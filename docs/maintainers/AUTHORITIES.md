@@ -13,11 +13,11 @@ does not establish freshness, validity, scale, or a passing verdict.
 The inventory is derived from:
 
 - `benchmarks/claims.json`
-- `docs/UPSTREAM_SURFACE_MAP.md`
-- `docs/COVERAGE_MATRIX.md`
-- `docs/PARITY_VALIDATION_PROGRAM.md`
-- `docs/INSTRUCTION_OPTIMIZER_FIDELITY.md`
-- `docs/RESEARCH_LANDSCAPE.md`
+- `docs/CONFORMANCE.md`
+- `docs/internal/COVERAGE_MATRIX.md`
+- `docs/internal/PARITY_VALIDATION_PROGRAM.md`
+- `docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md`
+- `docs/internal/RESEARCH_LANDSCAPE.md`
 
 Every family row maps the exact claim surface tokens it owns, upstream-surface
 ledger IDs, Coverage Matrix concepts, and Parity Validation Program lanes. A
@@ -105,7 +105,7 @@ open.
 
 The instruction optimizer authority is DSPy `3.3.0b1` at full commit
 `b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`. The following SHA-256 values are
-copied exactly from `docs/INSTRUCTION_OPTIMIZER_FIDELITY.md`:
+copied exactly from `docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md`:
 
 | Source | SHA-256 |
 | --- | --- |
@@ -159,7 +159,7 @@ scientific parity claims.
 
 Ax's selected implementation files are bound by
 `benchmarks/authority_sources/ax-23.0.0-eb5835e.json`; the executable scope and
-intentional native deviations are documented in `docs/AX_DIFFERENTIAL.md`.
+intentional native deviations are documented in `docs/internal/AX_DIFFERENTIAL.md`.
 
 ## Optimize Anything Protocol Pins
 

@@ -1,6 +1,8 @@
 defmodule Imp.ReproductionRegistryTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   alias Imp.ReproductionRegistry
 
   @registry "benchmarks/reproductions.json"

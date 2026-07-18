@@ -300,7 +300,13 @@ defmodule Imp.Optimizer.MIPROv2 do
     search_demos = if config.zeroshot, do: nil, else: demo_candidates
     space = categorical_space(predictors, instruction_candidates, search_demos)
     default_params = Map.new(space, fn {key, _choices} -> {key, 0} end)
-    baseline = evaluate(program, config.valset, optimizer)
+
+    baseline =
+      Imp.Telemetry.span(
+        [:imp, :optimizer, :trial],
+        %{optimizer: :mipro_v2, trial: 0, kind: :baseline},
+        fn -> evaluate(program, config.valset, optimizer) end
+      )
 
     policy =
       CategoricalPolicy
@@ -369,7 +375,18 @@ defmodule Imp.Optimizer.MIPROv2 do
     {params, policy} = SearchPolicy.suggest(state.policy, :candidate)
     candidate = apply_params(program, predictors, params, instructions, demos)
     {examples, rng} = trial_examples(config, state.rng)
-    result = evaluate(candidate, examples, optimizer)
+
+    result =
+      Imp.Telemetry.span(
+        [:imp, :optimizer, :trial],
+        %{
+          optimizer: :mipro_v2,
+          trial: trial,
+          kind: if(config.minibatch, do: :minibatch, else: :full)
+        },
+        fn -> evaluate(candidate, examples, optimizer) end
+      )
+
     policy = SearchPolicy.observe(policy, %{params: params, score: result.score})
     key = params_key(params)
     combo_scores = Map.update(state.combo_scores, key, [result.score], &[result.score | &1])
@@ -429,7 +446,13 @@ defmodule Imp.Optimizer.MIPROv2 do
 
       {_key, records} ->
         representative = hd(records)
-        result = evaluate(representative.program, config.valset, optimizer)
+
+        result =
+          Imp.Telemetry.span(
+            [:imp, :optimizer, :trial],
+            %{optimizer: :mipro_v2, trial: upstream_trial_num + 1, kind: :full_evaluation},
+            fn -> evaluate(representative.program, config.valset, optimizer) end
+          )
 
         policy =
           SearchPolicy.observe(state.policy, %{

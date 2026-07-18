@@ -158,7 +158,7 @@ defmodule Imp.UpstreamFidelityTest do
 
   test "checked-in readable projection reflects every executable ledger verdict" do
     report = Imp.UpstreamFidelity.report()
-    body = File.read!("docs/UPSTREAM_SURFACE_MAP.md")
+    body = File.read!("docs/CONFORMANCE.md")
 
     assert body =~ report.baseline.git_sha
 

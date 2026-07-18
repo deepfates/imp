@@ -449,7 +449,8 @@
       "surface_tokens": [
         "signature",
         "predict",
-        "chain_of_thought"
+        "chain_of_thought",
+        "history"
       ],
       "public_surfaces": [
         "Imp.Signature",
@@ -476,7 +477,9 @@
       "name": "Model/provider normalized runtime",
       "authority_family": "family.model_provider_runtime",
       "surface_tokens": [
-        "ReqLLM"
+        "ReqLLM",
+        "ReqLLMBatch",
+        "logprobs"
       ],
       "public_surfaces": [
         "Imp.LM",
@@ -712,7 +715,8 @@
       "authority_family": "family.composition_evaluation",
       "surface_tokens": [
         "evaluation",
-        "metrics"
+        "metrics",
+        "confidence"
       ],
       "public_surfaces": [
         "Imp.Assertion",
@@ -943,7 +947,8 @@
       "name": "InstructionSearch",
       "authority_family": "family.optimizer_instruction_search",
       "surface_tokens": [
-        "InstructionSearch"
+        "InstructionSearch",
+        "playbook"
       ],
       "public_surfaces": [
         "Imp.Optimizer.InstructionSearch"
@@ -1309,7 +1314,8 @@
       "surface_tokens": [
         "rag",
         "retrieval",
-        "retriever_protocol"
+        "retriever_protocol",
+        "embeddings"
       ],
       "public_surfaces": [
         "Imp.Retrieve",
@@ -1344,6 +1350,8 @@
         "concurrency",
         "signature_parse",
         "optimizer_scheduling",
+        "observability",
+        "telemetry",
         "redaction"
       ],
       "public_surfaces": [

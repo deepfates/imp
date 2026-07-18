@@ -133,7 +133,7 @@ evidence. These commands are not shipped as package APIs:
 
 Source-checkout maintainer aliases:
 
-- benchmark truth fixture harness tests through `mix benchmark.truth.check`
+- benchmark truth harness tests through `mix benchmark.truth.check`
 - provider-free Imp-vs-DSPy golden trace parity through
   `mix benchmark.trace.check`
 - overhead checks through `mix benchmark.overhead.check`
@@ -285,7 +285,9 @@ Stable event families:
 - `[:imp, :retriever, :start | :stop | :exception]`
 - `[:imp, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
 - `[:imp, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
-- `[:imp, :optimizer, :trial, :start | :stop | :exception]`
+- `[:imp, :optimizer, :trial, :start | :stop | :exception]` (RandomSearch,
+  COPRO, SIMBA, and MIPROv2 candidate evaluations)
+- `[:imp, :optimizer, :progress]` (GEPA generations)
 
 Event metadata is redacted before dispatch. Secret-shaped values and common
 secret keys are replaced with `[REDACTED]`.

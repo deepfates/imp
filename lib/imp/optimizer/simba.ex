@@ -352,7 +352,7 @@ defmodule Imp.Optimizer.SIMBA do
     {candidates, state} =
       build_candidates(analysis, state, optimizer, prompt_lm, optimizer.num_candidates + 1)
 
-    {evaluated, state} = evaluate_candidates(candidates, batch, state, optimizer)
+    {evaluated, state} = evaluate_candidates(candidates, batch, state, optimizer, step)
 
     winning_programs =
       case evaluated do
@@ -504,15 +504,23 @@ defmodule Imp.Optimizer.SIMBA do
     end)
   end
 
-  defp evaluate_candidates(candidates, batch, state, optimizer) do
+  defp evaluate_candidates(candidates, batch, state, optimizer, step) do
     examples = Enum.map(batch, &elem(&1, 1))
 
-    Enum.map_reduce(candidates, state, fn candidate, state ->
+    candidates
+    |> Enum.with_index()
+    |> Enum.map_reduce(state, fn {candidate, trial}, state ->
       trajectories =
-        TrajectoryRunner.run(candidate.program, examples, optimizer.metric,
-          max_concurrency: optimizer.max_concurrency,
-          timeout: optimizer.timeout,
-          runtime: :simba
+        Imp.Telemetry.span(
+          [:imp, :optimizer, :trial],
+          %{optimizer: :simba, step: step, trial: trial, batch_size: length(examples)},
+          fn ->
+            TrajectoryRunner.run(candidate.program, examples, optimizer.metric,
+              max_concurrency: optimizer.max_concurrency,
+              timeout: optimizer.timeout,
+              runtime: :simba
+            )
+          end
         )
 
       scores = Enum.map(trajectories, & &1.score)

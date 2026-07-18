@@ -9,7 +9,7 @@ defmodule DocumentationContractTest do
                                ])
 
   test "coverage matrix describes current evidence instead of closed planning tickets" do
-    body = File.read!("docs/COVERAGE_MATRIX.md")
+    body = File.read!("docs/internal/COVERAGE_MATRIX.md")
 
     refute_closed_ticket_refs(body)
     refute body =~ "integration gate should"
@@ -76,7 +76,7 @@ defmodule DocumentationContractTest do
   end
 
   test "parity validation program describes evidence lanes instead of ticket bookkeeping" do
-    body = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
+    body = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
     refute_closed_ticket_refs(body)
     refute body =~ "Ticket:"
@@ -84,7 +84,7 @@ defmodule DocumentationContractTest do
   end
 
   test "adapter fidelity audit names upstream semantics and Imp evidence" do
-    body = File.read!("docs/ADAPTER_FIDELITY.md")
+    body = File.read!("docs/internal/ADAPTER_FIDELITY.md")
     readme = File.read!("docs/README.md")
     contributing = File.read!("CONTRIBUTING.md")
 
@@ -98,10 +98,32 @@ defmodule DocumentationContractTest do
     assert body =~ "semantic: field names, delimiter structure, demo/history turn shape"
   end
 
-  test "user-facing docs name the executable Livebook proof" do
-    assert File.read!("README.md") =~ "mix livebook.execute.check"
-    assert File.read!("docs/README.md") =~ "mix livebook.execute.check"
+  test "the executable Livebook proof stays off the reader's front doors" do
+    refute File.read!("README.md") =~ "mix livebook.execute.check"
+    refute File.read!("docs/README.md") =~ "mix livebook.execute.check"
+    assert File.read!("CONTRIBUTING.md") =~ "mix livebook.execute.check"
     assert File.read!("docs/PRODUCTION_OPERATIONS.md") =~ "mix livebook.execute.check"
+  end
+
+  test "internal process vocabulary stays off user surfaces" do
+    # CONFORMANCE.md is the receipts appendix, promoted from the conformance
+    # program; evidence vocabulary ("authority", "differential") is its
+    # subject matter, not a leak.
+    user_surfaces =
+      ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")] --
+        ["docs/CONFORMANCE.md"]
+
+    # "differential" left off the ban list deliberately: "executable
+    # differential tests" is the public conformance claim, not process vocab.
+    banned = ~r/\bC1\b|authorit|\badmitted\b|tranche|fixture/i
+
+    offenders =
+      for path <- user_surfaces,
+          match = Regex.run(banned, File.read!(path)),
+          do: {path, hd(match)}
+
+    assert offenders == [],
+           "internal vocabulary leaked onto user surfaces: #{inspect(offenders)}"
   end
 
   test "learner-facing docs do not foreground maintainer evidence commands" do
@@ -112,17 +134,22 @@ defmodule DocumentationContractTest do
     refute learner_text =~ "mix evidence.check"
   end
 
-  test "README routes onboarding into the executable canonical learning path" do
+  test "README opens with a real provider call and routes into the learning path" do
     readme = File.read!("README.md")
     learning = File.read!("docs/LEARNING_PATH.md")
     docs = File.read!("docs/README.md")
 
-    assert readme =~ "Program your LMs on the BEAM"
-    assert readme =~ "Imp.LM.Static"
+    assert readme =~ "two kinds of intelligence"
+    assert readme =~ "Imp.req_llm"
+    assert readme =~ "OPENAI_API_KEY"
     assert readme =~ "docs/LEARNING_PATH.md"
-    assert readme =~ "test/learning_path_contract_test.exs"
+    assert readme =~ "docs/TUTORIAL_TICKET_ROUTING.md"
+    # The front door shows a real model call, never the deterministic test double.
+    refute readme =~ "Imp.LM.Static"
+    # No quality-gate plumbing on the front door.
+    refute readme =~ "test/learning_path_contract_test.exs"
     assert learning =~ "Imp.context/2"
-    assert learning =~ "OPENAI_MODEL"
+    assert learning =~ "Imp.LM.Static"
     assert docs =~ "livebooks/01_real_lm_front_door.livemd"
     refute readme =~ "05_real_lm_wow_path"
   end
@@ -131,9 +158,9 @@ defmodule DocumentationContractTest do
     readme = File.read!("README.md")
     docs = File.read!("docs/README.md")
     api = File.read!("docs/API_GUIDE.md")
-    philosophy = File.read!("docs/IMP_PHILOSOPHY.md")
+    philosophy = File.read!("docs/PHILOSOPHY.md")
 
-    assert readme =~ "canonical, self-contained route"
+    assert readme =~ "Learning Path"
     assert docs =~ "## Manual Spine"
     assert readme =~ "docs/LEARNING_PATH.md"
     assert docs =~ "[01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)"
@@ -240,7 +267,7 @@ defmodule DocumentationContractTest do
 
   test "API guide keeps protocol clients out of the normal provider path" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
+    advanced = File.read!("docs/internal/ADVANCED.md")
 
     assert api =~ "The normal provider path for inference is `Imp.req_llm/2`"
     assert api =~ "Advanced Protocol Clients"
@@ -263,9 +290,9 @@ defmodule DocumentationContractTest do
 
   test "GEPA documentation distinguishes the canonical program and artifact surfaces" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
-    coverage = File.read!("docs/COVERAGE_MATRIX.md")
-    parity = File.read!("docs/PARITY_VALIDATION_PROGRAM.md")
+    advanced = File.read!("docs/internal/ADVANCED.md")
+    coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
+    parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
     assert api =~ "## Optimize Arbitrary Artifacts"
     assert api =~ "is the sole Optimize Anything\nentry point"
@@ -274,14 +301,14 @@ defmodule DocumentationContractTest do
     assert api =~ "reject malformed\nvalues when the optimizer is built or run"
     assert advanced =~ "public frontend delegates to the production GEPA engine"
     assert advanced =~ "Current implementation fidelity is pinned to GEPA v0.1.4"
-    assert advanced =~ "v0.1.1\ncheckout remains a historical structural differential"
+    assert advanced =~ "earlier comparisons\nagainst the v0.1.1 checkout are kept as history"
     assert coverage =~ "GEPA-style reflection"
     assert parity =~ "GEPA-style optimizer rows"
   end
 
   test "instruction optimizer docs define durable run-level resume boundaries" do
     api = File.read!("docs/API_GUIDE.md")
-    fidelity = File.read!("docs/INSTRUCTION_OPTIMIZER_FIDELITY.md")
+    fidelity = File.read!("docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md")
 
     assert api =~ "`max_trials:` and the compile-time `max_steps:` cap only the new work"
     assert api =~ "Completed boundaries are not replayed"
@@ -294,7 +321,7 @@ defmodule DocumentationContractTest do
 
   test "embedding documentation names the deterministic baseline and provider shape contract" do
     api = File.read!("docs/API_GUIDE.md")
-    coverage = File.read!("docs/COVERAGE_MATRIX.md")
+    coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
 
     assert api =~ "BagOfWords` is deterministic and local"
     assert api =~ "Production semantic embeddings"
@@ -545,7 +572,7 @@ defmodule DocumentationContractTest do
 
     program = Imp.predict("question -> answer", lm: lm)
 
-    assert Imp.Streaming.stream(program, %{question: "q"}) |> Enum.to_list() == [
+    assert Imp.stream(program, %{question: "q"}) |> Enum.to_list() == [
              "P",
              "a",
              "r",

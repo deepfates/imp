@@ -1,6 +1,8 @@
 defmodule GoldenTraceTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   import ExUnit.CaptureIO
 
   @fixtures "test/fixtures/golden_trace/cases.json"

@@ -50,84 +50,6 @@ For a runnable real-provider walkthrough, open
 `livebooks/01_real_lm_front_door.livemd`. It is the best first stop after this
 guide when you want the "this is actually an LM program" moment.
 
-### Run A Resumable Provider Batch
-
-Use `Imp.Clients.ReqLLMBatch` when a collection of independent provider calls
-must survive process or host restarts. Each request needs a stable, unique ID
-and a JSON-safe payload. The callback is provider-neutral and reports an
-explicit outcome so retry policy does not depend on provider-specific structs:
-
-```elixir
-alias Imp.Clients.ReqLLMBatch
-
-requests = [
-  %{id: "question-001", payload: %{question: "Capital of France?"}},
-  %{id: "question-002", payload: %{question: "Capital of Italy?"}}
-]
-
-dispatch = fn request, _context ->
-  case MyProvider.complete(request.payload, idempotency_key: request.id) do
-    {:ok, output} -> {:ok, output}
-    {:error, :rate_limited} -> {:transient, :rate_limited}
-    {:error, :unauthorized} -> {:terminal, :unauthorized}
-    {:error, reason} -> {:malformed, reason}
-  end
-end
-
-{:ok, summary} =
-  ReqLLMBatch.run(requests, dispatch,
-    checkpoint: "var/question-batch.json",
-    max_concurrency: 4,
-    max_attempts: 3
-  )
-```
-
-Only `:transient` outcomes retry, and every dispatch consumes an attempt. A
-callback exception, throw, task exit, or timeout is recorded as transient.
-`:terminal` and `:malformed` outcomes do not retry. `validate_output:` can turn
-an otherwise successful return into a malformed outcome at the commit boundary.
-
-The checkpoint records append-only request, dispatch-intent, outcome, and
-resume-reconciliation events. Each update is written to a synced temporary file
-and atomically renamed. Resume uses the persisted request order, attempt counts,
-and retry limit:
-
-Checkpoints contain the JSON-safe request payloads, provider outputs, and failure
-details needed for audit and resume. Treat the checkpoint directory as
-application data: restrict access, apply the application's retention policy, and
-do not place credentials in request payloads.
-
-```elixir
-{:ok, summary} =
-  ReqLLMBatch.resume("var/question-batch.json", dispatch,
-    max_concurrency: 4
-  )
-```
-
-A committed success is never replayed. If a checkpoint contains a dispatch
-intent without a committed outcome, resume marks that request `:ambiguous` and
-does not send it again. Resolve that state using provider-side idempotency or
-reconciliation before starting a new request; Imp deliberately cannot infer
-whether the remote provider accepted an interrupted call.
-
-For ReqLLM, the included adapter works with any model spec supported by the
-client. Its default classification treats ReqLLM errors as transient; use a
-custom callback when application knowledge can classify errors more narrowly.
-
-```elixir
-client = Imp.Clients.ReqLLM.new("gemini:gemini-2.5-flash", api_key: api_key)
-dispatch = ReqLLMBatch.req_llm_dispatcher(client, temperature: 0)
-
-requests = [
-  %{
-    id: "question-001",
-    payload: %{messages: [%{role: :user, content: "Capital of France?"}]}
-  }
-]
-
-ReqLLMBatch.run(requests, dispatch, checkpoint: "var/req-llm-batch.json")
-```
-
 ## Basic Predict
 
 ```elixir
@@ -270,6 +192,8 @@ order, process-local settings, feedback, metric metadata, and error budgeting.
 | `Imp.parallel/3` | You want supervised concurrent batch calls with one result per input. |
 | `Imp.knn/3`, `Imp.nearest/2` | You want nearest-neighbor examples from a local trainset. |
 | `Imp.react/3` | The model should choose tools and then submit a validated answer. |
+| `Imp.react_v2/3` | You need native parallel tool calls with truthful IDs in history, and failed tools recorded as observations instead of aborts. |
+| `Imp.avatar/3` | You want one typed action per turn, with each tool isolated under its own timeout. |
 | `Imp.program_of_thought/2` | The model should write small sandboxed Elixir snippets. |
 | `Imp.code_act/3` | You want interleaved tool/code execution under a policy. |
 | `Imp.rlm/2` | You need a bounded recursive controller for large-context exploration. |
@@ -324,11 +248,38 @@ one_word =
 {Imp.get(constrained, :answer), Imp.get(constrained, :assertion_score)}
 ```
 
-`Imp.multi_chain_comparison/2` is useful when candidate completions are
-already available:
+For self-consistency workflows — run a program several times, keep the most
+common answer — `Imp.majority/2` votes on a field across predictions.
+Values are trimmed and downcased before grouping (pass `normalize:` for a
+custom grouping function), and ties keep the first value from the winning
+group:
 
 ```elixir
-chooser = Imp.multi_chain_comparison("question -> answer", lm: lm, m: 2)
+predictions = [
+  Imp.prediction(answer: "4"),
+  Imp.prediction(answer: " 4"),
+  Imp.prediction(answer: "5")
+]
+
+Imp.majority(predictions, field: :answer)
+#=> "4"
+```
+
+`Imp.multi_chain_comparison/2` is useful when candidate completions are
+already available. The comparison step adds a required `rationale` output to
+the signature, so the model (scripted here) must return that field too:
+
+```elixir
+mcc_lm = %{
+  module: Imp.LM.Static,
+  opts: [
+    handler: fn _messages, _opts ->
+      %{rationale: "both candidates compute 2+2 directly", answer: "4"}
+    end
+  ]
+}
+
+chooser = Imp.multi_chain_comparison("question -> answer", lm: mcc_lm, m: 2)
 
 Imp.call(chooser, %{
   question: "2+2?",
@@ -426,6 +377,78 @@ signature =
     "question -> verdict: yes_no, amount: numeric_span, answer: short_span",
     "Extract only the requested answer fields."
   )
+```
+
+## Streaming
+
+`Imp.stream/3` returns an Enumerable of chunks from one program
+call, and `Imp.collect/3` joins a stream back into a string —
+returning `{:error, reason}` rather than partial output if any chunk fails.
+
+With a ReqLLM-backed LM and `provider_stream: true`, chunks arrive from the
+provider as it generates: answer text as strings, provider-native thinking as
+`%{reasoning: text}` chunks tagged `metadata.type == :reasoning`, and tool
+calls as `%{tool_calls: [...]}` chunks (see Chain Of Thought above).
+
+```elixir
+lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+program = Imp.predict("question -> answer", lm: lm)
+
+program
+|> Imp.stream(%{question: "Name the Galilean moons."}, provider_stream: true)
+|> Enum.each(&IO.write(if is_binary(&1), do: &1, else: ""))
+```
+
+In a LiveView, run the stream in a supervised task and send chunks to the
+view — a sketch of the shape:
+
+```elixir
+def handle_event("ask", %{"q" => q}, socket) do
+  view = self()
+
+  Task.Supervisor.start_child(MyApp.TaskSupervisor, fn ->
+    MyApp.Router.program()
+    |> Imp.stream(%{question: q}, provider_stream: true)
+    |> Enum.each(&send(view, {:answer_chunk, &1}))
+
+    send(view, :answer_done)
+  end)
+
+  {:noreply, assign(socket, answer: "")}
+end
+
+def handle_info({:answer_chunk, text}, socket) when is_binary(text) do
+  {:noreply, update(socket, :answer, &(&1 <> text))}
+end
+```
+
+Programs that cannot provider-stream (and any program without
+`provider_stream: true`) degrade honestly: the call runs once and the result
+is chunked locally, so stream consumers keep working. That is also the
+testing story — a scripted model streams through the same interface:
+
+```elixir
+lm = %{
+  module: Imp.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+}
+
+program = Imp.predict("question -> answer", lm: lm)
+
+Imp.stream(program, %{question: "q"}) |> Enum.to_list()
+#=> ["P", "a", "r", "i", "s"]
+```
+
+Pass `chunker: fn text -> [...] end` to control local chunking.
+`Imp.Streaming.incremental_fields/2` is the lower-level parser that turns
+delimiter-marked chunk sequences into per-field increments:
+
+```elixir
+Imp.Streaming.incremental_fields(
+  ["[[ ## answer ## ]]Paris", "[[ ## rationale ## ]]lookup"],
+  "question -> answer, rationale"
+)
+#=> [%{field: :answer, value: "Paris"}, %{field: :rationale, value: "lookup"}]
 ```
 
 ## Examples And Demos
@@ -542,6 +565,26 @@ should be injected behind the `Imp.Embeddings` behaviour so credentials,
 network calls, and model choice stay explicit. Any provider must return exactly
 one numeric vector for each input text, in the same order.
 
+## Datasets
+
+`Imp.Datasets` turns records you already have into example lists: 
+`from_records/3` for in-memory data, `jsonl/3` and `csv/3` for files, and
+`split/2` for a shuffled train/dev split. Benchmark-shaped loaders —
+`Imp.Datasets.GSM8K`, `HotPotQA`, `MATH`, `Colors` — read files in those
+datasets' formats from paths you supply; nothing is downloaded for you.
+
+```elixir
+examples =
+  Imp.Datasets.from_records(
+    [%{question: "Capital of France?", answer: "Paris"}],
+    [:question]
+  )
+```
+
+Every loader returns `Imp.Example` values with inputs already marked, ready
+for `Imp.evaluate/4` and the optimizers. `Imp.Datasets.GSM8K.metric/3` is the
+exact-match metric that benchmark conventionally uses.
+
 ## Optimize A Program
 
 ```elixir
@@ -596,7 +639,7 @@ Use:
 | `RandomSearch` / `BootstrapRS` | You want a small deterministic baseline search over demo sets. |
 | `InstructionSearch` / `InferRules` / `COPRO` | Instructions or signature-level rules are the likely bottleneck. |
 | `MIPROv2` / `SIMBA` | You want broader instruction/demo search with stronger evaluation discipline. |
-| `GEPA` | You want Imp-native GEPA-style reflection over program instructions, with comparative claims handled by the parity gates. |
+| `GEPA` | You want reflective instruction evolution, where the optimizer reads text feedback from your metric and rewrites instructions between candidates. |
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
 
@@ -881,8 +924,7 @@ Use `Imp.react_v2/3` when native multi-turn tool history and parallel calls are
 required. ReActV2 preserves call/result IDs in `Imp.History`, records unknown
 and failing tools as observations instead of aborting, and forces one final
 `submit` call when the normal loop ends. Existing `Imp.react/3` retains its
-fail-fast behavior. The pinned source mapping and deliberate Imp policy/redaction
-extensions are documented in `docs/REACT_V2_FIDELITY.md`.
+fail-fast behavior.
 
 ### Tool Call Primitives
 
@@ -906,6 +948,22 @@ ordinary `%{role: :assistant, tool_calls: calls}` message boundary, and provider
 streaming exposes tool-call chunks as `%{tool_calls: [...]}` stream chunks.
 
 ## Agents
+
+Imp has several action patterns because agents fail in several ways, and each
+pattern buys a different safety trade. `Imp.react/3` is the upstream-shaped
+tool loop: provider tool calls, a reserved `submit` that validates the final
+answer, fail-fast on unknown tools. `Imp.react_v2/3` is the native-calling
+loop: parallel tool calls keep their IDs in history, unknown or failing tools
+become observations instead of aborting the run, and a final `submit` is
+forced if the loop ends without output. `Imp.avatar/3` takes one typed action
+per turn and runs each tool in an isolated task under `:tool_timeout_ms`, so
+one hung tool cannot hang the run. `Imp.code_act/3` and
+`Imp.program_of_thought/2` move the action into sandboxed Elixir code, and
+`Imp.rlm/2` gives a controller model a budgeted recursive sandbox. `Imp.Agent`
+below is the explicit runtime — ordinary structs with tools, child agents,
+memory, policies, and event streams — for when you want to own the loop
+yourself. Start with `react/3`; move along the spectrum when a failure mode
+demands it.
 
 ```elixir
 tool = Imp.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
@@ -960,9 +1018,87 @@ policies for anything with side effects.
 The normal provider path for inference is `Imp.req_llm/2`. Imp also ships
 explicit protocol clients for application boundaries that are not ordinary LM
 inference: HTTP retrievers, MCP transports, and provider training jobs. Those
-clients are documented in [Advanced Imp](ADVANCED.md) and
+clients are documented in [Advanced Imp](internal/ADVANCED.md) and
 [Production Operations](PRODUCTION_OPERATIONS.md) because they require explicit
 service ownership, credentials, payload contracts, and protocol-specific tests.
+
+## Resumable Provider Batches
+
+Use `Imp.Clients.ReqLLMBatch` when a collection of independent provider calls
+must survive process or host restarts. Each request needs a stable, unique ID
+and a JSON-safe payload. The callback is provider-neutral and reports an
+explicit outcome so retry policy does not depend on provider-specific structs:
+
+```elixir
+alias Imp.Clients.ReqLLMBatch
+
+requests = [
+  %{id: "question-001", payload: %{question: "Capital of France?"}},
+  %{id: "question-002", payload: %{question: "Capital of Italy?"}}
+]
+
+dispatch = fn request, _context ->
+  case MyProvider.complete(request.payload, idempotency_key: request.id) do
+    {:ok, output} -> {:ok, output}
+    {:error, :rate_limited} -> {:transient, :rate_limited}
+    {:error, :unauthorized} -> {:terminal, :unauthorized}
+    {:error, reason} -> {:malformed, reason}
+  end
+end
+
+{:ok, summary} =
+  ReqLLMBatch.run(requests, dispatch,
+    checkpoint: "var/question-batch.json",
+    max_concurrency: 4,
+    max_attempts: 3
+  )
+```
+
+Only `:transient` outcomes retry, and every dispatch consumes an attempt. A
+callback exception, throw, task exit, or timeout is recorded as transient.
+`:terminal` and `:malformed` outcomes do not retry. `validate_output:` can turn
+an otherwise successful return into a malformed outcome at the commit boundary.
+
+The checkpoint records append-only request, dispatch-intent, outcome, and
+resume-reconciliation events. Each update is written to a synced temporary file
+and atomically renamed. Resume uses the persisted request order, attempt counts,
+and retry limit:
+
+Checkpoints contain the JSON-safe request payloads, provider outputs, and failure
+details needed for audit and resume. Treat the checkpoint directory as
+application data: restrict access, apply the application's retention policy, and
+do not place credentials in request payloads.
+
+```elixir
+{:ok, summary} =
+  ReqLLMBatch.resume("var/question-batch.json", dispatch,
+    max_concurrency: 4
+  )
+```
+
+A committed success is never replayed. If a checkpoint contains a dispatch
+intent without a committed outcome, resume marks that request `:ambiguous` and
+does not send it again. Resolve that state using provider-side idempotency or
+reconciliation before starting a new request; Imp deliberately cannot infer
+whether the remote provider accepted an interrupted call.
+
+For ReqLLM, the included adapter works with any model spec supported by the
+client. Its default classification treats ReqLLM errors as transient; use a
+custom callback when application knowledge can classify errors more narrowly.
+
+```elixir
+client = Imp.Clients.ReqLLM.new("gemini:gemini-2.5-flash", api_key: api_key)
+dispatch = ReqLLMBatch.req_llm_dispatcher(client, temperature: 0)
+
+requests = [
+  %{
+    id: "question-001",
+    payload: %{messages: [%{role: :user, content: "Capital of France?"}]}
+  }
+]
+
+ReqLLMBatch.run(requests, dispatch, checkpoint: "var/req-llm-batch.json")
+```
 
 ## RLM
 
@@ -1117,24 +1253,3 @@ compiled few-shot and ensemble graphs, callback wrappers, agents, and RAG
 programs backed by `Imp.memory/2`. External service clients remain host-owned.
 Functions and tool closures must have stable names in a supplied registry; an
 unregistered closure fails during dumping instead of entering the artifact.
-
-## Streaming
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-program = Imp.predict("question -> answer", lm: lm)
-
-Imp.Streaming.stream(program, %{question: "q"}) |> Enum.to_list()
-
-Imp.Streaming.incremental_fields(
-  ["[[ ## answer ## ]]Paris", "[[ ## rationale ## ]]lookup"],
-  "question -> answer, rationale"
-)
-```
-
-Provider streaming and delimiter-based field parsing are covered through
-injectable transports and deterministic chunk fixtures.

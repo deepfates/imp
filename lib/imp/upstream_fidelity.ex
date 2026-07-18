@@ -178,7 +178,7 @@ defmodule Imp.UpstreamFidelity do
       invariants: ["stable DSPy remains the release baseline until 3.3 is final"],
       evidence: %{
         tests: ["test/req_llm_client_test.exs"],
-        docs: ["docs/UPSTREAM_FIDELITY_AUDIT.md"]
+        docs: ["docs/internal/UPSTREAM_FIDELITY_AUDIT.md"]
       }
     },
     %{
@@ -201,7 +201,7 @@ defmodule Imp.UpstreamFidelity do
       ],
       evidence: %{
         tests: ["test/production_adapter_persistence_test.exs", "test/golden_trace_test.exs"],
-        docs: ["docs/ADAPTER_FIDELITY.md", "docs/API_GUIDE.md"]
+        docs: ["docs/internal/ADAPTER_FIDELITY.md", "docs/API_GUIDE.md"]
       }
     },
     %{
@@ -215,7 +215,7 @@ defmodule Imp.UpstreamFidelity do
       invariants: ["encoding support is not evidence of model reasoning quality"],
       evidence: %{
         tests: ["test/multimodal_adapter_test.exs", "test/multimodal_quality_benchmark_test.exs"],
-        docs: ["docs/API_GUIDE.md", "docs/MULTIMODAL_FIDELITY.md"],
+        docs: ["docs/API_GUIDE.md", "docs/internal/MULTIMODAL_FIDELITY.md"],
         missing: ["audio quality remains an unsupported claim rather than an implied capability"]
       }
     },
@@ -268,7 +268,7 @@ defmodule Imp.UpstreamFidelity do
           "test/completion_surface_test.exs",
           "test/live_provider_e2e_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "docs/REACT_V2_FIDELITY.md"]
+        docs: ["docs/API_GUIDE.md", "docs/internal/REACT_V2_FIDELITY.md"]
       }
     },
     %{
@@ -298,7 +298,7 @@ defmodule Imp.UpstreamFidelity do
         docs: [
           "docs/API_GUIDE.md",
           "docs/ARCHITECTURE.md",
-          "docs/RLM_FIDELITY.md",
+          "docs/internal/RLM_FIDELITY.md",
           "livebooks/04_tools_agents_mcp_rlm.livemd"
         ],
         missing: [
@@ -400,7 +400,7 @@ defmodule Imp.UpstreamFidelity do
           "test/optimizer_behavioral_corpus_test.exs",
           "test/optimizer_lift_artifact_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "docs/BENCHMARK_TRUTH.md"]
+        docs: ["docs/API_GUIDE.md", "docs/internal/BENCHMARK_TRUTH.md"]
       }
     },
     %{
@@ -466,7 +466,7 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_contract_artifact_test.exs",
           "test/gepa_replication_artifact_test.exs"
         ],
-        docs: ["docs/ADVANCED.md", "docs/RESEARCH_LANDSCAPE.md"],
+        docs: ["docs/internal/ADVANCED.md", "docs/internal/RESEARCH_LANDSCAPE.md"],
         missing: [
           "C2 matched upstream differential evidence",
           "C3 matched live-provider evidence",
@@ -519,9 +519,9 @@ defmodule Imp.UpstreamFidelity do
           "test/public_surface_test.exs"
         ],
         docs: [
-          "docs/ADVANCED.md",
-          "docs/COVERAGE_MATRIX.md",
-          "docs/UPSTREAM_FIDELITY_AUDIT.md"
+          "docs/internal/ADVANCED.md",
+          "docs/internal/COVERAGE_MATRIX.md",
+          "docs/internal/UPSTREAM_FIDELITY_AUDIT.md"
         ],
         artifacts: [
           "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
@@ -567,7 +567,7 @@ defmodule Imp.UpstreamFidelity do
           "test/fast_slow_runner_test.exs",
           "test/fast_slow_campaign_test.exs"
         ],
-        docs: ["docs/RESEARCH_LANDSCAPE.md", "docs/API_GUIDE.md"],
+        docs: ["docs/internal/RESEARCH_LANDSCAPE.md", "docs/API_GUIDE.md"],
         missing: [
           "external-provider CISPO execution and model-artifact evidence",
           "matched prompt-only, slow-only, and combined provider effectiveness",
@@ -606,7 +606,7 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_module_selector_test.exs",
           "test/gepa_evaluation_cache_backend_test.exs"
         ],
-        docs: ["docs/ADVANCED.md", "docs/BENCHMARK_TRUTH.md"],
+        docs: ["docs/internal/ADVANCED.md", "docs/internal/BENCHMARK_TRUTH.md"],
         missing: ["paper-scale upstream comparison"]
       }
     },
@@ -669,7 +669,7 @@ defmodule Imp.UpstreamFidelity do
           "test/task_supervision_test.exs",
           "test/production_hardening_test.exs"
         ],
-        docs: ["docs/ARCHITECTURE.md", "docs/PARITY_VALIDATION_PROGRAM.md"]
+        docs: ["docs/ARCHITECTURE.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md"]
       }
     },
     %{

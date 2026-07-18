@@ -141,7 +141,12 @@ defmodule Imp.Optimizer.RandomSearch do
         {program, source_metadata} =
           candidate_program(student, trainset, teacher, optimizer, seed, labeled_sample)
 
-        result = evaluate!(program, valset, optimizer)
+        result =
+          Imp.Telemetry.span(
+            [:imp, :optimizer, :trial],
+            %{optimizer: :random_search, trial: evaluation_order, seed: seed},
+            fn -> evaluate!(program, valset, optimizer) end
+          )
 
         record =
           Map.merge(source_metadata, %{

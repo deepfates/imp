@@ -1,5 +1,12 @@
 defmodule Imp.Agent.Runtime do
-  @moduledoc "Runtime sessions, context references, and traces for agents."
+  @moduledoc """
+  Runtime sessions, context references, and traces for agents.
+
+  Trace events are delivered to the optional `:event_sink`. A sink that raises,
+  throws, or exits does not abort the agent run, but the failure is never
+  silent: it is logged through `Imp.Observability.log/3` and emitted as an
+  `[:imp, :agent, :event_sink, :exception]` telemetry event.
+  """
 
   defstruct context: %{},
             memory: %{},
@@ -66,7 +73,29 @@ defmodule Imp.Agent.Runtime do
     sink.(event)
     :ok
   rescue
-    _exception -> :ok
+    exception -> surface_sink_failure(event, Exception.message(exception))
+  catch
+    kind, reason -> surface_sink_failure(event, inspect({kind, reason}))
+  end
+
+  # An event sink is an observer: a crashing sink must not abort the agent run,
+  # but it must never fail invisibly. Surface the failure through Imp-scoped
+  # logging and the `[:imp, :agent, :event_sink, :exception]` telemetry event
+  # (same convention as `[:imp, :tool, :exception]`).
+  defp surface_sink_failure(event, message) do
+    Imp.Observability.log(
+      :error,
+      "Imp.Agent.Runtime event sink raised: #{message}",
+      event_type: Map.get(event, :type)
+    )
+
+    Imp.Telemetry.execute(
+      [:imp, :agent, :event_sink, :exception],
+      %{},
+      %{error: message, event: event}
+    )
+
+    :ok
   end
 
   def validate_event_sink(nil), do: {:ok, nil}

@@ -15,6 +15,13 @@ raw model output back into a `Imp.Prediction`.
 Use `Imp.Adapter.Chat` for readable field-labelled text. Use
 `Imp.Adapter.JSON` when output shape matters.
 
+## Artifact
+
+An artifact is a saved program: a checksummed JSON file produced by
+`Imp.save!/2` and loaded with `Imp.load!/1`. It carries the program shape,
+instructions, and demos — never provider credentials. Review and version it
+like the deployable state it is.
+
 ## Demo
 
 A demo is an example attached to a program so the model can see the desired
@@ -67,6 +74,12 @@ Example:
 ```elixir
 Imp.signature("question -> answer: short_span")
 ```
+
+## Test Set
+
+A test set (held-out set) is data that nothing selected against: not the
+optimizer, not you while iterating. Its score is the only honest answer to
+"did this get better?"
 
 ## Trace
 

@@ -9,15 +9,29 @@ concurrency:
   group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
+# The four gates run as parallel jobs so wall-clock ~= the slowest gate
+# (production.check). Only production.check needs the pinned Python/Deno
+# reference environments: the DSPy parity / reference-runtime differential
+# tests live in the root test suite it runs. integration/protocol/quality
+# touch no external runtimes, so those jobs stay light.
+#
+# All jobs share one deps/_build cache key (via .github/actions/elixir-setup).
+# On a cold key the jobs race to save it; first writer wins and the losers
+# log a harmless "unable to reserve cache" warning. A dedicated seed job was
+# considered and rejected: the three light gates finish in seconds, so a seed
+# job would only lengthen the critical path.
+
 jobs:
-  test:
+  production:
+    name: production.check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: erlef/setup-beam@v1
         with:
-          otp-version: "28"
-          elixir-version: "1.19"
+          # Full history: the source-binding evidence validators resolve
+          # ancestor SHAs and fail on a shallow checkout.
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -29,14 +43,39 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.8.3
-      - run: mix local.hex --force
-      - run: mix deps.get
       - name: Install pinned reference runtimes
         run: |
           PYTHON=python3.12 scripts/setup_dspy_parity_env.sh
           PYTHON=python3.12 scripts/setup_dspy_current_target.sh
           PYTHON=python3.12 scripts/setup_reference_test_env.sh
       - run: mix production.check
+
+  integration:
+    name: integration.check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
       - run: mix integration.check
+
+  protocol:
+    name: protocol.check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
       - run: mix protocol.check
+
+  quality:
+    name: quality.check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
       - run: mix quality.check
