@@ -280,24 +280,28 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_field_list(fields) do
+    # Byte-faithful to DSPy's get_field_description_string (dspy/adapters/
+    # utils.py): each field renders `N. \`name\` (type): {desc}` with the
+    # colon-space always present, then the whole group is stripped — so a
+    # field with no description keeps its trailing space only when it is not
+    # the last line in its group. (epic dee-8zev / dee-l9vm, dee-qtzk)
     fields
     |> Enum.with_index(1)
     |> Enum.map(fn {field, index} ->
-      desc = field_description(field)
-      "#{index}. `#{field.name}` (#{field_type(field.type)}):#{desc}"
+      "#{index}. `#{field.name}` (#{field_type(field.type)}): #{field_description(field)}"
     end)
     |> Enum.join("\n")
+    |> String.trim()
   end
 
   defp field_description(field) do
-    parts =
-      [field.desc, answer_shape_instruction(field)]
-      |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    # DSPy renders a description equal to the "${name}" placeholder (the
+    # ChainOfThought reasoning sentinel) as empty; match that exactly.
+    desc = if field.desc == "${#{field.name}}", do: nil, else: field.desc
 
-    case parts do
-      [] -> ""
-      parts -> " " <> Enum.join(parts, " ")
-    end
+    [desc, answer_shape_instruction(field)]
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.join(" ")
   end
 
   defp answer_shape_instruction(field) do
@@ -334,17 +338,41 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_interaction_template(signature) do
-    (signature.inputs ++ signature.outputs)
-    |> Enum.map(fn field ->
-      """
-      [[ ## #{field.name} ## ]]
-      {#{field.name}}
-      """
-      |> String.trim()
-    end)
+    # DSPy 3.2.1 ChatAdapter.format_field_structure renders each field's value
+    # placeholder via translate_field_type: input fields (and str/Reasoning
+    # outputs) get no note; typed OUTPUT fields get an 8-space-indented
+    # "# note: the value you produce ..." suffix. Match it exactly (dee-3zun).
+    input_lines = Enum.map(signature.inputs, &interaction_field_line(&1, ""))
+    output_lines = Enum.map(signature.outputs, &interaction_field_line(&1, structure_type_note(&1)))
+
+    (input_lines ++ output_lines)
     |> Kernel.++(["[[ ## completed ## ]]"])
     |> Enum.join("\n\n")
   end
+
+  defp interaction_field_line(field, note) do
+    """
+    [[ ## #{field.name} ## ]]
+    {#{field.name}}#{note}
+    """
+    |> String.trim()
+  end
+
+  # Faithful to DSPy 3.2.1 dspy/adapters/utils.py translate_field_type: the note
+  # text keyed on the field's Python type. Emitted only for output fields.
+  defp structure_type_note(field) do
+    case field_type(field.type) do
+      "str" -> ""
+      "bool" -> structure_note("must be True or False")
+      "int" -> structure_note("must be a single int value")
+      "float" -> structure_note("must be a single float value")
+      # Imp's scalar type system stops here; enum/Literal/pydantic notes (DSPy's
+      # remaining branches) arrive when Imp grows those types (dee-3zun follow-up).
+      _ -> ""
+    end
+  end
+
+  defp structure_note(desc), do: String.duplicate(" ", 8) <> "# note: the value you produce " <> desc
 
   defp field_type(:string), do: "str"
   defp field_type(:integer), do: "int"
@@ -379,16 +407,24 @@ defmodule Imp.Adapter.Chat do
   defp render_response_instruction(_signature, false), do: ""
 
   defp render_response_instruction(signature, true) do
-    outputs = Enum.map(signature.outputs, &"`[[ ## #{&1.name} ## ]]`")
+    # Byte-faithful to DSPy 3.2.1 ChatAdapter.user_message_output_requirements:
+    # always singular "the field ", then every output marker joined with
+    # ", then ", each carrying a Python-type note for non-str fields.
+    # (epic dee-8zev / dee-l9vm, dee-3zun)
+    markers =
+      signature.outputs
+      |> Enum.map(fn field -> "`[[ ## #{field.name} ## ]]`" <> output_type_info(field) end)
+      |> Enum.join(", then ")
 
-    final =
-      case outputs do
-        [] -> "the output fields"
-        [one] -> "the field #{one}"
-        many -> "the fields " <> Enum.join(many, ", then ")
-      end
+    "\n\nRespond with the corresponding output fields, starting with the field " <>
+      markers <> ", and then ending with the marker for `[[ ## completed ## ]]`."
+  end
 
-    "\n\nRespond with the corresponding output fields, starting with #{final}, and then ending with the marker for `[[ ## completed ## ]]`."
+  defp output_type_info(field) do
+    case field_type(field.type) do
+      "str" -> ""
+      type_name -> " (must be formatted as a valid Python #{type_name})"
+    end
   end
 
   defp append_content(content, ""), do: content
