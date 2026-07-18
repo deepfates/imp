@@ -210,13 +210,13 @@ defmodule ClaimsInventoryTest do
     assert get_in(random, ["requirements", Access.at(0), "lane"]) ==
              "random_search_differential"
 
-    assert Enum.any?(bootstrap["sources"], &String.contains?(&1, "8afbb2c4"))
-    assert Enum.any?(random["sources"], &String.contains?(&1, "da944120"))
+    assert Enum.any?(bootstrap["sources"], &String.contains?(&1, "90348d4b"))
+    assert Enum.any?(random["sources"], &String.contains?(&1, "5701ab79"))
 
     copro = claims["claim.optimizer.copro.semantic_conformance"]
     assert copro["claim_state"] == "asserted"
     assert copro["target_rung"] == "C1"
-    assert Enum.any?(copro["sources"], &String.contains?(&1, "6832262b"))
+    assert Enum.any?(copro["sources"], &String.contains?(&1, "23e37a26"))
     assert get_in(copro, ["requirements", Access.at(0), "lane"]) == "copro_isolation"
     assert hd(copro["limitations"]) =~ "exact Python RNG parity"
 

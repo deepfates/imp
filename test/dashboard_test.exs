@@ -370,7 +370,10 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["blocked"] ==
              length(dashboard["claims"]["blocking_requirements"])
 
-    assert dashboard["claims"]["summary"]["informational"] == 11
+    # 11 evidence-backed informational conformance claims from the admission
+    # campaign plus the 8 informational census claims for previously unclaimed
+    # public surfaces (claims census reconciliation, PR #16).
+    assert dashboard["claims"]["summary"]["informational"] == 19
 
     proven_claim_ids =
       dashboard["claims"]["claims"]

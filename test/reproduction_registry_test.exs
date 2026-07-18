@@ -73,9 +73,9 @@ defmodule Imp.ReproductionRegistryTest do
     assert copro["admitted_evidence"] == %{
              "tier" => "t1",
              "artifact" =>
-               "benchmarks/evidence/admitted/copro_isolation/6832262b8bb4ac4ff3c527fbaffb2ab1ce8dba417ea367213bcb3999e9f1534b.json",
+               "benchmarks/evidence/admitted/copro_isolation/23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125.json",
              "artifact_sha256" =>
-               "6832262b8bb4ac4ff3c527fbaffb2ab1ce8dba417ea367213bcb3999e9f1534b",
+               "23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125",
              "protocol_id" => "copro_isolation"
            }
   end
