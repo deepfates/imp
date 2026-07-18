@@ -116,8 +116,15 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     end
 
     dashboard = dashboard(Keyword.put(opts, :profile, profile_name))
-    out_path = Path.join(out_dir, "parity-dashboard-#{timestamp_slug()}.json")
-    File.write!(out_path, Jason.encode!(dashboard, pretty: true) <> "\n")
+
+    # Exclusive allocation: two runs in the same wall-clock second must produce
+    # two files, never a silent overwrite. ArtifactFile suffixes on collision
+    # and returns the path it actually wrote, which is the path we announce.
+    out_path =
+      ArtifactFile.write_json!(
+        Path.join(out_dir, "parity-dashboard-#{timestamp_slug()}.json"),
+        dashboard
+      )
 
     Mix.shell().info("parity dashboard: #{out_path}")
     Mix.shell().info("release profile: #{dashboard["profile"]["id"]}")

@@ -20,7 +20,8 @@ defmodule Imp.Datasets do
       type: {:custom, __MODULE__, :validate_train_fraction, []},
       default: 0.8
     ],
-    shuffle: [type: :boolean, default: true]
+    shuffle: [type: :boolean, default: true],
+    seed: [type: :non_neg_integer, default: 0]
   ]
 
   def from_records(records, input_keys, opts \\ []) do
@@ -79,11 +80,36 @@ defmodule Imp.Datasets do
   def hotpotqa(path),
     do: jsonl(path, [:question, :context], record: Imp.Datasets.HotPotQA.Record)
 
+  @doc """
+  Splits examples into `{train, rest}` at the `:train` fraction (default `0.8`).
+
+  With `shuffle: true` (the default) the examples are shuffled with a seeded
+  RNG before splitting. The shuffle is deterministic: the same examples and
+  the same `:seed` (default `0`) always produce the same split, so downstream
+  consumers such as `Imp.Optimizer.LabeledFewShot` see the same trainset on
+  every run. Pass a different `seed:` for a different permutation, or
+  `shuffle: false` to preserve input order.
+  """
   def split(examples, opts \\ []) do
     opts = Imp.Options.validate!(opts, @split_option_schema, "Imp.Datasets.split/2")
-    examples = validate_enumerable!(examples, "Imp.Datasets.split/2", "examples")
+
+    examples =
+      examples
+      |> validate_enumerable!("Imp.Datasets.split/2", "examples")
+      |> Enum.to_list()
+
     train = opts[:train]
-    shuffled = if opts[:shuffle], do: Enum.shuffle(examples), else: examples
+
+    shuffled =
+      if opts[:shuffle] do
+        {shuffled, _rng} =
+          Imp.Optimizer.Sampling.shuffle(examples, Imp.Optimizer.Sampling.new(opts[:seed]))
+
+        shuffled
+      else
+        examples
+      end
+
     count = floor(length(shuffled) * train)
     Enum.split(shuffled, count)
   end
@@ -250,6 +276,7 @@ defmodule Imp.Datasets.Dataset do
       default: 0.8
     ],
     shuffle: [type: :boolean, default: false],
+    seed: [type: :non_neg_integer, default: 0],
     metadata: [type: {:map, :any, :any}, default: %{}]
   ]
 
@@ -259,7 +286,8 @@ defmodule Imp.Datasets.Dataset do
     {train, rest} =
       Imp.Datasets.split(examples,
         train: opts[:train],
-        shuffle: opts[:shuffle]
+        shuffle: opts[:shuffle],
+        seed: opts[:seed]
       )
 
     {dev, test} = Enum.split(rest, div(length(rest), 2))
