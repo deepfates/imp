@@ -1,0 +1,33 @@
+name: Elixir setup
+description: >
+  Shared BEAM/Elixir setup for all CI gates: toolchain, deps/_build cache
+  keyed on mix.lock, hex, and dependency fetch. Keeping this in one place
+  means the cache key cannot drift between the parallel gate jobs.
+
+runs:
+  using: composite
+  steps:
+    - uses: erlef/setup-beam@v1
+      id: beam
+      with:
+        otp-version: "28"
+        elixir-version: "1.19"
+    - name: Cache Elixir deps and build
+      uses: actions/cache@v4
+      with:
+        path: |
+          deps
+          _build
+          ~/.hex/packages
+        # ~/.hex/packages must be cached alongside deps: production.check
+        # builds a fresh consumer project whose deps.get unpacks the Hex
+        # tarballs from there. Key is v2 because the v1 cache (saved without
+        # ~/.hex) hits exactly and actions/cache never re-saves on an exact
+        # hit, which left every cache-hit run without tarballs.
+        key: mix-v2-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+        restore-keys: |
+          mix-v2-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-
+    - run: mix local.hex --force
+      shell: bash
+    - run: mix deps.get
+      shell: bash
