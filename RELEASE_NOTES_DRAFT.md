@@ -34,10 +34,16 @@ effectiveness result ships with its artifact: the
 from 25–30% to 85% on held-out data across three committed live runs, for
 about a cent, and you can rerun the experiment yourself.
 
-**Borrowed honestly.** The optimization *algorithms'* general effectiveness
-rests on their published literature (DSPy, MIPROv2, SIMBA, GEPA). We verified
-the port; the papers verified the methods. Whether any optimizer improves
-*your* task is an empirical question Imp gives you the tools to answer in an
+**Borrowed honestly — with the gap named.** The optimization *algorithms'*
+effectiveness evidence comes from their published literature (DSPy, MIPROv2,
+SIMBA, GEPA) — which verified *those implementations on those tasks*. Imp's
+differentials verify that our machinery matches the upstream mechanics; they
+do not yet verify that matched machinery reproduces matched outcomes with
+live models, and we have not measured that ourselves for most optimizers.
+That transfer question is tracked as open targets in the ledger, not assumed
+away. What we can say from our own committed evidence: demonstration-based
+compilation produces real held-out lift (the tutorial's result), and whether
+any optimizer improves *your* task is a question Imp lets you answer in an
 afternoon — signature, metric, held-out split, receipt.
 
 **Promised, explicitly.** Our own matched-control effectiveness science —
