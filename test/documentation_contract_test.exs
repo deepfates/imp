@@ -108,10 +108,13 @@ defmodule DocumentationContractTest do
   test "internal process vocabulary stays off user surfaces" do
     # CONFORMANCE.md is the receipts appendix, promoted from the conformance
     # program; evidence vocabulary ("authority", "differential") is its
-    # subject matter, not a leak.
+    # subject matter, not a leak. EVIDENCE.md is the public definition of the
+    # C0-C5 ladder (owner ruling 2026-07-17: the ladder IS the maturity
+    # story), so the vocabulary is its subject matter too — everywhere else
+    # it stays banned.
     user_surfaces =
       ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")] --
-        ["docs/CONFORMANCE.md"]
+        ["docs/CONFORMANCE.md", "docs/EVIDENCE.md"]
 
     # "differential" left off the ban list deliberately: "executable
     # differential tests" is the public conformance claim, not process vocab.
@@ -267,7 +270,7 @@ defmodule DocumentationContractTest do
 
   test "API guide keeps protocol clients out of the normal provider path" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/internal/ADVANCED.md")
+    advanced = File.read!("docs/ADVANCED.md")
 
     assert api =~ "The normal provider path for inference is `Imp.req_llm/2`"
     assert api =~ "Advanced Protocol Clients"
@@ -290,7 +293,7 @@ defmodule DocumentationContractTest do
 
   test "GEPA documentation distinguishes the canonical program and artifact surfaces" do
     api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/internal/ADVANCED.md")
+    advanced = File.read!("docs/ADVANCED.md")
     coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
     parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 

@@ -174,19 +174,12 @@ defmodule Imp.MixProject do
       "docs/PHILOSOPHY.md",
       "docs/IMP_FOR_DSPY_USERS.md",
       "docs/CONFORMANCE.md",
+      "docs/EVIDENCE.md",
       "docs/PRIOR_ART.md",
-      "docs/internal/RESEARCH_LANDSCAPE.md",
       "docs/ARCHITECTURE.md",
-      "docs/internal/IDENTITY_COMPATIBILITY.md",
       "docs/API_GUIDE.md",
-      "docs/internal/TUTORIAL_EXAMPLE_PARITY.md",
-      "docs/internal/ADVANCED.md",
-      "docs/internal/REACT_V2_FIDELITY.md",
-      "docs/internal/RLM_FIDELITY.md",
-      "docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md",
-      "docs/internal/COMBEE_FIDELITY.md",
-      "docs/internal/AX_DIFFERENTIAL.md",
-      "docs/internal/OBSERVABILITY.md",
+      "docs/ADVANCED.md",
+      "docs/OBSERVABILITY.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
   end

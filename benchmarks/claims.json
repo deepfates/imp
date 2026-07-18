@@ -863,7 +863,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "imp_local_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/internal/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
+      "sources": ["docs/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
         {
           "id": "local_mlx_weight_training.full",
