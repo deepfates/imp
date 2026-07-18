@@ -1,11 +1,10 @@
 # Imp
 
-There are two kinds of intelligence in a modern program. One is fluid. A
-language model can read a support ticket and understand that customers
-seeing each other's invoices is a security incident, not a billing question.
-The other is solid. Types, functions, and supervision trees do exactly what
-they say, every time. Most tools make you pick one and fake the other. Imp
-is for building programs out of both.
+Imp is [DSPy](https://dspy.ai) for the BEAM: declare a language-model task
+as a typed Elixir program, then test, measure, improve, and operate it like
+any other code. There are two kinds of intelligence in a modern program,
+the fluid kind that can read a situation and the solid kind that does
+exactly what it says. Imp is for building programs out of both.
 
 <!-- "Imp with cards", Le Grand Etteilla (public domain, via Wikimedia Commons) -->
 <p align="center">
@@ -13,9 +12,9 @@ is for building programs out of both.
        alt="An imp studies a hand of cards through a lens while a smaller imp springs from its tail.">
 </p>
 
-Here is what that means in practice. You declare a task the way you would
-declare a type, with named inputs, named outputs, and constraints, and Imp
-turns the declaration into a program. The program is a value, not a prompt.
+You declare the task the way you would declare a type, with named inputs,
+named outputs, and constraints. Imp turns the declaration into a program.
+The program is a value, not a prompt.
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -32,62 +31,12 @@ Imp.get(prediction, :team)
 #=> "security"
 ```
 
-Notice what the model did. The ticket is about invoices, but the model read
-the situation and routed it to security at high urgency. Notice what the
-types did too. The answer is always one of your four teams, because when the
-model returns anything else, Imp rejects the output against the declared
-enum and retries with the validation error. You never wrote a prompt.
-
-Because the program is a value, the things you already do to programs now
-work on language-model behavior. You can test the router against a scripted
-model without spending a cent. You can score it on labeled data and get a
-number instead of an impression. You can hand it to an optimizer that
-rewrites the program until held-out data shows it got better. In the
-[tutorial](docs/TUTORIAL_TICKET_ROUTING.md), a router goes from 30% to 85%
-on tickets it has never seen, in about ten seconds, for about a cent.
-You can also read exactly what the optimizer changed, because its work is
-data attached to the program.
-
-The loop of declaring, measuring, improving, and proving scales the whole
-way up:
-
-- **Programs**: `Predict`, `ChainOfThought`, `ReAct` agents with typed tools
-  and policies, `CodeAct`, `ProgramOfThought`, refinement, best-of-N,
-  parallel fan-out, retrieval wrappers, and RLM, which gives a model
-  recursive control for inputs too large for one prompt, inside a budgeted
-  and supervised Elixir sandbox.
-- **Optimizers**: few-shot selection (`LabeledFewShot`, `BootstrapFewShot`,
-  random search), instruction evolution (`COPRO`, `SIMBA`, `MIPROv2`, and
-  `GEPA` with text feedback), ensembles and `BetterTogether`, and
-  weight-level training with `BootstrapFinetune`, `GRPO`, and local MLX
-  fine-tuning. They all use one `Imp.optimize` shape, and your metric on
-  held-out data gates every one of them.
-- **Beyond prompts**: Optimize-Anything points the same machinery at
-  arbitrary text artifacts such as code, configs, and heuristics. It works
-  anywhere you can score a candidate.
-
-You will use one or two of these; the rest are there when a task earns them.
-
-Then you run the program where it belongs. On the BEAM, a model call is one
-more slow, fallible, concurrent effect, and supervising effects like that is
-what the runtime was built for. Compiled programs persist as checksummed
-artifacts with no secrets inside, and credentials bind at runtime. Execution
-runs in bounded, supervised workers that return overloads instead of
-hanging. Every call, retry, and tool step emits telemetry you can ship to
-your metrics system. The [deployment example](examples/deployment) is a
-complete OTP application.
-
-Imp is a native BEAM realization of [DSPy](https://dspy.ai)'s research
-program of programming language models instead of prompting them. Imp tracks
-DSPy 3.2.1, and executable differential tests verify the optimizers against
-that pinned upstream source, so "faithful port" is a claim you can run
-yourself ([conformance report](docs/CONFORMANCE.md)). Where the BEAM offers
-more, such as supervision and cheap concurrency, Imp uses it. See
-[Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) for exactly what differs.
+The model read the situation: an invoice complaint that is really a
+security incident. The types held the contract: the answer is always one of
+your four teams, and a generation that breaks the declaration is rejected
+and retried with the validation error. You never wrote a prompt.
 
 ## Install
-
-Add the release to your `mix.exs` deps:
 
 ```elixir
 {:imp, github: "deepfates/imp", tag: "v0.1.0"}
@@ -97,23 +46,77 @@ Imp is not on Hex yet; a Hex release is planned. You will need an API key
 for a model provider (any [ReqLLM](https://hex.pm/packages/req_llm)
 provider works; the docs use OpenAI).
 
+## Because the program is a value, the rest is ordinary engineering
+
+Each stage below is one stop on the [Learning Path](docs/LEARNING_PATH.md),
+which grows this same router end to end.
+
+- **Declare** the task as a typed signature. The prompt is rendered from
+  the declaration at call time; you never maintain it.
+- **Test** without a provider. A scripted model plays the LM's part while
+  the real signature validation, adapters, and metrics run in your suite.
+- **Measure** on labeled data. Evaluation returns a score and every row,
+  a number instead of an impression.
+- **Improve** with an optimizer that compiles a better program. In the
+  [tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s committed runs, the router
+  goes from 30% to 85% on tickets it has never seen, for about a cent,
+  and you can read exactly what changed, because the optimizer's work is
+  data attached to the program.
+- **Extend** with typed tools under explicit policies, agent loops from
+  ReAct through a sandboxed recursive controller, retrieval, and token
+  streaming straight into your LiveView.
+- **Operate** it where it belongs. On the BEAM a model call is one more
+  slow, fallible, concurrent effect: bounded supervised workers, compiled
+  programs persisted as checksummed artifacts with no secrets inside,
+  credentials bound at runtime, redacted telemetry on every call, retry,
+  and tool step. The [deployment example](examples/deployment) is a
+  complete OTP application.
+
+## The whole surface, stage by stage
+
+Nearly everything is one call on the `Imp` module. This is the map of what
+you can reach and where it belongs; the [API Guide](docs/API_GUIDE.md) has
+a worked example for every row.
+
+| Stage | What you can use |
+| --- | --- |
+| **Declare** | `signature` (string DSL or map form with constraints), `example`, `with_inputs`, `prediction`, `get`, `to_map`, conversation `history` and `append_history` |
+| **Run** | `call`, `stream` and `collect` (provider token streaming, honest local fallback), `req_llm` (any ReqLLM provider), `configure` / `settings` / `context` for defaults and scoped overrides |
+| **Test** | `context` swaps a scripted model into any program with no patching, so signatures, adapters, and metrics run for real in your suite |
+| **Measure** | `evaluate` (score plus every row), `exact_match`, `extractive_qa`, `classification`, `classification_report`, `majority` voting |
+| **Improve** | `optimize`, `train` (weights are deliberately separate), `with_demos`, `with_playbook`, `with_lm`, `optimizer_capabilities`; optimizers: `LabeledFewShot`, `BootstrapFewShot`, `RandomSearch`, `KNNFewShot`, `COPRO`, `SIMBA`, `MIPROv2`, `GEPA`, `InferRules`, `SignatureOptimizer`, `Ensemble`, `BetterTogether`, `BootstrapFinetune`, `GRPO` (local MLX included), and Optimize-Anything for arbitrary text artifacts |
+| **Extend** | program shapes: `predict`, `chain_of_thought`, `react` and `react_v2`, `avatar`, `code_act`, `program_of_thought`, `rlm` with `rlm_serializable` handles; composition: `best_of_n`, `refine`, `assert` / `assertion`, `multi_chain_comparison`, `parallel`; tools and context: `tool`, `Imp.MCP.import_tools`, `memory`, `retrieve`, `rag`, `knn` / `nearest`, `Imp.Datasets` loaders, `Imp.Embeddings` |
+| **Operate** | `save!` / `load!` (checksummed artifacts) and `dump` / `load` (state as data), `trace`, `inspect_history`, `subscribe_optimizer_progress`, `enable_logging` / `disable_logging` |
+
+You will use one or two rows at first; the rest are there when a task
+earns them.
+
+## The port is verified, and you can run the receipts
+
+Imp is a native BEAM realization of DSPy's research program of programming
+language models instead of prompting them. It tracks DSPy 3.2.1, and
+executable differential tests verify behavior against that pinned upstream
+source, so "faithful port" is a claim you can check yourself: the
+[conformance report](docs/CONFORMANCE.md) enumerates every surface and its
+evidence. Where the BEAM offers more, such as supervision and cheap
+concurrency, Imp uses it. [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md)
+maps every name you already know and states exactly what differs.
+
 ## Learn
 
-- **[Learning Path](docs/LEARNING_PATH.md)**: one router grown step by step,
-  from the first live call through testing without a provider, metrics,
-  optimization, tools, retrieval, persistence, and deployment.
-- **[Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md)**: the full
-  experiment, with the numbers and costs above.
-- **[Livebooks](livebooks/)**: the same path as runnable notebooks.
+- [Learning Path](docs/LEARNING_PATH.md): the router above, grown step by
+  step from first live call to deployment.
+- [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md): the full
+  experiment behind the numbers, artifact included.
+- [Livebooks](livebooks/): the same path as runnable notebooks.
 - Reference: [API Guide](docs/API_GUIDE.md), [Glossary](docs/GLOSSARY.md),
-  [Architecture](docs/ARCHITECTURE.md), and
+  [Architecture](docs/ARCHITECTURE.md),
   [Production Operations](docs/PRODUCTION_OPERATIONS.md).
 
 ## Where this is going
 
-The near roadmap has three parts. First, a Hex release. Second, an
-interactive-fiction environment package, where an optimizer teaches an
-agent to survive a classic dungeon and every episode is recorded as a
-replayable, branchable log. Third, the longer bet that belongs to this
-runtime: optimization as a resident process, meaning programs that improve
-from their own recorded history, under supervision, while they run.
+First, a Hex release. Second, an interactive-fiction environment package,
+where an optimizer teaches an agent to survive a classic dungeon and every
+episode is a replayable, branchable log. Third, the bet that belongs to
+this runtime: optimization as a resident process, programs improving from
+their own recorded history, under supervision, while they run.
