@@ -1378,6 +1378,8 @@ defmodule Imp.Saving do
       "parallel_tool_calls" -> :parallel_tool_calls
       "openai_parallel_tool_calls" -> :openai_parallel_tool_calls
       "stream" -> :stream
+      "json_retries" -> :json_retries
+      "json_fallback" -> :json_fallback
       "timeout" -> :timeout
       "retries" -> :retries
       "num_retries" -> :num_retries
