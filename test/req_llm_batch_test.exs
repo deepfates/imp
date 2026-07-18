@@ -223,7 +223,7 @@ defmodule ReqLLMBatchTest do
 
     dispatcher = ReqLLMBatch.req_llm_dispatcher(client, temperature: 0)
 
-    # Exact payload shape documented in docs/API_GUIDE.md for req_llm_dispatcher.
+    # Exact payload shape documented in docs/OPERATIONS_REFERENCE.md for req_llm_dispatcher.
     requests = [
       %{
         id: "question-001",

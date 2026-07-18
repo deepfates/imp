@@ -323,6 +323,7 @@ defmodule PublicAPIManifestTest do
         "docs/OBSERVABILITY.md",
         "docs/API_GUIDE.md",
         "docs/ARCHITECTURE.md",
+        "docs/OPERATIONS_REFERENCE.md",
         "docs/PRODUCTION_OPERATIONS.md",
         "docs/internal/TUTORIAL_EXAMPLE_PARITY.md",
         "docs/LEARNING_PATH.md",

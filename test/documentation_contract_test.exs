@@ -102,7 +102,7 @@ defmodule DocumentationContractTest do
     refute File.read!("README.md") =~ "mix livebook.execute.check"
     refute File.read!("docs/README.md") =~ "mix livebook.execute.check"
     assert File.read!("CONTRIBUTING.md") =~ "mix livebook.execute.check"
-    assert File.read!("docs/PRODUCTION_OPERATIONS.md") =~ "mix livebook.execute.check"
+    assert File.read!("docs/maintainers/GATES.md") =~ "mix livebook.execute.check"
   end
 
   test "internal process vocabulary stays off user surfaces" do
@@ -312,12 +312,12 @@ defmodule DocumentationContractTest do
   end
 
   test "instruction optimizer docs define durable run-level resume boundaries" do
-    api = File.read!("docs/API_GUIDE.md")
+    ops = File.read!("docs/OPERATIONS_REFERENCE.md")
     fidelity = File.read!("docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md")
 
-    assert api =~ "`max_trials:` and the compile-time `max_steps:` cap only the new work"
-    assert api =~ "Completed boundaries are not replayed"
-    assert api =~ "not signatures, authentication,\nencryption, or a sandbox"
+    assert ops =~ "`max_trials:` and the compile-time `max_steps:` cap only the new work"
+    assert ops =~ "Completed boundaries are not replayed"
+    assert ops =~ "not signatures, authentication,\nencryption, or a sandbox"
     assert fidelity =~ "## Durable Run-Level Resume"
     assert fidelity =~ "A trial is the atomic boundary"
     assert fidelity =~ "every completed finalist evaluation"
@@ -371,12 +371,13 @@ defmodule DocumentationContractTest do
 
   test "API guide distinguishes runnable snippets from external-service sketches" do
     api = File.read!("docs/API_GUIDE.md")
+    ops = File.read!("docs/OPERATIONS_REFERENCE.md")
 
     assert api =~ "Path.join(System.tmp_dir!(), \"imp-program.json\")"
     refute api =~ "tmp/program.json"
 
     assert api =~ "This is an external\nservice sketch"
-    assert api =~ "point Imp at trusted services you own"
+    assert ops =~ "point Imp at trusted services you own"
   end
 
   test "API guide ReAct example is executable with a deterministic tool-calling LM" do

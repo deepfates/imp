@@ -98,11 +98,11 @@ defmodule OperationsStressTest do
     refute File.read!("benchmarks/claims.json") =~ "operations_stress"
 
     benchmark_truth = File.read!("docs/internal/BENCHMARK_TRUTH.md")
-    production_operations = File.read!("docs/PRODUCTION_OPERATIONS.md")
+    gates = File.read!("docs/maintainers/GATES.md")
 
     assert benchmark_truth =~ "deliberately outside the evidence"
     assert benchmark_truth =~ "must not be admitted or cited at any C0-C5 level"
-    assert production_operations =~ "intentionally excluded from `mix\nevidence.check`"
+    assert gates =~ "intentionally excluded from `mix\nevidence.check`"
   end
 
   defp tmp_dir(name) do

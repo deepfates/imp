@@ -304,36 +304,14 @@ through either facade function. Optimizer-specific `compile` functions also
 remain available when advanced callers need native return values or direct
 checkpoint orchestration.
 
-Metric-driven optimizers live under `Imp.Optimizer.*`:
-
-- `LabeledFewShot`
-- `BootstrapFewShot`
-- `RandomSearch`
-- `InstructionSearch`
-- `COPRO`
-- `MIPROv2`
-- `SIMBA`
-- `GEPA`
-- `BetterTogether`
-- `BootstrapFinetune`, `GRPO` run through `Imp.train/3` or `Imp.train/4` only
-  when an explicit trainer backend is supplied. Bootstrap fine-tuning returns
-  a `:job_created` training result for asynchronous work or a completed result
-  containing the rebound program when the trainer returns terminal success;
-  terminal failures remain errors. GRPO returns a completed training result
-  containing the rebound program. A missing trainer is an error;
-  Imp does not silently select a local training fallback. The optional
-  `Imp.Clients.MLXLMTrainer` is an explicit SFT backend. Provider training jobs
-  enforce job and terminal artifact identity, support idempotent bounded-retry
-  submit/refresh/cancel, persist credential-free checkpoints, and can rebind a
-  successful model artifact onto the compiled program. BetterTogether awaits
-  typed asynchronous jobs under explicit polling and cancellation deadlines;
-  unknown provider states remain visible and are not cancelled speculatively.
-- Fast-Slow state modules and `Imp.Training.FastSlow.Runner` preserve the paper's
-  prefetch, GEPA fast update, cross-prompt rollout grouping, and exactly `T`
-  slow-update cycle. Provider effects cross an explicit backend behaviour with
-  durable operation intents, content-bound state/context checkpoints, and
-  fail-closed replay certification. Token-aligned CISPO groups flow through the
-  shared trainer contract; no local weight-training fallback is implied.
+The metric-driven optimizers — `LabeledFewShot`, `BootstrapFewShot`,
+`RandomSearch`, `InstructionSearch`, `COPRO`, `MIPROv2`, `SIMBA`, `GEPA`, and
+`BetterTogether` — live under `Imp.Optimizer.*`, and the
+[API Guide](API_GUIDE.md) optimizer table is the single home for when to reach
+for each. Training optimizers (`BootstrapFinetune`, `GRPO`) run through
+`Imp.train/3` with an explicit trainer backend, and Fast-Slow training has its
+own provider-neutral runner; both are detailed in
+[Operations Reference](OPERATIONS_REFERENCE.md).
 
 Arbitrary artifact optimization lives under `Imp.Optimize.*`:
 
