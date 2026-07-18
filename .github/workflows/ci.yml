@@ -15,11 +15,14 @@ concurrency:
 # tests live in the root test suite it runs. integration/protocol/quality
 # touch no external runtimes, so those jobs stay light.
 #
-# All jobs share one deps/_build cache key (via .github/actions/elixir-setup).
-# On a cold key the jobs race to save it; first writer wins and the losers
-# log a harmless "unable to reserve cache" warning. A dedicated seed job was
-# considered and rejected: the three light gates finish in seconds, so a seed
-# job would only lengthen the critical path.
+# All jobs share one deps/_build/~/.hex cache key (via
+# .github/actions/elixir-setup), but only production.check SAVES it
+# (save-cache: "true" below) — the light gates restore read-only. Racing
+# writers were one half of the four-instance cache-poisoning class recorded
+# in the composite action's header comment; the restore-keys prefix fallback
+# was the other half, and is gone too. A dedicated seed job was considered
+# and rejected: the three light gates finish in seconds, so a seed job would
+# only lengthen the critical path.
 
 jobs:
   production:
@@ -32,6 +35,8 @@ jobs:
           # ancestor SHAs and fail on a shallow checkout.
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
+        with:
+          save-cache: "true"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

@@ -1,8 +1,70 @@
 name: Elixir setup
 description: >
-  Shared BEAM/Elixir setup for all CI gates: toolchain, deps/_build cache
-  keyed on mix.lock, hex, and dependency fetch. Keeping this in one place
-  means the cache key cannot drift between the parallel gate jobs.
+  Shared BEAM/Elixir setup for all CI gates: toolchain, deps/_build/~/.hex
+  cache keyed on mix.lock, hex, dependency fetch, and a Hex-closure warm step.
+  Keeping this in one place means the cache key cannot drift between the
+  parallel gate jobs.
+
+# CACHE POISONING HISTORY — four instances of one bug class. Read before
+# touching the cache config.
+#
+# production.check runs an OFFLINE clean-room (HEX_OFFLINE=1 deps.get inside
+# mix imp.package.clean_room's consumer and deployment VMs, both using the
+# main mix.lock). That needs ~/.hex to hold, for EVERY locked package, both
+# the registry entry (cache.ets) and the tarball (packages/). Failures:
+#
+#   1. key v1 (PR #12/#15 era): ~/.hex not cached at all. With deps/ restored,
+#      deps.get no-ops and never populates the registry -> PR #16 failed
+#      ("registry entry for package splode is not cached locally").
+#   2. PR #15's composite action cached only ~/.hex/packages: tarballs OK,
+#      registry gone -> PR #20 failed on splode again.
+#   3. key v3 (PR #21): whole ~/.hex cached. Bought one clean generation.
+#   4. 2026-07-17, PR #23 run 29626320741: "registry entry for package credo
+#      is not cached locally" — with the whole ~/.hex cached. Mechanism, now
+#      confirmed: restore-keys PREFIX fallback restored a PARTIAL cache from
+#      a different lock generation -> deps.get no-oped (deps/ present) ->
+#      the ~/.hex gap persisted -> the job SAVED that state under the NEW
+#      exact key. actions/cache never re-saves on an exact hit, so the gap
+#      became canonical for that key forever. Worse, all four parallel gates
+#      raced to save, so whichever light gate finished first defined the
+#      cache for everyone.
+#
+# Key bumps (v1 -> v2 -> v3) each bought exactly one clean generation because
+# they evicted the poisoned cache without removing either mechanism. v4
+# removes both mechanisms instead:
+#
+#   a) NO restore-keys prefix fallback. Exact lock match or cold. A partial
+#      ancestor cache can no longer seed a new key. Cost: a mix.lock change
+#      cold-compiles all four gates once (~3-4 min); a poisoned cache costs
+#      far more (nondeterministic production.check failures until the next
+#      key bump).
+#   b) Single deterministic cache writer: only production.check saves (the
+#      save-cache input below). The light gates restore read-only, so a fast
+#      gate can never define ~/.hex for the job that actually needs it.
+#   c) The warm step below runs EVERY time and makes ~/.hex a deterministic
+#      function of mix.lock, independent of cache ancestry: it guarantees
+#      registry entry + tarball for the full lock closure. Empirically
+#      (2026-07-17, Hex 2.5.0): `mix hex.package fetch NAME VSN` populates
+#      both pieces, serves from cache when warm (succeeds under HEX_OFFLINE=1,
+#      ~0.3s/package), and covers the lock entries (ex_aws_auth, goth, jose)
+#      that plain deps.get skips as unused optionals. Whole-lock warm is
+#      ~20s for 43 packages, warm or cold — the cost is VM boot per fetch,
+#      not network.
+#
+# With (a)+(b)+(c): any exact-key hit is a cache that was warmed to the full
+# closure of this very lock before being saved, and the warm step re-proves
+# the closure on every run anyway. There is no path left for a partial
+# ~/.hex to persist.
+
+inputs:
+  save-cache:
+    description: >
+      "true" to save the deps/_build/~/.hex cache at job end (actions/cache
+      post step). Exactly one job — production.check, the only one with
+      offline ~/.hex requirements — passes true, so the cache has a single
+      deterministic writer instead of four racing gates.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -12,24 +74,28 @@ runs:
       with:
         otp-version: "28"
         elixir-version: "1.19"
-    - name: Cache Elixir deps and build
+    - name: Cache Elixir deps and build (single writer)
+      if: inputs.save-cache == 'true'
       uses: actions/cache@v4
       with:
         path: |
           deps
           _build
           ~/.hex
-        # The WHOLE ~/.hex must be cached alongside deps: production.check's
-        # offline clean-room deps.get needs both the registry cache
-        # (~/.hex/cache.ets) and the package tarballs (~/.hex/packages).
-        # Caching only one reproduces the other's failure — this key is v3
-        # because v1 lacked ~/.hex entirely (tarball failures) and v2 cached
-        # only packages/ (registry failures), and actions/cache never
-        # re-saves on an exact key hit.
-        key: mix-v3-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
-        restore-keys: |
-          mix-v3-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-
+        key: mix-v4-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+    - name: Restore Elixir deps and build (read-only)
+      if: inputs.save-cache != 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          deps
+          _build
+          ~/.hex
+        key: mix-v4-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
     - run: mix local.hex --force
       shell: bash
     - run: mix deps.get
+      shell: bash
+    - name: Warm Hex cache to the full mix.lock closure
+      run: .github/scripts/warm_hex_closure.sh mix.lock
       shell: bash
