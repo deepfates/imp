@@ -221,13 +221,16 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
   end
 
   defp imp_responses(scenario) do
+    # :dspy_3_2_1 faithful contract: each turn is the three reasoning fields
+    # (next_thought / next_tool_name / next_tool_args), and the reserved
+    # terminator is `finish` (no submit alias). The final response is the
+    # separate ChainOfThought extraction turn.
     actions =
       Enum.map(scenario["actions"], fn action ->
-        name = if action["tool"] == "finish", do: "submit", else: action["tool"]
-
         %{
           next_thought: "Follow the preregistered schedule.",
-          tool_calls: [%{name: name, arguments: action["arguments"]}]
+          next_tool_name: action["tool"],
+          next_tool_args: action["arguments"] || %{}
         }
       end)
 
@@ -329,16 +332,14 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
       else: "unknown"
   end
 
-  defp normalize_imp_tool(tool, _result) do
-    tool |> to_string() |> then(&if(&1 == "submit", do: "finish", else: &1))
-  end
+  defp normalize_imp_tool(tool, _result), do: to_string(tool)
 
   defp execution_error?(result, tool, marker) do
     is_binary(result) and String.starts_with?(result, "Execution error in #{tool}:") and
       String.contains?(result, marker)
   end
 
-  defp normalize_terminal_reason(:submit), do: "finish"
+  defp normalize_terminal_reason(:finish), do: "finish"
   defp normalize_terminal_reason(:max_iters), do: "max_iters"
   defp normalize_terminal_reason(reason), do: to_string(reason)
 

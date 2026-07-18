@@ -988,10 +988,26 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
 
     {:ok, actions} =
       Agent.start_link(fn ->
+        # :dspy_3_2_1 (faithful dspy.ReAct): the model emits next_thought /
+        # next_tool_name / next_tool_args as chat fields, terminates with the
+        # reserved `finish` tool, then a separate extraction pass produces the
+        # outputs.
         [
-          %{tool_calls: [%{name: :lookup, arguments: %{query: "failure-recovery"}}]},
-          %{tool_calls: [%{name: :lookup, arguments: %{query: "failure-recovery"}}]},
-          %{tool_calls: [%{name: :submit, arguments: %{}}]},
+          %{
+            next_thought: "Look up the fixed fact.",
+            next_tool_name: "lookup",
+            next_tool_args: %{query: "failure-recovery"}
+          },
+          %{
+            next_thought: "Retry the transient failure.",
+            next_tool_name: "lookup",
+            next_tool_args: %{query: "failure-recovery"}
+          },
+          %{
+            next_thought: "The lookup returned pong.",
+            next_tool_name: "finish",
+            next_tool_args: %{}
+          },
           %{reasoning: "Recovered after one bounded tool failure.", answer: "pong"}
         ]
       end)
@@ -1009,12 +1025,12 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
       Imp.react(
         Imp.Signature.new(
           "question -> answer",
-          "Use lookup first with query failure-recovery. If history contains lookup result pong, stop calling lookup and call submit with answer pong. Do not answer directly."
+          "Use lookup first with query failure-recovery. Once the trajectory contains lookup result pong, stop calling lookup and call finish. A separate step will extract the answer pong. Do not answer directly."
         ),
         [tool],
         lm: lm,
         mode: :dspy_3_2_1,
-        tool_policy: [:lookup, :submit],
+        tool_policy: [:lookup],
         max_iters: 4
       )
 
@@ -1035,7 +1051,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
          [
            %{tool: :lookup, result: "Execution error in lookup: :transient_local_failure"},
            %{tool: :lookup, result: "pong"},
-           %{tool: :submit, result: "Completed."}
+           %{tool: :finish, result: "Completed."}
          ] <- history,
          [] <- remaining_actions,
          true <- elapsed_ms <= timeout do
@@ -1053,7 +1069,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
          history: [
            %{tool: :lookup, result: "transient_local_failure"},
            %{tool: :lookup, result: "pong"},
-           %{tool: :submit, result: "completed"}
+           %{tool: :finish, result: "completed"}
          ],
          deadline_ms: timeout,
          elapsed_ms: elapsed_ms,
@@ -1117,7 +1133,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
                     row["history"] == [
                       %{"tool" => "lookup", "result" => "transient_local_failure"},
                       %{"tool" => "lookup", "result" => "pong"},
-                      %{"tool" => "submit", "result" => "completed"}
+                      %{"tool" => "finish", "result" => "completed"}
                     ]
                 end)
             }

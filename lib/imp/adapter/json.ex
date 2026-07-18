@@ -42,20 +42,168 @@ defmodule Imp.Adapter.JSON do
   def format(signature, inputs, opts) do
     opts = validate_opts!(opts, "#{inspect(__MODULE__)}.format/3")
 
+    # Reuse Chat's structure for input rendering, demos, and history, but with
+    # Chat's own response instruction suppressed — JSONAdapter substitutes its
+    # own system message and its own trailing output requirements.
     messages =
       Imp.Adapter.Chat.format(signature, inputs, Keyword.put(opts, :response_instruction, false))
 
-    schema = signature.outputs |> Enum.map(&to_string(&1.name)) |> Enum.join(", ")
-    field_contract = output_contract(signature.outputs)
+    [_chat_system | rest] = messages
+    system = %{role: :system, content: render_system(signature)}
 
-    json_message = %{
-      role: :system,
-      content:
-        "Return only a JSON object with keys: #{schema}. Each value must satisfy the task instruction and its field contract. #{field_contract} Do not include extra explanation or unrelated detail outside those fields."
-    }
+    [system | append_output_requirements(rest, signature)]
+  end
 
-    [system | rest] = messages
-    [system, json_message | rest]
+  # DSPy's JSONAdapter appends `user_message_output_requirements` to the final
+  # (main-request) user message. In Chat's message list that is always the last
+  # message, so we append the JSON tail there.
+  defp append_output_requirements(messages, signature) do
+    tail = "\n\n" <> user_message_output_requirements(signature)
+    {init, [last]} = Enum.split(messages, -1)
+    init ++ [Map.update!(last, :content, &append_text(&1, tail))]
+  end
+
+  defp append_text(content, suffix) when is_binary(content), do: content <> suffix
+  defp append_text(content, suffix) when is_list(content), do: content ++ [suffix]
+
+  # ------------------------------------------------------------------
+  # DSPy JSONAdapter system message: format_field_description (inherited from
+  # ChatAdapter) + JSONAdapter.format_field_structure + format_task_description.
+  # ------------------------------------------------------------------
+  defp render_system(signature) do
+    field_description(signature) <>
+      "\n" <> field_structure(signature) <> "\n" <> task_description(signature)
+  end
+
+  # ChatAdapter.format_field_description / utils.get_field_description_string.
+  defp field_description(signature) do
+    "Your input fields are:\n" <>
+      field_desc_block(signature.inputs) <>
+      "\nYour output fields are:\n" <> field_desc_block(signature.outputs)
+  end
+
+  defp field_desc_block(fields) do
+    fields
+    |> Enum.with_index(1)
+    |> Enum.map_join("\n", fn {field, index} ->
+      "#{index}. `#{field.name}` (#{field_annotation_name(field)}): #{field_desc(field)}"
+    end)
+    |> String.trim()
+  end
+
+  defp field_desc(field), do: to_string(field.desc || "")
+
+  # JSONAdapter.format_field_structure.
+  defp field_structure(signature) do
+    [
+      "All interactions will be structured in the following way, with the appropriate values filled in.",
+      "Inputs will have the following structure:",
+      input_structure(signature.inputs),
+      "Outputs will be a JSON object with the following fields.",
+      output_structure(signature.outputs)
+    ]
+    |> Enum.join("\n\n")
+    |> String.trim()
+  end
+
+  # Inputs rendered with role="user": `[[ ## name ## ]]\n{translate_field_type}`.
+  defp input_structure(inputs) do
+    inputs
+    |> Enum.map_join("\n\n", fn field ->
+      "[[ ## #{field.name} ## ]]\n" <> translate_field_type(field, :input)
+    end)
+    |> String.trim()
+  end
+
+  # Outputs rendered with role="assistant": a pretty-printed JSON object whose
+  # values are the `translate_field_type` templates (with type notes inline).
+  defp output_structure(outputs) do
+    outputs
+    |> Enum.map(fn field -> {to_string(field.name), translate_field_type(field, :output)} end)
+    |> pretty_json_object()
+  end
+
+  # utils.translate_field_type: input fields (and str/reasoning) carry no note;
+  # typed output fields carry an 8-space-indented note inside the value.
+  defp translate_field_type(field, :input), do: "{#{field.name}}"
+
+  defp translate_field_type(field, :output) do
+    case output_note_desc(field) do
+      nil ->
+        "{#{field.name}}"
+
+      note ->
+        "{#{field.name}}" <> String.duplicate(" ", 8) <> "# note: the value you produce " <> note
+    end
+  end
+
+  # Composite output fields (enum->Literal, array->list, object->dict) note first
+  # via CompositeType (dee-9ttv); scalars keep their existing type_note clauses.
+  defp output_note_desc(field),
+    do: Imp.Adapter.CompositeType.note_desc(field) || type_note(field.type)
+
+  defp type_note(:string), do: nil
+  defp type_note(:integer), do: "must be a single int value"
+  defp type_note(:float), do: "must be a single float value"
+  defp type_note(:boolean), do: "must be True or False"
+  # `:number` has no native DSPy counterpart; treat like float for the note.
+  defp type_note(:number), do: "must be a single float value"
+  defp type_note(_type), do: nil
+
+  # ChatAdapter.format_task_description.
+  defp task_description(signature) do
+    "In adhering to this structure, your objective is: " <> objective_text(signature.instructions)
+  end
+
+  defp objective_text(instructions) do
+    instructions
+    |> to_string()
+    |> String.split("\n")
+    |> then(fn lines -> [""] ++ lines end)
+    |> Enum.join("\n        ")
+  end
+
+  # JSONAdapter.user_message_output_requirements.
+  defp user_message_output_requirements(signature) do
+    fields =
+      Enum.map_join(signature.outputs, ", then ", fn field ->
+        "`#{field.name}`" <> type_info(field)
+      end)
+
+    "Respond with a JSON object in the following order of fields: " <> fields <> "."
+  end
+
+  defp type_info(field) do
+    case field_annotation_name(field) do
+      "str" -> ""
+      name -> " (must be formatted as a valid Python #{name})"
+    end
+  end
+
+  # DSPy annotation name for a field: composite types (Literal/list/dict) resolve
+  # through CompositeType; scalars fall back to the plain type-name mapping.
+  defp field_annotation_name(field),
+    do: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
+
+  # utils.get_annotation_name for the scalar types Imp models.
+  defp annotation_name(:string), do: "str"
+  defp annotation_name(:integer), do: "int"
+  defp annotation_name(:float), do: "float"
+  defp annotation_name(:boolean), do: "bool"
+  defp annotation_name(:number), do: "float"
+  defp annotation_name(type), do: to_string(type)
+
+  # Mirror Python `json.dumps(obj, indent=2, ensure_ascii=False)` for an ordered
+  # object whose values are strings (the only case JSONAdapter produces here).
+  defp pretty_json_object([]), do: "{}"
+
+  defp pretty_json_object(pairs) do
+    body =
+      Enum.map_join(pairs, ",\n", fn {key, value} ->
+        "  " <> Jason.encode!(key) <> ": " <> Jason.encode!(value)
+      end)
+
+    "{\n" <> body <> "\n}"
   end
 
   def lm_opts(signature, opts) do
@@ -128,18 +276,6 @@ defmodule Imp.Adapter.JSON do
     |> String.trim_trailing("```")
     |> String.trim()
   end
-
-  defp output_contract(fields) do
-    fields
-    |> Enum.map(fn field ->
-      desc = field.desc || default_field_desc(field.name)
-      "#{field.name}: #{desc}"
-    end)
-    |> Enum.join("; ")
-  end
-
-  defp default_field_desc(:reasoning), do: "show the reasoning needed to derive the answer"
-  defp default_field_desc(_name), do: "answer according to the task instruction"
 
   defp validate_lm_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
