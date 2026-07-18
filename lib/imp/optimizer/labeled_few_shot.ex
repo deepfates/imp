@@ -7,6 +7,29 @@ defmodule Imp.Optimizer.LabeledFewShot do
   deterministic few-shot baseline: take up to `k` examples from the trainset and
   attach them as demonstrations. The compiled program carries an optimizer
   report that records the selected examples.
+
+  ## Selection behavior and determinism
+
+  Selection is `Enum.take(trainset, k)`: the first `min(k, length(trainset))`
+  examples in trainset order. No randomness is involved on any path — direct
+  `compile/3` and the `Imp.optimize/3` facade run the same selection, and
+  compiling the same program and trainset always attaches the same demos.
+  When `k` is greater than or equal to the trainset size, the whole trainset
+  is attached in order.
+
+  If compiled demos vary between runs, the variation comes from upstream of
+  this optimizer — most commonly a shuffled trainset (see the `:seed` option
+  of `Imp.Datasets.split/2`). To attach a different demo subset, reorder the
+  trainset explicitly before compiling, for example with a seeded
+  `Imp.Optimizer.Sampling.shuffle/2`.
+
+  ## Deviation from DSPy
+
+  Upstream `dspy.LabeledFewShot.compile/2` defaults to `sample=True`, which
+  draws `k` demos with a fixed-seed RNG (`random.Random(0)`) — deterministic
+  per trainset, but not first-`k` — and defaults to `k=16`. Imp implements
+  upstream's `sample=False` path (a first-`k` slice) as its only behavior and
+  defaults to `k: 4`. There is no sampling option.
   """
 
   defstruct k: 4
@@ -15,6 +38,11 @@ defmodule Imp.Optimizer.LabeledFewShot do
     k: [type: :non_neg_integer, default: 4]
   ]
 
+  @doc """
+  Builds the optimizer. Accepts `k:` (default `4`), the maximum number of
+  demos to attach. Selection is always the deterministic first-`k` slice of
+  the trainset; there is no sampling, shuffle, or seed option.
+  """
   def new(opts \\ []) do
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.LabeledFewShot.new/1")
     %__MODULE__{k: opts[:k]}
@@ -35,6 +63,12 @@ defmodule Imp.Optimizer.LabeledFewShot do
     end
   end
 
+  @doc """
+  Attaches the first `min(k, length(trainset))` trainset examples as demos.
+
+  Deterministic: the same program and trainset always produce the same demo
+  set, on this path and through `Imp.optimize/3`.
+  """
   def compile(%__MODULE__{k: k}, program, trainset) do
     {demos, errors} = take_demos(trainset, k)
     compiled = if errors == [], do: put_demos(program, demos), else: program
