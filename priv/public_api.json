@@ -3427,6 +3427,7 @@
         "metric",
         "multitask",
         "teacher",
+        "timeout",
         "train_kwargs",
         "trainer"
       ],
@@ -3635,6 +3636,7 @@
         "reward_fn",
         "seed",
         "status_poll_interval_ms",
+        "timeout",
         "train_kwargs",
         "trainer",
         "use_train_as_val",

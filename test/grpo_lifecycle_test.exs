@@ -131,6 +131,41 @@ defmodule GRPOLifecycleTest do
     assert optimizer.callback_timeout_ms == 30_000
   end
 
+  describe "rollout timeout threading" do
+    test "defaults to 5000ms and accepts :infinity" do
+      assert Imp.Optimizer.GRPO.new(fn _e, _p -> 1.0 end).timeout == 5_000
+
+      assert %Imp.Optimizer.GRPO{timeout: :infinity} =
+               Imp.Optimizer.GRPO.new(fn _e, _p -> 1.0 end, timeout: :infinity)
+    end
+
+    test "a rollout slower than the configured timeout is killed and scored as a failure",
+         context do
+      optimizer = optimizer(trainer(context, :ok), nil, num_train_steps: 1, timeout: 20)
+
+      assert {:ok, _compiled} =
+               Imp.Optimizer.GRPO.compile(optimizer, slow_program(200), trainset())
+
+      assert_received {:grpo_step_batches, batches}
+      rewards = for group <- batches, completion <- group.group, do: completion.reward
+      assert rewards != []
+      assert Enum.all?(rewards, &(&1 == 0.0))
+    end
+
+    test "raising the timeout past rollout latency preserves the real reward (5s default was previously not threadable)",
+         context do
+      optimizer = optimizer(trainer(context, :ok), nil, num_train_steps: 1, timeout: 2_000)
+
+      assert {:ok, _compiled} =
+               Imp.Optimizer.GRPO.compile(optimizer, slow_program(200), trainset())
+
+      assert_received {:grpo_step_batches, batches}
+      rewards = for group <- batches, completion <- group.group, do: completion.reward
+      assert rewards != []
+      assert Enum.all?(rewards, &(&1 == 1.0))
+    end
+  end
+
   test "an accepted session is reconciled after the start callback crash window", context do
     first = trainer(context, :accepted_then_hang)
     optimizer = optimizer(first, context.path, num_train_steps: 0)
@@ -354,6 +389,21 @@ defmodule GRPOLifecycleTest do
       module: Imp.LM.Static,
       model: "base-model",
       opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
+    }
+
+    Imp.predict("question -> answer", lm: lm)
+  end
+
+  defp slow_program(sleep_ms) do
+    lm = %{
+      module: Imp.LM.Static,
+      model: "base-model",
+      opts: [
+        handler: fn _messages, _opts ->
+          Process.sleep(sleep_ms)
+          %{answer: "ok"}
+        end
+      ]
     }
 
     Imp.predict("question -> answer", lm: lm)
