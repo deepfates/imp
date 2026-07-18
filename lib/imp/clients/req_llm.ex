@@ -521,10 +521,19 @@ defmodule Imp.Clients.ReqLLM do
       deadline ->
         remaining = Imp.Optimizer.GEPA.Coordinator.remaining(deadline)
 
+        # Cap :connect_options only when the caller supplied it — ReqLLM's
+        # option schema rejects the key, so fabricating it here made every
+        # deadline-bearing call fail validation (GEPA reflection was the
+        # only such caller and was undrivable live). The :receive_timeout
+        # cap alone bounds the call end to end.
         opts
         |> cap_timeout(:receive_timeout, remaining)
-        |> Keyword.update(:connect_options, [timeout: remaining], fn connect_options ->
-          cap_timeout(connect_options, :timeout, remaining)
+        |> then(fn capped ->
+          if Keyword.has_key?(capped, :connect_options) do
+            Keyword.update!(capped, :connect_options, &cap_timeout(&1, :timeout, remaining))
+          else
+            capped
+          end
         end)
     end
   end
