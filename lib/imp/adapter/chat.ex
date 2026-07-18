@@ -343,7 +343,9 @@ defmodule Imp.Adapter.Chat do
     # outputs) get no note; typed OUTPUT fields get an 8-space-indented
     # "# note: the value you produce ..." suffix. Match it exactly (dee-3zun).
     input_lines = Enum.map(signature.inputs, &interaction_field_line(&1, ""))
-    output_lines = Enum.map(signature.outputs, &interaction_field_line(&1, structure_type_note(&1)))
+
+    output_lines =
+      Enum.map(signature.outputs, &interaction_field_line(&1, structure_type_note(&1)))
 
     (input_lines ++ output_lines)
     |> Kernel.++(["[[ ## completed ## ]]"])
@@ -372,7 +374,8 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  defp structure_note(desc), do: String.duplicate(" ", 8) <> "# note: the value you produce " <> desc
+  defp structure_note(desc),
+    do: String.duplicate(" ", 8) <> "# note: the value you produce " <> desc
 
   defp field_type(:string), do: "str"
   defp field_type(:integer), do: "int"
