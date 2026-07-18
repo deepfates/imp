@@ -5,6 +5,8 @@ Versioning once the first public package is released.
 
 ## 0.2.0 — 2026-07-17
 
+First Hex release.
+
 ### Added
 
 - Streaming is now part of the `Imp` facade: `Imp.stream/3` returns an
@@ -14,18 +16,45 @@ Versioning once the first public package is released.
   from the provider as it generates; otherwise the call runs once and the
   result is chunked locally. `Imp.Streaming.incremental_fields/2` stays as
   the lower-level parser.
+- `Imp.Optimizer.BootstrapFewShot` accepts a `timeout:` option
+  (`pos_integer` or `:infinity`, default unchanged at 5000ms) threaded to
+  each teacher execution. The runner always enforced a timeout; callers can
+  now raise it for slow teachers — agentic and environment-backed teachers
+  routinely run for minutes. Found live by dogfooding.
+- The evidence ladder is public: `docs/EVIDENCE.md` defines the C0–C5 rungs
+  every claim in `benchmarks/claims.json` is graded on, with the live ledger
+  counts. Nine new differential artifact families landed; every
+  semantic-conformance claim in the ledger is now asserted.
+- The README is a pyramid: claim, proof, install, the lifecycle in six
+  stages, and a stage-by-stage table of the entire facade surface.
 
 ### Changed
 
+- Installs from Hex: `{:imp, "~> 0.2.0"}` is the front door; the immutable
+  Git tag remains the pinned alternative. Livebooks install from the local
+  checkout when run inside the repository and from the Hex release when
+  opened standalone.
 - The documentation is now a reader-first book: the API guide teaches before
   it specifies, the conformance report against pinned upstream DSPy is a
   first-class user document (`docs/CONFORMANCE.md`), and the prior-art
   lineage is stated in daylight (`docs/PRIOR_ART.md`). Internal fidelity and
-  evidence docs moved to `docs/internal/` and out of the package.
+  evidence audits are repository-only — the package ships no
+  `docs/internal/` files; `docs/ADVANCED.md` and `docs/OBSERVABILITY.md`
+  are promoted user docs.
+- Headline numbers cite committed evidence: the tutorial's optimizer lift is
+  25–30% → 85% across three live repeats, from a content-addressed run
+  artifact reproducible with one script (replacing an earlier unreproduced
+  35% → 90%).
+- `Imp.Optimizer.LabeledFewShot` demo selection is pinned deterministic
+  (first k, matching pinned upstream), and `Imp.Datasets.split/2` shuffles
+  with an explicit seed.
+- The conformance report is byte-reproducible by its generator: repository-
+  only link annotations are rendered package-aware instead of hand-edited.
 - Five internal modules that carried `@moduledoc false` now have short,
   accurate moduledocs marked `Internal.`
-- CI caches compiled dependencies keyed on `mix.lock` and the exact
-  OTP/Elixir versions, cutting recompile time from every run.
+- CI runs four parallel gates over a deterministic dependency cache warmed
+  from the lockfile on every run, cutting merge latency to roughly the
+  production gate alone.
 
 ### Fixed
 
@@ -35,6 +64,15 @@ Versioning once the first public package is released.
 - `Imp.subscribe_optimizer_progress/1` now receives real events: optimizer
   candidate evaluations emit `[:imp, :optimizer, :trial]` start/stop spans,
   which were documented as stable but never emitted.
+- `Imp.Evaluate` timeouts are loud: a killed slow row logs a warning naming
+  the budget and records an explicit failure score instead of silently
+  scoring 0.0 inside search optimizers.
+- The package contract gate actually runs in CI, and the two failures it had
+  been hiding are fixed.
+- Two dashboard runs in the same second can no longer silently overwrite the
+  same evidence artifact; output paths are allocated exclusively.
+- Agent event-sink crashes surface instead of disappearing, and missing
+  context references are errors.
 
 ## 0.1.0 — 2026-07-16
 
