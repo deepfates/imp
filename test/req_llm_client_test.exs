@@ -474,6 +474,24 @@ defmodule ReqLLMClientTest do
     assert Keyword.fetch!(opts, :connect_options)[:timeout] <= 1_000
   end
 
+  # Regression (campaign find): GEPA reflection passes a deadline but no
+  # :connect_options; the cap used to FABRICATE the key, and real ReqLLM's
+  # option schema rejects it — so every deadline-bearing call without
+  # caller-supplied connect_options failed validation before the request.
+  test "the GEPA deadline cap does not fabricate :connect_options" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ObjectStub)
+    deadline = Imp.Optimizer.GEPA.Coordinator.deadline(1_000)
+
+    assert {:ok, _output} =
+             Imp.Optimizer.GEPA.Coordinator.with_deadline({:deadline, deadline}, fn ->
+               Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], timeout: 5_000)
+             end)
+
+    assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
+    assert Keyword.fetch!(opts, :receive_timeout) <= 1_000
+    refute Keyword.has_key?(opts, :connect_options)
+  end
+
   test "ReqLLM text responses still work with Imp adapters" do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
     program = Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
