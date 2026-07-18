@@ -1,0 +1,805 @@
+{
+  "artifact_type": "imp_program_artifact",
+  "payload": {
+    "adapter": "Elixir.Imp.Adapter.JSON",
+    "config": [
+      [
+        "json_retries",
+        1
+      ]
+    ],
+    "demos": [
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "atlas"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "We were charged twice for the March invoice."
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      },
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "harbor"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "Card payments have been timing out at checkout since 9am."
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      },
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "beacon"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "I can't log in after resetting my password."
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      },
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "quill"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "Can you add a dark mode to the dashboard?"
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      },
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "atlas"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "Please send a copy of last month's receipt for our records."
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      },
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "harbor"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "The API is returning 502 errors intermittently."
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      },
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "beacon"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "A former employee still has access to our workspace."
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      },
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "team"
+              },
+              "quill"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "ticket"
+              },
+              "How do I export my data to CSV?"
+            ]
+          ]
+        },
+        "input_keys": [
+          {
+            "__imp_type__": "atom",
+            "value": "ticket"
+          }
+        ]
+      }
+    ],
+    "dynamic_adapter": false,
+    "dynamic_lm": false,
+    "lm": {
+      "model": "openai:gpt-5.4-mini",
+      "opts": [
+        [
+          "temperature",
+          0
+        ]
+      ],
+      "provider": "req_llm"
+    },
+    "metadata": {
+      "__imp_type__": "map",
+      "entries": [
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "optimizer_report"
+          },
+          {
+            "__imp_type__": "optimizer_report",
+            "best_score": {
+              "__imp_type__": "atom",
+              "value": "nil"
+            },
+            "candidate_count": 8,
+            "candidates": [
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    0
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "atlas"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "We were charged twice for the March invoice."
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    1
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "harbor"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "Card payments have been timing out at checkout since 9am."
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    2
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "beacon"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "I can't log in after resetting my password."
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    3
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "quill"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "Can you add a dark mode to the dashboard?"
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    4
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "atlas"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "Please send a copy of last month's receipt for our records."
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    5
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "harbor"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "The API is returning 502 errors intermittently."
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    6
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "beacon"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "A former employee still has access to our workspace."
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "index"
+                    },
+                    7
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "example"
+                    },
+                    {
+                      "__imp_type__": "example",
+                      "demos": [],
+                      "fields": {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "team"
+                            },
+                            "quill"
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "ticket"
+                            },
+                            "How do I export my data to CSV?"
+                          ]
+                        ]
+                      },
+                      "input_keys": [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "ticket"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selected?"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "true"
+                    }
+                  ]
+                ]
+              }
+            ],
+            "errors": [],
+            "metadata": {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "status"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "ok"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "requested_k"
+                  },
+                  8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected_count"
+                  },
+                  8
+                ]
+              ]
+            },
+            "optimizer": {
+              "__imp_type__": "atom",
+              "value": "labeled_few_shot"
+            }
+          }
+        ]
+      ]
+    },
+    "signature": {
+      "inputs": [
+        {
+          "desc": null,
+          "kind": "input",
+          "metadata": {},
+          "name": "ticket",
+          "prefix": "Ticket:",
+          "type": "string"
+        }
+      ],
+      "instructions": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.",
+      "metadata": {},
+      "outputs": [
+        {
+          "desc": null,
+          "kind": "output",
+          "metadata": {
+            "constraints": {
+              "enum": [
+                "atlas",
+                "harbor",
+                "beacon",
+                "quill"
+              ]
+            }
+          },
+          "name": "team",
+          "prefix": "Team:",
+          "type": "string"
+        }
+      ]
+    },
+    "type": "predict"
+  },
+  "payload_sha256": "sha256:762d2666b4288c01454768cfdbe38af0e0a32cb40c82bcc9dac9227959b58ac0",
+  "schema_version": 1
+}

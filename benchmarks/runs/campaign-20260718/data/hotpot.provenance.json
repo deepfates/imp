@@ -1,0 +1,15 @@
+{
+  "dataset": "hotpotqa/hotpot_qa",
+  "config": "distractor",
+  "split": "validation",
+  "source_url": "https://datasets-server.huggingface.co/rows?dataset=hotpotqa/hotpot_qa&config=distractor&split=validation&offset=0&length=100",
+  "canonical_equivalent": "hotpot_dev_distractor_v1.json (HotPotQA dev distractor v1; HF hotpotqa/hotpot_qa distractor/validation is its mirror)",
+  "offset": 0,
+  "length": 100,
+  "row_order": "row_idx 0..99 as served",
+  "fetched_at": "2026-07-18",
+  "cross_check": "question+answer of all 100 rows match benchmarks/data/hotpotqa-validation-0-7405.jsonl (repo canonical full materialization, manifest sha256 14e5499a...) rows 0-99, mismatches=0",
+  "transform": "context.title[i] + joined(context.sentences[i]) -> paragraphs[{title,text}]; question/answer verbatim",
+  "sha256_hotpot_json": "a213e77d88287804081105c24a46fa04ab66fc29a26019cc4f0fcd571fce7fb3",
+  "license": "CC BY-SA 4.0 (see benchmarks/data/HOTPOTQA_ATTRIBUTION.md)"
+}
