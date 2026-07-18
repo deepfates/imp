@@ -1,0 +1,91 @@
+{
+  "cell": "gepa_rerun",
+  "dataset": {
+    "dev": 20,
+    "path": "priv/tutorial/support_tickets.json",
+    "sha256": "7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87",
+    "test": 20,
+    "train": 20
+  },
+  "generated_at": "2026-07-18T06:09:54.403791Z",
+  "git_sha": "26d0ccaee48296b49b17a548e931663ea594f74d",
+  "model": "openai:gpt-5.4-mini",
+  "purpose": "GEPA arm rerun after connect_options fix (PR #33, main 26d0cca)",
+  "reference": {
+    "labeled_fewshot_k8": 0.85,
+    "miprov2": 0.85,
+    "zero_shot": 0.3
+  },
+  "repeats": [
+    {
+      "status": "ok",
+      "cache": {
+        "hits": 0,
+        "misses": 82,
+        "bypasses": 0
+      },
+      "score": 0.95,
+      "repeat": 1,
+      "demo_count": 0,
+      "row_scores": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "compiled_instruction": "{\"instruction\":\"Assign the support ticket to the correct squad by matching the issue type to these ownership areas: atlas for billing/finance (charges, refunds, invoices, plans, taxes, receipts); harbor for integrations/ops delivery issues (webhooks, delivery failures, pipelines, sync, outages in service delivery); beacon for identity and trust issues (accounts, credentials, sessions, permissions, lockouts, access, data exposure); quill for product experience and documentation (feature requests, how-to questions, UX, docs). Choose the best single squad from atlas, harbor, beacon, or quill.\"}",
+      "wall_seconds": 27.998
+    },
+    {
+      "status": "ok",
+      "cache": {
+        "hits": 0,
+        "misses": 82,
+        "bypasses": 0
+      },
+      "score": 0.95,
+      "repeat": 2,
+      "demo_count": 0,
+      "row_scores": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "compiled_instruction": "{\"instruction\":\"Assign the support ticket to the correct squad by issue type. Use atlas for money-related billing, charges, refunds, invoices, plans, taxes, and receipts. Use harbor for platform or technical failures such as outages, errors, latency, and broken integrations/webhooks, even if payment or email is mentioned. Use beacon for identity and trust issues such as accounts, credentials, sessions, permissions, lockouts, or data exposure. Use quill for product experience requests, how-to questions, and documentation/help using the product.\"}",
+      "wall_seconds": 29.894
+    }
+  ]
+}
