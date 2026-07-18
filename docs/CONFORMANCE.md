@@ -138,7 +138,7 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/req_llm_client_test.exs`
-- docs: `docs/internal/UPSTREAM_FIDELITY_AUDIT.md`
+- docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
@@ -162,7 +162,7 @@ Executable evidence:
 
 - test: `test/production_adapter_persistence_test.exs`
 - test: `test/golden_trace_test.exs`
-- docs: `docs/internal/ADAPTER_FIDELITY.md`
+- docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
 - docs: `docs/API_GUIDE.md`
 
 
@@ -186,7 +186,7 @@ Executable evidence:
 - test: `test/multimodal_adapter_test.exs`
 - test: `test/multimodal_quality_benchmark_test.exs`
 - docs: `docs/API_GUIDE.md`
-- docs: `docs/internal/MULTIMODAL_FIDELITY.md`
+- docs: [docs/internal/MULTIMODAL_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/MULTIMODAL_FIDELITY.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
@@ -355,7 +355,7 @@ Executable evidence:
 - test: `test/optimizer_behavioral_corpus_test.exs`
 - test: `test/optimizer_lift_artifact_test.exs`
 - docs: `docs/API_GUIDE.md`
-- docs: `docs/internal/BENCHMARK_TRUTH.md`
+- docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
@@ -468,8 +468,8 @@ Executable evidence:
 - test: `test/protocol_training/provider_training_lifecycle_test.exs`
 - test: `test/public_surface_test.exs`
 - docs: `docs/internal/ADVANCED.md`
-- docs: `docs/internal/COVERAGE_MATRIX.md`
-- docs: `docs/internal/UPSTREAM_FIDELITY_AUDIT.md`
+- docs: [docs/internal/COVERAGE_MATRIX.md](https://github.com/deepfates/imp/blob/main/docs/internal/COVERAGE_MATRIX.md) (repository only, not shipped in the package)
+- docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json`
 
 Missing evidence or behavior:
@@ -539,7 +539,7 @@ Executable evidence:
 - test: `test/gepa_module_selector_test.exs`
 - test: `test/gepa_evaluation_cache_backend_test.exs`
 - docs: `docs/internal/ADVANCED.md`
-- docs: `docs/internal/BENCHMARK_TRUTH.md`
+- docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
@@ -594,7 +594,7 @@ Executable evidence:
 - test: `test/task_supervision_test.exs`
 - test: `test/production_hardening_test.exs`
 - docs: `docs/ARCHITECTURE.md`
-- docs: `docs/internal/PARITY_VALIDATION_PROGRAM.md`
+- docs: [docs/internal/PARITY_VALIDATION_PROGRAM.md](https://github.com/deepfates/imp/blob/main/docs/internal/PARITY_VALIDATION_PROGRAM.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
@@ -703,10 +703,10 @@ Executable evidence:
 - test: `test/production_hardening_test.exs`
 - test: `test/deployment_reference_test.exs`
 - docs: `README.md`
-- docs: `CHANGELOG.md`
+- docs: `../CHANGELOG.md`
 - docs: `LICENSE`
-- docs: `SECURITY.md`
-- docs: `docs/maintainers/RELEASE.md`
+- docs: [SECURITY.md](https://github.com/deepfates/imp/blob/main/SECURITY.md) (repository only, not shipped in the package)
+- docs: [docs/maintainers/RELEASE.md](https://github.com/deepfates/imp/blob/main/docs/maintainers/RELEASE.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
