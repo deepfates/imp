@@ -2,9 +2,12 @@
 
 You know DSPy. This page maps what you know onto Imp, names what is
 deliberately different on the BEAM, and marks what is tracked rather than
-done. Imp follows DSPy 3.2.1 — not loosely: the optimizers are
-verified against the pinned upstream source with executable differential
-tests, and the conformance table below is generated from that program.
+done. Imp follows DSPy 3.2.1 — not loosely. The few-shot and weight
+optimizer families and the adapters carry executable differential tests that
+run real DSPy 3.2.1 in a sidecar and compare arm to arm; other surfaces are
+held by behavioral conformance tests or are deliberate Elixir-native
+equivalents, and two families are marked as honest gaps. The conformance
+table below shows which is which, per surface.
 
 ## The mapping
 
@@ -59,15 +62,16 @@ Imp's conformance program tracks 23 upstream surface groups against DSPy
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| Conformant | 13 | Differentially verified against the pinned upstream source |
+| Conformant | 13 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer and adapter families, a behavioral conformance test elsewhere |
 | Elixir-native equivalent | 6 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
 | Tracking | 2 | Following DSPy's unreleased 3.3 changes |
 | Gap | 2 | Exact-reproduction evidence for the instruction-optimizer family and for GEPA (both non-blocking; local behavior is tested, upstream-matched outcomes are not claimed) |
 
-The per-surface table is the [conformance report](CONFORMANCE.md), generated
-by executable checks (`scripts/` and the `mix imp.benchmark.*` differential
-tasks run real pinned DSPy in a sidecar and compare arm to arm). If this
-page and the code ever disagree, the tests win.
+The per-surface table is the [conformance report](CONFORMANCE.md). Behind
+the differential rows, the `scripts/` sidecars and `mix imp.benchmark.*_differential`
+tasks run real pinned DSPy 3.2.1 and compare arm to arm — a capture raises
+unless Imp's output matches upstream, so you can run them yourself and see
+the match. If this page and the code ever disagree, the code wins.
 
 Ecosystem breadth is the real gap: DSPy has years of retriever integrations,
 observability partners, and community. Imp's seams for that are behaviours

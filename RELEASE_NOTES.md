@@ -24,11 +24,14 @@ Be precise about what kind of thing this release is, in three layers:
 realized natively: the signature DSL, program shapes from `predict` through
 ReAct, CodeAct, and a sandboxed recursive controller, evaluation, fifteen
 optimizers, retrieval, MCP, streaming, and persistence. "Faithful port" is a
-checked claim, not a slogan: every conformance claim in the ledger is asserted
-by executable differential tests against the pinned upstream source, with
-committed, content-addressed evidence artifacts — see
-[Evidence](docs/EVIDENCE.md) for the C0–C5 ladder this is graded on and
-[Conformance](docs/CONFORMANCE.md) for the per-surface table. One complete
+checked claim, not a slogan — and checkable by you. The optimizer and adapter
+families carry executable differential tests that run pinned DSPy 3.2.1 and
+compare outputs, backed by committed, content-addressed evidence artifacts;
+the conformance report tracks all surfaces with per-surface evidence and
+dispositions — differential, Elixir-native equivalent, or honest gap. It is
+not a blanket "everything matches upstream"; it is a per-surface ledger you
+can audit. See [Evidence](docs/EVIDENCE.md) for the C0–C5 ladder this is
+graded on and [Conformance](docs/CONFORMANCE.md) for the per-surface table. One complete
 effectiveness result ships with its artifact: the
 [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s router improves
 from 25–30% to 85% on held-out data across three committed live runs, for

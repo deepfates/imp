@@ -48,6 +48,11 @@ same release directly from source instead, use
 for a model provider (any [ReqLLM](https://hex.pm/packages/req_llm)
 provider works; the docs use OpenAI).
 
+No key yet? You can still build, test, evaluate, and even compile a program
+with a scripted model — Livebooks 02–05 and the "Test It Without A Provider"
+step of the [Learning Path](docs/LEARNING_PATH.md) run start to finish with
+no provider and no spend.
+
 ## Because the program is a value, the rest is ordinary engineering
 
 Each stage below is one stop on the [Learning Path](docs/LEARNING_PATH.md),
@@ -96,11 +101,15 @@ earns them.
 ## The port is verified, and you can run the receipts
 
 Imp is a native BEAM realization of DSPy's research program of programming
-language models instead of prompting them. It tracks DSPy 3.2.1, and
-executable differential tests verify behavior against that pinned upstream
-source, so "faithful port" is a claim you can check yourself: the
-[conformance report](docs/CONFORMANCE.md) enumerates every surface and its
-evidence. Where the BEAM offers more, such as supervision and cheap
+language models instead of prompting them. It tracks DSPy 3.2.1, and its
+optimizer and adapter families carry executable differential tests that run
+real pinned DSPy in a sidecar and compare outputs arm to arm — so "faithful
+port" is a claim you can run yourself, not take on faith. The
+[conformance report](docs/CONFORMANCE.md) then enumerates every surface with
+its own evidence: a differential where a sidecar comparison exists, a
+behavioral conformance test or a deliberate Elixir-native equivalent where
+the BEAM does the job differently, and an honest gap where an exact
+upstream-matched outcome is not yet proven. Where the BEAM offers more, such as supervision and cheap
 concurrency, Imp uses it. [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md)
 maps every name you already know and states exactly what differs.
 

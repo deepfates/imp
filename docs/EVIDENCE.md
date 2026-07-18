@@ -15,7 +15,7 @@ which is the ledger's word for "promised, not proven."
 | Rung | What it proves |
 | --- | --- |
 | **C0** | The API exists and is callable. |
-| **C1** | Behavior conforms to a pinned authority for the declared scope — for most of Imp, an executable differential against the pinned DSPy 3.2.1 source. |
+| **C1** | Behavior conforms to a pinned authority for the declared scope — an executable differential against real DSPy 3.2.1 for the families that have one (the optimizer and adapter families), a behavioral conformance test otherwise. |
 | **C2** | The capability executes operationally through its real boundary (real transport, real process tree, real artifact round-trip). |
 | **C3** | Held-out evidence supports effectiveness for the declared task portfolio — a number on data nothing selected for. |
 | **C4** | An exact paper protocol is reproduced from public authoritative materials. |
