@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 12
+    assert report["fixtures"]["cases"] == 14
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -59,6 +59,18 @@ defmodule GoldenTraceTest do
     assert parity_by_case["list_str_field_json"] == true
     assert parity_by_case["list_int_field_json"] == true
     assert parity_by_case["dict_field_json"] == true
+
+    # Composite chat-adapter PARSE (dee-dgme): a `list[...]`/`dict` chat response
+    # field arrives as JSON text (e.g. `[[ ## tags ## ]]\n["a","b"]`). Chat parse
+    # now JSON-decodes non-scalar field values (mirroring DSPy `parse_value`'s
+    # json-decode-then-validate) so the composite output round-trips. Both cases
+    # reach template_parity (rendering, dee-9ttv) AND prediction_parity (this
+    # parse path). Locked so the parse defect class retires permanently.
+    assert parity_by_case["list_str_field_chat"] == true
+    assert parity_by_case["dict_field_chat"] == true
+
+    assert Enum.find(report["cases"], &(&1["id"] == "list_str_field_chat"))["prediction_parity"]
+    assert Enum.find(report["cases"], &(&1["id"] == "dict_field_chat"))["prediction_parity"]
     assert report["imp"]["runner"] == "imp-golden-trace"
     assert report["dspy"]["runner"] == "python-dspy-golden-trace"
 

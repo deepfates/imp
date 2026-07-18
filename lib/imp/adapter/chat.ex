@@ -150,7 +150,24 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
+  # Composite field types arrive from the chat wire as text (e.g. `["a","b"]`
+  # or `{"k":1}`). DSPy's `parse_value` JSON-decodes non-str field values before
+  # handing them to validation (utils.py: `candidate = json_repair.loads(value)`
+  # then `TypeAdapter(annotation).validate_python(candidate)`); on a decode miss
+  # it falls back to the raw value and lets validation raise. We mirror that here:
+  # decode the binary, and on failure return it unchanged so schema validation
+  # produces the honest "expected array/object" error instead of swallowing it.
+  defp coerce_value(value, :array) when is_binary(value), do: decode_composite(value)
+  defp coerce_value(value, :object) when is_binary(value), do: decode_composite(value)
+
   defp coerce_value(value, _type), do: value
+
+  defp decode_composite(value) do
+    case Jason.decode(value) do
+      {:ok, decoded} -> decoded
+      {:error, _reason} -> value
+    end
+  end
 
   defp fetch_field(fields, name) do
     string_name = to_string(name)
