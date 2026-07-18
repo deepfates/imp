@@ -36,6 +36,18 @@ defmodule GoldenTraceTest do
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
     assert report["fixtures"]["cases"] == 8
+
+    # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
+    # prompt is byte-identical to DSPy's, per case. Every case is measured, and
+    # the chat-adapter paths proven byte-identical to DSPy are LOCKED as
+    # regressions here. Remaining divergences are the JSON-adapter/parse-failure
+    # fallback (dee-ye3h, dee-bd34) and ReAct trajectory (dee-kzop); full
+    # cross-adapter enforcement lands in dee-3e4v.
+    parity_by_case = report["summary"]["template_parity_by_case"]
+    assert map_size(parity_by_case) == report["summary"]["total"]
+    assert parity_by_case["predict_chat_basic"] == true
+    assert parity_by_case["chain_of_thought_basic"] == true
+    assert parity_by_case["typed_fields_chat"] == true
     assert report["imp"]["runner"] == "imp-golden-trace"
     assert report["dspy"]["runner"] == "python-dspy-golden-trace"
 

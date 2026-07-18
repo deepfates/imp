@@ -11,7 +11,10 @@ defmodule Imp.Predict.ChainOfThought do
       |> Imp.Signature.ensure()
       |> Imp.Signature.prepend_output(%{
         name: :reasoning,
-        desc: "Work through the problem step by step before giving the final answer"
+        # DSPy 3.2.1 ChainOfThought sets the reasoning field description to the
+        # "${reasoning}" placeholder, which its ChatAdapter renders as an empty
+        # description. Match it exactly for prompt parity (epic dee-8zev).
+        desc: "${reasoning}"
       })
 
     %__MODULE__{predict: Imp.Predict.Predict.new(signature, opts)}

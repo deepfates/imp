@@ -237,9 +237,15 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         "tool_trace_cases" => length(tool_trace_cases),
         "tool_trace_parity" => Enum.all?(tool_trace_cases, & &1["tool_trace_parity"]),
         "imp_semantic_checks" => semantic_summary(semantic_checks),
-        "message_template_parity" => false,
-        "message_template_note" =>
-          "Imp and DSPy intentionally use different prompt templates; this lane records message traces and asserts normalized prediction parity first."
+        # Computed, not hardcoded: how many cases render byte-identical
+        # prompts to DSPy. This is the real faithful-port measurement (epic
+        # dee-8zev). It is intentionally NOT yet asserted for all cases —
+        # known divergences (CoT reasoning desc dee-l9vm, typed-field type
+        # hints dee-3zun, whitespace dee-qtzk, ReAct dee-kzop, JSON dee-ye3h)
+        # are being fixed; enforcement lands in dee-3e4v once resolved.
+        "template_parity_cases" => Enum.count(comparisons, & &1["template_parity"]),
+        "message_template_parity" => Enum.all?(comparisons, & &1["template_parity"]),
+        "template_parity_by_case" => Map.new(comparisons, &{&1["id"], &1["template_parity"]})
       },
       "imp_semantic_checks" => semantic_checks,
       "cases" => comparisons
@@ -287,15 +293,38 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "tool_trace_parity" => if(tool_trace_required?, do: tool_trace_parity),
       "expected_tool_trace" => expected_tool_trace,
       "expected_prediction" => expected,
+      # Real prompt-fidelity measurement: are the rendered messages Imp sends
+      # byte-identical to what DSPy sends for the same fixture? The prompt IS
+      # the behavior; a divergence here means Imp instructs the model
+      # differently than DSPy and is not a faithful port for this case.
+      # (epic dee-8zev)
+      "template_parity" =>
+        canonical_messages(rendered_messages(imp)) ==
+          canonical_messages(rendered_messages(dspy)),
       "imp" => imp,
       "dspy" => dspy,
-      "intentional_deviations" =>
-        List.wrap(fixture["intentional_deviations"]) ++
-          [
-            "Prompt template byte parity is not asserted in this initial lane; normalized message traces are retained for review."
-          ]
+      "intentional_deviations" => List.wrap(fixture["intentional_deviations"])
     }
   end
+
+  # The rendered prompt messages Imp/DSPy actually sent to the model, across
+  # every LM call, as [%{role, content}] — the comparable unit for prompt
+  # parity. Nil side (missing run) yields [], which will not match a real run.
+  defp rendered_messages(nil), do: []
+
+  defp rendered_messages(side) do
+    (side["history"] || [])
+    |> Enum.flat_map(fn entry -> entry["messages"] || [] end)
+    |> Enum.map(fn message -> Map.take(message, ["role", "content"]) end)
+  end
+
+  # Canonical form for prompt comparison. The Imp side is in-memory Elixir
+  # (message role can be an atom like `:system`) while the DSPy side is
+  # JSON-decoded (role is the string "system"); Elixir `==` distinguishes
+  # those but they are the same wire value. Round-tripping both through JSON
+  # compares exactly what gets sent to the model, matching the report's own
+  # serialized view.
+  defp canonical_messages(messages), do: messages |> Jason.encode!() |> Jason.decode!()
 
   defp error_contains?(_error, nil), do: true
   defp error_contains?(nil, _text), do: false
