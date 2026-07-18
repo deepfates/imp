@@ -17,8 +17,35 @@ defmodule GateContractTest do
              "docs"
            ]
 
+    # Path-filtered CI (dee-4g0z): the fast merge signal. Pinned so it can't
+    # silently drift from production.check's format/compile/unit-suite prefix.
+    assert Keyword.fetch!(aliases, :"fast.check") == [
+             "format --check-formatted",
+             "clean",
+             "compile --warnings-as-errors",
+             "legacy_identity.check",
+             "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package"
+           ]
+
+    # Path-filtered CI (dee-4g0z): the docs-only path. Render docs + validate
+    # livebooks, no package build / campaign / Python differentials.
+    assert Keyword.fetch!(aliases, :"docs.check") == [
+             "docs.clean",
+             "docs",
+             "livebook.check"
+           ]
+
     assert [docs_clean] = Keyword.fetch!(aliases, :"docs.clean")
     assert is_function(docs_clean, 1)
+
+    # fast.check and docs.check run `test`/`livebook.check`, which only work in
+    # the :test env. Mix does NOT auto-switch MIX_ENV for a `test` step nested
+    # inside an alias, so both MUST be pinned in preferred_envs or they silently
+    # run in :dev and blow up ("mix test is running in the dev environment").
+    # This regressed once (dee-4g0z); pin it so it can't again.
+    preferred = Imp.MixProject.cli() |> Keyword.fetch!(:preferred_envs)
+    assert Keyword.get(preferred, :"fast.check") == :test
+    assert Keyword.get(preferred, :"docs.check") == :test
 
     assert Keyword.fetch!(aliases, :"evidence.check") == [
              "reproduction.check",
