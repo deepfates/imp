@@ -51,11 +51,10 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     rows =
       report.surfaces
       |> Enum.map(fn surface ->
-        ticket = Map.get(surface, :ticket, "")
         upstream = Enum.join(surface.upstream, ", ")
         gate = gate_label(surface)
 
-        "| #{surface.id} | #{surface.category} | #{surface.status} | #{gate} | #{upstream} | #{ticket} |"
+        "| #{surface.id} | #{surface.category} | #{surface.status} | #{gate} | #{upstream} |"
       end)
       |> Enum.join("\n")
 
@@ -80,8 +79,8 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     Release blockers: #{report.summary.release_blockers}
     Passing: #{report.summary.passing}
 
-    | ID | Category | Status | Product gate | Upstream surfaces | Ticket |
-    | --- | --- | --- | --- | --- | --- |
+    | ID | Category | Status | Product gate | Upstream surfaces |
+    | --- | --- | --- | --- | --- |
     #{rows}
 
     ## Executable Contracts
