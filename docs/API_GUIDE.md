@@ -197,7 +197,6 @@ order, process-local settings, feedback, metric metadata, and error budgeting.
 | `Imp.program_of_thought/2` | The model should write small sandboxed Elixir snippets. |
 | `Imp.code_act/3` | You want interleaved tool/code execution under a policy. |
 | `Imp.rlm/2` | You need a bounded recursive controller for large-context exploration. |
-| `Imp.Agent` | You want an explicit Elixir agent runtime with tools and events. |
 
 The later sections are there when your program needs more control, not because
 every Imp project should start with agents or recursive controllers.
@@ -959,27 +958,21 @@ forced if the loop ends without output. `Imp.avatar/3` takes one typed action
 per turn and runs each tool in an isolated task under `:tool_timeout_ms`, so
 one hung tool cannot hang the run. `Imp.code_act/3` and
 `Imp.program_of_thought/2` move the action into sandboxed Elixir code, and
-`Imp.rlm/2` gives a controller model a budgeted recursive sandbox. `Imp.Agent`
-below is the explicit runtime — ordinary structs with tools, child agents,
-memory, policies, and event streams — for when you want to own the loop
-yourself. Start with `react/3`; move along the spectrum when a failure mode
-demands it.
+`Imp.rlm/2` gives a controller model a budgeted recursive sandbox. Start with
+`react/3`; move along the spectrum when a failure mode demands it.
+
+The packaged surface deliberately stops there. When you want to own the loop
+yourself, compose the same pieces in ordinary Elixir: call `Imp.Tool.call/2`
+from your own process, keep the loop's state in a GenServer you supervise,
+and pass a `tool_policy:` to any react-family program you delegate to. An
+agent loop you wrote is an agent loop you can reason about — that is the BEAM
+story, not a resident framework.
 
 ```elixir
-tool = Imp.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+double = Imp.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
 
-agent =
-  Imp.Agent.new(:doubler, fn agent, %{x: x}, runtime ->
-    Imp.Agent.call_tool(agent, :double, %{x: x}, runtime)
-  end, tools: [tool], tool_policy: [:double])
-
-{:ok, output, runtime} = Imp.Agent.run(agent, %{x: 4})
-```
-
-For incremental traces:
-
-```elixir
-Imp.Agent.stream_events(agent, %{x: 4}) |> Enum.to_list()
+Imp.Tool.call(double, %{x: 4})
+#=> %{y: 8}
 ```
 
 ## MCP Import

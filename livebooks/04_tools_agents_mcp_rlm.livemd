@@ -35,43 +35,21 @@ lookup =
 Imp.Tool.call(lookup, %{query: "capital-france"})
 ```
 
-## Agent Runtime
+## Owning The Loop Yourself
 
-An agent is an Elixir function plus a runtime. The runtime records traces,
-enforces tool policy, and provides the place where more advanced systems can add
-memory or child-agent calls.
-
-```elixir
-agent =
-  Imp.Agent.new(
-    :qa_agent,
-    fn agent, %{query: query}, runtime ->
-      Imp.Agent.call_tool(agent, :lookup, %{query: query}, runtime)
-    end,
-    tools: [lookup],
-    tool_policy: [:lookup]
-  )
-
-{:ok, output, runtime} = Imp.Agent.run(agent, %{query: "capital-france"})
-{output, runtime.traces}
-```
-
-Incremental trace events:
+The packaged agent surface is the react-family spectrum above. When you want
+a loop the framework does not ship, compose the same pieces in ordinary
+Elixir: tools are values, and calling one is just a function call your own
+supervised process can orchestrate.
 
 ```elixir
-Imp.Agent.stream_events(agent, %{query: "capital-france"}) |> Enum.to_list()
+Imp.Tool.call(lookup, %{query: "capital-france"})
 ```
 
-Tool policy denial:
-
-```elixir
-locked =
-  Imp.Agent.new(:locked, fn agent, _input, runtime ->
-    Imp.Agent.call_tool(agent, :lookup, %{query: "capital-france"}, runtime)
-  end, tools: [lookup], tool_policy: [])
-
-Imp.Agent.run(locked, %{})
-```
+Policy lives where the model chooses actions: any react-family program takes
+`tool_policy:`, and a tool outside the policy becomes a recorded denial
+instead of an execution — the ReAct section above demonstrated exactly that
+boundary.
 
 ## MCP Catalog Import
 

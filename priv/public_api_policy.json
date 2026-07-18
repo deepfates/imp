@@ -2,14 +2,39 @@
   "schema_version": 1,
   "rule_resolution": "most_specific_match",
   "categories": {
-    "facade": {"callbacks": true, "types": true, "support": "facade"},
-    "stable": {"callbacks": true, "types": true, "support": "stable"},
-    "advanced": {"callbacks": true, "types": true, "support": "supported"},
-    "spi": {"callbacks": true, "types": true, "support": "implementer"},
-    "internal": {"callbacks": false, "types": false, "support": "excluded"}
+    "facade": {
+      "callbacks": true,
+      "types": true,
+      "support": "facade"
+    },
+    "stable": {
+      "callbacks": true,
+      "types": true,
+      "support": "stable"
+    },
+    "advanced": {
+      "callbacks": true,
+      "types": true,
+      "support": "supported"
+    },
+    "spi": {
+      "callbacks": true,
+      "types": true,
+      "support": "implementer"
+    },
+    "internal": {
+      "callbacks": false,
+      "types": false,
+      "support": "excluded"
+    }
   },
   "rules": [
-    {"category": "facade", "modules": ["Imp"]},
+    {
+      "category": "facade",
+      "modules": [
+        "Imp"
+      ]
+    },
     {
       "category": "spi",
       "modules": [
@@ -30,6 +55,7 @@
     {
       "category": "internal",
       "modules": [
+        "Imp.Agent",
         "Imp.Agent.Runtime",
         "Imp.FieldSelector",
         "Imp.FunctionContract",
@@ -66,7 +92,6 @@
       "prefixes": [
         "Imp.Adapter.",
         "Imp.Adapters.",
-        "Imp.Agent",
         "Imp.Assertion",
         "Imp.Cache",
         "Imp.Capabilities",

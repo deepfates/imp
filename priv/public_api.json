@@ -35,6 +35,11 @@
   "excluded_modules": [
     {
       "category": "internal",
+      "module": "Imp.Agent",
+      "source": "lib/imp/agent.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Agent.Runtime",
       "source": "lib/imp/agent/runtime.ex"
     },
@@ -893,58 +898,6 @@
         "id",
         "name",
         "result"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "call_child/4",
-        "call_tool/4",
-        "new/3",
-        "run/3",
-        "stream/3",
-        "stream_events/3",
-        "validate_children/1"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Agent",
-      "signatures": {
-        "functions": {
-          "call_child/4": [
-            "call_child(agent, name, input, runtime)"
-          ],
-          "call_tool/4": [
-            "call_tool(agent, name, input, runtime)"
-          ],
-          "new/3": [
-            "new(name, handler, opts \\\\ [])"
-          ],
-          "run/3": [
-            "run(agent, inputs, runtime \\\\ Runtime.new())"
-          ],
-          "stream/3": [
-            "stream(agent, inputs, runtime \\\\ Runtime.new())"
-          ],
-          "stream_events/3": [
-            "stream_events(agent, inputs, runtime \\\\ Runtime.new())"
-          ],
-          "validate_children/1": [
-            "validate_children(children)"
-          ]
-        }
-      },
-      "source": "lib/imp/agent.ex",
-      "struct_fields": [
-        "children",
-        "handler",
-        "input_schema",
-        "name",
-        "output_schema",
-        "tool_policy",
-        "tools"
       ],
       "types": []
     },

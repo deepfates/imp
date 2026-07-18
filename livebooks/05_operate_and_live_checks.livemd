@@ -68,18 +68,18 @@ example = Imp.example(%{key => "value"})
 }
 ```
 
-Trace redaction:
+Trace redaction — secret-shaped values in tool traffic are replaced before
+any event or log leaves the boundary:
 
 ```elixir
 echo = Imp.tool(:echo, "echo", fn input -> input end)
 
-agent =
-  Imp.Agent.new(:redactor, fn agent, _input, runtime ->
-    Imp.Agent.call_tool(agent, :echo, %{api_key: "sk-live", nested: %{token: "secret"}}, runtime)
-  end, tools: [echo])
+trace =
+  Imp.trace(fn ->
+    Imp.Tool.call(echo, %{api_key: "sk-live", nested: %{token: "secret"}})
+  end)
 
-{:ok, _output, runtime} = Imp.Agent.run(agent, %{})
-runtime.traces
+Enum.map(trace.events, fn {name, _measurements, metadata} -> {name, metadata} end)
 ```
 
 ## Optional Live Provider

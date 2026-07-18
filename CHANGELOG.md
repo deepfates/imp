@@ -50,6 +50,10 @@ First Hex release.
   with an explicit seed.
 - The conformance report is byte-reproducible by its generator: repository-
   only link annotations are rendered package-aware instead of hand-edited.
+- `Imp.Agent` is internal: the packaged agent story is the react-family
+  spectrum (`react`, `react_v2`, `avatar`, `code_act`, `rlm`) plus your own
+  supervised Elixir around `Imp.Tool.call/2`. The module still ships and
+  works, but it is no longer documented public API and may change freely.
 - Five internal modules that carried `@moduledoc false` now have short,
   accurate moduledocs marked `Internal.`
 - CI runs four parallel gates over a deterministic dependency cache warmed

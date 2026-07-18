@@ -178,13 +178,15 @@ defmodule DocumentationContractTest do
     refute docs =~ "05 Real LM Wow Path"
   end
 
-  test "canonical API guide distinguishes ReAct programs from agent runtimes" do
+  test "canonical API guide teaches the react/rlm spectrum, not a resident agent runtime" do
     body = File.read!("docs/API_GUIDE.md")
 
     assert body =~ "## Tools And ReAct"
     assert body =~ "Imp.react"
-    assert body =~ "Imp.Agent"
-    assert body =~ "explicit Elixir agent runtime"
+    # Imp.Agent is internal (owner ruling 2026-07-17): the packaged agent
+    # story is the react-family spectrum plus user-owned supervised Elixir.
+    assert body =~ "The packaged surface deliberately stops there."
+    refute body =~ "Imp.Agent"
   end
 
   test "API guide teaches facade-first composition helpers" do
