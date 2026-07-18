@@ -89,6 +89,19 @@ defmodule BootstrapFinetuneTest do
     }
   end
 
+  defp slow_lm(sleep_ms) do
+    %{
+      module: Imp.LM.Static,
+      model: "slow-base",
+      opts: [
+        handler: fn _messages, _opts ->
+          Process.sleep(sleep_ms)
+          %{answer: "ok"}
+        end
+      ]
+    }
+  end
+
   defp always_pass(_example, _prediction), do: 1.0
 
   defp tagged_rows(examples) do
@@ -102,6 +115,41 @@ defmodule BootstrapFinetuneTest do
 
   defp predictor_lms(program) do
     Map.new(Imp.ProgramParameters.predictors(program), &{&1.name, &1.predictor.lm})
+  end
+
+  describe "teacher timeout threading" do
+    test "defaults to 5000ms and accepts :infinity" do
+      assert BootstrapFinetune.new(&always_pass/2).timeout == 5_000
+
+      assert %BootstrapFinetune{timeout: :infinity} =
+               BootstrapFinetune.new(&always_pass/2, timeout: :infinity)
+    end
+
+    test "a teacher slower than the configured timeout selects no traces" do
+      program = Imp.predict("question -> answer", lm: slow_lm(200))
+
+      trainer = fn _lm, _examples, _opts ->
+        {:ok, TrainingJob.new(%{id: "slow-job", status: :running})}
+      end
+
+      optimizer = BootstrapFinetune.new(&always_pass/2, trainer: trainer, timeout: 20)
+      result = BootstrapFinetune.compile(optimizer, program, [train_example()])
+
+      assert %{plan: %TrainingPlan{selected_trace_count: 0}} = result
+    end
+
+    test "raising the timeout past teacher latency selects the trace (5s default was previously not threadable)" do
+      program = Imp.predict("question -> answer", lm: slow_lm(200))
+
+      trainer = fn _lm, _examples, _opts ->
+        {:ok, TrainingJob.new(%{id: "slow-job", status: :running})}
+      end
+
+      optimizer = BootstrapFinetune.new(&always_pass/2, trainer: trainer, timeout: 2_000)
+      result = BootstrapFinetune.compile(optimizer, program, [train_example()])
+
+      assert %{plan: %TrainingPlan{selected_trace_count: 1}} = result
+    end
   end
 
   test "successful trace data is unbounded by default and limiting is opt-in" do

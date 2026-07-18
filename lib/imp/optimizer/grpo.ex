@@ -11,6 +11,11 @@ defmodule Imp.Optimizer.GRPO do
   deadlines in isolated unlinked tasks, so callback implementations must not
   rely on the caller's process dictionary or mailbox. Independent jobs for
   multiple student LMs are not implemented.
+
+  `timeout` bounds each per-example rollout and validation evaluation (default
+  5000ms) and is a BEAM-native execution option: pass a larger value or
+  `:infinity` when rollouts are slow — agentic or environment-backed programs
+  routinely run for minutes and would otherwise be killed at the 5s default.
   """
 
   alias Imp.Clients.{ReinforcementSession, Trainer}
@@ -35,7 +40,8 @@ defmodule Imp.Optimizer.GRPO do
     max_status_polls: 300,
     callback_timeout_ms: 30_000,
     checkpoint_path: nil,
-    train_kwargs: []
+    train_kwargs: [],
+    timeout: 5_000
   ]
 
   @option_schema [
@@ -65,7 +71,8 @@ defmodule Imp.Optimizer.GRPO do
       default: 30_000
     ],
     checkpoint_path: [type: {:or, [:string, nil]}, default: nil],
-    train_kwargs: [type: :keyword_list, default: []]
+    train_kwargs: [type: :keyword_list, default: []],
+    timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5_000]
   ]
 
   def new(reward_fn, opts \\ []) do
@@ -880,7 +887,8 @@ defmodule Imp.Optimizer.GRPO do
               examples,
               trajectory_metric(optimizer.reward_fn),
               max_concurrency: 1,
-              rollout_id: rollout
+              rollout_id: rollout,
+              timeout: optimizer.timeout
             )
             |> Enum.with_index()
             |> Enum.map(fn {trajectory, example_index} ->
@@ -1066,7 +1074,8 @@ defmodule Imp.Optimizer.GRPO do
         nil ->
           _ =
             TrajectoryRunner.run(program, dataset, trajectory_metric(optimizer.reward_fn),
-              max_concurrency: 1
+              max_concurrency: 1,
+              timeout: optimizer.timeout
             )
 
           :ok

@@ -59,6 +59,11 @@ defmodule Imp.Optimizer.BootstrapFinetune do
   attributing trace calls to stable `Imp.ProgramParameters` predictor names.
   `:max_concurrency` is the BEAM-native `num_threads` boundary: it controls
   teacher trace workers and must also cover the number of provider jobs.
+
+  `timeout` bounds each teacher trace-collection execution (default 5000ms) and
+  is a BEAM-native execution option: pass a larger value or `:infinity` when
+  teacher programs are slow — agentic or environment-backed teachers routinely
+  run for minutes and would otherwise be killed at the 5s default.
   """
 
   alias Imp.Clients.{TrainingJob, Trainer}
@@ -81,7 +86,8 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     train_kwargs: [],
     launch_timeout: @default_launch_timeout,
     cancellation_timeout: @default_cancellation_timeout,
-    lifecycle_observer: nil
+    lifecycle_observer: nil,
+    timeout: 5_000
   ]
 
   @option_schema [
@@ -94,7 +100,8 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     exclude_demos: [type: :boolean, default: false],
     train_kwargs: [type: {:custom, __MODULE__, :validate_train_kwargs, []}, default: []],
     launch_timeout: [type: :pos_integer, default: @default_launch_timeout],
-    cancellation_timeout: [type: :pos_integer, default: @default_cancellation_timeout]
+    cancellation_timeout: [type: :pos_integer, default: @default_cancellation_timeout],
+    timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5_000]
   ]
 
   def new(metric, opts \\ []) do
@@ -278,7 +285,8 @@ defmodule Imp.Optimizer.BootstrapFinetune do
              teachers,
              trainset,
              trajectory_metric(optimizer.metric),
-             optimizer.max_concurrency
+             optimizer.max_concurrency,
+             optimizer.timeout
            ),
          {selected, candidates} <- select_trace_data(trace_data, optimizer.max_demos),
          {:ok, rows} <- trace_rows(selected, teachers, predictors, optimizer.exclude_demos),
@@ -374,7 +382,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     end)
   end
 
-  defp collect_trace_data(teachers, trainset, metric, max_concurrency) do
+  defp collect_trace_data(teachers, trainset, metric, max_concurrency, timeout) do
     trace_data =
       teachers
       |> Enum.with_index()
@@ -382,7 +390,8 @@ defmodule Imp.Optimizer.BootstrapFinetune do
         teacher
         |> TrajectoryRunner.run(trainset, metric,
           runtime: :evaluation,
-          max_concurrency: max_concurrency
+          max_concurrency: max_concurrency,
+          timeout: timeout
         )
         |> Enum.map(&%{teacher_index: teacher_index, trajectory: &1})
       end)
