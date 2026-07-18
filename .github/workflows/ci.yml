@@ -9,30 +9,76 @@ concurrency:
   group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
-# The four gates run as parallel jobs so wall-clock ~= the slowest gate
-# (production.check). Only production.check needs the pinned Python/Deno
-# reference environments: the DSPy parity / reference-runtime differential
-# tests live in the root test suite it runs. integration/protocol/quality
-# touch no external runtimes, so those jobs stay light.
+# Tiered, path-filtered CI. The old design ran the full monolith
+# (Python/Deno install + package clean-room + 10-iteration failure campaign
+# + livebook execution + docs) on EVERY push, including one-line doc typos —
+# which is what exhausted the Actions budget. This version:
 #
-# All jobs share one deps/_build/~/.hex cache key (via
-# .github/actions/elixir-setup), but only production.check SAVES it
-# (save-cache: "true" below) — the light gates restore read-only. Racing
-# writers were one half of the four-instance cache-poisoning class recorded
-# in the composite action's header comment; the restore-keys prefix fallback
-# was the other half, and is gone too. A dedicated seed job was considered
-# and rejected: the three light gates finish in seconds, so a seed job would
-# only lengthen the critical path.
+#   * `changes` classifies the diff (code vs docs/livebooks/evidence-only).
+#   * `fast` (format + compile + deterministic unit suite, no Python/Deno)
+#     runs on every PR and is the quick merge signal (~2-3 min).
+#   * `heavy` (production.check: failure campaign, package clean-room,
+#     livebooks, docs, Python-backed differentials) runs only when code
+#     changed. Docs-only PRs skip it entirely.
+#   * `integration`/`protocol`/`quality` run only when code changed.
+#   * `docs` (mix docs + livebook.check) runs only when docs/livebooks changed.
+#
+# Every job that a given change does not need reports as skipped-success, so
+# branch protection stays satisfiable without running the whole matrix on a
+# README edit.
 
 jobs:
-  production:
-    name: production.check
+  changes:
+    name: classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'lib/**'
+              - 'test/**'
+              - 'scripts/**'
+              - 'benchmarks/**'
+              - 'priv/**'
+              - 'examples/**'
+              - 'mix.exs'
+              - 'mix.lock'
+              - '.github/**'
+            docs:
+              - 'docs/**'
+              - 'livebooks/**'
+              - 'README.md'
+              - 'CHANGELOG.md'
+              - 'RELEASE_NOTES.md'
+
+  fast:
+    name: fast.check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          # Full history: the source-binding evidence validators resolve
-          # ancestor SHAs and fail on a shallow checkout.
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
+      # Quick merge signal: no Python, no Deno, no package build, no campaign.
+      # `mix fast.check` = format --check-formatted + compile --warnings-as-errors
+      # + the deterministic unit suite (same exclusions as production.check's
+      # test step, minus failure_campaign/package/livebooks/docs).
+      - run: mix fast.check
+
+  heavy:
+    name: production.check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@v7
+        with:
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
         with:
@@ -58,6 +104,8 @@ jobs:
   integration:
     name: integration.check
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -68,6 +116,8 @@ jobs:
   protocol:
     name: protocol.check
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -78,9 +128,25 @@ jobs:
   quality:
     name: quality.check
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
       - run: mix quality.check
+
+  docs:
+    name: docs.check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
+      # Docs-only path: render docs + validate livebooks, without the
+      # package build / campaign / Python differentials.
+      - run: mix docs.check

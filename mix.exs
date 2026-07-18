@@ -252,6 +252,24 @@ defmodule Imp.MixProject do
         "docs.clean",
         "docs"
       ],
+      # Quick merge signal for path-filtered CI (dee-4g0z): format + compile +
+      # the deterministic unit suite (same exclusions as production.check's test
+      # step), minus failure_campaign/package/livebooks/docs. No Python/Deno
+      # reference runtimes required.
+      "fast.check": [
+        "format --check-formatted",
+        "clean",
+        "compile --warnings-as-errors",
+        "legacy_identity.check",
+        "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package"
+      ],
+      # Docs-only path for path-filtered CI (dee-4g0z): render docs + validate
+      # livebooks, without the package build / campaign / Python differentials.
+      "docs.check": [
+        "docs.clean",
+        "docs",
+        "livebook.check"
+      ],
       "docs.clean": [
         &clean_docs/1
       ],
