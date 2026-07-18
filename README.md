@@ -39,7 +39,7 @@ and retried with the validation error. You never wrote a prompt.
 ## Install
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.1.0"}
+{:imp, github: "deepfates/imp", tag: "v0.2.0"}
 ```
 
 Imp is not on Hex yet; a Hex release is planned. You will need an API key
