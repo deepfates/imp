@@ -280,7 +280,10 @@ defmodule Imp.MixProject do
       ],
       "package.check": [
         "package.clean",
-        "test test/package_contract_test.exs",
+        # cmd, not a plain "test" step: Mix runs each task once per invocation,
+        # so inside production.check (whose suite run already consumed "test")
+        # a plain step would silently no-op and this gate would never execute.
+        "cmd mix test test/package_contract_test.exs",
         "cmd mix hex.build --unpack --output tmp/package-check",
         "imp.package.clean_room --package tmp/package-check"
       ],
