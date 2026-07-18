@@ -138,7 +138,7 @@ defmodule Imp.FailureCampaignTest do
     expected_history = [
       %{"tool" => "lookup", "result" => "transient_local_failure"},
       %{"tool" => "lookup", "result" => "pong"},
-      %{"tool" => "submit", "result" => "completed"}
+      %{"tool" => "finish", "result" => "completed"}
     ]
 
     assert Enum.all?(agent["outcomes"], fn outcome ->

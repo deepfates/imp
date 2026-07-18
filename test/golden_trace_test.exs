@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 14
+    assert report["fixtures"]["cases"] == 15
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -71,6 +71,31 @@ defmodule GoldenTraceTest do
 
     assert Enum.find(report["cases"], &(&1["id"] == "list_str_field_chat"))["prediction_parity"]
     assert Enum.find(report["cases"], &(&1["id"] == "dict_field_chat"))["prediction_parity"]
+
+    # ReAct :dspy_3_2_1 byte-faithfulness (dee-kzop): the reshaped `:dspy_3_2_1`
+    # mode reproduces dspy.ReAct exactly. `react_dspy_tool_lookup` drives Imp's
+    # faithful mode and real dspy.ReAct with the SAME text-trajectory responses,
+    # so the reasoning-signature prompt (question + trajectory ->
+    # next_thought/next_tool_name/next_tool_args), the interleaved trajectory
+    # text, AND the separate ChainOfThought extraction call are all byte-
+    # identical. Locked here so the ReAct trajectory divergence retires
+    # permanently. The three provider-native `react_*` cases stay a documented
+    # deviation (see below).
+    assert parity_by_case["react_dspy_tool_lookup"] == true
+    react_dspy = Enum.find(report["cases"], &(&1["id"] == "react_dspy_tool_lookup"))
+    assert react_dspy["template_parity"]
+    assert react_dspy["prediction_parity"]
+    assert react_dspy["tool_trace_parity"]
+    # 2 reasoning calls + 1 extraction call, all replayed provider-free.
+    assert length(react_dspy["imp"]["history"]) == 3
+    assert length(react_dspy["dspy"]["history"]) == 3
+
+    # The three provider-native ReAct cases remain an intentional, documented
+    # deviation: Imp's default mode uses provider function-tool calls, not the
+    # DSPy text trajectory, so their prompts are NOT byte-identical.
+    assert parity_by_case["react_tool_lookup"] == false
+    assert parity_by_case["react_multi_tool_transform"] == false
+    assert parity_by_case["react_tool_argument_error"] == false
     assert report["imp"]["runner"] == "imp-golden-trace"
     assert report["dspy"]["runner"] == "python-dspy-golden-trace"
 

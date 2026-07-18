@@ -365,42 +365,156 @@ defmodule ReActContractTest do
     assert [%{tool: :submit}] = Imp.Prediction.get(prediction, :history)
   end
 
-  test "DSPy 3.2.1 mode observes tool execution failures and extracts after submit" do
+  # ------------------------------------------------------------------
+  # :dspy_3_2_1 — byte-faithful port of DSPy 3.2.1 dspy.ReAct.
+  #
+  # In this mode the reasoning signature is (inputs + trajectory) ->
+  # next_thought (str), next_tool_name (Literal[tools + 'finish']),
+  # next_tool_args (dict[str, Any]). The model emits those three fields as
+  # ORDINARY chat output — there are no provider tool_calls. Each turn the
+  # observation is appended to a text trajectory; the reserved `finish` tool
+  # terminates the loop; a separate dspy.ChainOfThought pass extracts the outputs
+  # from (inputs + trajectory). These assertions encode what dspy/predict/
+  # react.py actually does, verified byte-for-byte by the golden trace
+  # (react_dspy_tool_lookup). The full-prompt byte-parity is locked in
+  # golden_trace_test.exs; these tests lock the control-flow and shape.
+
+  test "dspy_3_2_1: reasoning signature and instructions match dspy.ReAct" do
+    lookup =
+      Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{query: q} -> q end,
+        schema: %{
+          "type" => "object",
+          "properties" => %{"query" => %{"type" => "string"}},
+          "required" => ["query"]
+        }
+      )
+
+    signature =
+      Imp.signature("question -> answer", "Use the lookup tool when external facts are needed.")
+
+    agent = Imp.Predict.ReAct.new(signature, [lookup], lm: nil, mode: :dspy_3_2_1)
+
+    react = agent.react.signature
+
+    # Inputs = original inputs + a `trajectory` (str) input (react.py line 75).
+    assert Enum.map(react.inputs, & &1.name) == [:question, :trajectory]
+    assert Enum.find(react.inputs, &(&1.name == :trajectory)).type == :string
+
+    # Outputs = next_thought (str) + next_tool_name (Literal[...]) + next_tool_args
+    # (dict) — react.py lines 76-78, in this order.
+    assert Enum.map(react.outputs, & &1.name) == [:next_thought, :next_tool_name, :next_tool_args]
+    next_tool_name = Enum.find(react.outputs, &(&1.name == :next_tool_name))
+
+    # Literal enum is the user tool names, then the reserved `finish` LAST
+    # (react.py adds finish to the tools dict before building the Literal).
+    assert next_tool_name.metadata.constraints.enum == ["lookup", "finish"]
+    assert Enum.find(react.outputs, &(&1.name == :next_tool_args)).type == :object
+
+    # Instructions reproduce DSPy's "You are an Agent..." block, list each tool
+    # textually via str(Tool), and end with the JSON-format reminder (react.py
+    # lines 51-71). The reserved finish tool references the output fields.
+    instr = react.instructions
+    assert instr =~ "Use the lookup tool when external facts are needed."
+    assert instr =~ "You are an Agent. In each episode, you will be given the fields `question`"
+    assert instr =~ "for producing `answer`"
+
+    assert instr =~
+             "(1) lookup, whose description is <desc>Lookup a fact by query.</desc>. " <>
+               "It takes arguments {'query': {'type': 'string'}}."
+
+    assert instr =~ "(2) finish, whose description is <desc>Marks the task as complete."
+
+    assert instr =~
+             "i.e. `answer`, are now available to be extracted.</desc>. It takes arguments {}."
+
+    assert instr =~
+             "When providing `next_tool_args`, the value inside the field must be in JSON format"
+
+    # No provider tool config is attached — the loop is chat-field driven.
+    refute Keyword.has_key?(agent.react.config, :tools)
+    refute Keyword.has_key?(agent.react.config, :tool_choice)
+    # The reserved tool is `finish` (not `submit`).
+    assert Map.has_key?(agent.tools, :finish)
+    refute Map.has_key?(agent.tools, :submit)
+  end
+
+  test "dspy_3_2_1: interleaves the text trajectory then extracts after finish" do
+    parent = self()
+
     Process.put(:react_actions, [
-      %{tool_calls: [%{name: :lookup, arguments: %{query: "x"}}]},
-      %{tool_calls: [%{name: :submit, arguments: %{}}]},
-      %{reasoning: "The failed lookup is enough context", answer: "recovered"}
+      %{
+        next_thought: "Need the lookup result.",
+        next_tool_name: "lookup",
+        next_tool_args: %{"query" => "capital-france"}
+      },
+      %{
+        next_thought: "The lookup result is enough.",
+        next_tool_name: "finish",
+        next_tool_args: %{}
+      },
+      %{reasoning: "The lookup observation says Paris.", answer: "Paris"}
     ])
 
-    lm = sequence_lm(:react_actions)
-    lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "provider exploded" end)
+    lm = fn messages, _opts ->
+      send(parent, {:react_messages, messages})
+      [next | rest] = Process.get(:react_actions)
+      Process.put(:react_actions, rest)
+      {:ok, next}
+    end
+
+    lookup =
+      Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{query: "capital-france"} ->
+        "Paris"
+      end)
+
+    signature =
+      Imp.signature("question -> answer", "Use the lookup tool when external facts are needed.")
 
     agent =
-      Imp.Predict.ReAct.new("question -> answer", [lookup],
+      Imp.Predict.ReAct.new(signature, [lookup],
         lm: lm,
         mode: :dspy_3_2_1,
-        max_iters: 3
+        max_iters: 5
       )
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
-    assert Imp.Prediction.get(prediction, :answer) == "recovered"
-    assert Imp.Prediction.get(prediction, :reasoning) == "The failed lookup is enough context"
-    assert Imp.Prediction.get(prediction, :termination_reason) == :submit
 
+    # Extraction (a separate ChainOfThought) yields reasoning + the outputs.
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+    assert Imp.Prediction.get(prediction, :reasoning) == "The lookup observation says Paris."
+    assert Imp.Prediction.get(prediction, :termination_reason) == :finish
+
+    # History is derived from the trajectory: the real tool call, then finish.
     assert [
-             %{
-               tool: :lookup,
-               result: "Execution error in lookup: provider exploded"
-             },
-             %{tool: :submit, result: "Completed."}
+             %{tool: :lookup, arguments: %{query: "capital-france"}, result: "Paris"},
+             %{tool: :finish, result: "Completed."}
            ] = Imp.Prediction.get(prediction, :history)
 
     assert Process.get(:react_actions) == []
+
+    # The SECOND reasoning call must see the first tool call rendered as the DSPy
+    # text trajectory, with the tool args JSON-serialized the way DSPy does
+    # (space after the colon, from json.dumps).
+    _first = receive(do: ({:react_messages, m} -> m))
+    second = receive(do: ({:react_messages, m} -> m))
+    third = receive(do: ({:react_messages, m} -> m))
+    second_user = second |> List.last() |> Map.fetch!(:content)
+    assert second_user =~ "[[ ## trajectory ## ]]\n[[ ## thought_0 ## ]]\nNeed the lookup result."
+    assert second_user =~ "[[ ## tool_name_0 ## ]]\nlookup"
+    assert second_user =~ ~s([[ ## tool_args_0 ## ]]\n{"query": "capital-france"})
+    assert second_user =~ "[[ ## observation_0 ## ]]\nParis"
+
+    # The extraction call sees the finish observation too, and asks for the
+    # ORIGINAL output field (answer) plus the CoT reasoning field.
+    third_user = third |> List.last() |> Map.fetch!(:content)
+    assert third_user =~ "[[ ## observation_1 ## ]]\nCompleted."
+    assert third_user =~ "`[[ ## reasoning ## ]]`"
+    assert third_user =~ "`[[ ## answer ## ]]`"
   end
 
-  test "DSPy 3.2.1 mode extracts after iteration exhaustion" do
+  test "dspy_3_2_1: iteration exhaustion falls through to extraction" do
     Process.put(:react_actions, [
-      %{tool_calls: [%{name: :lookup, arguments: %{}}]},
+      %{next_thought: "look it up", next_tool_name: "lookup", next_tool_args: %{}},
       %{reasoning: "Use the observation", answer: "observed"}
     ])
 
@@ -419,13 +533,15 @@ defmodule ReActContractTest do
     assert [%{tool: :lookup, result: "observed"}] = Imp.Prediction.get(prediction, :history)
   end
 
-  test "DSPy 3.2.1 mode truncates the oldest events across three context attempts" do
+  test "dspy_3_2_1: truncates the oldest tool call across three context attempts" do
     Process.put(:react_context_responses, [
-      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "first"}}]}},
-      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "second"}}]}},
+      {:ok,
+       %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "first"}}},
+      {:ok,
+       %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "second"}}},
       {:error, %Imp.ContextWindowExceededError{message: "too long"}},
       {:error, %Imp.ContextWindowExceededError{message: "still too long"}},
-      {:ok, %{tool_calls: [%{name: :submit, arguments: %{}}]}},
+      {:ok, %{next_thought: "t", next_tool_name: "finish", next_tool_args: %{}}},
       {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
     ])
 
@@ -447,17 +563,23 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "done"
-    assert [%{tool: :submit, result: "Completed."}] = Imp.Prediction.get(prediction, :history)
+    # After two truncations the earlier tool calls are dropped from the
+    # trajectory (react.py truncate_trajectory pops four keys per call), so the
+    # recorded history reflects only the retained finish call — exactly as DSPy's
+    # returned trajectory would.
+    assert [%{tool: :finish, result: "Completed."}] = Imp.Prediction.get(prediction, :history)
     assert Process.get(:react_context_responses) == []
 
     messages = for _ <- 1..6, do: receive(do: ({:react_context_messages, value} -> value))
+    # Attempt 1 renders the full trajectory; each truncation drops the oldest
+    # tool call (4 keys) and the truncated trajectory propagates forward.
     assert inspect(Enum.at(messages, 2)) =~ "first"
     refute inspect(Enum.at(messages, 3)) =~ "first"
     assert inspect(Enum.at(messages, 3)) =~ "second"
     refute inspect(Enum.at(messages, 4)) =~ "second"
   end
 
-  test "DSPy 3.2.1 mode reports an overflow when no trajectory can be truncated" do
+  test "dspy_3_2_1: reports an overflow when no trajectory can be truncated" do
     error = %Imp.ContextWindowExceededError{message: "input alone is too long"}
     lm = fn _messages, _opts -> {:error, error} end
 
@@ -472,11 +594,13 @@ defmodule ReActContractTest do
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
-  test "DSPy 3.2.1 mode also truncates extraction trajectory retries" do
+  test "dspy_3_2_1: also truncates the extraction trajectory retries" do
     Process.put(:react_extraction_context_responses, [
-      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "first"}}]}},
-      {:ok, %{tool_calls: [%{name: :lookup, arguments: %{query: "second"}}]}},
-      {:ok, %{tool_calls: [%{name: :submit, arguments: %{}}]}},
+      {:ok,
+       %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "first"}}},
+      {:ok,
+       %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "second"}}},
+      {:ok, %{next_thought: "t", next_tool_name: "finish", next_tool_args: %{}}},
       {:error, %Imp.ContextWindowExceededError{message: "too long"}},
       {:error, %Imp.ContextWindowExceededError{message: "still too long"}},
       {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
@@ -500,7 +624,7 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "done"
-    assert [%{tool: :submit, result: "Completed."}] = Imp.Prediction.get(prediction, :history)
+    assert [%{tool: :finish, result: "Completed."}] = Imp.Prediction.get(prediction, :history)
 
     messages =
       for _ <- 1..6, do: receive(do: ({:react_extraction_context_messages, value} -> value))
@@ -511,31 +635,41 @@ defmodule ReActContractTest do
     refute inspect(Enum.at(messages, 5)) =~ "second"
   end
 
-  test "DSPy 3.2.1 mode makes unknown tools recoverable observations" do
+  test "dspy_3_2_1: tool exceptions become recoverable observations" do
     Process.put(:react_actions, [
-      %{tool_calls: [%{name: "missing", arguments: %{}}]},
-      %{tool_calls: [%{name: :submit, arguments: %{}}]},
-      %{reasoning: "The missing tool was not needed", answer: "done"}
+      %{next_thought: "try lookup", next_tool_name: "lookup", next_tool_args: %{"query" => "x"}},
+      %{next_thought: "done", next_tool_name: "finish", next_tool_args: %{}},
+      %{reasoning: "The failed lookup is enough context", answer: "recovered"}
     ])
 
+    lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "provider exploded" end)
+
     agent =
-      Imp.Predict.ReAct.new("question -> answer", [],
+      Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: sequence_lm(:react_actions),
-        mode: :dspy_3_2_1
+        mode: :dspy_3_2_1,
+        max_iters: 3
       )
 
+    # react.py wraps a raising tool call in try/except and stores
+    # "Execution error in {tool}: ..." as the observation, so the model can
+    # recover on a later turn. (Imp's message text stands in for DSPy's Python
+    # traceback — see the release note.)
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "recovered"
 
     assert [
-             %{tool: nil, result: "Execution error in missing: unknown tool"},
-             %{tool: :submit, result: "Completed."}
+             %{tool: :lookup, result: "Execution error in lookup: provider exploded"},
+             %{tool: :finish, result: "Completed."}
            ] = Imp.Prediction.get(prediction, :history)
+
+    assert Process.get(:react_actions) == []
   end
 
-  test "DSPy 3.2.1 mode treats BEAM error tuples as recoverable observations" do
+  test "dspy_3_2_1: a tool returning an error tuple is a recoverable observation" do
     Process.put(:react_actions, [
-      %{tool_calls: [%{name: :lookup, arguments: %{}}]},
-      %{tool_calls: [%{name: :submit, arguments: %{}}]},
+      %{next_thought: "try lookup", next_tool_name: "lookup", next_tool_args: %{}},
+      %{next_thought: "done", next_tool_name: "finish", next_tool_args: %{}},
       %{reasoning: "Recovered from the explicit error", answer: "done"}
     ])
 
@@ -551,11 +685,16 @@ defmodule ReActContractTest do
 
     assert [
              %{tool: :lookup, result: "Execution error in lookup: :not_found"},
-             %{tool: :submit, result: "Completed."}
+             %{tool: :finish, result: "Completed."}
            ] = Imp.Prediction.get(prediction, :history)
   end
 
-  test "DSPy 3.2.1 mode extracts after action parse failure" do
+  test "dspy_3_2_1: an invalid/missing action is a parse failure that extracts" do
+    # react.py breaks the loop on a reasoning-signature ValueError (an action it
+    # cannot parse) and proceeds straight to extraction. Here the model omits
+    # next_tool_name/next_tool_args, so the reasoning signature cannot be parsed.
+    # (JSON adapter so a missing-field parse failure is not masked by the chat
+    # adapter's JSON fallback retry.)
     Process.put(:react_actions, [
       %{next_thought: "I cannot select an action"},
       %{reasoning: "Answer without another action", answer: "fallback"}
@@ -572,21 +711,17 @@ defmodule ReActContractTest do
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "fallback"
     assert Imp.Prediction.get(prediction, :termination_reason) == :parse_failure
+    # Nothing was appended to the trajectory before the failed action.
     assert Imp.Prediction.get(prediction, :history) == []
   end
 
-  test "DSPy 3.2.1 mode does not weaken tool policy failures" do
+  test "dspy_3_2_1: tool policy stays fail-fast (Imp safety extension)" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          send(parent, :react_lm_called)
-          %{tool_calls: [%{name: :lookup, arguments: %{}}]}
-        end
-      ]
-    }
+    lm = fn _messages, _opts ->
+      send(parent, :react_lm_called)
+      {:ok, %{next_thought: "look", next_tool_name: "lookup", next_tool_args: %{}}}
+    end
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "must not execute" end)
 
@@ -597,29 +732,13 @@ defmodule ReActContractTest do
         tool_policy: []
       )
 
+    # DSPy has no tool policy; this is an Imp safety layer. A denied tool is NOT
+    # fed back to the model as a recoverable observation — it fails fast.
     assert {:error, {:tool_denied, :lookup}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
 
     assert_received :react_lm_called
     refute_received :react_lm_called
-  end
-
-  test "DSPy 3.2.1 mode keeps malformed provider calls fail-fast" do
-    Process.put(:react_actions, [
-      %{tool_calls: ["not-a-tool-call"]},
-      %{reasoning: "must not extract", answer: "bad"}
-    ])
-
-    agent =
-      Imp.Predict.ReAct.new("question -> answer", [],
-        lm: sequence_lm(:react_actions),
-        mode: :dspy_3_2_1
-      )
-
-    assert {:error, {:malformed_tool_call, "not-a-tool-call"}} =
-             Imp.Predict.ReAct.call(agent, %{question: "q"})
-
-    assert [_unused_extraction] = Process.get(:react_actions)
   end
 
   test "ReAct mode defaults honestly to the existing provider-native contract" do

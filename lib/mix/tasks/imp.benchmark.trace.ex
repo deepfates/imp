@@ -118,6 +118,15 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         max_iters: Process.get(:imp_golden_trace_max_iters, 20)
       )
 
+  defp build_imp_program("react_dspy", signature, adapter, lm),
+    do:
+      Imp.react(signature, Process.get(:imp_golden_trace_tools, []),
+        lm: lm,
+        adapter: adapter_module(adapter),
+        mode: :dspy_3_2_1,
+        max_iters: Process.get(:imp_golden_trace_max_iters, 20)
+      )
+
   defp build_imp_program(module, _signature, _adapter, _lm),
     do: Mix.raise("unsupported fixture module: #{module}")
 
@@ -339,7 +348,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
   defp tool_trace(%{"history" => history}) when is_list(history) do
     history
-    |> Enum.reject(&(to_string(&1["tool"]) == "submit"))
+    |> Enum.reject(&(to_string(&1["tool"]) in ["submit", "finish"]))
     |> Enum.map(fn event ->
       %{
         "tool" => to_string(event["tool"]),

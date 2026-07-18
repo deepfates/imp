@@ -202,11 +202,13 @@ defmodule Imp.Saving do
   end
 
   defp dump_state(%Imp.Predict.ReAct{} = react) do
+    reserved = Imp.Predict.ReAct.reserved_tool_name(react.mode)
+
     %{
       "type" => "react",
       "signature" => Imp.Signature.dump(react.signature),
       "react" => dump(react.react),
-      "tools" => dump_tools(Map.delete(react.tools, :submit), "ReAct"),
+      "tools" => dump_tools(Map.delete(react.tools, reserved), "ReAct"),
       "max_iters" => react.max_iters,
       "mode" => dump_react_mode!(react.mode),
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReAct tool policy")
@@ -526,12 +528,14 @@ defmodule Imp.Saving do
 
     tools = load_tools!(state["tools"], "ReAct")
     mode = load_react_mode!(Map.fetch!(state, "mode"))
-    submit = load_react_submit_tool(mode)
+    signature = Imp.Signature.load(state["signature"])
+    reserved_name = Imp.Predict.ReAct.reserved_tool_name(mode)
+    reserved = Imp.Predict.ReAct.reserved_tool(mode, signature)
 
     %Imp.Predict.ReAct{
-      signature: Imp.Signature.load(state["signature"]),
+      signature: signature,
       react: require_predict!(load(state["react"]), "ReAct"),
-      tools: Map.put(tools, :submit, submit),
+      tools: Map.put(tools, reserved_name, reserved),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReAct max_iters"),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReAct tool policy"),
       mode: mode
@@ -1060,17 +1064,6 @@ defmodule Imp.Saving do
   defp load_react_mode!(mode) do
     raise ArgumentError, "invalid saved ReAct mode: #{inspect(mode)}"
   end
-
-  defp load_react_submit_tool(:provider_native),
-    do: Imp.Tool.new(:submit, "Submit final outputs", fn args -> args end)
-
-  defp load_react_submit_tool(:dspy_3_2_1),
-    do:
-      Imp.Tool.new(
-        :submit,
-        "Mark the task complete so the collected information can be extracted",
-        fn _args -> "Completed." end
-      )
 
   defp dump_portable_lm(nil, true, _context), do: nil
 

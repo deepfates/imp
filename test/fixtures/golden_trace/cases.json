@@ -420,5 +420,53 @@
         "k": 1
       }
     }
+  },
+  {
+    "id": "react_dspy_tool_lookup",
+    "module": "react_dspy",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Use the lookup tool when external facts are needed.",
+    "inputs": {
+      "question": "What is the capital of France?"
+    },
+    "tools": [
+      {
+        "name": "lookup",
+        "description": "Lookup a fact by query.",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        },
+        "outputs": {
+          "{\"query\":\"capital-france\"}": "Paris"
+        }
+      }
+    ],
+    "responses": [
+      "[[ ## next_thought ## ]]\nNeed the lookup result.\n[[ ## next_tool_name ## ]]\nlookup\n[[ ## next_tool_args ## ]]\n{\"query\":\"capital-france\"}",
+      "[[ ## next_thought ## ]]\nThe lookup result is enough.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## reasoning ## ]]\nThe lookup observation says Paris.\n[[ ## answer ## ]]\nParis"
+    ],
+    "expected_prediction": {
+      "answer": "Paris"
+    },
+    "expected_tool_trace": [
+      {
+        "tool": "lookup",
+        "arguments": {
+          "query": "capital-france"
+        },
+        "result": "Paris"
+      }
+    ],
+    "faithful": "react_dspy builds Imp's byte-faithful :dspy_3_2_1 ReAct against real dspy.ReAct with shared text-trajectory responses; template/prediction/tool-trace parity are all required (dee-kzop)."
   }
 ]

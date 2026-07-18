@@ -106,7 +106,10 @@ def build_program(case: Dict[str, Any], signature):
         return dspy.Predict(signature)
     if module == "chain_of_thought":
         return dspy.ChainOfThought(signature)
-    if module == "react":
+    if module in ("react", "react_dspy"):
+        # `react` and `react_dspy` both build the real dspy.ReAct. The Imp side
+        # differs: `react` builds provider-native ReAct (documented deviation),
+        # while `react_dspy` builds Imp's byte-faithful :dspy_3_2_1 mode.
         return dspy.ReAct(signature, build_tools(case), max_iters=case.get("max_iters", 5))
     raise ValueError(f"unsupported fixture module: {module}")
 

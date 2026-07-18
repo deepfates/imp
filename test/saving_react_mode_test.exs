@@ -14,10 +14,14 @@ defmodule Imp.SavingReActModeTest do
 
     assert loaded.mode == :dspy_3_2_1
 
-    assert loaded.tools.submit.description ==
-             "Mark the task complete so the collected information can be extracted"
+    # The faithful mode's reserved control tool is `finish` (dspy.ReAct), not
+    # `submit`, and its description references the signature's output fields.
+    refute Map.has_key?(loaded.tools, :submit)
 
-    assert Imp.Tool.call(loaded.tools.submit, %{answer: "ignored"}) == "Completed."
+    assert loaded.tools.finish.description ==
+             "Marks the task as complete. That is, signals that all information for producing the outputs, i.e. `answer`, are now available to be extracted."
+
+    assert Imp.Tool.call(loaded.tools.finish, %{answer: "ignored"}) == "Completed."
   end
 
   test "rejects ReAct state missing the current mode field" do
