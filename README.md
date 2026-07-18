@@ -43,8 +43,8 @@ work on language-model behavior. You can test the router against a scripted
 model without spending a cent. You can score it on labeled data and get a
 number instead of an impression. You can hand it to an optimizer that
 rewrites the program until held-out data shows it got better. In the
-[tutorial](docs/TUTORIAL_TICKET_ROUTING.md), a router goes from 35% to 90%
-on tickets it has never seen, in about twenty seconds, for about a cent.
+[tutorial](docs/TUTORIAL_TICKET_ROUTING.md), a router goes from 30% to 85%
+on tickets it has never seen, in about ten seconds, for about a cent.
 You can also read exactly what the optimizer changed, because its work is
 data attached to the program.
 
