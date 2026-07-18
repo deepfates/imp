@@ -73,9 +73,9 @@ defmodule Imp.ReproductionRegistryTest do
     assert copro["admitted_evidence"] == %{
              "tier" => "t1",
              "artifact" =>
-               "benchmarks/evidence/admitted/copro_isolation/23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125.json",
+               "benchmarks/evidence/admitted/copro_isolation/158d8eebdf32704706b8e5224e12ee83d30c7f0059760878af87bac3d14ea574.json",
              "artifact_sha256" =>
-               "23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125",
+               "158d8eebdf32704706b8e5224e12ee83d30c7f0059760878af87bac3d14ea574",
              "protocol_id" => "copro_isolation"
            }
   end
@@ -140,24 +140,24 @@ defmodule Imp.ReproductionRegistryTest do
     assert bootstrap_c1["protocol_id"] == "bootstrap_finetune_differential"
 
     assert bootstrap_c1["artifact_sha256"] ==
-             "fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902"
+             "8a226901c3fc2f02f005a2d6bd3057a80d73ae230205cf13f0ecf1617084ae9d"
 
     expected_admissions = %{
       "avatar" =>
         {"avatar_actor_differential",
-         "609b5b3d0cb57a3aeb5a7fe0167f4272d0fc843a0d6785baf1c925d54ea00f45"},
+         "5f56cc48e7aa09c96e9885695dad387d87e9a15adb576531846e15cf8fccde5a"},
       "avatar_optimizer" =>
         {"avatar_optimizer_differential",
-         "2b1c849f263850e96fbc624d55f06538daea85a212725d234797ca20b327ca23"},
+         "00f89c35ca4805fa1a32c645439cbe8d8a63a79c6ff01dc56641d5e59d62b20c"},
       "grpo" =>
         {"mmgrpo_differential",
-         "eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7"},
+         "a6ed8d44d8b1dad7a608b411829c2a09cae630726658da38f1db1c400f6dac9f"},
       "better_together" =>
         {"better_together_differential",
-         "893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51"},
+         "c62c92dc77719335c7a098b702bd75affefe258ee891c3fdcd1197812ddb8fa5"},
       "ensemble" =>
         {"ensemble_differential",
-         "eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a"}
+         "230c253b640f3263fa05febe693dc3700d8559b8effadc6eef46f72ebdacd185"}
     }
 
     Enum.each(expected_admissions, fn {id, {protocol_id, sha256}} ->

@@ -1,4 +1,4 @@
-# Imp v0.2.0 — release notes
+# Imp v0.2.1 — release notes
 
 Imp is DSPy for the BEAM: declare a language-model task as a typed Elixir
 program, then test, measure, improve, and operate it like any other code.

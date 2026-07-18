@@ -205,7 +205,7 @@ defmodule PackageContractTest do
     # The Hex release is the primary install; the Git tag alternative must
     # reference the same version, and no floating-branch install may appear.
     assert readme =~ ~s({:imp, "~> 0.2.0"})
-    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.2.0"})
+    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.2.1"})
     refute readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
 
     # The README need not offer a source-checkout install, but if it shows

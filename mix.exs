@@ -4,7 +4,7 @@ defmodule Imp.MixProject do
   def project do
     [
       app: :imp,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.19",
       name: "Imp",
       source_url: "https://github.com/deepfates/imp",
@@ -247,7 +247,6 @@ defmodule Imp.MixProject do
         "legacy_identity.check",
         "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
         "benchmark.failure_campaign.check",
-        "reproduction.check",
         "package.check",
         "livebook.check",
         "docs.clean",

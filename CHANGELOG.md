@@ -3,6 +3,53 @@
 All notable Imp changes will be recorded here. Imp follows Semantic
 Versioning once the first public package is released.
 
+## 0.2.1 — 2026-07-18
+
+### Changed
+
+- The fidelity claim now says what is true. "Every conformance claim is
+  differentially verified against pinned upstream" overstated: the
+  conformance report tracks all surfaces with per-surface evidence and
+  dispositions, and executable differentials against real DSPy 3.2.1 back
+  the optimizer and adapter families specifically — not every row. README,
+  `IMP_FOR_DSPY_USERS`, `EVIDENCE`, and the release notes now state that
+  precisely, and it is a claim a skeptic can run.
+- The README points keyless readers at the provider-free Livebooks and
+  Learning Path step, so a reader with no API key sees a working path
+  instead of an `OPENAI_API_KEY` error on the first example.
+- `Imp.Optimizer.BootstrapFewShot` (0.2.0) plus `GRPO` and
+  `BootstrapFinetune` now thread a teacher/rollout `timeout` to the
+  trajectory runner, so slow environment-backed teachers are no longer
+  killed at a fixed 5s with no recourse.
+
+### Fixed
+
+- `Imp.save!`/`Imp.load!` round-trip `config: [json_retries: 1]` and
+  `json_fallback` (the README template program) — the keys survived the
+  artifact as strings and `Predict.new` rejected them on load.
+- GEPA reflection drives live again: the ReqLLM deadline cap no longer
+  fabricates a `:connect_options` key that the provider option schema
+  rejects.
+- The reasoning-model `:max_tokens` → `:max_completion_tokens` rename is
+  now a single debug line, pre-normalized so the request on the wire is
+  unchanged (proven wire-neutral across models).
+- A signature `list[...]` (DSPy's spelling) now suggests `array[...]`
+  (Imp's), instead of the nearest scalar.
+- Three order-dependent test flakes fixed at their synchronization windows
+  without weakening any assertion; a global-settings leak that shifted
+  optimizer digests across test modules is reset on exit.
+
+### Internal (repository, not shipped)
+
+- Documentation restructured: the API guide is a cookbook, deep operations
+  material moved to `docs/OPERATIONS_REFERENCE.md`, and maintainer gate
+  docs to `docs/maintainers/GATES.md`.
+- CI gains an evidence-infrastructure lane, and `production.check` now runs
+  `reproduction.check` so an optimizer source change without a matching
+  evidence re-capture fails per-PR instead of drifting silently. The three
+  differential artifacts made stale by the timeout changes were re-captured
+  against real DSPy 3.2.1.
+
 ## 0.2.0 — 2026-07-17
 
 First Hex release.
