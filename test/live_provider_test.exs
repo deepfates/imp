@@ -55,4 +55,28 @@ defmodule LiveProviderTest do
     assert Imp.Prediction.get(prediction, :answer) == "pong"
     assert Imp.Prediction.get(prediction, :score) == 7
   end
+
+  # The README's hero example prints its output (#=> "security"). That
+  # annotation was aspirational once and wrong in practice (a cold reader
+  # caught the old ticket answering "billing" 4/4) — this test makes the
+  # front door's displayed result a live-verified claim: exact README
+  # program, exact README ticket, exact README model, temp 0.
+  @tag :live
+  test "the README hero example produces its displayed output" do
+    api_key = System.fetch_env!("OPENAI_API_KEY")
+    lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: api_key, temperature: 0)
+
+    route =
+      "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
+      |> Imp.signature("Assign the support ticket to the team that owns it.")
+      |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
+
+    {:ok, prediction} =
+      Imp.call(route, %{
+        ticket:
+          "A customer noticed they can open other users' invoices by changing the number in the URL."
+      })
+
+    assert Imp.get(prediction, :team) == "security"
+  end
 end
