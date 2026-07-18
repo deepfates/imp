@@ -1,6 +1,8 @@
 defmodule RLMBenchmarkArtifactTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   import ExUnit.CaptureIO
 
   test "RLM task writes honest T0 deterministic contract evidence" do

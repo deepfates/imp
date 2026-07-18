@@ -8,6 +8,14 @@ defmodule Imp.Streaming do
     ]
   ]
 
+  @doc """
+  Streams one program call as an Enumerable of chunks.
+
+  With `provider_stream: true` and a provider-streaming-capable program,
+  chunks arrive from the provider as it generates. Otherwise the program runs
+  once and the result is chunked locally (grapheme by grapheme, or through
+  the `:chunker` function when given).
+  """
   def stream(program, inputs, opts \\ []) do
     owned_opts = validate_opts!(opts, "Imp.Streaming.stream/3")
 

@@ -17,16 +17,18 @@ Example / inputs
 
 `Imp` in `lib/imp.ex` is the canonical public entry point:
 
-- `Imp.configure/1`, `Imp.context/2`
-- `Imp.signature/2`, `Imp.example/1`, `Imp.prediction/1`
-- `Imp.with_inputs/2`, `Imp.inputs/1`, `Imp.labels/1`, `Imp.get/3`, `Imp.to_map/1`
-- `Imp.predict/2`, `chain_of_thought/2`, `multi_chain_comparison/2`, `best_of_n/3`, `refine/3`, `assert/3`, `parallel/3`, `knn/3`, `nearest/2`
-- `Imp.program_of_thought/2`, `code_act/3`, `react/3`, `rlm/2`
-- `Imp.memory/2`, `Imp.retrieve/3`, `Imp.rag/3`
-- `Imp.tool/4`, `Imp.with_demos/2`, `Imp.call/2`, `Imp.evaluate/4`
-- `Imp.optimize/3`, `Imp.optimize/4`, `Imp.optimize/5`, `Imp.train/3`, `Imp.train/4`, `Imp.optimizer_capabilities/1`
-- `Imp.exact_match/1`, `Imp.extractive_qa/3`, `Imp.classification/3`, `Imp.classification_report/2`
-- `Imp.dump/1`, `Imp.load/1`, `Imp.save!/2`, `Imp.load!/1`
+- settings: `Imp.configure/1`, `Imp.settings/0`, `Imp.context/2`
+- data: `Imp.signature/2`, `Imp.example/1`, `Imp.with_inputs/2`, `Imp.inputs/1`, `Imp.labels/1`, `Imp.prediction/1`, `Imp.get/3`, `Imp.to_map/1`, `Imp.majority/2`
+- history: `Imp.history/1`, `Imp.append_history/2`
+- programs: `Imp.predict/2`, `Imp.chain_of_thought/2`, `Imp.multi_chain_comparison/2`, `Imp.best_of_n/3`, `Imp.refine/3`, `Imp.assertion/3`, `Imp.assert/3`, `Imp.parallel/3`, `Imp.knn/3`, `Imp.nearest/2`
+- sandbox and recursive programs: `Imp.program_of_thought/2`, `Imp.code_act/3`, `Imp.rlm/2`, `Imp.rlm_serializable/3`
+- tools and agents: `Imp.tool/4`, `Imp.react/3`, `Imp.react_v2/3`, `Imp.avatar/3`
+- retrieval: `Imp.memory/2`, `Imp.retrieve/3`, `Imp.rag/3`
+- execution: `Imp.call/2`, `Imp.stream/3`, `Imp.collect/3`, `Imp.with_demos/2`, `Imp.with_playbook/2`, `Imp.with_lm/2`
+- evaluation and metrics: `Imp.evaluate/4`, `Imp.exact_match/1`, `Imp.extractive_qa/3`, `Imp.classification/3`, `Imp.classification_report/2`
+- optimization: `Imp.optimize/3`, `Imp.optimize/4`, `Imp.optimize/5`, `Imp.train/4`, `Imp.optimizer_capabilities/1`
+- persistence: `Imp.dump/1`, `Imp.dump/2`, `Imp.load/1`, `Imp.load/2`, `Imp.save!/2`, `Imp.save!/3`, `Imp.load!/1`, `Imp.load!/2`
+- observability: `Imp.inspect_history/2`, `Imp.trace/2`, `Imp.subscribe_optimizer_progress/1`, `Imp.unsubscribe_optimizer_progress/1`, `Imp.enable_logging/0`, `Imp.disable_logging/0`
 - provider helper: `Imp.req_llm/2`
 
 Use the facade for application code. Use deeper modules when you need direct
@@ -98,9 +100,10 @@ register a process, or persist state between calls. Their facade contracts
 cover scoring, threshold stopping, deterministic tie selection, failure
 isolation, and provenance.
 
-Finite multidimensional budgets perform ordered-prefix admission before work
-starts. `admitted_budget` is the sum of all admitted projections, while
-`observed_budget` is the sum of projections attached to completed outcomes.
+Finite multidimensional budgets decide up front, in request order, how much
+work may start. `admitted_budget` is the sum of the projections the budget let
+start, while `observed_budget` is the sum of projections attached to completed
+outcomes.
 Neither field is actual provider usage. Sequential evaluators receive prior
 ordered outcomes, which Refine uses for feedback history. Concurrent evaluators
 run under Imp's supervised task runtime, bounded by `max_concurrency`, and

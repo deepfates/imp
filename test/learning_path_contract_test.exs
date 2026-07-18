@@ -1,57 +1,82 @@
 defmodule LearningPathContractTest do
   use ExUnit.Case, async: false
 
-  @contract_paths ["README.md", "docs/LEARNING_PATH.md"]
-  @expected_results %{
-    "readme_predict" => "Paris",
-    "predict" => "Paris",
-    "evaluate" => 1.0,
-    "optimize" => {0.0, 1.0},
-    "react" => "Paris",
-    "retrieval" => {"Paris", 1},
-    "rlm" => {"Paris", [:submit]},
-    "persistence" => "Paris",
-    "observability" => {"Paris", [[:imp, :tool, :start], [:imp, :tool, :stop]]}
+  # The reader-facing docs carry no test markers; this contract pins them by
+  # position instead. `blocks` is the expected number of ```elixir blocks in
+  # the file. `local` lists {index, expected_result} pairs for the blocks that
+  # execute deterministically without provider credentials; every other block
+  # is a live-provider block and is executed end to end by the :live test
+  # below (run via `mix live.check` with OPENAI_API_KEY set).
+  @contract %{
+    "README.md" => %{blocks: 2, local: []},
+    "docs/LEARNING_PATH.md" => %{
+      blocks: 9,
+      local: [
+        {3, {"security", "high"}},
+        {4, 0.5},
+        {7, "security"},
+        {8, {"Ines", [[:imp, :tool, :start], [:imp, :tool, :stop]]}}
+      ]
+    },
+    "docs/TUTORIAL_TICKET_ROUTING.md" => %{blocks: 7, local: []}
   }
 
-  test "every local Elixir learning-path snippet executes with its documented result" do
-    snippets = Enum.flat_map(@contract_paths, &local_snippets/1)
+  test "every documented Elixir snippet parses and the block inventory is pinned" do
+    for {path, %{blocks: expected_count}} <- @contract do
+      blocks = elixir_blocks(path)
 
-    assert MapSet.new(Enum.map(snippets, & &1.name)) == MapSet.new(Map.keys(@expected_results))
+      assert length(blocks) == expected_count,
+             "#{path} has #{length(blocks)} elixir blocks, contract expects #{expected_count}; " <>
+               "update this contract when the docs change"
 
-    Enum.each(snippets, fn snippet ->
-      {result, _binding} = Code.eval_string(snippet.code, [], file: snippet.path)
-      assert result == Map.fetch!(@expected_results, snippet.name), snippet.name
-    end)
+      for {code, index} <- Enum.with_index(blocks) do
+        Code.string_to_quoted!(code, file: "#{path}##{index}")
+      end
+    end
   end
 
-  test "the only non-local Elixir snippet declares the required credentials" do
-    docs = File.read!("docs/LEARNING_PATH.md")
-
-    assert ["live_provider"] =
-             Regex.scan(~r/# learning-path-credential-gated: ([a-z0-9_]+)/, docs)
-             |> Enum.map(fn [_, name] -> name end)
-
-    assert docs =~ "System.fetch_env!(\"OPENAI_API_KEY\")"
-    assert docs =~ "System.fetch_env!(\"OPENAI_MODEL\")"
+  test "deterministic snippets execute with their documented results" do
+    for {path, %{local: local}} <- @contract, {index, expected} <- local do
+      code = path |> elixir_blocks() |> Enum.at(index)
+      {result, _binding} = Code.eval_string(code, [], file: "#{path}##{index}")
+      assert result == expected, "#{path} block #{index}"
+    end
   end
 
-  defp local_snippets(path) do
-    docs = File.read!(path)
+  test "live snippets declare the credential they need" do
+    for {path, %{blocks: count, local: local}} <- @contract, count > length(local) do
+      body = File.read!(path)
+      assert body =~ "OPENAI_API_KEY", "#{path} has live blocks but never names OPENAI_API_KEY"
+    end
+  end
 
-    all_elixir_blocks =
-      Regex.scan(~r/```elixir\n(.*?)\n```/s, docs)
-      |> Enum.reject(fn [_, code] ->
-        String.starts_with?(code, "# learning-path-credential-gated:")
-      end)
+  @tag :live
+  @tag timeout: 600_000
+  test "live documentation paths execute end to end against the real provider" do
+    tmp = Path.join(System.tmp_dir!(), "imp-docs-live-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(tmp)
+    original = File.cwd!()
 
-    snippets =
-      Regex.scan(~r/```elixir\n# learning-path-contract: ([a-z0-9_]+)\n(.*?)\n```/s, docs)
-      |> Enum.map(fn [_, name, code] -> %{name: name, code: code, path: path} end)
+    try do
+      File.cd!(tmp)
 
-    assert length(all_elixir_blocks) == length(snippets),
-           "every local Elixir snippet in #{path} must have a learning-path contract marker"
+      for {path, _spec} <- @contract do
+        blocks = elixir_blocks(Path.join(original, path))
 
-    snippets
+        Enum.reduce(Enum.with_index(blocks), [], fn {code, index}, binding ->
+          {_result, binding} = Code.eval_string(code, binding, file: "#{path}##{index}")
+          binding
+        end)
+      end
+    after
+      File.cd!(original)
+      File.rm_rf!(tmp)
+    end
+  end
+
+  defp elixir_blocks(path) do
+    ~r/```elixir\n(.*?)\n```/s
+    |> Regex.scan(File.read!(path))
+    |> Enum.map(fn [_, code] -> code end)
   end
 end

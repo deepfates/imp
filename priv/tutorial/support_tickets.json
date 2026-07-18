@@ -1,0 +1,254 @@
+{
+  "conventions": [
+    "atlas owns money: charges, refunds, invoices, plans, taxes, receipts.",
+    "harbor owns the platform: outages, errors, latency, queues, and technical failures even when they involve payments or email delivery.",
+    "beacon owns identity and trust: accounts, credentials, sessions, permissions, and data exposure, including routine lockouts.",
+    "quill owns the product experience: feature requests, how-to questions, and documentation."
+  ],
+  "train": [
+    {
+      "ticket": "We were charged twice for the March invoice.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Card payments have been timing out at checkout since 9am.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "I can't log in after resetting my password.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "Can you add a dark mode to the dashboard?",
+      "team": "quill"
+    },
+    {
+      "ticket": "Please send a copy of last month's receipt for our records.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "The API is returning 502 errors intermittently.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "A former employee still has access to our workspace.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "How do I export my data to CSV?",
+      "team": "quill"
+    },
+    {
+      "ticket": "How do I switch from monthly to annual billing?",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Dashboard pages take 30+ seconds to load today.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "We received a password reset email nobody requested.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "The onboarding checklist is confusing; where do I invite teammates?",
+      "team": "quill"
+    },
+    {
+      "ticket": "Our VAT number is wrong on the latest invoice.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Webhooks stopped being delivered around midnight UTC.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "Two-factor codes are not being accepted.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "Does the API support filtering by created date?",
+      "team": "quill"
+    },
+    {
+      "ticket": "I cancelled in April but was still charged in May.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Receipt emails have not been sent for any order since the deploy.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "My account is locked after too many failed logins.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "We'd love a Slack integration for alerts.",
+      "team": "quill"
+    }
+  ],
+  "dev": [
+    {
+      "ticket": "Can we get a refund for the unused seats on our plan?",
+      "team": "atlas"
+    },
+    {
+      "ticket": "The invoice PDF shows the old company address.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "We need a W-9 form before finance will pay the invoice.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Why did our subscription price go up this cycle?",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Please split our invoice across two cost centers.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "The payment processor is returning 500s for all EU transactions.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "File uploads fail for anything over 10 MB.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "Our exports have been stuck in the queue for six hours.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "The status page says operational but the app won't load.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "Checkout shows a spinner forever and never completes.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "One of our users is seeing another customer's data.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "Please rotate our API keys; a laptop was stolen.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "Login attempts from an unfamiliar country appeared in the audit log.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "We need SSO enforced for everyone in the org.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "An invoice link shared publicly shows customer emails.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "The date picker starts weeks on Sunday; can it start Monday?",
+      "team": "quill"
+    },
+    {
+      "ticket": "Is there a way to duplicate a project template?",
+      "team": "quill"
+    },
+    {
+      "ticket": "The docs for the webhooks endpoint are out of date.",
+      "team": "quill"
+    },
+    {
+      "ticket": "Can we get custom fields on customer records?",
+      "team": "quill"
+    },
+    {
+      "ticket": "Where can I see the changelog for last week's release?",
+      "team": "quill"
+    }
+  ],
+  "test": [
+    {
+      "ticket": "Downgrade our plan to the starter tier at the end of the term.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "The proration on our upgrade looks wrong by about $40.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Our purchase order number is missing from the invoice.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Do you offer nonprofit discounts on the team plan?",
+      "team": "atlas"
+    },
+    {
+      "ticket": "The currency on our invoice should be EUR, not USD.",
+      "team": "atlas"
+    },
+    {
+      "ticket": "Scheduled reports did not run last night.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "We're seeing elevated latency from the eu-west region.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "The search index seems stale; new records don't appear.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "Refund attempts fail with a gateway timeout error.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "The mobile app can't sync; requests fail with DNS errors.",
+      "team": "harbor"
+    },
+    {
+      "ticket": "Can you confirm whether our data was in the reported breach?",
+      "team": "beacon"
+    },
+    {
+      "ticket": "A phishing email is impersonating your billing notifications.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "We want to restrict API tokens to read-only scopes.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "Session stays active after logout on shared computers.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "Please enable IP allowlisting for our admin accounts.",
+      "team": "beacon"
+    },
+    {
+      "ticket": "Please support markdown in comments.",
+      "team": "quill"
+    },
+    {
+      "ticket": "Can the weekly digest email be customized with our logo?",
+      "team": "quill"
+    },
+    {
+      "ticket": "Is there an on-prem version of the product?",
+      "team": "quill"
+    },
+    {
+      "ticket": "The mobile app is missing the reports tab.",
+      "team": "quill"
+    },
+    {
+      "ticket": "Can I merge two workspaces into one?",
+      "team": "quill"
+    }
+  ]
+}

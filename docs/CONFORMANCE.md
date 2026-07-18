@@ -2,11 +2,11 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 23
-Conformant: 14
+Conformant: 13
 Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 1
-Claim-specific non-blocking gaps: 1
+Gaps: 2
+Claim-specific non-blocking gaps: 2
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -138,7 +138,7 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/req_llm_client_test.exs`
-- docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
+- docs: `docs/internal/UPSTREAM_FIDELITY_AUDIT.md`
 
 
 Missing evidence or behavior:
@@ -162,7 +162,7 @@ Executable evidence:
 
 - test: `test/production_adapter_persistence_test.exs`
 - test: `test/golden_trace_test.exs`
-- docs: `docs/ADAPTER_FIDELITY.md`
+- docs: `docs/internal/ADAPTER_FIDELITY.md`
 - docs: `docs/API_GUIDE.md`
 
 
@@ -186,7 +186,7 @@ Executable evidence:
 - test: `test/multimodal_adapter_test.exs`
 - test: `test/multimodal_quality_benchmark_test.exs`
 - docs: `docs/API_GUIDE.md`
-- docs: `docs/MULTIMODAL_FIDELITY.md`
+- docs: `docs/internal/MULTIMODAL_FIDELITY.md`
 
 
 Missing evidence or behavior:
@@ -242,7 +242,7 @@ Executable evidence:
 - test: `test/completion_surface_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
-- docs: `docs/REACT_V2_FIDELITY.md`
+- docs: `docs/internal/REACT_V2_FIDELITY.md`
 
 
 Missing evidence or behavior:
@@ -273,7 +273,7 @@ Executable evidence:
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `docs/ARCHITECTURE.md`
-- docs: `docs/RLM_FIDELITY.md`
+- docs: `docs/internal/RLM_FIDELITY.md`
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
 
@@ -355,7 +355,7 @@ Executable evidence:
 - test: `test/optimizer_behavioral_corpus_test.exs`
 - test: `test/optimizer_lift_artifact_test.exs`
 - docs: `docs/API_GUIDE.md`
-- docs: `docs/BENCHMARK_TRUTH.md`
+- docs: `docs/internal/BENCHMARK_TRUTH.md`
 
 
 Missing evidence or behavior:
@@ -404,7 +404,7 @@ Product gate: `claim-specific gap` (nonblocking)
 
 Local conformance: `structural`
 
-Evidence rung: `C1`
+Evidence tier: local structural and behavioral checks
 
 Claim boundary: local structural and behavioral conformance only; this is not paper-family reproduction evidence.
 
@@ -416,7 +416,7 @@ Semantic invariants:
 - the local engine and adapter contracts track pinned standalone GEPA v0.1.4 structure
 - reflective mutation uses per-example feedback and trajectories in focused local tests
 - candidate lineage, Pareto state, and source-versioned results are retained locally
-- C1 conformance does not establish matched upstream or paper-family outcomes
+- local conformance does not establish matched upstream or paper-family outcomes
 
 Executable evidence:
 
@@ -424,8 +424,8 @@ Executable evidence:
 - test: `test/gepa_engine_test.exs`
 - test: `test/gepa_contract_artifact_test.exs`
 - test: `test/gepa_replication_artifact_test.exs`
-- docs: `docs/ADVANCED.md`
-- docs: `docs/RESEARCH_LANDSCAPE.md`
+- docs: `docs/internal/ADVANCED.md`
+- docs: `docs/internal/RESEARCH_LANDSCAPE.md`
 
 
 Missing evidence or behavior:
@@ -467,9 +467,9 @@ Executable evidence:
 - test: `test/provider_training_lifecycle_test.exs`
 - test: `test/protocol_training/provider_training_lifecycle_test.exs`
 - test: `test/public_surface_test.exs`
-- docs: `docs/ADVANCED.md`
-- docs: `docs/COVERAGE_MATRIX.md`
-- docs: `docs/UPSTREAM_FIDELITY_AUDIT.md`
+- docs: `docs/internal/ADVANCED.md`
+- docs: `docs/internal/COVERAGE_MATRIX.md`
+- docs: `docs/internal/UPSTREAM_FIDELITY_AUDIT.md`
 - artifact: `benchmarks/evidence/admitted/local_mlx/c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16.json`
 
 Missing evidence or behavior:
@@ -502,7 +502,7 @@ Executable evidence:
 - test: `test/fast_slow_checkpoint_test.exs`
 - test: `test/fast_slow_runner_test.exs`
 - test: `test/fast_slow_campaign_test.exs`
-- docs: `docs/RESEARCH_LANDSCAPE.md`
+- docs: `docs/internal/RESEARCH_LANDSCAPE.md`
 - docs: `docs/API_GUIDE.md`
 
 
@@ -538,8 +538,8 @@ Executable evidence:
 - test: `test/optimize_anything_tracking_test.exs`
 - test: `test/gepa_module_selector_test.exs`
 - test: `test/gepa_evaluation_cache_backend_test.exs`
-- docs: `docs/ADVANCED.md`
-- docs: `docs/BENCHMARK_TRUTH.md`
+- docs: `docs/internal/ADVANCED.md`
+- docs: `docs/internal/BENCHMARK_TRUTH.md`
 
 
 Missing evidence or behavior:
@@ -594,7 +594,7 @@ Executable evidence:
 - test: `test/task_supervision_test.exs`
 - test: `test/production_hardening_test.exs`
 - docs: `docs/ARCHITECTURE.md`
-- docs: `docs/PARITY_VALIDATION_PROGRAM.md`
+- docs: `docs/internal/PARITY_VALIDATION_PROGRAM.md`
 
 
 Missing evidence or behavior:

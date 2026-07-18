@@ -44,6 +44,32 @@ defmodule ImpFacadeTest do
     assert Imp.get(prediction, :answer) == "Paris"
   end
 
+  test "facade streams and collects one program call" do
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
+    }
+
+    program = Imp.predict("question -> answer", lm: lm)
+
+    assert Imp.stream(program, %{question: "Capital of France?"}) |> Enum.to_list() ==
+             ["P", "a", "r", "i", "s"]
+
+    assert Imp.stream(program, %{question: "Capital of France?"}, chunker: &[&1])
+           |> Enum.to_list() == ["Paris"]
+
+    assert Imp.collect(program, %{question: "Capital of France?"}) == "Paris"
+
+    failing = %{
+      module: Imp.LM.Static,
+      opts: [handler: fn _messages, _opts -> raise "provider down" end]
+    }
+
+    failing_program = Imp.predict("question -> answer", lm: failing)
+
+    assert {:error, _reason} = Imp.collect(failing_program, %{question: "Capital of France?"})
+  end
+
   test "facade exposes examples and predictions through one reader" do
     example =
       Imp.example(question: "2+2?", answer: "4")

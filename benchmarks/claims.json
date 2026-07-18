@@ -84,7 +84,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "test/fixtures/golden_trace/cases.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "test/fixtures/golden_trace/cases.json"],
       "requirements": [
         {
           "id": "golden_trace.full",
@@ -108,7 +108,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/PARITY_VALIDATION_PROGRAM.md", "docs/maintainers/RELEASE.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "docs/maintainers/RELEASE.md"],
       "requirements": [
         {
           "id": "live_matched_model.full",
@@ -132,7 +132,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/bootstrap_few_shot_trajectory_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/bootstrap_few_shot_trajectory_test.exs"],
       "requirements": [{"id": "optimizer.bootstrap_few_shot.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific BootstrapFewShot semantic differential passes"}]
     },
     {
@@ -148,7 +148,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/random_search_policy_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/random_search_policy_test.exs"],
       "requirements": [{"id": "optimizer.random_search.semantic", "kind": "optimizer_conformance", "lane": "optimizer_lift", "evidence": "full", "threshold": "a source-bound family-specific RandomSearch semantic differential passes"}]
     },
     {
@@ -164,7 +164,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json", "test/copro_isolation_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json", "test/copro_isolation_artifact_test.exs"],
       "requirements": [{"id": "optimizer.copro.semantic", "kind": "optimizer_conformance", "lane": "copro_isolation", "evidence": "passing", "threshold": "the canonical COPRO isolation artifact verifies all five declared observations and retained exclusions"}]
     },
     {
@@ -180,7 +180,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md"],
       "requirements": [{"id": "optimizer.bootstrap_few_shot.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out BootstrapFewShot lift satisfies the preregistered multi-seed policy"}]
     },
     {
@@ -196,7 +196,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md"],
       "requirements": [{"id": "optimizer.random_search.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out RandomSearch lift satisfies the preregistered multi-seed policy"}]
     },
     {
@@ -212,7 +212,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md"],
       "requirements": [{"id": "optimizer.copro.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out COPRO lift satisfies the preregistered multi-seed policy"}]
     },
     {
@@ -228,7 +228,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md"],
       "requirements": [{"id": "optimizer.ensemble.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out Ensemble effectiveness satisfies the preregistered policy"}]
     },
     {
@@ -244,7 +244,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/avatar_optimizer_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/avatar_optimizer_test.exs"],
       "requirements": [{"id": "optimizer.avatar.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific held-out Avatar effectiveness satisfies the preregistered policy"}]
     },
     {
@@ -260,7 +260,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
       "requirements": [{"id": "optimizer.bootstrap_finetune.provider_effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "a bounded provider-backed BootstrapFinetune campaign demonstrates held-out effectiveness under matched controls"}]
     },
     {
@@ -276,7 +276,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/better_together_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/better_together_test.exs"],
       "requirements": [{"id": "optimizer.better_together.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "family-specific BetterTogether held-out effectiveness satisfies the preregistered prompt/weight composition policy"}]
     },
     {
@@ -292,7 +292,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy_and_imp_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/PRODUCTION_OPERATIONS.md"],
       "requirements": [{"id": "optimizer.mmgrpo.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "a pinned mmGRPO campaign demonstrates independently scored held-out effectiveness under matched controls"}]
     },
     {
@@ -308,7 +308,7 @@
       "claim_type": "research_replication",
       "comparison": "dspy_gepa",
       "gate_policy": "blocking",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md"],
       "requirements": [
         {
           "id": "gepa_replication.full",
@@ -332,7 +332,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "imp_baseline_and_authored_comparator",
       "gate_policy": "blocking",
-      "sources": ["benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json", "docs/BENCHMARK_TRUTH.md", "docs/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs"],
+      "sources": ["benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json", "docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs"],
       "requirements": [
         {
           "id": "optimize_anything.non_prompt.full",
@@ -356,7 +356,7 @@
       "claim_type": "research_replication",
       "comparison": "upstream_optimize_anything",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "benchmarks/research_portfolio.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "benchmarks/research_portfolio.json"],
       "requirements": [{"id": "optimize_anything.upstream_comparative.full", "kind": "research_replication", "lane": "optimize_anything", "evidence": "full", "threshold": "a matched multi-domain upstream comparison satisfies the preregistered paper-portfolio policy"}]
     },
     {
@@ -372,7 +372,7 @@
       "claim_type": "conformance",
       "comparison": "dspy_for_memory_retrieval_and_imp_native_elsewhere",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "rag.provider_free_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact rag_memory_retrieval, rag_multi_hop_retrieval, and http_retriever_protocol_shape rows pass in a source-bound provider-free artifact"}]
     },
     {
@@ -388,7 +388,7 @@
       "claim_type": "conformance",
       "comparison": "dspy_for_successful_lookup_and_imp_native_for_unknown_tool",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "react.provider_free_tool_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact react_lookup_tool and react_unknown_tool_error_trace rows pass in a source-bound provider-free artifact"}]
     },
     {
@@ -404,7 +404,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "react_v2.provider_free_recovery_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact react_v2_recovers_from_tool_and_submit_errors row passes and terminates by submit"}]
     },
     {
@@ -420,7 +420,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "mcp.in_process_import_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact mcp_import_agent_trace row passes in a source-bound provider-free artifact"}]
     },
     {
@@ -436,7 +436,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "agents.policy_denial_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact agent_tool_policy_denial row passes with the declared denial trace"}]
     },
     {
@@ -452,7 +452,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "code_act.provider_free_execution_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact code_act_tool_program row passes with the declared two-step trace"}]
     },
     {
@@ -468,7 +468,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "program_of_thought.safe_eval_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact program_of_thought_safe_eval and program_of_thought_rejects_unsafe_remote_call rows pass"}]
     },
     {
@@ -484,7 +484,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "streaming.incremental_field_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact streaming_incremental_fields row passes with the declared events"}]
     },
     {
@@ -500,7 +500,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "async.ordered_stream_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact tasks_async_stream_ordered_results row passes with the declared ordered results"}]
     },
     {
@@ -516,7 +516,7 @@
       "claim_type": "conformance",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
       "requirements": [{"id": "persistence.credential_redaction_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact save_load_redacts_provider_secret row passes without persisting its dummy secret"}]
     },
     {
@@ -532,7 +532,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "test/hotpot_retrieval_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "test/hotpot_retrieval_artifact_test.exs"],
       "requirements": [{"id": "rag.hotpot_retrieval.differential", "kind": "retrieval_conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the source-bound ten-row HotPotQA retrieval differential passes exact retrieval and supporting-fact checks"}]
     },
     {
@@ -548,7 +548,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json"],
       "requirements": [{"id": "rag.hotpot_retrieval.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "held-out HotPotQA answer and supporting-fact quality satisfy the preregistered matched comparison"}]
     },
     {
@@ -564,7 +564,7 @@
       "claim_type": "conformance",
       "comparison": "independent_reference_scorer",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/config/bfcl-adapted-differential-v1.json", "test/bfcl_adapted_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/bfcl-adapted-differential-v1.json", "test/bfcl_adapted_artifact_test.exs"],
       "requirements": [{"id": "tools.bfcl_scorer.conformance", "kind": "scorer_conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "all twelve positive fixtures and nine mutations agree across the Elixir and independent Python scorers"}]
     },
     {
@@ -580,7 +580,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/bfcl-adapted-differential-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/bfcl-adapted-differential-v1.json"],
       "requirements": [{"id": "tools.bfcl_selection.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "a pinned BFCL protocol scores model-produced tool calls and satisfies the preregistered matched policy"}]
     },
     {
@@ -596,7 +596,7 @@
       "claim_type": "operational_contract",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/config/rag-tool-failure-differential-v1.json", "test/rag_tool_failure_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/rag-tool-failure-differential-v1.json", "test/rag_tool_failure_differential_test.exs"],
       "requirements": [{"id": "agents.failure_injected.runtime_differential", "kind": "operational_contract", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "all six source-authenticated queued-action scenarios match exact observations and terminals"}]
     },
     {
@@ -612,7 +612,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/rag-tool-failure-differential-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/rag-tool-failure-differential-v1.json"],
       "requirements": [{"id": "agents.failure_recovery.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "an identical model-selected matched failure schedule satisfies preregistered recovery and task-completion thresholds"}]
     },
     {
@@ -631,7 +631,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_CATALOG.md", "test/fixtures/benchmarks/hotpotqa-small.jsonl"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_CATALOG.md", "test/fixtures/benchmarks/hotpotqa-small.jsonl"],
       "requirements": [
         {
           "id": "rlm_benchmark.full",
@@ -655,7 +655,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json", "test/auto_evaluation_contract_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json", "test/auto_evaluation_contract_test.exs"],
       "requirements": [{"id": "evaluation.auto_evaluation.semantic_conformance", "kind": "evaluation_conformance", "lane": "live_matched_model", "evidence": "full", "threshold": "a dedicated source-bound claim lane validates the admitted T1 auto-evaluation artifact against current committed source"}]
     },
     {
@@ -671,7 +671,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "independent_labels_and_dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "benchmarks/config/auto-evaluation-differential-v1.json"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "benchmarks/config/auto-evaluation-differential-v1.json"],
       "requirements": [{"id": "evaluation.natural_judge.effectiveness", "kind": "evaluation_effectiveness", "lane": "live_matched_model", "evidence": "full", "threshold": "a preregistered natural-task campaign establishes judge agreement, calibration, and bias against independent labels"}]
     },
     {
@@ -687,7 +687,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "first_attempt_and_dspy",
       "gate_policy": "blocking",
-      "sources": ["docs/COVERAGE_MATRIX.md", "docs/BENCHMARK_TRUTH.md", "test/refine_feedback_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "test/refine_feedback_test.exs"],
       "requirements": [{"id": "evaluation.refine_advice.effectiveness", "kind": "evaluation_effectiveness", "lane": "live_matched_model", "evidence": "full", "threshold": "a preregistered natural-task campaign shows independent held-out lift under equal candidate and advice-call budgets"}]
     },
     {
@@ -703,7 +703,7 @@
       "claim_type": "performance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/BENCHMARK_TRUTH.md", "docs/maintainers/RELEASE.md"],
+      "sources": ["docs/internal/BENCHMARK_TRUTH.md", "docs/maintainers/RELEASE.md"],
       "requirements": [
         {
           "id": "provider_free_overhead.full",
@@ -727,7 +727,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "imp_local_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/ADVANCED.md", "docs/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
+      "sources": ["docs/internal/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
         {
           "id": "local_mlx_weight_training.full",
@@ -832,6 +832,281 @@
           "lane": "failure_recovery",
           "evidence": "full",
           "threshold": "verified deterministic T0 authority plus a valid completed retrieval_and_tool_agent_recovery_live row"
+        }
+      ]
+    },
+    {
+      "id": "claim.clients.req_llm_batch.durable_execution_contract",
+      "claim_state": "asserted",
+      "target_rung": "C2",
+      "release": "v0.1",
+      "scope": "Deterministic operational contract for Imp.Clients.ReqLLMBatch: checkpointed dispatch, bounded retries, resume semantics, concurrency bounds, and the documented transport payload shape, exercised through real checkpoint files and an injected transport.",
+      "limitations": [
+        "No live provider batch campaign is claimed; transports are injected and no throughput or cost behavior is established."
+      ],
+      "statement": "Imp.Clients.ReqLLMBatch executes durable batches through its real checkpoint and client boundaries: transient failures retry within bounds, terminal and malformed outcomes are explicit, resume fails closed for uncommitted post-dispatch requests, concurrency never exceeds its bound, and JSON-round-tripped messages reach the transport with roles preserved.",
+      "category": "runtime",
+      "surface": [
+        "ReqLLMBatch",
+        "ReqLLM"
+      ],
+      "claim_type": "operational_contract",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/clients/req_llm_batch.ex",
+        "test/req_llm_batch_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "clients.req_llm_batch.durable_execution",
+          "kind": "operational_contract",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/req_llm_batch_test.exs passes in the source-checkout suite gated by mix production.check, including the round-tripped message-role regression, and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.observability.telemetry_trace_contract",
+      "claim_state": "asserted",
+      "target_rung": "C2",
+      "release": "v0.1",
+      "scope": "Redacted telemetry through the real :telemetry boundary: Imp.Telemetry.execute/span, Imp.trace ordered capture, optimizer progress subscriptions including [:imp, :optimizer, :trial] spans, inspect_history redaction, and logging controls.",
+      "limitations": [
+        "No exporter, collector, or provider-side observability integration is claimed; the failure-campaign lane validates span balance and secret-free metadata, not the full subscription surface."
+      ],
+      "statement": "Imp emits redacted, balanced telemetry through the real :telemetry runtime: trace captures ordered events with the operation result, optimizer progress subscriptions deliver baseline, generation, and trial events, and metadata stays secret-free under the deterministic failure campaign's telemetry audit.",
+      "category": "runtime",
+      "surface": [
+        "telemetry",
+        "observability",
+        "redaction"
+      ],
+      "claim_type": "operational_contract",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/telemetry.ex",
+        "lib/imp/observability.ex",
+        "test/observability_test.exs",
+        "test/optimizer_trial_telemetry_test.exs",
+        "docs/PRODUCTION_OPERATIONS.md"
+      ],
+      "requirements": [
+        {
+          "id": "observability.telemetry_trace_contract",
+          "kind": "operational_contract",
+          "lane": "failure_recovery",
+          "evidence": "passing",
+          "threshold": "the verified deterministic failure-campaign artifact reports detached handlers, balanced spans, and secret-free metadata, and test/observability_test.exs plus test/optimizer_trial_telemetry_test.exs pass in the source-checkout suite"
+        }
+      ]
+    },
+    {
+      "id": "claim.core.history_contract",
+      "claim_state": "asserted",
+      "target_rung": "C0",
+      "release": "v0.1",
+      "scope": "The Imp.History public API: immutable signature-shaped conversation turns with append, messages, truncation, and serialization behavior as documented.",
+      "limitations": [
+        "No pinned DSPy History differential exists; conformance to upstream History semantics beyond the documented Imp behavior is not claimed."
+      ],
+      "statement": "Imp.History exists and is callable as documented: turns are immutable signature-keyed maps that the Chat adapter renders as prior conversation turns.",
+      "category": "runtime",
+      "surface": [
+        "history",
+        "signature"
+      ],
+      "claim_type": "feature_completeness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/history.ex",
+        "test/history_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "core.history_contract",
+          "kind": "feature_completeness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/history_test.exs passes in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.playbook.transactional_delta_contract",
+      "claim_state": "asserted",
+      "target_rung": "C0",
+      "release": "v0.1",
+      "scope": "The Imp.Playbook public API: the Imp.with_playbook/2 facade and the module delta API with transactional commit, policy bounds, provenance, tombstones, and hash-chained revisions.",
+      "limitations": [
+        "No pinned external authority exists for the playbook contract, and playbook optimizer effectiveness is not claimed here; live playbook campaign artifacts in benchmarks/results are recorded runs, not an admitted effectiveness claim."
+      ],
+      "statement": "Imp.Playbook exists and is callable as documented: deltas are evaluated against a private candidate and committed atomically only when every operation and policy bound succeeds, with exact content equality after normalization.",
+      "category": "optimizer",
+      "surface": [
+        "playbook"
+      ],
+      "claim_type": "feature_completeness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/playbook.ex",
+        "lib/imp/optimizer/playbook.ex",
+        "test/playbook_test.exs",
+        "test/playbook_with_context_test.exs",
+        "test/playbook_optimizer_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "playbook.transactional_delta_contract",
+          "kind": "feature_completeness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/playbook_test.exs, test/playbook_with_context_test.exs, and test/playbook_optimizer_test.exs pass in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.embeddings.boundary_contract",
+      "claim_state": "asserted",
+      "target_rung": "C0",
+      "release": "v0.1",
+      "scope": "The Imp.Embeddings behaviour and the deterministic Imp.Embeddings.BagOfWords baseline: shape validation that every input text receives exactly one numeric vector in order.",
+      "limitations": [
+        "No embedding quality, provider-backed embedding behavior, or retrieval effectiveness is claimed."
+      ],
+      "statement": "Imp.Embeddings exists and is callable: the boundary rejects mispaired or malformed provider output and the BagOfWords baseline embeds deterministically.",
+      "category": "tools_agents_rag",
+      "surface": [
+        "embeddings",
+        "retrieval"
+      ],
+      "claim_type": "feature_completeness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/embeddings.ex",
+        "test/completion_surface_test.exs",
+        "docs/API_GUIDE.md"
+      ],
+      "requirements": [
+        {
+          "id": "embeddings.boundary_contract",
+          "kind": "feature_completeness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "the Imp.Embeddings boundary tests in test/completion_surface_test.exs pass in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+        }
+      ]
+    },
+    {
+      "id": "claim.logprobs.extraction_conformance",
+      "claim_state": "asserted",
+      "target_rung": "C1",
+      "release": "v0.1",
+      "scope": "Joint token logprob extraction for one enum-constrained JSON field using the exact overlap rule of llm-structured-confidence 0.4.5 as used by GEPA commit 65df4325e3fb4781cf2ab17dd144d6ce2f7b98fe, with the declared deviation that empty overlap is an error rather than confidence 1.0.",
+      "limitations": [
+        "The authority is pinned by module documentation and deterministic tests, not by an executed cross-runtime differential artifact; provider logprob quality and calibration are separate claims."
+      ],
+      "statement": "Imp.Logprobs implements the pinned overlap rule for enum-constrained field extraction, resolves enum alternatives, and reports empty overlap as unavailable instead of a misleading numeric zero.",
+      "category": "evaluation",
+      "surface": [
+        "logprobs",
+        "confidence"
+      ],
+      "claim_type": "conformance",
+      "comparison": "llm_structured_confidence_and_gepa",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/logprobs.ex",
+        "test/logprobs_capabilities_test.exs",
+        "test/req_llm_confidence_metadata_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "logprobs.extraction_conformance",
+          "kind": "conformance",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/logprobs_capabilities_test.exs and test/req_llm_confidence_metadata_test.exs pass in the source-checkout suite gated by mix production.check"
+        }
+      ]
+    },
+    {
+      "id": "claim.confidence.scoring_conformance",
+      "claim_state": "asserted",
+      "target_rung": "C1",
+      "release": "v0.1",
+      "scope": "Confidence-aware evaluation for enum-constrained JSON classification following GEPA commit 65df4325e3fb4781cf2ab17dd144d6ce2f7b98fe for joint logprob, scoring formulas, feedback buckets, and alternative formatting, with fail-closed handling of missing logprobs.",
+      "limitations": [
+        "The authority is pinned by module documentation and deterministic tests, not by an executed cross-runtime differential artifact; live calibration artifacts in benchmarks/results are recorded measurements, not an admitted calibration claim."
+      ],
+      "statement": "Imp.Confidence scores enum-constrained predictions by the pinned GEPA formulas, treats raw confidence as diagnostic metadata, gives incorrect predictions zero confidence quality, and fails closed on missing logprobs unless accuracy fallback is selected explicitly.",
+      "category": "evaluation",
+      "surface": [
+        "confidence",
+        "evaluation"
+      ],
+      "claim_type": "conformance",
+      "comparison": "llm_structured_confidence_and_gepa",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/confidence.ex",
+        "lib/imp/confidence/scoring.ex",
+        "test/confidence_test.exs",
+        "test/confidence_scoring_test.exs",
+        "test/confidence_calibration_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "confidence.scoring_conformance",
+          "kind": "conformance",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "test/confidence_test.exs, test/confidence_scoring_test.exs, and test/confidence_calibration_test.exs pass in the source-checkout suite gated by mix production.check"
+        }
+      ]
+    },
+    {
+      "id": "claim.docs.tutorial_ticket_routing.optimizer_lift",
+      "claim_state": "asserted",
+      "target_rung": "C3",
+      "release": "v0.1",
+      "scope": "The exact experiment shipped in docs/TUTORIAL_TICKET_ROUTING.md: LabeledFewShot(k: 8) lift over the zero-shot enum router on the twenty held-out tickets of the shipped sixty-ticket support dataset with openai:gpt-5.4-mini, across three cache-cleared live repeats.",
+      "limitations": [
+        "One task, one dataset, one model; no generalization beyond the shipped support-ticket dataset, no search-optimizer effectiveness, and no DSPy-matched comparison is claimed.",
+        "The tutorial's headline single draw (0.35 -> 0.90) was not reproduced exactly; the committed repeats measured 0.25-0.30 -> 0.85, inside the doc's published repeat ranges (baseline 0.20-0.40, optimized 0.85-0.90)."
+      ],
+      "statement": "The tutorial's optimizer lift reproduces live: in the committed three-repeat artifact every cache-cleared repeat improves held-out routing accuracy, measuring baseline 0.25-0.30 against optimized 0.85 on the twenty held-out tickets with a minimum absolute lift of 0.55.",
+      "category": "optimizer",
+      "surface": [
+        "docs",
+        "LabeledFewShot",
+        "predict",
+        "signature"
+      ],
+      "claim_type": "functional_effectiveness",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "docs/TUTORIAL_TICKET_ROUTING.md",
+        "scripts/tutorial_ticket_routing_experiment.exs",
+        "benchmarks/evidence/admitted/tutorial_ticket_routing/55af30010802d1625a1b800bc3ae905b80b383f7613673c5d11f69b10daff031.json",
+        "test/tutorial_ticket_routing_artifact_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "docs.tutorial_ticket_routing.optimizer_lift",
+          "kind": "optimizer_effectiveness",
+          "lane": "product_package",
+          "evidence": "passing",
+          "threshold": "the committed content-addressed tutorial artifact verifies dataset provenance and positive held-out lift with zero cache hits in every recorded repeat, enforced by test/tutorial_ticket_routing_artifact_test.exs in the suite gated by mix production.check"
         }
       ]
     }

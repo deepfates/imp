@@ -1,6 +1,8 @@
 defmodule OptimizerLiftArtifactTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   import ExUnit.CaptureIO
 
   test "optimizer lift artifact includes passing natural user-story lanes" do

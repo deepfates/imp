@@ -39,10 +39,10 @@ defmodule PackageContractTest do
   ]
 
   @excluded_files [
-    "docs/BENCHMARK_CATALOG.md",
-    "docs/BENCHMARK_TRUTH.md",
-    "docs/COVERAGE_MATRIX.md",
-    "docs/PARITY_VALIDATION_PROGRAM.md",
+    "docs/internal/BENCHMARK_CATALOG.md",
+    "docs/internal/BENCHMARK_TRUTH.md",
+    "docs/internal/COVERAGE_MATRIX.md",
+    "docs/internal/PARITY_VALIDATION_PROGRAM.md",
     "docs/maintainers/RELEASE.md",
     "docs/maintainers/EVIDENCE.md",
     "lib/imp/legacy_identity_audit.ex",
@@ -199,10 +199,11 @@ defmodule PackageContractTest do
     assert unqualified == []
   end
 
-  test "README starts with immutable release installs and labels source-checkout installs" do
+  test "README starts with the immutable Git tag install and labels source-checkout installs" do
     readme = File.read!("README.md")
 
-    assert readme =~ ~s({:imp, "~> 0.1.0"})
+    # Imp is not published on Hex; the README must not claim a Hex install.
+    refute readme =~ ~s({:imp, "~> )
     assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.1.0"})
     refute readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
     assert readme =~ "source checkout"

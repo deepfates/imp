@@ -4,7 +4,7 @@ defmodule Imp.MixProject do
   def project do
     [
       app: :imp,
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.19",
       name: "Imp",
       source_url: "https://github.com/deepfates/imp",
@@ -12,6 +12,7 @@ defmodule Imp.MixProject do
       package: package(),
       docs: [
         main: "Imp",
+        assets: %{"assets" => "assets"},
         api_reference: true,
         extras: ["README.md", "CHANGELOG.md"] ++ product_docs() ++ livebooks(),
         filter_modules: &public_doc_module?/2,
@@ -155,7 +156,9 @@ defmodule Imp.MixProject do
         ".formatter.exs",
         "CHANGELOG.md",
         "LICENSE",
+        "assets/imp-with-cards.jpg",
         "priv/public_api.json",
+        "priv/tutorial/support_tickets.json",
         "README.md",
         "mix.exs"
       ]
@@ -165,21 +168,24 @@ defmodule Imp.MixProject do
     [
       "docs/README.md",
       "docs/LEARNING_PATH.md",
+      "docs/TUTORIAL_TICKET_ROUTING.md",
       "docs/GLOSSARY.md",
-      "docs/IMP_PHILOSOPHY.md",
+      "docs/PHILOSOPHY.md",
+      "docs/IMP_FOR_DSPY_USERS.md",
+      "docs/CONFORMANCE.md",
       "docs/PRIOR_ART.md",
-      "docs/RESEARCH_LANDSCAPE.md",
+      "docs/internal/RESEARCH_LANDSCAPE.md",
       "docs/ARCHITECTURE.md",
-      "docs/IDENTITY_COMPATIBILITY.md",
+      "docs/internal/IDENTITY_COMPATIBILITY.md",
       "docs/API_GUIDE.md",
-      "docs/TUTORIAL_EXAMPLE_PARITY.md",
-      "docs/ADVANCED.md",
-      "docs/REACT_V2_FIDELITY.md",
-      "docs/RLM_FIDELITY.md",
-      "docs/INSTRUCTION_OPTIMIZER_FIDELITY.md",
-      "docs/COMBEE_FIDELITY.md",
-      "docs/AX_DIFFERENTIAL.md",
-      "docs/OBSERVABILITY.md",
+      "docs/internal/TUTORIAL_EXAMPLE_PARITY.md",
+      "docs/internal/ADVANCED.md",
+      "docs/internal/REACT_V2_FIDELITY.md",
+      "docs/internal/RLM_FIDELITY.md",
+      "docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md",
+      "docs/internal/COMBEE_FIDELITY.md",
+      "docs/internal/AX_DIFFERENTIAL.md",
+      "docs/internal/OBSERVABILITY.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
   end
@@ -213,6 +219,9 @@ defmodule Imp.MixProject do
     |> Map.fetch!("excluded_modules")
     |> MapSet.new(& &1["module"])
   end
+
+  # ExDoc passes nil for references that name no module (links between extras).
+  defp skip_filtered_doc_reference?(nil), do: false
 
   defp skip_filtered_doc_reference?(reference) do
     reference = String.trim_leading(reference, "Elixir.")

@@ -38,6 +38,11 @@ Imp.Test.EnvLoader.load()
 external_excludes =
   [
     {"LIVE_PROVIDER", :live},
+    # Maintainer-only evidence/reproduction-registry checks. They need full git
+    # history, the pinned DSPy Python environments, and provider credentials.
+    # Include them with EVIDENCE_INFRASTRUCTURE=1 mix test (or --include
+    # evidence_infrastructure). See "Maintainer checks" in CONTRIBUTING.md.
+    {"EVIDENCE_INFRASTRUCTURE", :evidence_infrastructure},
     {"PROTOCOL_TRAINING", :protocol_training},
     {"PROTOCOL_RETRIEVER", :protocol_retriever},
     {"PROTOCOL_MCP", :protocol_mcp}

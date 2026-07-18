@@ -1,6 +1,8 @@
 defmodule Imp.BenchmarkTruth.EvidenceAdmissionTest do
   use ExUnit.Case, async: false
 
+  @moduletag :evidence_infrastructure
+
   alias Imp.BenchmarkTruth.EvidenceAdmission
   alias Imp.ReproductionRegistry
 

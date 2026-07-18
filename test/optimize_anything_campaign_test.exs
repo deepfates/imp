@@ -453,6 +453,7 @@ defmodule OptimizeAnythingCampaignTest do
     refute persisted =~ "CANARY_OA_PRICING"
   end
 
+  @tag :evidence_infrastructure
   test "live task requires explicit pricing and all spend ceilings" do
     base = [
       "--live",

@@ -460,6 +460,7 @@ defmodule GepaMetricsTest do
     assert metric.(example, Imp.prediction(response: "bridge-ok")) == 1.0
   end
 
+  @tag :evidence_infrastructure
   test "IFBench registry parity fixtures cover every active upstream instruction id" do
     fixture_path = "test/fixtures/ifbench_registry_parity.jsonl"
     fixtures = load_ifbench_parity_fixtures(fixture_path)

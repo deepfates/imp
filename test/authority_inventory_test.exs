@@ -3,9 +3,9 @@ defmodule AuthorityInventoryTest do
 
   @authority_path "benchmarks/authorities.json"
   @claims_path "benchmarks/claims.json"
-  @surface_map_path "docs/UPSTREAM_SURFACE_MAP.md"
-  @coverage_matrix_path "docs/COVERAGE_MATRIX.md"
-  @parity_program_path "docs/PARITY_VALIDATION_PROGRAM.md"
+  @surface_map_path "docs/CONFORMANCE.md"
+  @coverage_matrix_path "docs/internal/COVERAGE_MATRIX.md"
+  @parity_program_path "docs/internal/PARITY_VALIDATION_PROGRAM.md"
 
   @dimensions [
     "upstream_repository",

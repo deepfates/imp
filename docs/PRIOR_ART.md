@@ -31,7 +31,7 @@ of hand-writing prompt glue:
 - [ds_ex / DSPEx](https://github.com/nshkrdotcom/ds_ex) is prior Elixir work
   on pure-BEAM DSPy-style programming, and
   [gepa_ex](https://github.com/nshkrdotcom/gepa_ex) is nearby Elixir GEPA work.
-  They are prior art to inspect, not authorities for parity or effectiveness.
+  They are prior art to inspect, not sources Imp measures itself against.
 
 The goal of Imp is not a mechanical translation of any one codebase. It is a
 BEAM-native interpretation of the same broad philosophy:
@@ -48,4 +48,4 @@ MIPROv2, GEPA, ReAct, or RLM, the local module documentation and tests define
 the Imp contract.
 
 The broader paper, repository, and production-system review is recorded in
-[Research Landscape](RESEARCH_LANDSCAPE.md).
+the repository's internal research notes.

@@ -3,6 +3,7 @@ defmodule RagToolAgentArtifactTest do
 
   import ExUnit.CaptureIO
 
+  @tag :evidence_infrastructure
   test "RAG tool agent task writes a passing production-semantics artifact" do
     out_dir = tmp_dir("rag-tool-agent")
 

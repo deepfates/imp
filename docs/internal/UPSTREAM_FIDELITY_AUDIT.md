@@ -3,7 +3,7 @@
 Imp tracks upstream fidelity as executable product contracts, not as a list of
 names found in source code or documentation. The authoritative ledger lives in
 `Imp.UpstreamFidelity`; the generated, maintainer-readable projection is the
-[Executable Upstream Conformance Map](UPSTREAM_SURFACE_MAP.md).
+[Executable Upstream Conformance Map](../CONFORMANCE.md).
 
 ## Baseline Policy
 
@@ -77,7 +77,7 @@ Regenerate the checked-in readable projection:
 ```sh
 mix imp.upstream_fidelity \
   --format markdown \
-  --out docs/UPSTREAM_SURFACE_MAP.md
+  --out docs/internal/../CONFORMANCE.md
 ```
 
 Run the release-blocking conformance gate:
