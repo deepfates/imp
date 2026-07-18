@@ -283,6 +283,23 @@ defmodule ReqLLMClientTest do
     def generate_text(_model, _messages, _opts), do: :not_a_req_llm_response
   end
 
+  # Captures the opts Imp hands to req_llm for any model form (string or inline
+  # map), without stringifying the model — used by the wire-neutrality test.
+  defmodule WireStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:wire_generate, model, opts})
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_wire",
+         model: "wire",
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(~s({"answer":"pong","score":7})),
+         object: nil
+       }}
+    end
+  end
+
   defmodule InlineModelStub do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:inline_model_generate, model, opts})
@@ -831,6 +848,60 @@ defmodule ReqLLMClientTest do
     refute Keyword.has_key?(opts, :max_tokens)
     refute Keyword.has_key?(opts, :temperature)
     refute Keyword.has_key?(opts, :top_p)
+  end
+
+  test "reasoning-model normalization is wire-neutral vs req_llm's own default (no silent cap)" do
+    # Without an explicit limit, req_llm injects its own default and renames it,
+    # logging a warning on every call. Imp pre-normalizes so req_llm never sees
+    # :max_tokens and stays quiet. That MUST NOT change the request on the wire:
+    # for each model, the final token options must equal what req_llm would have
+    # produced from an untouched request. The o1-mini row (nil output limit) is the
+    # regression guard — a naive `fallback:` would silently cap a model req_llm
+    # leaves uncapped.
+    wire = fn model, opts ->
+      opts
+      # req_llm's text/stream-path default injection (no fallback).
+      |> ReqLLM.Provider.Options.put_model_max_tokens_default(model)
+      # req_llm's reasoning rename, part of translate_options for :chat.
+      |> then(&(ReqLLM.Providers.OpenAI.translate_options(:chat, model, &1) |> elem(0)))
+      |> then(fn o ->
+        {Keyword.get(o, :max_tokens), Keyword.get(o, :max_completion_tokens)}
+      end)
+    end
+
+    # The last entry is an inline reasoning model with no output limit: req_llm
+    # leaves it UNCAPPED, so Imp must too. It is the regression guard against a
+    # silent cap (a naive `fallback:` would have injected one here).
+    specs = [
+      "openai:gpt-5.4-mini",
+      "openai:o3-mini",
+      "openai:gpt-5",
+      %{provider: :openai, id: "o1-mini"}
+    ]
+
+    for spec <- specs do
+      {:ok, model} = ReqLLM.model(spec)
+
+      lm = Imp.req_llm(spec, test_pid: self(), req_module: WireStub, cache: false)
+      program = Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
+
+      assert {:ok, _prediction} = Imp.call(program, %{question: "pong?"})
+      assert_received {:wire_generate, _model, imp_opts}
+
+      old_wire = wire.(model, [])
+      new_wire = wire.(model, imp_opts)
+
+      assert old_wire == new_wire,
+             "wire changed for #{inspect(spec)}: req_llm default #{inspect(old_wire)} " <>
+               "vs Imp-normalized #{inspect(new_wire)}"
+
+      # req_llm never sees :max_tokens for these models, so it never logs the rename.
+      refute Keyword.has_key?(imp_opts, :max_tokens)
+    end
+
+    # Spell out the guard: the inline no-limit reasoning model stays uncapped.
+    {:ok, nolimit} = ReqLLM.model(%{provider: :openai, id: "o1-mini"})
+    assert wire.(nolimit, []) == {nil, nil}
   end
 
   test "ReqLLM client supports inline model descriptors without losing provider profiles" do

@@ -9,6 +9,8 @@ defmodule Imp.Clients.ReqLLM do
 
   @behaviour Imp.LM
 
+  require Logger
+
   defstruct model: nil,
             opts: [],
             req_module: ReqLLM
@@ -606,25 +608,47 @@ defmodule Imp.Clients.ReqLLM do
 
     if openai_reasoning_model?(model) do
       opts
-      |> rename_max_tokens_for_reasoning()
+      |> rename_max_tokens_for_reasoning(model)
       |> Keyword.drop([:temperature, :top_p, :frequency_penalty, :presence_penalty])
     else
       opts
     end
   end
 
-  defp rename_max_tokens_for_reasoning(opts) do
+  # Reasoning models use `:max_completion_tokens`, not `:max_tokens`. If we hand
+  # `:max_tokens` (or no token limit at all) to req_llm, it injects/renames the
+  # option itself and logs a `[warning] Renamed :max_tokens ...` line on every
+  # request — twice, once per prepare pass. We pre-normalize here so req_llm never
+  # sees `:max_tokens` for these models and stays quiet.
+  #
+  # Wire-neutrality is load-bearing: we must send the SAME request req_llm would.
+  # On the text/stream path req_llm resolves its own default with
+  # `put_model_max_tokens_default(opts, model)` — NO fallback (see
+  # `ReqLLM.Provider.Options.maybe_extract_max_tokens/2`): it seeds the model's
+  # output limit when one exists and otherwise leaves the request uncapped. We call
+  # the exact same helper with the exact same (fallback-free) semantics, differing
+  # only in the target key — which is precisely what req_llm's rename step would
+  # have produced. A `fallback:` here would silently cap models that req_llm leaves
+  # uncapped, so it is deliberately omitted.
+  defp rename_max_tokens_for_reasoning(opts, model) do
     {max_tokens, opts} = Keyword.pop(opts, :max_tokens)
 
     cond do
       Keyword.has_key?(opts, :max_completion_tokens) ->
         opts
 
-      is_nil(max_tokens) ->
-        opts
+      not is_nil(max_tokens) ->
+        Logger.debug(fn ->
+          "Imp: renamed :max_tokens to :max_completion_tokens for reasoning model " <>
+            inspect(model_id(model))
+        end)
+
+        Keyword.put(opts, :max_completion_tokens, max_tokens)
 
       true ->
-        Keyword.put(opts, :max_completion_tokens, max_tokens)
+        ReqLLM.Provider.Options.put_model_max_tokens_default(opts, model,
+          key: :max_completion_tokens
+        )
     end
   end
 
