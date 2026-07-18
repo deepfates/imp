@@ -86,7 +86,7 @@ defmodule Imp.Adapter.JSON do
     fields
     |> Enum.with_index(1)
     |> Enum.map_join("\n", fn {field, index} ->
-      "#{index}. `#{field.name}` (#{annotation_name(field.type)}): #{field_desc(field)}"
+      "#{index}. `#{field.name}` (#{field_annotation_name(field)}): #{field_desc(field)}"
     end)
     |> String.trim()
   end
@@ -128,7 +128,7 @@ defmodule Imp.Adapter.JSON do
   defp translate_field_type(field, :input), do: "{#{field.name}}"
 
   defp translate_field_type(field, :output) do
-    case type_note(field.type) do
+    case output_note_desc(field) do
       nil ->
         "{#{field.name}}"
 
@@ -136,6 +136,11 @@ defmodule Imp.Adapter.JSON do
         "{#{field.name}}" <> String.duplicate(" ", 8) <> "# note: the value you produce " <> note
     end
   end
+
+  # Composite output fields (enum->Literal, array->list, object->dict) note first
+  # via CompositeType (dee-9ttv); scalars keep their existing type_note clauses.
+  defp output_note_desc(field),
+    do: Imp.Adapter.CompositeType.note_desc(field) || type_note(field.type)
 
   defp type_note(:string), do: nil
   defp type_note(:integer), do: "must be a single int value"
@@ -162,14 +167,23 @@ defmodule Imp.Adapter.JSON do
   defp user_message_output_requirements(signature) do
     fields =
       Enum.map_join(signature.outputs, ", then ", fn field ->
-        "`#{field.name}`" <> type_info(field.type)
+        "`#{field.name}`" <> type_info(field)
       end)
 
     "Respond with a JSON object in the following order of fields: " <> fields <> "."
   end
 
-  defp type_info(:string), do: ""
-  defp type_info(type), do: " (must be formatted as a valid Python #{annotation_name(type)})"
+  defp type_info(field) do
+    case field_annotation_name(field) do
+      "str" -> ""
+      name -> " (must be formatted as a valid Python #{name})"
+    end
+  end
+
+  # DSPy annotation name for a field: composite types (Literal/list/dict) resolve
+  # through CompositeType; scalars fall back to the plain type-name mapping.
+  defp field_annotation_name(field),
+    do: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
 
   # utils.get_annotation_name for the scalar types Imp models.
   defp annotation_name(:string), do: "str"

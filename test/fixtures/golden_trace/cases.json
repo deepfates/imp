@@ -311,5 +311,77 @@
     "intentional_deviations": [
       "Both DSPy and Imp retry ChatAdapter parse failure through JSON-style output handling; this fixture deliberately gives the retry another incomplete response, so shared error status and trace retention are asserted."
     ]
+  },
+  {
+    "id": "enum_literal_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> label: enum[yes,no]",
+    "instructions": "Classify the statement as yes or no.",
+    "inputs": {
+      "question": "Is fire hot?"
+    },
+    "responses": [
+      "[[ ## label ## ]]\nyes"
+    ],
+    "expected_prediction": {
+      "label": "yes"
+    }
+  },
+  {
+    "id": "list_str_field_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> tags: array[string]",
+    "instructions": "Return the tags as a list of strings.",
+    "inputs": {
+      "question": "Tag this: beam and elixir."
+    },
+    "responses": [
+      "{\"tags\": [\"beam\", \"elixir\"]}"
+    ],
+    "expected_prediction": {
+      "tags": [
+        "beam",
+        "elixir"
+      ]
+    }
+  },
+  {
+    "id": "list_int_field_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> scores: array[integer]",
+    "instructions": "Return the scores as a list of integers.",
+    "inputs": {
+      "question": "The scores are three and seven."
+    },
+    "responses": [
+      "{\"scores\": [3, 7]}"
+    ],
+    "expected_prediction": {
+      "scores": [
+        3,
+        7
+      ]
+    }
+  },
+  {
+    "id": "dict_field_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> meta: object",
+    "instructions": "Return the metadata as a JSON object.",
+    "inputs": {
+      "question": "Key k has value 1."
+    },
+    "responses": [
+      "{\"meta\": {\"k\": 1}}"
+    ],
+    "expected_prediction": {
+      "meta": {
+        "k": 1
+      }
+    }
   }
 ]
