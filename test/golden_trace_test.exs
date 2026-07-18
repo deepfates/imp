@@ -36,6 +36,16 @@ defmodule GoldenTraceTest do
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
     assert report["fixtures"]["cases"] == 8
+
+    # Prompt fidelity (epic dee-8zev): the lane now MEASURES whether Imp's
+    # rendered prompt is byte-identical to DSPy's, per case. Every case is
+    # measured, and the basic predict path — proven byte-identical to DSPy —
+    # must stay that way. Known divergences (CoT dee-l9vm, typed fields
+    # dee-3zun, whitespace dee-qtzk, ReAct dee-kzop, JSON dee-ye3h) are being
+    # fixed; full enforcement lands in dee-3e4v.
+    parity_by_case = report["summary"]["template_parity_by_case"]
+    assert map_size(parity_by_case) == report["summary"]["total"]
+    assert parity_by_case["predict_chat_basic"] == true
     assert report["imp"]["runner"] == "imp-golden-trace"
     assert report["dspy"]["runner"] == "python-dspy-golden-trace"
 
