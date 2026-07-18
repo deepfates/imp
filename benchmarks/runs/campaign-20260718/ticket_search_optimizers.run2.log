@@ -1,0 +1,2161 @@
+Compiling 1 file (.ex)
+Generated imp app
+dataset sha256=7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87 train=20 dev=20 test=20
+
+==== ARM zero_shot ====
+  -- repeat 1/2
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:44.821 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:45.677 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:45.771 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:45.785 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:45.797 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:45.912 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:45.916 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:46.235 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:46.505 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:46.505 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:46.684 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:47.000 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:47.202 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.3 misses=20 bypasses=0 demos=0 dur=5041ms errors=0
+  -- repeat 2/2
+
+21:31:49.864 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:49.864 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:49.865 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:49.865 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:49.865 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:49.864 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:49.866 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:49.866 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:50.470 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:50.470 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:50.470 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:50.487 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:50.680 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:51.136 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:51.222 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:51.225 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:51.331 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:51.756 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:51.842 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:51.945 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.3 misses=20 bypasses=0 demos=0 dur=4806ms errors=0
+
+==== ARM labeled_fewshot_k8 ====
+  -- repeat 1/2
+
+21:31:54.684 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:54.684 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:54.684 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:54.684 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:54.685 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:54.685 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:54.685 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:54.685 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:55.280 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:55.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:55.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:55.339 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:55.359 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:55.470 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:56.000 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:56.114 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:56.181 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:56.208 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:56.586 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:56.620 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.85 misses=20 bypasses=0 demos=8 dur=5153ms errors=0
+  -- repeat 2/2
+
+21:31:59.826 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:59.826 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:59.826 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:59.826 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:59.826 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:59.827 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:59.828 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:31:59.828 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:00.400 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:00.400 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:00.469 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:00.476 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:00.491 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:00.983 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:01.011 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:01.080 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:01.166 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:01.410 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:01.514 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:01.544 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.85 misses=20 bypasses=0 demos=8 dur=2998ms errors=0
+
+==== ARM bootstrap_fewshot_b8 ====
+  -- repeat 1/2
+
+21:32:02.833 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:03.487 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:04.173 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:04.770 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:05.419 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:06.135 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:07.569 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:08.077 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:08.635 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:09.153 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:09.723 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:10.540 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:11.050 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:11.605 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:12.225 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:13.098 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:13.771 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:14.419 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:14.990 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:15.591 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.239 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.239 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.239 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.239 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.240 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.240 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.239 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.242 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.788 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.800 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.893 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:16.900 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:17.374 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:17.400 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:17.616 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:18.016 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:18.251 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:18.318 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:18.554 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:18.669 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.6 misses=40 bypasses=0 demos=5 dur=18198ms errors=0
+  -- repeat 2/2
+
+21:32:21.023 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:21.691 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:22.252 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:22.983 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:23.582 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:24.098 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:25.004 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:25.595 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:26.104 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:26.719 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:27.691 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:28.524 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:29.276 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:29.730 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:30.225 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:30.917 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:31.495 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:32.044 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:32.585 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.087 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.810 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.810 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.810 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.811 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.811 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.811 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.811 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:33.812 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:34.294 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:34.297 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:34.469 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:34.500 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:34.911 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:34.970 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:35.155 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:35.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:35.731 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:35.776 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:35.876 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:36.450 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.5 misses=40 bypasses=0 demos=6 dur=17415ms errors=0
+
+==== ARM random_search_c8_d4 ====
+  -- repeat 1/2
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:38.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.009 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.009 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.064 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.100 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.111 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.112 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.117 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.724 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.730 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.825 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:39.848 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:40.132 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:40.974 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:41.688 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:42.254 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:42.898 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:43.519 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:43.996 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:44.527 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:45.210 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:45.764 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:46.578 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:47.096 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:47.928 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:48.465 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:49.090 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:49.760 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.373 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.373 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.373 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.373 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.374 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.375 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.375 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.375 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.922 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:50.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.014 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.065 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.114 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.472 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.542 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.630 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.636 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.664 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.843 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:51.848 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:54.681 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:55.395 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:57.734 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.465 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.465 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.465 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.465 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.465 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.466 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.466 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.465 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.946 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:58.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.029 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.068 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.194 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.535 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.563 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.614 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.703 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:32:59.827 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:00.137 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:00.182 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:02.222 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.079 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.079 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.079 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.080 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.080 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.080 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.080 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.080 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.630 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.641 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.802 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:03.975 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:04.168 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:04.274 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:04.370 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:04.733 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:05.118 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:05.236 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:05.308 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:05.938 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.870 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.870 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.871 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.871 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.871 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.871 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.871 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:08.871 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:09.420 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:09.428 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:09.598 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:09.792 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:10.044 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:10.149 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:10.197 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:10.486 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:10.697 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:10.885 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:11.037 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:11.146 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:13.412 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.030 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.030 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.592 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.783 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.823 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:14.845 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:15.311 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:15.311 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:15.489 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:15.602 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:15.610 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:15.973 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:15.976 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:19.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:20.380 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:20.380 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:20.380 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:20.387 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:20.874 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:20.932 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:21.005 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:21.072 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:21.249 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:21.476 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:21.551 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:21.585 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.956 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.956 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.956 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.957 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.957 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.957 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.957 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:22.957 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:23.420 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:23.757 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:23.757 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:23.757 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:23.991 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:24.079 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:24.408 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:24.411 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:24.466 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:24.471 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:24.550 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:24.983 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.607 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.607 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:26.607 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.237 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.247 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.334 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.947 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.947 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.947 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:27.969 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:28.691 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:28.863 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:29.378 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.635 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.635 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.635 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.635 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.635 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.636 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.636 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:31.636 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:32.239 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:32.331 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:32.508 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:32.610 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:32.905 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:33.094 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:33.096 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:33.362 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:33.528 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:33.643 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:33.661 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:33.900 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.255 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.255 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.255 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.256 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.256 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.256 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.256 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.257 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.744 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.846 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:35.973 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:36.021 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:36.026 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:36.329 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:36.508 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:36.540 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:36.585 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:36.696 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:37.147 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:37.179 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.45 misses=240 bypasses=0 demos=4 dur=60803ms errors=0
+  -- repeat 2/2
+
+21:33:39.218 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.218 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.218 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.218 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.219 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.219 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.219 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.218 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.817 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:39.880 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.010 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.010 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.157 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.540 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.607 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.653 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.707 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:40.711 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:41.097 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:41.132 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:42.680 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:43.181 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:44.004 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:44.526 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:45.226 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:46.049 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:46.786 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:47.568 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:48.197 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:48.796 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.426 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.964 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.964 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.964 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.964 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.965 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.966 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.966 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:49.966 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:50.552 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:50.552 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:50.552 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:50.581 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:50.656 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:51.034 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:51.129 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:51.153 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:51.241 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:51.724 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:51.737 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:51.818 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:53.670 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:54.494 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:55.157 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:56.184 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:56.982 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:57.706 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.741 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.741 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.741 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.741 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.742 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.742 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.741 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:58.743 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.234 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.260 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.359 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.431 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.658 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.723 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.862 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:33:59.976 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:00.066 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:00.271 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:00.431 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:00.663 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:01.914 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.640 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.640 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.640 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.641 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.641 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.641 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.641 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:02.642 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.137 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.212 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.265 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.391 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.432 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.456 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.650 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.758 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:03.911 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:04.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:04.070 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:04.136 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:05.314 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.020 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.020 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.020 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.020 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.020 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.020 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.020 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.021 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.692 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.766 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.875 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:06.879 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:07.326 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:07.392 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:07.498 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:07.559 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:07.559 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:08.054 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:08.139 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:08.211 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:10.615 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.440 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.440 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.440 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.440 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.440 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.441 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.440 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.442 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.976 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.991 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:11.993 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:12.127 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:12.218 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:12.679 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:12.683 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:12.791 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:12.995 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:13.097 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:13.401 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:13.414 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.230 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.231 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.232 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.232 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.712 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.756 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:15.856 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:16.349 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:16.354 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:16.391 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:16.470 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:16.522 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:16.956 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:17.134 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:17.191 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:17.472 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.905 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.905 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.905 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.905 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.905 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.906 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.906 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:18.906 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:19.524 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:19.600 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:19.635 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:19.646 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:19.772 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:20.121 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:20.158 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:20.192 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:20.277 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:20.284 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:20.380 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:20.700 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:22.407 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.083 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.083 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.158 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.194 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.210 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.666 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.750 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.809 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:23.827 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:24.233 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:24.310 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:24.463 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.275 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.275 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.275 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.275 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.276 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.276 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.276 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.276 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.895 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.948 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:26.948 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:27.010 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:27.129 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:27.238 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:27.564 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:27.564 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:27.711 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:27.746 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:28.123 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:28.240 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.891 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.891 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.891 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.892 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:29.892 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:30.479 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:30.479 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:30.525 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:30.672 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:31.401 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:31.401 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:31.814 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:31.973 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:32.178 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:32.732 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:32.797 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:32.823 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.5 misses=240 bypasses=0 demos=4 dur=55772ms errors=0
+
+==== ARM miprov2 ====
+  -- repeat 1/2
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:34.987 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:35.598 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:35.598 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:35.598 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:35.637 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:35.715 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:35.885 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:36.125 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:36.318 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:36.425 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:36.611 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:36.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:37.072 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.167 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.167 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.167 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.167 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.167 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.168 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.168 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.169 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.720 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.740 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.833 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:40.887 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:41.304 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:41.334 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:41.555 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:41.607 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:41.644 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:41.832 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:41.848 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:42.151 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:45.394 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:47.833 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:51.213 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:53.523 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.891 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.892 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.892 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:55.892 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:56.594 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:56.594 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:56.653 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:56.958 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:57.305 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:57.322 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:57.330 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:57.693 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:57.841 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:57.960 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:58.435 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:34:58.644 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.650 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.651 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.651 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.651 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.650 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.651 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.652 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:02.652 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:03.244 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:03.297 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:03.305 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:03.389 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:03.970 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:04.031 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:04.057 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:04.070 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:04.680 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:04.680 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:04.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:05.344 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.866 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.866 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.866 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.866 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.867 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.867 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.867 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:07.867 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:08.516 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:08.516 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:08.529 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:08.547 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:08.583 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:08.586 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:09.199 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:09.237 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:09.272 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:09.319 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:09.800 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:09.890 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.85 misses=104 bypasses=0 demos=8 dur=36765ms errors=0
+  -- repeat 2/2
+
+21:35:11.739 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:11.739 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:11.739 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:11.739 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:11.739 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:11.740 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:11.740 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:11.740 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:12.367 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:12.382 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:12.487 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:12.487 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:12.847 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:13.018 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:13.025 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:13.505 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:13.657 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:13.758 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:13.764 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:13.986 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.942 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.942 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.942 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.942 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.942 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.944 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.944 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:15.944 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:16.455 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:16.455 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:16.468 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:16.476 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:16.499 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:16.574 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:17.071 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:17.086 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:17.091 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:17.157 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:17.169 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:17.198 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:18.394 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:20.860 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:23.478 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:25.069 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.487 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.488 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.488 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.488 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.488 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.488 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.488 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:28.489 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:29.010 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:29.054 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:29.361 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:29.397 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:29.521 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:29.521 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:29.564 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:30.082 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:30.095 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:30.181 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:30.283 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:30.600 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.153 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.153 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.154 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.154 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.154 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.154 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.154 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.155 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.737 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.748 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.771 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.785 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.970 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:33.973 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:34.585 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:34.585 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:34.585 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:34.607 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:34.719 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:35.301 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.404 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.405 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.405 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.405 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.405 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.405 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.405 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.405 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.959 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:37.986 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:38.010 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:38.579 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:38.591 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:38.869 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:39.190 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:39.190 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:39.241 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:39.725 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:39.769 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:39.907 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.85 misses=104 bypasses=0 demos=8 dur=31229ms errors=0
+
+==== ARM copro ====
+  -- repeat 1/2
+
+21:35:42.974 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.527 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.527 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.527 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.527 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.527 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.528 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.528 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:44.529 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.098 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.107 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.127 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.205 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.266 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.744 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.744 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:45.754 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:46.169 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:46.428 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:46.510 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:46.655 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.306 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.306 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.308 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.308 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.308 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:49.942 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.011 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.011 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.157 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.195 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.257 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.687 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.760 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.786 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.847 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.849 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:50.851 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.967 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.967 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.968 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.968 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.969 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.969 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.969 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:54.970 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:55.574 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:55.574 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:55.574 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:55.581 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:55.646 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:55.650 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:56.189 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:56.189 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:56.221 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:56.365 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:56.411 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:56.812 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:58.348 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:35:59.548 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.180 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.180 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.192 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.260 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.672 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.724 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.803 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.861 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:00.864 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:01.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:01.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:01.307 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.35 misses=82 bypasses=0 demos=0 dur=19524ms errors=0
+  -- repeat 2/2
+
+21:36:02.492 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.977 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.977 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.977 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.978 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.978 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.977 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.979 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:03.980 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:04.687 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:04.702 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:04.811 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:04.860 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:04.877 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:04.908 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:05.507 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:05.507 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:05.608 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:05.623 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:05.715 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:05.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.068 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.068 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.068 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.068 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.068 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.069 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.068 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.070 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.606 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.747 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.798 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.809 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:08.884 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:09.116 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:09.293 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:09.344 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:09.344 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:09.511 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:09.869 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.879 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.879 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.880 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.880 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.881 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.881 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.881 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:12.881 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:13.595 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:13.636 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:13.638 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:13.803 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:13.805 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:14.427 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:14.427 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:14.427 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:14.515 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:14.529 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:14.588 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:15.157 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.006 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.006 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.006 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.006 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.007 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.007 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.007 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.008 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.567 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.567 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.617 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.676 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.695 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:16.932 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:17.190 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:17.228 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:17.271 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:17.347 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:17.418 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:17.643 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:19.301 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.774 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.774 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.774 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.774 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.774 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.775 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:20.774 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:21.481 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:21.481 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:21.481 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:21.540 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.174 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.207 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.210 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.259 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.260 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.916 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.940 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:22.974 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.081 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.081 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.081 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.081 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.081 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.081 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.082 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.082 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.779 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.793 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.820 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.827 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:26.964 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:27.555 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:27.555 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:27.555 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:27.564 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:27.674 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:28.329 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+
+21:36:28.329 [warning] Renamed :max_tokens to :max_completion_tokens for reasoning models
+     score=0.4 misses=122 bypasses=0 demos=0 dur=26863ms errors=0
+
+==== ARM gepa ====
+  -- repeat 1/2
+     ERROR: ** (ArgumentError) Imp.optimize/4 failed: {:optimizer_failed, Imp.Optimizer.GEPA, "GEPA speculative proposal worker failed: {:reflection_lm_failed, %ReqLLM.Error.Unknown.Unknown{error: %NimbleOptions.ValidationError{message: \"unknown options [:connect_options], valid options are: [:temperature, :max_tokens, :base_url, :top_p, :top_k, :frequency_penalty, :presence_penalty, :seed, :stop, :user, :system_prompt, :cache, :cache_key, :cache_ttl, :cache_options, :json_repair, :reasoning_effort, :reasoning_token_budget, :tools, :tool_choice, :n, :stream, :tool_call_id_compat, :provider_options, :stream_transport, :defer_http_events_until_telemetry?, :on_finch_request, :on_unsupported, :req_http_options, :telemetry, :receive_timeout, :max_retries]\\n\\nSuggestion: Did you mean one of these provider-specific options? connect_options -> oauth_http_options\\nProvider-specific options should be nested under :provider_options: [provider_options: [your_option: value]]\", key: [:connect_options], value: nil, keys_path: []}, splode: nil, bread_crumbs: [], vars: [], path: [], stacktrace: #Splode.Stacktrace<>, class: :unknown}}"}
+  -- repeat 2/2
+     ERROR: ** (ArgumentError) Imp.optimize/4 failed: {:optimizer_failed, Imp.Optimizer.GEPA, "GEPA speculative proposal worker failed: {:reflection_lm_failed, %ReqLLM.Error.Unknown.Unknown{error: %NimbleOptions.ValidationError{message: \"unknown options [:connect_options], valid options are: [:temperature, :max_tokens, :base_url, :top_p, :top_k, :frequency_penalty, :presence_penalty, :seed, :stop, :user, :system_prompt, :cache, :cache_key, :cache_ttl, :cache_options, :json_repair, :reasoning_effort, :reasoning_token_budget, :tools, :tool_choice, :n, :stream, :tool_call_id_compat, :provider_options, :stream_transport, :defer_http_events_until_telemetry?, :on_finch_request, :on_unsupported, :req_http_options, :telemetry, :receive_timeout, :max_retries]\\n\\nSuggestion: Did you mean one of these provider-specific options? connect_options -> oauth_http_options\\nProvider-specific options should be nested under :provider_options: [provider_options: [your_option: value]]\", key: [:connect_options], value: nil, keys_path: []}, splode: nil, bread_crumbs: [], vars: [], path: [], stacktrace: #Splode.Stacktrace<>, class: :unknown}}"}
+
+artifact: benchmarks/runs/campaign-20260718/ticket_search_optimizers-result.json
+
+==== SUMMARY ====
+zero_shot              status=ok mean=0.3 scores=[0.3, 0.3]
+labeled_fewshot_k8     status=ok mean=0.85 scores=[0.85, 0.85]
+bootstrap_fewshot_b8   status=ok mean=0.55 scores=[0.6, 0.5]
+random_search_c8_d4    status=ok mean=0.475 scores=[0.45, 0.5]
+miprov2                status=ok mean=0.85 scores=[0.85, 0.85]
+copro                  status=ok mean=0.375 scores=[0.35, 0.4]
+gepa                   status=error mean= scores=[]
+EXIT=0
