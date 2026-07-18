@@ -188,6 +188,41 @@ defmodule ImpTest do
     end
   end
 
+  test "signature parse error suggests array[...] for DSPy's list[...] form" do
+    error =
+      assert_raise Imp.Signature.ParseError, fn ->
+        Imp.signature("question -> tags: list[string]")
+      end
+
+    assert error.message =~
+             ~s{did you mean "array[string]"? (Imp uses array[...] where DSPy uses list[...])}
+
+    # DSPy's Python capitalization is handled too.
+    upper =
+      assert_raise Imp.Signature.ParseError, fn ->
+        Imp.signature("question -> tags: List[string]")
+      end
+
+    assert upper.message =~ ~s{did you mean "array[string]"?}
+
+    # Bare list -> array.
+    bare =
+      assert_raise Imp.Signature.ParseError, fn ->
+        Imp.signature("question -> tags: list")
+      end
+
+    assert bare.message =~ ~s{did you mean "array"?}
+
+    # Genuinely unknown scalars still suggest the nearest scalar type.
+    scalar =
+      assert_raise Imp.Signature.ParseError, fn ->
+        Imp.signature("question: strng -> answer")
+      end
+
+    assert scalar.message =~ ~s{did you mean "string"?}
+    refute scalar.message =~ "array"
+  end
+
   test "configured settings resolve dynamically for existing programs" do
     first = %{
       module: Imp.LM.Static,

@@ -6,6 +6,7 @@ defmodule Imp.Signature.ParseError do
     position = Keyword.fetch!(opts, :position)
     detail = Keyword.fetch!(opts, :detail)
     suggestion = Keyword.get(opts, :suggestion)
+    note = Keyword.get(opts, :note)
 
     pointer =
       input
@@ -18,7 +19,10 @@ defmodule Imp.Signature.ParseError do
         "invalid signature at position #{position}: #{detail}",
         input,
         pointer,
-        if(suggestion, do: "did you mean #{inspect(suggestion)}?", else: nil)
+        if(suggestion,
+          do: "did you mean #{inspect(suggestion)}?" <> if(note, do: " #{note}", else: ""),
+          else: nil
+        )
       ]
       |> Enum.reject(&is_nil/1)
       |> Enum.join("\n")
@@ -143,11 +147,14 @@ defmodule Imp.Signature.Parser do
         {:string, %{constraints: %{enum: values}}}
 
       true ->
+        {suggestion, note} = suggest_type(raw)
+
         raise Imp.Signature.ParseError,
           input: spec,
           position: position,
           detail: "unknown field type #{inspect(raw)}",
-          suggestion: closest_type(raw)
+          suggestion: suggestion,
+          note: note
     end
   end
 
@@ -180,6 +187,28 @@ defmodule Imp.Signature.Parser do
     |> then(fn {fields, current, _depth, _quoted?, start} ->
       Enum.reverse([{current, start || 0} | fields])
     end)
+  end
+
+  @list_note "(Imp uses array[...] where DSPy uses list[...])"
+
+  # DSPy users reach for Python's `list[...]` / `List[...]`; Imp spells the same
+  # thing `array[...]`. Point them at the array form explicitly instead of at the
+  # nearest scalar, which is never what they meant. Genuinely unknown scalars still
+  # fall through to `closest_type/1`.
+  defp suggest_type(raw) do
+    case Regex.run(~r/^[Ll]ist\s*\[(.*)\]$/, raw) do
+      [_, inner] ->
+        inner = String.trim(inner)
+        suggestion = if inner == "", do: "array", else: "array[#{inner}]"
+        {suggestion, @list_note}
+
+      nil ->
+        if raw in ["list", "List"] do
+          {"array", @list_note}
+        else
+          {closest_type(raw), nil}
+        end
+    end
   end
 
   defp closest_type(raw) do
