@@ -7451,7 +7451,7 @@
       ]
     }
   ],
-  "package_version": "0.2.0",
+  "package_version": "0.2.1",
   "schema_version": 3,
   "scope": "Curated Imp API compiled from package-shipped sources. Exports come from non-hidden documentation entries; callbacks, types, and struct fields are category- and policy-gated."
 }

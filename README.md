@@ -44,7 +44,7 @@ and retried with the validation error. You never wrote a prompt.
 
 Documentation lives at [hexdocs.pm/imp](https://hexdocs.pm/imp). To pin the
 same release directly from source instead, use
-`{:imp, github: "deepfates/imp", tag: "v0.2.0"}`. You will need an API key
+`{:imp, github: "deepfates/imp", tag: "v0.2.1"}`. You will need an API key
 for a model provider (any [ReqLLM](https://hex.pm/packages/req_llm)
 provider works; the docs use OpenAI).
 
