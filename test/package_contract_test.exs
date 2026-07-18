@@ -199,11 +199,12 @@ defmodule PackageContractTest do
     assert unqualified == []
   end
 
-  test "README installs from the immutable Git tag and never claims a Hex release" do
+  test "README installs from the Hex release, with the immutable Git tag as the pinned alternative" do
     readme = File.read!("README.md")
 
-    # Imp is not published on Hex; the README must not claim a Hex install.
-    refute readme =~ ~s({:imp, "~> )
+    # The Hex release is the primary install; the Git tag alternative must
+    # reference the same version, and no floating-branch install may appear.
+    assert readme =~ ~s({:imp, "~> 0.2.0"})
     assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.2.0"})
     refute readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
 

@@ -37,11 +37,18 @@ Every guide and notebook follows the same product story:
 - [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
   optimize-anything style systems.
 
+## Check The Claims
+
+- [Evidence](EVIDENCE.md): the C0–C5 ladder every Imp claim is graded on,
+  and where the ledger stands today.
+- [Conformance Report](CONFORMANCE.md): every tracked upstream surface and
+  its verification status, generated from executable checks.
+
 ## Build With Imp
 
 - [API Guide](API_GUIDE.md): task-oriented examples for normal application
   code.
-- [Advanced Imp](internal/ADVANCED.md): artifact optimization, GEPA-style reflection,
+- [Advanced Imp](ADVANCED.md): artifact optimization, GEPA-style reflection,
   agents, MCP, schemas, and deterministic test doubles.
 
 ## Learn By Running Code
@@ -58,7 +65,7 @@ you exactly what to set when it is not.
 
 ## Operate It
 
-- [Observability and Debugging](internal/OBSERVABILITY.md): redacted inspection,
+- [Observability and Debugging](OBSERVABILITY.md): redacted inspection,
   normalized status, progress subscriptions, and trace capture.
 - [Production Operations](PRODUCTION_OPERATIONS.md): live credentials,
   redaction, security posture, and release discipline.
@@ -78,4 +85,6 @@ you exactly what to set when it is not.
 
 Maintainer material — fidelity audits, benchmark evidence, parity programs,
 and release protocols — lives in the repository's `internal` and `maintainers`
-directories under this one. None of it is needed to use Imp.
+directories under this one. None of it ships in the Hex package, and none of
+it is needed to use Imp; the user-facing summary of that work is the
+[Evidence](EVIDENCE.md) page and the [Conformance Report](CONFORMANCE.md).

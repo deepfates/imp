@@ -466,7 +466,7 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_contract_artifact_test.exs",
           "test/gepa_replication_artifact_test.exs"
         ],
-        docs: ["docs/internal/ADVANCED.md", "docs/internal/RESEARCH_LANDSCAPE.md"],
+        docs: ["docs/ADVANCED.md", "docs/internal/RESEARCH_LANDSCAPE.md"],
         missing: [
           "C2 matched upstream differential evidence",
           "C3 matched live-provider evidence",
@@ -519,7 +519,7 @@ defmodule Imp.UpstreamFidelity do
           "test/public_surface_test.exs"
         ],
         docs: [
-          "docs/internal/ADVANCED.md",
+          "docs/ADVANCED.md",
           "docs/internal/COVERAGE_MATRIX.md",
           "docs/internal/UPSTREAM_FIDELITY_AUDIT.md"
         ],
@@ -606,7 +606,7 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_module_selector_test.exs",
           "test/gepa_evaluation_cache_backend_test.exs"
         ],
-        docs: ["docs/internal/ADVANCED.md", "docs/internal/BENCHMARK_TRUTH.md"],
+        docs: ["docs/ADVANCED.md", "docs/internal/BENCHMARK_TRUTH.md"],
         missing: ["paper-scale upstream comparison"]
       }
     },

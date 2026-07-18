@@ -87,7 +87,7 @@ Executable evidence:
 - test: `test/public_surface_test.exs`
 - test: `test/property_invariants_test.exs`
 - test: `test/live_provider_e2e_test.exs`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: `docs/API_GUIDE.md`
 
 
@@ -242,7 +242,7 @@ Executable evidence:
 - test: `test/completion_surface_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
-- docs: `docs/internal/REACT_V2_FIDELITY.md`
+- docs: [docs/internal/REACT_V2_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/REACT_V2_FIDELITY.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
@@ -273,7 +273,7 @@ Executable evidence:
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `docs/ARCHITECTURE.md`
-- docs: `docs/internal/RLM_FIDELITY.md`
+- docs: [docs/internal/RLM_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/RLM_FIDELITY.md) (repository only, not shipped in the package)
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
 
@@ -374,18 +374,10 @@ Semantic invariants:
 - public names preserve the upstream optimization mechanism
 - proposal, bootstrapping, search, and selection stages are independently observable
 - optimization demonstrates held-out lift under matched budgets
-- pinned DSPy 3.2.1 COPRO evidence isolates the global LM in a fresh process and
-  observes proposal fan-out/order from LM call history before checking equal-score
-  duplicate removal and statistics shape; first-record retention is separately
-  supported by the pinned source's greater-than-or-equal score guard
 
 Executable evidence:
 
 - test: `test/optimizer_behavioral_corpus_test.exs`
-- test: `test/copro_isolation_differential_test.exs`
-- test: `test/copro_isolation_artifact_test.exs`
-- test: `test/python_dspy_copro_isolation_differential_test.py`
-- protocol: `benchmarks/config/copro-isolation-differential-v1.json`
 - docs: `docs/API_GUIDE.md`
 
 
@@ -394,19 +386,10 @@ Missing evidence or behavior:
 - matched DSPy 3.3.0b1 MIPROv2 differential artifact
 - matched DSPy 3.3.0b1 SIMBA differential artifact
 - paper-scale lift evidence
-- exact Python RNG sequence parity and provider/effectiveness evidence remain out of scope
 
 ### `optimization.gepa`
 
 Status: `gap`
-
-Product gate: `claim-specific gap` (nonblocking)
-
-Local conformance: `structural`
-
-Evidence tier: local structural and behavioral checks
-
-Claim boundary: local structural and behavioral conformance only; this is not paper-family reproduction evidence.
 
 Upstream source: `gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975 (standalone v0.1.4 structural authority)`
 
@@ -416,7 +399,7 @@ Semantic invariants:
 - the local engine and adapter contracts track pinned standalone GEPA v0.1.4 structure
 - reflective mutation uses per-example feedback and trajectories in focused local tests
 - candidate lineage, Pareto state, and source-versioned results are retained locally
-- local conformance does not establish matched upstream or paper-family outcomes
+- C1 conformance does not establish matched upstream or paper-family outcomes
 
 Executable evidence:
 
@@ -424,8 +407,8 @@ Executable evidence:
 - test: `test/gepa_engine_test.exs`
 - test: `test/gepa_contract_artifact_test.exs`
 - test: `test/gepa_replication_artifact_test.exs`
-- docs: `docs/internal/ADVANCED.md`
-- docs: `docs/internal/RESEARCH_LANDSCAPE.md`
+- docs: `docs/ADVANCED.md`
+- docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
@@ -439,18 +422,7 @@ Missing evidence or behavior:
 
 Status: `elixir_native_equivalent`
 
-Upstream source: six independently pinned DSPy 3.2.1 families: `dspy/predict/avatar`, `dspy/teleprompt/avatar_optimizer.py`, `bootstrap_finetune.py`, `grpo.py`, `bettertogether.py`, and `ensemble.py`
-
-The implementation authority for `Imp.Optimizer.GRPO` is DSPy 3.2.1's pinned
-`dspy/teleprompt/grpo.py` mmGRPO contract at commit `29448ae…`. The DeepSeekMath
-GRPO paper is retained as algorithmic background only; it is not used to claim
-that Imp reproduces the paper trainer or results.
-
-The authority ledger keeps Avatar actor, AvatarOptimizer, BootstrapFinetune,
-mmGRPO, BetterTogether, and Ensemble separate. Source-defined families cite
-their exact DSPy file hashes; BootstrapFinetune and BetterTogether additionally
-cite the pinned BetterTogether paper. Their C0 API claims, C1 semantic targets,
-and C3 effectiveness targets must not satisfy one another.
+Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
 Imp modules: `Imp.Predict.Avatar`, `Imp.Optimizer.Avatar`, `Imp.Optimizer.BootstrapFinetune`, `Imp.Optimizer.GRPO`, `Imp.Optimizer.BetterTogether`, `Imp.Optimizer.Ensemble`
 Elixir-native rationale: BEAM-native optimizer contracts separate program compilation, asynchronous training jobs, completed rebound programs, and composed workflows while keeping provider execution behind explicit trainer boundaries.
@@ -473,7 +445,7 @@ Executable evidence:
 - test: `test/provider_training_lifecycle_test.exs`
 - test: `test/protocol_training/provider_training_lifecycle_test.exs`
 - test: `test/public_surface_test.exs`
-- docs: `docs/internal/ADVANCED.md`
+- docs: `docs/ADVANCED.md`
 - docs: [docs/internal/COVERAGE_MATRIX.md](https://github.com/deepfates/imp/blob/main/docs/internal/COVERAGE_MATRIX.md) (repository only, not shipped in the package)
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json`
@@ -482,9 +454,8 @@ Missing evidence or behavior:
 
 - paid-provider weight-training execution evidence
 - BetterTogether paid-provider lifecycle completion
-- source-bound C1 differentials for all six independent families
-- matched Avatar actor and AvatarOptimizer effectiveness as separate claims
-- matched Ensemble, BetterTogether, BootstrapFinetune-provider, and mmGRPO effectiveness
+- matched Avatar and AvatarOptimizer effectiveness
+- matched BetterTogether and GRPO effectiveness
 
 ### `optimization.fast_slow`
 
@@ -509,7 +480,7 @@ Executable evidence:
 - test: `test/fast_slow_checkpoint_test.exs`
 - test: `test/fast_slow_runner_test.exs`
 - test: `test/fast_slow_campaign_test.exs`
-- docs: `docs/internal/RESEARCH_LANDSCAPE.md`
+- docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
 - docs: `docs/API_GUIDE.md`
 
 
@@ -545,7 +516,7 @@ Executable evidence:
 - test: `test/optimize_anything_tracking_test.exs`
 - test: `test/gepa_module_selector_test.exs`
 - test: `test/gepa_evaluation_cache_backend_test.exs`
-- docs: `docs/internal/ADVANCED.md`
+- docs: `docs/ADVANCED.md`
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 
 
@@ -679,7 +650,7 @@ Executable evidence:
 - test: `test/learning_path_contract_test.exs`
 - test: `test/livebook_contract_test.exs`
 - test: `test/documentation_contract_test.exs`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: `docs/LEARNING_PATH.md`
 - docs: `docs/README.md`
 - docs: `livebooks/01_real_lm_front_door.livemd`
@@ -709,9 +680,9 @@ Executable evidence:
 - test: `test/gate_contract_test.exs`
 - test: `test/production_hardening_test.exs`
 - test: `test/deployment_reference_test.exs`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: `../CHANGELOG.md`
-- docs: `LICENSE`
+- docs: `../LICENSE`
 - docs: [SECURITY.md](https://github.com/deepfates/imp/blob/main/SECURITY.md) (repository only, not shipped in the package)
 - docs: [docs/maintainers/RELEASE.md](https://github.com/deepfates/imp/blob/main/docs/maintainers/RELEASE.md) (repository only, not shipped in the package)
 

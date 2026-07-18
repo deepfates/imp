@@ -1018,7 +1018,7 @@ policies for anything with side effects.
 The normal provider path for inference is `Imp.req_llm/2`. Imp also ships
 explicit protocol clients for application boundaries that are not ordinary LM
 inference: HTTP retrievers, MCP transports, and provider training jobs. Those
-clients are documented in [Advanced Imp](internal/ADVANCED.md) and
+clients are documented in [Advanced Imp](ADVANCED.md) and
 [Production Operations](PRODUCTION_OPERATIONS.md) because they require explicit
 service ownership, credentials, payload contracts, and protocol-specific tests.
 
