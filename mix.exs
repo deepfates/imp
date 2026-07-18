@@ -179,6 +179,7 @@ defmodule Imp.MixProject do
       "docs/ARCHITECTURE.md",
       "docs/API_GUIDE.md",
       "docs/ADVANCED.md",
+      "docs/OPERATIONS_REFERENCE.md",
       "docs/OBSERVABILITY.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]

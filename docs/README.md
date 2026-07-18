@@ -50,6 +50,10 @@ Every guide and notebook follows the same product story:
   code.
 - [Advanced Imp](ADVANCED.md): artifact optimization, GEPA-style reflection,
   agents, MCP, schemas, and deterministic test doubles.
+- [Operations Reference](OPERATIONS_REFERENCE.md): the contract-heavy
+  boundaries — durable optimizer resume, provider training-job lifecycle and
+  dispatch journals, Fast-Slow training, resumable provider batches, and
+  advanced MCP transports.
 
 ## Learn By Running Code
 
@@ -67,8 +71,8 @@ you exactly what to set when it is not.
 
 - [Observability and Debugging](OBSERVABILITY.md): redacted inspection,
   normalized status, progress subscriptions, and trace capture.
-- [Production Operations](PRODUCTION_OPERATIONS.md): live credentials,
-  redaction, security posture, and release discipline.
+- [Production Operations](PRODUCTION_OPERATIONS.md): runtime posture, live
+  credentials, secret handling, telemetry, and deployment.
 
 ## First Things To Try
 
