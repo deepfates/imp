@@ -92,9 +92,17 @@ defmodule DeploymentReferenceTest do
     executor = fn _program, _lm, :crash -> exit(:provider_crash) end
     {server, _task_supervisor} = start_runtime(executor)
 
-    assert {:error, {:worker_crash, :provider_crash}} =
-             deployment_call(server, :crash, 200)
+    # The worker crashes immediately, so this call returns as soon as the DOWN is
+    # observed — but under full-suite load the worker can take longer than a tight
+    # 200ms window just to be scheduled, and the ProgramServer's own Task.yield
+    # timeout would then brutal-kill it and report {:error, :timeout} instead of
+    # the crash. A generous ceiling closes that window without slowing the test.
+    # with_log contains the expected abnormal-exit report so it stays deterministic
+    # under load. Ticket dee-n3sb.
+    {result, _log} =
+      ExUnit.CaptureLog.with_log(fn -> deployment_call(server, :crash, 5_000) end)
 
+    assert result == {:error, {:worker_crash, :provider_crash}}
     assert Process.alive?(server)
   end
 
