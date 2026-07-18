@@ -15,6 +15,9 @@ defmodule Imp.BenchmarkTruth.MmgrpoDifferentialTest do
     assert Differential.local_observations() == expected
   end
 
+  # build_artifact! validates fixture authority against the pinned DSPy 3.2.1
+  # source tree under tmp/, so this row needs the capture environment.
+  @tag :requires_dspy_capture
   test "artifact is narrow, matched, source-bound, and explicit about exclusions" do
     expected = @config |> File.read!() |> Jason.decode!() |> get_in(["fixture", "expected"])
 

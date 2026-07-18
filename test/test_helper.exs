@@ -43,6 +43,17 @@ external_excludes =
     # Include them with EVIDENCE_INFRASTRUCTURE=1 mix test (or --include
     # evidence_infrastructure). See "Maintainer checks" in CONTRIBUTING.md.
     {"EVIDENCE_INFRASTRUCTURE", :evidence_infrastructure},
+    # A second, independent gate WITHIN the evidence suite: tests that shell out
+    # to the pinned DSPy 3.2.1 parity venv / source checkout under tmp/ (via
+    # System.cmd or by reading tmp/dspy-3.2.1 source files). These are excluded
+    # unless DSPY_CAPTURE=1, so a per-PR CI job can run EVIDENCE_INFRASTRUCTURE=1
+    # WITHOUT DSPY_CAPTURE to exercise the venv-free structural/differential
+    # validators, while the weekly capture job sets both. NB: this must NOT be
+    # combined with `mix test --only evidence_infrastructure`, because an
+    # `--only`/`--include` tag unconditionally overrides `exclude` — env-gating
+    # here (removing the tag from the default exclude list) is what makes the
+    # per-PR / capture split actually take effect.
+    {"DSPY_CAPTURE", :requires_dspy_capture},
     {"PROTOCOL_TRAINING", :protocol_training},
     {"PROTOCOL_RETRIEVER", :protocol_retriever},
     {"PROTOCOL_MCP", :protocol_mcp}

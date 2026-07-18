@@ -17,6 +17,9 @@ defmodule Imp.BenchmarkTruth.EnsembleDifferentialTest do
     assert local["deterministic_replay_supported"]
   end
 
+  # build_artifact! validates fixture authority by hashing the pinned DSPy 3.2.1
+  # source tree under tmp/, so this row needs the capture environment.
+  @tag :requires_dspy_capture
   test "artifact keeps shared observations separate from native extensions" do
     expected = @config |> File.read!() |> Jason.decode!() |> get_in(["fixture", "expected"])
 
