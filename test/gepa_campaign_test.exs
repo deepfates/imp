@@ -595,8 +595,13 @@ defmodule GepaCampaignTest do
 
     task = Task.async(fn -> GepaCampaign.run(opts) end)
 
-    assert_receive :slow_evaluation_started, 1_000
-    assert %{report: %{"rows" => [_row]}} = Task.await(task, 5_000)
+    # `:slow_evaluation_started` is an explicit start signal the stub sends before
+    # it sleeps, so this waits for the campaign to actually reach evaluation. The
+    # window only bounds campaign startup latency (dataset load, generation), which
+    # can exceed 1s on a loaded CI runner — 10s is a CI-safe ceiling that still
+    # fails loudly if evaluation never starts. Ticket dee-m1de.
+    assert_receive :slow_evaluation_started, 10_000
+    assert %{report: %{"rows" => [_row]}} = Task.await(task, 10_000)
   end
 
   test "Imp GEPA campaign rejects artifact optimizer state at the program resume boundary" do
