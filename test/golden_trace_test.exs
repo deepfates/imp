@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 8
+    assert report["fixtures"]["cases"] == 12
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -51,6 +51,14 @@ defmodule GoldenTraceTest do
     assert parity_by_case["typed_fields_chat"] == true
     assert parity_by_case["json_adapter_basic"] == true
     assert parity_by_case["missing_output_error"] == true
+
+    # Non-scalar type rendering (dee-9ttv): enum->Literal, array->list, object->dict
+    # render byte-identically to DSPy 3.2.1 across both adapters. Locked as
+    # regressions so each composite type retires its defect class permanently.
+    assert parity_by_case["enum_literal_chat"] == true
+    assert parity_by_case["list_str_field_json"] == true
+    assert parity_by_case["list_int_field_json"] == true
+    assert parity_by_case["dict_field_json"] == true
     assert report["imp"]["runner"] == "imp-golden-trace"
     assert report["dspy"]["runner"] == "python-dspy-golden-trace"
 

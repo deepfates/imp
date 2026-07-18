@@ -288,7 +288,7 @@ defmodule Imp.Adapter.Chat do
     fields
     |> Enum.with_index(1)
     |> Enum.map(fn {field, index} ->
-      "#{index}. `#{field.name}` (#{field_type(field.type)}): #{field_description(field)}"
+      "#{index}. `#{field.name}` (#{field_annotation(field)}): #{field_description(field)}"
     end)
     |> Enum.join("\n")
     |> String.trim()
@@ -362,14 +362,21 @@ defmodule Imp.Adapter.Chat do
 
   # Faithful to DSPy 3.2.1 dspy/adapters/utils.py translate_field_type: the note
   # text keyed on the field's Python type. Emitted only for output fields.
+  # Composite types (enum->Literal, array->list, object->dict) are handled first
+  # via Imp.Adapter.CompositeType (dee-9ttv); scalars keep their existing clauses.
   defp structure_type_note(field) do
+    case Imp.Adapter.CompositeType.note_desc(field) do
+      nil -> scalar_structure_type_note(field)
+      desc -> structure_note(desc)
+    end
+  end
+
+  defp scalar_structure_type_note(field) do
     case field_type(field.type) do
       "str" -> ""
       "bool" -> structure_note("must be True or False")
       "int" -> structure_note("must be a single int value")
       "float" -> structure_note("must be a single float value")
-      # Imp's scalar type system stops here; enum/Literal/pydantic notes (DSPy's
-      # remaining branches) arrive when Imp grows those types (dee-3zun follow-up).
       _ -> ""
     end
   end
@@ -424,11 +431,16 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp output_type_info(field) do
-    case field_type(field.type) do
+    case field_annotation(field) do
       "str" -> ""
       type_name -> " (must be formatted as a valid Python #{type_name})"
     end
   end
+
+  # DSPy annotation name for a field: composite types (Literal/list/dict) resolve
+  # through CompositeType; scalars fall back to the plain type-name mapping.
+  defp field_annotation(field),
+    do: Imp.Adapter.CompositeType.annotation_name(field) || field_type(field.type)
 
   defp append_content(content, ""), do: content
   defp append_content(content, suffix) when is_binary(content), do: content <> suffix

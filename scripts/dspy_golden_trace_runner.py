@@ -136,11 +136,68 @@ def adapter(name: Optional[str]):
 
 
 def dspy_signature(signature: str) -> str:
+    """Translate Imp's signature type syntax into DSPy/Python type syntax so one
+    fixture signature string parses identically on both sides.
+
+    Composite types are handled first (order matters: `array[T]` must be rewritten
+    before its inner scalar, and the bare-word scalar swaps must not touch names
+    inside `enum[...]`), then the remaining scalar aliases.
+    """
+    signature = _translate_composites(signature)
     return (
         signature.replace(": string", ": str")
         .replace(": integer", ": int")
         .replace(": boolean", ": bool")
     )
+
+
+_SCALAR_TO_PY = {
+    "string": "str",
+    "integer": "int",
+    "int": "int",
+    "float": "float",
+    "number": "float",
+    "boolean": "bool",
+    "bool": "bool",
+}
+
+
+def _translate_composites(signature: str) -> str:
+    import re
+
+    # enum[a,b] / class[a,b] -> Literal['a', 'b']
+    def enum_repl(match: "re.Match[str]") -> str:
+        values = [v.strip() for v in re.split(r"[,|]", match.group(1)) if v.strip()]
+        rendered = ", ".join(_quote_literal(v) for v in values)
+        return f"Literal[{rendered}]"
+
+    signature = re.sub(r"(?:enum|class)\[([^\]]*)\]", enum_repl, signature)
+
+    # array[T] -> list[T-as-python]; bare `array` -> `list`
+    def array_repl(match: "re.Match[str]") -> str:
+        inner = match.group(1).strip()
+        return f"list[{_SCALAR_TO_PY.get(inner, inner)}]"
+
+    signature = re.sub(r"array\[([^\]]*)\]", array_repl, signature)
+    signature = re.sub(r"(?<![\w\[])array(?![\w\[])", "list", signature)
+
+    # object / map -> dict[str, Any]
+    signature = re.sub(r"(?<![\w\[])(?:object|map)(?![\w\[])", "dict[str, Any]", signature)
+
+    return signature
+
+
+def _quote_literal(value: str) -> str:
+    # Mirror dspy.adapters.utils._quoted_string_for_literal_type_annotation.
+    has_single = "'" in value
+    has_double = '"' in value
+    if has_single and not has_double:
+        return f'"{value}"'
+    if has_double and not has_single:
+        return f"'{value}'"
+    if has_single and has_double:
+        return "'" + value.replace("'", "\\'") + "'"
+    return f"'{value}'"
 
 
 def normalize_prediction(prediction: Any) -> Dict[str, Any]:
