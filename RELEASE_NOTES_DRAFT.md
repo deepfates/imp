@@ -1,64 +1,85 @@
-# Imp v0.1.0 — draft release notes (plain-language rewrite)
+# Imp v0.2.0 — release notes
 
-Imp is a library for programming language models in Elixir. Instead of pasting
-prompt strings around your codebase, you declare an LM task as an ordinary
-Elixir value — a typed input/output signature, a callable program, examples,
-and a metric — and the library handles prompting, parsing, evaluation, and
-optimization. It is inspired by DSPy, rebuilt natively for the BEAM: structs,
-behaviours, supervision trees, and telemetry rather than a Python port.
+Imp is DSPy for the BEAM: declare a language-model task as a typed Elixir
+program, then test, measure, improve, and operate it like any other code.
+Instead of maintaining prompt strings, you declare signatures — named, typed
+inputs and outputs — and programs are ordinary Elixir values you can call,
+evaluate against metrics, compile with optimizers, persist as checksummed
+artifacts, and run under OTP supervision.
 
 ## Install
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.1.0"}
+{:imp, "~> 0.2.0"}
 ```
 
-Imp is not on Hex yet; a Hex release is planned.
+Documentation: [hexdocs.pm/imp](https://hexdocs.pm/imp). To pin from source:
+`{:imp, github: "deepfates/imp", tag: "v0.2.0"}`.
 
-## What works today
+## What you are getting
 
-- **Typed programs.** Write `"question -> answer: short_span"`, get a callable
-  program with structured, validated output.
-- **Swappable providers.** The model provider is a runtime dependency. Develop
-  and test deterministically with `Imp.LM.Static`; point the same program at a
-  real provider (via ReqLLM) in production without changing its shape.
-- **Evaluation.** Examples, metrics, and evaluation reports so you can measure
-  a program's behavior instead of eyeballing it.
-- **Optimization.** Few-shot selection, instruction search, and
-  reflective-mutation optimizers (in the family of DSPy's MIPROv2, SIMBA, and
-  GEPA) that measurably improve a program against your metric.
-- **Tools and agents.** ReAct-style tool loops, MCP client support, and
-  sandboxed code execution.
-- **Retrieval.** RAG helpers, including multi-hop.
-- **Persistence and operations.** Save and load optimized programs, redact
-  credentials from anything serialized, and run under OTP supervision. A small
-  deployment example app ships in `examples/deployment`.
-- **Runnable docs.** Five Livebook notebooks and a learning path; the code
-  snippets in the docs are executed by the test suite, so they cannot silently
-  rot.
+Be precise about what kind of thing this release is, in three layers:
 
-## What is honestly not done
+**Proven here, with receipts you can run.** The complete DSPy 3.2.1 surface,
+realized natively: the signature DSL, program shapes from `predict` through
+ReAct, CodeAct, and a sandboxed recursive controller, evaluation, fifteen
+optimizers, retrieval, MCP, streaming, and persistence. "Faithful port" is a
+checked claim, not a slogan: every conformance claim in the ledger is asserted
+by executable differential tests against the pinned upstream source, with
+committed, content-addressed evidence artifacts — see
+[Evidence](docs/EVIDENCE.md) for the C0–C5 ladder this is graded on and
+[Conformance](docs/CONFORMANCE.md) for the per-surface table. One complete
+effectiveness result ships with its artifact: the
+[ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s router improves
+from 25–30% to 85% on held-out data across three committed live runs, for
+about a cent, and you can rerun the experiment yourself.
 
-- **Not on Hex.** Install from the Git tag above.
-- **Parity with DSPy is measured, not assumed — and it is not complete.**
-  We keep a ledger comparing Imp's behavior against pinned upstream DSPy on
-  the same inputs. Where the ledger says a feature matches, that claim is
-  backed by a committed, re-runnable comparison. Where it does not, the
-  feature may still work, but we do not claim equivalence.
-- **Recursive language-model programs (RLM) are structural, not proven at
-  paper scale.** The control loop works and is tested deterministically; we
-  do not claim the published benchmark results.
-- **No performance or cost benchmarks yet.** Optimizer results depend on your
-  task, metric, and model; nothing here promises specific quality numbers.
-- **APIs may change.** This is a 0.x release; expect breaking changes before
-  1.0.
+**Borrowed honestly.** The optimization *algorithms'* general effectiveness
+rests on their published literature (DSPy, MIPROv2, SIMBA, GEPA). We verified
+the port; the papers verified the methods. Whether any optimizer improves
+*your* task is an empirical question Imp gives you the tools to answer in an
+afternoon — signature, metric, held-out split, receipt.
 
-## For contributors
+**Promised, explicitly.** Our own matched-control effectiveness science —
+multi-seed optimizer studies, paper-scale reproductions, matched-model
+Imp-vs-DSPy comparisons — is the open research program, tracked as unasserted
+target claims in the same public ledger. We do not assert what we have not
+measured, and the ledger is the boundary between the two.
 
-On current `main`, a fresh clone's `mix test` runs the library's test suite
-and is green with no extra setup (at the v0.1.0 tag itself this was not yet
-true). The maintainer-only checks — the ones that re-validate the
-benchmark-evidence ledger against pinned Python DSPy environments and full git
-history — are opt-in; see "Maintainer checks" in the README.
+## What the BEAM adds
 
-Released from commit `e7edc10a0dd0b493b3afddcd556869a370a7647e`.
+A model call is one more slow, fallible, concurrent effect: bounded supervised
+evaluation fan-out, tools in isolated tasks under their own timeouts, scripted
+deterministic testing with `Imp.LM.Static` through the same seams production
+uses, compiled programs as checksummed artifacts with no secrets inside,
+credentials bound at runtime, and redacted telemetry on every call, retry, and
+tool step. The [deployment example](examples/deployment) is a complete OTP
+application.
+
+## Since v0.1.0
+
+- Now on Hex, with the full manual on hexdocs (the package ships the guides,
+  livebooks, and the deployment example; internal audit material stays in the
+  repository).
+- Documentation rebuilt reader-first: new README, Learning Path, tutorial with
+  honest artifact-cited numbers, DSPy-users mapping, and the public evidence
+  ladder.
+- Evidence campaign: nine new differential artifact families landed; every
+  semantic-conformance claim in the ledger is now asserted (was 1 of 4).
+- Streaming promoted to the facade (`Imp.stream/3`, `Imp.collect/3`) with
+  provider token streaming and an honest local fallback.
+- Two silent-failure bugs found and fixed the same day they were exposed by
+  the claims census (batch message mangling; swallowed telemetry), plus
+  loud-by-default evaluation timeouts and a threadable teacher timeout for
+  `BootstrapFewShot` — that last one found live by our own dogfooding.
+- `LabeledFewShot` selection semantics pinned deterministic;
+  `Imp.Datasets.split/2` shuffle now seeded.
+- CI rebuilt: four parallel gates, deterministic dependency cache.
+
+## Expectations for 0.x
+
+APIs may change before 1.0. Known flaky tests are ticketed and public in the
+repository. The evidence ladder is the contract: if a page claims more than
+its receipts support, that is a bug — file it.
+
+Released from the v0.2.0 tag.
