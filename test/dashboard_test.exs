@@ -1432,6 +1432,9 @@ defmodule DashboardTest do
     end
   end
 
+  # Revalidates every admitted artifact through its protocol validator; the
+  # source-bound validators need the pinned DSPy trees under tmp/.
+  @tag :evidence_infrastructure
   test "immutable admitted C1 lanes are revalidated without expiring by age" do
     root = tmp_dir("dashboard-immutable-admission")
     out_dir = Path.join(root, "out")

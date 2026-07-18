@@ -1,6 +1,10 @@
 defmodule Imp.BenchmarkTruth.MmgrpoDifferentialTest do
   use ExUnit.Case, async: false
 
+  # Requires the pinned DSPy 3.2.1 source checkout and parity venv under tmp/
+  # (see CONTRIBUTING.md "Maintainer checks"); run with EVIDENCE_INFRASTRUCTURE=1.
+  @moduletag :evidence_infrastructure
+
   alias Mix.Tasks.Imp.Benchmark.MmgrpoDifferential, as: Differential
 
   @config "benchmarks/config/mmgrpo-differential-v1.json"
