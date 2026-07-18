@@ -1,6 +1,9 @@
 defmodule Imp.Agent do
   @moduledoc """
-  Typed agent runtime with tools, child agents, memory/context, policies, and traces.
+  Agent runtime with tools, child agents, memory/context, policies, and traces.
+
+  Input/output schemas are checked for required-key presence only
+  (`%{required: [...]}`); field values are not type-checked.
 
   Agents are ordinary Elixir structs. A handler can be arity 2:
 
@@ -19,7 +22,9 @@ defmodule Imp.Agent do
   - tool exceptions return `{:error, {:tool_error, tool_name, reason}, runtime}`;
   - tool-policy exceptions return
     `{:error, {:tool_policy_error, tool_name, reason}, runtime}`;
-  - schema failures return `{:error, {:missing_required, fields}, runtime}`.
+  - schema failures return `{:error, {:missing_required, fields}, runtime}`;
+  - context references pointing at missing runtime context return
+    `{:error, {:missing_context, keys}, runtime}`.
 
   The returned runtime preserves traces accumulated before the failure.
   """
@@ -100,9 +105,8 @@ defmodule Imp.Agent do
   agent boundary.
   """
   def run(%__MODULE__{} = agent, inputs, runtime \\ Runtime.new()) do
-    with :ok <- validate(inputs, agent.input_schema) do
-      inputs = resolve_inputs(inputs, runtime)
-
+    with :ok <- validate(inputs, agent.input_schema),
+         {:ok, inputs} <- resolve_inputs(inputs, runtime) do
       case invoke_handler(agent, inputs, runtime) do
         {:ok, output, runtime} ->
           case validate(output, agent.output_schema) do
@@ -259,13 +263,25 @@ defmodule Imp.Agent do
     )
   end
 
+  # A `{:context_ref, key}` pointing at missing runtime context is a loud,
+  # structured error — never a raw tuple silently handed to the handler.
   defp resolve_inputs(inputs, runtime) do
-    Map.new(inputs, fn {key, value} ->
-      case Runtime.resolve(runtime, value) do
-        {:ok, resolved} -> {key, resolved}
-        :error -> {key, value}
-      end
-    end)
+    {resolved, missing} =
+      Enum.reduce(inputs, {[], []}, fn {key, value}, {resolved, missing} ->
+        case Runtime.resolve(runtime, value) do
+          {:ok, resolved_value} ->
+            {[{key, resolved_value} | resolved], missing}
+
+          :error ->
+            {:context_ref, context_key} = value
+            {resolved, [context_key | missing]}
+        end
+      end)
+
+    case missing do
+      [] -> {:ok, Map.new(resolved)}
+      keys -> {:error, {:missing_context, Enum.sort(keys)}}
+    end
   end
 
   defp validate(_value, schema) when schema in [%{}, nil], do: :ok

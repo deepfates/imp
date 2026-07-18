@@ -29,9 +29,15 @@ jobs:
           path: |
             deps
             _build
-          key: mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+            ~/.hex/packages
+          # ~/.hex/packages must be cached alongside deps: production.check
+          # builds a fresh consumer project whose deps.get unpacks the Hex
+          # tarballs from there. Key is v2 because the v1 cache (saved without
+          # ~/.hex) hits exactly and actions/cache never re-saves on an exact
+          # hit, which left every cache-hit run without tarballs.
+          key: mix-v2-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-
+            mix-v2-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
