@@ -398,8 +398,8 @@ defmodule ReqLLMClientTest do
 
     assert_received {:req_llm_generate, "openai:gpt-test", messages, opts}
 
+    # DSPy JSONAdapter emits exactly one system message and one user message.
     assert [
-             %ReqLLM.Message{role: :system},
              %ReqLLM.Message{role: :system},
              %ReqLLM.Message{role: :user}
            ] = messages

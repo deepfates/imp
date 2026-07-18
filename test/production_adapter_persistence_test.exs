@@ -19,25 +19,29 @@ defmodule ProductionAdapterPersistenceTest do
     assert Imp.Prediction.get(prediction, :answer) == "42"
   end
 
-  test "JSON adapter keeps task instruction before output-format instruction" do
+  test "JSON adapter emits DSPy JSONAdapter system + user messages (no invented message)" do
+    # DSPy 3.2.1 JSONAdapter emits exactly two messages: one system message and
+    # one user message. There is no second "Return only a JSON object" system
+    # message (that was an Imp invention DSPy never emits).
     signature = Imp.signature("question -> answer", "Answer from the supplied context.")
 
     assert [
              %{role: :system, content: system},
-             %{
-               role: :system,
-               content:
-                 "Return only a JSON object with keys: answer. Each value must satisfy the task instruction and its field contract. answer: answer according to the task instruction Do not include extra explanation or unrelated detail outside those fields."
-             },
-             %{role: :user}
+             %{role: :user, content: user}
            ] = Imp.Adapter.JSON.format(signature, %{question: "q"}, [])
 
     assert system =~ "Your input fields are:"
     assert system =~ "Your output fields are:"
+    assert system =~ "Inputs will have the following structure:"
+    assert system =~ "Outputs will be a JSON object with the following fields."
     assert system =~ "Answer from the supplied context."
+    refute system =~ "Return only a JSON object"
+
+    assert user =~ "[[ ## question ## ]]\nq"
+    assert user =~ "Respond with a JSON object in the following order of fields: `answer`."
   end
 
-  test "JSON adapter includes output field descriptions in the provider contract" do
+  test "JSON adapter includes output field descriptions and the JSON object template" do
     signature =
       "question -> answer: string \"final numeric answer\""
       |> Imp.signature("Solve the problem.")
@@ -46,15 +50,18 @@ defmodule ProductionAdapterPersistenceTest do
         desc: "Work through the problem step by step before giving the final answer"
       })
 
-    [_task, %{content: content}, _input] =
+    [%{role: :system, content: system}, %{role: :user}] =
       Imp.Adapter.JSON.format(signature, %{question: "q"}, [])
 
-    assert content =~ "keys: reasoning, answer"
+    # Descriptions live in the field-description block (DSPy get_field_description_string).
+    assert system =~
+             "`reasoning` (str): Work through the problem step by step before giving the final answer"
 
-    assert content =~
-             "reasoning: Work through the problem step by step before giving the final answer"
+    assert system =~ "`answer` (str): final numeric answer"
 
-    assert content =~ "answer: final numeric answer"
+    # Outputs are rendered as a JSON object template (both str fields carry no note).
+    assert system =~ "Outputs will be a JSON object with the following fields."
+    assert system =~ ~s({\n  "reasoning": "{reasoning}",\n  "answer": "{answer}"\n})
   end
 
   test "adapters validate owned options while ignoring provider options they do not own" do
@@ -327,7 +334,12 @@ defmodule ProductionAdapterPersistenceTest do
     assert Keyword.get(retry_opts, :response_format) == %{type: "json_object"}
     refute Keyword.has_key?(retry_opts, :json_fallback)
     refute Keyword.has_key?(retry_opts, :json_retries)
-    assert Enum.any?(retry_messages, &(&1.content =~ "Return only a JSON object"))
+
+    assert Enum.any?(
+             retry_messages,
+             &(&1.content =~ "Respond with a JSON object in the following order of fields:")
+           )
+
     assert prediction.metadata.trace.raw == ~s({"answer":"Paris","confidence":0.99})
   end
 
