@@ -204,7 +204,7 @@ defmodule PackageContractTest do
 
     # Imp is not published on Hex; the README must not claim a Hex install.
     refute readme =~ ~s({:imp, "~> )
-    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.1.0"})
+    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.2.0"})
     refute readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
 
     # The README need not offer a source-checkout install, but if it shows

@@ -61,7 +61,7 @@ its declared evidence. It never means complete DSPy or paper parity.
 2. Promote that commit to the default branch.
 3. Verify that a branch-unspecified fresh clone identifies `:imp` and `Imp`.
 4. Build the package from the promoted commit and rerun the clean consumer.
-5. Tag `v0.1.0` and publish through the owner-approved distribution channel.
+5. Tag the release (currently `v0.2.0`) and publish through the owner-approved distribution channel.
 6. Replace mutable Git installation instructions with the immutable tag or
    package coordinate.
 7. Generate the final dashboard from the tagged source and attach its digest
