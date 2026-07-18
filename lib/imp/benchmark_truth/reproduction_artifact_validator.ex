@@ -61,6 +61,44 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
     :ok
   end
 
+  def validate!("avatar_actor_differential" = protocol, artifact) do
+    Mix.Tasks.Imp.Benchmark.AvatarActorDifferential.validate_artifact!(protocol, artifact)
+    :ok
+  end
+
+  def validate!("avatar_optimizer_differential" = protocol, artifact) do
+    Mix.Tasks.Imp.Benchmark.AvatarOptimizerDifferential.validate_artifact!(protocol, artifact)
+    :ok
+  end
+
+  def validate!("bootstrap_finetune_differential", artifact) do
+    Mix.Tasks.Imp.Benchmark.WeightCompositionDifferential.validate_artifact!(
+      "bootstrap_finetune",
+      artifact
+    )
+
+    :ok
+  end
+
+  def validate!("better_together_differential", artifact) do
+    Mix.Tasks.Imp.Benchmark.WeightCompositionDifferential.validate_artifact!(
+      "better_together",
+      artifact
+    )
+
+    :ok
+  end
+
+  def validate!("ensemble_differential" = protocol, artifact) do
+    Mix.Tasks.Imp.Benchmark.EnsembleDifferential.validate_artifact!(protocol, artifact)
+    :ok
+  end
+
+  def validate!("mmgrpo_differential" = protocol, artifact) do
+    Mix.Tasks.Imp.Benchmark.MmgrpoDifferential.validate_artifact!(protocol, artifact)
+    :ok
+  end
+
   def validate!("optimize_anything", artifact) do
     validation = OptimizeAnythingArtifact.validate_rows(artifact["rows"], mode: :full)
 

@@ -80,7 +80,12 @@ open.
 | MIPROv2 | optimizer | 3.3.0b1 @ b2829b7ae3b6 | pinned | absent | partial | partial |
 | SIMBA | optimizer | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | absent | protocol_defined | partial |
 | GEPA prompt and program optimization | optimizer | 0.1.4 @ 8b0ce6cd99a2 | pinned | partial | protocol_defined | partial |
-| Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, and Ensemble | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | partial | partial |
+| Avatar actor | optimizer | 3.2.1 @ 29448ae12756 | pinned | absent | gap | gap |
+| Avatar trajectory optimizer | optimizer | 3.2.1 @ 29448ae12756 | pinned | absent | gap | gap |
+| BootstrapFinetune and training protocol | optimizer | 3.2.1 @ 29448ae12756 | pinned | partial | partial | partial |
+| DSPy mmGRPO adaptation | optimizer | 3.2.1 @ 29448ae12756 | pinned | partial | gap | gap |
+| BetterTogether composition | optimizer | 3.2.1 @ 29448ae12756 | pinned | partial | gap | gap |
+| Ensemble composition | optimizer | 3.2.1 @ 29448ae12756 | pinned | present | gap | gap |
 | Fast-Slow interleaved prompt and policy adaptation | optimizer | gap | pinned | absent | partial | partial |
 | Optimize Anything arbitrary artifact optimization | optimizer | 0.1.4 @ 8b0ce6cd99a2 | pinned | partial | protocol_defined | partial |
 | Retrieval, RAG, embeddings, and dataset loading | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | pinned | present |

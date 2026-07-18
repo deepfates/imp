@@ -119,6 +119,96 @@
         "arity": 2
       }
     },
+    "avatar_actor_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.avatar_actor_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/avatar-actor-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "avatar_optimizer_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.avatar_optimizer_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/avatar-optimizer-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "bootstrap_finetune_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.bootstrap_finetune_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/weight-composition-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "better_together_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.better_together_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/weight-composition-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "ensemble_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.ensemble_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/ensemble-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
+    "mmgrpo_differential": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.mmgrpo_differential",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/mmgrpo-differential-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
+    },
     "rag_failure_differential": {
       "mode": "provider_free",
       "max_tier": "t1",
@@ -359,7 +449,8 @@
       "surface_tokens": [
         "signature",
         "predict",
-        "chain_of_thought"
+        "chain_of_thought",
+        "history"
       ],
       "public_surfaces": [
         "Imp.Signature",
@@ -386,7 +477,9 @@
       "name": "Model/provider normalized runtime",
       "authority_family": "family.model_provider_runtime",
       "surface_tokens": [
-        "ReqLLM"
+        "ReqLLM",
+        "ReqLLMBatch",
+        "logprobs"
       ],
       "public_surfaces": [
         "Imp.LM",
@@ -622,7 +715,8 @@
       "authority_family": "family.composition_evaluation",
       "surface_tokens": [
         "evaluation",
-        "metrics"
+        "metrics",
+        "confidence"
       ],
       "public_surfaces": [
         "Imp.Assertion",
@@ -766,8 +860,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/bootstrap_few_shot_differential/3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9.json",
-        "artifact_sha256": "3c5d1dbd0fb79948b630e87f7fb299079520423f7b27b411e38cabd9f38009e9",
+        "artifact": "benchmarks/evidence/admitted/bootstrap_few_shot_differential/90348d4bcb9efa653e5b15060f767664e2153ecf82ddc475fa25bc18e92b0af2.json",
+        "artifact_sha256": "90348d4bcb9efa653e5b15060f767664e2153ecf82ddc475fa25bc18e92b0af2",
         "protocol_id": "bootstrap_few_shot_differential"
       }
     },
@@ -794,8 +888,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/random_search_differential/2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318.json",
-        "artifact_sha256": "2b1e40ab9cfb669f5bfcecffc1864d9390c1e2cdc004dafc0598f903b54d0318",
+        "artifact": "benchmarks/evidence/admitted/random_search_differential/5701ab79b7984b9a07e23ac383cb8970641c7f37549f76ba49785fee7cd1cb3f.json",
+        "artifact_sha256": "5701ab79b7984b9a07e23ac383cb8970641c7f37549f76ba49785fee7cd1cb3f",
         "protocol_id": "random_search_differential"
       }
     },
@@ -843,8 +937,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/copro_isolation/cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d.json",
-        "artifact_sha256": "cead13aa2367e3c2a5e0fa4dafcbf1c0cedf8c2166146a4c046923419c2a032d",
+        "artifact": "benchmarks/evidence/admitted/copro_isolation/23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125.json",
+        "artifact_sha256": "23e37a26a5562bfdab68f0cd7330a1319d1a13c6903594fd827c6e95ea60b125",
         "protocol_id": "copro_isolation"
       }
     },
@@ -853,7 +947,8 @@
       "name": "InstructionSearch",
       "authority_family": "family.optimizer_instruction_search",
       "surface_tokens": [
-        "InstructionSearch"
+        "InstructionSearch",
+        "playbook"
       ],
       "public_surfaces": [
         "Imp.Optimizer.InstructionSearch"
@@ -995,7 +1090,7 @@
     {
       "id": "avatar",
       "name": "Avatar actor",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_avatar_actor",
       "surface_tokens": [
         "Avatar"
       ],
@@ -1007,18 +1102,20 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "avatar_actor_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/avatar_actor_differential/609b5b3d0cb57a3aeb5a7fe0167f4272d0fc843a0d6785baf1c925d54ea00f45.json",
+        "artifact_sha256": "609b5b3d0cb57a3aeb5a7fe0167f4272d0fc843a0d6785baf1c925d54ea00f45",
+        "protocol_id": "avatar_actor_differential"
       }
     },
     {
       "id": "avatar_optimizer",
       "name": "Avatar optimizer",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_avatar_optimizer",
       "surface_tokens": [
         "AvatarOptimizer"
       ],
@@ -1030,18 +1127,28 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "avatar_optimizer_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/avatar_optimizer_differential/2b1c849f263850e96fbc624d55f06538daea85a212725d234797ca20b327ca23.json",
+        "artifact_sha256": "2b1c849f263850e96fbc624d55f06538daea85a212725d234797ca20b327ca23",
+        "protocol_id": "avatar_optimizer_differential"
       }
     },
     {
+      "supporting_evidence": [
+        {
+          "tier": "t1",
+          "artifact": "benchmarks/evidence/admitted/bootstrap_finetune_differential/fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902.json",
+          "artifact_sha256": "fb72126547fe2cc00ec4bbdb357330be14dac1f6cd97939949c3ac34cfb7c902",
+          "protocol_id": "bootstrap_finetune_differential"
+        }
+      ],
       "id": "bootstrap_finetune",
       "name": "BootstrapFinetune and training protocol",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_bootstrap_finetune",
       "surface_tokens": [
         "BootstrapFinetune",
         "training_protocol",
@@ -1059,7 +1166,8 @@
       "classification": "adaptation",
       "protocol_ids": [
         "local_mlx",
-        "provider_training"
+        "provider_training",
+        "bootstrap_finetune_differential"
       ],
       "admitted_evidence": {
         "tier": "t2",
@@ -1071,7 +1179,7 @@
     {
       "id": "grpo",
       "name": "GRPO",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_mmgrpo",
       "surface_tokens": [
         "GRPO",
         "mmGRPO"
@@ -1084,18 +1192,20 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "mmgrpo_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/mmgrpo_differential/eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7.json",
+        "artifact_sha256": "eef3e7d53bf5c9d872834fb03fcc9ff867aea72e119dc3d699aa8a116f5b28f7",
+        "protocol_id": "mmgrpo_differential"
       }
     },
     {
       "id": "better_together",
       "name": "BetterTogether",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_better_together",
       "surface_tokens": [
         "BetterTogether"
       ],
@@ -1107,18 +1217,20 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "provider_training"
+        "provider_training",
+        "better_together_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/better_together_differential/893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51.json",
+        "artifact_sha256": "893ba7cd93d8cfc3a851d6952538ebb1d636d4c641aee8513d2010a4bbd86b51",
+        "protocol_id": "better_together_differential"
       }
     },
     {
       "id": "ensemble",
       "name": "Ensemble",
-      "authority_family": "family.optimizer_weights",
+      "authority_family": "family.optimizer_ensemble",
       "surface_tokens": [
         "Ensemble"
       ],
@@ -1130,12 +1242,14 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "optimizer_lift"
+        "optimizer_lift",
+        "ensemble_differential"
       ],
       "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
+        "tier": "t1",
+        "artifact": "benchmarks/evidence/admitted/ensemble_differential/eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a.json",
+        "artifact_sha256": "eb36c1fe7b02900d3e808e2c4a244bdd1dba39fa76ac2ad7417b7e794751d02a",
+        "protocol_id": "ensemble_differential"
       }
     },
     {
@@ -1200,7 +1314,8 @@
       "surface_tokens": [
         "rag",
         "retrieval",
-        "retriever_protocol"
+        "retriever_protocol",
+        "embeddings"
       ],
       "public_surfaces": [
         "Imp.Retrieve",
@@ -1235,6 +1350,8 @@
         "concurrency",
         "signature_parse",
         "optimizer_scheduling",
+        "observability",
+        "telemetry",
         "redaction"
       ],
       "public_surfaces": [

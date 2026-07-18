@@ -78,6 +78,33 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmissionTest do
            end)
   end
 
+  test "a lower-tier admission is retained as complementary evidence without downgrading" do
+    registry_path = temporary_registry!()
+
+    result =
+      EvidenceAdmission.admit!(
+        artifact_path: @artifact,
+        protocol_id: "auto_evaluation_contract",
+        tier: "t0",
+        feature_ids: ["semantic_f1"],
+        registry_path: registry_path
+      )
+
+    assert result.primary_features == []
+    assert result.supporting_features == ["semantic_f1"]
+
+    feature =
+      registry_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> then(&Enum.find(&1["features"], fn feature -> feature["id"] == "semantic_f1" end))
+
+    assert feature["admitted_evidence"]["tier"] == "t1"
+    assert [supporting] = feature["supporting_evidence"]
+    assert supporting["tier"] == "t0"
+    assert supporting["artifact"] == @artifact
+  end
+
   test "a valid source-bound refresh can replace an invalid prior artifact" do
     registry_path = temporary_registry!()
 

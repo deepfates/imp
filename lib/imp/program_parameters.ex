@@ -43,7 +43,7 @@ defmodule Imp.ProgramParameters do
   @spec predictors(struct()) :: [entry()]
   def predictors(%module{} = program) do
     cond do
-      function_exported?(module, :optimizer_predictors, 1) ->
+      callback_exported?(module, :optimizer_predictors, 1) ->
         program
         |> module.optimizer_predictors()
         |> normalize_custom_predictors!()
@@ -56,7 +56,7 @@ defmodule Imp.ProgramParameters do
   @spec update_predictor(struct(), name(), (struct() -> struct())) :: struct()
   def update_predictor(%module{} = program, name, update) when is_function(update, 1) do
     cond do
-      function_exported?(module, :update_optimizer_predictor, 3) ->
+      callback_exported?(module, :update_optimizer_predictor, 3) ->
         module.update_optimizer_predictor(program, name, update)
 
       name == :main ->
@@ -99,7 +99,7 @@ defmodule Imp.ProgramParameters do
   @doc "Returns named persistent playbook parameters exposed by a program."
   @spec playbooks(struct()) :: [playbook_entry()]
   def playbooks(%module{} = program) do
-    if function_exported?(module, :optimizer_playbooks, 1) do
+    if callback_exported?(module, :optimizer_playbooks, 1) do
       program
       |> module.optimizer_playbooks()
       |> normalize_custom_playbooks!()
@@ -111,7 +111,7 @@ defmodule Imp.ProgramParameters do
   @doc "Functionally updates one named persistent playbook parameter."
   @spec update_playbook(struct(), name(), (Imp.Playbook.t() -> Imp.Playbook.t())) :: struct()
   def update_playbook(%module{} = program, name, update) when is_function(update, 1) do
-    if function_exported?(module, :update_optimizer_playbook, 3) do
+    if callback_exported?(module, :update_optimizer_playbook, 3) do
       updated = module.update_optimizer_playbook(program, name, update)
 
       unless match?(%Imp.Playbook{}, fetch_playbook!(updated, name)) do
@@ -279,11 +279,18 @@ defmodule Imp.ProgramParameters do
   defp state_matches?(_stored, _fresh), do: false
 
   defp program_id(%module{} = program) do
-    if function_exported?(module, :optimizer_parameter_id, 1) do
+    if callback_exported?(module, :optimizer_parameter_id, 1) do
       program |> module.optimizer_parameter_id() |> Parameter.validate_id!()
     else
       "program/" <> Atom.to_string(module)
     end
+  end
+
+  # Struct construction does not guarantee that its defining module has been
+  # loaded. Ensure custom optimizer callbacks are discoverable in fresh BEAM
+  # processes, including packaged consumers and clean benchmark captures.
+  defp callback_exported?(module, function, arity) do
+    Code.ensure_loaded?(module) and function_exported?(module, function, arity)
   end
 
   defp normalize_changes(changes) do

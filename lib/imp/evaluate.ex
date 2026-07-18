@@ -39,7 +39,15 @@ defmodule Imp.Evaluate do
   `%Imp.Metrics.Result{}`. Arity-3 metrics also receive the prediction trace.
   Program and metric failures are recorded as failed rows so optimizers can keep
   searching and report diagnostics.
+
+  The per-row `:timeout` defaults to `:infinity`, matching DSPy's `Evaluate`
+  (which imposes no per-example deadline). When a finite `:timeout` kills a row
+  it is logged loudly and the row carries `{:evaluation_task_exit, :timeout}`
+  with a `nil` prediction, so a killed call stays distinguishable from a wrong
+  answer.
   """
+
+  require Logger
 
   defstruct [
     :devset,
@@ -48,7 +56,7 @@ defmodule Imp.Evaluate do
     failure_score: 0.0,
     max_errors: :infinity,
     max_concurrency: 1,
-    timeout: 5000,
+    timeout: :infinity,
     deadline: nil
   ]
 
@@ -60,7 +68,7 @@ defmodule Imp.Evaluate do
       default: :infinity
     ],
     max_concurrency: [type: :pos_integer, default: 1],
-    timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5000],
+    timeout: [type: {:or, [:timeout, :pos_integer]}, default: :infinity],
     deadline: [type: :any, default: nil]
   ]
 
@@ -127,6 +135,19 @@ defmodule Imp.Evaluate do
       {:exit, reason}, {rows, errors} ->
         index = length(rows)
         error = %{index: index, reason: {:evaluation_task_exit, reason}}
+
+        budget =
+          if evaluator.deadline,
+            do: "deadline: #{inspect(evaluator.deadline)}",
+            else: "timeout: #{inspect(evaluator.timeout)}"
+
+        Logger.warning(
+          "Imp.Evaluate killed row #{index} (#{inspect(reason)}) after exceeding its " <>
+            "time budget (#{budget}); recording failure_score " <>
+            "#{inspect(evaluator.failure_score)}. This is a killed call, not a model miss - " <>
+            "raise :timeout or use :infinity if your model calls are legitimately slow."
+        )
+
         row = failed_row_data(index, nil, evaluator.failure_score, error.reason)
         errors = [error | errors]
 

@@ -5,7 +5,14 @@ defmodule ClaimsInventoryTest do
   @claim_states ["asserted", "target", "retired"]
   @gate_policies ["blocking", "informational"]
   @known_lanes ~w(
+    auto_evaluation_contract
+    avatar_actor_differential
+    avatar_optimizer_differential
+    better_together_differential
+    bootstrap_few_shot_differential
+    bootstrap_finetune_differential
     copro_isolation
+    ensemble_differential
     failure_recovery
     gepa_replication
     golden_trace
@@ -19,6 +26,8 @@ defmodule ClaimsInventoryTest do
     protocol_gates
     provider_free_overhead
     rag_tool_agent
+    random_search_differential
+    mmgrpo_differential
     rlm_benchmark
   )
 
@@ -185,20 +194,85 @@ defmodule ClaimsInventoryTest do
     for family <- ~w(bootstrap_few_shot random_search) do
       semantic = claims["claim.optimizer.#{family}.semantic_conformance"]
       effectiveness = claims["claim.optimizer.#{family}.effectiveness"]
+      assert semantic["claim_state"] == "asserted"
       assert semantic["target_rung"] == "C1"
       assert semantic["claim_type"] == "conformance"
       assert effectiveness["target_rung"] == "C3"
       assert effectiveness["claim_type"] == "functional_effectiveness"
     end
 
+    bootstrap = claims["claim.optimizer.bootstrap_few_shot.semantic_conformance"]
+    random = claims["claim.optimizer.random_search.semantic_conformance"]
+
+    assert get_in(bootstrap, ["requirements", Access.at(0), "lane"]) ==
+             "bootstrap_few_shot_differential"
+
+    assert get_in(random, ["requirements", Access.at(0), "lane"]) ==
+             "random_search_differential"
+
+    assert Enum.any?(bootstrap["sources"], &String.contains?(&1, "90348d4b"))
+    assert Enum.any?(random["sources"], &String.contains?(&1, "5701ab79"))
+
     copro = claims["claim.optimizer.copro.semantic_conformance"]
     assert copro["claim_state"] == "asserted"
     assert copro["target_rung"] == "C1"
-    assert copro["sources"] |> Enum.any?(&String.contains?(&1, "cead13aa"))
+    assert Enum.any?(copro["sources"], &String.contains?(&1, "23e37a26"))
     assert get_in(copro, ["requirements", Access.at(0), "lane"]) == "copro_isolation"
-    assert hd(copro["limitations"]) =~ "excludes exact Python RNG parity"
+    assert hd(copro["limitations"]) =~ "exact Python RNG parity"
 
     refute Map.has_key?(claims, "claim.optimizer_lift.full")
+  end
+
+  test "weight families have independent C0, C1, and C3 obligations" do
+    claims = Map.new(read_claims!(), &{&1["id"], &1})
+
+    families = %{
+      "avatar_actor" => {["Avatar"], "avatar_actor_differential"},
+      "avatar_optimizer" => {["AvatarOptimizer"], "avatar_optimizer_differential"},
+      "bootstrap_finetune" => {["BootstrapFinetune"], "bootstrap_finetune_differential"},
+      "mmgrpo" => {["GRPO", "mmGRPO"], "mmgrpo_differential"},
+      "better_together" => {["BetterTogether"], "better_together_differential"},
+      "ensemble" => {["Ensemble"], "ensemble_differential"}
+    }
+
+    Enum.each(families, fn {family, {surfaces, lane}} ->
+      api = claims["claim.optimizer.#{family}.api"]
+      semantic = claims["claim.optimizer.#{family}.semantic_conformance"]
+
+      assert api["claim_state"] == "asserted"
+      assert api["target_rung"] == "C0"
+      assert api["claim_type"] == "feature_completeness"
+      assert get_in(api, ["requirements", Access.at(0), "lane"]) == "product_package"
+
+      assert semantic["claim_state"] == "asserted"
+      assert semantic["target_rung"] == "C1"
+      assert semantic["claim_type"] == "conformance"
+      assert semantic["gate_policy"] == "informational"
+      assert get_in(semantic, ["requirements", Access.at(0), "lane"]) == lane
+      assert MapSet.subset?(MapSet.new(surfaces), MapSet.new(api["surface"]))
+      assert MapSet.subset?(MapSet.new(surfaces), MapSet.new(semantic["surface"]))
+    end)
+
+    assert claims["claim.optimizer.avatar_actor.effectiveness"]["surface"] == ["Avatar"]
+
+    assert claims["claim.optimizer.avatar_optimizer.effectiveness"]["surface"] == [
+             "AvatarOptimizer"
+           ]
+
+    refute Map.has_key?(claims, "claim.optimizer.avatar.effectiveness")
+
+    c3_ids = ~w(
+      claim.optimizer.avatar_actor.effectiveness
+      claim.optimizer.avatar_optimizer.effectiveness
+      claim.optimizer.bootstrap_finetune.provider_effectiveness
+      claim.optimizer.mmgrpo.effectiveness
+      claim.optimizer.better_together.effectiveness
+      claim.optimizer.ensemble.effectiveness
+    )
+
+    for id <- c3_ids do
+      assert claims[id]["target_rung"] == "C3"
+    end
   end
 
   test "OA bounded effectiveness and evaluation quality gaps remain explicit" do
@@ -214,11 +288,29 @@ defmodule ClaimsInventoryTest do
     assert claims["claim.optimize_anything.upstream_comparative_effectiveness"]["claim_state"] ==
              "target"
 
-    assert claims["claim.evaluation.auto_evaluation.semantic_conformance"]["target_rung"] ==
-             "C1"
+    auto_evaluation = claims["claim.evaluation.auto_evaluation.semantic_conformance"]
+    assert auto_evaluation["claim_state"] == "asserted"
+    assert auto_evaluation["target_rung"] == "C1"
+
+    assert get_in(auto_evaluation, ["requirements", Access.at(0), "lane"]) ==
+             "auto_evaluation_contract"
 
     assert claims["claim.evaluation.natural_judge.effectiveness"]["target_rung"] == "C3"
     assert claims["claim.evaluation.refine_advice.effectiveness"]["target_rung"] == "C3"
+
+    assert get_in(claims, [
+             "claim.evaluation.natural_judge.effectiveness",
+             "requirements",
+             Access.at(0),
+             "lane"
+           ]) == "live_matched_model"
+
+    assert get_in(claims, [
+             "claim.evaluation.refine_advice.effectiveness",
+             "requirements",
+             Access.at(0),
+             "lane"
+           ]) == "live_matched_model"
   end
 
   test "local MLX effectiveness claim remains narrow and independently gated" do

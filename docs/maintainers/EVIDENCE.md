@@ -47,6 +47,12 @@ validator, feature ownership, and evidence tier before installing an immutable
 content-addressed artifact. Historical admitted evidence does not become
 unadmitted when the current checkout or clock changes.
 
+Dashboard lanes using the `immutable_admission` policy do not apply an age
+timeout. They may use that policy only after loading the content-addressed
+selection from the reproduction registry and running its pure protocol
+validator against the current implementation. Live results and disposable
+candidate runs must continue to use source, age, or source-and-age freshness.
+
 Filesystem mtime is never scientific provenance. It may only break ties between
 otherwise valid disposable candidates. A newer malformed or ineligible run must
 not mask an older eligible candidate, and neither candidate automatically
@@ -82,6 +88,14 @@ mix imp.evidence.admit \
   --tier t2 \
   --features feature_id,second_feature_id
 ```
+
+Each feature keeps its highest-tier admission as `admitted_evidence`. A valid
+lower-tier artifact from another declared protocol is retained under
+`supporting_evidence` instead of replacing that primary record. This is
+intentional: source-conformance and effectiveness artifacts can support
+different claims, and admitting one must neither discard nor inflate the
+other. Every primary and supporting record is content-addressed and replayed
+through its pure protocol validator.
 
 ## Operating Rules
 

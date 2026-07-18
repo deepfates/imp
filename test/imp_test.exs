@@ -521,6 +521,59 @@ defmodule ImpTest do
     assert Enum.all?(result.errors, &match?(%{reason: {:evaluation_task_exit, :timeout}}, &1))
   end
 
+  test "evaluate and optimizers apply no per-row timeout by default" do
+    # Regression (discovered 2026-07-16): the old 5s default silently scored
+    # slow-but-correct live model calls as failure_score 0.0 inside optimizer
+    # candidate search, corrupting selection with no loud signal.
+    metric = Imp.Metrics.exact_match(:answer)
+    devset = [Imp.example(question: "2+2?", answer: "4") |> Imp.Example.with_inputs(:question)]
+
+    assert Imp.Evaluate.new(devset, metric).timeout == :infinity
+    assert Imp.Optimizer.MIPROv2.new(metric).timeout == :infinity
+    assert Imp.Optimizer.SIMBA.new(metric).timeout == :infinity
+  end
+
+  test "a timed-out row is loud and distinguishable from a wrong answer" do
+    handler = fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      if prompt =~ "slow", do: Process.sleep(:infinity), else: %{answer: "wrong"}
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    program = Imp.predict("question -> answer", lm: lm)
+
+    devset = [
+      Imp.example(question: "slow question", answer: "right")
+      |> Imp.Example.with_inputs(:question),
+      Imp.example(question: "fast question", answer: "right")
+      |> Imp.Example.with_inputs(:question)
+    ]
+
+    {result, log} =
+      ExUnit.CaptureLog.with_log(fn ->
+        devset
+        |> Imp.Evaluate.new(Imp.Metrics.exact_match(:answer),
+          max_concurrency: 2,
+          max_errors: :infinity,
+          timeout: 100
+        )
+        |> Imp.Evaluate.run(program)
+      end)
+
+    [timed_out, wrong] = result.rows
+
+    assert timed_out.error == {:evaluation_task_exit, :timeout}
+    assert timed_out.prediction == nil
+
+    assert wrong.error == nil
+    refute wrong.prediction == nil
+    refute wrong.passed?
+
+    assert [%{index: 0, reason: {:evaluation_task_exit, :timeout}}] = result.errors
+    assert log =~ "killed row 0"
+    assert log =~ "not a model miss"
+  end
+
   test "bootstrap few-shot selects successful demos" do
     handler = fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)

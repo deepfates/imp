@@ -238,6 +238,23 @@ Then capture the clean, source-bound C1 receipt with:
 mix imp.benchmark.copro_isolation --require-clean --out tmp/copro-isolation
 ```
 
+BootstrapFewShot and RandomSearch have separate provider-free, clean-source C1
+protocols against the same stable DSPy authority:
+
+```sh
+mix imp.benchmark.bootstrap_few_shot_differential --require-clean --out tmp/bootstrap-few-shot-differential
+mix imp.benchmark.random_search_differential --require-clean --out tmp/random-search-differential
+```
+
+The canonical BootstrapFewShot (`90348d4b…`), RandomSearch (`5701ab79…`), and
+COPRO (`23e37a26…`) receipts were captured from clean Imp commit `51c00f3` after
+the authority ledger was split into independent weight families and then
+recaptured when the claims-census merge changed the ledger bytes they bind. Their validators
+recompute the exact source bindings and retained scopes. The protocols exclude
+exact Python RNG, provider behavior/effectiveness, and full optimizer parity;
+BootstrapFewShot also excludes repeated-call sampling parity, and RandomSearch
+excludes shuffled-row-order parity.
+
 The canonical validator is receipt-only and provider-free by default; fresh Python
 replay is an explicit additional operation. The fixture starts COPRO in a fresh worker process after installing mutable parent
 LM state. It verifies the canonical authority ledger, clean release commit/tag,

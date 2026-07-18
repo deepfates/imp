@@ -83,13 +83,12 @@
       "id": "optimizer_lift",
       "name": "Instruction and demonstration optimizer lift",
       "claim_ids": [
-        "claim.optimizer.bootstrap_few_shot.semantic_conformance",
-        "claim.optimizer.random_search.semantic_conformance",
         "claim.optimizer.bootstrap_few_shot.effectiveness",
         "claim.optimizer.random_search.effectiveness",
         "claim.optimizer.copro.effectiveness",
         "claim.optimizer.ensemble.effectiveness",
-        "claim.optimizer.avatar.effectiveness",
+        "claim.optimizer.avatar_actor.effectiveness",
+        "claim.optimizer.avatar_optimizer.effectiveness",
         "claim.optimizer.bootstrap_finetune.provider_effectiveness",
         "claim.optimizer.better_together.effectiveness",
         "claim.optimizer.mmgrpo.effectiveness"
@@ -483,7 +482,6 @@
       "id": "evaluation_refinement",
       "name": "Evaluation and inference-time refinement",
       "claim_ids": [
-        "claim.evaluation.auto_evaluation.semantic_conformance",
         "claim.evaluation.natural_judge.effectiveness",
         "claim.evaluation.refine_advice.effectiveness"
       ],
