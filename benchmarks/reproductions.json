@@ -860,8 +860,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/bootstrap_few_shot_differential/7ed813e9e8ead6664615807ad253ba5a8c7c2e99c1d33f08ecd9569a7be7743c.json",
-        "artifact_sha256": "7ed813e9e8ead6664615807ad253ba5a8c7c2e99c1d33f08ecd9569a7be7743c",
+        "artifact": "benchmarks/evidence/admitted/bootstrap_few_shot_differential/9b89dac91786fb2360c810f3122d2a755fc930228253730cd91de6a3b2df2094.json",
+        "artifact_sha256": "9b89dac91786fb2360c810f3122d2a755fc930228253730cd91de6a3b2df2094",
         "protocol_id": "bootstrap_few_shot_differential"
       }
     },
@@ -888,8 +888,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/random_search_differential/836965d630bcc3e642ed8bf0fb324b9d121a758f10db77157b5399f8adf151b6.json",
-        "artifact_sha256": "836965d630bcc3e642ed8bf0fb324b9d121a758f10db77157b5399f8adf151b6",
+        "artifact": "benchmarks/evidence/admitted/random_search_differential/f7e496859639514877a23800cd4e3b8eb5b7d4e6d71aafecfde675dcb8acd19b.json",
+        "artifact_sha256": "f7e496859639514877a23800cd4e3b8eb5b7d4e6d71aafecfde675dcb8acd19b",
         "protocol_id": "random_search_differential"
       }
     },
@@ -937,8 +937,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/copro_isolation/158d8eebdf32704706b8e5224e12ee83d30c7f0059760878af87bac3d14ea574.json",
-        "artifact_sha256": "158d8eebdf32704706b8e5224e12ee83d30c7f0059760878af87bac3d14ea574",
+        "artifact": "benchmarks/evidence/admitted/copro_isolation/5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e.json",
+        "artifact_sha256": "5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e",
         "protocol_id": "copro_isolation"
       }
     },
@@ -1107,8 +1107,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/avatar_actor_differential/5f56cc48e7aa09c96e9885695dad387d87e9a15adb576531846e15cf8fccde5a.json",
-        "artifact_sha256": "5f56cc48e7aa09c96e9885695dad387d87e9a15adb576531846e15cf8fccde5a",
+        "artifact": "benchmarks/evidence/admitted/avatar_actor_differential/190b4002bcb3c96f7a0a3bcea442bb58f2999a935bb2c1b0f1e64c37911beb77.json",
+        "artifact_sha256": "190b4002bcb3c96f7a0a3bcea442bb58f2999a935bb2c1b0f1e64c37911beb77",
         "protocol_id": "avatar_actor_differential"
       }
     },
@@ -1132,8 +1132,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/avatar_optimizer_differential/00f89c35ca4805fa1a32c645439cbe8d8a63a79c6ff01dc56641d5e59d62b20c.json",
-        "artifact_sha256": "00f89c35ca4805fa1a32c645439cbe8d8a63a79c6ff01dc56641d5e59d62b20c",
+        "artifact": "benchmarks/evidence/admitted/avatar_optimizer_differential/581e61073a32d8b0b6555e6d30e59038083cae6f813e28bda926ef007d144f3b.json",
+        "artifact_sha256": "581e61073a32d8b0b6555e6d30e59038083cae6f813e28bda926ef007d144f3b",
         "protocol_id": "avatar_optimizer_differential"
       }
     },
@@ -1222,8 +1222,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/better_together_differential/c62c92dc77719335c7a098b702bd75affefe258ee891c3fdcd1197812ddb8fa5.json",
-        "artifact_sha256": "c62c92dc77719335c7a098b702bd75affefe258ee891c3fdcd1197812ddb8fa5",
+        "artifact": "benchmarks/evidence/admitted/better_together_differential/547de99c674841e587d307acd46b6e50af6b496a924e1d2d7be79d1afed5bb75.json",
+        "artifact_sha256": "547de99c674841e587d307acd46b6e50af6b496a924e1d2d7be79d1afed5bb75",
         "protocol_id": "better_together_differential"
       }
     },
@@ -1247,8 +1247,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/ensemble_differential/230c253b640f3263fa05febe693dc3700d8559b8effadc6eef46f72ebdacd185.json",
-        "artifact_sha256": "230c253b640f3263fa05febe693dc3700d8559b8effadc6eef46f72ebdacd185",
+        "artifact": "benchmarks/evidence/admitted/ensemble_differential/3a7d990af2dd277371e33f81d53d5640dfa50beac6b843a2511cfe24ac5a61e1.json",
+        "artifact_sha256": "3a7d990af2dd277371e33f81d53d5640dfa50beac6b843a2511cfe24ac5a61e1",
         "protocol_id": "ensemble_differential"
       }
     },

@@ -132,7 +132,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_few_shot_differential/7ed813e9e8ead6664615807ad253ba5a8c7c2e99c1d33f08ecd9569a7be7743c.json", "test/classical_optimizer_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_few_shot_differential/9b89dac91786fb2360c810f3122d2a755fc930228253730cd91de6a3b2df2094.json", "test/classical_optimizer_differential_test.exs"],
       "requirements": [{"id": "optimizer.bootstrap_few_shot.semantic", "kind": "optimizer_conformance", "lane": "bootstrap_few_shot_differential", "evidence": "full", "threshold": "the canonical BootstrapFewShot artifact verifies the admitted observations and retained exclusions"}]
     },
     {
@@ -148,7 +148,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/random_search_differential/836965d630bcc3e642ed8bf0fb324b9d121a758f10db77157b5399f8adf151b6.json", "test/classical_optimizer_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/random_search_differential/f7e496859639514877a23800cd4e3b8eb5b7d4e6d71aafecfde675dcb8acd19b.json", "test/classical_optimizer_differential_test.exs"],
       "requirements": [{"id": "optimizer.random_search.semantic", "kind": "optimizer_conformance", "lane": "random_search_differential", "evidence": "full", "threshold": "the canonical RandomSearch artifact verifies the admitted observations and retained exclusions"}]
     },
     {
@@ -164,7 +164,7 @@
       "claim_type": "conformance",
       "comparison": "dspy",
       "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/158d8eebdf32704706b8e5224e12ee83d30c7f0059760878af87bac3d14ea574.json", "test/copro_isolation_artifact_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/copro_isolation/5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e.json", "test/copro_isolation_artifact_test.exs"],
       "requirements": [{"id": "optimizer.copro.semantic", "kind": "optimizer_conformance", "lane": "copro_isolation", "evidence": "passing", "threshold": "the canonical COPRO isolation artifact verifies all five declared observations and retained exclusions"}]
     },
     {
@@ -232,7 +232,7 @@
       "limitations": ["Exact prompts, provider tool selection, tool-failure parity, task effectiveness, and full Avatar parity remain excluded; iteration bounds, the separate finisher, and recoverable tool failures are native Imp behavior.", "DSPy 3.2.1 Avatar cannot construct as released; upstream observations are captured under a disclosed sidecar monkey-patch of the absent dspy.TypedPredictor export, recorded in the artifact scope."],
       "statement": "Imp has source-bound C1 evidence for the three admitted Avatar actor observations against authenticated DSPy 3.2.1 source.",
       "category": "optimizer", "surface": ["Avatar"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_actor_differential/5f56cc48e7aa09c96e9885695dad387d87e9a15adb576531846e15cf8fccde5a.json", "test/avatar_actor_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_actor_differential/190b4002bcb3c96f7a0a3bcea442bb58f2999a935bb2c1b0f1e64c37911beb77.json", "test/avatar_actor_differential_test.exs"],
       "requirements": [{"id": "optimizer.avatar_actor.semantic", "kind": "optimizer_conformance", "lane": "avatar_actor_differential", "evidence": "full", "threshold": "the canonical Avatar actor artifact verifies its three declared observations and retained exclusions"}]
     },
     {
@@ -252,7 +252,7 @@
       "limitations": ["Imp evaluates rewritten candidates before accepting them; exact Python sampling and RNG order are excluded.", "DSPy 3.2.1 AvatarOptimizer cannot construct as released; upstream observations are captured under a disclosed sidecar monkey-patch of the absent dspy.TypedPredictor and dspy.Predict factories, recorded in the artifact scope."],
       "statement": "Imp has source-bound C1 evidence for the admitted AvatarOptimizer classification, comparator, rewrite, and feedback-propagation observations, with the candidate-evaluation correction explicit.",
       "category": "optimizer", "surface": ["AvatarOptimizer"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_optimizer_differential/00f89c35ca4805fa1a32c645439cbe8d8a63a79c6ff01dc56641d5e59d62b20c.json", "test/avatar_optimizer_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_optimizer_differential/581e61073a32d8b0b6555e6d30e59038083cae6f813e28bda926ef007d144f3b.json", "test/avatar_optimizer_differential_test.exs"],
       "requirements": [{"id": "optimizer.avatar_optimizer.semantic", "kind": "optimizer_conformance", "lane": "avatar_optimizer_differential", "evidence": "full", "threshold": "the canonical AvatarOptimizer artifact verifies its declared observations, native corrections, and exclusions"}]
     },
     {
@@ -312,7 +312,7 @@
       "limitations": ["Exact Python shuffle order is excluded; generic optimizer dispatch and bounded asynchronous cleanup are Imp-native extensions."],
       "statement": "Imp has source-bound C1 evidence for the admitted BetterTogether strategy parsing, prefix enumeration, stable validation tie handling, and no-validation latest-prefix observations.",
       "category": "optimizer", "surface": ["BetterTogether"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/better_together_differential/c62c92dc77719335c7a098b702bd75affefe258ee891c3fdcd1197812ddb8fa5.json", "test/weight_composition_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/better_together_differential/547de99c674841e587d307acd46b6e50af6b496a924e1d2d7be79d1afed5bb75.json", "test/weight_composition_differential_test.exs"],
       "requirements": [{"id": "optimizer.better_together.semantic", "kind": "optimizer_conformance", "lane": "better_together_differential", "evidence": "full", "threshold": "the canonical BetterTogether artifact verifies the admitted observations and retained exclusions"}]
     },
     {
@@ -332,7 +332,7 @@
       "limitations": ["DSPy rejects deterministic mode; Imp's seeded replay is native. Exact sampled membership, RNG sequence, and structured failure parity are excluded."],
       "statement": "Imp has source-bound C1 evidence for the admitted Ensemble all-program, reducer, and subset-cardinality observations, with deterministic replay declared native.",
       "category": "optimizer", "surface": ["Ensemble"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/ensemble_differential/230c253b640f3263fa05febe693dc3700d8559b8effadc6eef46f72ebdacd185.json", "test/ensemble_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/ensemble_differential/3a7d990af2dd277371e33f81d53d5640dfa50beac6b843a2511cfe24ac5a61e1.json", "test/ensemble_differential_test.exs"],
       "requirements": [{"id": "optimizer.ensemble.semantic", "kind": "optimizer_conformance", "lane": "ensemble_differential", "evidence": "full", "threshold": "the canonical Ensemble artifact verifies the admitted shared observations, native replay, and retained exclusions"}]
     },
     {
