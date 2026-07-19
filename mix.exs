@@ -53,6 +53,7 @@ defmodule Imp.MixProject do
       "production.check": :test,
       "fast.check": :test,
       "docs.check": :test,
+      "parity.check": :test,
       "public_surface.check": :test,
       "integration.check": :test,
       "protocol.check": :test,
@@ -271,6 +272,13 @@ defmodule Imp.MixProject do
         "docs.clean",
         "docs",
         "livebook.check"
+      ],
+      # Prompt-template fidelity gate (dee-3e4v): run the golden-trace differential
+      # test (Imp vs the pinned DSPy 3.2.1 venv) so a byte-parity regression FAILS
+      # the build per-PR, not only on the weekly evidence-full lane. Requires the
+      # tmp/dspy-parity-venv the heavy CI job builds; runs after that setup.
+      "parity.check": [
+        "test --raise test/golden_trace_test.exs --include evidence_infrastructure"
       ],
       "docs.clean": [
         &clean_docs/1

@@ -108,6 +108,13 @@ jobs:
           PYTHON=python3.12 scripts/setup_dspy_current_target.sh
           PYTHON=python3.12 scripts/setup_reference_test_env.sh
       - run: mix production.check
+      # Enforce prompt-template byte-parity to DSPy 3.2.1 per-PR (dee-3e4v). The
+      # golden-trace test is :evidence_infrastructure (excluded from the default
+      # suite) and previously ran only on the weekly evidence-full lane; this gates
+      # it on every code PR using the dspy-parity venv built above, so a fidelity
+      # regression fails the build the same day it lands, not the next Monday.
+      - name: Enforce prompt-template parity (golden trace vs DSPy 3.2.1)
+        run: mix parity.check
 
   integration:
     name: integration.check

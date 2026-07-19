@@ -38,6 +38,13 @@ defmodule GateContractTest do
     assert [docs_clean] = Keyword.fetch!(aliases, :"docs.clean")
     assert is_function(docs_clean, 1)
 
+    # Prompt-template parity gate (dee-3e4v): the heavy CI job runs this after
+    # building the dspy-parity venv so a byte-parity regression fails per-PR.
+    # Pinned so it can't drift from the golden-trace test path.
+    assert Keyword.fetch!(aliases, :"parity.check") == [
+             "test --raise test/golden_trace_test.exs --include evidence_infrastructure"
+           ]
+
     # fast.check and docs.check run `test`/`livebook.check`, which only work in
     # the :test env. Mix does NOT auto-switch MIX_ENV for a `test` step nested
     # inside an alias, so both MUST be pinned in preferred_envs or they silently
@@ -46,6 +53,7 @@ defmodule GateContractTest do
     preferred = Imp.MixProject.cli() |> Keyword.fetch!(:preferred_envs)
     assert Keyword.get(preferred, :"fast.check") == :test
     assert Keyword.get(preferred, :"docs.check") == :test
+    assert Keyword.get(preferred, :"parity.check") == :test
 
     assert Keyword.fetch!(aliases, :"evidence.check") == [
              "reproduction.check",
