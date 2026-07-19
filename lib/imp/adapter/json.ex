@@ -100,7 +100,12 @@ defmodule Imp.Adapter.JSON do
     |> String.trim()
   end
 
-  defp field_desc(field), do: to_string(field.desc || "")
+  # DSPy get_field_description_string (utils.py:230) renders a description equal
+  # to the "${name}" placeholder (the ChainOfThought reasoning sentinel) as
+  # empty. chat.ex already mirrors this; json.ex must too (dee-cidk).
+  defp field_desc(field) do
+    if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
+  end
 
   # JSONAdapter.format_field_structure.
   defp field_structure(signature) do
@@ -161,15 +166,8 @@ defmodule Imp.Adapter.JSON do
 
   # ChatAdapter.format_task_description.
   defp task_description(signature) do
-    "In adhering to this structure, your objective is: " <> objective_text(signature.instructions)
-  end
-
-  defp objective_text(instructions) do
-    instructions
-    |> to_string()
-    |> String.split("\n")
-    |> then(fn lines -> [""] ++ lines end)
-    |> Enum.join("\n        ")
+    "In adhering to this structure, your objective is: " <>
+      Imp.Adapter.Instructions.objective_text(signature.instructions)
   end
 
   # JSONAdapter.user_message_output_requirements.

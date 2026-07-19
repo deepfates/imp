@@ -188,18 +188,58 @@ def _translate_composites(signature: str) -> str:
 
     signature = re.sub(r"(?:enum|class)\[([^\]]*)\]", enum_repl, signature)
 
-    # array[T] -> list[T-as-python]; bare `array` -> `list`
-    def array_repl(match: "re.Match[str]") -> str:
-        inner = match.group(1).strip()
-        return f"list[{_SCALAR_TO_PY.get(inner, inner)}]"
+    # array[T] -> list[<T translated>], with BALANCED bracket matching so nested
+    # arrays and object-valued elements survive. The old non-nesting regex
+    # `array\[([^\]]*)\]` produced invalid `list[array[integer]]` /`list[object]`
+    # that DSPy rejects, masking the divergence (dee-68oy / dee-p1d5).
+    signature = _rewrite_arrays(signature)
 
-    signature = re.sub(r"array\[([^\]]*)\]", array_repl, signature)
+    # bare `array` -> `list`
     signature = re.sub(r"(?<![\w\[])array(?![\w\[])", "list", signature)
 
-    # object / map -> dict[str, Any]
+    # standalone object / map -> dict[str, Any] (array elements handled above)
     signature = re.sub(r"(?<![\w\[])(?:object|map)(?![\w\[])", "dict[str, Any]", signature)
 
     return signature
+
+
+def _rewrite_arrays(signature: str) -> str:
+    """Replace every balanced `array[...]` span with `list[<translated inner>]`."""
+    out = []
+    i = 0
+    n = len(signature)
+    while i < n:
+        if signature.startswith("array[", i):
+            depth = 0
+            k = i + len("array")  # index of the opening '['
+            while k < n:
+                if signature[k] == "[":
+                    depth += 1
+                elif signature[k] == "]":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                k += 1
+            out.append(_translate_type(signature[i : k + 1]))
+            i = k + 1
+        else:
+            out.append(signature[i])
+            i += 1
+    return "".join(out)
+
+
+def _translate_type(t: str) -> str:
+    """Translate a single, whole Imp type expression into Python type syntax."""
+    t = t.strip()
+    if t.startswith("array[") and t.endswith("]"):
+        return f"list[{_translate_type(t[len('array['):-1])}]"
+    if t == "array":
+        return "list"
+    if t in ("object", "map"):
+        return "dict[str, Any]"
+    if t.startswith(("Literal[", "list[", "dict[")):
+        return t
+    return _SCALAR_TO_PY.get(t, t)
 
 
 def _quote_literal(value: str) -> str:

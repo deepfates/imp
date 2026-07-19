@@ -130,9 +130,19 @@ defmodule Imp.Signature.Parser do
         {:array, %{}}
 
       String.starts_with?(raw, "array[") and String.ends_with?(raw, "]") ->
-        inner = raw |> String.trim_leading("array[") |> String.trim_trailing("]") |> String.trim()
-        {item_type, _metadata} = parse_type(spec, inner, position + 6)
-        {:array, %{constraints: %{items: %{type: item_type}}}}
+        # Strip EXACTLY ONE `array[...]` layer. `String.trim_leading/2` and
+        # `String.trim_trailing/2` remove ALL repeated occurrences, which
+        # collapsed `array[array[integer]]` to inner `"integer"` and silently
+        # flattened the type (dee-68oy). replace_prefix/replace_suffix remove a
+        # single occurrence, so the inner `array[integer]` survives to recurse.
+        inner =
+          raw
+          |> String.replace_prefix("array[", "")
+          |> String.replace_suffix("]", "")
+          |> String.trim()
+
+        {item_type, item_metadata} = parse_type(spec, inner, position + 6)
+        {:array, %{constraints: %{items: item_descriptor(item_type, item_metadata)}}}
 
       (String.starts_with?(raw, "enum[") or String.starts_with?(raw, "class[")) and
           String.ends_with?(raw, "]") ->
@@ -156,6 +166,17 @@ defmodule Imp.Signature.Parser do
           suggestion: suggestion,
           note: note
     end
+  end
+
+  # The `items` descriptor for an array's element type: a FLAT map of the
+  # element's type plus its own inline constraint keys (`items` for a nested
+  # array, `enum` for a literal, etc.), matching the shape Imp.Schema.json_nested
+  # already recurses over. A scalar element yields `%{type: :integer}` exactly as
+  # before (backward compatible); a nested `array[integer]` element yields
+  # `%{type: :array, items: %{type: :integer}}` (dee-68oy).
+  defp item_descriptor(item_type, item_metadata) do
+    inner_constraints = Map.get(item_metadata, :constraints, %{})
+    Map.merge(%{type: item_type}, inner_constraints)
   end
 
   defp split_fields(raw) do

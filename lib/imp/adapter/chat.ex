@@ -247,9 +247,51 @@ defmodule Imp.Adapter.Chat do
     if native_content?(value) do
       ["[[ ## #{field.name} ## ]]\n" | native_content_parts(value)]
     else
-      "[[ ## #{field.name} ## ]]\n#{format_value(value)}"
+      "[[ ## #{field.name} ## ]]\n#{format_field_value(field, value)}"
     end
   end
+
+  # DSPy format_field_value (utils.py:57-59) special-cases a list value on a
+  # `str`-annotated field, rendering it as a numbered guillemet blob list rather
+  # than a JSON dump. This is the RAG-passages pattern (a `context` str field
+  # carrying a list of retrieved passages). Every other value defers to
+  # format_value/1. A list on an array-TYPED field (annotation list[...], not
+  # str) keeps the json-dump path. (dee-tsce)
+  defp format_field_value(field, value) when is_list(value) do
+    # DSPy's `_format_blob` only accepts string elements (it raises TypeError on
+    # anything else), so DSPy's list-on-str blob path is reachable in practice
+    # only for a list of strings (or the empty list -> "N/A"). Restrict the blob
+    # branch to exactly those cases; any other list (e.g. provider-native ReAct's
+    # `tools` field carrying a list of tool-definition maps) keeps the prior
+    # json-style rendering rather than crashing. (dee-tsce)
+    if field_annotation(field) == "str" and Enum.all?(value, &is_binary/1) do
+      format_input_list_field_value(value)
+    else
+      format_value(value)
+    end
+  end
+
+  defp format_field_value(_field, value), do: format_value(value)
+
+  # utils._format_input_list_field_value / _format_blob.
+  defp format_input_list_field_value([]), do: "N/A"
+  defp format_input_list_field_value([single]), do: format_blob(single)
+
+  defp format_input_list_field_value(values) do
+    values
+    |> Enum.with_index(1)
+    |> Enum.map_join("\n", fn {value, index} -> "[#{index}] #{format_blob(value)}" end)
+  end
+
+  defp format_blob(blob) when is_binary(blob) do
+    if String.contains?(blob, "\n") or String.contains?(blob, "«") or String.contains?(blob, "»") do
+      "«««\n    " <> String.replace(blob, "\n", "\n    ") <> "\n»»»"
+    else
+      "«" <> blob <> "»"
+    end
+  end
+
+  defp format_blob(blob), do: format_blob(to_string(blob))
 
   defp native_content?(value) when is_list(value), do: Enum.any?(value, &native_content?/1)
   defp native_content?(%Imp.Adapters.Types.Image{}), do: true
@@ -330,17 +372,9 @@ defmodule Imp.Adapter.Chat do
     All interactions will be structured in the following way, with the appropriate values filled in.
 
     #{render_interaction_template(signature)}
-    In adhering to this structure, your objective is: #{objective_text(signature.instructions)}
+    In adhering to this structure, your objective is: #{Imp.Adapter.Instructions.objective_text(signature.instructions)}
     """
     |> String.trim()
-  end
-
-  defp objective_text(instructions) do
-    instructions
-    |> to_string()
-    |> String.split("\n")
-    |> then(fn lines -> [""] ++ lines end)
-    |> Enum.join("\n        ")
   end
 
   defp render_field_list(fields) do

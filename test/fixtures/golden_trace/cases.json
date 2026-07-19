@@ -544,5 +544,326 @@
       "answer": "Yes",
       "flag": true
     }
+  },
+  {
+    "id": "tsce_list_on_str_input_multi_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "context, question -> answer",
+    "instructions": "Answer using the context passages.",
+    "inputs": {
+      "context": ["alpha", "beta"],
+      "question": "Which comes first?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\nalpha"
+    ],
+    "expected_prediction": {
+      "answer": "alpha"
+    },
+    "edge": "dee-tsce: a list value on a str-annotated INPUT field renders DSPy's numbered guillemet blobs, not Elixir inspect()."
+  },
+  {
+    "id": "tsce_list_on_str_input_single_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "context, question -> answer",
+    "instructions": "Answer using the context passages.",
+    "inputs": {
+      "context": ["alpha"],
+      "question": "What is it?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\nalpha"
+    ],
+    "expected_prediction": {
+      "answer": "alpha"
+    },
+    "edge": "dee-tsce: single-element list on a str field renders a bare guillemet blob."
+  },
+  {
+    "id": "tsce_list_on_str_input_empty_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "context, question -> answer",
+    "instructions": "Answer using the context passages.",
+    "inputs": {
+      "context": [],
+      "question": "What is it?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\nnone"
+    ],
+    "expected_prediction": {
+      "answer": "none"
+    },
+    "edge": "dee-tsce: empty list on a str field renders N/A."
+  },
+  {
+    "id": "wrx5_empty_instructions_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "",
+    "inputs": {
+      "question": "What is the capital of France?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\nParis"
+    ],
+    "expected_prediction": {
+      "answer": "Paris"
+    },
+    "edge": "dee-wrx5: empty-string instructions are replaced with DSPy's default-instructions sentence."
+  },
+  {
+    "id": "o709_indented_multiline_instructions_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "\n    Answer carefully.\n    Then double-check.\n    ",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\n4"
+    ],
+    "expected_prediction": {
+      "answer": "4"
+    },
+    "edge": "dee-709o: cleandoc dedents and strips leading/trailing blank lines before the 8-space-indent join."
+  },
+  {
+    "id": "o709_indented_multiline_instructions_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> answer",
+    "instructions": "\n    Answer carefully.\n    Then double-check.\n    ",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "{\"answer\":\"4\"}"
+    ],
+    "expected_prediction": {
+      "answer": "4"
+    },
+    "edge": "dee-709o: the same cleandoc+dedent objective transform applies under the JSON adapter."
+  },
+  {
+    "id": "o709_crlf_instructions_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "First line.\r\nSecond line.",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\n4"
+    ],
+    "expected_prediction": {
+      "answer": "4"
+    },
+    "edge": "dee-709o: str.splitlines consumes the CRLF boundary; the stray 0x0D does not survive."
+  },
+  {
+    "id": "o709_tab_continuation_instructions_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "\tAnswer.\n\tCheck.",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\n4"
+    ],
+    "expected_prediction": {
+      "answer": "4"
+    },
+    "edge": "dee-709o: cleandoc expands tabs and strips the common tab margin."
+  },
+  {
+    "id": "o709_unicode_line_separator_instructions_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "First Second",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\n4"
+    ],
+    "expected_prediction": {
+      "answer": "4"
+    },
+    "edge": "dee-709o: str.splitlines splits the full Unicode boundary set (U+2028), which String.split(\"\\n\") missed."
+  },
+  {
+    "id": "o68oy_nested_array_int_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> x: array[array[integer]]",
+    "instructions": "Return a list of lists of integers.",
+    "inputs": {
+      "question": "Group these."
+    },
+    "responses": [
+      "{\"x\": [[1, 2], [3]]}"
+    ],
+    "expected_prediction": {
+      "x": [[1, 2], [3]]
+    },
+    "edge": "dee-68oy: array[array[integer]] renders list[list[int]] with a doubly-nested schema, not silently flattened to list[int]."
+  },
+  {
+    "id": "o68oy_nested_array_str_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> x: array[array[string]]",
+    "instructions": "Return a list of lists of strings.",
+    "inputs": {
+      "question": "Group these."
+    },
+    "responses": [
+      "{\"x\": [[\"a\", \"b\"], [\"c\"]]}"
+    ],
+    "expected_prediction": {
+      "x": [["a", "b"], ["c"]]
+    },
+    "edge": "dee-68oy: array[array[string]] renders list[list[str]]."
+  },
+  {
+    "id": "p1d5_array_object_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> items: array[object]",
+    "instructions": "Return a list of objects.",
+    "inputs": {
+      "question": "List the records."
+    },
+    "responses": [
+      "{\"items\": [{\"k\": 1}]}"
+    ],
+    "expected_prediction": {
+      "items": [{"k": 1}]
+    },
+    "edge": "dee-p1d5: array[object] renders list[dict[str, Any]] with additionalProperties:true, consistent with standalone object."
+  },
+  {
+    "id": "h7nw_react_float_observation",
+    "module": "react_dspy",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Use the compute tool then finish.",
+    "inputs": {
+      "question": "Compute the big number."
+    },
+    "tools": [
+      {
+        "name": "compute",
+        "description": "Return a computed value.",
+        "schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "outputs": {
+          "{}": 1000000.0
+        }
+      }
+    ],
+    "responses": [
+      "[[ ## next_thought ## ]]\nCompute it.\n[[ ## next_tool_name ## ]]\ncompute\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## next_thought ## ]]\nThe value is enough.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## reasoning ## ]]\nThe compute observation is a large float.\n[[ ## answer ## ]]\nok"
+    ],
+    "expected_prediction": {
+      "answer": "ok"
+    },
+    "edge": "dee-h7nw: a bare float observation renders Python fixed form 1000000.0, not Elixir exponent 1.0e6."
+  },
+  {
+    "id": "h7nw_react_bool_observation",
+    "module": "react_dspy",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Use the check tool then finish.",
+    "inputs": {
+      "question": "Is it even?"
+    },
+    "tools": [
+      {
+        "name": "check",
+        "description": "Return a boolean.",
+        "schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "outputs": {
+          "{}": true
+        }
+      }
+    ],
+    "responses": [
+      "[[ ## next_thought ## ]]\nCheck it.\n[[ ## next_tool_name ## ]]\ncheck\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## next_thought ## ]]\nDone.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## reasoning ## ]]\nThe check observation is a boolean.\n[[ ## answer ## ]]\nyes"
+    ],
+    "expected_prediction": {
+      "answer": "yes"
+    },
+    "edge": "dee-h7nw: a bare bool observation renders Python True/False, not Elixir true/false."
+  },
+  {
+    "id": "h7nw_react_nil_observation",
+    "module": "react_dspy",
+    "adapter": "chat",
+    "signature": "question -> answer",
+    "instructions": "Use the store tool then finish.",
+    "inputs": {
+      "question": "Store it."
+    },
+    "tools": [
+      {
+        "name": "store",
+        "description": "Store a value and return nothing.",
+        "schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "outputs": {
+          "{}": null
+        }
+      }
+    ],
+    "responses": [
+      "[[ ## next_thought ## ]]\nStore it.\n[[ ## next_tool_name ## ]]\nstore\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## next_thought ## ]]\nDone.\n[[ ## next_tool_name ## ]]\nfinish\n[[ ## next_tool_args ## ]]\n{}",
+      "[[ ## reasoning ## ]]\nThe store observation is empty.\n[[ ## answer ## ]]\ndone"
+    ],
+    "expected_prediction": {
+      "answer": "done"
+    },
+    "edge": "dee-h7nw: a bare nil observation renders Python None, not an empty value line."
+  },
+  {
+    "id": "cidk_chain_of_thought_json",
+    "module": "chain_of_thought",
+    "adapter": "json",
+    "signature": "question -> answer",
+    "instructions": "Solve the math problem.",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "{\"reasoning\":\"2 + 2 = 4\",\"answer\":\"4\"}"
+    ],
+    "expected_prediction": {
+      "reasoning": "2 + 2 = 4",
+      "answer": "4"
+    },
+    "edge": "dee-cidk: the ChainOfThought reasoning field's ${reasoning} sentinel renders as an empty description under the JSON adapter."
   }
 ]

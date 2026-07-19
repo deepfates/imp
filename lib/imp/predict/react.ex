@@ -757,7 +757,13 @@ defmodule Imp.Predict.ReAct do
   defp format_trajectory_value(value) when is_list(value), do: format_input_list(value)
   defp format_trajectory_value(value) when is_map(value), do: python_json(value)
   defp format_trajectory_value(value) when is_binary(value), do: value
-  defp format_trajectory_value(nil), do: ""
+  # DSPy renders a bare scalar observation through str(serialize_for_json(v)):
+  # `True`/`False`/`None`, and Python float repr (fixed vs exponent form) rather
+  # than Elixir's `true`/`false`, empty line, and `1.0e6` exponent form (dee-h7nw).
+  defp format_trajectory_value(true), do: "True"
+  defp format_trajectory_value(false), do: "False"
+  defp format_trajectory_value(nil), do: "None"
+  defp format_trajectory_value(value) when is_float(value), do: Imp.PyFloat.repr(value)
   defp format_trajectory_value(value), do: to_string(value)
 
   defp format_input_list([]), do: "N/A"
@@ -791,6 +797,10 @@ defmodule Imp.Predict.ReAct do
   defp python_json(value) when is_list(value),
     do: "[" <> Enum.map_join(value, ", ", &python_json/1) <> "]"
 
+  # Python json.dumps renders floats with the same repr algorithm str() uses
+  # (`{"p": 1000000.0}`, not Jason's `1.0e6`); scalars otherwise defer to Jason,
+  # whose bool/null/int/string output already matches json.dumps (dee-h7nw).
+  defp python_json(value) when is_float(value), do: Imp.PyFloat.repr(value)
   defp python_json(value), do: Jason.encode!(value)
 
   # Python repr() for a tool's argument schema, as embedded in DSPy's tool
