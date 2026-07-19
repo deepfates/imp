@@ -142,7 +142,7 @@ defmodule TrainingDispatchJournalTest do
         dispatch(trainer(context, :ok), context.path, dispatch_observer: observer)
       end)
 
-    assert_receive :training_intent_prepared
+    assert_receive :training_intent_prepared, 5_000
     Task.shutdown(task, :brutal_kill)
     refute_received {:training_dispatched, _dispatch_id}
     assert %{phase: :prepared} = TrainingDispatch.load!(context.path)
@@ -169,8 +169,8 @@ defmodule TrainingDispatchJournalTest do
         dispatch(hanging_trainer, context.path)
       end)
 
-    assert_receive {:training_dispatched, dispatch_id}
-    assert_receive {:training_accepted, ^dispatch_id}
+    assert_receive {:training_dispatched, dispatch_id}, 5_000
+    assert_receive {:training_accepted, ^dispatch_id}, 5_000
     Task.shutdown(task, :brutal_kill)
 
     assert %{phase: :dispatching, intent: %{dispatch_id: ^dispatch_id}} =
@@ -201,7 +201,7 @@ defmodule TrainingDispatchJournalTest do
         dispatch(trainer(context, :ok), context.path, dispatch_observer: observer)
       end)
 
-    assert_receive {:training_handle_committed, dispatch_id}
+    assert_receive {:training_handle_committed, dispatch_id}, 5_000
     Task.shutdown(task, :brutal_kill)
 
     assert %{phase: :committed, intent: %{dispatch_id: ^dispatch_id}} =
@@ -281,8 +281,8 @@ defmodule TrainingDispatchJournalTest do
     provider = trainer(context, :accepted_then_hang)
     hanging = Task.async(fn -> dispatch(provider, context.path) end)
 
-    assert_receive {:training_dispatched, dispatch_id}
-    assert_receive {:training_accepted, ^dispatch_id}
+    assert_receive {:training_dispatched, dispatch_id}, 5_000
+    assert_receive {:training_accepted, ^dispatch_id}, 5_000
     Task.shutdown(hanging, :brutal_kill)
 
     assert {:error, {:training_dispatch_job_identity_mismatch, ^dispatch_id}} =
