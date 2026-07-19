@@ -99,7 +99,7 @@ def run_case(case: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         signature = dspy.Signature(dspy_signature(case["signature"]), case.get("instructions"))
-        dspy.configure(lm=lm, adapter=adapter(case.get("adapter")))
+        dspy.configure(lm=lm, adapter=adapter(case.get("adapter"), lm))
         program = build_program(case, signature)
         prediction = program(**case["inputs"])
         status = "ok"
@@ -170,11 +170,16 @@ def build_tool(spec: Dict[str, Any]):
     return dspy.Tool(run, name=name, desc=desc, args=spec.get("schema", {}).get("properties", {}))
 
 
-def adapter(name: Optional[str]):
+def adapter(name: Optional[str], lm=None):
     if name == "json":
         return dspy.JSONAdapter()
     if name == "xml":
         return dspy.XMLAdapter()
+    if name == "two_step":
+        # The SAME FixtureLM serves as the extraction model, so both the main
+        # call and the extraction call replay from one response queue and land
+        # in one history — mirroring the Imp side (dee-qt5r).
+        return dspy.TwoStepAdapter(extraction_model=lm)
     return dspy.ChatAdapter()
 
 

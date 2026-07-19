@@ -130,7 +130,9 @@ Available adapters:
 - `Imp.Adapter.Chat`
 - `Imp.Adapter.JSON`
 - `Imp.Adapter.XML`
-- `Imp.Adapter.TwoStep`
+- `Imp.Adapter.TwoStep` (DSPy TwoStepAdapter port; extraction LM via the
+  `two_step_extraction_lm` setting)
+- `Imp.Adapter.PlanFirst` (Imp extension: plan-prepend over Chat)
 
 `JSON` and schema-constrained signatures are the best fit when the output shape
 matters more than prose flexibility.

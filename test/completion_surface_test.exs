@@ -661,8 +661,60 @@ defmodule CompletionSurfaceTest do
 
     assert length(vector) == 8
 
-    messages = Imp.Adapter.TwoStep.format(Imp.signature("q -> a"), %{q: "x"}, [])
+    # PlanFirst (the renamed plan-prepend Imp extension) still injects a plan
+    # field through the Chat adapter.
+    messages = Imp.Adapter.PlanFirst.format(Imp.signature("q -> a"), %{q: "x"}, [])
     assert Enum.any?(messages, &String.contains?(&1.content, "plan"))
+  end
+
+  test "TwoStep adapter is the faithful DSPy TwoStepAdapter contract" do
+    signature = Imp.signature("question -> answer", "Answer the question.")
+
+    # MAIN call: persona system message from field descriptions, plain
+    # `name: value` user content — no [[ ## ]] markers anywhere.
+    messages = Imp.Adapter.TwoStep.format(signature, %{question: "capital of France?"}, [])
+    assert [%{role: :system, content: system}, %{role: :user, content: user}] = messages
+    assert String.starts_with?(system, "You are a helpful assistant")
+    assert system =~ "As input, you will be provided with:\n1. `question` (str):"
+    assert system =~ "Specific instructions: Answer the question."
+    assert user == "question: capital of France?"
+    refute Enum.any?(messages, &String.contains?(&1.content, "[[ ##"))
+
+    # parse without a configured extraction LM fails LOUDLY (nothing silent).
+    assert {:error, {:two_step_extraction_lm_not_configured, _message}} =
+             Imp.Adapter.TwoStep.parse(signature, "The answer is Paris.", [])
+
+    # parse runs the SECOND extraction LM over the synthesized
+    # `text -> outputs` signature via the ChatAdapter path.
+    {:ok, calls} = Agent.start_link(fn -> [] end)
+
+    extraction_lm = fn messages, _opts ->
+      Agent.update(calls, &(&1 ++ [messages]))
+      {:ok, "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"}
+    end
+
+    assert {:ok, prediction} =
+             Imp.Settings.context([two_step_extraction_lm: extraction_lm], fn ->
+               Imp.Adapter.TwoStep.parse(signature, "The answer is Paris.", [])
+             end)
+
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+
+    assert [
+             [
+               %{role: :system, content: extractor_system},
+               %{role: :user, content: extractor_user}
+             ]
+           ] =
+             Agent.get(calls, & &1)
+
+    assert extractor_system =~ "Your input fields are:\n1. `text` (str):"
+
+    assert extractor_system =~
+             "The input is a text that should contain all the necessary information to produce the fields `answer`."
+
+    assert extractor_user =~ "[[ ## text ## ]]\nThe answer is Paris."
+    Agent.stop(calls)
   end
 
   test "embedding providers report invalid boundaries clearly" do

@@ -91,7 +91,18 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       Process.put(:imp_golden_trace_max_iters, case["max_iters"] || 20)
       program = build_imp_program(case["module"], signature, case["adapter"], lm, case["demos"])
 
-      case safe_call(program, atomize_keys(case["inputs"])) do
+      # The two_step adapter mirrors dspy.TwoStepAdapter(extraction_model=...):
+      # the SAME fixture LM serves both the main call and the extraction call,
+      # so the recorded history covers both stages in order (dee-qt5r).
+      call_settings =
+        if case["adapter"] == "two_step", do: [two_step_extraction_lm: lm], else: []
+
+      result =
+        Imp.Settings.context(call_settings, fn ->
+          safe_call(program, atomize_keys(case["inputs"]))
+        end)
+
+      case result do
         {:ok, prediction} -> imp_success(case, prediction, calls, queue)
         {:error, reason} -> imp_error(case, reason, calls, queue)
       end
@@ -196,6 +207,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
   defp adapter_module("chat"), do: Imp.Adapter.Chat
   defp adapter_module("json"), do: Imp.Adapter.JSON
   defp adapter_module("xml"), do: Imp.Adapter.XML
+  defp adapter_module("two_step"), do: Imp.Adapter.TwoStep
   defp adapter_module(adapter), do: Mix.raise("unsupported fixture adapter: #{adapter}")
 
   defp dspy_report(fixtures_path, python, out_dir) do

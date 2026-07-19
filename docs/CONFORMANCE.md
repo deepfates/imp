@@ -2,11 +2,11 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 26
-Conformant: 14
+Conformant: 16
 Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 4
-Claim-specific non-blocking gaps: 4
+Gaps: 2
+Claim-specific non-blocking gaps: 2
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -21,7 +21,7 @@ Passing: true
 | models.normalized_runtime_prerelease | model_runtime | tracking | tracked | 3.3 BaseLM normalized requests/responses, LMRequest, LMResponse, LMStream |
 | adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter |
 | adapters.xml | adapters | conformant | satisfied | XMLAdapter |
-| adapters.two_step | adapters | gap | claim-specific gap | TwoStepAdapter |
+| adapters.two_step | adapters | conformant | satisfied | TwoStepAdapter |
 | primitives.multimodal | primitives | conformant | satisfied | Image, Audio, File, Code, Document, Citations, Reasoning |
 | tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
 | agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |
@@ -29,7 +29,7 @@ Passing: true
 | composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |
 | evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
 | optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
-| optimization.knn | optimization | gap | claim-specific gap | KNN, KNNFewShot |
+| optimization.knn | optimization | conformant | satisfied | KNN, KNNFewShot |
 | optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
 | optimization.gepa | optimization | gap | claim-specific gap | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
 | optimization.weights | optimization | elixir_native_equivalent | satisfied | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble |
@@ -200,26 +200,29 @@ Missing evidence or behavior:
 
 ### `adapters.two_step`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/adapters/two_step_adapter.py`
 
 Imp modules: `Imp.Adapter.TwoStep`
 Semantic invariants:
 
-- Imp.Adapter.TwoStep is an Imp extension: it prepends a :plan output field and delegates format and parse to the Chat adapter
-- the extension does not claim DSPy TwoStepAdapter semantics
+- Imp.Adapter.TwoStep is the faithful DSPy TwoStepAdapter port: the MAIN LM receives a persona/natural-language prompt (field-description system message, plain name: value demos and inputs, no [[ ## ]] markers)
+- parse runs a SECOND extraction LM through the ChatAdapter path over the synthesized text -> outputs signature (original output fields and annotations intact, upstream's exact instructions string), with DSPy's JSONAdapter fallback on extraction failure
+- the extraction LM threads through settings (two_step_extraction_lm) or parse opts, mapping DSPy's TwoStepAdapter(extraction_model=...) constructor argument; a missing extraction LM is a loud error, never a silent single-step parse
+- byte-parity is measured per call (BOTH stages) against real DSPy 3.2.1 by the golden-trace differential (two_step_* cases: template AND envelope parity)
+- the former plan-prepend extension keeps its behavior under the honest name Imp.Adapter.PlanFirst
 
 Executable evidence:
 
+- test: `test/golden_trace_test.exs`
 - test: `test/completion_surface_test.exs`
 - docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
 
-- DSPy TwoStepAdapter port: a free-form main prompt plus a second extraction LM running ChatAdapter over a synthesized text -> outputs signature; no extraction LM exists in Imp's adapter contract (dee-qt5r)
-- golden differential fixtures for both stages (dee-1gb9)
+- none
 
 ### `primitives.multimodal`
 
@@ -419,18 +422,22 @@ Missing evidence or behavior:
 
 ### `optimization.knn`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/predict/knn.py; dspy/teleprompt/knn_fewshot.py`
 
 Imp modules: `Imp.Predict.KNN`, `Imp.Optimizer.KNNFewShot`
 Semantic invariants:
 
-- Imp.Optimizer.KNNFewShot attaches the k retrieved neighbors as raw demos via LabeledFewShot at call time (a deviation from upstream, declared here)
-- retrieval uses token-overlap similarity rather than upstream's required Embedder (declared deviation)
+- Imp.Predict.KNN is the faithful upstream KNN: the trainset's INPUT fields embed once at construction through the required Embedder-analog vectorizer, queries embed at call time, and the top-k neighbors return by descending dot product
+- Imp.Optimizer.KNNFewShot runs a full metric/teacher-driven BootstrapFewShot compilation of the student over the k retrieved neighbors on EVERY forward call (upstream's patched forward), never attaching raw neighbors
+- selections and metric-gated demo sets are proven equal to real DSPy 3.2.1 by a deterministic-embedder differential (test/knn_dspy_differential_test.exs), and unit tests pin neighbor ranking against a hand-computed dot-product expectation
+- the former token-overlap retrieval lives on only under the honest non-DSPy name Imp.Retrievers.KNN
 
 Executable evidence:
 
+- test: `test/knn_few_shot_test.exs`
+- test: `test/knn_dspy_differential_test.exs`
 - test: `test/public_surface_test.exs`
 - test: `test/optimizer_lift_artifact_test.exs`
 - docs: `docs/API_GUIDE.md`
@@ -438,9 +445,7 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- upstream KNNFewShot semantics: a metric/teacher-driven BootstrapFewShot compiled over the k retrieved neighbors on every forward call (dee-bivg)
-- embedding-based neighbor retrieval matching upstream's Embedder contract (dee-bivg)
-- a behavioral-corpus test exercising KNNFewShot against upstream (dee-bivg)
+- none
 
 ### `optimization.instructions`
 

@@ -534,7 +534,7 @@ defmodule ProductionAdapterPersistenceTest do
     ]
 
     loaded_knn =
-      Imp.Predict.KNN.new(1, examples)
+      Imp.Predict.KNN.new(1, examples, vectorizer: Imp.Embeddings.BagOfWords)
       |> Imp.Saving.dump()
       |> Imp.Saving.load()
 
@@ -647,7 +647,7 @@ defmodule ProductionAdapterPersistenceTest do
     ]
 
     knn_program =
-      Imp.Optimizer.KNNFewShot.new(1, examples)
+      Imp.Optimizer.KNNFewShot.new(1, examples, vectorizer: Imp.Embeddings.BagOfWords)
       |> Imp.Optimizer.KNNFewShot.compile(base)
 
     reducer = fn predictions -> hd(predictions) end

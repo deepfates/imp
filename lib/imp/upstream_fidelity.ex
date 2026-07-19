@@ -228,21 +228,21 @@ defmodule Imp.UpstreamFidelity do
       category: :adapters,
       upstream: ["TwoStepAdapter"],
       source: "dspy/adapters/two_step_adapter.py",
-      disposition: :gap,
-      release_blocking: false,
-      ticket: "dee-qt5r",
+      disposition: :conformant,
       imp: [Imp.Adapter.TwoStep],
       invariants: [
-        "Imp.Adapter.TwoStep is an Imp extension: it prepends a :plan output field and delegates format and parse to the Chat adapter",
-        "the extension does not claim DSPy TwoStepAdapter semantics"
+        "Imp.Adapter.TwoStep is the faithful DSPy TwoStepAdapter port: the MAIN LM receives a persona/natural-language prompt (field-description system message, plain name: value demos and inputs, no [[ ## ]] markers)",
+        "parse runs a SECOND extraction LM through the ChatAdapter path over the synthesized text -> outputs signature (original output fields and annotations intact, upstream's exact instructions string), with DSPy's JSONAdapter fallback on extraction failure",
+        "the extraction LM threads through settings (two_step_extraction_lm) or parse opts, mapping DSPy's TwoStepAdapter(extraction_model=...) constructor argument; a missing extraction LM is a loud error, never a silent single-step parse",
+        "byte-parity is measured per call (BOTH stages) against real DSPy 3.2.1 by the golden-trace differential (two_step_* cases: template AND envelope parity)",
+        "the former plan-prepend extension keeps its behavior under the honest name Imp.Adapter.PlanFirst"
       ],
       evidence: %{
-        tests: ["test/completion_surface_test.exs"],
-        docs: ["docs/internal/ADAPTER_FIDELITY.md"],
-        missing: [
-          "DSPy TwoStepAdapter port: a free-form main prompt plus a second extraction LM running ChatAdapter over a synthesized text -> outputs signature; no extraction LM exists in Imp's adapter contract (dee-qt5r)",
-          "golden differential fixtures for both stages (dee-1gb9)"
-        ]
+        tests: [
+          "test/golden_trace_test.exs",
+          "test/completion_surface_test.exs"
+        ],
+        docs: ["docs/internal/ADAPTER_FIDELITY.md"]
       }
     },
     %{
@@ -451,25 +451,22 @@ defmodule Imp.UpstreamFidelity do
       category: :optimization,
       upstream: ["KNN", "KNNFewShot"],
       source: "dspy/predict/knn.py; dspy/teleprompt/knn_fewshot.py",
-      disposition: :gap,
-      release_blocking: false,
-      ticket: "dee-bivg",
+      disposition: :conformant,
       imp: [Imp.Predict.KNN, Imp.Optimizer.KNNFewShot],
       invariants: [
-        "Imp.Optimizer.KNNFewShot attaches the k retrieved neighbors as raw demos via LabeledFewShot at call time (a deviation from upstream, declared here)",
-        "retrieval uses token-overlap similarity rather than upstream's required Embedder (declared deviation)"
+        "Imp.Predict.KNN is the faithful upstream KNN: the trainset's INPUT fields embed once at construction through the required Embedder-analog vectorizer, queries embed at call time, and the top-k neighbors return by descending dot product",
+        "Imp.Optimizer.KNNFewShot runs a full metric/teacher-driven BootstrapFewShot compilation of the student over the k retrieved neighbors on EVERY forward call (upstream's patched forward), never attaching raw neighbors",
+        "selections and metric-gated demo sets are proven equal to real DSPy 3.2.1 by a deterministic-embedder differential (test/knn_dspy_differential_test.exs), and unit tests pin neighbor ranking against a hand-computed dot-product expectation",
+        "the former token-overlap retrieval lives on only under the honest non-DSPy name Imp.Retrievers.KNN"
       ],
       evidence: %{
         tests: [
+          "test/knn_few_shot_test.exs",
+          "test/knn_dspy_differential_test.exs",
           "test/public_surface_test.exs",
           "test/optimizer_lift_artifact_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md"],
-        missing: [
-          "upstream KNNFewShot semantics: a metric/teacher-driven BootstrapFewShot compiled over the k retrieved neighbors on every forward call (dee-bivg)",
-          "embedding-based neighbor retrieval matching upstream's Embedder contract (dee-bivg)",
-          "a behavioral-corpus test exercising KNNFewShot against upstream (dee-bivg)"
-        ]
+        docs: ["docs/API_GUIDE.md"]
       }
     },
     %{

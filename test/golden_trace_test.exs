@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 40
+    assert report["fixtures"]["cases"] == 42
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -206,6 +206,33 @@ defmodule GoldenTraceTest do
              "expected prediction_parity for #{id}"
     end
 
+    # TwoStep adapter faithful port (dee-qt5r / dee-1gb9): Imp.Adapter.TwoStep
+    # now reproduces dspy.TwoStepAdapter — a persona/natural-language MAIN call
+    # (field-description system message, plain `name: value` demos and inputs,
+    # no [[ ## ]] markers) plus a SECOND extraction call through the ChatAdapter
+    # path over the synthesized `text -> outputs` signature (12-space
+    # instruction run included). Both fixture cases replay BOTH calls through
+    # one fixture LM on each side and match byte-for-byte per call. The old
+    # plan-prepend extension (now Imp.Adapter.PlanFirst) fails both cases
+    # (prove-teeth transcript in the dee-qt5r ledger note).
+    for id <- ["two_step_basic", "two_step_typed"] do
+      assert parity_by_case[id] == true, "expected template parity for #{id}"
+      two_step_case = Enum.find(report["cases"], &(&1["id"] == id))
+      assert two_step_case["prediction_parity"], "expected prediction_parity for #{id}"
+      # Main call + extraction call, on BOTH sides.
+      assert length(two_step_case["imp"]["history"]) == 2
+      assert length(two_step_case["dspy"]["history"]) == 2
+    end
+
+    # two_step_basic also proves the demo path: a complete demo and a
+    # present-nil (incomplete) demo render as plain `name: value` turns with
+    # DSPy's incomplete-demo prefix and Python `None` spelling.
+    two_step_basic = Enum.find(report["cases"], &(&1["id"] == "two_step_basic"))
+    [main_call | _] = two_step_basic["imp"]["history"]
+    demo_contents = Enum.map(main_call["messages"], & &1["content"])
+    assert Enum.any?(demo_contents, &(&1 == "answer: Berlin"))
+    assert Enum.any?(demo_contents, &(&1 == "answer: None"))
+
     # Request-envelope fidelity (dee-idig). The old instrument compared only
     # message role+content, so it reported false parity while Imp shipped
     # response_format:json_object on JSON cases and DSPy (capability-gated)
@@ -359,13 +386,21 @@ defmodule GoldenTraceTest do
       assert envelope_by_case[id] == true, "expected envelope parity for #{id}"
     end
 
+    # The two TwoStep cases reach envelope parity too: both the main call and
+    # the extraction call send an empty request envelope on both sides (DSPy
+    # passes lm_kwargs={} to the extraction ChatAdapter call; Imp passes []).
+    for id <- ["two_step_basic", "two_step_typed"] do
+      assert envelope_by_case[id] == true, "expected envelope parity for #{id}"
+    end
+
     # The honest faithful-port count: byte-identical messages AND identical
-    # request envelope, per call. Thirty-seven of forty cases fully match —
+    # request envelope, per call. Thirty-nine of forty-two cases fully match —
     # every case EXCEPT the three provider-native ReAct cases (documented
-    # tools/tool_choice deviation). The five XML cases (dee-ovd3/dee-1gb9)
-    # joined at full parity with the faithful XMLAdapter port.
-    assert report["summary"]["envelope_parity_cases"] == 37
-    assert report["summary"]["full_parity_cases"] == 37
+    # tools/tool_choice deviation). The five XML cases (dee-ovd3/dee-1gb9) and
+    # the two TwoStep cases (dee-qt5r) joined at full parity with their
+    # faithful ports.
+    assert report["summary"]["envelope_parity_cases"] == 39
+    assert report["summary"]["full_parity_cases"] == 39
     # Still false: the three native ReAct cases diverge on the envelope.
     assert report["summary"]["message_envelope_parity"] == false
 

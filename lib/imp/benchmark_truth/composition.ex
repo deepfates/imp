@@ -206,7 +206,7 @@ defmodule Imp.BenchmarkTruth.Composition do
   defp knn(examples) do
     trainset = Enum.map(examples, &example_from_row/1)
     query = List.first(examples)
-    program = Imp.Predict.KNN.new(2, trainset)
+    program = Imp.Predict.KNN.new(2, trainset, vectorizer: Imp.Embeddings.BagOfWords)
     demos = Imp.Predict.KNN.call(program, %{question: query["question"]})
     retrieved_answers = Enum.map(demos, &Imp.Example.get(&1, :answer))
     score = if query["answer"] in retrieved_answers, do: 1.0, else: 0.0
