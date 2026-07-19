@@ -238,7 +238,8 @@ redacted trace before raising them.
 A program — including one an optimizer compiled — is a value. `Imp.save!/2`
 and `Imp.load!/1` round-trip it through a checksummed JSON artifact.
 Credentials are never persisted: rebind the live model at load time with
-`Imp.with_lm/2` or a scoped `Imp.context/2`.
+`Imp.with_lm/2` or a scoped `Imp.context/2`. Saving a program pinned to a
+non-portable runtime LM fails loudly instead of silently dropping the pin.
 
 ```elixir
 lm = %{
@@ -249,7 +250,7 @@ lm = %{
 path = Path.join(System.tmp_dir!(), "ticket-router-#{System.unique_integer([:positive])}.json")
 
 try do
-  router = Imp.predict("ticket -> team", lm: lm)
+  router = Imp.predict("ticket -> team")
   :ok = Imp.save!(router, path)
   loaded = Imp.load!(path)
 

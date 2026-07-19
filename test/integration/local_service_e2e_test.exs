@@ -339,11 +339,13 @@ defmodule LocalServiceE2ETest do
       ]
     }
 
-    base = Imp.predict("question, context -> answer", lm: lm)
+    # Dynamic LM via context: a Static-pinned program can no longer be saved
+    # (dee-i3s4 / P03 made that loud), and this test saves the compiled RAG.
+    base = Imp.predict("question, context -> answer")
     rag = Imp.rag(base, retriever, k: 1)
 
     evaluator = Imp.Evaluate.new(dataset.dev, Imp.Metrics.exact_match(:answer))
-    baseline = Imp.Evaluate.run(evaluator, rag)
+    baseline = Imp.context([lm: lm], fn -> Imp.Evaluate.run(evaluator, rag) end)
 
     assert baseline.score == 1.0
     assert [%{prediction: prediction}] = baseline.rows
@@ -354,7 +356,7 @@ defmodule LocalServiceE2ETest do
       |> Imp.Optimizer.LabeledFewShot.compile(base, dataset.train)
       |> Imp.rag(retriever, k: 1)
 
-    optimized = Imp.Evaluate.run(evaluator, compiled)
+    optimized = Imp.context([lm: lm], fn -> Imp.Evaluate.run(evaluator, compiled) end)
 
     assert optimized.score == 1.0
 

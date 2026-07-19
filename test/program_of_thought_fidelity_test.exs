@@ -120,9 +120,11 @@ defmodule ProgramOfThoughtFidelityTest do
     owner = self()
     lm = static_sequence(owner, List.duplicate(%{program: "missing + 1"}, 2))
 
+    # Built dynamic and re-pinned after load: a Static-pinned program can no
+    # longer be dumped (dee-i3s4 / P03 made that loud).
     loaded =
       "x -> answer"
-      |> Imp.program_of_thought(lm: lm, max_iters: 2)
+      |> Imp.program_of_thought(max_iters: 2)
       |> Imp.dump()
       |> Imp.load()
       |> Imp.with_lm(lm)

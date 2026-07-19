@@ -524,10 +524,14 @@ retriever = Imp.memory(docs, k: 1)
 
 program =
   "question, context -> answer"
-  |> Imp.predict(lm: lm)
+  |> Imp.predict()
   |> Imp.rag(retriever, k: 1)
 
-{:ok, prediction} = Imp.call(program, %{question: "capital France"})
+{:ok, prediction} =
+  Imp.context([lm: lm], fn ->
+    Imp.call(program, %{question: "capital France"})
+  end)
+
 Imp.get(prediction, :answer)
 prediction.metadata.retrieval
 ```
@@ -582,7 +586,10 @@ examples =
 
 Every loader returns `Imp.Example` values with inputs already marked, ready
 for `Imp.evaluate/4` and the optimizers. `Imp.Datasets.GSM8K.metric/3` is the
-exact-match metric that benchmark conventionally uses.
+benchmark metric: it compares the canonical final answer (the `#### N` value,
+kept in `:canonical_answer` by the fetcher) with numeric equivalence and a
+normalized text fallback, mirroring DSPy's `gsm8k_metric`, so a prediction of
+`"18"` scores true against a gold rationale ending `#### 18`.
 
 ## Optimize A Program
 

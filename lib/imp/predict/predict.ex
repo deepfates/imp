@@ -132,14 +132,20 @@ defmodule Imp.Predict.Predict do
       "config" => encode_keyword(predict.config),
       "metadata" => Imp.Optimizer.Report.encode_term(predict.metadata),
       "adapter" => predict |> resolve_adapter() |> Atom.to_string(),
-      "lm" => dump_lm(predict.lm),
+      "lm" => dump_lm(predict.lm, predict.dynamic_lm?),
       "dynamic_lm" => predict.dynamic_lm?,
       "dynamic_adapter" => predict.dynamic_adapter?
     }
   end
 
-  defp dump_lm(%Imp.Clients.ReqLLM{} = lm), do: Imp.Clients.ReqLLM.dump(lm)
-  defp dump_lm(_lm), do: nil
+  # Imp.Saving's portable-LM doctrine (already enforced by RLM): a program
+  # pinned to a non-portable LM must fail LOUDLY at dump time instead of
+  # silently persisting `dynamic_lm: false` with a nil LM — an artifact that
+  # would load as a dynamic program answering with the global LM. The escape
+  # hatch is explicit: pin a portable ReqLLM client, or opt in to dynamic LM
+  # resolution (build the program without `:lm`).
+  defp dump_lm(lm, dynamic_lm?),
+    do: Imp.Saving.dump_portable_lm(lm, dynamic_lm?, "Predict LM")
 
   defp encode_keyword(values) when is_list(values),
     do: Enum.map(values, fn {k, v} -> [Atom.to_string(k), v] end)

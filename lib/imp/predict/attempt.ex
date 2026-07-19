@@ -23,9 +23,17 @@ defmodule Imp.Predict.Attempt do
     end)
   end
 
-  def score(metric, prediction) do
+  # DSPy Refine/BestOfN score with `reward = self.reward_fn(kwargs, outputs)`
+  # (dspy/predict/refine.py and dspy/predict/best_of_n.py), where `kwargs` is
+  # the caller's ORIGINAL inputs — the retry hint is injected at the adapter
+  # layer and never reaches the reward function. The metric therefore receives
+  # an Example built from the real call inputs, never a fabricated empty one.
+  def score(metric, inputs, prediction) do
+    inputs = Map.new(inputs)
+    example = inputs |> Imp.Example.new() |> Imp.Example.with_inputs(Map.keys(inputs))
+
     metric
-    |> apply([%Imp.Example{}, prediction])
+    |> apply([example, prediction])
     |> Imp.Metrics.normalize_result()
   rescue
     error ->

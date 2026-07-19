@@ -517,12 +517,18 @@ defmodule DocumentationContractTest do
 
     retriever = Imp.Retrieve.Memory.new(docs, k: 1)
 
+    # Mirrors the API guide: the RAG program stays dynamic (context-scoped LM)
+    # because a Static-pinned program can no longer be saved (dee-i3s4 / P03).
     program =
       "question, context -> answer"
-      |> Imp.predict(lm: lm)
+      |> Imp.predict()
       |> Imp.rag(retriever, k: 1)
 
-    assert {:ok, prediction} = Imp.call(program, %{question: "capital France"})
+    assert {:ok, prediction} =
+             Imp.context([lm: lm], fn ->
+               Imp.call(program, %{question: "capital France"})
+             end)
+
     assert Imp.get(prediction, :answer) == "Paris"
     assert prediction.metadata.retrieval.count == 1
 

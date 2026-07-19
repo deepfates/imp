@@ -92,7 +92,10 @@ defmodule Imp.Predict.Refine do
 
     case Imp.Module.call(program, attempt_inputs) do
       {:ok, prediction} ->
-        metric_result = Attempt.score(refine.metric, prediction)
+        # Score against the ORIGINAL call inputs (DSPy refine.py:
+        # `reward = self.reward_fn(kwargs, outputs)`), not attempt_inputs —
+        # the injected :hint_ must stay invisible to the reward function.
+        metric_result = Attempt.score(refine.metric, inputs, prediction)
         outcome = %{attempt: attempt, prediction: prediction, metric: metric_result}
         outcomes = outcomes ++ [outcome]
         best = choose_best(best, outcome)

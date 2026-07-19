@@ -48,7 +48,9 @@ defmodule Imp.Predict.BestOfN do
         program = Attempt.bind(best.program, candidate.value)
 
         case Imp.Module.call(program, inputs) do
-          {:ok, prediction} -> {:ok, prediction, Attempt.score(best.metric, prediction)}
+          # DSPy best_of_n.py: `reward = self.reward_fn(kwargs, pred)` — the
+          # reward function sees the caller's actual inputs.
+          {:ok, prediction} -> {:ok, prediction, Attempt.score(best.metric, inputs, prediction)}
           {:error, reason} -> {:error, reason}
         end
       end,

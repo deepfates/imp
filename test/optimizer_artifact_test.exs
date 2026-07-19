@@ -72,10 +72,19 @@ defmodule Imp.Optimizer.ArtifactTest do
   end
 
   test "strips credentials and rejects runtime functions" do
-    program = runtime_program("safe", "answer", api_key: "sk-test-secret-123456789")
+    # Corrected toward loudness (dee-i3s4 / P03): a candidate whose program
+    # pins a non-portable runtime LM now fails loudly at dump time instead of
+    # silently stripping the LM into a contradictory artifact — the pinned
+    # credential can never reach the artifact at all.
+    assert_raise ArgumentError, ~r/Predict LM is not portable/, fn ->
+      Artifact.candidate(
+        "safe",
+        runtime_program("safe", "answer", api_key: "sk-test-secret-123456789")
+      )
+    end
 
     candidate =
-      Artifact.candidate("safe", program,
+      Artifact.candidate("safe", optimized("safe"),
         metadata: %{
           api_key: "sk-metadata-secret-123456",
           nested: %{authorization: "Bearer abcdefghijklmnop"},

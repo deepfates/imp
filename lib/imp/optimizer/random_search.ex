@@ -290,12 +290,22 @@ defmodule Imp.Optimizer.RandomSearch do
     max_concurrency =
       optimizer.num_threads || Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers)
 
+    # Imp.Evaluate now halts loudly at errors >= max_errors (DSPy
+    # parallelizer semantics); translate into RandomSearch's budget error so
+    # the optimizer-facing contract stays the same.
     result =
-      Imp.Evaluate.new(valset, optimizer.metric,
-        max_concurrency: max_concurrency,
-        max_errors: evaluator_error_limit(optimizer.max_errors)
-      )
-      |> Imp.Evaluate.run(program)
+      try do
+        Imp.Evaluate.new(valset, optimizer.metric,
+          max_concurrency: max_concurrency,
+          max_errors: optimizer.max_errors
+        )
+        |> Imp.Evaluate.run(program)
+      rescue
+        cancelled in Imp.EvaluationCancelledError ->
+          raise RuntimeError,
+                "random_search_evaluation error budget exhausted: " <>
+                  "#{length(cancelled.errors)} errors (maximum #{optimizer.max_errors})"
+      end
 
     enforce_error_budget!(result.errors, optimizer.max_errors, :random_search_evaluation)
 
@@ -352,9 +362,6 @@ defmodule Imp.Optimizer.RandomSearch do
   defp compare(left, right) when left < right, do: :lt
   defp compare(left, right) when left > right, do: :gt
   defp compare(_left, _right), do: :eq
-
-  defp evaluator_error_limit(:infinity), do: :infinity
-  defp evaluator_error_limit(max_errors), do: max(max_errors - 1, 0)
 
   defp enforce_error_budget!([], _max_errors, _stage), do: :ok
   defp enforce_error_budget!(_errors, :infinity, _stage), do: :ok

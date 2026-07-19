@@ -1065,18 +1065,22 @@ defmodule Imp.Saving do
     raise ArgumentError, "invalid saved ReAct mode: #{inspect(mode)}"
   end
 
-  defp dump_portable_lm(nil, true, _context), do: nil
+  @doc false
+  # Shared portable-LM doctrine for every dumping program (RLM, Predict, ...):
+  # a pinned (`dynamic?: false`) LM that cannot be serialized must raise here,
+  # never dump as nil — a `{"dynamic_lm" => false, "lm" => nil}` artifact loads
+  # as a dynamic program that silently answers with the global LM.
+  def dump_portable_lm(nil, true, _context), do: nil
 
-  defp dump_portable_lm(%Imp.Clients.ReqLLM{} = lm, _dynamic?, _context),
+  def dump_portable_lm(%Imp.Clients.ReqLLM{} = lm, _dynamic?, _context),
     do: Imp.Clients.ReqLLM.dump(lm)
 
-  defp dump_portable_lm(lm, false, context) do
+  def dump_portable_lm(lm, false, context) do
     raise ArgumentError,
           "#{context} is not portable; pin ReqLLM or use dynamic settings, got: #{inspect(program_name(lm))}"
   end
 
-  defp dump_portable_lm(nil, false, _context), do: nil
-  defp dump_portable_lm(_lm, true, _context), do: nil
+  def dump_portable_lm(_lm, true, _context), do: nil
 
   defp dump_adapter(_adapter, true), do: nil
   defp dump_adapter(adapter, false) when is_atom(adapter), do: Atom.to_string(adapter)
