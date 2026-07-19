@@ -16,6 +16,8 @@ defmodule Imp.LegacyIdentityAudit do
   @historical_prefixes %{
     "benchmarks/data/" => "frozen benchmark inputs and provenance",
     "benchmarks/evidence/admitted/" => "immutable admitted benchmark evidence",
+    "benchmarks/evidence/archive/" =>
+      "immutable superseded benchmark evidence (archived admissions)",
     "benchmarks/results/" => "pre-cutover benchmark results retained as historical evidence",
     "benchmarks/upstream/" => "pinned upstream evidence"
   }

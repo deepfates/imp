@@ -21,6 +21,75 @@ defmodule LearningPathContractTest do
     "docs/TUTORIAL_TICKET_ROUTING.md" => %{blocks: 7, local: []}
   }
 
+  # docs/API_GUIDE.md is pinned separately (dee-qzv9): its blocks deliberately
+  # continue one another, so the deterministic ones execute SEQUENTIALLY with
+  # carried bindings rather than standalone. Blocks that cannot execute offline
+  # are pinned below by index, first line, and reason; everything else must
+  # eval. If the guide changes, both pins fail loudly and must be re-pinned
+  # against the new block inventory — that is the point.
+  @api_guide "docs/API_GUIDE.md"
+  @api_guide_blocks 43
+  @api_guide_skips %{
+    1 => {"model = System.fetch_env!(\"OPENAI_MODEL\")", "live provider block (OPENAI_MODEL)"},
+    16 => {"lm = Imp.req_llm(\"openai:gpt-5.4-mini\"", "live provider block (OPENAI_API_KEY)"},
+    17 => {"def handle_event(\"ask\"", "LiveView module-context sketch, not a script"},
+    36 => {"client = Imp.MCP.HTTPClient.new(", "external MCP service sketch"},
+    42 => {"lm =", "live provider block (OPENAI_MODEL)"}
+  }
+
+  test "API guide block inventory is pinned and every block parses" do
+    blocks = elixir_blocks(@api_guide)
+
+    assert length(blocks) == @api_guide_blocks,
+           "#{@api_guide} has #{length(blocks)} elixir blocks, contract expects " <>
+             "#{@api_guide_blocks}; update this contract when the guide changes"
+
+    for {code, index} <- Enum.with_index(blocks) do
+      Code.string_to_quoted!(code, file: "#{@api_guide}##{index}")
+    end
+
+    for {index, {first_line, _reason}} <- @api_guide_skips do
+      block = Enum.at(blocks, index)
+
+      assert String.starts_with?(block, first_line),
+             "#{@api_guide} block #{index} no longer starts with #{inspect(first_line)}; " <>
+               "the skip pin is stale — re-verify whether the block is executable"
+    end
+  end
+
+  @tag timeout: 300_000
+  test "API guide deterministic blocks execute sequentially with their documented results" do
+    binding =
+      @api_guide
+      |> elixir_blocks()
+      |> Enum.with_index()
+      |> Enum.reduce([], fn {code, index}, binding ->
+        if Map.has_key?(@api_guide_skips, index) do
+          binding
+        else
+          {_result, binding} = Code.eval_string(code, binding, file: "#{@api_guide}##{index}")
+          binding
+        end
+      end)
+
+    # The flagship MIPROv2 checkpoint example (dee-qzv9): as previously
+    # documented it raised "minibatch_size cannot exceed valset size 1"
+    # before writing any checkpoint.
+    paused = Keyword.fetch!(binding, :paused)
+    resumed = Keyword.fetch!(binding, :resumed)
+    assert Imp.Optimizer.Report.fetch(paused).metadata.run_status == :paused
+    assert Imp.Optimizer.Report.fetch(resumed).metadata.run_status == :complete
+
+    # The Avatar and Optimize Anything examples referenced never-bound
+    # variables; bound, they must actually optimize.
+    compiled_avatar = Keyword.fetch!(binding, :compiled_avatar)
+    assert Imp.Optimizer.Report.fetch(compiled_avatar).best_score == 1.0
+
+    result = Keyword.fetch!(binding, :result)
+    assert hd(result.validation_scores) == 0.5
+    assert Enum.max(result.validation_scores) == 1.0
+  end
+
   test "every documented Elixir snippet parses and the block inventory is pinned" do
     for {path, %{blocks: expected_count}} <- @contract do
       blocks = elixir_blocks(path)

@@ -75,6 +75,10 @@ Program calls return tagged tuples. Match both branches at application
 boundaries instead of assuming every provider call succeeds:
 
 ```elixir
+require Logger
+
+question = "What is the capital of France?"
+
 case Imp.call(program, %{question: question}) do
   {:ok, prediction} ->
     {:ok, Imp.get(prediction, :answer)}
@@ -93,6 +97,12 @@ configuration defects and should fail before serving traffic.
 Evaluation keeps per-example failures visible rather than hiding them:
 
 ```elixir
+devset = [
+  Imp.example(question: "Eiffel Tower city?", answer: "Paris") |> Imp.with_inputs(:question)
+]
+
+metric = Imp.exact_match(:answer)
+
 report = Imp.evaluate(program, devset, metric, failure_score: 0.0, max_errors: 5)
 
 Enum.each(report.errors, fn error ->
@@ -660,9 +670,14 @@ mipro =
     num_trials: 8,
     max_bootstrapped_demos: 2,
     max_labeled_demos: 2,
+    minibatch: false,
     startup_trials: 2
   )
 ```
+
+`minibatch: false` matters at this scale: minibatched evaluation is the
+default, and its `minibatch_size` must not exceed the validation-set size, so
+a small `devset` like the one on this page rejects the run before it starts.
 
 MIPROv2 and SIMBA can pause at durable run boundaries and resume from the
 JSON-safe checkpoint attached to the optimizer report:
@@ -691,10 +706,12 @@ resumed =
   )
 ```
 
-For SIMBA, use the corresponding five-argument call and invocation-level
-`max_steps:` option:
+For SIMBA, build the optimizer, then use the corresponding five-argument call
+and invocation-level `max_steps:` option:
 
 ```elixir
+simba = Imp.Optimizer.SIMBA.new(metric, bsize: 1, num_candidates: 2, max_steps: 1)
+
 Imp.Optimizer.SIMBA.compile(simba, program, trainset, devset,
   max_steps: 1,
   checkpoint_fn: persist
@@ -709,8 +726,47 @@ Build an Avatar through the facade, then optimize its actor instruction with
 the dedicated optimizer:
 
 ```elixir
-lookup = Imp.tool(:lookup, "Look up a country capital", &lookup_country/1)
-avatar = Imp.avatar("question -> answer", [lookup], lm: lm, max_iters: 3)
+lookup_country = fn
+  %{country: "France"} -> "Paris"
+  _other -> "unknown"
+end
+
+actor_lm = %{
+  module: Imp.LM.Static,
+  opts: [
+    handler: fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+
+      cond do
+        prompt =~ "Do not request another tool." ->
+          if prompt =~ "Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+
+        prompt =~ "tool_output:" ->
+          %{action: %{tool_name: "Finish", tool_input_query: %{}}}
+
+        true ->
+          %{action: %{tool_name: "lookup", tool_input_query: %{country: "France"}}}
+      end
+    end
+  ]
+}
+
+feedback_lm = %{
+  module: Imp.LM.Static,
+  opts: [handler: fn _messages, _opts -> %{feedback: "Use exact country names."} end]
+}
+
+rewrite_lm = %{
+  module: Imp.LM.Static,
+  opts: [
+    handler: fn _messages, _opts ->
+      %{new_instruction: "Look up the exact country name, then Finish."}
+    end
+  ]
+}
+
+lookup = Imp.tool(:lookup, "Look up a country capital", lookup_country)
+avatar = Imp.avatar("question -> answer", [lookup], lm: actor_lm, max_iters: 3)
 
 avatar_optimizer =
   Imp.Optimizer.Avatar.new(Imp.exact_match(:answer),
@@ -758,6 +814,22 @@ call per candidate. A `dataset:` selects multi-task optimization; adding a
 non-empty `valset:` selects held-out generalization.
 
 ```elixir
+evaluator = fn candidate, _example ->
+  if candidate.planner =~ "numbered steps", do: 1.0, else: 0.5
+end
+
+training_examples = [
+  %{feedback: "The plan needs explicit numbered steps."},
+  %{feedback: "Number each step of the plan."}
+]
+
+held_out_examples = [%{feedback: "Held-out: numbered steps still required."}]
+
+reflection_lm = %{
+  module: Imp.LM.Static,
+  opts: [handler: fn _messages, _opts -> "Plan with explicit numbered steps." end]
+}
+
 result =
   Imp.Optimize.Anything.run(
     %{planner: "Plan directly.", writer: "Answer clearly."},
