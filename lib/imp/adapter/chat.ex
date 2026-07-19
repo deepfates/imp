@@ -12,7 +12,15 @@ defmodule Imp.Adapter.Chat do
     # Optional injectable renderer for demo/history ASSISTANT turns, letting a
     # delegating adapter (JSON) substitute its own serialization while reusing
     # Chat's message assembly. Arity 3: (signature, outputs, missing_message).
-    output_renderer: [type: {:fun, 3}]
+    output_renderer: [type: {:fun, 3}],
+    # Optional injectable renderer for one INPUT-field section in user-facing
+    # turns (main request, demos, history). DSPy's XMLAdapter overrides
+    # `format_field_with_value`, which changes how EVERY input field renders
+    # (`<name>\nvalue\n</name>` instead of `[[ ## name ## ]]\nvalue`); this seam
+    # mirrors that polymorphism (dee-ovd3). Arity 2: (field, formatted_value)
+    # where formatted_value is Chat's field-aware formatted string (blob lists,
+    # scalars) — the renderer only wraps it in the adapter's dialect.
+    input_section_renderer: [type: {:fun, 2}]
   ]
 
   @impl true
@@ -27,17 +35,23 @@ defmodule Imp.Adapter.Chat do
     # the JSON adapter can override the assistant/output path instead of
     # delegating Chat's marker rendering (dee-0bwu).
     output_renderer = Keyword.get(opts, :output_renderer) || (&render_demo_outputs/3)
-    {history_messages, history_fields} = extract_history(signature, inputs, output_renderer)
+    input_renderer = Keyword.get(opts, :input_section_renderer) || (&chat_input_section/2)
+
+    {history_messages, history_fields} =
+      extract_history(signature, inputs, output_renderer, input_renderer)
 
     [%{role: :system, content: render_system(signature)}] ++
-      render_demos(signature, demos, output_renderer) ++
+      render_demos(signature, demos, output_renderer, input_renderer) ++
       history_messages ++
       [
         %{
           role: :user,
           content:
             append_content(
-              render_inputs(signature, inputs, skip: history_fields),
+              render_inputs(signature, inputs,
+                skip: history_fields,
+                section_renderer: input_renderer
+              ),
               render_response_instruction(signature, response_instruction?)
             )
         }
@@ -210,9 +224,10 @@ defmodule Imp.Adapter.Chat do
       ((is_binary(name) and existing_atom(name)) && Map.has_key?(fields, existing_atom(name)))
   end
 
-  defp render_inputs(signature, inputs, opts \\ []) do
+  defp render_inputs(signature, inputs, opts) do
     prefix = Keyword.get(opts, :prefix, "")
     skip = opts |> Keyword.get(:skip, MapSet.new()) |> MapSet.new()
+    section_renderer = Keyword.get(opts, :section_renderer) || (&chat_input_section/2)
 
     sections =
       signature.inputs
@@ -222,7 +237,7 @@ defmodule Imp.Adapter.Chat do
         if is_nil(value) or MapSet.member?(skip, field.name) do
           acc
         else
-          [render_input_section(field, value) | acc]
+          [render_input_section(field, value, section_renderer) | acc]
         end
       end)
       |> Enum.reverse()
@@ -243,13 +258,22 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  defp render_input_section(field, value) do
+  # Native multimodal content keeps Chat's marker header regardless of the
+  # section renderer: DSPy's multimodal split (`split_message_content_for_custom
+  # _types`) operates on the provider content parts, not the field dialect, and
+  # no golden XML/native fixture exists to pin an alternative. Text values go
+  # through the injectable section renderer (Chat markers by default, XML tags
+  # for Imp.Adapter.XML).
+  defp render_input_section(field, value, section_renderer) do
     if native_content?(value) do
       ["[[ ## #{field.name} ## ]]\n" | native_content_parts(value)]
     else
-      "[[ ## #{field.name} ## ]]\n#{format_field_value(field, value)}"
+      section_renderer.(field, format_field_value(field, value))
     end
   end
+
+  # Default (ChatAdapter) input-section dialect: `[[ ## name ## ]]\nvalue`.
+  defp chat_input_section(field, formatted), do: "[[ ## #{field.name} ## ]]\n#{formatted}"
 
   # DSPy format_field_value (utils.py:57-59) special-cases a list value on a
   # `str`-annotated field, rendering it as a numbered guillemet blob list rather
@@ -546,24 +570,27 @@ defmodule Imp.Adapter.Chat do
   defp append_content(content, suffix) when is_list(content),
     do: merge_adjacent_text_parts(content ++ [suffix])
 
-  defp format_value(value) when is_binary(value), do: value
-
   # DSPy formats scalars via Python `str(...)` after `serialize_for_json`:
   # `None -> "None"`, `True -> "True"`, `False -> "False"`. Elixir's
   # `to_string/1` would give "" / "true" / "false", so these three are pinned.
-  defp format_value(nil), do: "None"
-  defp format_value(true), do: "True"
-  defp format_value(false), do: "False"
+  # Public (`@doc false`) as an internal cross-adapter seam: the XML adapter's
+  # demo/history assistant renderer resolves values through the SAME scalar
+  # formatting so the adapters differ only in dialect (dee-ovd3).
+  @doc false
+  def format_value(value) when is_binary(value), do: value
+  def format_value(nil), do: "None"
+  def format_value(true), do: "True"
+  def format_value(false), do: "False"
 
-  defp format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
+  def format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
     do: to_string(value)
 
-  defp format_value(value), do: inspect(value)
+  def format_value(value), do: inspect(value)
 
-  defp render_demos(_signature, [], _renderer), do: []
-  defp render_demos(_signature, nil, _renderer), do: []
+  defp render_demos(_signature, [], _renderer, _input_renderer), do: []
+  defp render_demos(_signature, nil, _renderer, _input_renderer), do: []
 
-  defp render_demos(signature, demos, renderer) do
+  defp render_demos(signature, demos, renderer, input_renderer) do
     {complete, incomplete} =
       demos
       |> Enum.map(&Imp.Example.to_map/1)
@@ -582,21 +609,26 @@ defmodule Imp.Adapter.Chat do
 
     incomplete
     |> Enum.reverse()
-    |> Enum.flat_map(&render_demo(signature, &1, :incomplete, renderer))
+    |> Enum.flat_map(&render_demo(signature, &1, :incomplete, renderer, input_renderer))
     |> Kernel.++(
       complete
       |> Enum.reverse()
-      |> Enum.flat_map(&render_demo(signature, &1, :complete, renderer))
+      |> Enum.flat_map(&render_demo(signature, &1, :complete, renderer, input_renderer))
     )
   end
 
-  defp extract_history(signature, inputs, renderer) do
+  defp extract_history(signature, inputs, renderer, input_renderer) do
     signature.inputs
     |> Enum.reduce({[], MapSet.new()}, fn field, {messages, fields} ->
       case fetch_field(inputs, field.name) do
         %Imp.History{} = history ->
-          {messages ++ render_history_turns(signature, Imp.History.messages(history), renderer),
-           MapSet.put(fields, field.name)}
+          {messages ++
+             render_history_turns(
+               signature,
+               Imp.History.messages(history),
+               renderer,
+               input_renderer
+             ), MapSet.put(fields, field.name)}
 
         _other ->
           {messages, fields}
@@ -604,7 +636,7 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  defp render_history_turns(signature, turns, renderer) do
+  defp render_history_turns(signature, turns, renderer, input_renderer) do
     turns
     |> Enum.flat_map(fn turn ->
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
@@ -615,7 +647,11 @@ defmodule Imp.Adapter.Chat do
         [
           %{
             role: :user,
-            content: render_inputs(signature, turn, skip: history_input_fields(signature))
+            content:
+              render_inputs(signature, turn,
+                skip: history_input_fields(signature),
+                section_renderer: input_renderer
+              )
           },
           %{
             role: :assistant,
@@ -716,14 +752,15 @@ defmodule Imp.Adapter.Chat do
       Enum.any?(signature.outputs, fn field -> field_present?(demo, field.name) end)
   end
 
-  defp render_demo(signature, demo, :incomplete, renderer) do
+  defp render_demo(signature, demo, :incomplete, renderer, input_renderer) do
     [
       %{
         role: :user,
         content:
           render_inputs(signature, demo,
             prefix:
-              "This is an example of the task, though some input or output fields are not supplied."
+              "This is an example of the task, though some input or output fields are not supplied.",
+            section_renderer: input_renderer
           )
       },
       %{
@@ -733,9 +770,9 @@ defmodule Imp.Adapter.Chat do
     ]
   end
 
-  defp render_demo(signature, demo, :complete, renderer) do
+  defp render_demo(signature, demo, :complete, renderer, input_renderer) do
     [
-      %{role: :user, content: render_inputs(signature, demo)},
+      %{role: :user, content: render_inputs(signature, demo, section_renderer: input_renderer)},
       %{
         role: :assistant,
         content:

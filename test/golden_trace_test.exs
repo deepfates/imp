@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 35
+    assert report["fixtures"]["cases"] == 40
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -161,6 +161,35 @@ defmodule GoldenTraceTest do
     # dee-cidk: ChainOfThought's ${reasoning} sentinel renders as an empty field
     # description under the JSON adapter (matching chat), not the literal token.
     assert parity_by_case["cidk_chain_of_thought_json"] == true
+
+    # XML adapter faithful port (dee-ovd3 / dee-1gb9): Imp.Adapter.XML now
+    # renders DSPy XMLAdapter's single XML-only dialect — one system message
+    # with `<field>\n{field}\n</field>` structure blocks (no `[[ ## ]]` markers,
+    # no completed sentinel), XML-wrapped inputs, and the exact "Respond with
+    # the corresponding output fields wrapped in XML tags ..." sentence. The
+    # old two-dialect prompt (chat markers + a prepended "Return XML fields"
+    # system line) failed all five of these before the rewrite (prove-teeth
+    # transcript in the dee-ovd3 ledger note). Byte-verified per call against
+    # real DSPy 3.2.1 and locked here.
+    assert parity_by_case["xml_basic"] == true
+    assert parity_by_case["xml_typed_int"] == true
+    assert parity_by_case["xml_enum_literal"] == true
+    assert parity_by_case["xml_multi_output"] == true
+
+    # XML parse failure inherits ChatAdapter's JSONAdapter fallback in DSPy
+    # (chat_adapter.py __call__); Imp mirrors it, so BOTH sides make two calls
+    # (XML format, then JSON-format retry) and error out when the retry is also
+    # incomplete. Per-call template parity covers both prompts.
+    assert parity_by_case["xml_missing_output_error"] == true
+    xml_error = Enum.find(report["cases"], &(&1["id"] == "xml_missing_output_error"))
+    assert xml_error["error_parity"]
+    assert length(xml_error["imp"]["history"]) == 2
+    assert length(xml_error["dspy"]["history"]) == 2
+
+    for id <- ["xml_basic", "xml_typed_int", "xml_enum_literal", "xml_multi_output"] do
+      assert Enum.find(report["cases"], &(&1["id"] == id))["prediction_parity"],
+             "expected prediction_parity for #{id}"
+    end
 
     # All seven fixes carry prediction_parity too (the render AND the round-trip).
     for id <- [
@@ -290,6 +319,20 @@ defmodule GoldenTraceTest do
     assert envelope_by_case["react_multi_tool_transform"] == false
     assert envelope_by_case["react_tool_argument_error"] == false
 
+    # The five XML fixtures reach envelope parity too: XMLAdapter sets no
+    # request options on either side, and the error case's JSON-format retry
+    # capability-gates to nothing for the none-capability fixture LM exactly
+    # like DSPy's fallback JSONAdapter call.
+    for id <- [
+          "xml_basic",
+          "xml_typed_int",
+          "xml_enum_literal",
+          "xml_multi_output",
+          "xml_missing_output_error"
+        ] do
+      assert envelope_by_case[id] == true, "expected envelope parity for #{id}"
+    end
+
     # The seven-edge fixtures now ALL reach envelope parity: the chat and
     # faithful-ReAct cases send no extra request options, and — with dee-ps19
     # fixed — the JSON-adapter cases capability-gate to nothing for the
@@ -317,13 +360,12 @@ defmodule GoldenTraceTest do
     end
 
     # The honest faithful-port count: byte-identical messages AND identical
-    # request envelope, per call. With dee-ps19 fixed, thirty-two of thirty-five
-    # cases fully match — every case EXCEPT the three provider-native ReAct cases
-    # (documented tools/tool_choice deviation). The message-only matches that
-    # used to be barred from full parity (nine JSON + the JSON demo case +
-    # fallback) now legitimately reach it because their envelopes match too.
-    assert report["summary"]["envelope_parity_cases"] == 32
-    assert report["summary"]["full_parity_cases"] == 32
+    # request envelope, per call. Thirty-seven of forty cases fully match —
+    # every case EXCEPT the three provider-native ReAct cases (documented
+    # tools/tool_choice deviation). The five XML cases (dee-ovd3/dee-1gb9)
+    # joined at full parity with the faithful XMLAdapter port.
+    assert report["summary"]["envelope_parity_cases"] == 37
+    assert report["summary"]["full_parity_cases"] == 37
     # Still false: the three native ReAct cases diverge on the envelope.
     assert report["summary"]["message_envelope_parity"] == false
 
@@ -354,6 +396,7 @@ defmodule GoldenTraceTest do
            ]
 
     assert Enum.any?(report["cases"], &(&1["adapter"] == "json"))
+    assert Enum.any?(report["cases"], &(&1["adapter"] == "xml"))
     assert Enum.all?(report["cases"], &(&1["imp"]["history"] != []))
     assert Enum.all?(report["cases"], &(&1["dspy"]["history"] != []))
 

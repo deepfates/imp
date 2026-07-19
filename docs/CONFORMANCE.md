@@ -2,11 +2,11 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 26
-Conformant: 13
+Conformant: 14
 Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 5
-Claim-specific non-blocking gaps: 5
+Gaps: 4
+Claim-specific non-blocking gaps: 4
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -20,7 +20,7 @@ Passing: true
 | models.runtime | model_runtime | elixir_native_equivalent | satisfied | BaseLM, LM, Embedder, configure, context, Errors |
 | models.normalized_runtime_prerelease | model_runtime | tracking | tracked | 3.3 BaseLM normalized requests/responses, LMRequest, LMResponse, LMStream |
 | adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter |
-| adapters.xml | adapters | gap | claim-specific gap | XMLAdapter |
+| adapters.xml | adapters | conformant | satisfied | XMLAdapter |
 | adapters.two_step | adapters | gap | claim-specific gap | TwoStepAdapter |
 | primitives.multimodal | primitives | conformant | satisfied | Image, Audio, File, Code, Document, Citations, Reasoning |
 | tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
@@ -175,28 +175,28 @@ Missing evidence or behavior:
 
 ### `adapters.xml`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/adapters/xml_adapter.py`
 
 Imp modules: `Imp.Adapter.XML`
 Semantic invariants:
 
-- Imp.Adapter.XML parses <field>value</field> tags through the shared schema path
-- the format divergence from DSPy XMLAdapter is declared here, not presented as conformance
+- Imp.Adapter.XML renders DSPy XMLAdapter's single XML-only dialect: XML-wrapped structure and inputs, no [[ ## ]] markers, no completed sentinel, and the exact XML output-requirements sentence
+- parse requires every output field present in tags and rejects tag-free prose with a loud missing-output-fields error; a parse failure falls back to a JSONAdapter-format retry exactly like DSPy's inherited ChatAdapter.__call__
+- byte-parity is measured per call against real DSPy 3.2.1 by the golden-trace differential (xml_* cases: template AND envelope parity)
 
 Executable evidence:
 
+- test: `test/golden_trace_test.exs`
 - test: `test/production_adapter_persistence_test.exs`
-- test: `test/completion_surface_test.exs`
+- test: `test/silent_failure_regressions_test.exs`
 - docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
 
 
 Missing evidence or behavior:
 
-- DSPy-shaped format: upstream emits one XML-only system message; Imp prepends a single XML-tags line to the full Chat [[ ## ]] prompt, producing a two-dialect prompt (dee-ovd3)
-- parse must reject tag-free prose with a missing-output-fields error instead of falling back to Chat parse (runtime fix tracked in dee-ovd3)
-- XML cases in the golden differential set (dee-1gb9)
+- none
 
 ### `adapters.two_step`
 

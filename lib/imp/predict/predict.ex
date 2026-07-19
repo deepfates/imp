@@ -326,7 +326,12 @@ defmodule Imp.Predict.Predict do
     end
   end
 
-  defp chat_json_fallback?(Imp.Adapter.Chat, opts),
+  # DSPy 3.2.1 ChatAdapter.__call__ retries any failure through JSONAdapter
+  # unless the adapter IS a JSONAdapter or use_json_adapter_fallback is false
+  # (dspy/adapters/chat_adapter.py). XMLAdapter subclasses ChatAdapter without
+  # overriding __call__, so it inherits the same JSON fallback — byte-verified
+  # by the xml_missing_output_error golden-trace case (dee-ovd3).
+  defp chat_json_fallback?(adapter, opts) when adapter in [Imp.Adapter.Chat, Imp.Adapter.XML],
     do: Keyword.get(opts, :json_fallback, true)
 
   defp chat_json_fallback?(_adapter, _opts), do: false

@@ -207,25 +207,20 @@ defmodule Imp.UpstreamFidelity do
       category: :adapters,
       upstream: ["XMLAdapter"],
       source: "dspy/adapters/xml_adapter.py",
-      disposition: :gap,
-      release_blocking: false,
-      ticket: "dee-ovd3",
+      disposition: :conformant,
       imp: [Imp.Adapter.XML],
       invariants: [
-        "Imp.Adapter.XML parses <field>value</field> tags through the shared schema path",
-        "the format divergence from DSPy XMLAdapter is declared here, not presented as conformance"
+        "Imp.Adapter.XML renders DSPy XMLAdapter's single XML-only dialect: XML-wrapped structure and inputs, no [[ ## ]] markers, no completed sentinel, and the exact XML output-requirements sentence",
+        "parse requires every output field present in tags and rejects tag-free prose with a loud missing-output-fields error; a parse failure falls back to a JSONAdapter-format retry exactly like DSPy's inherited ChatAdapter.__call__",
+        "byte-parity is measured per call against real DSPy 3.2.1 by the golden-trace differential (xml_* cases: template AND envelope parity)"
       ],
       evidence: %{
         tests: [
+          "test/golden_trace_test.exs",
           "test/production_adapter_persistence_test.exs",
-          "test/completion_surface_test.exs"
+          "test/silent_failure_regressions_test.exs"
         ],
-        docs: ["docs/internal/ADAPTER_FIDELITY.md"],
-        missing: [
-          "DSPy-shaped format: upstream emits one XML-only system message; Imp prepends a single XML-tags line to the full Chat [[ ## ]] prompt, producing a two-dialect prompt (dee-ovd3)",
-          "parse must reject tag-free prose with a missing-output-fields error instead of falling back to Chat parse (runtime fix tracked in dee-ovd3)",
-          "XML cases in the golden differential set (dee-1gb9)"
-        ]
+        docs: ["docs/internal/ADAPTER_FIDELITY.md"]
       }
     },
     %{

@@ -173,6 +173,8 @@ def build_tool(spec: Dict[str, Any]):
 def adapter(name: Optional[str]):
     if name == "json":
         return dspy.JSONAdapter()
+    if name == "xml":
+        return dspy.XMLAdapter()
     return dspy.ChatAdapter()
 
 
