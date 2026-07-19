@@ -95,7 +95,14 @@ defmodule DocumentationContractTest do
     assert body =~ "Imp.Adapter.JSON.lm_opts/2"
     assert body =~ "Imp.Clients.ReqLLM"
     assert body =~ "Intentional Deviations"
-    assert body =~ "semantic: field names, delimiter structure, demo/history turn shape"
+    assert body =~ "semantic contract (field names, delimiter structure, demo/history turn shape"
+
+    # Lock the honest byte-parity claim (dee-8zev): the doc must state the
+    # measured byte-parity AND that it is enforced — so it can neither drift back
+    # to the stale "not byte-identical" underclaim nor inflate to an unqualified
+    # overclaim without a deliberate, test-visible edit.
+    assert body =~ "byte-identical to DSPy 3.2.1"
+    assert body =~ "enforced per-PR in CI"
   end
 
   test "the executable Livebook proof stays off the reader's front doors" do
