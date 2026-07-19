@@ -302,9 +302,10 @@ defmodule Imp.Optimizer.RandomSearch do
         |> Imp.Evaluate.run(program)
       rescue
         cancelled in Imp.EvaluationCancelledError ->
-          raise RuntimeError,
-                "random_search_evaluation error budget exhausted: " <>
-                  "#{length(cancelled.errors)} errors (maximum #{optimizer.max_errors})"
+          reraise RuntimeError,
+                  "random_search_evaluation error budget exhausted: " <>
+                    "#{length(cancelled.errors)} errors (maximum #{optimizer.max_errors})",
+                  __STACKTRACE__
       end
 
     enforce_error_budget!(result.errors, optimizer.max_errors, :random_search_evaluation)

@@ -516,9 +516,10 @@ defmodule Imp.Optimizer.MIPROv2 do
         Imp.Evaluate.run(evaluator, program)
       rescue
         cancelled in Imp.EvaluationCancelledError ->
-          raise RuntimeError,
-                "MIPROv2 error budget exhausted: #{length(cancelled.errors)} errors " <>
-                  "(maximum #{optimizer.max_errors})"
+          reraise RuntimeError,
+                  "MIPROv2 error budget exhausted: #{length(cancelled.errors)} errors " <>
+                    "(maximum #{optimizer.max_errors})",
+                  __STACKTRACE__
       end
 
     enforce_error_budget!(result.errors, optimizer.max_errors)

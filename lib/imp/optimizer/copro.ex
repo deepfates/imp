@@ -548,9 +548,10 @@ defmodule Imp.Optimizer.COPRO do
         |> Imp.Evaluate.run(program)
       rescue
         cancelled in Imp.EvaluationCancelledError ->
-          raise RuntimeError,
-                "COPRO evaluation error budget exhausted: #{length(cancelled.errors)} errors " <>
-                  "(maximum #{max_errors})"
+          reraise RuntimeError,
+                  "COPRO evaluation error budget exhausted: #{length(cancelled.errors)} errors " <>
+                    "(maximum #{max_errors})",
+                  __STACKTRACE__
       end
 
     enforce_error_budget!(result.errors, max_errors)
