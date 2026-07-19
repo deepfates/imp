@@ -111,12 +111,15 @@ Tools are ordinary structs called directly or handed to react-family
 programs under a `tool_policy:`; the API guide's agent-spectrum section
 covers when each loop shape earns its place.
 
-MCP-style catalogs import external schemas into ordinary `Imp.Tool` structs:
+MCP catalogs import external schemas into ordinary `Imp.Tool` structs. Schemas
+use the MCP spec dialect (camelCase `"inputSchema"`, optional `"description"`);
+in-process catalogs may also use snake_case `:input_schema` as a back-compat
+fallback:
 
 ```elixir
 catalog =
   Imp.MCP.Catalog.new([
-    %{name: :lookup, description: "lookup", input_schema: %{required: [:key]}, run: & &1}
+    %{"name" => "lookup", "inputSchema" => %{"required" => ["key"]}, "run" => & &1}
   ])
 
 [tool] = Imp.MCP.import_tools(catalog)

@@ -41,11 +41,22 @@ defmodule Imp.Test.LocalHTTP do
       body: body
     }
 
-    {status, response_body} = handler.(request)
+    {status, response_headers, response_body} =
+      case handler.(request) do
+        {status, headers, body} -> {status, headers, body}
+        {status, body} -> {status, [], body}
+      end
+
+    conn =
+      Enum.reduce(response_headers, conn, fn {name, value}, conn ->
+        put_resp_header(conn, name, value)
+      end)
+
+    body = if is_binary(response_body), do: response_body, else: Jason.encode!(response_body)
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(status, Jason.encode!(response_body))
+    |> send_resp(status, body)
   end
 
   defp listener_port(server) do

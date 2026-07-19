@@ -1,11 +1,30 @@
 defmodule Imp.MCP do
   @moduledoc """
-  MCP-style tool catalog importer.
+  MCP tool catalog importer.
 
   `Imp.MCP.import_tools/1` converts either an in-process catalog or a
-  transport-backed HTTP catalog into ordinary `Imp.Tool` values. Imported tools
+  transport-backed catalog into ordinary `Imp.Tool` values. Imported tools
   validate required fields and basic JSON-schema-style property constraints.
+
+  Tool schemas follow the MCP specification dialect: the input contract is the
+  camelCase `"inputSchema"` key (MCP spec, Tool definition) and `"description"`
+  is optional. For in-process Elixir catalogs the snake_case `:input_schema`
+  key is accepted as a documented back-compat fallback; wire transports always
+  see spec-compliant servers use `inputSchema`.
   """
+
+  @client_info %{"name" => "imp", "version" => "0.1.0"}
+
+  @doc false
+  def initialize_params(protocol_version) do
+    # MCP spec, Lifecycle: initialize MUST carry protocolVersion, capabilities,
+    # and clientInfo. An empty params object is non-compliant.
+    %{
+      "protocolVersion" => protocol_version,
+      "capabilities" => %{},
+      "clientInfo" => @client_info
+    }
+  end
 
   defmodule Catalog do
     @moduledoc "In-process MCP-like catalog used for tests and adapters."
@@ -361,11 +380,7 @@ defmodule Imp.MCP do
 
     defp initialize(client) do
       with {:ok, %{status: status}} when status in 200..299 <-
-             post_json(client, "initialize", %{
-               "protocolVersion" => client.protocol_version,
-               "capabilities" => %{},
-               "clientInfo" => %{"name" => "imp", "version" => "0.1.0"}
-             }),
+             post_json(client, "initialize", Imp.MCP.initialize_params(client.protocol_version)),
            {:ok, %{status: status}} when status in 200..299 <-
              post_notification(client, "notifications/initialized", %{}) do
         {:ok, :initialized}
@@ -458,11 +473,7 @@ defmodule Imp.MCP do
                request(
                  port,
                  "initialize",
-                 %{
-                   "protocolVersion" => client.protocol_version,
-                   "capabilities" => %{},
-                   "clientInfo" => %{"name" => "imp", "version" => "0.1.0"}
-                 },
+                 Imp.MCP.initialize_params(client.protocol_version),
                  client.timeout
                ),
              :ok <- notify(port, "notifications/initialized", %{}),
@@ -484,7 +495,13 @@ defmodule Imp.MCP do
         port = open_port(client)
 
         try do
-          with {:ok, _} <- request(port, "initialize", %{}, client.timeout),
+          with {:ok, _} <-
+                 request(
+                   port,
+                   "initialize",
+                   Imp.MCP.initialize_params(client.protocol_version),
+                   client.timeout
+                 ),
                :ok <- notify(port, "notifications/initialized", %{}),
                {:ok, decoded} <-
                  request(
@@ -625,13 +642,70 @@ defmodule Imp.MCP do
     end
 
     def list_tools(%__MODULE__{} = client) do
-      with {:ok, _} <- rpc(client, "initialize", %{}),
+      with {:ok, client} <- initialize(client),
            {:ok, decoded} <- rpc(client, "tools/list", %{}),
            {:ok, tools} <- decode_tools(decoded) do
         Enum.map(tools, &attach_remote_run(client, &1))
       else
         {:error, reason} -> raise ArgumentError, "MCP streamable HTTP failed: #{inspect(reason)}"
       end
+    end
+
+    # MCP spec, Lifecycle + Streamable HTTP transport:
+    # 1. initialize carries full params (protocolVersion, capabilities, clientInfo);
+    # 2. if the server assigns an Mcp-Session-Id header on the initialize
+    #    response, the client MUST include it on all subsequent requests;
+    # 3. after a successful initialize the client MUST send the
+    #    notifications/initialized notification (the server responds 202
+    #    Accepted with no body, so the response is not JSON-decoded).
+    defp initialize(client) do
+      with {:ok, %{status: status, headers: response_headers, body: body}}
+           when status in 200..299 <-
+             Imp.MCP.HTTPRecovery.request(
+               client,
+               [:imp, :mcp, :streamable_http],
+               "initialize",
+               Imp.MCP.initialize_params(client.protocol_version),
+               headers(client)
+             ),
+           {:ok, decoded} <- decode_body(body),
+           {:ok, _result} <- Imp.MCP.json_rpc_result(decoded) do
+        client = capture_session(client, response_headers)
+        notify_initialized(client)
+      else
+        {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+
+    defp notify_initialized(client) do
+      case Imp.MCP.HTTPRecovery.notification(
+             client,
+             [:imp, :mcp, :streamable_http],
+             "notifications/initialized",
+             %{},
+             headers(client)
+           ) do
+        {:ok, %{status: status}} when status in 200..299 -> {:ok, client}
+        {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+
+    # A server-assigned session id supersedes any preconfigured one; without a
+    # server assignment the configured session id (session resumption) stands.
+    defp capture_session(client, response_headers) do
+      case session_id(response_headers) do
+        nil -> client
+        session_id -> %{client | session_id: session_id}
+      end
+    end
+
+    defp session_id(headers) do
+      Enum.find_value(headers, fn {name, value} ->
+        if name |> to_string() |> String.downcase() == "mcp-session-id",
+          do: to_string(value)
+      end)
     end
 
     def headers(%__MODULE__{} = client) do
@@ -759,8 +833,8 @@ defmodule Imp.MCP do
 
   defp tool_from_schema(schema) when is_map(schema) do
     name = validate_tool_name!(fetch_required!(schema, :name))
-    description = validate_description!(fetch_required!(schema, :description), name)
-    input_schema = validate_input_schema!(fetch_required!(schema, :input_schema), name)
+    description = validate_description!(fetch_description(schema), name)
+    input_schema = validate_input_schema!(fetch_input_schema!(schema, name), name)
     run = validate_run!(fetch_required!(schema, :run), name)
 
     Imp.Tool.new(
@@ -794,6 +868,40 @@ defmodule Imp.MCP do
     raise ArgumentError, "MCP tool name must be an atom or string, got: #{inspect(name)}"
   end
 
+  # MCP spec, Tool definition: description is optional. The MCP reference SDK
+  # types it Optional[str], so both an absent key and an explicit null mean
+  # "no description". Imp normalizes both to "" because downstream consumers
+  # (adapters, Imp.ProgramParameters) require string descriptions.
+  defp fetch_description(schema) do
+    case fetch_optional(schema, :description, :__missing__) do
+      :__missing__ -> ""
+      nil -> ""
+      description -> description
+    end
+  end
+
+  # MCP spec, Tool definition: the input contract key is camelCase
+  # "inputSchema". The snake_case :input_schema spelling is a documented
+  # back-compat fallback for in-process Elixir catalogs only.
+  defp fetch_input_schema!(schema, name) do
+    case fetch_optional(schema, :inputSchema, :__missing__) do
+      :__missing__ ->
+        case fetch_optional(schema, :input_schema, :__missing__) do
+          :__missing__ ->
+            raise ArgumentError,
+                  "MCP tool #{inspect(name)} schema missing inputSchema " <>
+                    "(MCP spec camelCase; snake_case input_schema is accepted " <>
+                    "only as an in-process catalog fallback)"
+
+          input_schema ->
+            input_schema
+        end
+
+      input_schema ->
+        input_schema
+    end
+  end
+
   defp validate_description!(description, _name) when is_binary(description), do: description
 
   defp validate_description!(description, name) do
@@ -805,7 +913,7 @@ defmodule Imp.MCP do
 
   defp validate_input_schema!(schema, name) do
     raise ArgumentError,
-          "MCP tool #{inspect(name)} input_schema must be a map, got: #{inspect(schema)}"
+          "MCP tool #{inspect(name)} inputSchema must be a map, got: #{inspect(schema)}"
   end
 
   defp validate_run!(run, _name) when is_function(run, 1), do: run

@@ -57,14 +57,17 @@ boundary.
 Catalog import turns external tool descriptions into Imp tools so the rest of
 the system does not care whether a tool was handwritten or discovered.
 
+Schemas use the MCP spec dialect: camelCase `"inputSchema"` with an optional
+`"description"` (snake_case `:input_schema` remains an in-process fallback).
+
 ```elixir
 catalog =
   Imp.MCP.Catalog.new([
     %{
-      name: :remote_lookup,
-      description: "lookup through an imported catalog",
-      input_schema: %{required: [:key]},
-      run: fn %{key: "capital"} -> %{value: "Paris"} end
+      "name" => "remote_lookup",
+      "description" => "lookup through an imported catalog",
+      "inputSchema" => %{"required" => ["key"]},
+      "run" => fn %{key: "capital"} -> %{value: "Paris"} end
     }
   ])
 

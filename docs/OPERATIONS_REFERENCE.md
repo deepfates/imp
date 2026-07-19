@@ -220,8 +220,15 @@ For stdio or Streamable HTTP transports, point Imp at trusted services you own:
 
 ```elixir
 stdio = Imp.MCP.StdioClient.new("/path/to/server", args: ["--stdio"])
-streamable = Imp.MCP.StreamableHTTPClient.new("https://mcp.example/mcp", session_id: "session")
+streamable = Imp.MCP.StreamableHTTPClient.new("https://mcp.example/mcp")
 ```
+
+Both transports run the MCP lifecycle handshake: a full `initialize` request
+(protocol version, capabilities, client info) followed by the
+`notifications/initialized` notification. The Streamable HTTP client captures a
+server-assigned `Mcp-Session-Id` from the initialize response and sends it on
+every later request; pass `session_id:` only to resume a known session (a
+server-assigned id supersedes it).
 
 Only connect MCP stdio clients to trusted local executables. The stdio client
 opens a process for discovery and opens a fresh process for each imported tool
