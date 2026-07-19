@@ -40,9 +40,24 @@ Those are provider transport concerns in Imp and are handled by
 format/parse behaviours and keeps side-effectful tool execution under explicit
 program modules.
 
-Imp prompt text is not byte-identical to DSPy. The benchmark-safe contract is
-semantic: field names, delimiter structure, demo/history turn shape, parse
-errors, retry feedback, and provider option intent are stable and tested.
+Imp prompt text IS byte-identical to DSPy 3.2.1 across the measured surface
+(epic dee-8zev, 2026-07-18): 32 of 35 golden differential cases match real DSPy
+byte-for-byte on BOTH the rendered messages and the per-call request envelope
+(`mix imp.benchmark.trace` vs the pinned `dspy==3.2.1` venv) — predict,
+ChainOfThought, typed/enum/list/dict fields, few-shot demos, conversation
+history, multi-line/CRLF/unicode instructions, RAG list inputs, DSPy-faithful
+ReAct (`mode: :dspy_3_2_1`), and capability-gated `response_format`. The only 3
+non-matching cases are Imp's DEFAULT provider-native ReAct mode, an intentional
+design choice (native function-tool calling); the byte-faithful `:dspy_3_2_1`
+mode ships alongside it. Byte-parity is enforced per-PR in CI (`mix
+parity.check`, dee-3e4v) so it cannot silently regress. Known, ticketed
+limitations: xml/two_step adapters are not yet in the differential (dee-1gb9);
+real-model `response_format` decisions follow the ReqLLM/LLMDB registry and match
+DSPy only where it agrees with litellm (dee-7r2t); parse leniency is stricter
+than DSPy's `json_repair` (dee-q2w2); multi-key dict value ordering (dee-1fd0).
+Beyond byte-parity, the semantic contract (field names, delimiter structure,
+demo/history turn shape, parse errors, retry feedback, provider option intent)
+remains stable and tested.
 
 Stream listeners select their adapter explicitly because normalized provider
 events do not carry adapter identity. JSON framing uses a bounded lexical parser
