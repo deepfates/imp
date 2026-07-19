@@ -60,7 +60,7 @@ defmodule Imp.Signature do
     %__MODULE__{
       inputs: inputs,
       outputs: outputs,
-      instructions: instructions || default_instructions(inputs, outputs)
+      instructions: resolve_instructions(instructions, inputs, outputs)
     }
   end
 
@@ -80,8 +80,11 @@ defmodule Imp.Signature do
       inputs: inputs,
       outputs: outputs,
       instructions:
-        instructions || Map.get(attrs, :instructions, Map.get(attrs, "instructions")) ||
-          default_instructions(inputs, outputs),
+        resolve_instructions(
+          instructions || Map.get(attrs, :instructions, Map.get(attrs, "instructions")),
+          inputs,
+          outputs
+        ),
       metadata: Map.get(attrs, :metadata, Map.get(attrs, "metadata", %{}))
     }
   end
@@ -164,6 +167,15 @@ defmodule Imp.Signature do
     raise ArgumentError,
           "Imp.Signature.load/1 expects a map with \"inputs\" and \"outputs\", got: #{inspect(state)}"
   end
+
+  # DSPy `make_signature` treats an empty-string `__doc__` (and a missing one) as
+  # absent and substitutes `_default_instructions`. Elixir treats only nil/false
+  # as falsy, so a bare "" survived. Match DSPy: nil OR exactly "" -> default.
+  # Whitespace-only instructions are NOT replaced (DSPy keeps them; they render
+  # empty after cleandoc), so only the empty string is special-cased (dee-wrx5).
+  defp resolve_instructions(nil, inputs, outputs), do: default_instructions(inputs, outputs)
+  defp resolve_instructions("", inputs, outputs), do: default_instructions(inputs, outputs)
+  defp resolve_instructions(instructions, _inputs, _outputs), do: instructions
 
   defp default_instructions(inputs, outputs) do
     input_names = inputs |> Enum.map(&"`#{&1.name}`") |> Enum.join(", ")

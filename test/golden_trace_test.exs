@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 17
+    assert report["fixtures"]["cases"] == 33
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -118,6 +118,65 @@ defmodule GoldenTraceTest do
     assert parity_by_case["react_multi_tool_transform"] == false
     assert parity_by_case["react_tool_argument_error"] == false
 
+    # Seven message-level edge divergences found by adversarial review (epic
+    # dee-8zev), each now byte-identical to real DSPy 3.2.1 and LOCKED here so its
+    # defect class retires permanently. Every case below reaches template_parity
+    # (byte-identical rendered prompt); the JSON-adapter ones read envelope=false
+    # like every JSON case (dee-ps19, asserted later).
+    #
+    # dee-tsce: a list value on a `str`-annotated INPUT field renders DSPy's
+    # numbered guillemet blobs (`[1] «alpha»` / `«alpha»` / `N/A`), not inspect().
+    assert parity_by_case["tsce_list_on_str_input_multi_chat"] == true
+    assert parity_by_case["tsce_list_on_str_input_single_chat"] == true
+    assert parity_by_case["tsce_list_on_str_input_empty_chat"] == true
+
+    # dee-wrx5: empty-string instructions ("") are replaced with DSPy's
+    # default-instructions sentence (whitespace-only is NOT — see the parser fix).
+    assert parity_by_case["wrx5_empty_instructions_chat"] == true
+
+    # dee-709o: the objective transform now reproduces inspect.cleandoc +
+    # textwrap.dedent + str.splitlines (the full Unicode boundary set), on BOTH
+    # adapters, so indented/multiline/tab/CRLF/exotic-separator instructions match.
+    assert parity_by_case["o709_indented_multiline_instructions_chat"] == true
+    assert parity_by_case["o709_indented_multiline_instructions_json"] == true
+    assert parity_by_case["o709_crlf_instructions_chat"] == true
+    assert parity_by_case["o709_tab_continuation_instructions_chat"] == true
+    assert parity_by_case["o709_unicode_line_separator_instructions_chat"] == true
+
+    # dee-68oy: nested array types render faithfully (list[list[int]] /
+    # list[list[str]] with a doubly-nested schema), not silently flattened.
+    assert parity_by_case["o68oy_nested_array_int_json"] == true
+    assert parity_by_case["o68oy_nested_array_str_json"] == true
+
+    # dee-p1d5: array[object] renders list[dict[str, Any]] with
+    # additionalProperties:true, consistent with standalone object.
+    assert parity_by_case["p1d5_array_object_json"] == true
+
+    # dee-h7nw: bare scalar ReAct observations render Python-faithfully — float
+    # fixed/exponent form (1000000.0, not 1.0e6), True/False, and None.
+    assert parity_by_case["h7nw_react_float_observation"] == true
+    assert parity_by_case["h7nw_react_bool_observation"] == true
+    assert parity_by_case["h7nw_react_nil_observation"] == true
+
+    # dee-cidk: ChainOfThought's ${reasoning} sentinel renders as an empty field
+    # description under the JSON adapter (matching chat), not the literal token.
+    assert parity_by_case["cidk_chain_of_thought_json"] == true
+
+    # All seven fixes carry prediction_parity too (the render AND the round-trip).
+    for id <- [
+          "tsce_list_on_str_input_multi_chat",
+          "o68oy_nested_array_int_json",
+          "o68oy_nested_array_str_json",
+          "p1d5_array_object_json",
+          "cidk_chain_of_thought_json",
+          "h7nw_react_float_observation",
+          "h7nw_react_bool_observation",
+          "h7nw_react_nil_observation"
+        ] do
+      assert Enum.find(report["cases"], &(&1["id"] == id))["prediction_parity"],
+             "expected prediction_parity for #{id}"
+    end
+
     # Request-envelope fidelity (dee-idig). The old instrument compared only
     # message role+content, so it reported false parity while Imp shipped
     # response_format:json_object on JSON cases and DSPy (capability-gated)
@@ -175,13 +234,46 @@ defmodule GoldenTraceTest do
     assert envelope_by_case["react_multi_tool_transform"] == false
     assert envelope_by_case["react_tool_argument_error"] == false
 
+    # The seven-edge fixtures inherit their adapter's envelope behavior: chat and
+    # faithful-ReAct cases send no extra request options (full parity), while the
+    # JSON-adapter cases send response_format:json_object like every JSON case, so
+    # their envelope honestly reads false (dee-ps19, not these tickets). The
+    # message templates match on all of them (asserted above).
+    for id <- [
+          "tsce_list_on_str_input_multi_chat",
+          "tsce_list_on_str_input_single_chat",
+          "tsce_list_on_str_input_empty_chat",
+          "wrx5_empty_instructions_chat",
+          "o709_indented_multiline_instructions_chat",
+          "o709_crlf_instructions_chat",
+          "o709_tab_continuation_instructions_chat",
+          "o709_unicode_line_separator_instructions_chat",
+          "h7nw_react_float_observation",
+          "h7nw_react_bool_observation",
+          "h7nw_react_nil_observation"
+        ] do
+      assert envelope_by_case[id] == true, "expected envelope parity for #{id}"
+    end
+
+    for id <- [
+          "o709_indented_multiline_instructions_json",
+          "o68oy_nested_array_int_json",
+          "o68oy_nested_array_str_json",
+          "p1d5_array_object_json",
+          "cidk_chain_of_thought_json"
+        ] do
+      assert envelope_by_case[id] == false, "expected honest envelope divergence for #{id}"
+    end
+
     # The honest faithful-port count: byte-identical messages AND identical
-    # request envelope, per call. Eight of seventeen cases fully match today
-    # (the seven originals plus the pure-chat demo case); the nine message-only
-    # matches (five JSON incl. the JSON demo case + fallback + three native
-    # ReAct) are not allowed to read as full parity.
-    assert report["summary"]["envelope_parity_cases"] == 8
-    assert report["summary"]["full_parity_cases"] == 8
+    # request envelope, per call. Nineteen of thirty-three cases fully match today
+    # (the original eight full-parity cases plus eleven of the seven-edge
+    # fixtures: three dee-tsce, one dee-wrx5, four dee-709o chat, three dee-h7nw
+    # ReAct). The message-only matches (nine JSON incl. the five new JSON-adapter
+    # edge fixtures + the JSON demo case + fallback, plus three native ReAct) are
+    # not allowed to read as full parity.
+    assert report["summary"]["envelope_parity_cases"] == 19
+    assert report["summary"]["full_parity_cases"] == 19
     assert report["summary"]["message_envelope_parity"] == false
 
     full_by_case = report["summary"]["full_parity_by_case"]

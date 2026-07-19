@@ -5,32 +5,27 @@ defmodule Imp.Adapter.CompositeType do
   # models (lib/imp/signature/parser.ex):
   #
   #   * `enum[a,b]` / `class[a,b]` -> `:string` with `constraints.enum` -> DSPy `Literal[...]`
-  #   * `array[T]`                 -> `:array`  with `constraints.items.type` -> DSPy `list[...]`
+  #   * `array[T]`                 -> `:array`  with `constraints.items`  -> DSPy `list[...]`
   #   * `object` / `map`           -> `:object` -> DSPy `dict[str, Any]`
   #
-  # Mirrors DSPy 3.2.1 `dspy/adapters/utils.py` `get_annotation_name` and
-  # `translate_field_type` for exactly these composites (verified byte-for-byte
-  # against the differential runner). Scalars are intentionally NOT handled here;
-  # each adapter keeps its own scalar clauses so scalar rendering is untouched.
-  # (epic dee-8zev / dee-9ttv)
+  # Array item types recurse (dee-68oy / dee-p1d5): `array[array[integer]]` ->
+  # `list[list[int]]` and `array[object]` -> `list[dict[str, Any]]`, each with the
+  # correspondingly nested JSON-schema note. Mirrors DSPy 3.2.1
+  # `dspy/adapters/utils.py` `get_annotation_name` and `translate_field_type`
+  # (verified byte-for-byte against the differential runner). Scalars are
+  # intentionally NOT handled here; each adapter keeps its own scalar clauses so
+  # scalar rendering is untouched. (epic dee-8zev / dee-9ttv)
 
   @doc """
   DSPy annotation name for a composite field, or `nil` when the field is a scalar
   the caller must render itself.
   """
   def annotation_name(field) do
-    case classify(field) do
-      {:literal, values} ->
-        "Literal[" <> Enum.map_join(values, ", ", &quoted_literal/1) <> "]"
+    node = field_node(field)
 
-      {:list, item} ->
-        "list" <> list_annotation_args(item)
-
-      :dict ->
-        "dict[str, Any]"
-
-      nil ->
-        nil
+    case classify(node) do
+      :scalar -> nil
+      _ -> annotation_of(node)
     end
   end
 
@@ -39,41 +34,92 @@ defmodule Imp.Adapter.CompositeType do
   "the value you produce "), or `nil` for scalars.
   """
   def note_desc(field) do
-    case classify(field) do
+    node = field_node(field)
+
+    case classify(node) do
+      :scalar ->
+        nil
+
       {:literal, values} ->
         "must exactly match (no extra characters) one of: " <> Enum.join(values, "; ")
 
-      {:list, item} ->
-        ~s(must adhere to the JSON schema: {"type": "array", "items": ) <>
-          item_schema(item) <> "}"
-
-      :dict ->
-        ~s(must adhere to the JSON schema: {"type": "object", "additionalProperties": true})
-
-      nil ->
-        nil
+      _composite ->
+        "must adhere to the JSON schema: " <> schema_of(node)
     end
   end
 
   # ------------------------------------------------------------------
+  # Type nodes: `%{type: t, constraints: c}`. The top-level node comes from the
+  # field; an array item node comes from the flat `items` descriptor the parser
+  # builds. Both annotation and schema recurse over nodes.
 
-  defp classify(field) do
-    constraints = constraints(field)
+  defp field_node(field), do: %{type: field.type, constraints: constraints(field)}
 
+  defp classify(%{type: type, constraints: constraints}) do
     cond do
-      field.type == :string and is_list(enum_values(constraints)) ->
+      normalize_type(type) == :string and is_list(enum_values(constraints)) ->
         {:literal, enum_values(constraints)}
 
-      field.type == :array ->
-        {:list, item_type(constraints)}
+      normalize_type(type) == :array ->
+        {:list, item_node(constraints)}
 
-      field.type == :object ->
+      normalize_type(type) == :object ->
         :dict
 
       true ->
-        nil
+        :scalar
     end
   end
+
+  # DSPy get_annotation_name over a node (recursive for nested lists).
+  defp annotation_of(node) do
+    case classify(node) do
+      {:literal, values} ->
+        "Literal[" <> Enum.map_join(values, ", ", &quoted_literal/1) <> "]"
+
+      {:list, nil} ->
+        "list"
+
+      {:list, item} ->
+        "list[" <> annotation_of(item) <> "]"
+
+      :dict ->
+        "dict[str, Any]"
+
+      :scalar ->
+        python_name(node.type)
+    end
+  end
+
+  # pydantic `_get_json_schema` fragment over a node (recursive for nested lists).
+  defp schema_of(node) do
+    case classify(node) do
+      {:list, nil} ->
+        ~s({"type": "array", "items": {}})
+
+      {:list, item} ->
+        ~s({"type": "array", "items": ) <> schema_of(item) <> "}"
+
+      :dict ->
+        ~s({"type": "object", "additionalProperties": true})
+
+      :scalar ->
+        ~s({"type": ") <> json_schema_type(node.type) <> ~s("})
+
+      {:literal, values} ->
+        # A Literal nested inside an array (`array[enum[...]]`) would need
+        # pydantic's enum JSON-schema block, which Imp's item model does not
+        # carry. Rather than emit a wrong schema, fail loudly (nothing-silent /
+        # fidelity-invariant law). Standalone enums never reach schema_of — they
+        # take note_desc's {:literal} branch. (dee-p1d5)
+        raise ArgumentError,
+              "cannot faithfully render the JSON schema for a Literal nested in an array " <>
+                "(values: #{inspect(values)}); Imp's array item model has no enum-schema slot. " <>
+                "Faithful DSPy output would require the pydantic Literal schema block."
+    end
+  end
+
+  # ------------------------------------------------------------------
 
   defp constraints(%{metadata: metadata}) when is_map(metadata),
     do: fetch(metadata, :constraints) || %{}
@@ -83,22 +129,18 @@ defmodule Imp.Adapter.CompositeType do
   defp enum_values(constraints) when is_map(constraints), do: fetch(constraints, :enum)
   defp enum_values(_constraints), do: nil
 
-  defp item_type(constraints) when is_map(constraints) do
+  # The array's element type as a node, or nil for a bare `array` (no item type).
+  defp item_node(constraints) when is_map(constraints) do
     case fetch(constraints, :items) do
-      items when is_map(items) -> fetch(items, :type)
-      _other -> nil
+      items when is_map(items) ->
+        %{type: fetch(items, :type), constraints: Map.drop(items, [:type, "type"])}
+
+      _other ->
+        nil
     end
   end
 
-  defp item_type(_constraints), do: nil
-
-  # `list[<inner>]`; bare `array` (no item type) -> `list`.
-  defp list_annotation_args(nil), do: ""
-  defp list_annotation_args(item), do: "[" <> python_name(item) <> "]"
-
-  # JSON-schema fragment for the array's item type; bare `array` -> `{}`.
-  defp item_schema(nil), do: "{}"
-  defp item_schema(item), do: ~s({"type": ") <> json_schema_type(item) <> ~s("})
+  defp item_node(_constraints), do: nil
 
   # DSPy get_annotation_name for the scalar Python types Imp's item types map to.
   defp python_name(type) do
@@ -135,6 +177,9 @@ defmodule Imp.Adapter.CompositeType do
       "number" -> :number
       "boolean" -> :boolean
       "bool" -> :boolean
+      "array" -> :array
+      "object" -> :object
+      "map" -> :object
       other -> other
     end
   end
