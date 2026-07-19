@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 15
+    assert report["fixtures"]["cases"] == 17
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -71,6 +71,27 @@ defmodule GoldenTraceTest do
 
     assert Enum.find(report["cases"], &(&1["id"] == "list_str_field_chat"))["prediction_parity"]
     assert Enum.find(report["cases"], &(&1["id"] == "dict_field_chat"))["prediction_parity"]
+
+    # Few-shot demo rendering (dee-u4st chat, dee-0bwu json). Optimized DSPy
+    # programs carry demos; Imp rendered them divergently on both adapters. Each
+    # case's demo list exercises every confirmed axis at once: a COMPLETE demo
+    # with `flag: true`, a COMPLETE demo with `flag: false` (a legitimate false
+    # must render "False"/false, not be dropped for the missing sentinel), a
+    # present-but-nil demo (kept as INCOMPLETE, values render "None"/null — not
+    # dropped), and an absent-output demo (the missing-field message). The chat
+    # side now always emits the trailing `[[ ## completed ## ]]` marker; the JSON
+    # side emits a pretty JSON object for assistant turns instead of chat markers.
+    # Byte-verified against real DSPy 3.2.1 and locked here.
+    assert parity_by_case["demo_history_fidelity_chat"] == true
+    assert parity_by_case["demo_history_fidelity_json"] == true
+
+    assert Enum.find(report["cases"], &(&1["id"] == "demo_history_fidelity_chat"))[
+             "prediction_parity"
+           ]
+
+    assert Enum.find(report["cases"], &(&1["id"] == "demo_history_fidelity_json"))[
+             "prediction_parity"
+           ]
 
     # ReAct :dspy_3_2_1 byte-faithfulness (dee-kzop): the reshaped `:dspy_3_2_1`
     # mode reproduces dspy.ReAct exactly. `react_dspy_tool_lookup` drives Imp's
@@ -128,6 +149,14 @@ defmodule GoldenTraceTest do
     assert envelope_by_case["list_int_field_json"] == false
     assert envelope_by_case["dict_field_json"] == false
 
+    # The demo cases inherit their adapter's envelope behavior: the pure-chat
+    # demo case sends no extra options (full parity); the JSON demo case sends
+    # response_format:json_object like every other JSON case, so its envelope
+    # honestly reads false (that divergence is dee-ps19, not this ticket). The
+    # message templates match on BOTH (asserted above).
+    assert envelope_by_case["demo_history_fidelity_chat"] == true
+    assert envelope_by_case["demo_history_fidelity_json"] == false
+
     # The surfaced per-call envelopes make the JSON divergence legible in the
     # report itself (nothing silent), not just as a boolean.
     json_case = Enum.find(report["cases"], &(&1["id"] == "json_adapter_basic"))
@@ -147,11 +176,12 @@ defmodule GoldenTraceTest do
     assert envelope_by_case["react_tool_argument_error"] == false
 
     # The honest faithful-port count: byte-identical messages AND identical
-    # request envelope, per call. Seven of fifteen cases fully match today; the
-    # eight message-only matches (four JSON + fallback + three native ReAct) are
-    # no longer allowed to read as full parity.
-    assert report["summary"]["envelope_parity_cases"] == 7
-    assert report["summary"]["full_parity_cases"] == 7
+    # request envelope, per call. Eight of seventeen cases fully match today
+    # (the seven originals plus the pure-chat demo case); the nine message-only
+    # matches (five JSON incl. the JSON demo case + fallback + three native
+    # ReAct) are not allowed to read as full parity.
+    assert report["summary"]["envelope_parity_cases"] == 8
+    assert report["summary"]["full_parity_cases"] == 8
     assert report["summary"]["message_envelope_parity"] == false
 
     full_by_case = report["summary"]["full_parity_by_case"]

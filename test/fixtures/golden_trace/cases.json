@@ -468,5 +468,81 @@
       }
     ],
     "faithful": "react_dspy builds Imp's byte-faithful :dspy_3_2_1 ReAct against real dspy.ReAct with shared text-trajectory responses; template/prediction/tool-trace parity are all required (dee-kzop)."
+  },
+  {
+    "id": "demo_history_fidelity_chat",
+    "module": "predict",
+    "adapter": "chat",
+    "signature": "question -> answer, flag: boolean",
+    "instructions": "Answer the question.",
+    "demos": [
+      {
+        "question": "Is the sky blue?",
+        "answer": "Yes",
+        "flag": true
+      },
+      {
+        "question": "Is grass red?",
+        "answer": "No",
+        "flag": false
+      },
+      {
+        "question": "What is unknowable?",
+        "answer": null,
+        "flag": null
+      },
+      {
+        "question": "Partial info?",
+        "answer": "Maybe"
+      }
+    ],
+    "inputs": {
+      "question": "Is fire hot?"
+    },
+    "responses": [
+      "[[ ## answer ## ]]\nYes\n\n[[ ## flag ## ]]\nTrue"
+    ],
+    "expected_prediction": {
+      "answer": "Yes",
+      "flag": true
+    }
+  },
+  {
+    "id": "demo_history_fidelity_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> answer: string, flag: boolean",
+    "instructions": "Answer the question.",
+    "demos": [
+      {
+        "question": "Is the sky blue?",
+        "answer": "Yes",
+        "flag": true
+      },
+      {
+        "question": "Is grass red?",
+        "answer": "No",
+        "flag": false
+      },
+      {
+        "question": "What is unknowable?",
+        "answer": null,
+        "flag": null
+      },
+      {
+        "question": "Partial info?",
+        "answer": "Maybe"
+      }
+    ],
+    "inputs": {
+      "question": "Is fire hot?"
+    },
+    "responses": [
+      "{\"answer\":\"Yes\",\"flag\":true}"
+    ],
+    "expected_prediction": {
+      "answer": "Yes",
+      "flag": true
+    }
   }
 ]

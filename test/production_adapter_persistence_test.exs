@@ -282,7 +282,7 @@ defmodule ProductionAdapterPersistenceTest do
     assert current_user =~ "Respond with the corresponding output fields"
   end
 
-  test "json adapter normalizes direct demo options before delegating to chat format" do
+  test "json adapter renders demo assistant turns as JSON objects, not chat markers" do
     signature = Imp.signature("question -> answer")
 
     messages =
@@ -290,9 +290,18 @@ defmodule ProductionAdapterPersistenceTest do
         demos: [%{question: "Capital?", answer: "Paris"}]
       )
 
+    assistant =
+      Enum.find(messages, &(&1.role == :assistant))
+
+    # DSPy JSONAdapter.format_assistant_message_content emits a pretty JSON
+    # object for demo/history turns (dee-0bwu), NOT the chat `[[ ## field ## ]]`
+    # markers. The demo user turn still uses chat input markers on both adapters.
+    assert assistant.content == "{\n  \"answer\": \"Paris\"\n}"
+    refute assistant.content =~ "[[ ## answer ## ]]"
+
     assert Enum.any?(
              messages,
-             &(&1.role == :assistant and &1.content =~ "[[ ## answer ## ]]\nParis")
+             &(&1.role == :user and &1.content =~ "[[ ## question ## ]]\nCapital?")
            )
   end
 

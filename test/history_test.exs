@@ -39,9 +39,12 @@ defmodule Imp.HistoryTest do
            ] = messages
 
     assert prior_user_1 == "[[ ## question ## ]]\nWhat is the capital of France?"
-    assert prior_assistant_1 == "[[ ## answer ## ]]\nParis"
+    # History assistant turns carry the trailing `[[ ## completed ## ]]` marker,
+    # matching DSPy format_assistant_message_content (dee-u4st axis A): the same
+    # renderer serves demos and conversation history, and DSPy always appends it.
+    assert prior_assistant_1 == "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]\n"
     assert prior_user_2 == "[[ ## question ## ]]\nWhat is the capital of Germany?"
-    assert prior_assistant_2 == "[[ ## answer ## ]]\nBerlin"
+    assert prior_assistant_2 == "[[ ## answer ## ]]\nBerlin\n\n[[ ## completed ## ]]\n"
     assert current_user =~ "[[ ## question ## ]]\nWhat about Italy?"
     refute current_user =~ "[[ ## history ## ]]"
     refute current_user =~ "%Imp.History"

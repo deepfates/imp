@@ -8,7 +8,11 @@ defmodule Imp.Adapter.Chat do
       type: {:custom, __MODULE__, :validate_demos, []},
       default: []
     ],
-    response_instruction: [type: :boolean, default: true]
+    response_instruction: [type: :boolean, default: true],
+    # Optional injectable renderer for demo/history ASSISTANT turns, letting a
+    # delegating adapter (JSON) substitute its own serialization while reusing
+    # Chat's message assembly. Arity 3: (signature, outputs, missing_message).
+    output_renderer: [type: {:fun, 3}]
   ]
 
   @impl true
@@ -16,10 +20,17 @@ defmodule Imp.Adapter.Chat do
     opts = validate_format_opts!(opts, "#{inspect(__MODULE__)}.format/3")
     demos = opts[:demos]
     response_instruction? = opts[:response_instruction]
-    {history_messages, history_fields} = extract_history(signature, inputs)
+    # DSPy renders demo/history ASSISTANT turns through a polymorphic
+    # `format_assistant_message_content`. ChatAdapter emits `[[ ## field ## ]]`
+    # markers; JSONAdapter overrides it to emit a JSON object. Imp mirrors that
+    # polymorphism with an injectable output renderer (default: Chat's own), so
+    # the JSON adapter can override the assistant/output path instead of
+    # delegating Chat's marker rendering (dee-0bwu).
+    output_renderer = Keyword.get(opts, :output_renderer) || (&render_demo_outputs/3)
+    {history_messages, history_fields} = extract_history(signature, inputs, output_renderer)
 
     [%{role: :system, content: render_system(signature)}] ++
-      render_demos(signature, demos) ++
+      render_demos(signature, demos, output_renderer) ++
       history_messages ++
       [
         %{
@@ -187,6 +198,18 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
+  # Whether `name` is a PRESENT key (even with a nil value), across the atom,
+  # string, and existing-atom spellings fetch_field understands. DSPy's
+  # `k in demo` / `outputs.get(k, ...)` distinguish present-nil from absent;
+  # fetch_field alone collapses both to nil, so key-presence needs its own path.
+  defp field_present?(fields, name) do
+    string_name = to_string(name)
+
+    Map.has_key?(fields, name) or
+      Map.has_key?(fields, string_name) or
+      ((is_binary(name) and existing_atom(name)) && Map.has_key?(fields, existing_atom(name)))
+  end
+
   defp render_inputs(signature, inputs, opts \\ []) do
     prefix = Keyword.get(opts, :prefix, "")
     skip = opts |> Keyword.get(:skip, MapSet.new()) |> MapSet.new()
@@ -258,20 +281,44 @@ defmodule Imp.Adapter.Chat do
     |> Enum.reverse()
   end
 
-  defp render_outputs(signature, outputs, opts) do
-    missing_field_message = Keyword.get(opts, :missing_field_message)
-
-    signature.outputs
-    |> Enum.map(fn field ->
-      value = fetch_field(outputs, field.name) || missing_field_message
-
-      """
-      [[ ## #{field.name} ## ]]
-      #{format_value(value)}
-      """
+  # Default (ChatAdapter) assistant-content renderer for demo/history turns.
+  # Mirrors DSPy ChatAdapter.format_assistant_message_content:
+  #   - value resolution is KEY-PRESENCE (`outputs.get(k, missing)`), not `|| `,
+  #     so a legitimate `false`/`nil` output is kept, not replaced by the missing
+  #     sentinel;
+  #   - the joined field block is stripped ONCE (matching format_field_with_value)
+  #     rather than per field, so interior trailing whitespace survives;
+  #   - the trailing `\n\n[[ ## completed ## ]]\n` marker is ALWAYS appended.
+  defp render_demo_outputs(signature, outputs, missing_field_message) do
+    body =
+      signature
+      |> resolve_demo_outputs(outputs, missing_field_message)
+      |> Enum.map_join("\n\n", fn {name, value} ->
+        "[[ ## #{name} ## ]]\n#{format_value(value)}"
+      end)
       |> String.trim()
+
+    body <> "\n\n[[ ## completed ## ]]\n"
+  end
+
+  # Resolves a demo/history turn's output fields to ordered `{name, value}`
+  # pairs, using DSPy's key-presence rule (`outputs.get(k, missing_field_message)`):
+  # a present field (even nil/false) keeps its value; an absent field takes the
+  # missing-field message. Shared with the JSON adapter so both assistant paths
+  # resolve values identically and only differ in serialization (dee-u4st,
+  # dee-0bwu). Internal cross-adapter seam — not public API (`@doc false`).
+  @doc false
+  def resolve_demo_outputs(signature, outputs, missing_field_message) do
+    Enum.map(signature.outputs, fn field ->
+      value =
+        if field_present?(outputs, field.name) do
+          fetch_field(outputs, field.name)
+        else
+          missing_field_message
+        end
+
+      {field.name, value}
     end)
-    |> Enum.join("\n\n")
   end
 
   defp render_system(signature) do
@@ -467,14 +514,22 @@ defmodule Imp.Adapter.Chat do
 
   defp format_value(value) when is_binary(value), do: value
 
+  # DSPy formats scalars via Python `str(...)` after `serialize_for_json`:
+  # `None -> "None"`, `True -> "True"`, `False -> "False"`. Elixir's
+  # `to_string/1` would give "" / "true" / "false", so these three are pinned.
+  defp format_value(nil), do: "None"
+  defp format_value(true), do: "True"
+  defp format_value(false), do: "False"
+
   defp format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
     do: to_string(value)
 
   defp format_value(value), do: inspect(value)
 
-  defp render_demos(_signature, []), do: []
+  defp render_demos(_signature, [], _renderer), do: []
+  defp render_demos(_signature, nil, _renderer), do: []
 
-  defp render_demos(signature, demos) do
+  defp render_demos(signature, demos, renderer) do
     {complete, incomplete} =
       demos
       |> Enum.map(&Imp.Example.to_map/1)
@@ -493,20 +548,20 @@ defmodule Imp.Adapter.Chat do
 
     incomplete
     |> Enum.reverse()
-    |> Enum.flat_map(&render_demo(signature, &1, :incomplete))
+    |> Enum.flat_map(&render_demo(signature, &1, :incomplete, renderer))
     |> Kernel.++(
       complete
       |> Enum.reverse()
-      |> Enum.flat_map(&render_demo(signature, &1, :complete))
+      |> Enum.flat_map(&render_demo(signature, &1, :complete, renderer))
     )
   end
 
-  defp extract_history(signature, inputs) do
+  defp extract_history(signature, inputs, renderer) do
     signature.inputs
     |> Enum.reduce({[], MapSet.new()}, fn field, {messages, fields} ->
       case fetch_field(inputs, field.name) do
         %Imp.History{} = history ->
-          {messages ++ render_history_turns(signature, Imp.History.messages(history)),
+          {messages ++ render_history_turns(signature, Imp.History.messages(history), renderer),
            MapSet.put(fields, field.name)}
 
         _other ->
@@ -515,7 +570,7 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  defp render_history_turns(signature, turns) do
+  defp render_history_turns(signature, turns, renderer) do
     turns
     |> Enum.flat_map(fn turn ->
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
@@ -531,9 +586,7 @@ defmodule Imp.Adapter.Chat do
           %{
             role: :assistant,
             content:
-              render_outputs(signature, turn,
-                missing_field_message: "Not supplied for this conversation history message. "
-              )
+              renderer.(signature, turn, "Not supplied for this conversation history message. ")
           }
         ]
         |> Enum.reject(&blank_message?/1)
@@ -620,12 +673,16 @@ defmodule Imp.Adapter.Chat do
     |> Enum.all?(fn field -> not is_nil(fetch_field(demo, field.name)) end)
   end
 
+  # DSPy base.format_demos keeps an incomplete demo when it has at least one
+  # input field and one output field PRESENT (`any(k in demo ...)`), regardless
+  # of whether their values are nil. Key-presence, not `not is_nil`, so a
+  # present-but-nil output field no longer drops the whole demo (dee-u4st).
   defp usable_incomplete_demo?(signature, demo) do
-    Enum.any?(signature.inputs, fn field -> not is_nil(fetch_field(demo, field.name)) end) and
-      Enum.any?(signature.outputs, fn field -> not is_nil(fetch_field(demo, field.name)) end)
+    Enum.any?(signature.inputs, fn field -> field_present?(demo, field.name) end) and
+      Enum.any?(signature.outputs, fn field -> field_present?(demo, field.name) end)
   end
 
-  defp render_demo(signature, demo, :incomplete) do
+  defp render_demo(signature, demo, :incomplete, renderer) do
     [
       %{
         role: :user,
@@ -637,23 +694,18 @@ defmodule Imp.Adapter.Chat do
       },
       %{
         role: :assistant,
-        content:
-          render_outputs(signature, demo,
-            missing_field_message: "Not supplied for this particular example. "
-          )
+        content: renderer.(signature, demo, "Not supplied for this particular example. ")
       }
     ]
   end
 
-  defp render_demo(signature, demo, :complete) do
+  defp render_demo(signature, demo, :complete, renderer) do
     [
       %{role: :user, content: render_inputs(signature, demo)},
       %{
         role: :assistant,
         content:
-          render_outputs(signature, demo,
-            missing_field_message: "Not supplied for this conversation history message. "
-          )
+          renderer.(signature, demo, "Not supplied for this conversation history message. ")
       }
     ]
   end

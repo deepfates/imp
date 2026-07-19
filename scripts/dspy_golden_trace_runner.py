@@ -102,10 +102,22 @@ def run_case(case: Dict[str, Any]) -> Dict[str, Any]:
 def build_program(case: Dict[str, Any], signature):
     module = case["module"]
 
+    # Few-shot demos are attached to the predictor. DSPy's adapter.format reads
+    # `program.demos` (Predict) / `program.predict.demos` (ChainOfThought) and
+    # renders them as multiturn messages, so setting them here threads demos
+    # into the rendered prompt exactly as an optimized program would (dee-u4st,
+    # dee-0bwu). Plain dicts match the JSON fixture and DSPy's `k in demo` /
+    # `demo.get(k, ...)` key-presence checks (present-null stays null).
+    demos = case.get("demos") or []
+
     if module == "predict":
-        return dspy.Predict(signature)
+        program = dspy.Predict(signature)
+        program.demos = demos
+        return program
     if module == "chain_of_thought":
-        return dspy.ChainOfThought(signature)
+        program = dspy.ChainOfThought(signature)
+        program.predict.demos = demos
+        return program
     if module in ("react", "react_dspy"):
         # `react` and `react_dspy` both build the real dspy.ReAct. The Imp side
         # differs: `react` builds provider-native ReAct (documented deviation),

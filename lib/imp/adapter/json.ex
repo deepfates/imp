@@ -45,8 +45,17 @@ defmodule Imp.Adapter.JSON do
     # Reuse Chat's structure for input rendering, demos, and history, but with
     # Chat's own response instruction suppressed — JSONAdapter substitutes its
     # own system message and its own trailing output requirements.
-    messages =
-      Imp.Adapter.Chat.format(signature, inputs, Keyword.put(opts, :response_instruction, false))
+    #
+    # DSPy's JSONAdapter overrides `format_assistant_message_content` so demo /
+    # history ASSISTANT turns emit a pretty-printed JSON object, NOT the chat
+    # `[[ ## field ## ]]` markers. We inject that assistant renderer into Chat's
+    # message assembly (dee-0bwu) instead of delegating Chat.render_outputs.
+    format_opts =
+      opts
+      |> Keyword.put(:response_instruction, false)
+      |> Keyword.put(:output_renderer, &render_assistant_json/3)
+
+    messages = Imp.Adapter.Chat.format(signature, inputs, format_opts)
 
     [_chat_system | rest] = messages
     system = %{role: :system, content: render_system(signature)}
@@ -193,8 +202,22 @@ defmodule Imp.Adapter.JSON do
   defp annotation_name(:number), do: "float"
   defp annotation_name(type), do: to_string(type)
 
+  # Demo / history ASSISTANT-turn renderer injected into Chat.format.
+  # Mirrors DSPy JSONAdapter.format_assistant_message_content:
+  #   d = {k.name: outputs.get(k, missing_field_message) for k in output_fields}
+  #   json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
+  # Value resolution (key-presence, present-nil kept) is shared with Chat so the
+  # two adapters differ only in serialization: markers here become a JSON object.
+  defp render_assistant_json(signature, outputs, missing_field_message) do
+    signature
+    |> Imp.Adapter.Chat.resolve_demo_outputs(outputs, missing_field_message)
+    |> Enum.map(fn {name, value} -> {to_string(name), value} end)
+    |> pretty_json_object()
+  end
+
   # Mirror Python `json.dumps(obj, indent=2, ensure_ascii=False)` for an ordered
-  # object whose values are strings (the only case JSONAdapter produces here).
+  # object whose values are JSON scalars (strings for the structure template;
+  # strings/bools/nil/numbers for assistant demo turns).
   defp pretty_json_object([]), do: "{}"
 
   defp pretty_json_object(pairs) do

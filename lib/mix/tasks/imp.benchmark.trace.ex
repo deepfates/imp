@@ -91,7 +91,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       signature = Imp.signature(case["signature"], case["instructions"] || "")
       Process.put(:imp_golden_trace_tools, build_imp_tools(case))
       Process.put(:imp_golden_trace_max_iters, case["max_iters"] || 20)
-      program = build_imp_program(case["module"], signature, case["adapter"], lm)
+      program = build_imp_program(case["module"], signature, case["adapter"], lm, case["demos"])
 
       case safe_call(program, atomize_keys(case["inputs"])) do
         {:ok, prediction} -> imp_success(case, prediction, calls, queue)
@@ -105,20 +105,25 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     end
   end
 
-  defp build_imp_program("predict", signature, adapter, lm),
-    do: Imp.predict(signature, lm: lm, adapter: adapter_module(adapter))
+  defp build_imp_program("predict", signature, adapter, lm, demos),
+    do: Imp.predict(signature, lm: lm, adapter: adapter_module(adapter), demos: demos || [])
 
-  defp build_imp_program("chain_of_thought", signature, adapter, lm),
-    do: Imp.chain_of_thought(signature, lm: lm, adapter: adapter_module(adapter))
+  defp build_imp_program("chain_of_thought", signature, adapter, lm, demos),
+    do:
+      Imp.chain_of_thought(signature,
+        lm: lm,
+        adapter: adapter_module(adapter),
+        demos: demos || []
+      )
 
-  defp build_imp_program("react", signature, _adapter, lm),
+  defp build_imp_program("react", signature, _adapter, lm, _demos),
     do:
       Imp.react(signature, Process.get(:imp_golden_trace_tools, []),
         lm: lm,
         max_iters: Process.get(:imp_golden_trace_max_iters, 20)
       )
 
-  defp build_imp_program("react_dspy", signature, adapter, lm),
+  defp build_imp_program("react_dspy", signature, adapter, lm, _demos),
     do:
       Imp.react(signature, Process.get(:imp_golden_trace_tools, []),
         lm: lm,
@@ -127,7 +132,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         max_iters: Process.get(:imp_golden_trace_max_iters, 20)
       )
 
-  defp build_imp_program(module, _signature, _adapter, _lm),
+  defp build_imp_program(module, _signature, _adapter, _lm, _demos),
     do: Mix.raise("unsupported fixture module: #{module}")
 
   defp build_imp_tools(case) do
