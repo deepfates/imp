@@ -1075,7 +1075,14 @@ defmodule ProviderTrainingLifecycleTest do
                    "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
                },
                %{"role" => "user", "content" => "[[ ## question ## ]]\n2+2?"},
-               %{"role" => "assistant", "content" => "[[ ## answer ## ]]\n4"}
+               # Finetune assistant turns carry the trailing `[[ ## completed ## ]]`
+               # marker, matching DSPy ChatAdapter.format_finetune_data (which
+               # renders the assistant content via format_assistant_message_content,
+               # always appending the marker) (dee-u4st axis A).
+               %{
+                 "role" => "assistant",
+                 "content" => "[[ ## answer ## ]]\n4\n\n[[ ## completed ## ]]\n"
+               }
              ]
            }
 
