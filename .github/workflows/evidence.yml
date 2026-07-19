@@ -64,6 +64,17 @@ jobs:
       - uses: ./.github/actions/elixir-setup
         with:
           save-cache: "false"
+      # The registry's protocol validators hash files in the pinned DSPy source
+      # tree (e.g. mmgrpo's authority materialization check). The tree is a plain
+      # shallow git clone -- no Python, ~seconds -- so materialize it here rather
+      # than env-gating the check out of the per-PR lane (which would leave the
+      # materialization-drift class invisible until the weekly cron).
+      - name: Materialize pinned DSPy 3.2.1 source (git only, no venv)
+        run: |
+          git init -q tmp/dspy-3.2.1
+          git -C tmp/dspy-3.2.1 remote add origin https://github.com/stanfordnlp/dspy.git
+          git -C tmp/dspy-3.2.1 fetch -q --depth 1 origin 29448ae12756abdd14bd8796c819247ebb83673c
+          git -C tmp/dspy-3.2.1 checkout -q FETCH_HEAD
       - name: Run venv-free evidence rows
         env:
           EVIDENCE_INFRASTRUCTURE: "1"
