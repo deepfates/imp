@@ -8,6 +8,36 @@ defmodule Imp.LM do
   @callback stream(lm :: term(), messages :: list(map()), opts :: keyword()) :: Enumerable.t()
   @optional_callbacks stream: 3
 
+  @doc false
+  # The LM's response-format capability (internal), the Imp analog of DSPy's
+  # `lm.supported_params` / `lm.supports_response_schema` (see
+  # `Imp.LM.Capability`). The JSON adapter gates `response_format` on this
+  # exactly as DSPy's `JSONAdapter` gates on those two properties.
+  #
+  # Resolution mirrors DSPy: a client that carries a real model registry
+  # introspects it; anything that cannot be introspected (a bare arity-2
+  # callback, a plain module, a configured `%{module:, opts:}` map) resolves to
+  # the DSPy `BaseLM` default — no declared capability — so no `response_format`
+  # is sent. This is deliberate and NOT silent: it is the same contract DSPy
+  # gives an LM that does not declare `supported_params`.
+  #
+  #   * `%Imp.Clients.ReqLLM{}` -> introspect the ReqLLM/LLMDB model registry.
+  #   * a struct whose module exports `response_format_capability/1` -> ask it
+  #     (lets fixtures and custom clients declare their tier).
+  #   * anything else -> `Imp.LM.Capability.none/0`.
+  @spec response_format_capability(term()) :: Imp.LM.Capability.t()
+  def response_format_capability(%module{} = lm) do
+    cond do
+      Code.ensure_loaded?(module) and function_exported?(module, :response_format_capability, 1) ->
+        module.response_format_capability(lm)
+
+      true ->
+        Imp.LM.Capability.none()
+    end
+  end
+
+  def response_format_capability(_lm), do: Imp.LM.Capability.none()
+
   def generate(lm, messages, opts \\ [])
 
   def generate(lm, messages, opts) do

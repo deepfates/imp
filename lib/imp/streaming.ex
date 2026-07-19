@@ -69,7 +69,7 @@ defmodule Imp.Streaming do
 
       with {:ok, messages} <-
              format_with_adapter(adapter, program.signature, inputs, demos: program.demos),
-           {:ok, lm_opts} <- adapter_lm_opts(adapter, program.signature, config) do
+           {:ok, lm_opts} <- adapter_lm_opts(adapter, program.signature, config, lm) do
         stream_lm(lm, messages, lm_opts)
       else
         {:error, reason} -> error_response(reason)
@@ -151,10 +151,11 @@ defmodule Imp.Streaming do
     kind, reason -> {:error, {:adapter_format_failed, adapter, {kind, reason}}}
   end
 
-  defp adapter_lm_opts(adapter, signature, config) do
+  defp adapter_lm_opts(adapter, signature, config, lm) do
     with :ok <- ensure_adapter_loaded(adapter),
-         true <- function_exported?(adapter, :lm_opts, 2),
-         {:ok, opts} <- call_adapter_lm_opts(adapter, signature, config) do
+         true <-
+           function_exported?(adapter, :lm_opts, 3) or function_exported?(adapter, :lm_opts, 2),
+         {:ok, opts} <- call_adapter_lm_opts(adapter, signature, config, lm) do
       {:ok, Keyword.merge(config, opts)}
     else
       false -> {:ok, config}
@@ -162,8 +163,13 @@ defmodule Imp.Streaming do
     end
   end
 
-  defp call_adapter_lm_opts(adapter, signature, config) do
-    opts = adapter.lm_opts(signature, config)
+  defp call_adapter_lm_opts(adapter, signature, config, lm) do
+    opts =
+      if function_exported?(adapter, :lm_opts, 3) do
+        adapter.lm_opts(signature, config, Imp.LM.response_format_capability(lm))
+      else
+        adapter.lm_opts(signature, config)
+      end
 
     if Keyword.keyword?(opts) do
       {:ok, opts}

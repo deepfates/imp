@@ -308,13 +308,24 @@ defmodule ProductionAdapterPersistenceTest do
   test "predict retries malformed chat output through JSON adapter fallback" do
     parent = self()
 
+    # The retry is re-rendered with the JSON adapter, so the handler keys its
+    # valid-JSON reply on the JSON-adapter system marker — NOT on response_format,
+    # which is now capability-gated (dee-ps19). This LM declares no capability
+    # (a plain configured-map test double), so like DSPy's BaseLM default the
+    # JSON fallback retry sends NO response_format.
     lm = %{
       module: Imp.LM.Static,
       opts: [
         handler: fn messages, opts ->
           send(parent, {:lm_call, messages, opts})
 
-          if Keyword.get(opts, :response_format) == %{type: "json_object"} do
+          json_adapter? =
+            Enum.any?(
+              messages,
+              &(&1.content =~ "Respond with a JSON object in the following order of fields:")
+            )
+
+          if json_adapter? do
             ~s({"answer":"Paris","confidence":0.99})
           else
             "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
@@ -339,8 +350,10 @@ defmodule ProductionAdapterPersistenceTest do
     refute Keyword.has_key?(opts, :json_fallback)
     refute Keyword.has_key?(opts, :json_retries)
 
+    # Capability-gated (dee-ps19): a none-capability LM's JSON fallback retry
+    # sends no response_format, faithful to DSPy's JSONAdapter for such an LM.
     assert_received {:lm_call, retry_messages, retry_opts}
-    assert Keyword.get(retry_opts, :response_format) == %{type: "json_object"}
+    refute Keyword.has_key?(retry_opts, :response_format)
     refute Keyword.has_key?(retry_opts, :json_fallback)
     refute Keyword.has_key?(retry_opts, :json_retries)
 

@@ -865,5 +865,44 @@
       "answer": "4"
     },
     "edge": "dee-cidk: the ChainOfThought reasoning field's ${reasoning} sentinel renders as an empty description under the JSON adapter."
+  },
+  {
+    "id": "ps19_response_format_tier_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> answer: string, score: int",
+    "instructions": "Answer the question.",
+    "lm_capability": "response_format",
+    "inputs": {
+      "question": "What is 2 + 2?"
+    },
+    "responses": [
+      "{\"answer\":\"four\",\"score\":4}"
+    ],
+    "expected_prediction": {
+      "answer": "four",
+      "score": 4
+    },
+    "edge": "dee-ps19 tier 2: an LM that accepts response_format but not json_schema -> Imp and DSPy both send {\"type\": \"json_object\"}."
+  },
+  {
+    "id": "ps19_json_schema_tier_json",
+    "module": "predict",
+    "adapter": "json",
+    "signature": "question -> answer: string, tags: array[string], mood: enum[happy,sad]",
+    "instructions": "Answer the question.",
+    "lm_capability": "json_schema",
+    "inputs": {
+      "question": "How are you?"
+    },
+    "responses": [
+      "{\"answer\":\"doing well\",\"tags\":[\"a\",\"b\"],\"mood\":\"happy\"}"
+    ],
+    "expected_prediction": {
+      "answer": "doing well",
+      "tags": ["a", "b"],
+      "mood": "happy"
+    },
+    "edge": "dee-ps19 tier 3: a json_schema-capable LM -> Imp and DSPy both send the DSPyProgramOutputs structured schema (scalar + list + Literal), in litellm wire form."
   }
 ]

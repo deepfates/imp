@@ -227,9 +227,44 @@ defmodule Imp.Adapter.JSON do
     "{\n" <> body <> "\n}"
   end
 
+  @doc """
+  Provider request options for a JSON-adapter call. Faithful to DSPy's
+  `JSONAdapter`, which selects `response_format` by the LM's *capability*, not by
+  which keys the caller passed (`dspy/adapters/json_adapter.py`
+  `_json_adapter_call_common` + `__call__`):
+
+    * LM does NOT accept `response_format` (`"response_format" not in
+      lm.supported_params`) -> send NOTHING.
+    * LM accepts `response_format` but not structured schema
+      (`not lm.supports_response_schema`, or an open-ended `dict` output) ->
+      `{"type": "json_object"}`.
+    * LM supports structured JSON schema -> a pydantic-shaped `json_schema`
+      built from the signature outputs (DSPy's
+      `_get_structured_outputs_response_format`, in the litellm wire form).
+
+  `capability` is the LM's `Imp.LM.Capability` (resolved by
+  `Imp.LM.response_format_capability/1` at the call site). The arity-2 form is a
+  capability-agnostic convenience that assumes a standard `response_format`-
+  capable provider (the historical Imp default, `json_object`); real dispatch
+  through `Imp.Predict`/`Imp.Streaming` uses the arity-3 form with the actual
+  per-LM capability.
+
+  Two explicit-override escape hatches are honored ahead of capability gating,
+  with no DSPy analog: `native_json_schema: true` forces Imp's own json_schema
+  envelope, and a caller-supplied `response_format` map is passed through
+  untouched (returns `[]` so the caller's value wins).
+  """
   def lm_opts(signature, opts) do
     opts = validate_lm_opts!(opts, "#{inspect(__MODULE__)}.lm_opts/2")
+    build_lm_opts(signature, opts, Imp.LM.Capability.response_format_only())
+  end
 
+  def lm_opts(signature, opts, %Imp.LM.Capability{} = capability) do
+    opts = validate_lm_opts!(opts, "#{inspect(__MODULE__)}.lm_opts/3")
+    build_lm_opts(signature, opts, capability)
+  end
+
+  defp build_lm_opts(signature, opts, %Imp.LM.Capability{} = capability) do
     cond do
       opts[:native_json_schema] ->
         [
@@ -243,9 +278,104 @@ defmodule Imp.Adapter.JSON do
         []
 
       true ->
-        [response_format: %{type: "json_object"}]
+        capability_response_format(signature, capability)
     end
   end
+
+  # DSPy's three capability tiers, in order.
+  defp capability_response_format(_signature, %Imp.LM.Capability{response_format: false}), do: []
+
+  defp capability_response_format(signature, %Imp.LM.Capability{response_schema: true}) do
+    # DSPy tries a structured schema and, if it cannot build one (open-ended
+    # mapping, or a shape Imp cannot render byte-faithfully), falls back to
+    # json_object — its `except Exception` clause. Nothing silent: the only
+    # fallback is DSPy's own.
+    case structured_response_format(signature) do
+      {:ok, response_format} -> [response_format: response_format]
+      :fallback -> [response_format: %{type: "json_object"}]
+    end
+  end
+
+  defp capability_response_format(_signature, %Imp.LM.Capability{}),
+    do: [response_format: %{type: "json_object"}]
+
+  # DSPy `_get_structured_outputs_response_format` (a pydantic `DSPyProgramOutputs`
+  # model) in the wire form litellm sends: `{"type": "json_schema", "json_schema":
+  # {"name": "DSPyProgramOutputs", "schema": <model_json_schema>, "strict": true}}`.
+  # Returns `:fallback` when any output is an open-ended mapping or a shape whose
+  # pydantic schema Imp cannot reproduce byte-faithfully (DSPy's json_object path).
+  defp structured_response_format(signature) do
+    with {:ok, properties} <- output_properties(signature.outputs) do
+      schema = %{
+        "type" => "object",
+        "additionalProperties" => false,
+        "properties" => Map.new(properties),
+        "required" => Enum.map(signature.outputs, &to_string(&1.name)),
+        "title" => "DSPyProgramOutputs"
+      }
+
+      {:ok,
+       %{
+         type: "json_schema",
+         json_schema: %{name: "DSPyProgramOutputs", schema: schema, strict: true}
+       }}
+    end
+  rescue
+    # CompositeType raises for shapes with no faithful pydantic schema (e.g. a
+    # Literal nested in an array). DSPy's `except Exception` -> json_object.
+    ArgumentError -> :fallback
+  end
+
+  defp output_properties(outputs) do
+    Enum.reduce_while(outputs, {:ok, []}, fn field, {:ok, acc} ->
+      case field_property_schema(field) do
+        {:ok, schema} -> {:cont, {:ok, [{to_string(field.name), schema} | acc]}}
+        :open_ended -> {:halt, :fallback}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      :fallback -> :fallback
+    end
+  end
+
+  # The pydantic property body for one output field, with pydantic's default
+  # `title` (field name titlecased). Scalars carry only `type`; composites route
+  # through CompositeType.
+  defp field_property_schema(field) do
+    case Imp.Adapter.CompositeType.pydantic_schema_body(field) do
+      :scalar ->
+        {:ok, %{"type" => scalar_json_type(field.type)} |> put_title(field.name)}
+
+      :open_ended ->
+        :open_ended
+
+      {:ok, body} ->
+        {:ok, put_title(body, field.name)}
+    end
+  end
+
+  defp put_title(map, name), do: Map.put(map, "title", pydantic_title(name))
+
+  # pydantic v2 default field title: `name.replace("_", " ").title()`.
+  defp pydantic_title(name) do
+    name
+    |> to_string()
+    |> String.split("_")
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  # pydantic JSON-schema `type` for the scalar output types Imp models.
+  defp scalar_json_type(:string), do: "string"
+  defp scalar_json_type(:integer), do: "integer"
+  defp scalar_json_type(:float), do: "number"
+  defp scalar_json_type(:number), do: "number"
+  defp scalar_json_type(:boolean), do: "boolean"
+  defp scalar_json_type("string"), do: "string"
+  defp scalar_json_type("integer"), do: "integer"
+  defp scalar_json_type("float"), do: "number"
+  defp scalar_json_type("number"), do: "number"
+  defp scalar_json_type("boolean"), do: "boolean"
 
   @impl true
   def parse(signature, raw, opts) when is_map(raw),

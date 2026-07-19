@@ -35,7 +35,7 @@ defmodule GoldenTraceTest do
     assert report["summary"]["tool_trace_parity"]
     assert report["summary"]["imp_semantic_checks"]["all_passing"]
     assert report["summary"]["passing"] == report["summary"]["total"]
-    assert report["fixtures"]["cases"] == 33
+    assert report["fixtures"]["cases"] == 35
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
     # prompt is byte-identical to DSPy's, per case. Every case is measured, and
@@ -121,8 +121,8 @@ defmodule GoldenTraceTest do
     # Seven message-level edge divergences found by adversarial review (epic
     # dee-8zev), each now byte-identical to real DSPy 3.2.1 and LOCKED here so its
     # defect class retires permanently. Every case below reaches template_parity
-    # (byte-identical rendered prompt); the JSON-adapter ones read envelope=false
-    # like every JSON case (dee-ps19, asserted later).
+    # (byte-identical rendered prompt); with dee-ps19 fixed the JSON-adapter ones
+    # also reach envelope parity (asserted later).
     #
     # dee-tsce: a list value on a `str`-annotated INPUT field renders DSPy's
     # numbered guillemet blobs (`[1] «alpha»` / `«alpha»` / `N/A`), not inspect().
@@ -199,33 +199,89 @@ defmodule GoldenTraceTest do
     assert envelope_by_case["dict_field_chat"] == true
     assert envelope_by_case["react_dspy_tool_lookup"] == true
 
-    # The four JSON-adapter cases: Imp sends response_format:{type:json_object}
-    # while DSPy's capability-gated JSONAdapter sends nothing for the fixture LM.
-    # This request divergence was MASKED by the message-only instrument and is
-    # now VISIBLE. message-parity stays true; the envelope honestly reads false.
-    assert envelope_by_case["json_adapter_basic"] == false
-    assert envelope_by_case["list_str_field_json"] == false
-    assert envelope_by_case["list_int_field_json"] == false
-    assert envelope_by_case["dict_field_json"] == false
+    # The four JSON-adapter cases (dee-ps19 FIXED): Imp now gates response_format
+    # on the LM's capability exactly like DSPy's JSONAdapter. The provider-free
+    # fixture LM declares DSPy's BaseLM default (supported_params=set(),
+    # supports_response_schema=false), so BOTH sides send NOTHING -> envelope
+    # parity is TRUE. Locked at the corrected measured value.
+    assert envelope_by_case["json_adapter_basic"] == true
+    assert envelope_by_case["list_str_field_json"] == true
+    assert envelope_by_case["list_int_field_json"] == true
+    assert envelope_by_case["dict_field_json"] == true
 
-    # The demo cases inherit their adapter's envelope behavior: the pure-chat
-    # demo case sends no extra options (full parity); the JSON demo case sends
-    # response_format:json_object like every other JSON case, so its envelope
-    # honestly reads false (that divergence is dee-ps19, not this ticket). The
-    # message templates match on BOTH (asserted above).
+    # The demo cases: both the pure-chat and the JSON demo case now reach
+    # envelope parity — the JSON side sends nothing for the none-capability
+    # fixture LM (dee-ps19), matching DSPy. Message templates match on BOTH.
     assert envelope_by_case["demo_history_fidelity_chat"] == true
-    assert envelope_by_case["demo_history_fidelity_json"] == false
+    assert envelope_by_case["demo_history_fidelity_json"] == true
 
-    # The surfaced per-call envelopes make the JSON divergence legible in the
-    # report itself (nothing silent), not just as a boolean.
+    # The surfaced per-call envelopes make the (now matching) request legible in
+    # the report itself (nothing silent): both sides send an empty envelope.
     json_case = Enum.find(report["cases"], &(&1["id"] == "json_adapter_basic"))
-    assert json_case["imp_call_envelopes"] == [%{"response_format" => %{"type" => "json_object"}}]
+    assert json_case["imp_call_envelopes"] == [%{}]
     assert json_case["dspy_call_envelopes"] == [%{}]
 
-    # The ChatAdapter->JSONAdapter parse-failure fallback (missing_output_error)
-    # retries the second call with response_format on the Imp side only, so its
-    # envelope diverges on that call even though messages match per call.
-    assert envelope_by_case["missing_output_error"] == false
+    # The ChatAdapter->JSONAdapter parse-failure fallback (missing_output_error):
+    # the JSON retry now capability-gates too (dee-ps19), so the second call
+    # sends nothing on BOTH sides for the none-capability fixture LM -> envelope
+    # parity TRUE.
+    assert envelope_by_case["missing_output_error"] == true
+
+    # dee-ps19 three-tier proof: one fixture per DSPy response_format tier, both
+    # sides declaring the SAME capability, Imp's envelope byte-identical to DSPy's.
+    #
+    #   tier 1 (none)          -> nothing              (every JSON case above)
+    #   tier 2 (response_format) -> {"type":"json_object"}
+    #   tier 3 (json_schema)   -> DSPyProgramOutputs structured schema
+    assert envelope_by_case["ps19_response_format_tier_json"] == true
+    assert envelope_by_case["ps19_json_schema_tier_json"] == true
+
+    rf_tier = Enum.find(report["cases"], &(&1["id"] == "ps19_response_format_tier_json"))
+
+    assert rf_tier["imp_call_envelopes"] ==
+             [%{"response_format" => %{"type" => "json_object"}}]
+
+    assert rf_tier["dspy_call_envelopes"] == rf_tier["imp_call_envelopes"]
+
+    schema_tier = Enum.find(report["cases"], &(&1["id"] == "ps19_json_schema_tier_json"))
+
+    # The structured schema Imp builds from the signature outputs is the pydantic
+    # `DSPyProgramOutputs` model in litellm's wire form (scalar + list + Literal),
+    # byte-identical to what real DSPy sends.
+    assert schema_tier["imp_call_envelopes"] == [
+             %{
+               "response_format" => %{
+                 "type" => "json_schema",
+                 "json_schema" => %{
+                   "name" => "DSPyProgramOutputs",
+                   "strict" => true,
+                   "schema" => %{
+                     "type" => "object",
+                     "additionalProperties" => false,
+                     "title" => "DSPyProgramOutputs",
+                     "required" => ["answer", "tags", "mood"],
+                     "properties" => %{
+                       "answer" => %{"title" => "Answer", "type" => "string"},
+                       "tags" => %{
+                         "title" => "Tags",
+                         "type" => "array",
+                         "items" => %{"type" => "string"}
+                       },
+                       "mood" => %{
+                         "title" => "Mood",
+                         "type" => "string",
+                         "enum" => ["happy", "sad"]
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           ]
+
+    assert schema_tier["dspy_call_envelopes"] == schema_tier["imp_call_envelopes"]
+    assert schema_tier["template_parity"]
+    assert schema_tier["prediction_parity"]
 
     # The three provider-native ReAct cases already diverge on messages
     # (documented deviation); they also diverge on the envelope because Imp
@@ -234,11 +290,11 @@ defmodule GoldenTraceTest do
     assert envelope_by_case["react_multi_tool_transform"] == false
     assert envelope_by_case["react_tool_argument_error"] == false
 
-    # The seven-edge fixtures inherit their adapter's envelope behavior: chat and
-    # faithful-ReAct cases send no extra request options (full parity), while the
-    # JSON-adapter cases send response_format:json_object like every JSON case, so
-    # their envelope honestly reads false (dee-ps19, not these tickets). The
-    # message templates match on all of them (asserted above).
+    # The seven-edge fixtures now ALL reach envelope parity: the chat and
+    # faithful-ReAct cases send no extra request options, and — with dee-ps19
+    # fixed — the JSON-adapter cases capability-gate to nothing for the
+    # none-capability fixture LM, matching DSPy. Message templates match on all
+    # of them (asserted above).
     for id <- [
           "tsce_list_on_str_input_multi_chat",
           "tsce_list_on_str_input_single_chat",
@@ -250,35 +306,30 @@ defmodule GoldenTraceTest do
           "o709_unicode_line_separator_instructions_chat",
           "h7nw_react_float_observation",
           "h7nw_react_bool_observation",
-          "h7nw_react_nil_observation"
-        ] do
-      assert envelope_by_case[id] == true, "expected envelope parity for #{id}"
-    end
-
-    for id <- [
+          "h7nw_react_nil_observation",
           "o709_indented_multiline_instructions_json",
           "o68oy_nested_array_int_json",
           "o68oy_nested_array_str_json",
           "p1d5_array_object_json",
           "cidk_chain_of_thought_json"
         ] do
-      assert envelope_by_case[id] == false, "expected honest envelope divergence for #{id}"
+      assert envelope_by_case[id] == true, "expected envelope parity for #{id}"
     end
 
     # The honest faithful-port count: byte-identical messages AND identical
-    # request envelope, per call. Nineteen of thirty-three cases fully match today
-    # (the original eight full-parity cases plus eleven of the seven-edge
-    # fixtures: three dee-tsce, one dee-wrx5, four dee-709o chat, three dee-h7nw
-    # ReAct). The message-only matches (nine JSON incl. the five new JSON-adapter
-    # edge fixtures + the JSON demo case + fallback, plus three native ReAct) are
-    # not allowed to read as full parity.
-    assert report["summary"]["envelope_parity_cases"] == 19
-    assert report["summary"]["full_parity_cases"] == 19
+    # request envelope, per call. With dee-ps19 fixed, thirty-two of thirty-five
+    # cases fully match — every case EXCEPT the three provider-native ReAct cases
+    # (documented tools/tool_choice deviation). The message-only matches that
+    # used to be barred from full parity (nine JSON + the JSON demo case +
+    # fallback) now legitimately reach it because their envelopes match too.
+    assert report["summary"]["envelope_parity_cases"] == 32
+    assert report["summary"]["full_parity_cases"] == 32
+    # Still false: the three native ReAct cases diverge on the envelope.
     assert report["summary"]["message_envelope_parity"] == false
 
     full_by_case = report["summary"]["full_parity_by_case"]
     assert map_size(full_by_case) == report["summary"]["total"]
-    assert full_by_case["json_adapter_basic"] == false
+    assert full_by_case["json_adapter_basic"] == true
     assert full_by_case["predict_chat_basic"] == true
 
     assert report["imp"]["runner"] == "imp-golden-trace"
