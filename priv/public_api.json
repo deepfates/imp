@@ -2871,14 +2871,18 @@
         "answer_type/1",
         "classification/3",
         "classification_report/2",
+        "dpr_normalize/1",
         "em/2",
         "exact_match/1",
         "extractive_qa/3",
         "f1/2",
         "feedback/1",
+        "has_answer/2",
+        "hotpot_f1/2",
         "normalize_result/1",
         "normalize_text/1",
         "pass?/1",
+        "passage_match/2",
         "retrieval_recall/3",
         "score/1",
         "span_relation/2"
@@ -2900,6 +2904,9 @@
           "classification_report/2": [
             "classification_report(rows, opts \\\\ [])"
           ],
+          "dpr_normalize/1": [
+            "dpr_normalize(text)"
+          ],
           "em/2": [
             "em(prediction, answers)"
           ],
@@ -2915,6 +2922,12 @@
           "feedback/1": [
             "feedback(value)"
           ],
+          "has_answer/2": [
+            "has_answer(tokenized_answers, text)"
+          ],
+          "hotpot_f1/2": [
+            "hotpot_f1(prediction, answers)"
+          ],
           "normalize_result/1": [
             "normalize_result(result)"
           ],
@@ -2923,6 +2936,9 @@
           ],
           "pass?/1": [
             "pass?(value)"
+          ],
+          "passage_match/2": [
+            "passage_match(passages, answers)"
           ],
           "retrieval_recall/3": [
             "retrieval_recall(prediction, expected_ids, opts \\\\ [])"

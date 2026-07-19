@@ -622,7 +622,10 @@ def gsm8k_metric(example: Dict[str, Any], prediction: Any) -> Dict[str, Any]:
 def hotpotqa_metric(example: Dict[str, Any], prediction: Any) -> Dict[str, Any]:
     predicted = getattr(prediction, "answer", "")
     gold = example.get("answer", "")
-    exact_match = normalize_text(predicted) == normalize_text(gold)
+    # "official" = the HotPotQA leaderboard metric as ported by DSPy
+    # (em_score / hotpot_f1_score, incl. the yes/no/noanswer F1 gate); DSPy's
+    # only delta from hotpot_evaluate_v1.py is a leading Unicode NFD step.
+    exact_match = hotpotqa_em(predicted, gold)
     f1 = hotpotqa_f1(predicted, gold)
     return {
         "score": 1.0 if exact_match else 0.0,
@@ -673,34 +676,32 @@ def parse_numeric_answer(value: Any) -> Optional[float]:
     return float(text)
 
 
+# Metric helpers call the REAL dspy.evaluate.metrics implementations
+# (dee-c2ur / dee-j11u): the previous home-grown normalize (punctuation ->
+# space, no NFD, no article word-boundary) provably disagreed with the
+# official SQuAD/HotPotQA metric (f1('the US congress','U.S. congress') was
+# 0.4; official is 1.0). Imports are function-local, not module-level: the
+# structural tests in test/benchmark_truth_test.exs exec this module against
+# a stub dspy that has no dspy.evaluate submodule. A missing real dspy fails
+# loudly at metric time, never silently falls back.
+
+
 def normalize_text(value: Any) -> str:
-    text = str(value).lower()
-    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
-    words = [word for word in text.split() if word not in {"a", "an", "the"}]
-    return " ".join(words)
+    from dspy.evaluate.metrics import normalize_text as dspy_normalize_text
+
+    return dspy_normalize_text(str(value))
+
+
+def hotpotqa_em(predicted: Any, gold: Any) -> bool:
+    from dspy.evaluate.metrics import em_score
+
+    return bool(em_score(str(predicted), str(gold)))
 
 
 def hotpotqa_f1(predicted: Any, gold: Any) -> float:
-    pred_tokens = normalize_text(predicted).split()
-    gold_tokens = normalize_text(gold).split()
-    if not pred_tokens or not gold_tokens:
-        return 0.0
+    from dspy.evaluate.metrics import hotpot_f1_score
 
-    common = 0
-    gold_counts: Dict[str, int] = {}
-    for token in gold_tokens:
-        gold_counts[token] = gold_counts.get(token, 0) + 1
-    for token in pred_tokens:
-        if gold_counts.get(token, 0) > 0:
-            common += 1
-            gold_counts[token] -= 1
-
-    if common == 0:
-        return 0.0
-
-    precision = common / len(pred_tokens)
-    recall = common / len(gold_tokens)
-    return 2 * precision * recall / (precision + recall)
+    return float(hotpot_f1_score(str(predicted), str(gold)))
 
 
 def average(values: Iterable[float]) -> float:

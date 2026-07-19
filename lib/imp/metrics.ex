@@ -25,6 +25,8 @@ defmodule Imp.Metrics do
       {0.75, true, "partial"}
   """
 
+  require Logger
+
   defmodule Result do
     @moduledoc """
     Normalized metric result with numeric score, pass/fail flag, feedback, and metadata.
@@ -99,39 +101,82 @@ defmodule Imp.Metrics do
   defp passed?(value) when is_number(value), do: value > 0
   defp passed?(_value), do: false
 
-  @doc """
-  Normalizes answer text for extractive exact match and F1.
+  # Word-boundary English article removal, exactly DSPy's
+  # `re.sub(r"\b(a|an|the)\b", " ", text)`. PCRE2's `\b` under UCP (10.43+)
+  # counts combining marks as word characters, but Python's `re` does not —
+  # so after NFD an article followed by a bare combining mark keeps its
+  # boundary in Python (see the pinned `article_then_combining_mark` and
+  # `ring_and_diaeresis` fixture cases). Emulate Python's boundary with
+  # explicit lookarounds over Python's word set (letters, digits,
+  # underscore). Residual known divergence: exotic Other_Alphabetic
+  # combining marks (e.g. Hebrew niqqud) count as word chars in Python but
+  # not here; none can follow an ASCII English article in real QA data.
+  @english_articles ~r/(?<![\p{L}\p{N}_])(a|an|the)(?![\p{L}\p{N}_])/u
 
-  The normalizer lowercases text, removes punctuation, splits Unicode words, and
-  drops English articles. It is intentionally small and deterministic so local
-  tests can use it as an oracle.
+  # Python `str.split()` whitespace: \t\n\v\f\r space, \x1c-\x1f, \x85, and
+  # Unicode Z* (Zs/Zl/Zp). Elixir's `String.split/1` misses \x1c-\x1f, so the
+  # set is spelled out to match Python byte-for-byte.
+  @python_whitespace ~r/[\x09-\x0D\x1C-\x1F\x20\x{85}\p{Z}]+/u
+
+  # DPR SimpleTokenizer pattern (tmp/dspy-3.2.1/dspy/dsp/utils/dpr.py):
+  # runs of letters/digits/marks are word tokens; any other visible
+  # (non-separator, non-control) character is a single-character token.
+  @dpr_token_regex ~r/[\p{L}\p{N}\p{M}]+|[^\p{Z}\p{C}]/u
+
+  # Official HotPotQA special labels (hotpot_evaluate_v1.py, mirrored by
+  # DSPy's hotpot_f1_score): a yes/no/noanswer mismatch scores 0.
+  @hotpot_special_labels ["yes", "no", "noanswer"]
+
+  @doc """
+  Normalizes answer text exactly like DSPy's `dspy.evaluate.metrics.normalize_text`.
+
+  The SQuAD-style pipeline, in DSPy's order: Unicode NFD normalization,
+  lowercasing, deletion (not substitution) of Python's `string.punctuation`
+  characters (ASCII only — Unicode punctuation is kept), word-boundary English
+  article removal, and whitespace collapse. Differential parity with real
+  DSPy 3.2.1 is pinned in `test/metrics_dspy_parity_test.exs`.
   """
   def normalize_text(value) do
-    text = value |> to_string() |> String.downcase()
-
-    text
-    |> normalized_tokens()
-    |> Enum.reject(&(&1 in ["a", "an", "the"]))
-    |> Enum.join(" ")
+    value
+    |> to_string()
+    |> nfd!()
+    |> String.downcase()
+    |> delete_python_punctuation()
+    |> then(&Regex.replace(@english_articles, &1, " "))
+    |> collapse_python_whitespace()
   end
 
-  defp normalized_tokens(text) do
-    if ascii_word_space?(text) do
-      String.split(text)
-    else
-      text
-      |> String.replace(~r/[^\p{L}\p{N}\s]/u, " ")
-      |> String.split()
+  defp nfd!(text) do
+    case :unicode.characters_to_nfd_binary(text) do
+      normalized when is_binary(normalized) ->
+        normalized
+
+      error ->
+        raise ArgumentError,
+              "normalize_text requires valid UTF-8 input, got #{inspect(text)} (#{inspect(error)})"
     end
   end
 
-  defp ascii_word_space?(<<>>), do: true
+  # Deletes exactly Python's `string.punctuation` (the 32 ASCII characters
+  # !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~), mirroring DSPy's `remove_punc`.
+  defp delete_python_punctuation(text) do
+    for <<codepoint::utf8 <- text>>, not python_punctuation?(codepoint), into: "" do
+      <<codepoint::utf8>>
+    end
+  end
 
-  defp ascii_word_space?(<<char, rest::binary>>)
-       when char in ?a..?z or char in ?0..?9 or char in [?\s, ?\t, ?\n, ?\r],
-       do: ascii_word_space?(rest)
+  defp python_punctuation?(codepoint)
+       when codepoint in 0x21..0x2F or codepoint in 0x3A..0x40 or
+              codepoint in 0x5B..0x60 or codepoint in 0x7B..0x7E,
+       do: true
 
-  defp ascii_word_space?(_text), do: false
+  defp python_punctuation?(_codepoint), do: false
+
+  defp collapse_python_whitespace(text) do
+    @python_whitespace
+    |> Regex.split(text, trim: true)
+    |> Enum.join(" ")
+  end
 
   @doc """
   Returns exact-match truth after `normalize_text/1`.
@@ -163,6 +208,14 @@ defmodule Imp.Metrics do
         acc + min(count, Enum.count(gold_tokens, &(&1 == token)))
       end)
 
+    if pred_tokens == [] and gold_tokens == [] do
+      # DSPy prints a diagnostic on this rare edge (both sides normalize to
+      # nothing) and still scores 0; mirror the loudness, not just the value.
+      Logger.warning(
+        "F1 metric: rare edge case of empty normalized prediction AND ground truth; scoring 0.0"
+      )
+    end
+
     cond do
       pred_tokens == [] or gold_tokens == [] ->
         0.0
@@ -174,6 +227,32 @@ defmodule Imp.Metrics do
         precision = common / length(pred_tokens)
         recall = common / length(gold_tokens)
         2 * precision * recall / (precision + recall)
+    end
+  end
+
+  @doc """
+  Computes HotPotQA-style F1 mirroring DSPy's `hotpot_f1_score`/`HotPotF1`.
+
+  Identical to `f1/2` except that when either normalized side is one of the
+  special HotPotQA labels `"yes"`, `"no"`, or `"noanswer"` and the sides
+  differ, the score is 0.0 — the same gating the official HotPotQA evaluation
+  script (`hotpot_evaluate_v1.py`) applies. When given multiple acceptable
+  answers, the best score is returned.
+  """
+  def hotpot_f1(prediction, answers) when is_list(answers),
+    do: answers |> Enum.map(&hotpot_f1(prediction, &1)) |> Enum.max(fn -> 0.0 end)
+
+  def hotpot_f1(prediction, answer) do
+    normalized_prediction = normalize_text(prediction)
+    normalized_gold = normalize_text(answer)
+
+    special? =
+      normalized_prediction in @hotpot_special_labels or normalized_gold in @hotpot_special_labels
+
+    if special? and normalized_prediction != normalized_gold do
+      0.0
+    else
+      f1(prediction, answer)
     end
   end
 
@@ -481,15 +560,70 @@ defmodule Imp.Metrics do
   @doc """
   Builds a metric that passes when an answer appears in a predicted context field.
 
-  This is useful for retrieval tests where the program should surface supporting
-  context before a final answer is judged.
+  Mirrors DSPy's `answer_passage_match`: each passage is checked separately
+  (a string context counts as a single passage) and matching uses DPR
+  `has_answer` token-sequence semantics via `passage_match/2`, so an answer
+  can never match inside an unrelated word and never across a passage seam.
   """
   def answer_passage_match(answer_field \\ :answer, context_field \\ :context) do
     fn example, prediction ->
-      answer = normalize_text(Imp.Example.get(example, answer_field))
-      context = normalize_text(Imp.Prediction.get(prediction, context_field, ""))
-      answer != "" and String.contains?(context, answer)
+      answers = example |> Imp.Example.get(answer_field) |> List.wrap()
+      passages = prediction |> Imp.Prediction.get(context_field, []) |> List.wrap()
+      passage_match(passages, answers)
     end
+  end
+
+  @doc """
+  Returns whether any passage contains any answer, mirroring DSPy's
+  `_passage_match` (dspy/evaluate/metrics.py) over DPR `has_answer`
+  (dspy/dsp/utils/dpr.py).
+
+  Answers and passages both go through `normalize_text/1` and DPR
+  tokenization; an answer matches only as a contiguous token sequence within
+  a single passage.
+  """
+  def passage_match(passages, answers) when is_list(passages) and is_list(answers) do
+    tokenized_answers = Enum.map(answers, &dpr_normalize(normalize_text(&1)))
+
+    Enum.any?(passages, fn passage ->
+      has_answer(tokenized_answers, normalize_text(passage))
+    end)
+  end
+
+  @doc """
+  DPR `has_answer`: whether any tokenized answer occurs as a contiguous
+  token subsequence of the DPR-normalized `text`.
+
+  Faithful to DSPy's port of Facebook DPR, including the edge where an
+  empty tokenized answer matches any text.
+  """
+  def has_answer(tokenized_answers, text) when is_list(tokenized_answers) do
+    text_tokens = dpr_normalize(text)
+    Enum.any?(tokenized_answers, &token_window_match?(text_tokens, &1))
+  end
+
+  @doc """
+  DPR normalization (dspy/dsp/utils/dpr.py `DPR_normalize`): NFD, tokenize
+  with the DPR SimpleTokenizer pattern, lowercase each token.
+  """
+  def dpr_normalize(text) do
+    normalized = text |> to_string() |> nfd!()
+
+    @dpr_token_regex
+    |> Regex.scan(normalized)
+    |> Enum.map(fn [token | _groups] -> String.downcase(token) end)
+  end
+
+  # Mirrors DPR has_answer's window scan: `for i in range(0, len(text) -
+  # len(answer) + 1)`, so an empty answer matches at offset 0 of any text.
+  defp token_window_match?(text_tokens, answer_tokens) do
+    text_length = length(text_tokens)
+    answer_length = length(answer_tokens)
+
+    answer_length <= text_length and
+      Enum.any?(0..(text_length - answer_length), fn offset ->
+        Enum.slice(text_tokens, offset, answer_length) == answer_tokens
+      end)
   end
 
   defp contains_token_sequence?(_left, ""), do: false

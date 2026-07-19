@@ -394,9 +394,7 @@ defmodule Imp.UpstreamFidelity do
         "CompleteAndGrounded"
       ],
       source: "dspy/evaluate",
-      disposition: :gap,
-      release_blocking: false,
-      ticket: "dee-c2ur",
+      disposition: :conformant,
       imp: [
         Imp.Evaluate,
         Imp.Metrics,
@@ -406,20 +404,20 @@ defmodule Imp.UpstreamFidelity do
       invariants: [
         "boolean, numeric, and feedback-bearing metrics normalize consistently",
         "evaluation retains per-row outputs, failures, scores, and traces",
-        "concurrency does not reorder rows or lose process context"
+        "concurrency does not reorder rows or lose process context",
+        "normalize_text matches DSPy's SQuAD pipeline byte-for-byte: NFD, lowercase, punctuation deletion, word-boundary article removal, whitespace collapse",
+        "EM/F1/HotPot-F1 equal DSPy-computed scores on the pinned adversarial table",
+        "answer_passage_match applies DPR has_answer token-sequence matching per passage, never substring or cross-passage"
       ],
       evidence: %{
         tests: [
           "test/metric_contract_test.exs",
           "test/imp_test.exs",
-          "test/property_invariants_test.exs"
+          "test/property_invariants_test.exs",
+          "test/metrics_dspy_parity_test.exs"
         ],
         docs: ["docs/API_GUIDE.md", "livebooks/03_evaluate_and_optimize.livemd"],
-        missing: [
-          "DSPy-conformant normalize_text: NFD normalization and punctuation deletion; Imp replaces punctuation with spaces and skips NFD, so exact-match and F1 on punctuated gold answers are not comparable to DSPy-reported numbers (dee-c2ur)",
-          "answer_passage_match: per-passage DPR has_answer token-sequence matching; Imp substring-matches the concatenated context, so a gold answer can match inside an unrelated word (dee-c2ur)",
-          "differential probe tests pinning the divergent metric pairs to DSPy-derived values (dee-c2ur)"
-        ]
+        missing: []
       }
     },
     %{

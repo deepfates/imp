@@ -2,11 +2,11 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 26
-Conformant: 12
+Conformant: 13
 Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 6
-Claim-specific non-blocking gaps: 6
+Gaps: 5
+Claim-specific non-blocking gaps: 5
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -27,7 +27,7 @@ Passing: true
 | agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |
 | agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper |
 | composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |
-| evaluation.metrics | evaluation | gap | claim-specific gap | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
+| evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
 | optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
 | optimization.knn | optimization | gap | claim-specific gap | KNN, KNNFewShot |
 | optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
@@ -364,7 +364,7 @@ Missing evidence or behavior:
 
 ### `evaluation.metrics`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/evaluate`
 
@@ -374,21 +374,23 @@ Semantic invariants:
 - boolean, numeric, and feedback-bearing metrics normalize consistently
 - evaluation retains per-row outputs, failures, scores, and traces
 - concurrency does not reorder rows or lose process context
+- normalize_text matches DSPy's SQuAD pipeline byte-for-byte: NFD, lowercase, punctuation deletion, word-boundary article removal, whitespace collapse
+- EM/F1/HotPot-F1 equal DSPy-computed scores on the pinned adversarial table
+- answer_passage_match applies DPR has_answer token-sequence matching per passage, never substring or cross-passage
 
 Executable evidence:
 
 - test: `test/metric_contract_test.exs`
 - test: `test/imp_test.exs`
 - test: `test/property_invariants_test.exs`
+- test: `test/metrics_dspy_parity_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `livebooks/03_evaluate_and_optimize.livemd`
 
 
 Missing evidence or behavior:
 
-- DSPy-conformant normalize_text: NFD normalization and punctuation deletion; Imp replaces punctuation with spaces and skips NFD, so exact-match and F1 on punctuated gold answers are not comparable to DSPy-reported numbers (dee-c2ur)
-- answer_passage_match: per-passage DPR has_answer token-sequence matching; Imp substring-matches the concatenated context, so a gold answer can match inside an unrelated word (dee-c2ur)
-- differential probe tests pinning the divergent metric pairs to DSPy-derived values (dee-c2ur)
+- none
 
 ### `optimization.few_shot`
 

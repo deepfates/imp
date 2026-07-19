@@ -1,0 +1,447 @@
+{
+  "generator": "scripts/dspy_metrics_differential.py",
+  "command": "tmp/dspy-parity-venv/bin/python scripts/dspy_metrics_differential.py",
+  "dspy_version": "3.2.1",
+  "python_version": "3.13.12",
+  "normalize_cases": [
+    {
+      "id": "us_abbreviation",
+      "input": "U.S.",
+      "expected": "us"
+    },
+    {
+      "id": "apostrophe_contraction",
+      "input": "don't",
+      "expected": "dont"
+    },
+    {
+      "id": "docstring_example",
+      "input": "The,  Eiffel  Tower!",
+      "expected": "eiffel tower"
+    },
+    {
+      "id": "accented_nfc",
+      "input": "caf\u00e9",
+      "expected": "cafe\u0301"
+    },
+    {
+      "id": "accented_nfd",
+      "input": "cafe\u0301",
+      "expected": "cafe\u0301"
+    },
+    {
+      "id": "accented_words_nfc",
+      "input": "na\u00efve r\u00e9sum\u00e9",
+      "expected": "nai\u0308ve re\u0301sume\u0301"
+    },
+    {
+      "id": "hyphenated_compound",
+      "input": "state-of-the-art",
+      "expected": "stateoftheart"
+    },
+    {
+      "id": "ascii_double_quotes",
+      "input": "\"quoted\" answer",
+      "expected": "quoted answer"
+    },
+    {
+      "id": "leading_apostrophe",
+      "input": "'Til Death",
+      "expected": "til death"
+    },
+    {
+      "id": "smart_quotes",
+      "input": "\u201csmart quotes\u201d",
+      "expected": "\u201csmart quotes\u201d"
+    },
+    {
+      "id": "articles_only",
+      "input": "A An The a an the",
+      "expected": ""
+    },
+    {
+      "id": "article_like_prefixes",
+      "input": "another antenna theory",
+      "expected": "another antenna theory"
+    },
+    {
+      "id": "decimal_number",
+      "input": "3.14",
+      "expected": "314"
+    },
+    {
+      "id": "comma_grouped_number",
+      "input": "1,000,000",
+      "expected": "1000000"
+    },
+    {
+      "id": "currency_parenthetical",
+      "input": "$100 (approx.)",
+      "expected": "100 approx"
+    },
+    {
+      "id": "percentage",
+      "input": "50%",
+      "expected": "50"
+    },
+    {
+      "id": "email_address",
+      "input": "e-mail@example.com",
+      "expected": "emailexamplecom"
+    },
+    {
+      "id": "mixed_whitespace",
+      "input": "  leading\tand\ntrailing  ",
+      "expected": "leading and trailing"
+    },
+    {
+      "id": "accented_city",
+      "input": "M\u00e9xico City",
+      "expected": "me\u0301xico city"
+    },
+    {
+      "id": "accented_hyphenated_name",
+      "input": "Beyonc\u00e9 Knowles-Carter",
+      "expected": "beyonce\u0301 knowlescarter"
+    },
+    {
+      "id": "article_plus_abbreviation",
+      "input": "the U.S. Congress",
+      "expected": "us congress"
+    },
+    {
+      "id": "article_then_combining_mark",
+      "input": "th\u00e9",
+      "expected": "\u0301"
+    },
+    {
+      "id": "non_decomposable_l_stroke",
+      "input": "\u0141\u00f3d\u017a, Poland",
+      "expected": "\u0142o\u0301dz\u0301 poland"
+    },
+    {
+      "id": "cjk",
+      "input": "\u5317\u4eac\u5927\u5b66",
+      "expected": "\u5317\u4eac\u5927\u5b66"
+    },
+    {
+      "id": "numero_sign_em_dash",
+      "input": "\u21165 \u2014 result",
+      "expected": "\u21165 \u2014 result"
+    },
+    {
+      "id": "bracket_zoo",
+      "input": "AC/DC; [Back] {in} <Black>",
+      "expected": "acdc back in black"
+    },
+    {
+      "id": "empty_string",
+      "input": "",
+      "expected": ""
+    },
+    {
+      "id": "blank_spaces",
+      "input": "   ",
+      "expected": ""
+    },
+    {
+      "id": "article_sentence",
+      "input": "The answer is 42.",
+      "expected": "answer is 42"
+    },
+    {
+      "id": "ring_and_diaeresis",
+      "input": "\u00c5ngstr\u00f6m",
+      "expected": "\u030angstro\u0308m"
+    },
+    {
+      "id": "colon_semicolon",
+      "input": "semi;colon:test",
+      "expected": "semicolontest"
+    },
+    {
+      "id": "nbsp_separator",
+      "input": "a\u00a0b",
+      "expected": "b"
+    }
+  ],
+  "pair_cases": [
+    {
+      "id": "us_vs_dotted",
+      "prediction": "US",
+      "gold": "U.S.",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "dont_vs_apostrophe",
+      "prediction": "dont",
+      "gold": "don't",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "ticket_probe_congress",
+      "prediction": "the US congress",
+      "gold": "U.S. congress",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "nfc_vs_ascii",
+      "prediction": "caf\u00e9",
+      "gold": "cafe",
+      "em": false,
+      "f1": 0.0,
+      "hotpot_f1": 0.0
+    },
+    {
+      "id": "nfc_vs_nfd",
+      "prediction": "caf\u00e9",
+      "gold": "cafe\u0301",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "docstring_f1_third",
+      "prediction": "Eiffel Tower is in Paris",
+      "gold": "Paris",
+      "em": false,
+      "f1": 0.33333333333333337,
+      "hotpot_f1": 0.33333333333333337
+    },
+    {
+      "id": "hotpot_yes_vs_no",
+      "prediction": "yes",
+      "gold": "no",
+      "em": false,
+      "f1": 0.0,
+      "hotpot_f1": 0.0
+    },
+    {
+      "id": "hotpot_yes_vs_yes",
+      "prediction": "yes",
+      "gold": "yes",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "hotpot_noanswer_vs_spaced",
+      "prediction": "noanswer",
+      "gold": "no answer",
+      "em": false,
+      "f1": 0.0,
+      "hotpot_f1": 0.0
+    },
+    {
+      "id": "hotpot_spaced_vs_noanswer",
+      "prediction": "no answer",
+      "gold": "noanswer",
+      "em": false,
+      "f1": 0.0,
+      "hotpot_f1": 0.0
+    },
+    {
+      "id": "comma_number",
+      "prediction": "1,000",
+      "gold": "1000",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "comma_locality",
+      "prediction": "Paris, France",
+      "gold": "Paris France",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "empty_prediction",
+      "prediction": "",
+      "gold": "answer",
+      "em": false,
+      "f1": 0.0,
+      "hotpot_f1": 0.0
+    },
+    {
+      "id": "articles_normalize_empty",
+      "prediction": "a",
+      "gold": "the",
+      "em": true,
+      "f1": 0.0,
+      "hotpot_f1": 0.0
+    },
+    {
+      "id": "leading_article_team",
+      "prediction": "San Francisco 49ers",
+      "gold": "the San Francisco 49ers",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "middle_initial",
+      "prediction": "Barack H. Obama",
+      "gold": "Barack Obama",
+      "em": false,
+      "f1": 0.8,
+      "hotpot_f1": 0.8
+    },
+    {
+      "id": "span_vs_sentence",
+      "prediction": "42",
+      "gold": "The answer is 42.",
+      "em": false,
+      "f1": 0.5,
+      "hotpot_f1": 0.5
+    },
+    {
+      "id": "hotpot_yes_vs_punctuated_yes",
+      "prediction": "yes",
+      "gold": "Yes.",
+      "em": true,
+      "f1": 1.0,
+      "hotpot_f1": 1.0
+    },
+    {
+      "id": "hotpot_no_vs_yes",
+      "prediction": "no",
+      "gold": "yes",
+      "em": false,
+      "f1": 0.0,
+      "hotpot_f1": 0.0
+    }
+  ],
+  "passage_cases": [
+    {
+      "id": "substring_inside_word",
+      "answers": [
+        "art"
+      ],
+      "passages": [
+        "Many participated in the event"
+      ],
+      "match": false
+    },
+    {
+      "id": "plain_hit_first_passage",
+      "answers": [
+        "Eiffel Tower"
+      ],
+      "passages": [
+        "The Eiffel Tower is in Paris.",
+        "Nothing else"
+      ],
+      "match": true
+    },
+    {
+      "id": "dotted_abbreviation",
+      "answers": [
+        "U.S."
+      ],
+      "passages": [
+        "the US economy grew"
+      ],
+      "match": true
+    },
+    {
+      "id": "hit_in_second_passage",
+      "answers": [
+        "Paris"
+      ],
+      "passages": [
+        "nothing here",
+        "He lives in Paris now"
+      ],
+      "match": true
+    },
+    {
+      "id": "concat_seam",
+      "answers": [
+        "bc"
+      ],
+      "passages": [
+        "a b",
+        "c d"
+      ],
+      "match": false
+    },
+    {
+      "id": "accented_answer",
+      "answers": [
+        "caf\u00e9"
+      ],
+      "passages": [
+        "They met at the caf\u00e9."
+      ],
+      "match": true
+    },
+    {
+      "id": "answer_spanning_passages",
+      "answers": [
+        "New York City"
+      ],
+      "passages": [
+        "He moved to New York",
+        "City taxes are high"
+      ],
+      "match": false
+    },
+    {
+      "id": "empty_answer_quirk",
+      "answers": [
+        ""
+      ],
+      "passages": [
+        "any passage"
+      ],
+      "match": true
+    },
+    {
+      "id": "no_passages",
+      "answers": [
+        "yes"
+      ],
+      "passages": [],
+      "match": false
+    },
+    {
+      "id": "multi_answer_list",
+      "answers": [
+        "Louvre",
+        "Paris"
+      ],
+      "passages": [
+        "The Louvre is in Paris"
+      ],
+      "match": true
+    },
+    {
+      "id": "whole_word_hit",
+      "answers": [
+        "participated"
+      ],
+      "passages": [
+        "Many participated in the event"
+      ],
+      "match": true
+    },
+    {
+      "id": "punctuated_phrase",
+      "answers": [
+        "don't stop"
+      ],
+      "passages": [
+        "They said don't stop believing"
+      ],
+      "match": true
+    }
+  ]
+}

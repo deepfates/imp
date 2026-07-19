@@ -242,9 +242,15 @@ defmodule Imp.BenchmarkTruth.Runner do
       gold = Imp.Example.get(example, :answer)
       result = Imp.Metrics.extractive_qa(predicted, gold, metric_name: "hotpotqa_exact_match")
 
+      # "official" here means the HotPotQA leaderboard metric as ported by
+      # DSPy (hotpot_f1_score / em_score in dspy/evaluate/metrics.py): SQuAD
+      # normalization with punctuation deletion plus the yes/no/noanswer F1
+      # gate from hotpot_evaluate_v1.py. DSPy's sole delta from the
+      # leaderboard script is a leading Unicode NFD step. Parity is pinned in
+      # test/metrics_dspy_parity_test.exs (dee-c2ur, dee-j11u).
       metadata =
         result.metadata
-        |> Map.put("official_hotpotqa_f1", result.metadata["f1"])
+        |> Map.put("official_hotpotqa_f1", Imp.Metrics.hotpot_f1(predicted, gold))
         |> Map.put("official_hotpotqa_em", result.metadata["exact_match"])
 
       %{result | metadata: metadata}

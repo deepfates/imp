@@ -65,10 +65,10 @@ Imp's conformance program tracks 26 upstream surface groups against DSPy
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| Conformant | 12 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer and adapter families, a behavioral conformance test elsewhere |
+| Conformant | 13 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer, adapter, and answer-metric families, a behavioral conformance test elsewhere |
 | Elixir-native equivalent | 6 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
 | Tracking | 2 | Following DSPy's unreleased 3.3 changes |
-| Gap | 6 | Declared divergences and missing evidence, all non-blocking and ticketed: the instruction-optimizer family and GEPA (exact-reproduction evidence), the XML and TwoStep adapters (Imp's versions diverge from upstream's shapes), KNN/KNNFewShot (a different algorithm than upstream), and the answer-matching metrics (normalize_text and answer_passage_match diverge, so EM/F1 numbers are not comparable to DSPy's on punctuated answers). Local behavior is tested; upstream-matched outcomes are not claimed |
+| Gap | 5 | Declared divergences and missing evidence, all non-blocking and ticketed: the instruction-optimizer family and GEPA (exact-reproduction evidence), the XML and TwoStep adapters (Imp's versions diverge from upstream's shapes), and KNN/KNNFewShot (a different algorithm than upstream). Local behavior is tested; upstream-matched outcomes are not claimed |
 
 The per-surface table is the [conformance report](CONFORMANCE.md). Behind
 the differential rows, the `scripts/` sidecars and `mix imp.benchmark.*_differential`
