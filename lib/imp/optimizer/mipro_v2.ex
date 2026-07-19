@@ -505,10 +505,23 @@ defmodule Imp.Optimizer.MIPROv2 do
       Imp.Evaluate.new(examples, optimizer.metric,
         max_concurrency: optimizer.max_concurrency,
         timeout: optimizer.timeout,
-        max_errors: evaluator_error_limit(optimizer.max_errors)
+        max_errors: optimizer.max_errors
       )
 
-    result = Imp.Evaluate.run(evaluator, program)
+    # Imp.Evaluate now halts loudly at errors >= max_errors (DSPy
+    # parallelizer semantics); translate into MIPROv2's budget error so the
+    # optimizer-facing contract stays the same.
+    result =
+      try do
+        Imp.Evaluate.run(evaluator, program)
+      rescue
+        cancelled in Imp.EvaluationCancelledError ->
+          reraise RuntimeError,
+                  "MIPROv2 error budget exhausted: #{length(cancelled.errors)} errors " <>
+                    "(maximum #{optimizer.max_errors})",
+                  __STACKTRACE__
+      end
+
     enforce_error_budget!(result.errors, optimizer.max_errors)
     result
   end
@@ -692,7 +705,4 @@ defmodule Imp.Optimizer.MIPROv2 do
     raise RuntimeError,
           "MIPROv2 error budget exhausted: #{length(errors)} errors (maximum #{maximum})"
   end
-
-  defp evaluator_error_limit(:infinity), do: :infinity
-  defp evaluator_error_limit(maximum), do: max(maximum - 1, 0)
 end

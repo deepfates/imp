@@ -630,12 +630,14 @@ defmodule CompletionSurfaceTest do
   end
 
   test "save/load, embeddings, and structured adapters work" do
+    # Dynamic LM via context: a Static-pinned program can no longer be saved
+    # (dee-i3s4 / P03 made that loud), and this test saves the program below.
     lm = %{
       module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> ~s({"answer":"ok"}) end]
     }
 
-    program = Imp.predict("question -> answer", lm: lm, adapter: Imp.Adapter.JSON)
+    program = Imp.predict("question -> answer", adapter: Imp.Adapter.JSON)
 
     path =
       Path.join(
@@ -643,7 +645,11 @@ defmodule CompletionSurfaceTest do
         "imp-program-#{System.unique_integer([:positive])}.json"
       )
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "ship?"})
+    assert {:ok, prediction} =
+             Imp.context([lm: lm], fn ->
+               Imp.Predict.Predict.call(program, %{question: "ship?"})
+             end)
+
     assert Imp.Prediction.get(prediction, :answer) == "ok"
 
     assert :ok = Imp.Saving.save!(program, path)

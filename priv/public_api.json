@@ -2291,6 +2291,24 @@
     {
       "callbacks": [],
       "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.EvaluationCancelledError",
+      "signatures": {},
+      "source": "lib/imp/evaluate.ex",
+      "struct_fields": [
+        "__exception__",
+        "errors",
+        "max_errors",
+        "message",
+        "rows"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
       "functions": [
         "delete/2",
         "fetch!/2",

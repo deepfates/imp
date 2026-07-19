@@ -86,6 +86,7 @@
       "modules": [
         "Imp.AdapterParseError",
         "Imp.ContextWindowExceededError",
+        "Imp.EvaluationCancelledError",
         "Imp.LMError",
         "Imp.Retrieve.Memory"
       ],

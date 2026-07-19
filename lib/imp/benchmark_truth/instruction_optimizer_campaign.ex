@@ -356,19 +356,16 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
     |> Imp.chain_of_thought(lm: lm, adapter: Imp.Adapter.Chat, config: [cache: false])
   end
 
+  # The checkpoint artifact is deliberately LM-free: loading always rebinds
+  # the budgeted LM (rebind_lm/2 above). Dump the program as EXPLICITLY
+  # dynamic — keeping the pinned harness LM would now fail loudly in
+  # Imp.Saving (dee-i3s4 / P03), and silently stripping it while claiming
+  # dynamic_lm: false was exactly the defect that fix retired.
   defp unwrap_budgeted_lm(program) do
-    Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{
-                                                                         name: name,
-                                                                         predictor: predictor
-                                                                       },
-                                                                       acc ->
-      inner =
-        case predictor.lm do
-          %BudgetedLM{inner: inner} -> inner
-          other -> other
-        end
-
-      Imp.ProgramParameters.update_predictor(acc, name, &Imp.Predict.Predict.with_lm(&1, inner))
+    Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+      Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
+        %{predictor | lm: nil, dynamic_lm?: true}
+      end)
     end)
   end
 

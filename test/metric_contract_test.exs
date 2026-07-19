@@ -57,18 +57,34 @@ defmodule MetricContractTest do
     assert [%{feedback: {:trace_seen, true}}] = result.rows
   end
 
-  test "Evaluate records failures with configurable failure score and max errors" do
+  # Corrected toward loudness (dee-f1ct / P14): this test used to assert the
+  # old SILENT halt (max_errors: 0 quietly returned a 1-row partial Result).
+  # The contract now matches DSPy's parallelizer: reaching max_errors raises.
+  test "Evaluate records failures with configurable failure score and cancels loudly at max errors" do
     program = %Program{handler: fn _inputs -> {:error, :boom} end}
     metric = fn _example, _prediction -> true end
+    devset = [example("one", "1"), example("two", "2")]
 
     result =
-      [example("one", "1"), example("two", "2")]
-      |> Imp.Evaluate.new(metric, failure_score: -1.0, max_errors: 0)
+      devset
+      |> Imp.Evaluate.new(metric, failure_score: -1.0)
       |> Imp.Evaluate.run(program)
 
     assert result.score == -1.0
-    assert [%{reason: :boom}] = result.errors
-    assert length(result.rows) == 1
+    assert [%{reason: :boom}, %{reason: :boom}] = result.errors
+    assert length(result.rows) == 2
+
+    ExUnit.CaptureLog.capture_log(fn ->
+      error =
+        assert_raise Imp.EvaluationCancelledError, fn ->
+          devset
+          |> Imp.Evaluate.new(metric, failure_score: -1.0, max_errors: 1)
+          |> Imp.Evaluate.run(program)
+        end
+
+      assert [%{reason: :boom}] = error.errors
+      assert length(error.rows) == 1
+    end)
   end
 
   test "Evaluate can run rows concurrently while preserving row order and process context" do
@@ -258,18 +274,24 @@ defmodule MetricContractTest do
            ] = result.rows
   end
 
+  # Corrected toward loudness (dee-f1ct / P14): metric failures count toward
+  # max_errors, and reaching the budget cancels loudly instead of quietly
+  # returning a partial Result.
   test "Evaluate applies max_errors to metric failures" do
     program = %Program{handler: fn _inputs -> {:ok, Imp.prediction(answer: "Paris")} end}
     metric = fn _example, _prediction -> raise "metric exploded" end
 
-    result =
-      [example("one", "1"), example("two", "2")]
-      |> Imp.Evaluate.new(metric, max_errors: 0)
-      |> Imp.Evaluate.run(program)
+    ExUnit.CaptureLog.capture_log(fn ->
+      error =
+        assert_raise Imp.EvaluationCancelledError, fn ->
+          [example("one", "1"), example("two", "2")]
+          |> Imp.Evaluate.new(metric, max_errors: 1)
+          |> Imp.Evaluate.run(program)
+        end
 
-    assert result.score == 0.0
-    assert [%{index: 0, stage: :metric, reason: "metric exploded"}] = result.errors
-    assert length(result.rows) == 1
+      assert [%{index: 0, stage: :metric, reason: "metric exploded"}] = error.errors
+      assert length(error.rows) == 1
+    end)
   end
 
   test "token F1 counts duplicate overlap like extractive QA metrics" do

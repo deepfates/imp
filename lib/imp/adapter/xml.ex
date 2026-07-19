@@ -12,10 +12,10 @@ defmodule Imp.Adapter.XML do
 
   @impl true
   def parse(signature, raw, opts) when is_binary(raw) do
+    output_names = Imp.Signature.output_names(signature)
+
     fields =
-      signature
-      |> Imp.Signature.output_names()
-      |> Enum.reduce(%{}, fn name, acc ->
+      Enum.reduce(output_names, %{}, fn name, acc ->
         pattern = ~r/<#{name}>\s*(.*?)\s*<\/#{name}>/s
 
         case Regex.run(pattern, raw) do
@@ -24,9 +24,15 @@ defmodule Imp.Adapter.XML do
         end
       end)
 
-    if fields == %{},
-      do: Imp.Adapter.Chat.parse(signature, raw, opts),
-      else: Imp.Adapter.Chat.parse(signature, fields, opts)
+    # DSPy XMLAdapter.parse (dspy/adapters/xml_adapter.py) raises
+    # AdapterParseError unless every output field is present in tags:
+    # `if fields.keys() != signature.output_fields.keys(): raise ...`.
+    # Tag-free prose must be a loud parse error (feeding the retry path),
+    # never silently stuffed into an output field via the Chat fallback.
+    case Enum.reject(output_names, &Map.has_key?(fields, &1)) do
+      [] -> Imp.Adapter.Chat.parse(signature, fields, opts)
+      missing -> {:error, {:missing_output_fields, missing}}
+    end
   end
 
   def parse(signature, raw, opts), do: Imp.Adapter.Chat.parse(signature, raw, opts)

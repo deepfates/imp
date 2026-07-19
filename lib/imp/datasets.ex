@@ -327,11 +327,62 @@ defmodule Imp.Datasets.GSM8K do
 
   def load(path), do: Imp.Datasets.gsm8k(path)
 
+  # Fetched GSM8K rows keep the full rationale (ending "#### N") in :answer
+  # and the bare number in :canonical_answer. DSPy's gsm8k_metric
+  # (dspy/datasets/gsm8k.py) compares parse_integer_answer on BOTH sides, so
+  # a prediction of exactly "18" scores true against gold "... #### 18".
+  # Scoring text EM on the raw :answer marked every correct prediction as a
+  # failure on the repo's own fetched data. This mirrors the benchmark
+  # runner's internal scorer (Imp.BenchmarkTruth.Runner metric(:gsm8k)):
+  # canonical gold first, numeric equivalence, then normalized text EM.
   def metric(example, prediction, _trace \\ nil) do
-    Imp.Metrics.em(
-      Imp.Prediction.get(prediction, :answer),
-      Imp.Example.get(example, :answer)
-    )
+    gold =
+      example
+      |> Imp.Example.get(:canonical_answer, Imp.Example.get(example, :answer))
+      |> canonical_gold()
+
+    predicted = Imp.Prediction.get(prediction, :answer)
+
+    numeric_answer_equal?(predicted, gold) or Imp.Metrics.em(predicted, gold)
+  end
+
+  # Rows without :canonical_answer may still carry the raw "#### N" rationale;
+  # extract the final answer the way the fetcher does.
+  defp canonical_gold(nil), do: nil
+
+  defp canonical_gold(value) do
+    value
+    |> to_string()
+    |> String.split("####")
+    |> List.last()
+    |> String.trim()
+  end
+
+  defp numeric_answer_equal?(predicted, gold) do
+    with {:ok, predicted_number} <- parse_numeric_answer(predicted),
+         {:ok, gold_number} <- parse_numeric_answer(gold) do
+      abs(predicted_number - gold_number) <= 1.0e-9
+    else
+      _other -> false
+    end
+  end
+
+  defp parse_numeric_answer(value) do
+    text =
+      value
+      |> to_string()
+      |> String.trim()
+      |> String.replace(",", "")
+      |> String.trim_leading("$")
+
+    if String.match?(text, ~r/^-?\d+(?:\.\d+)?$/) do
+      case Float.parse(text) do
+        {number, ""} -> {:ok, number}
+        _other -> :error
+      end
+    else
+      :error
+    end
   end
 end
 

@@ -40,19 +40,20 @@ defmodule AvatarDeploymentPersistenceTest do
   test "compiled Avatar optimizer output preserves its deployment report" do
     metric = fn _example, prediction -> Imp.get(prediction, :answer) == "Paris" end
 
+    # Dynamic LM via context: a Static-pinned program can no longer be saved
+    # (dee-i3s4 / P03 made that loud), and this test saves the compiled output.
     student =
-      Imp.avatar("question -> answer", [],
-        lm: finish_lm(),
-        metadata: %{deployment: "candidate"}
-      )
+      Imp.avatar("question -> answer", [], metadata: %{deployment: "candidate"})
 
     trainset = [
       Imp.example(question: "Capital?", answer: "Paris") |> Imp.with_inputs(:question)
     ]
 
     compiled =
-      Imp.Optimizer.Avatar.new(metric, max_iters: 0)
-      |> Imp.Optimizer.Avatar.compile(student, trainset)
+      Imp.context([lm: finish_lm()], fn ->
+        Imp.Optimizer.Avatar.new(metric, max_iters: 0)
+        |> Imp.Optimizer.Avatar.compile(student, trainset)
+      end)
 
     path = temp_path("compiled-avatar")
     on_exit(fn -> File.rm(path) end)

@@ -85,15 +85,20 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
   end
 
   test "uses generated outputs rather than labeled outputs as demos" do
+    # Dynamic LM via context: a Static-pinned program can no longer be dumped
+    # (dee-i3s4 / P03 made that loud), and this test round-trips the compiled
+    # program through Saving below.
     lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "generated"} end]}
-    program = Imp.predict("question -> answer", lm: lm)
+    program = Imp.predict("question -> answer")
     example = Imp.example(question: "q", answer: "gold") |> Imp.with_inputs(:question)
     metric = fn _example, prediction -> Imp.get(prediction, :answer) == "generated" end
 
     compiled =
-      metric
-      |> Imp.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 1)
-      |> Imp.Optimizer.BootstrapFewShot.compile(program, [example])
+      Imp.context([lm: lm], fn ->
+        metric
+        |> Imp.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 1)
+        |> Imp.Optimizer.BootstrapFewShot.compile(program, [example])
+      end)
 
     assert [%Imp.Example{} = demo] = compiled.demos
     assert Imp.Example.to_map(demo) == %{question: "q", answer: "generated", augmented: true}

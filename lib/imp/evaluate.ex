@@ -10,6 +10,20 @@ defmodule Imp.Evaluate.Result do
   defstruct [:score, rows: [], errors: []]
 end
 
+defmodule Imp.EvaluationCancelledError do
+  @moduledoc """
+  Raised when an evaluation halts because `:max_errors` was reached.
+
+  Mirrors DSPy's `ParallelExecutor`, which raises
+  `Exception("Execution cancelled due to errors or interruption.")` once
+  `error_count >= max_errors` (dspy/utils/parallelizer.py). A truncated
+  evaluation must never masquerade as a completed one, so the partial rows
+  and errors ride on the exception instead of a normal-looking result.
+  """
+
+  defexception [:message, :rows, :errors, :max_errors]
+end
+
 defmodule Imp.Evaluate do
   @moduledoc """
   Evaluate a program against examples and a metric.
@@ -44,7 +58,16 @@ defmodule Imp.Evaluate do
   (which imposes no per-example deadline). When a finite `:timeout` kills a row
   it is logged loudly and the row carries `{:evaluation_task_exit, :timeout}`
   with a `nil` prediction, so a killed call stays distinguishable from a wrong
-  answer.
+  answer. A finite `:timeout` is enforced at every concurrency level,
+  including the default `max_concurrency: 1`.
+
+  When `:max_errors` is reached the evaluation halts LOUDLY by raising
+  `Imp.EvaluationCancelledError`, mirroring DSPy's `ParallelExecutor`
+  (halts once `error_count >= max_errors` and raises "Execution cancelled
+  due to errors or interruption."). A truncated run never returns a
+  normal-looking partial score. Deviation from upstream: `:max_errors`
+  defaults to `:infinity` here, while DSPy inherits `dspy.settings.max_errors`
+  (default 10); pass `:max_errors` explicitly for the upstream behavior.
   """
 
   require Logger
@@ -97,24 +120,48 @@ defmodule Imp.Evaluate do
   end
 
   def run(%__MODULE__{} = evaluator, program) do
-    {rows, errors} = run_rows(evaluator, program)
+    case run_rows(evaluator, program) do
+      {:completed, rows, errors} ->
+        rows = Enum.reverse(rows)
+        errors = Enum.reverse(errors)
+        %Imp.Evaluate.Result{score: average(rows), rows: rows, errors: errors}
 
-    rows = Enum.reverse(rows)
-    errors = Enum.reverse(errors)
-    %Imp.Evaluate.Result{score: average(rows), rows: rows, errors: errors}
+      {:cancelled, rows, errors} ->
+        rows = Enum.reverse(rows)
+        errors = Enum.reverse(errors)
+
+        # DSPy parallelizer.py logs "Execution cancelled due to errors or
+        # interruption." and raises; a truncated evaluation must be loud,
+        # never a normal-looking partial Result with an inflated score.
+        message =
+          "Imp.Evaluate execution cancelled: #{length(errors)} errors reached " <>
+            "max_errors #{inspect(evaluator.max_errors)} after #{length(rows)} of " <>
+            "#{Enum.count(evaluator.devset)} examples"
+
+        Logger.error(message)
+
+        raise Imp.EvaluationCancelledError,
+          message: message,
+          rows: rows,
+          errors: errors,
+          max_errors: evaluator.max_errors
+    end
   end
 
-  defp run_rows(%__MODULE__{max_concurrency: 1} = evaluator, program) do
+  # The sequential fast path only applies when no per-row timeout is
+  # requested; a finite :timeout must go through the task machinery so the
+  # documented kill contract holds at the default max_concurrency: 1 too.
+  defp run_rows(%__MODULE__{max_concurrency: 1, timeout: :infinity} = evaluator, program) do
     evaluator.devset
     |> Enum.with_index()
-    |> Enum.reduce_while({[], []}, fn {example, index}, {rows, errors} ->
+    |> Enum.reduce_while({:completed, [], []}, fn {example, index}, {_tag, rows, errors} ->
       {row, error} = evaluate_with_deadline(evaluator, program, example, index)
       errors = add_error(errors, error)
 
       if too_many_errors?(errors, evaluator.max_errors) do
-        {:halt, {[row | rows], errors}}
+        {:halt, {:cancelled, [row | rows], errors}}
       else
-        {:cont, {[row | rows], errors}}
+        {:cont, {:completed, [row | rows], errors}}
       end
     end)
   end
@@ -122,17 +169,17 @@ defmodule Imp.Evaluate do
   defp run_rows(%__MODULE__{} = evaluator, program) do
     evaluator
     |> evaluation_stream(program)
-    |> Enum.reduce_while({[], []}, fn
-      {:ok, {row, error}}, {rows, errors} ->
+    |> Enum.reduce_while({:completed, [], []}, fn
+      {:ok, {row, error}}, {_tag, rows, errors} ->
         errors = add_error(errors, error)
 
         if too_many_errors?(errors, evaluator.max_errors) do
-          {:halt, {[row | rows], errors}}
+          {:halt, {:cancelled, [row | rows], errors}}
         else
-          {:cont, {[row | rows], errors}}
+          {:cont, {:completed, [row | rows], errors}}
         end
 
-      {:exit, reason}, {rows, errors} ->
+      {:exit, reason}, {_tag, rows, errors} ->
         index = length(rows)
         error = %{index: index, reason: {:evaluation_task_exit, reason}}
 
@@ -152,9 +199,9 @@ defmodule Imp.Evaluate do
         errors = [error | errors]
 
         if too_many_errors?(errors, evaluator.max_errors) do
-          {:halt, {[row | rows], errors}}
+          {:halt, {:cancelled, [row | rows], errors}}
         else
-          {:cont, {[row | rows], errors}}
+          {:cont, {:completed, [row | rows], errors}}
         end
     end)
   end
@@ -320,8 +367,12 @@ defmodule Imp.Evaluate do
   defp average([]), do: 0.0
   defp average(rows), do: Enum.sum(Enum.map(rows, & &1.score)) / length(rows)
 
+  # DSPy parallelizer.py cancels once `self.error_count >= self.max_errors`
+  # (checked when an error occurs, so an error-free run never cancels even at
+  # max_errors: 0). The old `>` comparison was off by one against upstream.
+  defp too_many_errors?([], _max_errors), do: false
   defp too_many_errors?(_errors, :infinity), do: false
-  defp too_many_errors?(errors, max_errors), do: length(errors) > max_errors
+  defp too_many_errors?(errors, max_errors), do: length(errors) >= max_errors
 
   defp error_message(%_{} = exception), do: Exception.message(exception)
   defp error_message(error), do: inspect(error)

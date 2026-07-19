@@ -536,12 +536,23 @@ defmodule Imp.Optimizer.COPRO do
     max_concurrency =
       eval_opts[:num_threads] || Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers)
 
+    # Imp.Evaluate now halts loudly at errors >= max_errors (DSPy
+    # parallelizer semantics); translate into COPRO's budget error so the
+    # optimizer-facing contract stays the same.
     result =
-      Imp.Evaluate.new(trainset, metric,
-        max_concurrency: max_concurrency,
-        max_errors: evaluator_error_limit(max_errors)
-      )
-      |> Imp.Evaluate.run(program)
+      try do
+        Imp.Evaluate.new(trainset, metric,
+          max_concurrency: max_concurrency,
+          max_errors: max_errors
+        )
+        |> Imp.Evaluate.run(program)
+      rescue
+        cancelled in Imp.EvaluationCancelledError ->
+          reraise RuntimeError,
+                  "COPRO evaluation error budget exhausted: #{length(cancelled.errors)} errors " <>
+                    "(maximum #{max_errors})",
+                  __STACKTRACE__
+      end
 
     enforce_error_budget!(result.errors, max_errors)
 
@@ -598,9 +609,6 @@ defmodule Imp.Optimizer.COPRO do
   defp compare(left, right) when left < right, do: :lt
   defp compare(left, right) when left > right, do: :gt
   defp compare(_left, _right), do: :eq
-
-  defp evaluator_error_limit(:infinity), do: :infinity
-  defp evaluator_error_limit(max_errors), do: max(max_errors - 1, 0)
 
   defp enforce_error_budget!([], _max_errors), do: :ok
   defp enforce_error_budget!(_errors, :infinity), do: :ok
