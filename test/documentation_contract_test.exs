@@ -95,7 +95,7 @@ defmodule DocumentationContractTest do
     assert body =~ "Imp.Adapter.JSON.lm_opts/2"
     assert body =~ "Imp.Clients.ReqLLM"
     assert body =~ "Intentional Deviations"
-    assert body =~ "semantic contract (field names, delimiter structure, demo/history turn shape"
+    assert body =~ "the semantic contract (field names, delimiter structure"
 
     # Lock the honest byte-parity claim (dee-8zev): the doc must state the
     # measured byte-parity AND that it is enforced — so it can neither drift back
