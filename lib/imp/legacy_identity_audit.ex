@@ -16,6 +16,8 @@ defmodule Imp.LegacyIdentityAudit do
   @historical_prefixes %{
     "benchmarks/data/" => "frozen benchmark inputs and provenance",
     "benchmarks/evidence/admitted/" => "immutable admitted benchmark evidence",
+    "benchmarks/evidence/archive/" =>
+      "immutable superseded benchmark evidence (archived admissions)",
     "benchmarks/results/" => "pre-cutover benchmark results retained as historical evidence",
     "benchmarks/upstream/" => "pinned upstream evidence"
   }
@@ -27,7 +29,9 @@ defmodule Imp.LegacyIdentityAudit do
     "lib/imp/benchmark_truth/local_mlx_campaign.ex" => "benchmark provenance adapter",
     "lib/imp/benchmark_truth/provider_training_campaign.ex" => "benchmark provenance adapter",
     "lib/imp/legacy_identity_audit.ex" => "the audit's own token matcher and policy",
-    "scripts/legacy_identity_audit.exs" => "the audit's release-gate entrypoint"
+    "scripts/legacy_identity_audit.exs" => "the audit's release-gate entrypoint",
+    "test/evidence_provenance_test.exs" =>
+      "dead-command lint (dee-1t1w): grandfather annotations name the retired dsex command being linted"
   }
 
   @type finding :: %{

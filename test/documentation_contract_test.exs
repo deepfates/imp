@@ -1,6 +1,53 @@
 defmodule DocumentationContractTest do
   use ExUnit.Case, async: true
 
+  # Release-claims gate (dee-6yen hardening). Docs may state a Hex release as
+  # present-tense fact only when hex.pm actually serves the claimed version.
+  # While the docs honestly say publication is pending, this needs no network:
+  # it asserts the pending marker instead. The moment a doc claims "published
+  # on Hex" or links hexdocs.pm/imp WITHOUT a pending qualifier, the test
+  # shells out to `mix hex.info imp` and fails unless the claim verifies — so
+  # premature claims fail everywhere (offline included, deliberately: an
+  # unverifiable release claim is exactly the defect), and when the owner
+  # publishes, re-pinning the docs is a deliberate act done with network.
+  @release_claim_files ["README.md", "RELEASE_NOTES.md", "CHANGELOG.md"]
+  @release_claim_patterns [
+    ~r{hexdocs\.pm/imp(?![\w-])},
+    ~r{hex\.pm/packages/imp(?![\w-])},
+    ~r/(published|available|released)\s+(on|to)\s+Hex\b/i
+  ]
+  @pending_qualifiers ~r/not yet|pending|will become|will be|becomes|once it is|until|prepared as/i
+
+  test "docs claim a completed Hex release only if hex.pm confirms the claimed version" do
+    files = @release_claim_files ++ Path.wildcard("docs/**/*.md")
+
+    claims =
+      for file <- files,
+          {line, number} <- file |> File.read!() |> String.split("\n") |> Enum.with_index(1),
+          Enum.any?(@release_claim_patterns, &Regex.match?(&1, line)),
+          not Regex.match?(@pending_qualifiers, line),
+          do: {file, number, String.trim(line)}
+
+    if claims == [] do
+      # Never pass vacuously: while nothing claims a release, the front door
+      # must carry the honest pending state (dee-6yen step 1 wording).
+      assert File.read!("README.md") =~ "not yet published to Hex",
+             "no doc claims a Hex release, but README.md also lost its honest " <>
+               "pending-publication statement; state one or the other"
+    else
+      version = Mix.Project.config() |> Keyword.fetch!(:version)
+      {out, status} = System.cmd("mix", ["hex.info", "imp"], stderr_to_stdout: true)
+
+      assert status == 0 and out =~ version,
+             "these lines state a Hex release as present-tense fact:\n" <>
+               Enum.map_join(claims, "\n", fn {f, n, l} -> "  #{f}:#{n}: #{l}" end) <>
+               "\nbut `mix hex.info imp` cannot confirm version #{version} " <>
+               "(exit #{status}): #{String.trim(out)}\nEither the claim is premature " <>
+               "(restate it as pending) or you are offline while re-pinning release " <>
+               "docs — verify with network (dee-6yen)"
+    end
+  end
+
   @documented_module_allowlist MapSet.new([
                                  "Imp.Optimize",
                                  "Imp.Optimizer",

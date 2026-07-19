@@ -50,10 +50,12 @@ benchmark.dashboard --profile v0.1` recomputes claim state from committed
 evidence alone and reports **10 of the 45 proven, 26 blocked, 19
 informational** (profile ready: false): most asserted rows cite lane
 evidence that maintainers generate locally under `tmp/` and that is not
-committed, so a fresh clone cannot replay it. That gap is real, tracked, and being closed by wiring the
-dashboard readiness check into CI — until it closes, treat "asserted" as
-"attested by the maintainers," and treat the dashboard's proven count as
-what you can verify yourself today.
+committed, so a fresh clone cannot replay it. That gap is real and tracked:
+CI recomputes this reconciliation from committed evidence on every pull
+request and fails when this paragraph drifts from the computed state
+(`test/evidence_reconciliation_test.exs`). Until the gap closes, treat
+"asserted" as "attested by the maintainers," and treat the dashboard's
+proven count as what you can verify yourself today.
 
 Read the shape honestly: the exists-and-conforms level is asserted with
 differential lanes behind it, but only the committed subset replays from a

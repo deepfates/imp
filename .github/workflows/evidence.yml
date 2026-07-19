@@ -42,18 +42,39 @@ concurrency:
 
 jobs:
   # Per-PR: venv-free structural/differential evidence rows only. Runs on every PR
-  # and push. No Python, no full git history — the rows here read committed
-  # benchmarks/evidence files and exercise pure helpers (credential scrubbing,
-  # fixture matching). Grow the file list as more files' capture-only rows get the
-  # :requires_dspy_capture tag.
+  # and push. No Python — the rows here read committed benchmarks/evidence files,
+  # the local git store, and pure helpers (credential scrubbing, fixture
+  # matching). Full history IS required (fetch-depth: 0): the registry and
+  # provenance gates resolve artifact commit SHAs against origin/main. Grow the
+  # file list as more files' capture-only rows get the :requires_dspy_capture
+  # tag. This lane is the P11/P12 gate (dee-v0zl, dee-di7u): a broken admitted
+  # artifact binding, an orphaned/unpushed evidence commit, a dead reproduction
+  # recipe, or reconciliation-prose drift fails the PR, not the Monday cron.
   evidence-venv-free:
     name: evidence.venv-free
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history + all refs: the source-binding validators run
+          # `git show <artifact-sha>:<path>` and the provenance gate runs
+          # `git merge-base --is-ancestor <artifact-sha> origin/main`; both
+          # fail spuriously on a shallow checkout.
+          fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
         with:
           save-cache: "false"
+      # The registry's protocol validators hash files in the pinned DSPy source
+      # tree (e.g. mmgrpo's authority materialization check). The tree is a plain
+      # shallow git clone -- no Python, ~seconds -- so materialize it here rather
+      # than env-gating the check out of the per-PR lane (which would leave the
+      # materialization-drift class invisible until the weekly cron).
+      - name: Materialize pinned DSPy 3.2.1 source (git only, no venv)
+        run: |
+          git init -q tmp/dspy-3.2.1
+          git -C tmp/dspy-3.2.1 remote add origin https://github.com/stanfordnlp/dspy.git
+          git -C tmp/dspy-3.2.1 fetch -q --depth 1 origin 29448ae12756abdd14bd8796c819247ebb83673c
+          git -C tmp/dspy-3.2.1 checkout -q FETCH_HEAD
       - name: Run venv-free evidence rows
         env:
           EVIDENCE_INFRASTRUCTURE: "1"
@@ -62,7 +83,10 @@ jobs:
         run: |
           mix test \
             test/ensemble_differential_test.exs \
-            test/mmgrpo_differential_test.exs
+            test/mmgrpo_differential_test.exs \
+            test/reproduction_registry_test.exs \
+            test/evidence_provenance_test.exs \
+            test/evidence_reconciliation_test.exs
 
   # Weekly / manual: the complete evidence suite against the pinned DSPy 3.2.1
   # parity environment. This is the only lane that builds the reference runtimes,

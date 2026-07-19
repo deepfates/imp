@@ -246,10 +246,11 @@ mix imp.benchmark.bootstrap_few_shot_differential --require-clean --out tmp/boot
 mix imp.benchmark.random_search_differential --require-clean --out tmp/random-search-differential
 ```
 
-The canonical BootstrapFewShot (`7ed813e9…`), RandomSearch (`836965d6…`), and
-COPRO (`158d8eeb…`) receipts were captured from clean, pushed Imp commits (`bfda991` for BootstrapFewShot; `0e96d62` for RandomSearch and COPRO) after
-the authority ledger was split into independent weight families and then
-recaptured when the claims-census merge changed the ledger bytes they bind. Their validators
+The canonical BootstrapFewShot (`9b89dac9…`), RandomSearch (`f7e49685…`), and
+COPRO (`5cf88e79…`) receipts were captured from a clean Imp commit reachable
+from `origin/main` (`fd48e27`) after the honesty-pass merge changed the
+authority-ledger bytes the previous receipts bound (an earlier generation had
+also bound a never-pushed local commit, `0e96d62`, invisible to fresh clones). Their validators
 recompute the exact source bindings and retained scopes. The protocols exclude
 exact Python RNG, provider behavior/effectiveness, and full optimizer parity;
 BootstrapFewShot also excludes repeated-call sampling parity, and RandomSearch
