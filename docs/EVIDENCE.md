@@ -8,9 +8,14 @@ and check the answer yourself.
 ## The ladder
 
 Each rung is a stronger kind of evidence than the one below it. A claim
-declares its target rung, and it is **asserted** only when committed,
-replayable evidence reaches that rung — otherwise it remains a **target**,
-which is the ledger's word for "promised, not proven."
+declares its target rung. **Asserted** is a maintainer attestation: the
+maintainers have run the claim's evidence lanes and seen the target rung
+reached, and intend the claim for the named product profile. It is not a
+statement that a fresh checkout can replay that evidence from committed
+artifacts alone — the dashboard computes that stronger property (see the
+reconciliation below), and a claim is publishable only when the dashboard
+computes it **proven**. A claim that is not asserted remains a **target**,
+the ledger's word for "promised, not proven."
 
 | Rung | What it proves |
 | --- | --- |
@@ -39,13 +44,25 @@ As of v0.2.0, the ledger holds **64 claims: 45 asserted, 19 still targets.**
 | C3 | 19 | 3 |
 | C4 | 2 | 0 |
 
-Read the shape honestly: everything at the exists-and-conforms level is
-asserted, with committed differential artifacts behind it. Most effectiveness
-claims are still targets — Imp does not claim an optimizer helps your task
-until a held-out score in a committed artifact says so. The three asserted C3
-rows include the [ticket-routing tutorial](TUTORIAL_TICKET_ROUTING.md)'s
-25–30% → 85% result, whose run artifact is content-addressed in the
-repository and reproducible with one script.
+**Reconciliation — asserted is not proven.** The 45 asserted rows are
+maintainer attestations. In a fresh source checkout, `mix
+benchmark.dashboard --profile v0.1` recomputes claim state from committed
+evidence alone and reports **10 of the 45 proven, 26 blocked, 19
+informational** (profile ready: false): most asserted rows cite lane
+evidence that maintainers generate locally under `tmp/` and that is not
+committed, so a fresh clone cannot replay it. That gap is real, tracked, and being closed by wiring the
+dashboard readiness check into CI — until it closes, treat "asserted" as
+"attested by the maintainers," and treat the dashboard's proven count as
+what you can verify yourself today.
+
+Read the shape honestly: the exists-and-conforms level is asserted with
+differential lanes behind it, but only the committed subset replays from a
+fresh checkout. Most effectiveness claims are still targets — Imp does not
+claim an optimizer helps your task until a held-out score in a committed
+artifact says so. The three asserted C3 rows include the
+[ticket-routing tutorial](TUTORIAL_TICKET_ROUTING.md)'s 25–30% → 85%
+result, whose run artifact is content-addressed in the repository and
+reproducible with one script.
 
 ## Where the receipts live
 
@@ -63,7 +80,7 @@ repository and reproducible with one script.
 
 A skeptic reading these docs meets three different numbers, and each counts a
 different thing. **Surfaces** are the grouped upstream capability areas the
-[conformance report](CONFORMANCE.md) totals — 23 of them. **Claims** are the
+[conformance report](CONFORMANCE.md) totals — 26 of them. **Claims** are the
 graded rows in this ledger — 64, each targeting a rung and each attached to one
 surface. **Requirement ids** are the individual checks nested inside claims, so
 with the 64 claim ids they account for the 130 `id` fields in

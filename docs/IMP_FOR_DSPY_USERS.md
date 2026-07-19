@@ -6,8 +6,10 @@ done. Imp follows DSPy 3.2.1 — not loosely. The few-shot and weight
 optimizer families and the adapters carry executable differential tests that
 run real DSPy 3.2.1 in a sidecar and compare arm to arm; other surfaces are
 held by behavioral conformance tests or are deliberate Elixir-native
-equivalents, and two families are marked as honest gaps. The conformance
-table below shows which is which, per surface.
+equivalents, and six surface groups are marked as honest gaps — including
+declared divergences where an Imp module shares an upstream name but not
+its algorithm. The conformance table below shows which is which, per
+surface.
 
 ## The mapping
 
@@ -22,7 +24,8 @@ table below shows which is which, per surface.
 | `dspy.Evaluate` | `Imp.evaluate/4` — returns score plus per-example rows |
 | `metric(gold, pred, trace)` | Two- or three-arity function, or `Imp.exact_match(:field)` |
 | `optimizer.compile(program, trainset=...)` | `Imp.optimize(program, optimizer, trainset)` |
-| `LabeledFewShot`, `BootstrapFewShot`, `BootstrapRS`, `KNNFewShot` | Same names, `Imp.Optimizer.*` |
+| `LabeledFewShot`, `BootstrapFewShot`, `BootstrapRS` | Same names, `Imp.Optimizer.*` |
+| `KNNFewShot` | Same name, deviating semantics: Imp attaches the k token-overlap-retrieved neighbors as raw demos per call (no per-call BootstrapFewShot, teacher, or metric, and no embedding retrieval) — see the conformance report |
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
 | `BootstrapFinetune`, `GRPO`, `Ensemble`, `BetterTogether`, `Avatar` | Same names; local MLX fine-tuning included |
 | `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
@@ -57,15 +60,15 @@ save/load story as DSPy with the operational edges sharpened.
 
 ## What is not identical
 
-Imp's conformance program tracks 23 upstream surface groups against DSPy
+Imp's conformance program tracks 26 upstream surface groups against DSPy
 3.2.1:
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| Conformant | 13 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer and adapter families, a behavioral conformance test elsewhere |
+| Conformant | 12 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer and adapter families, a behavioral conformance test elsewhere |
 | Elixir-native equivalent | 6 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
 | Tracking | 2 | Following DSPy's unreleased 3.3 changes |
-| Gap | 2 | Exact-reproduction evidence for the instruction-optimizer family and for GEPA (both non-blocking; local behavior is tested, upstream-matched outcomes are not claimed) |
+| Gap | 6 | Declared divergences and missing evidence, all non-blocking and ticketed: the instruction-optimizer family and GEPA (exact-reproduction evidence), the XML and TwoStep adapters (Imp's versions diverge from upstream's shapes), KNN/KNNFewShot (a different algorithm than upstream), and the answer-matching metrics (normalize_text and answer_passage_match diverge, so EM/F1 numbers are not comparable to DSPy's on punctuated answers). Local behavior is tested; upstream-matched outcomes are not claimed |
 
 The per-surface table is the [conformance report](CONFORMANCE.md). Behind
 the differential rows, the `scripts/` sidecars and `mix imp.benchmark.*_differential`
@@ -91,7 +94,7 @@ against a pinned current upstream, with the receipts executable.
 ## Coming from DSPy: the five-minute version
 
 ```elixir
-# pip install dspy            →  {:imp, "~> 0.2.0"}
+# pip install dspy            →  {:imp, path: "path/to/imp"}  (Hex publication pending)
 # dspy.configure(lm=lm)       →  lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: ...)
 # dspy.Predict("q -> a")      →  program = Imp.predict("q -> a", lm: lm)
 # program(q="...")            →  {:ok, pred} = Imp.call(program, %{q: "..."})

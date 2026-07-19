@@ -1,17 +1,24 @@
 defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
   @moduledoc """
-  Run provider-free optimizer lift parity checks for Imp and DSPy.
+  Run provider-free matched-mechanism lift parity checks for Imp and DSPy.
 
       mix imp.benchmark.optimizer_lift
 
-  The initial task is deterministic: the static local LM answers the train question
-  correctly but fails the dev wording unless a demo or selected instruction is
-  present. This proves optimizer lift without provider nondeterminism.
+  The task is deterministic and self-referential by design: the winning
+  instruction/demo (containing the gold answer) is planted in the candidate
+  pools, the static local LM answers correctly only when that winner is
+  present, and scoring reuses the same tiny devset that selection saw. Both
+  sides of the comparison perform the identical injection, so what this lane
+  demonstrates is mechanism parity: given an injected winning
+  instruction/demo, Imp optimizers select and apply it identically to DSPy
+  3.2.1 (lift_gap <= 0.001), without provider nondeterminism. It is NOT
+  held-out lift evidence — optimizer effectiveness on data nothing selected
+  for remains a separately gated C3 target (see docs/internal/BENCHMARK_TRUTH.md).
   """
 
   use Mix.Task
 
-  @shortdoc "Run Imp-vs-DSPy optimizer lift parity checks"
+  @shortdoc "Run Imp-vs-DSPy matched-mechanism optimizer lift parity checks"
 
   @default_out_dir Imp.BenchmarkTruth.Paths.runs("optimizer-lift")
 
@@ -148,12 +155,18 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       |> Imp.Optimizer.RandomSearch.compile(program, trainset, devset)
 
   defp compile_instruction_search(metric, program, {trainset, devset}) do
+    # The second instruction is the parity fixture's designed winner: it
+    # contains the gold answer so the fixture LM succeeds only when the
+    # optimizer selects it. Both Imp and DSPy receive the same pool.
     Imp.Optimizer.InstructionSearch.compile(program, metric, trainset, devset, [
       "Answer unknown.",
       "Always answer Paris when asked about France."
     ])
   end
 
+  # extra_instructions plants the parity fixture's designed winner (the gold
+  # answer) in the candidate pool; DSPy's side performs the identical
+  # injection, so the comparison is mechanism parity, not held-out lift.
   defp compile_copro(metric, program, {trainset, devset}),
     do:
       Imp.Optimizer.COPRO.new(metric,
@@ -192,6 +205,9 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       )
       |> Imp.Optimizer.SIMBA.compile(program, trainset)
 
+  # feedback_fn plants the parity fixture's designed winner (the gold answer)
+  # as the reflective feedback; this makes 0.0 -> 1.0 lift true by
+  # construction and is why this lane claims mechanism parity only.
   defp compile_gepa(metric, program, {trainset, devset}),
     do:
       Imp.Optimizer.GEPA.new(metric,
@@ -238,7 +254,10 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
         "all_passing" => passing == length(rows),
         "direct_comparisons" => Enum.count(rows, &(&1["comparison_status"] == "direct")),
         "imp_only_or_deviation" => Enum.count(rows, &(&1["comparison_status"] != "direct")),
-        "lift_evidence_complete" => passing == length(rows),
+        # Renamed from "lift_evidence_complete" (dee-5y5u): this artifact
+        # proves matched-mechanism parity on an injected-winner fixture, not
+        # held-out lift evidence.
+        "mechanism_parity_complete" => passing == length(rows),
         "control_flow_parity" => false,
         "full_optimizer_parity" => false,
         "note" => optimizer_summary_note(dspy, rows)

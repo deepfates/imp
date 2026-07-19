@@ -21,7 +21,9 @@ controls how long application shutdown waits for in-flight workers and defaults
 to 5000 milliseconds.
 
 During source development, set `IMP_PATH` to the Imp checkout. Published
-applications omit it and resolve the Hex dependency.
+applications omit it and resolve the Hex dependency once Imp is published
+to Hex (publication is still pending; until then `IMP_PATH` is the working
+path).
 
 ## Prepare An Artifact
 

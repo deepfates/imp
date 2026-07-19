@@ -38,15 +38,18 @@ and retried with the validation error. You never wrote a prompt.
 
 ## Install
 
+Imp is not yet published to Hex — `{:imp, "~> 0.2.0"}` will become the
+install line once the package is published. Until then, install from a
+source checkout:
+
 ```elixir
-{:imp, "~> 0.2.0"}
+{:imp, path: "path/to/imp"}
 ```
 
-Documentation lives at [hexdocs.pm/imp](https://hexdocs.pm/imp). To pin the
-same release directly from source instead, use
-`{:imp, github: "deepfates/imp", tag: "v0.2.1"}`. You will need an API key
-for a model provider (any [ReqLLM](https://hex.pm/packages/req_llm)
-provider works; the docs use OpenAI).
+The full manual ships in this repository under [docs/](docs/); it will land
+on hexdocs.pm with the Hex release. You will need an API key for a model
+provider (any [ReqLLM](https://hex.pm/packages/req_llm) provider works; the
+docs use OpenAI).
 
 No key yet? You can still build, test, evaluate, and even compile a program
 with a scripted model — Livebooks 02–05 and the "Test It Without A Provider"

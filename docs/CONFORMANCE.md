@@ -1,12 +1,12 @@
 # Imp Executable Upstream Conformance
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
-Total: 23
-Conformant: 13
+Total: 26
+Conformant: 12
 Elixir-native equivalents: 6
 Tracking: 2
-Gaps: 2
-Claim-specific non-blocking gaps: 2
+Gaps: 6
+Claim-specific non-blocking gaps: 6
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -19,14 +19,17 @@ Passing: true
 | programming.modules | programming_model | conformant | satisfied | Module, Predict, ChainOfThought, MultiChainComparison, Parallel |
 | models.runtime | model_runtime | elixir_native_equivalent | satisfied | BaseLM, LM, Embedder, configure, context, Errors |
 | models.normalized_runtime_prerelease | model_runtime | tracking | tracked | 3.3 BaseLM normalized requests/responses, LMRequest, LMResponse, LMStream |
-| adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter, XMLAdapter, TwoStepAdapter |
+| adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter |
+| adapters.xml | adapters | gap | claim-specific gap | XMLAdapter |
+| adapters.two_step | adapters | gap | claim-specific gap | TwoStepAdapter |
 | primitives.multimodal | primitives | conformant | satisfied | Image, Audio, File, Code, Document, Citations, Reasoning |
 | tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
 | agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |
 | agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper |
 | composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |
-| evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
-| optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS, KNN, KNNFewShot |
+| evaluation.metrics | evaluation | gap | claim-specific gap | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
+| optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
+| optimization.knn | optimization | gap | claim-specific gap | KNN, KNNFewShot |
 | optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
 | optimization.gepa | optimization | gap | claim-specific gap | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
 | optimization.weights | optimization | elixir_native_equivalent | satisfied | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble |
@@ -151,7 +154,7 @@ Status: `conformant`
 
 Upstream source: `dspy/adapters`
 
-Imp modules: `Imp.Adapter`, `Imp.Adapter.Chat`, `Imp.Adapter.JSON`, `Imp.Adapter.XML`, `Imp.Adapter.TwoStep`
+Imp modules: `Imp.Adapter`, `Imp.Adapter.Chat`, `Imp.Adapter.JSON`
 Semantic invariants:
 
 - adapters format signature fields and demonstrations
@@ -169,6 +172,54 @@ Executable evidence:
 Missing evidence or behavior:
 
 - none
+
+### `adapters.xml`
+
+Status: `gap`
+
+Upstream source: `dspy/adapters/xml_adapter.py`
+
+Imp modules: `Imp.Adapter.XML`
+Semantic invariants:
+
+- Imp.Adapter.XML parses <field>value</field> tags through the shared schema path
+- the format divergence from DSPy XMLAdapter is declared here, not presented as conformance
+
+Executable evidence:
+
+- test: `test/production_adapter_persistence_test.exs`
+- test: `test/completion_surface_test.exs`
+- docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
+
+
+Missing evidence or behavior:
+
+- DSPy-shaped format: upstream emits one XML-only system message; Imp prepends a single XML-tags line to the full Chat [[ ## ]] prompt, producing a two-dialect prompt (dee-ovd3)
+- parse must reject tag-free prose with a missing-output-fields error instead of falling back to Chat parse (runtime fix tracked in dee-ovd3)
+- XML cases in the golden differential set (dee-1gb9)
+
+### `adapters.two_step`
+
+Status: `gap`
+
+Upstream source: `dspy/adapters/two_step_adapter.py`
+
+Imp modules: `Imp.Adapter.TwoStep`
+Semantic invariants:
+
+- Imp.Adapter.TwoStep is an Imp extension: it prepends a :plan output field and delegates format and parse to the Chat adapter
+- the extension does not claim DSPy TwoStepAdapter semantics
+
+Executable evidence:
+
+- test: `test/completion_surface_test.exs`
+- docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
+
+
+Missing evidence or behavior:
+
+- DSPy TwoStepAdapter port: a free-form main prompt plus a second extraction LM running ChatAdapter over a synthesized text -> outputs signature; no extraction LM exists in Imp's adapter contract (dee-qt5r)
+- golden differential fixtures for both stages (dee-1gb9)
 
 ### `primitives.multimodal`
 
@@ -313,7 +364,7 @@ Missing evidence or behavior:
 
 ### `evaluation.metrics`
 
-Status: `conformant`
+Status: `gap`
 
 Upstream source: `dspy/evaluate`
 
@@ -335,20 +386,22 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- none
+- DSPy-conformant normalize_text: NFD normalization and punctuation deletion; Imp replaces punctuation with spaces and skips NFD, so exact-match and F1 on punctuated gold answers are not comparable to DSPy-reported numbers (dee-c2ur)
+- answer_passage_match: per-passage DPR has_answer token-sequence matching; Imp substring-matches the concatenated context, so a gold answer can match inside an unrelated word (dee-c2ur)
+- differential probe tests pinning the divergent metric pairs to DSPy-derived values (dee-c2ur)
 
 ### `optimization.few_shot`
 
 Status: `conformant`
 
-Upstream source: `dspy/teleprompt/bootstrap.py; random_search.py; knn_fewshot.py`
+Upstream source: `dspy/teleprompt/bootstrap.py; random_search.py`
 
-Imp modules: `Imp.Optimizer.LabeledFewShot`, `Imp.Optimizer.BootstrapFewShot`, `Imp.Optimizer.BootstrapFewShotWithRandomSearch`, `Imp.Optimizer.BootstrapRS`, `Imp.Optimizer.RandomSearch`, `Imp.Optimizer.KNNFewShot`
+Imp modules: `Imp.Optimizer.LabeledFewShot`, `Imp.Optimizer.BootstrapFewShot`, `Imp.Optimizer.BootstrapFewShotWithRandomSearch`, `Imp.Optimizer.BootstrapRS`, `Imp.Optimizer.RandomSearch`
 Semantic invariants:
 
 - successful traces become module-specific demonstrations
 - teacher and student programs remain distinct
-- candidate selection uses held-out evaluation
+- candidate selection scores candidates on a valset distinct from the trainset (mechanism parity; held-out effectiveness lift remains a separately gated C3 target)
 
 Executable evidence:
 
@@ -361,6 +414,31 @@ Executable evidence:
 Missing evidence or behavior:
 
 - none
+
+### `optimization.knn`
+
+Status: `gap`
+
+Upstream source: `dspy/predict/knn.py; dspy/teleprompt/knn_fewshot.py`
+
+Imp modules: `Imp.Predict.KNN`, `Imp.Optimizer.KNNFewShot`
+Semantic invariants:
+
+- Imp.Optimizer.KNNFewShot attaches the k retrieved neighbors as raw demos via LabeledFewShot at call time (a deviation from upstream, declared here)
+- retrieval uses token-overlap similarity rather than upstream's required Embedder (declared deviation)
+
+Executable evidence:
+
+- test: `test/public_surface_test.exs`
+- test: `test/optimizer_lift_artifact_test.exs`
+- docs: `docs/API_GUIDE.md`
+
+
+Missing evidence or behavior:
+
+- upstream KNNFewShot semantics: a metric/teacher-driven BootstrapFewShot compiled over the k retrieved neighbors on every forward call (dee-bivg)
+- embedding-based neighbor retrieval matching upstream's Embedder contract (dee-bivg)
+- a behavioral-corpus test exercising KNNFewShot against upstream (dee-bivg)
 
 ### `optimization.instructions`
 

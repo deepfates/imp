@@ -9,12 +9,16 @@ artifacts, and run under OTP supervision.
 
 ## Install
 
+Not yet published to Hex — `{:imp, "~> 0.2.0"}` becomes the install line
+once the package is published (an owner action still pending). Until then,
+install from a source checkout:
+
 ```elixir
-{:imp, "~> 0.2.0"}
+{:imp, path: "path/to/imp"}
 ```
 
-Documentation: [hexdocs.pm/imp](https://hexdocs.pm/imp). To pin from source:
-`{:imp, github: "deepfates/imp", tag: "v0.2.0"}`.
+Documentation ships in the repository under `docs/` and will land on
+hexdocs.pm with the Hex release.
 
 ## What you are getting
 
@@ -67,14 +71,18 @@ application.
 
 ## Since v0.1.0
 
-- Now on Hex, with the full manual on hexdocs (the package ships the guides,
-  livebooks, and the deployment example; internal audit material stays in the
-  repository).
+- Packaged for Hex, with the full manual in the package (the package ships
+  the guides, livebooks, and the deployment example; internal audit material
+  stays in the repository). Publication to hex.pm is still pending — until
+  it happens, install from a source checkout.
 - Documentation rebuilt reader-first: new README, Learning Path, tutorial with
   honest artifact-cited numbers, DSPy-users mapping, and the public evidence
   ladder.
 - Evidence campaign: nine new differential artifact families landed; every
   semantic-conformance claim in the ledger is now asserted (was 1 of 4).
+  "Asserted" is a maintainer attestation, not a fresh-checkout replay — see
+  the reconciliation in [docs/EVIDENCE.md](docs/EVIDENCE.md) for what a
+  clean clone can verify from committed evidence alone.
 - Streaming promoted to the facade (`Imp.stream/3`, `Imp.collect/3`) with
   provider token streaming and an honest local fallback.
 - Two silent-failure bugs found and fixed the same day they were exposed by
