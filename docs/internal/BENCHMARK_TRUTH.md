@@ -1096,6 +1096,14 @@ defect; it does not retroactively turn the historical full campaign's latency
 outcome green. A future full claim must use a fresh campaign id and the recorded
 effective `1 x concurrency` topology.
 
+Historical-metric annotation (2026-07-19, dee-c2ur): the per-row
+`official_hotpotqa_f1`/`official_hotpotqa_em` values inside these four artifacts
+were computed with the PRE-parity-port normalization (punctuation→space, no NFD)
+on BOTH arms. They remain valid as latency diagnostics — the artifacts' purpose —
+but their metric columns are not comparable to post-dee-c2ur scores. They are
+deliberately left unedited (historical evidence is immutable); any future metric
+claim must recompute from a fresh campaign.
+
 When resuming a release campaign after concurrency experiments, keep passing the
 release `--max-concurrency` value. The campaign runner forwards that value to
 aggregation, so coverage and next offsets are computed from the comparable
