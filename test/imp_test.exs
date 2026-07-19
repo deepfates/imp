@@ -452,24 +452,21 @@ defmodule ImpTest do
     assert Imp.Prediction.get(prediction, :answer) == "4"
   end
 
-  test "KNN predictor uses configured query fields instead of all inputs" do
+  test "KNN predictor retrieves by embedding similarity over marked inputs" do
     trainset = [
       Imp.example(question: "capital france", answer: "Paris") |> Imp.with_inputs(:question),
       Imp.example(question: "color sky", answer: "blue") |> Imp.with_inputs(:question)
     ]
 
-    knn = Imp.Predict.KNN.new(1, trainset, field: :question)
+    knn = Imp.Predict.KNN.new(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
 
     assert [%Imp.Example{} = nearest] =
-             Imp.Predict.KNN.call(knn, %{
-               "question" => "capital",
-               distractor: "sky sky sky"
-             })
+             Imp.Predict.KNN.call(knn, %{"question" => "capital france"})
 
     assert Imp.Example.get(nearest, :answer) == "Paris"
   end
 
-  test "KNN predictor can query from multiple fields" do
+  test "KNN predictor embeds multiple marked input fields" do
     trainset = [
       Imp.example(subject: "paris", detail: "france", answer: "capital")
       |> Imp.with_inputs([:subject, :detail]),
@@ -477,38 +474,54 @@ defmodule ImpTest do
       |> Imp.with_inputs([:subject, :detail])
     ]
 
-    knn = Imp.Predict.KNN.new(1, trainset, field: [:subject, :detail])
+    knn = Imp.Predict.KNN.new(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
 
     assert [%Imp.Example{} = nearest] =
-             Imp.Predict.KNN.call(knn, %{subject: "beam", detail: "process concurrency"})
+             Imp.Predict.KNN.call(knn, subject: "beam", detail: "process concurrency")
 
     assert Imp.Example.get(nearest, :answer) == "otp"
   end
 
   test "KNN predictor reports invalid constructor and call inputs clearly" do
     assert_raise ArgumentError, ~r/Imp\.Predict\.KNN\.new\/3: expected keyword options/, fn ->
-      Imp.Predict.KNN.new(1, [], %{field: :question})
+      Imp.Predict.KNN.new(1, [], %{vectorizer: Imp.Embeddings.BagOfWords})
     end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.KNN\.new\/3: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
+                 ~r/Imp\.Predict\.KNN\.new\/3: required :vectorizer option not found/,
                  fn ->
-                   Imp.Predict.KNN.new(1, [], field: nil)
+                   Imp.Predict.KNN.new(1, [])
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
+                 ~r/expected an Imp\.Embeddings provider/,
                  fn ->
-                   Imp.Predict.KNN.new(1, :not_trainset)
+                   Imp.Predict.KNN.new(1, [], vectorizer: :not_a_provider)
                  end
 
-    knn = Imp.Predict.KNN.new(1, [])
+    assert_raise ArgumentError,
+                 ~r/Imp\.Predict\.KNN\.new\/3 expects trainset to be an enumerable/,
+                 fn ->
+                   Imp.Predict.KNN.new(1, :not_trainset, vectorizer: Imp.Embeddings.BagOfWords)
+                 end
+
+    # DSPy KNN requires examples with marked inputs (example._input_keys); an
+    # unmarked example fails loudly at construction, not silently at call time.
+    assert_raise ArgumentError,
+                 ~r/requires trainset examples with marked inputs/,
+                 fn ->
+                   Imp.Predict.KNN.new(1, [Imp.example(question: "q", answer: "a")],
+                     vectorizer: Imp.Embeddings.BagOfWords
+                   )
+                 end
+
+    knn = Imp.Predict.KNN.new(1, [], vectorizer: Imp.Embeddings.BagOfWords)
 
     assert_raise ArgumentError, ~r/Imp\.Predict\.KNN\.call\/2 expects inputs as a map/, fn ->
       Imp.Predict.KNN.call(knn, :not_inputs)
     end
 
-    assert_raise ArgumentError, ~r/Imp\.Predict\.KNN\.call\/2 expects inputs as a map/, fn ->
+    assert_raise ArgumentError, ~r/expects inputs as \{key, value\} pairs/, fn ->
       Imp.Predict.KNN.call(knn, [:not_a_pair])
     end
   end

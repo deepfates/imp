@@ -401,6 +401,12 @@ defmodule Imp.Adapter.Chat do
     |> String.trim()
   end
 
+  # Byte-faithful get_field_description_string, shared with the TwoStep
+  # adapter's persona prompt (DSPy TwoStepAdapter.format_task_description calls
+  # the same utils helper). Internal cross-adapter seam — not public API.
+  @doc false
+  def field_description_string(fields), do: render_field_list(fields)
+
   defp render_field_list(fields) do
     # Byte-faithful to DSPy's get_field_description_string (dspy/adapters/
     # utils.py): each field renders `N. \`name\` (type): {desc}` with the

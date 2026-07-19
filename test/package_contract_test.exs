@@ -493,7 +493,7 @@ defmodule PackageContractTest do
       raise "Multi-chain facade workflow failed from package consumer"
     end
 
-    knn = Imp.knn(1, [demo], field: "question")
+    knn = Imp.knn(1, [demo], vectorizer: Imp.Embeddings.BagOfWords)
     [nearest] = Imp.nearest(knn, %{"question" => "Eiffel Tower city"})
 
     unless Imp.get(nearest, :answer) == "Paris" do

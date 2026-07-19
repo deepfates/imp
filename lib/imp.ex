@@ -230,7 +230,10 @@ defmodule Imp do
   @doc "Runs a program over a batch of inputs through Imp's supervised task boundary."
   def parallel(program, inputs, opts \\ []), do: Parallel.map(program, inputs, opts)
 
-  @doc "Builds a callable KNN predictor over an example trainset."
+  @doc """
+  Builds a callable embedding-based KNN predictor over an example trainset
+  (DSPy `KNN` port). Requires `:vectorizer` — an `Imp.Embeddings` provider.
+  """
   def knn(k, trainset, opts \\ []), do: KNN.new(k, trainset, opts)
 
   @doc "Retrieves nearest examples from an Imp KNN predictor for one input map."

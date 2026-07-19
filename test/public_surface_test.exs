@@ -6,6 +6,7 @@ defmodule PublicSurfaceTest do
     Imp.Adapter,
     Imp.Adapter.Chat,
     Imp.Adapter.JSON,
+    Imp.Adapter.PlanFirst,
     Imp.Adapter.XML,
     Imp.Adapter.TwoStep,
     Imp.Adapters.Types,
@@ -406,7 +407,7 @@ defmodule PublicSurfaceTest do
       Imp.example(question: "capital Germany", answer: "Berlin") |> Imp.with_inputs(:question)
     ]
 
-    knn = Imp.knn(1, trainset, field: "question")
+    knn = Imp.knn(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
     assert [nearest] = Imp.nearest(knn, %{question: "France"})
     assert Imp.get(nearest, :answer) == "Paris"
 
@@ -677,7 +678,7 @@ defmodule PublicSurfaceTest do
     ]
 
     knn =
-      Imp.Optimizer.KNNFewShot.new(1, trainset)
+      Imp.Optimizer.KNNFewShot.new(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
       |> Imp.Optimizer.KNNFewShot.compile(program)
 
     assert {:ok, knn_pred} = Imp.Optimizer.KNNFewShot.Program.call(knn, %{question: "2+2?"})
@@ -714,38 +715,40 @@ defmodule PublicSurfaceTest do
     program = Imp.predict("question -> answer", lm: lm)
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
+                 ~r/Imp\.Predict\.KNN\.new\/3 expects trainset to be an enumerable/,
                  fn ->
-                   Imp.Optimizer.KNNFewShot.new(1, :not_an_enumerable_trainset)
+                   Imp.Optimizer.KNNFewShot.new(1, :not_an_enumerable_trainset,
+                     vectorizer: Imp.Embeddings.BagOfWords
+                   )
                  end
 
     empty =
-      Imp.Optimizer.KNNFewShot.new(0, [
-        Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)
-      ])
+      Imp.Optimizer.KNNFewShot.new(
+        0,
+        [Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)],
+        vectorizer: Imp.Embeddings.BagOfWords
+      )
       |> Imp.Optimizer.KNNFewShot.compile(program)
 
     assert {:ok, prediction} = Imp.Optimizer.KNNFewShot.Program.call(empty, %{question: "2+2?"})
     assert prediction.metadata.knn_few_shot.demo_count == 0
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.KNNFewShot\.new\/3 expects k to be a non-negative integer/,
+                 ~r/Imp\.Predict\.KNN\.new\/3 expects k to be a non-negative integer/,
                  fn ->
-                   Imp.Optimizer.KNNFewShot.new(-2, [
-                     Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)
-                   ])
+                   Imp.Optimizer.KNNFewShot.new(
+                     -2,
+                     [Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)],
+                     vectorizer: Imp.Embeddings.BagOfWords
+                   )
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.KNNFewShot\.new\/3: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
+                 ~r/Imp\.Optimizer\.KNNFewShot\.new\/3: required :vectorizer option not found/,
                  fn ->
-                   Imp.Optimizer.KNNFewShot.new(
-                     1,
-                     [
-                       Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)
-                     ],
-                     field: ""
-                   )
+                   Imp.Optimizer.KNNFewShot.new(1, [
+                     Imp.example(question: "2+2?", answer: "4") |> Imp.with_inputs(:question)
+                   ])
                  end
   end
 

@@ -8,7 +8,7 @@ defmodule SavingRebindTest do
     ]
 
     left =
-      Imp.Optimizer.KNNFewShot.new(1, examples)
+      Imp.Optimizer.KNNFewShot.new(1, examples, vectorizer: Imp.Embeddings.BagOfWords)
       |> Imp.Optimizer.KNNFewShot.compile(Imp.predict("question -> answer"))
 
     right = Imp.predict("question -> answer")

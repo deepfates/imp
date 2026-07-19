@@ -139,9 +139,9 @@ defmodule Imp.Saving do
   defp dump_state(%Imp.Predict.KNN{} = knn) do
     %{
       "type" => "knn",
-      "examples" => Imp.Optimizer.Report.encode_term(knn.retriever.examples),
-      "k" => knn.retriever.k,
-      "field" => Imp.Optimizer.Report.encode_term(knn.field)
+      "examples" => Imp.Optimizer.Report.encode_term(knn.trainset),
+      "k" => knn.k,
+      "vectorizer" => dump_vectorizer!(knn.vectorizer)
     }
   end
 
@@ -288,7 +288,8 @@ defmodule Imp.Saving do
       "type" => "knn_few_shot_program",
       "student" => dump(program.student),
       "knn" => dump(program.optimizer.knn),
-      "bootstrap_k" => program.optimizer.bootstrap.k
+      "teacher" => if(program.teacher, do: dump(program.teacher)),
+      "bootstrap" => dump_knn_bootstrap!(program.optimizer.bootstrap)
     }
   end
 
@@ -402,11 +403,12 @@ defmodule Imp.Saving do
   end
 
   def load(%{"type" => "knn"} = state) do
-    require_keys!(state, ["type", "examples", "k", "field"])
+    require_keys!(state, ["type", "examples", "k", "vectorizer"])
     examples = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "examples"))
-    field = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "field"))
-    retriever = Imp.Retrievers.KNN.new(examples, k: Map.fetch!(state, "k"), field: field)
-    %Imp.Predict.KNN{retriever: retriever, field: field}
+    vectorizer = load_vectorizer!(Map.fetch!(state, "vectorizer"))
+    # Re-embeds the trainset at load: the stored artifact carries the corpus
+    # (examples) and the derivation (vectorizer), never stale vectors.
+    Imp.Predict.KNN.new(Map.fetch!(state, "k"), examples, vectorizer: vectorizer)
   end
 
   def load(%{"type" => "avatar"} = state) do
@@ -664,18 +666,41 @@ defmodule Imp.Saving do
   end
 
   def load(%{"type" => "knn_few_shot_program"} = state) do
-    require_keys!(state, ["type", "student", "knn", "bootstrap_k"])
+    require_keys!(state, ["type", "student", "knn", "teacher", "bootstrap"])
     knn = load(state["knn"])
 
     unless match?(%Imp.Predict.KNN{}, knn) do
       raise ArgumentError, "saved KNNFewShot knn must be a KNN program"
     end
 
+    bootstrap = Map.fetch!(state, "bootstrap")
+
+    require_keys!(bootstrap, [
+      "metric",
+      "metric_threshold",
+      "max_bootstrapped_demos",
+      "max_labeled_demos",
+      "max_rounds",
+      "max_errors",
+      "timeout"
+    ])
+
+    metric = load_optional_callback(bootstrap["metric"], [2, 3], "KNNFewShot bootstrap metric")
+
     %Imp.Optimizer.KNNFewShot.Program{
       student: load(state["student"]),
+      teacher: if(state["teacher"], do: load(state["teacher"])),
       optimizer: %Imp.Optimizer.KNNFewShot{
         knn: knn,
-        bootstrap: Imp.Optimizer.LabeledFewShot.new(k: state["bootstrap_k"])
+        bootstrap:
+          Imp.Optimizer.BootstrapFewShot.new(metric,
+            metric_threshold: bootstrap["metric_threshold"],
+            max_bootstrapped_demos: bootstrap["max_bootstrapped_demos"],
+            max_labeled_demos: bootstrap["max_labeled_demos"],
+            max_rounds: bootstrap["max_rounds"],
+            max_errors: decode_infinity(bootstrap["max_errors"]),
+            timeout: decode_infinity(bootstrap["timeout"])
+          )
       }
     }
   end
@@ -791,6 +816,69 @@ defmodule Imp.Saving do
 
   defp dump_optional_callback(nil, _context), do: nil
   defp dump_optional_callback(callback, context), do: dump_callback!(callback, context)
+
+  # KNNFewShot's per-call BootstrapFewShot arguments. Teacher settings can
+  # carry live LM handles, so a non-empty teacher_settings refuses to persist
+  # LOUDLY instead of silently dropping optimizer behavior.
+  defp dump_knn_bootstrap!(%Imp.Optimizer.BootstrapFewShot{} = bootstrap) do
+    unless bootstrap.teacher_settings == [] do
+      raise ArgumentError,
+            "saved KNNFewShot bootstrap teacher_settings are not portable; " <>
+              "got: #{inspect(bootstrap.teacher_settings)}"
+    end
+
+    %{
+      "metric" => dump_optional_callback(bootstrap.metric, "KNNFewShot bootstrap metric"),
+      "metric_threshold" => bootstrap.metric_threshold,
+      "max_bootstrapped_demos" => bootstrap.max_bootstrapped_demos,
+      "max_labeled_demos" => bootstrap.max_labeled_demos,
+      "max_rounds" => bootstrap.max_rounds,
+      "max_errors" => encode_infinity(bootstrap.max_errors),
+      "timeout" => encode_infinity(bootstrap.timeout)
+    }
+  end
+
+  defp encode_infinity(:infinity), do: "infinity"
+  defp encode_infinity(value), do: value
+
+  defp decode_infinity("infinity"), do: :infinity
+  defp decode_infinity(value), do: value
+
+  # The KNN vectorizer is either an Imp.Embeddings provider MODULE (portable
+  # by name, revalidated at load) or a function (portable only through the
+  # named-callback registry, like every other persisted callback).
+  defp dump_vectorizer!(module) when is_atom(module),
+    do: %{"kind" => "module", "name" => Atom.to_string(module)}
+
+  defp dump_vectorizer!(fun) when is_function(fun, 2),
+    do: %{"kind" => "callback", "name" => dump_callback!(fun, "KNN vectorizer")}
+
+  defp load_vectorizer!(%{"kind" => "module", "name" => name}) when is_binary(name) do
+    module =
+      try do
+        String.to_existing_atom(name)
+      rescue
+        ArgumentError ->
+          reraise ArgumentError,
+                  [message: "saved KNN vectorizer references unknown module #{inspect(name)}"],
+                  __STACKTRACE__
+      end
+
+    case Imp.Predict.KNN.validate_vectorizer(module) do
+      {:ok, module} ->
+        module
+
+      {:error, message} ->
+        raise ArgumentError, "saved KNN vectorizer #{inspect(name)}: #{message}"
+    end
+  end
+
+  defp load_vectorizer!(%{"kind" => "callback", "name" => name}),
+    do: load_callback!(name, [2], "KNN vectorizer")
+
+  defp load_vectorizer!(state) do
+    raise ArgumentError, "invalid saved KNN vectorizer state: #{inspect(state)}"
+  end
 
   defp load_optional_callback(nil, _arities, _context), do: nil
 
@@ -1240,6 +1328,7 @@ defmodule Imp.Saving do
       "Elixir.Imp.Adapter.JSON" -> Imp.Adapter.JSON
       "Elixir.Imp.Adapter.XML" -> Imp.Adapter.XML
       "Elixir.Imp.Adapter.TwoStep" -> Imp.Adapter.TwoStep
+      "Elixir.Imp.Adapter.PlanFirst" -> Imp.Adapter.PlanFirst
       other -> raise ArgumentError, "unsupported saved Imp adapter: #{inspect(other)}"
     end
   end

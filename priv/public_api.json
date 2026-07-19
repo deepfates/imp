@@ -723,8 +723,32 @@
       "functions": [],
       "kind": "module",
       "macros": [],
-      "module": "Imp.Adapter.TwoStep",
+      "module": "Imp.Adapter.PlanFirst",
       "signatures": {},
+      "source": "lib/imp/adapter/plan_first.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/3",
+        "parse/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapter.TwoStep",
+      "signatures": {
+        "functions": {
+          "format/3": [
+            "format(signature, inputs, opts)"
+          ],
+          "parse/3": [
+            "parse(signature, raw, opts)"
+          ]
+        }
+      },
       "source": "lib/imp/adapter/two_step.ex",
       "struct_fields": [],
       "types": []
@@ -3770,7 +3794,7 @@
       "callbacks": [],
       "category": "advanced",
       "functions": [
-        "compile/2",
+        "compile/3",
         "new/3"
       ],
       "kind": "struct",
@@ -3778,8 +3802,8 @@
       "module": "Imp.Optimizer.KNNFewShot",
       "signatures": {
         "functions": {
-          "compile/2": [
-            "compile(optimizer, student)"
+          "compile/3": [
+            "compile(optimizer, student, opts \\\\ [])"
           ],
           "new/3": [
             "new(k, trainset, opts \\\\ [])"
@@ -5051,8 +5075,10 @@
       },
       "source": "lib/imp/predict/knn.ex",
       "struct_fields": [
-        "field",
-        "retriever"
+        "k",
+        "trainset",
+        "trainset_vectors",
+        "vectorizer"
       ],
       "types": []
     },

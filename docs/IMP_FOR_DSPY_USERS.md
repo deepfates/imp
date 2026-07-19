@@ -6,10 +6,11 @@ done. Imp follows DSPy 3.2.1 — not loosely. The few-shot and weight
 optimizer families and the adapters carry executable differential tests that
 run real DSPy 3.2.1 in a sidecar and compare arm to arm; other surfaces are
 held by behavioral conformance tests or are deliberate Elixir-native
-equivalents, and six surface groups are marked as honest gaps — including
-declared divergences where an Imp module shares an upstream name but not
-its algorithm. The conformance table below shows which is which, per
-surface.
+equivalents, and two surface groups are marked as honest gaps (missing
+exact-reproduction evidence, not divergent algorithms). Where an Imp module
+wears a DSPy name, it carries DSPy's semantics; Imp-only behaviors carry
+Imp-only names (`Imp.Adapter.PlanFirst`, `Imp.Retrievers.KNN`). The
+conformance table below shows which is which, per surface.
 
 ## The mapping
 
@@ -25,7 +26,7 @@ surface.
 | `metric(gold, pred, trace)` | Two- or three-arity function, or `Imp.exact_match(:field)` |
 | `optimizer.compile(program, trainset=...)` | `Imp.optimize(program, optimizer, trainset)` |
 | `LabeledFewShot`, `BootstrapFewShot`, `BootstrapRS` | Same names, `Imp.Optimizer.*` |
-| `KNNFewShot` | Same name, deviating semantics: Imp attaches the k token-overlap-retrieved neighbors as raw demos per call (no per-call BootstrapFewShot, teacher, or metric, and no embedding retrieval) — see the conformance report |
+| `KNNFewShot` | Same name, same semantics: per-call embedding retrieval (required `vectorizer:`) plus a metric/teacher-driven BootstrapFewShot over the neighbors, proven against real DSPy by a deterministic-embedder differential |
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
 | `BootstrapFinetune`, `GRPO`, `Ensemble`, `BetterTogether`, `Avatar` | Same names; local MLX fine-tuning included |
 | `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
@@ -65,10 +66,10 @@ Imp's conformance program tracks 26 upstream surface groups against DSPy
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| Conformant | 13 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer, adapter, and answer-metric families, a behavioral conformance test elsewhere |
+| Conformant | 16 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer, adapter, and answer-metric families, a behavioral conformance test elsewhere |
 | Elixir-native equivalent | 6 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
 | Tracking | 2 | Following DSPy's unreleased 3.3 changes |
-| Gap | 5 | Declared divergences and missing evidence, all non-blocking and ticketed: the instruction-optimizer family and GEPA (exact-reproduction evidence), the XML and TwoStep adapters (Imp's versions diverge from upstream's shapes), and KNN/KNNFewShot (a different algorithm than upstream). Local behavior is tested; upstream-matched outcomes are not claimed |
+| Gap | 2 | Missing exact-reproduction evidence, non-blocking and ticketed: the instruction-optimizer family and GEPA. Local behavior is tested; upstream-matched outcomes are not claimed |
 
 The per-surface table is the [conformance report](CONFORMANCE.md). Behind
 the differential rows, the `scripts/` sidecars and `mix imp.benchmark.*_differential`

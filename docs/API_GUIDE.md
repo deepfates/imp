@@ -299,15 +299,17 @@ Imp.call(chooser, %{
 })
 ```
 
-`Imp.knn/3` builds a local nearest-neighbor predictor over examples. It returns
-retrieved examples rather than a model prediction:
+`Imp.knn/3` builds an embedding-based nearest-neighbor predictor over examples
+(the DSPy `KNN` port: the trainset embeds once through the required
+`:vectorizer`, queries score by dot product). It returns retrieved examples
+rather than a model prediction:
 
 ```elixir
 trainset = [
   Imp.example(question: "capital France", answer: "Paris") |> Imp.with_inputs(:question)
 ]
 
-knn = Imp.knn(1, trainset, field: "question")
+knn = Imp.knn(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
 Imp.nearest(knn, %{question: "France"})
 ```
 

@@ -432,7 +432,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       "program" => program,
       "calls" => calls,
       "compile" => fn _metric, program, trainset, _devset ->
-        Imp.Optimizer.KNNFewShot.new(1, trainset)
+        Imp.Optimizer.KNNFewShot.new(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
         |> Imp.Optimizer.KNNFewShot.compile(program)
       end
     })
