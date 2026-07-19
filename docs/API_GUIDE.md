@@ -955,10 +955,15 @@ Imp.Tool.call(double, %{x: 4})
 
 ## MCP Import
 
+Tool schemas use the MCP specification dialect: the input contract key is
+camelCase `"inputSchema"` and `"description"` is optional. In-process Elixir
+catalogs may also use the snake_case `:input_schema` spelling as a back-compat
+fallback; real MCP servers always send `inputSchema`.
+
 ```elixir
 catalog =
   Imp.MCP.Catalog.new([
-    %{name: :lookup, description: "lookup", input_schema: %{required: [:key]}, run: & &1}
+    %{"name" => "lookup", "inputSchema" => %{"required" => ["key"]}, "run" => & &1}
   ])
 
 [tool] = Imp.MCP.import_tools(catalog)

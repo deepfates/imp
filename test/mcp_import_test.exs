@@ -25,6 +25,8 @@ defmodule MCPImportTest do
           {:ok, %{status: 202, headers: [], body: Jason.encode!(%{})}}
 
         %{"method" => "tools/list", "jsonrpc" => "2.0", "id" => _id} ->
+          # MCP spec, Tool definition: the input contract key is camelCase
+          # "inputSchema", and "description" is optional (omitted here).
           {:ok,
            %{
              status: 200,
@@ -35,8 +37,7 @@ defmodule MCPImportTest do
                    "tools" => [
                      %{
                        "name" => "remote_lookup",
-                       "description" => "lookup remotely",
-                       "input_schema" => %{"required" => ["key"]}
+                       "inputSchema" => %{"required" => ["key"]}
                      }
                    ]
                  }
@@ -71,6 +72,7 @@ defmodule MCPImportTest do
             %{"jsonrpc" => "2.0", "result" => %{}}
 
           "tools/list" ->
+            # MCP spec, Tool definition: camelCase "inputSchema".
             %{
               "jsonrpc" => "2.0",
               "id" => decoded["id"],
@@ -79,7 +81,7 @@ defmodule MCPImportTest do
                   %{
                     "name" => "remote_fail",
                     "description" => "fails remotely",
-                    "input_schema" => %{"type" => "object"}
+                    "inputSchema" => %{"type" => "object"}
                   }
                 ]
               }
@@ -102,15 +104,41 @@ defmodule MCPImportTest do
 
     @impl true
     def post(url, headers, body, opts) do
+      decoded = Jason.decode!(body)
+
       with {:ok, %{body: response}} <- MCPTransport.post(url, headers, body, opts) do
-        {:ok,
-         %{
-           status: 200,
-           headers: [{"content-type", "text/event-stream"}],
-           body: "event: message\ndata: #{response}\n\n"
-         }}
+        case decoded["method"] do
+          "notifications/initialized" ->
+            # MCP spec, Streamable HTTP: notifications and responses receive
+            # HTTP 202 Accepted with no body.
+            {:ok, %{status: 202, headers: [], body: ""}}
+
+          "initialize" ->
+            # MCP spec, Streamable HTTP session management: the server MAY
+            # assign a session id via the Mcp-Session-Id header on the
+            # initialize response; the client MUST echo it afterwards.
+            {:ok,
+             %{
+               status: 200,
+               headers: [
+                 {"content-type", "text/event-stream"},
+                 {"mcp-session-id", "server-session-abc"}
+               ],
+               body: sse(response)
+             }}
+
+          _ ->
+            {:ok,
+             %{
+               status: 200,
+               headers: [{"content-type", "text/event-stream"}],
+               body: sse(response)
+             }}
+        end
       end
     end
+
+    defp sse(response), do: "event: message\ndata: #{response}\n\n"
   end
 
   defmodule MalformedCatalog do
@@ -130,19 +158,20 @@ defmodule MCPImportTest do
   end
 
   test "imports MCP-style catalog tools and runs them through an agent" do
+    # MCP spec, Tool definition: camelCase "inputSchema" is the spec dialect.
     catalog =
       MCP.Catalog.new([
         %{
-          name: :lookup,
-          description: "lookup a value",
-          input_schema: %{required: [:key]},
-          run: fn %{key: key} -> %{value: "value:#{key}"} end
+          "name" => "lookup",
+          "description" => "lookup a value",
+          "inputSchema" => %{"required" => ["key"]},
+          "run" => fn %{key: key} -> %{value: "value:#{key}"} end
         }
       ])
 
     [tool] = MCP.import_tools(catalog)
     assert tool.name == :lookup
-    assert tool.schema == %{required: [:key]}
+    assert tool.schema == %{"required" => ["key"]}
 
     agent =
       Agent.new(
@@ -188,17 +217,41 @@ defmodule MCPImportTest do
   end
 
   test "imported MCP tools normalize validation errors" do
+    # MCP spec, Tool definition: "description" is optional; omitted here.
     [tool] =
       MCP.import_tools([
         %{
-          name: :needs_key,
-          description: "needs key",
-          input_schema: %{required: [:key]},
-          run: fn _ -> :ok end
+          "name" => "needs_key",
+          "inputSchema" => %{"required" => ["key"]},
+          "run" => fn _ -> :ok end
         }
       ])
 
+    assert tool.description == ""
+    assert {:error, {:missing_required, ["key"]}} = Imp.Tool.call(tool, %{})
+  end
+
+  test "in-process catalogs may use snake_case input_schema as a documented fallback" do
+    # Back-compat lane only: spec servers send camelCase "inputSchema"; the
+    # snake_case atom spelling stays supported for in-process Elixir catalogs.
+    [tool] =
+      MCP.import_tools([
+        %{
+          name: :legacy_lookup,
+          description: "legacy in-process schema",
+          input_schema: %{required: [:key]},
+          run: fn input -> input end
+        }
+      ])
+
+    assert tool.schema == %{required: [:key]}
     assert {:error, {:missing_required, [:key]}} = Imp.Tool.call(tool, %{})
+  end
+
+  test "tools without any input schema key fail loudly naming the spec key" do
+    assert_raise ArgumentError, ~r/MCP tool :no_schema schema missing inputSchema/, fn ->
+      MCP.import_tools([%{name: :no_schema, run: fn input -> input end}])
+    end
   end
 
   test "imported MCP tools validate string-key JSON schema properties without atomizing keys" do
@@ -209,7 +262,7 @@ defmodule MCPImportTest do
         %{
           "name" => "score",
           "description" => "score a value",
-          "input_schema" => %{
+          "inputSchema" => %{
             "required" => [external_key],
             "properties" => %{
               external_key => %{"type" => "integer", "minimum" => 1, "maximum" => 5}
@@ -231,7 +284,7 @@ defmodule MCPImportTest do
     duplicate = %{
       name: :lookup,
       description: "lookup",
-      input_schema: %{},
+      inputSchema: %{},
       run: fn input -> input end
     }
 
@@ -270,7 +323,7 @@ defmodule MCPImportTest do
     base = %{
       name: :lookup,
       description: "lookup",
-      input_schema: %{},
+      inputSchema: %{},
       run: fn input -> input end
     }
 
@@ -279,11 +332,16 @@ defmodule MCPImportTest do
     end
 
     assert_raise ArgumentError, ~r/MCP tool :lookup description must be a string/, fn ->
-      MCP.import_tools([%{base | description: nil}])
+      MCP.import_tools([%{base | description: 123}])
     end
 
-    assert_raise ArgumentError, ~r/MCP tool :lookup input_schema must be a map/, fn ->
-      MCP.import_tools([%{base | input_schema: []}])
+    # MCP spec, Tool definition: description is Optional[str]; explicit null
+    # from a server means "no description" and normalizes to "".
+    [tool] = MCP.import_tools([%{base | description: nil}])
+    assert tool.description == ""
+
+    assert_raise ArgumentError, ~r/MCP tool :lookup inputSchema must be a map/, fn ->
+      MCP.import_tools([%{base | inputSchema: []}])
     end
 
     assert_raise ArgumentError, ~r/MCP tool :lookup run must be a one-argument function/, fn ->
@@ -364,7 +422,7 @@ defmodule MCPImportTest do
                         {
                             "name": "stdio_fail",
                             "description": "fails through stdio",
-                            "input_schema": {"type": "object"},
+                            "inputSchema": {"type": "object"},
                         }
                     ]
                 },
@@ -392,7 +450,7 @@ defmodule MCPImportTest do
              Imp.Tool.call(tool, %{})
   end
 
-  test "streamable HTTP MCP client sends session headers and decodes SSE data" do
+  test "streamable HTTP MCP client performs the spec handshake and decodes SSE data" do
     client =
       MCP.StreamableHTTPClient.new("https://mcp.example/stream",
         transport: MCPSSETransport,
@@ -403,10 +461,30 @@ defmodule MCPImportTest do
     [tool] = MCP.import_tools(client)
 
     assert tool.name == "remote_lookup"
+    # MCP spec, Tool definition: description is optional; the mock omits it.
+    assert tool.description == ""
     assert %{"value" => "abc"} = Imp.Tool.call(tool, %{"key" => "abc"})
 
-    assert [init_request, list_request, call_request] = receive_requests(3)
+    assert [init_request, initialized_request, list_request, call_request] = receive_requests(4)
+
+    # MCP spec, Lifecycle: initialize MUST carry protocolVersion,
+    # capabilities, and clientInfo.
+    assert init_request.body["params"]["protocolVersion"] == "2025-03-26"
+    assert init_request.body["params"]["clientInfo"]["name"] == "imp"
+    assert Map.has_key?(init_request.body["params"], "capabilities")
     assert {"mcp-session-id", "session-1"} in init_request.headers
+
+    # MCP spec, Lifecycle: the client MUST send notifications/initialized
+    # after a successful initialize; notifications carry no id.
+    assert initialized_request.body["method"] == "notifications/initialized"
+    refute Map.has_key?(initialized_request.body, "id")
+
+    # MCP spec, Streamable HTTP session management: the server-assigned
+    # Mcp-Session-Id from the initialize response rides every later request.
+    for request <- [initialized_request, list_request, call_request] do
+      assert {"mcp-session-id", "server-session-abc"} in request.headers
+    end
+
     assert {"accept", "application/json, text/event-stream"} in list_request.headers
     assert call_request.body["method"] == "tools/call"
   end

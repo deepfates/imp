@@ -611,13 +611,14 @@ defmodule DocumentationContractTest do
   end
 
   test "API guide MCP import example returns ordinary Imp tools" do
+    # Mirrors docs/API_GUIDE.md "MCP Import": spec dialect (camelCase
+    # "inputSchema", optional description per the MCP spec Tool definition).
     catalog =
       Imp.MCP.Catalog.new([
         %{
-          name: :lookup,
-          description: "lookup",
-          input_schema: %{required: [:key]},
-          run: & &1
+          "name" => "lookup",
+          "inputSchema" => %{"required" => ["key"]},
+          "run" => & &1
         }
       ])
 

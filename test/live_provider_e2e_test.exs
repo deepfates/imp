@@ -158,7 +158,8 @@ defmodule LiveProviderE2ETest do
                    %{
                      name: "lookup_capital",
                      description: "Look up the capital for one supported country key.",
-                     input_schema: %{
+                     # MCP spec, Tool definition: camelCase "inputSchema".
+                     inputSchema: %{
                        type: "object",
                        properties: %{
                          country: %{type: "string", enum: ["france"]}

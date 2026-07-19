@@ -137,7 +137,8 @@ defmodule LocalServiceE2ETest do
                    %{
                      name: "lookup",
                      description: "Lookup a local fact.",
-                     input_schema: %{
+                     # MCP spec, Tool definition: camelCase "inputSchema".
+                     inputSchema: %{
                        type: "object",
                        properties: %{key: %{type: "string"}},
                        required: ["key"]
@@ -175,7 +176,8 @@ defmodule LocalServiceE2ETest do
           "initialize" ->
             %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{}}
           "tools/list" ->
-            %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{"tools" => [%{"name" => "echo", "description" => "Echo input", "input_schema" => %{"type" => "object", "properties" => %{"text" => %{"type" => "string"}}, "required" => ["text"]}}]}}
+            # MCP spec, Tool definition: camelCase "inputSchema".
+            %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{"tools" => [%{"name" => "echo", "description" => "Echo input", "inputSchema" => %{"type" => "object", "properties" => %{"text" => %{"type" => "string"}}, "required" => ["text"]}}]}}
           "tools/call" ->
             %{"jsonrpc" => "2.0", "id" => request["id"], "result" => request["params"]["arguments"]["text"]}
           _ ->
@@ -222,7 +224,8 @@ defmodule LocalServiceE2ETest do
                    %{
                      name: "lookup",
                      description: "Lookup a local fact.",
-                     input_schema: %{
+                     # MCP spec, Tool definition: camelCase "inputSchema".
+                     inputSchema: %{
                        type: "object",
                        properties: %{key: %{type: "string"}},
                        required: ["key"]

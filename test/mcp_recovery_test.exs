@@ -25,6 +25,8 @@ defmodule MCPRecoveryTest do
     end
 
     defp respond(:ok, "tools/list", request, _owner) do
+      # MCP spec, Tool definition: camelCase "inputSchema"; "description" is
+      # optional and omitted here so recovery paths exercise the spec dialect.
       response = %{
         "jsonrpc" => "2.0",
         "id" => request["id"],
@@ -32,8 +34,7 @@ defmodule MCPRecoveryTest do
           "tools" => [
             %{
               "name" => "recoverable",
-              "description" => "scripted recovery tool",
-              "input_schema" => %{"type" => "object"}
+              "inputSchema" => %{"type" => "object"}
             }
           ]
         }

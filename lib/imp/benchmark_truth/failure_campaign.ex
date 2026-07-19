@@ -437,7 +437,8 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         method == "tools/list" ->
           mcp_response(request, %{
             "tools" => [
-              %{"name" => "recoverable", "description" => "fixture", "input_schema" => %{}}
+              # MCP spec, Tool definition: camelCase "inputSchema".
+              %{"name" => "recoverable", "description" => "fixture", "inputSchema" => %{}}
             ]
           })
 

@@ -20,6 +20,9 @@ defmodule ProtocolMCPProviderTest do
 
         case {request.path, method} do
           {"/mcp-http", "initialize"} ->
+            # MCP spec, Lifecycle: initialize MUST carry full params.
+            assert get_in(decoded, ["params", "protocolVersion"]) == "2025-03-26"
+            assert get_in(decoded, ["params", "clientInfo", "name"]) == "imp"
             {200, %{jsonrpc: "2.0", id: decoded["id"], result: %{serverInfo: %{name: "http"}}}}
 
           {"/mcp-http", "notifications/initialized"} ->
@@ -35,13 +38,29 @@ defmodule ProtocolMCPProviderTest do
 
           {"/mcp-stream", "initialize"} ->
             assert request.headers["accept"] =~ "text/event-stream"
+            # MCP spec, Lifecycle: initialize MUST carry full params.
+            assert get_in(decoded, ["params", "protocolVersion"]) == "2025-03-26"
+            assert get_in(decoded, ["params", "clientInfo", "name"]) == "imp"
+            # No session exists before the server assigns one at initialize.
+            refute Map.has_key?(request.headers, "mcp-session-id")
+
+            # MCP spec, Streamable HTTP session management: the server assigns
+            # the session id via the Mcp-Session-Id response header.
+            {200, [{"mcp-session-id", "session-live-mcp"}],
+             %{jsonrpc: "2.0", id: decoded["id"], result: %{serverInfo: %{name: "stream"}}}}
+
+          {"/mcp-stream", "notifications/initialized"} ->
+            # MCP spec, Lifecycle + Streamable HTTP: the client MUST send
+            # notifications/initialized; the server answers 202 with no body.
             assert request.headers["mcp-session-id"] == "session-live-mcp"
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: %{serverInfo: %{name: "stream"}}}}
+            {202, ""}
 
           {"/mcp-stream", "tools/list"} ->
+            assert request.headers["mcp-session-id"] == "session-live-mcp"
             {200, tools_response(decoded["id"], "lookup_stream")}
 
           {"/mcp-stream", "tools/call"} ->
+            assert request.headers["mcp-session-id"] == "session-live-mcp"
             assert get_in(decoded, ["params", "name"]) == "lookup_stream"
             assert get_in(decoded, ["params", "arguments", "key"]) == "runtime"
             {200, %{jsonrpc: "2.0", id: decoded["id"], result: "BEAM"}}
@@ -56,11 +75,11 @@ defmodule ProtocolMCPProviderTest do
     assert http_tool.name == :lookup_http
     assert Imp.Tool.call(http_tool, %{"key" => "capital"}) == "Paris"
 
+    # The client starts without a session id: the server assigns one on the
+    # initialize response and the client must echo it on later requests.
     [stream_tool] =
       base_url
-      |> then(
-        &Imp.MCP.StreamableHTTPClient.new(&1 <> "/mcp-stream", session_id: "session-live-mcp")
-      )
+      |> then(&Imp.MCP.StreamableHTTPClient.new(&1 <> "/mcp-stream"))
       |> Imp.MCP.import_tools()
 
     assert stream_tool.name == :lookup_stream
@@ -85,7 +104,8 @@ defmodule ProtocolMCPProviderTest do
           ~s({"jsonrpc":"2.0","id":#{id},"result":{"serverInfo":{"name":"stdio"}}})
 
         {["tools/list"], [id]} ->
-          ~s({"jsonrpc":"2.0","id":#{id},"result":{"tools":[{"name":"echo_stdio","description":"Echo trusted stdio input.","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}]}})
+          # MCP spec, Tool definition: camelCase "inputSchema".
+          ~s({"jsonrpc":"2.0","id":#{id},"result":{"tools":[{"name":"echo_stdio","description":"Echo trusted stdio input.","inputSchema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}]}})
 
         {["tools/call"], [id]} ->
           [text] = Regex.run(~r/"text":"([^"]*)"/, request, capture: :all_but_first)
@@ -111,6 +131,7 @@ defmodule ProtocolMCPProviderTest do
   end
 
   defp tools_response(id, name) do
+    # MCP spec, Tool definition: camelCase "inputSchema".
     %{
       jsonrpc: "2.0",
       id: id,
@@ -119,7 +140,7 @@ defmodule ProtocolMCPProviderTest do
           %{
             name: name,
             description: "Lookup a live gate fact.",
-            input_schema: %{
+            inputSchema: %{
               type: "object",
               properties: %{key: %{type: "string"}},
               required: ["key"]
