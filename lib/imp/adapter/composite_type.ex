@@ -48,6 +48,68 @@ defmodule Imp.Adapter.CompositeType do
     end
   end
 
+  @doc """
+  The pydantic JSON-schema *property body* (a MAP, no `"title"`) that DSPy's
+  `_get_structured_outputs_response_format` emits for this field, POST the
+  `enforce_required` rewrite — the per-field value under `properties`. Returns:
+
+    * `:scalar`     — the field is a scalar; the caller supplies the scalar body
+      (`Imp.Adapter.JSON` keeps its own scalar type map).
+    * `:open_ended` — the field is an open-ended mapping (`dict`/`object`);
+      Structured Outputs forbid it, so the caller must fall back to json_object
+      (mirrors DSPy `_has_open_ended_mapping` / the `except` fallback).
+    * `{:ok, map}`  — the full pydantic body for a `list[...]` or `Literal[...]`.
+
+  Raises for a `Literal` nested inside an array (same reason as `schema_of/1`);
+  the caller catches it and falls back to json_object exactly as DSPy's
+  `except Exception` clause does.
+  """
+  def pydantic_schema_body(field) do
+    node = field_node(field)
+
+    case classify(node) do
+      :scalar -> :scalar
+      :dict -> :open_ended
+      {:literal, values} -> {:ok, %{"type" => "string", "enum" => Enum.map(values, &to_string/1)}}
+      {:list, _item} -> {:ok, list_body(node)}
+    end
+  end
+
+  # Top-level `list[...]` body. A bare `array` (no item type) mirrors pydantic's
+  # `{"items": {}, "type": "array"}`.
+  defp list_body(node) do
+    case classify(node) do
+      {:list, nil} -> %{"type" => "array", "items" => %{}}
+      {:list, item} -> %{"type" => "array", "items" => item_body(item)}
+    end
+  end
+
+  # The pydantic body for a list ELEMENT (recursive; never carries a title).
+  defp item_body(node) do
+    case classify(node) do
+      :scalar ->
+        %{"type" => json_schema_type(node.type)}
+
+      {:list, _} ->
+        list_body(node)
+
+      :dict ->
+        # `list[dict[str, Any]]` element after enforce_required: an object with
+        # no declared properties (dee-p1d5 at the json_schema tier).
+        %{
+          "additionalProperties" => false,
+          "properties" => %{},
+          "required" => [],
+          "type" => "object"
+        }
+
+      {:literal, values} ->
+        raise ArgumentError,
+              "cannot faithfully render the json_schema body for a Literal nested in an array " <>
+                "(values: #{inspect(values)}); Imp's array item model has no enum-schema slot."
+    end
+  end
+
   # ------------------------------------------------------------------
   # Type nodes: `%{type: t, constraints: c}`. The top-level node comes from the
   # field; an array item node comes from the flat `items` descriptor the parser

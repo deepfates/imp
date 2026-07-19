@@ -75,17 +75,15 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
-    lm = fn messages, opts ->
-      Agent.update(
-        calls,
-        &(&1 ++ [%{"messages" => normalize(messages), "opts" => normalize(opts)}])
-      )
-
-      Agent.get_and_update(queue, fn
-        [response | rest] -> {{:ok, response}, rest}
-        [] -> {{:error, :fixture_response_queue_exhausted}, []}
-      end)
-    end
+    # A capability-carrying fixture LM (not a bare closure) so the JSON adapter
+    # gates response_format on the SAME tier the DSPy FixtureLM declares
+    # (dee-ps19). `lm_capability` is optional; absent => DSPy BaseLM default
+    # (none), matching the historical fixtures.
+    lm = %Imp.BenchmarkTruth.GoldenTraceFixtureLM{
+      queue: queue,
+      calls: calls,
+      capability: Imp.LM.Capability.from_tier(case["lm_capability"])
+    }
 
     try do
       signature = Imp.signature(case["signature"], case["instructions"] || "")
@@ -174,7 +172,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "prediction" => prediction_map,
       "tool_trace" => tool_trace(prediction_map),
       "error" => nil,
-      "history" => Agent.get(calls, & &1),
+      "history" => fixture_history(calls),
       "remaining_responses" => Agent.get(queue, &length/1)
     }
   end
@@ -186,10 +184,14 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "prediction" => nil,
       "tool_trace" => [],
       "error" => Exception.format(:error, reason),
-      "history" => Agent.get(calls, & &1),
+      "history" => fixture_history(calls),
       "remaining_responses" => Agent.get(queue, &length/1)
     }
   end
+
+  # The FixtureLM records raw per-call {messages, opts}; normalize at read time
+  # into the {"messages", "opts"} string-keyed shape the comparator consumes.
+  defp fixture_history(calls), do: calls |> Agent.get(& &1) |> normalize()
 
   defp adapter_module("chat"), do: Imp.Adapter.Chat
   defp adapter_module("json"), do: Imp.Adapter.JSON
@@ -269,9 +271,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         # identical to what DSPy sends for the same fixture? The old instrument
         # compared only message role+content and so reported false parity while
         # Imp shipped `response_format: json_object` on JSON cases and DSPy
-        # (capability-gated) shipped nothing. This dimension makes that
-        # divergence VISIBLE. It is measured, not yet enforced: the underlying
-        # capability-gating product fix is a separate ticket.
+        # (capability-gated) shipped nothing. This dimension made that divergence
+        # VISIBLE, and dee-ps19 then FIXED it: Imp now gates response_format on
+        # the LM's capability exactly like DSPy's JSONAdapter, so the JSON cases
+        # match tier-for-tier (none / json_object / json_schema).
         "envelope_parity_cases" => Enum.count(comparisons, & &1["envelope_parity"]),
         "message_envelope_parity" => Enum.all?(comparisons, & &1["envelope_parity"]),
         "envelope_parity_by_case" => Map.new(comparisons, &{&1["id"], &1["envelope_parity"]}),

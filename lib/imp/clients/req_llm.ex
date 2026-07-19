@@ -44,6 +44,54 @@ defmodule Imp.Clients.ReqLLM do
     {:error, "expected a ReqLLM-compatible module atom, got: #{inspect(module)}"}
   end
 
+  @doc false
+  # Response-format capability for this LM (internal), read from the ReqLLM/LLMDB
+  # model registry (`Imp.LM.Capability`). This is Imp's analog of DSPy's
+  # `litellm.get_supported_openai_params` / `litellm.supports_response_schema`:
+  # DSPy delegates to litellm's registry, Imp delegates to ReqLLM's.
+  #
+  # The mapping from LLMDB's `capabilities.json` descriptor:
+  #
+  #   * `response_schema` := `json.schema` (structured Structured-Outputs support).
+  #   * `response_format` := `json.native or json.schema` (the model accepts a
+  #     `response_format` request param at all — either json-object mode or
+  #     json-schema mode implies the param is accepted).
+  #
+  # When the registry has no `json` capability for a model (unknown / sparse
+  # entry), this returns `Imp.LM.Capability.none/0` — no `response_format` is
+  # sent. That is loud-by-omission and faithful to DSPy: an LM whose registry
+  # does not advertise the param gets nothing rather than a guessed-wrong
+  # envelope. The two registries (litellm vs LLMDB) are independent, so a
+  # *decision* divergence here reflects a registry-data difference, not a logic
+  # difference — the gating logic itself is byte-identical to DSPy's.
+  @spec response_format_capability(t()) :: Imp.LM.Capability.t()
+  def response_format_capability(%__MODULE__{model: model_spec}) do
+    with {:ok, model} <- resolve_model(model_spec),
+         %{} = json <- json_capability(model) do
+      schema? = truthy?(Map.get(json, :schema))
+      native? = truthy?(Map.get(json, :native))
+      %Imp.LM.Capability{response_format: native? or schema?, response_schema: schema?}
+    else
+      _ -> Imp.LM.Capability.none()
+    end
+  end
+
+  defp resolve_model(%{capabilities: _} = model), do: {:ok, model}
+
+  defp resolve_model(model_spec) do
+    ReqLLM.model(model_spec)
+  rescue
+    _ -> :error
+  catch
+    _, _ -> :error
+  end
+
+  defp json_capability(%{capabilities: %{json: json}}) when is_map(json), do: json
+  defp json_capability(_model), do: nil
+
+  defp truthy?(true), do: true
+  defp truthy?(_), do: false
+
   @impl true
   def generate(messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/2")

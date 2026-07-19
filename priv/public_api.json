@@ -697,7 +697,8 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
-        "lm_opts/2"
+        "lm_opts/2",
+        "lm_opts/3"
       ],
       "kind": "module",
       "macros": [],
@@ -706,6 +707,9 @@
         "functions": {
           "lm_opts/2": [
             "lm_opts(signature, opts)"
+          ],
+          "lm_opts/3": [
+            "lm_opts(signature, opts, capability)"
           ]
         }
       },

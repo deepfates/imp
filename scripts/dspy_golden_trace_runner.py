@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 import dspy
+import pydantic
 
 
 @dataclass
@@ -23,10 +24,35 @@ class FakeResponse:
     _hidden_params: dict
 
 
+_CAPABILITY_TIERS = {
+    # tier name -> (supported_params, supports_response_schema)
+    None: (set(), False),
+    "none": (set(), False),
+    "response_format": ({"response_format"}, False),
+    "json_object": ({"response_format"}, False),
+    "json_schema": ({"response_format"}, True),
+    "response_schema": ({"response_format"}, True),
+}
+
+
 class FixtureLM(dspy.BaseLM):
-    def __init__(self, responses: List[str]) -> None:
+    def __init__(self, responses: List[str], capability: Optional[str] = None) -> None:
         super().__init__(model="fake/golden", cache=False)
         self.responses = list(responses)
+        if capability not in _CAPABILITY_TIERS:
+            raise ValueError(f"unknown lm_capability tier: {capability!r}")
+        self._supported_params, self._supports_response_schema = _CAPABILITY_TIERS[capability]
+
+    # The two properties dspy.JSONAdapter gates response_format on. Declaring
+    # them here lets one fixture exercise a specific capability tier so the
+    # Elixir side (Imp.LM.Capability) can be proven to match tier-for-tier.
+    @property
+    def supported_params(self) -> set:
+        return set(self._supported_params)
+
+    @property
+    def supports_response_schema(self) -> bool:
+        return self._supports_response_schema
 
     def forward(self, prompt=None, messages=None, **kwargs):  # noqa: ANN001
         if not self.responses:
@@ -68,7 +94,7 @@ def main() -> int:
 
 
 def run_case(case: Dict[str, Any]) -> Dict[str, Any]:
-    lm = FixtureLM(case.get("dspy_responses", case["responses"]))
+    lm = FixtureLM(case.get("dspy_responses", case["responses"]), case.get("lm_capability"))
     dspy.configure(lm=lm)
 
     try:
@@ -292,13 +318,35 @@ def normalize_history(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         normalized.append(
             {
                 "messages": entry.get("messages"),
-                "kwargs": entry.get("kwargs"),
+                "kwargs": _sanitize_kwargs(entry.get("kwargs")),
                 "outputs": entry.get("outputs"),
                 "model": entry.get("model"),
                 "model_type": entry.get("model_type"),
             }
         )
     return normalized
+
+
+def _sanitize_kwargs(kwargs: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Render the request envelope in its true on-the-wire form.
+
+    For the json_schema tier DSPy sets `response_format` to a pydantic model
+    CLASS (`DSPyProgramOutputs`); litellm — DSPy's transport — converts that to
+    the OpenAI `{"type": "json_schema", "json_schema": {...}}` param before it
+    hits the provider. We reproduce that exact conversion here so the logged
+    envelope is (a) JSON-serializable and (b) the same bytes any real
+    litellm-backed dspy.LM would send — the honest comparison target for Imp.
+    """
+    if not kwargs:
+        return kwargs
+
+    rf = kwargs.get("response_format")
+    if isinstance(rf, type) and issubclass(rf, pydantic.BaseModel):
+        from litellm.utils import type_to_response_format_param
+
+        kwargs = dict(kwargs)
+        kwargs["response_format"] = type_to_response_format_param(rf)
+    return kwargs
 
 
 def git_sha() -> Optional[str]:

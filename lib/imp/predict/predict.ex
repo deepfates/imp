@@ -86,7 +86,7 @@ defmodule Imp.Predict.Predict do
          :ok <- validate_inputs(predict.signature, inputs),
          {:ok, messages} <-
            format_with_adapter(adapter, predict.signature, inputs, demos: predict.demos),
-         {:ok, lm_opts} <- adapter_lm_opts(adapter, predict.signature, predict.config),
+         {:ok, lm_opts} <- adapter_lm_opts(adapter, predict.signature, predict.config, lm),
          {:ok, raw} <- Imp.LM.generate(lm, messages, provider_lm_opts(lm_opts)),
          {:ok, prediction, trace_messages, trace_raw, trace_lm_metadata} <-
            parse_with_retry(
@@ -237,10 +237,11 @@ defmodule Imp.Predict.Predict do
       {:error, {:adapter_format_failed, adapter, {kind, reason}}}
   end
 
-  defp adapter_lm_opts(adapter, signature, config) do
+  defp adapter_lm_opts(adapter, signature, config, lm) do
     with :ok <- ensure_adapter_loaded(adapter),
-         true <- function_exported?(adapter, :lm_opts, 2),
-         {:ok, opts} <- call_adapter_lm_opts(adapter, signature, config) do
+         true <-
+           function_exported?(adapter, :lm_opts, 3) or function_exported?(adapter, :lm_opts, 2),
+         {:ok, opts} <- call_adapter_lm_opts(adapter, signature, config, lm) do
       {:ok, Keyword.merge(config, opts)}
     else
       false ->
@@ -251,8 +252,15 @@ defmodule Imp.Predict.Predict do
     end
   end
 
-  defp call_adapter_lm_opts(adapter, signature, config) do
-    opts = adapter.lm_opts(signature, config)
+  # Prefer the capability-gated arity-3 form (DSPy-faithful response_format
+  # selection); fall back to arity-2 for adapters that predate it.
+  defp call_adapter_lm_opts(adapter, signature, config, lm) do
+    opts =
+      if function_exported?(adapter, :lm_opts, 3) do
+        adapter.lm_opts(signature, config, Imp.LM.response_format_capability(lm))
+      else
+        adapter.lm_opts(signature, config)
+      end
 
     if Keyword.keyword?(opts) do
       {:ok, opts}
@@ -337,7 +345,9 @@ defmodule Imp.Predict.Predict do
 
     retry_opts =
       opts
-      |> Keyword.merge(Imp.Adapter.JSON.lm_opts(signature, opts))
+      |> Keyword.merge(
+        Imp.Adapter.JSON.lm_opts(signature, opts, Imp.LM.response_format_capability(lm))
+      )
       |> Keyword.put(:json_fallback, false)
 
     with {:ok, retry_raw} <- Imp.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
