@@ -904,5 +904,95 @@
       "mood": "happy"
     },
     "edge": "dee-ps19 tier 3: a json_schema-capable LM -> Imp and DSPy both send the DSPyProgramOutputs structured schema (scalar + list + Literal), in litellm wire form."
+  },
+  {
+    "id": "xml_basic",
+    "module": "predict",
+    "adapter": "xml",
+    "signature": "question -> answer",
+    "instructions": "Answer the question.",
+    "inputs": {
+      "question": "What is the capital of France?"
+    },
+    "responses": [
+      "<answer>\nParis\n</answer>"
+    ],
+    "expected_prediction": {
+      "answer": "Paris"
+    },
+    "edge": "dee-ovd3: XMLAdapter baseline — one XML-only system message (no [[ ## ]] markers, no completed sentinel), XML-wrapped input, and the XML output-requirements sentence."
+  },
+  {
+    "id": "xml_typed_int",
+    "module": "predict",
+    "adapter": "xml",
+    "signature": "question -> answer: string, score: int",
+    "instructions": "Return an answer and integer score.",
+    "inputs": {
+      "question": "Say pong with score seven."
+    },
+    "responses": [
+      "<answer>\npong\n</answer>\n\n<score>\n7\n</score>"
+    ],
+    "expected_prediction": {
+      "answer": "pong",
+      "score": 7
+    },
+    "edge": "dee-ovd3: typed XML output — the int field carries translate_field_type's 8-space '# note:' inside its tag in the structure, and the parsed value casts to an integer on both sides."
+  },
+  {
+    "id": "xml_enum_literal",
+    "module": "predict",
+    "adapter": "xml",
+    "signature": "question -> label: enum[yes,no]",
+    "instructions": "Classify the statement as yes or no.",
+    "inputs": {
+      "question": "Is fire hot?"
+    },
+    "responses": [
+      "<label>\nyes\n</label>"
+    ],
+    "expected_prediction": {
+      "label": "yes"
+    },
+    "edge": "dee-ovd3: enum output under XML — Literal['yes', 'no'] annotation in the field description and the exact-match note inside the structure tag."
+  },
+  {
+    "id": "xml_multi_output",
+    "module": "predict",
+    "adapter": "xml",
+    "signature": "question -> reasoning: string, answer: string",
+    "instructions": "Reason, then answer.",
+    "inputs": {
+      "question": "Why is the sky blue?"
+    },
+    "responses": [
+      "<reasoning>\nSunlight scatters off air molecules, and blue scatters most.\n</reasoning>\n\n<answer>\nRayleigh scattering.\n</answer>"
+    ],
+    "expected_prediction": {
+      "reasoning": "Sunlight scatters off air molecules, and blue scatters most.",
+      "answer": "Rayleigh scattering."
+    },
+    "edge": "dee-ovd3: multiple XML outputs — the requirements sentence joins tags with ', then ' and parse requires every output tag."
+  },
+  {
+    "id": "xml_missing_output_error",
+    "module": "predict",
+    "adapter": "xml",
+    "signature": "question -> answer, score: int",
+    "instructions": "Return answer and integer score.",
+    "inputs": {
+      "question": "This fixture should fail parsing."
+    },
+    "responses": [
+      "<answer>\npartial\n</answer>",
+      "{\"answer\": \"partial\"}"
+    ],
+    "expected_status": "error",
+    "expected_error_contains": "score",
+    "intentional_deviations": [
+      "DSPy XMLAdapter inherits ChatAdapter's JSONAdapter fallback on parse failure; both sides retry with a JSON-format call and this fixture deliberately gives the retry another incomplete response, so shared error status and per-call trace retention are asserted."
+    ],
+    "edge": "dee-ovd3: XML parse rejects a missing output tag loudly and falls back to JSONAdapter exactly like DSPy's inherited ChatAdapter.__call__ retry."
   }
 ]

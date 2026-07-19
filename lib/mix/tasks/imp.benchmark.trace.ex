@@ -195,6 +195,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
   defp adapter_module("chat"), do: Imp.Adapter.Chat
   defp adapter_module("json"), do: Imp.Adapter.JSON
+  defp adapter_module("xml"), do: Imp.Adapter.XML
   defp adapter_module(adapter), do: Mix.raise("unsupported fixture adapter: #{adapter}")
 
   defp dspy_report(fixtures_path, python, out_dir) do
