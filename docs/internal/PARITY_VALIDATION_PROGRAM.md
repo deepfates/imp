@@ -243,7 +243,11 @@ scripts/setup_dspy_parity_env.sh
 mix benchmark.optimizer_lift.check
 ```
 
-The current artifact runs a deterministic provider-free optimizer lift task. It
+The current artifact runs a deterministic provider-free matched-mechanism
+lift task: the winning instruction/demo is planted in both sides' candidate
+pools and scoring reuses the selection devset, so it demonstrates that Imp
+optimizers select and apply an injected winner identically to DSPy — not
+held-out lift (dee-5y5u). It
 directly compares Imp and DSPy `LabeledFewShot`, `BootstrapFewShot`,
 `RandomSearch`, `COPRO`, `MIPROv2`, `SIMBA`, and GEPA-style optimizer rows when
 the installed DSPy sidecar exposes a compatible GEPA path. It records Imp

@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "purpose": "Canonical inventory of asserted Imp claims and telos targets. This file declares scope and proof obligations; current evidence state is computed by the dashboard and is never stored here.",
+  "purpose": "Canonical inventory of asserted Imp claims and telos targets. This file declares scope and proof obligations; current evidence state is computed by the dashboard and is never stored here. claim_state=asserted is a maintainer attestation, not a computed result: on a fresh checkout the dashboard recomputes state from committed evidence alone and many asserted rows compute as blocked until their maintainer-run lane evidence is regenerated (see docs/EVIDENCE.md, Reconciliation).",
   "claim_state_vocabulary": {
     "asserted": "A claim intended for the named product profile; it is publishable only when its computed evidence state is proven.",
     "target": "A declared telos target that is not a current product capability.",

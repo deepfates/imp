@@ -199,20 +199,21 @@ defmodule PackageContractTest do
     assert unqualified == []
   end
 
-  test "README installs from the Hex release, with the immutable Git tag as the pinned alternative" do
+  test "README states the honest install: source checkout now, Hex pending publication" do
     readme = File.read!("README.md")
 
-    # The Hex release is the primary install; the Git tag alternative must
-    # reference the same version, and no floating-branch install may appear.
-    assert readme =~ ~s({:imp, "~> 0.2.0"})
-    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v0.2.1"})
-    refute readme =~ ~s({:imp, github: "deepfates/imp", branch: "main"})
+    # Honesty pass (dee-6yen): the Hex package is not published and the
+    # repository is private, so the README may not advertise a Hex or
+    # github: install as currently working. The Hex line may appear only as
+    # the stated future install, and the working path is a source checkout.
+    assert readme =~ "not yet published to Hex"
+    assert readme =~ ~s({:imp, path:)
+    assert readme =~ "source checkout"
+    refute readme =~ ~s({:imp, github: "deepfates/imp")
+    refute readme =~ "Documentation lives at [hexdocs.pm/imp]"
 
-    # The README need not offer a source-checkout install, but if it shows
-    # one it must be labeled as such rather than posing as the normal path.
-    if readme =~ ~s({:imp, path:) do
-      assert readme =~ "source checkout"
-    end
+    # When the owner publishes to Hex (step 2 of dee-6yen), restore the
+    # Hex-first wording and re-pin this test to it.
   end
 
   defp assert_release_files(files) do

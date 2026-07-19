@@ -52,7 +52,9 @@ Versioning once the first public package is released.
 
 ## 0.2.0 — 2026-07-17
 
-First Hex release.
+Prepared as the first Hex release. Publication to hex.pm has not happened
+yet (it remains a pending owner action), so until it does the package
+installs from a source checkout, not from Hex.
 
 ### Added
 
@@ -71,16 +73,19 @@ First Hex release.
 - The evidence ladder is public: `docs/EVIDENCE.md` defines the C0–C5 rungs
   every claim in `benchmarks/claims.json` is graded on, with the live ledger
   counts. Nine new differential artifact families landed; every
-  semantic-conformance claim in the ledger is now asserted.
+  semantic-conformance claim in the ledger is now asserted ("asserted" is a
+  maintainer attestation — `docs/EVIDENCE.md` reconciles it against what a
+  fresh checkout computes from committed evidence alone).
 - The README is a pyramid: claim, proof, install, the lifecycle in six
   stages, and a stage-by-stage table of the entire facade surface.
 
 ### Changed
 
-- Installs from Hex: `{:imp, "~> 0.2.0"}` is the front door; the immutable
-  Git tag remains the pinned alternative. Livebooks install from the local
-  checkout when run inside the repository and from the Hex release when
-  opened standalone.
+- Packaged so that `{:imp, "~> 0.2.0"}` becomes the front door once the
+  package is published to Hex (publication is still pending). Livebooks
+  install from the local checkout when run inside the repository; their
+  standalone fallback targets the Hex release and works once it is
+  published.
 - The documentation is now a reader-first book: the API guide teaches before
   it specifies, the conformance report against pinned upstream DSPy is a
   first-class user document (`docs/CONFORMANCE.md`), and the prior-art

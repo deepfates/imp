@@ -184,15 +184,13 @@ defmodule Imp.UpstreamFidelity do
     %{
       id: "adapters.structured_io",
       category: :adapters,
-      upstream: ["Adapter", "ChatAdapter", "JSONAdapter", "XMLAdapter", "TwoStepAdapter"],
+      upstream: ["Adapter", "ChatAdapter", "JSONAdapter"],
       source: "dspy/adapters",
       disposition: :conformant,
       imp: [
         Imp.Adapter,
         Imp.Adapter.Chat,
-        Imp.Adapter.JSON,
-        Imp.Adapter.XML,
-        Imp.Adapter.TwoStep
+        Imp.Adapter.JSON
       ],
       invariants: [
         "adapters format signature fields and demonstrations",
@@ -202,6 +200,54 @@ defmodule Imp.UpstreamFidelity do
       evidence: %{
         tests: ["test/production_adapter_persistence_test.exs", "test/golden_trace_test.exs"],
         docs: ["docs/internal/ADAPTER_FIDELITY.md", "docs/API_GUIDE.md"]
+      }
+    },
+    %{
+      id: "adapters.xml",
+      category: :adapters,
+      upstream: ["XMLAdapter"],
+      source: "dspy/adapters/xml_adapter.py",
+      disposition: :gap,
+      release_blocking: false,
+      ticket: "dee-ovd3",
+      imp: [Imp.Adapter.XML],
+      invariants: [
+        "Imp.Adapter.XML parses <field>value</field> tags through the shared schema path",
+        "the format divergence from DSPy XMLAdapter is declared here, not presented as conformance"
+      ],
+      evidence: %{
+        tests: [
+          "test/production_adapter_persistence_test.exs",
+          "test/completion_surface_test.exs"
+        ],
+        docs: ["docs/internal/ADAPTER_FIDELITY.md"],
+        missing: [
+          "DSPy-shaped format: upstream emits one XML-only system message; Imp prepends a single XML-tags line to the full Chat [[ ## ]] prompt, producing a two-dialect prompt (dee-ovd3)",
+          "parse must reject tag-free prose with a missing-output-fields error instead of falling back to Chat parse (runtime fix tracked in dee-ovd3)",
+          "XML cases in the golden differential set (dee-1gb9)"
+        ]
+      }
+    },
+    %{
+      id: "adapters.two_step",
+      category: :adapters,
+      upstream: ["TwoStepAdapter"],
+      source: "dspy/adapters/two_step_adapter.py",
+      disposition: :gap,
+      release_blocking: false,
+      ticket: "dee-qt5r",
+      imp: [Imp.Adapter.TwoStep],
+      invariants: [
+        "Imp.Adapter.TwoStep is an Imp extension: it prepends a :plan output field and delegates format and parse to the Chat adapter",
+        "the extension does not claim DSPy TwoStepAdapter semantics"
+      ],
+      evidence: %{
+        tests: ["test/completion_surface_test.exs"],
+        docs: ["docs/internal/ADAPTER_FIDELITY.md"],
+        missing: [
+          "DSPy TwoStepAdapter port: a free-form main prompt plus a second extraction LM running ChatAdapter over a synthesized text -> outputs signature; no extraction LM exists in Imp's adapter contract (dee-qt5r)",
+          "golden differential fixtures for both stages (dee-1gb9)"
+        ]
       }
     },
     %{
@@ -348,7 +394,9 @@ defmodule Imp.UpstreamFidelity do
         "CompleteAndGrounded"
       ],
       source: "dspy/evaluate",
-      disposition: :conformant,
+      disposition: :gap,
+      release_blocking: false,
+      ticket: "dee-c2ur",
       imp: [
         Imp.Evaluate,
         Imp.Metrics,
@@ -366,7 +414,12 @@ defmodule Imp.UpstreamFidelity do
           "test/imp_test.exs",
           "test/property_invariants_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "livebooks/03_evaluate_and_optimize.livemd"]
+        docs: ["docs/API_GUIDE.md", "livebooks/03_evaluate_and_optimize.livemd"],
+        missing: [
+          "DSPy-conformant normalize_text: NFD normalization and punctuation deletion; Imp replaces punctuation with spaces and skips NFD, so exact-match and F1 on punctuated gold answers are not comparable to DSPy-reported numbers (dee-c2ur)",
+          "answer_passage_match: per-passage DPR has_answer token-sequence matching; Imp substring-matches the concatenated context, so a gold answer can match inside an unrelated word (dee-c2ur)",
+          "differential probe tests pinning the divergent metric pairs to DSPy-derived values (dee-c2ur)"
+        ]
       }
     },
     %{
@@ -376,24 +429,21 @@ defmodule Imp.UpstreamFidelity do
         "LabeledFewShot",
         "BootstrapFewShot",
         "BootstrapFewShotWithRandomSearch",
-        "BootstrapRS",
-        "KNN",
-        "KNNFewShot"
+        "BootstrapRS"
       ],
-      source: "dspy/teleprompt/bootstrap.py; random_search.py; knn_fewshot.py",
+      source: "dspy/teleprompt/bootstrap.py; random_search.py",
       disposition: :conformant,
       imp: [
         Imp.Optimizer.LabeledFewShot,
         Imp.Optimizer.BootstrapFewShot,
         Imp.Optimizer.BootstrapFewShotWithRandomSearch,
         Imp.Optimizer.BootstrapRS,
-        Imp.Optimizer.RandomSearch,
-        Imp.Optimizer.KNNFewShot
+        Imp.Optimizer.RandomSearch
       ],
       invariants: [
         "successful traces become module-specific demonstrations",
         "teacher and student programs remain distinct",
-        "candidate selection uses held-out evaluation"
+        "candidate selection scores candidates on a valset distinct from the trainset (mechanism parity; held-out effectiveness lift remains a separately gated C3 target)"
       ],
       evidence: %{
         tests: [
@@ -401,6 +451,32 @@ defmodule Imp.UpstreamFidelity do
           "test/optimizer_lift_artifact_test.exs"
         ],
         docs: ["docs/API_GUIDE.md", "docs/internal/BENCHMARK_TRUTH.md"]
+      }
+    },
+    %{
+      id: "optimization.knn",
+      category: :optimization,
+      upstream: ["KNN", "KNNFewShot"],
+      source: "dspy/predict/knn.py; dspy/teleprompt/knn_fewshot.py",
+      disposition: :gap,
+      release_blocking: false,
+      ticket: "dee-bivg",
+      imp: [Imp.Predict.KNN, Imp.Optimizer.KNNFewShot],
+      invariants: [
+        "Imp.Optimizer.KNNFewShot attaches the k retrieved neighbors as raw demos via LabeledFewShot at call time (a deviation from upstream, declared here)",
+        "retrieval uses token-overlap similarity rather than upstream's required Embedder (declared deviation)"
+      ],
+      evidence: %{
+        tests: [
+          "test/public_surface_test.exs",
+          "test/optimizer_lift_artifact_test.exs"
+        ],
+        docs: ["docs/API_GUIDE.md"],
+        missing: [
+          "upstream KNNFewShot semantics: a metric/teacher-driven BootstrapFewShot compiled over the k retrieved neighbors on every forward call (dee-bivg)",
+          "embedding-based neighbor retrieval matching upstream's Embedder contract (dee-bivg)",
+          "a behavioral-corpus test exercising KNNFewShot against upstream (dee-bivg)"
+        ]
       }
     },
     %{

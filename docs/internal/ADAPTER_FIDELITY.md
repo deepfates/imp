@@ -12,8 +12,13 @@ trying to byte-match Python prompt templates.
   chat parsing fails.
 - DSPy `JSONAdapter` requests structured JSON behavior and parses provider JSON
   into signature fields.
-- DSPy `XMLAdapter` and `TwoStepAdapter` are alternate formatting/parsing
-  strategies over the same signature contract.
+- DSPy `XMLAdapter` emits a single XML-only system message and raises
+  `AdapterParseError` when required output tags are absent. DSPy
+  `TwoStepAdapter` sends a free-form main prompt, then runs a second
+  extraction LM with `ChatAdapter` over a synthesized `text -> outputs`
+  signature. Imp's `Imp.Adapter.XML` and `Imp.Adapter.TwoStep` do NOT port
+  these shapes (see Declared Divergences below); they are registered as
+  gaps, not conformant, in the conformance report (dee-ovd3, dee-qt5r).
 - DSPy `ChatAdapter` also has provider-native function-calling flags. In Imp,
   provider-native tool calling belongs to `Imp.Clients.ReqLLM` and ReAct/tool
   modules, not the plain chat adapter.
@@ -25,11 +30,31 @@ trying to byte-match Python prompt templates.
 | Chat field delimiters | `Imp.Adapter.Chat` renders and parses `[[ ## field ## ]]` blocks | `test/production_adapter_persistence_test.exs` |
 | JSON fallback | `Imp.Adapter.Chat.parse/3` falls back to JSON object parsing when labelled parsing fails | `test/production_adapter_persistence_test.exs` |
 | JSON structured-output options | `Imp.Adapter.JSON.lm_opts/2` requests JSON object or JSON Schema response formats | `test/schema_constraints_test.exs`, `test/production_adapter_persistence_test.exs` |
-| XML fields | `Imp.Adapter.XML` parses `<field>...</field>` and validates through the shared schema path | `test/production_adapter_persistence_test.exs` |
-| Two-step planning | `Imp.Adapter.TwoStep` prepends a `plan` field before final outputs | `test/completion_surface_test.exs` |
+| XML fields | `Imp.Adapter.XML` parses `<field>...</field>` and validates through the shared schema path — but its format diverges from DSPy (see Declared Divergences) | `test/production_adapter_persistence_test.exs` |
+| Two-step planning | `Imp.Adapter.TwoStep` prepends a `plan` field before final outputs — an Imp extension, not DSPy `TwoStepAdapter` (see Declared Divergences) | `test/completion_surface_test.exs` |
 | Demos/history | `Imp.Adapter.Chat` renders examples and `Imp.History` task turns as user/assistant turns, including partial demos with explicit missing-field markers | `test/production_adapter_persistence_test.exs`, `test/history_test.exs` |
 | Tool formatting | Provider-native tools flow through `Imp.Clients.ReqLLM`; iterative tool use flows through `Imp.Predict.ReAct`, `CodeAct`, and `RLM` | `test/req_llm_client_test.exs`, `test/golden_trace_test.exs`, `test/integration/local_service_e2e_test.exs` |
 | Streaming chunks | `Imp.Streaming.Messages.StreamListener` incrementally frames Chat, JSON, and XML fields with bounded parser state; custom adapters may provide bounded exact delimiters | `test/stream_listener_incremental_test.exs`, `test/completion_surface_test.exs` |
+
+## Declared Divergences (registered as gaps, not conformance)
+
+`Imp.Adapter.XML` (dee-ovd3): DSPy's XMLAdapter emits one XML-only system
+message with XML-wrapped inputs and placeholders. Imp instead prepends a
+single "Return XML fields" line to the full Chat `[[ ## ]]` prompt, so the
+rendered prompt demands two dialects at once. On parse, DSPy raises
+`AdapterParseError` when output tags are missing; Imp's zero-tag fallback to
+Chat parse is a known silent-failure defect with a runtime fix tracked under
+the same ticket. There are no XML cases in the 35-case golden set (dee-1gb9).
+
+`Imp.Adapter.TwoStep` (dee-qt5r): this is an Imp extension that prepends a
+`:plan` output field and delegates to Chat. It is not a port of DSPy's
+TwoStepAdapter — no second extraction LM exists anywhere in
+`lib/imp/adapter/`, and the `format/3` + `parse/3` behaviour has no LM
+handle to express one. A faithful port is tracked in dee-qt5r.
+
+These two entries were previously listed under the conformant adapter
+surface; naming them missing *measurement* would understate it — the
+missing thing is the upstream implementation shape itself.
 
 ## Intentional Deviations
 
