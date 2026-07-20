@@ -188,35 +188,44 @@ defmodule Imp.Optimize.Anything.AdapterTest do
     end
   end
 
-  test "uses unnamed state and stops it when the adapter owner exits normally" do
+  # Regression for de-pacg: the store used to be an unlinked Agent with a janitor
+  # process that killed it when its CREATOR exited, even though the adapter
+  # struct is a value that can be handed to any process — a creator exiting
+  # mid-evaluation crashed in-flight workers on Agent.get_and_update. The store
+  # is now supervised (Imp.Optimize.Anything.StateStoreSupervisor) and has a
+  # single cleanup path: explicit close/1 (or application shutdown).
+  test "store survives its creator; adapter stays usable elsewhere until close/1" do
     parent = self()
 
-    owner =
+    creator =
       spawn(fn ->
         adapter = Adapter.new(fn _candidate -> 1 end, :single_task)
-        send(parent, {:store, adapter.optimization_state_store})
-
-        receive do
-          :stop -> :ok
-        end
+        send(parent, {:adapter, adapter})
       end)
 
-    assert_receive {:store, store}
-    assert Process.info(store, :registered_name) == {:registered_name, []}
-    monitor = Process.monitor(store)
+    creator_monitor = Process.monitor(creator)
+    assert_receive {:adapter, adapter}
+    assert_receive {:DOWN, ^creator_monitor, :process, ^creator, _reason}
 
-    send(owner, :stop)
+    store = adapter.optimization_state_store
+    store_monitor = Process.monitor(store)
 
-    # The store is an unlinked Agent (start_optimization_state_store/0): a janitor
-    # process monitors the owner and force-exits the store with :shutdown when the
-    # owner goes down. Both DOWN reasons describe the SAME orderly teardown driven
-    # by the owner exiting — :shutdown when our monitor observes the janitor's
-    # Process.exit(store, :shutdown), and :noproc when the store has already
-    # finished terminating by the time this monitor resolves under full-suite load.
-    # The load-bearing assertion is unchanged: the store MUST go down as a
-    # consequence of the owner exiting. Ticket dee-8efo.
-    assert_receive {:DOWN, ^monitor, :process, ^store, reason}
-    assert reason in [:shutdown, :noproc]
+    # Pre-fix, the janitor delivers Process.exit(store, :shutdown) here.
+    refute_receive {:DOWN, ^store_monitor, :process, ^store, _reason}, 200
+
+    supervised =
+      Imp.Optimize.Anything.StateStoreSupervisor
+      |> DynamicSupervisor.which_children()
+      |> Enum.map(fn {_id, pid, _type, _modules} -> pid end)
+
+    assert store in supervised
+
+    # The adapter remains usable from a process that is not its creator.
+    assert %Result{scores: [1]} = Evaluation.evaluate(adapter, [:sentinel], %{prompt: "go"})
+
+    assert Adapter.close(adapter) == :ok
+    assert_receive {:DOWN, ^store_monitor, :process, ^store, _reason}
+    assert Adapter.close(adapter) == :ok
   end
 
   test "normalizes evaluations and extracts global and parameter objectives" do

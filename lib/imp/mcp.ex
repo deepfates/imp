@@ -466,7 +466,7 @@ defmodule Imp.MCP do
     end
 
     def list_tools(%__MODULE__{} = client) do
-      port = open_port(client)
+      {port, os_pid} = open_port(client)
 
       try do
         with {:ok, _} <-
@@ -484,7 +484,7 @@ defmodule Imp.MCP do
           {:error, reason} -> raise ArgumentError, "MCP stdio failed: #{inspect(reason)}"
         end
       after
-        safe_close(port)
+        safe_close(port, os_pid)
       end
     end
 
@@ -492,7 +492,7 @@ defmodule Imp.MCP do
       name = Map.get(tool, "name", Map.get(tool, :name))
 
       Map.put(tool, "run", fn arguments ->
-        port = open_port(client)
+        {port, os_pid} = open_port(client)
 
         try do
           with {:ok, _} <-
@@ -514,25 +514,35 @@ defmodule Imp.MCP do
             result
           end
         after
-          safe_close(port)
+          safe_close(port, os_pid)
         end
       end)
     end
 
-    defp safe_close(port) do
-      Port.close(port)
-    rescue
-      ArgumentError -> :ok
+    # Closing the port alone only closes stdin; a server that ignores stdin EOF
+    # (or is stuck past the request timeout) survives as an orphan OS process.
+    # Reuse the shared TERM -> grace -> KILL process-group teardown instead.
+    defp safe_close(port, os_pid) do
+      Imp.ExternalCommand.Lifecycle.terminate_port_group(port, os_pid)
     end
 
     defp open_port(%__MODULE__{} = client) do
-      Port.open({:spawn_executable, client.command}, [
-        :binary,
-        :exit_status,
-        :use_stdio,
-        :stderr_to_stdout,
-        args: client.args
-      ])
+      port =
+        Port.open({:spawn_executable, client.command}, [
+          :binary,
+          :exit_status,
+          :use_stdio,
+          :stderr_to_stdout,
+          args: client.args
+        ])
+
+      os_pid =
+        case Port.info(port, :os_pid) do
+          {:os_pid, os_pid} -> os_pid
+          nil -> nil
+        end
+
+      {port, os_pid}
     end
 
     defp request(port, method, params, timeout) do

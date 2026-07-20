@@ -12,7 +12,9 @@ defmodule Imp.Application do
       Imp.Cache,
       Imp.Tasks.Admission,
       {Task.Supervisor, name: Imp.TaskSupervisor},
-      {Task.Supervisor, name: Imp.UnlinkedTaskSupervisor}
+      {Task.Supervisor, name: Imp.UnlinkedTaskSupervisor},
+      {DynamicSupervisor,
+       name: Imp.Optimize.Anything.StateStoreSupervisor, strategy: :one_for_one}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
