@@ -38,7 +38,6 @@ defmodule Imp.Cache do
     {:ok,
      %{
        policy: @default_policy,
-       usage: @empty_usage,
        flights: %{},
        flight_refs: %{}
      }}
@@ -128,18 +127,13 @@ defmodule Imp.Cache do
   """
   def put(key, value) do
     ensure_table()
-    policy = active_policy()
 
-    if policy.enabled do
-      now = System.monotonic_time(:millisecond)
-      :ets.insert(@table, {key, value, expiry(now, policy.ttl), now})
-      increment_counter(:writes)
-      enforce_capacity_direct(policy.max_entries)
+    if active_policy().enabled do
+      GenServer.call(__MODULE__, {:put, key, value}, :infinity)
     else
       increment_counter(:bypasses)
+      value
     end
-
-    value
   end
 
   @doc """
@@ -197,9 +191,22 @@ defmodule Imp.Cache do
 
   def handle_call({:configure, policy}, _from, state) do
     :persistent_term.put(@policy_key, policy)
-    enforce_capacity_direct(policy.max_entries)
+    enforce_capacity(policy.max_entries)
     state = %{state | policy: policy}
     {:reply, :ok, state}
+  end
+
+  def handle_call({:put, key, value}, _from, state) do
+    if state.policy.enabled do
+      unless :ets.member(@table, key), do: make_room_for_insert(state.policy.max_entries)
+      now = System.monotonic_time(:millisecond)
+      :ets.insert(@table, {key, value, expiry(now, state.policy.ttl), now})
+      increment_counter(:writes)
+    else
+      increment_counter(:bypasses)
+    end
+
+    {:reply, value, state}
   end
 
   def handle_call({:claim_flight, key, caller}, from, state) do
@@ -238,55 +245,6 @@ defmodule Imp.Cache do
       _other ->
         {:reply, :ok, state}
     end
-  end
-
-  def handle_call(:policy, _from, state), do: {:reply, state.policy, state}
-
-  def handle_call(:stats, _from, state) do
-    {:reply, Map.merge(state.usage, %{size: :ets.info(@table, :size), policy: state.policy}),
-     state}
-  end
-
-  def handle_call(:reset_stats, _from, state),
-    do: {:reply, reset_stats(), %{state | usage: @empty_usage}}
-
-  def handle_call({:get, _key, default}, _from, %{policy: %{enabled: false}} = state) do
-    {:reply, default, increment(state, :bypasses)}
-  end
-
-  def handle_call({:get, key, default}, _from, state) do
-    case :ets.lookup(@table, key) do
-      [{^key, value, expires_at, _inserted_at}] ->
-        if expired?(expires_at) do
-          :ets.delete(@table, key)
-          {:reply, default, state |> increment(:misses) |> increment(:expirations)}
-        else
-          {:reply, value, increment(state, :hits)}
-        end
-
-      [{^key, value}] ->
-        {:reply, value, increment(state, :hits)}
-
-      [] ->
-        {:reply, default, increment(state, :misses)}
-    end
-  end
-
-  def handle_call({:put, _key, value}, _from, %{policy: %{enabled: false}} = state) do
-    {:reply, value, increment(state, :bypasses)}
-  end
-
-  def handle_call({:put, key, value}, _from, state) do
-    now = System.monotonic_time(:millisecond)
-    expires_at = expiry(now, state.policy.ttl)
-    :ets.insert(@table, {key, value, expires_at, now})
-    state = state |> increment(:writes) |> enforce_capacity()
-    {:reply, value, state}
-  end
-
-  def handle_call(:clear, _from, state) do
-    :ets.delete_all_objects(@table)
-    {:reply, :ok, %{state | usage: @empty_usage}}
   end
 
   @impl true
@@ -388,7 +346,11 @@ defmodule Imp.Cache do
 
     try do
       value = fun.()
-      put(key, value)
+
+      # Error tuples are delivered to coalesced waiters but never stored:
+      # caching a transient failure forever would poison the key.
+      unless match?({:error, _reason}, value), do: put(key, value)
+
       :ok = GenServer.call(__MODULE__, {:complete_flight, key, self(), value}, :infinity)
       value
     catch
@@ -504,10 +466,6 @@ defmodule Imp.Cache do
   defp exit_class({:shutdown, _reason}), do: :shutdown
   defp exit_class(_reason), do: :error
 
-  defp increment(state, counter, amount \\ 1) do
-    update_in(state, [:usage, counter], &(&1 + amount))
-  end
-
   defp active_policy, do: :persistent_term.get(@policy_key, @default_policy)
 
   defp increment_counter(counter, amount \\ 1),
@@ -525,11 +483,23 @@ defmodule Imp.Cache do
     :ets.insert(@usage_table, Map.to_list(@empty_usage))
   end
 
-  defp enforce_capacity_direct(:infinity), do: :ok
+  # Both run only inside the cache owner process, so eviction is serialized:
+  # no two writers race tab2list/sort/delete against each other, and a new
+  # entry makes room BEFORE it is inserted, so the table never exceeds
+  # max_entries at any observable instant.
+  defp enforce_capacity(:infinity), do: :ok
 
-  defp enforce_capacity_direct(max_entries) do
-    excess = max(:ets.info(@table, :size) - max_entries, 0)
+  defp enforce_capacity(max_entries),
+    do: evict_oldest(:ets.info(@table, :size) - max_entries)
 
+  defp make_room_for_insert(:infinity), do: :ok
+
+  defp make_room_for_insert(max_entries),
+    do: evict_oldest(:ets.info(@table, :size) - max_entries + 1)
+
+  defp evict_oldest(excess) when excess <= 0, do: :ok
+
+  defp evict_oldest(excess) do
     @table
     |> :ets.tab2list()
     |> Enum.sort_by(fn
@@ -541,24 +511,6 @@ defmodule Imp.Cache do
       :ets.delete(@table, elem(entry, 0))
       increment_counter(:evictions)
     end)
-  end
-
-  defp enforce_capacity(%{policy: %{max_entries: :infinity}} = state), do: state
-
-  defp enforce_capacity(%{policy: %{max_entries: max_entries}} = state) do
-    excess = max(:ets.info(@table, :size) - max_entries, 0)
-
-    evicted =
-      @table
-      |> :ets.tab2list()
-      |> Enum.sort_by(fn
-        {_key, _value, _expires_at, inserted_at} -> inserted_at
-        {_key, _value} -> System.monotonic_time(:millisecond)
-      end)
-      |> Enum.take(excess)
-
-    Enum.each(evicted, fn entry -> :ets.delete(@table, elem(entry, 0)) end)
-    increment(state, :evictions, length(evicted))
   end
 
   defp start_unlinked do
