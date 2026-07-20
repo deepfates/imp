@@ -26,8 +26,6 @@ defmodule Imp.Clients.ReqLLM do
     opts: [type: :keyword_list, default: []]
   ]
 
-  @cache_credential_marker {:imp_cache_identity, :credential}
-
   def new(model_spec, opts \\ []) do
     {req_module, nested_opts} = validate_new_opts!(opts)
 
@@ -208,10 +206,22 @@ defmodule Imp.Clients.ReqLLM do
 
   defp cache_identity_field(key, value) do
     if Imp.Redaction.credential_entry?(key, value) do
-      @cache_credential_marker
+      credential_cache_discriminator(value)
     else
       cache_identity_value(value)
     end
+  end
+
+  # Credentials never enter cache identity as raw values, but they must still
+  # discriminate: two callers with different API keys must not share cached
+  # responses (cross-account aliasing). A one-way fingerprint keeps the secret
+  # out of key material while scoping the cache per credential.
+  defp credential_cache_discriminator(value) do
+    fingerprint =
+      :crypto.hash(:sha256, :erlang.term_to_binary(value, [:deterministic]))
+      |> Base.encode16(case: :lower)
+
+    {:imp_cache_identity, :credential, fingerprint}
   end
 
   defp cache_identity_value(%_{} = struct) do

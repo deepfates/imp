@@ -79,6 +79,30 @@ defmodule Imp.ExternalCommand.Lifecycle do
     end
   end
 
+  @doc """
+  Tears down a raw port's OS process group with the shared TERM -> grace -> KILL
+  escalation, then closes the port.
+
+  For callers (like the MCP stdio transport) that own a `Port` directly instead
+  of going through `run/3`/`start/3`. Must be called from the process that
+  opened the port, since it consumes the port's remaining messages. Raises if
+  the group survives KILL past the cleanup deadline — that failure is never
+  silent.
+  """
+  @spec terminate_port_group(port(), pos_integer() | nil, pos_integer()) :: :ok
+  def terminate_port_group(port, os_pid, grace_ms \\ @default_kill_grace) do
+    os_pid = if valid_os_pid?(os_pid), do: os_pid, else: nil
+    # A port whose external process already exited (exit_status consumed by the
+    # caller) is gone from Port.info; passing port_exited? avoids waiting the
+    # full grace window for a port message that will never arrive.
+    port_exited? = Port.info(port) == nil
+
+    _capture =
+      terminate_group(port, os_pid, new_capture(@signal_output_bytes), grace_ms, port_exited?)
+
+    :ok
+  end
+
   defp start_owner(executable, argv, opts, require_os_pid?) do
     with :ok <- validate_command(executable, argv),
          {:ok, executable_path} <- resolve_executable(executable),

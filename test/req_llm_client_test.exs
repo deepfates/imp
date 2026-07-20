@@ -551,7 +551,7 @@ defmodule ReqLLMClientTest do
     refute Keyword.has_key?(second_opts, :rollout_id)
   end
 
-  test "ReqLLM caches by default, allows opt-out, and excludes credentials from cache identity" do
+  test "ReqLLM caches by default, allows opt-out, and scopes cache identity per credential" do
     Imp.Cache.clear()
     model = "openai:gpt-cache-#{System.unique_integer([:positive])}"
     messages = [%{role: :user, content: "same prompt"}]
@@ -582,11 +582,21 @@ defmodule ReqLLMClientTest do
         provider_options: %{client_secret: "second"}
       )
 
-    assert first_key == second_key
+    # Different credentials must not alias (de-buqx): the identity carries a
+    # one-way fingerprint per credential, never the raw secret.
+    refute first_key == second_key
+
+    assert first_key ==
+             Imp.Clients.ReqLLM.cache_key(lm, messages,
+               api_key: "sk-first-credential",
+               authorization: "Bearer first-credential-value",
+               headers: [{"x-api-key", "first"}],
+               provider_options: %{client_secret: "first"}
+             )
 
     typed_key = %{"__imp_type__" => "atom", "value" => "api_key", "extra" => "bypass"}
 
-    assert Imp.Clients.ReqLLM.cache_key(lm, messages,
+    refute Imp.Clients.ReqLLM.cache_key(lm, messages,
              provider_options: %{typed_key => "CANARY_TYPED_FIRST"}
            ) ==
              Imp.Clients.ReqLLM.cache_key(lm, messages,
@@ -604,7 +614,7 @@ defmodule ReqLLMClientTest do
       ])
     end
 
-    assert Imp.Clients.ReqLLM.cache_key(lm, messages,
+    refute Imp.Clients.ReqLLM.cache_key(lm, messages,
              provider_options: mixed_envelope.("CANARY_COLLISION_FIRST")
            ) ==
              Imp.Clients.ReqLLM.cache_key(lm, messages,
@@ -663,7 +673,7 @@ defmodule ReqLLMClientTest do
              Imp.Clients.ReqLLM.cache_key(semantic_a, messages, max_tokens: 64)
   end
 
-  test "ReqLLM cache behavior ignores rotated credentials but preserves other headers" do
+  test "ReqLLM cache misses on rotated credentials and isolates other headers" do
     model = "openai:gpt-cache-credentials-#{System.unique_integer([:positive])}"
     messages = [%{role: :user, content: "same prompt"}]
 
@@ -688,8 +698,14 @@ defmodule ReqLLMClientTest do
       )
 
     assert {:ok, first} = Imp.Clients.ReqLLM.generate(credential_a, messages, [])
-    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(credential_b, messages, [])
+    assert {:ok, _second} = Imp.Clients.ReqLLM.generate(credential_b, messages, [])
+
+    # Different credentials are different cache scopes: both calls reach the
+    # provider (de-buqx), while re-using the SAME credential stays cached.
     assert_received {:req_llm_generate, ^model, _messages, _opts}
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+
+    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(credential_a, messages, [])
     refute_received {:req_llm_generate, ^model, _messages, _opts}
 
     Imp.Cache.clear()
@@ -751,7 +767,7 @@ defmodule ReqLLMClientTest do
              Imp.Clients.ReqLLM.cache_key(fused, messages, [])
   end
 
-  test "ReqLLM cache identity excludes inline model credentials" do
+  test "ReqLLM cache identity scopes inline model credentials without raw secrets" do
     messages = [%{role: :user, content: "same prompt"}]
 
     first =
@@ -770,11 +786,16 @@ defmodule ReqLLMClientTest do
         access_key_id: "AKIASECONDINLINE"
       })
 
-    assert Imp.Clients.ReqLLM.cache_key(first, messages, []) ==
+    # Inline model credentials scope the cache (no cross-account aliasing) but
+    # never appear raw: the identity carries only a one-way fingerprint.
+    refute Imp.Clients.ReqLLM.cache_key(first, messages, []) ==
              Imp.Clients.ReqLLM.cache_key(second, messages, [])
+
+    assert Imp.Clients.ReqLLM.cache_key(first, messages, []) ==
+             Imp.Clients.ReqLLM.cache_key(first, messages, [])
   end
 
-  test "ReqLLM cache hits survive every representative credential rotation shape" do
+  test "ReqLLM credential rotation re-calls the provider for every rotation shape" do
     messages = [%{role: :user, content: "same prompt"}]
 
     for {credential_key, first_canary} <- @credential_canaries,
@@ -786,8 +807,14 @@ defmodule ReqLLMClientTest do
       {second_lm, ^provider_event} = rotation_lm(shape, model_id, credential_key, second_canary)
 
       assert {:ok, first_response} = Imp.Clients.ReqLLM.generate(first_lm, messages, [])
-      assert {:ok, ^first_response} = Imp.Clients.ReqLLM.generate(second_lm, messages, [])
+      assert {:ok, _rotated_response} = Imp.Clients.ReqLLM.generate(second_lm, messages, [])
+
+      # A rotated credential is a new cache scope, so the provider is called
+      # again (de-buqx). Re-using the original credential still hits the cache.
       assert_provider_call(provider_event)
+      assert_provider_call(provider_event)
+
+      assert {:ok, ^first_response} = Imp.Clients.ReqLLM.generate(first_lm, messages, [])
       refute_provider_call(provider_event)
     end
   end
