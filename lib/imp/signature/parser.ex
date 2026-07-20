@@ -36,8 +36,13 @@ defmodule Imp.Signature.Parser do
 
   alias Imp.Signature.Field
 
+  # Includes the Python spellings DSPy string signatures accept for types Imp
+  # models: `str` (upstream tests/signatures/test_signature.py::
+  # test_typed_signatures_basic_types, dee-1nkd) and `dict`. Python's `list[...]`
+  # keeps its guided ParseError pointing at `array[...]` (see suggest_type/1).
   @types %{
     "string" => :string,
+    "str" => :string,
     "number" => :number,
     "integer" => :integer,
     "int" => :integer,
@@ -45,7 +50,8 @@ defmodule Imp.Signature.Parser do
     "boolean" => :boolean,
     "bool" => :boolean,
     "object" => :object,
-    "map" => :object
+    "map" => :object,
+    "dict" => :object
   }
 
   @answer_shapes %{
@@ -57,14 +63,40 @@ defmodule Imp.Signature.Parser do
   def parse(spec) when is_binary(spec) do
     case split_arrow(spec) do
       {:ok, raw_inputs, raw_outputs} ->
-        {parse_fields(spec, raw_inputs, :input, 0),
-         parse_fields(spec, raw_outputs, :output, arrow_end(spec))}
+        inputs = parse_fields(spec, raw_inputs, :input, 0)
+        outputs = parse_fields(spec, raw_outputs, :output, arrow_end(spec))
+        check_distinct_names!(spec, inputs, outputs)
+        {inputs, outputs}
 
       :error ->
         raise Imp.Signature.ParseError,
           input: spec,
           position: max(String.length(spec) - 1, 0),
           detail: "signature must contain exactly one `->`"
+    end
+  end
+
+  # DSPy `_parse_signature` (dspy/signatures/signature.py) raises when a name
+  # appears on both sides of the arrow ("Input and output fields must have
+  # distinct names..."). A silently shared name would make one field shadow the
+  # other in prompts and parses — nothing-silent (dee-1nkd; upstream
+  # tests/signatures/test_signature.py::test_duplicate_input_output_field_names_raise).
+  defp check_distinct_names!(spec, inputs, outputs) do
+    input_names = MapSet.new(inputs, & &1.name)
+
+    duplicates =
+      outputs
+      |> Enum.map(& &1.name)
+      |> Enum.filter(&MapSet.member?(input_names, &1))
+      |> Enum.sort()
+
+    if duplicates != [] do
+      raise Imp.Signature.ParseError,
+        input: spec,
+        position: arrow_end(spec),
+        detail:
+          "input and output fields must have distinct names, but found duplicates: " <>
+            "'#{Enum.join(duplicates, ", ")}'"
     end
   end
 

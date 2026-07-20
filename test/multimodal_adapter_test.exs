@@ -227,10 +227,22 @@ defmodule MultimodalAdapterTest do
              ]
            } = calls
 
+    # DSPy ToolCalls.format emits the OpenAI wire shape
+    # `{"type": "function", "function": {"name", "arguments"}}` (upstream
+    # tests/adapters/test_tool.py::test_tool_calls_format_basic; dee-4fuy).
+    # Imp's stable id rides at the top level, where OpenAI carries it.
     assert Types.ToolCalls.format(calls) == %{
              tool_calls: [
-               %{id: "call_search", name: "search", args: %{"query" => "cats"}},
-               %{id: "call_translate", name: "translate", args: %{"text" => "world"}}
+               %{
+                 id: "call_search",
+                 type: "function",
+                 function: %{name: "search", arguments: %{"query" => "cats"}}
+               },
+               %{
+                 id: "call_translate",
+                 type: "function",
+                 function: %{name: "translate", arguments: %{"text" => "world"}}
+               }
              ]
            }
 

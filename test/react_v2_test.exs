@@ -276,8 +276,13 @@ defmodule ReActV2Test do
            ] = messages
 
     assert user_content =~ "prior"
+
+    # Replayed assistant tool calls carry the OpenAI wire shape
+    # {"type": "function", "function": {"name", "arguments"}} (dee-4fuy),
+    # with Imp's stable id at the top level.
     assert call.id == "call-1"
-    assert call.name == "lookup"
+    assert call.type == "function"
+    assert call.function.name == "lookup"
   end
 
   test "participates in LM demo and registry-backed persistence lifecycle" do

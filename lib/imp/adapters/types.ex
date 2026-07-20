@@ -29,8 +29,15 @@ defmodule Imp.Adapters.Types do
       }
     end
 
+    # DSPy ToolCalls.ToolCall.format (dspy/adapters/types/tool.py): the OpenAI
+    # wire shape `{"type": "function", "function": {"name", "arguments"}}`.
+    # Imp's stable id (absent upstream) rides at the top level when present,
+    # matching where OpenAI carries tool-call ids.
     def format(%__MODULE__{} = call) do
-      %{name: to_string(call.name), args: normalize_arguments(call.arguments)}
+      %{
+        type: "function",
+        function: %{name: to_string(call.name), arguments: normalize_arguments(call.arguments)}
+      }
       |> maybe_put(:id, call.id)
     end
 
@@ -401,7 +408,15 @@ defmodule Imp.Adapters.Types do
     |> List.last()
     |> String.split(";")
     |> hd()
+    |> normalize_audio_format()
   end
+
+  # DSPy `_normalize_audio_format` (dspy/adapters/types/audio.py): strip ONE
+  # leading "x-" (Python `str.removeprefix`), so non-standard subtypes like
+  # audio/x-wav send the provider format "wav". Interior "x-" runs survive
+  # ("my-x-format" stays as-is; "x-my-format" -> "my-format").
+  defp normalize_audio_format("x-" <> rest), do: rest
+  defp normalize_audio_format(format), do: format
 
   defp mime_type(_kind, nil), do: nil
   defp mime_type(kind, format), do: "#{kind}/#{format}"

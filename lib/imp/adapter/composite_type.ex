@@ -41,7 +41,11 @@ defmodule Imp.Adapter.CompositeType do
         nil
 
       {:literal, values} ->
-        "must exactly match (no extra characters) one of: " <> Enum.join(values, "; ")
+        # DSPy translate_field_type joins `str(x)` for each member, so
+        # non-string members keep their Python spelling (True, 3), not
+        # Elixir's (true).
+        "must exactly match (no extra characters) one of: " <>
+          Enum.map_join(values, "; ", &py_str/1)
 
       _composite ->
         "must adhere to the JSON schema: " <> schema_of(node)
@@ -137,7 +141,7 @@ defmodule Imp.Adapter.CompositeType do
   defp annotation_of(node) do
     case classify(node) do
       {:literal, values} ->
-        "Literal[" <> Enum.map_join(values, ", ", &quoted_literal/1) <> "]"
+        "Literal[" <> Enum.map_join(values, ", ", &literal_member/1) <> "]"
 
       {:list, nil} ->
         "list"
@@ -247,6 +251,22 @@ defmodule Imp.Adapter.CompositeType do
   end
 
   defp normalize_type(type), do: type
+
+  # DSPy get_annotation_name over one Literal member: string members go through
+  # _quoted_string_for_literal_type_annotation; every other member renders via
+  # get_annotation_name -> Python `str(a)` (True, 3, 3.5, None — never quoted).
+  # Upstream: tests/adapters/test_chat_adapter.py::
+  # test_chat_adapter_quotes_literals_as_expected scenario 5 (dee-xyhv).
+  defp literal_member(value) when is_binary(value), do: quoted_literal(value)
+  defp literal_member(value), do: py_str(value)
+
+  # Python `str(...)` for the non-string scalars an Imp enum constraint can carry.
+  defp py_str(value) when is_binary(value), do: value
+  defp py_str(nil), do: "None"
+  defp py_str(true), do: "True"
+  defp py_str(false), do: "False"
+  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
+  defp py_str(value), do: to_string(value)
 
   # DSPy utils._quoted_string_for_literal_type_annotation.
   defp quoted_literal(value) do

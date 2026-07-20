@@ -381,31 +381,43 @@ defmodule Imp.Adapter.JSON do
   def parse(signature, raw, opts) when is_map(raw),
     do: Imp.Adapter.Chat.parse(signature, raw, opts)
 
+  # Faithful to DSPy JSONAdapter.parse (dspy/adapters/json_adapter.py):
+  # repair-decode the completion (json_repair; Imp.Adapter.JSONRepair covers the
+  # same Python-dict spellings — dee-16qm), and when that yields no object,
+  # extract the first balanced `{...}` block and repair-decode that. A
+  # completion with no JSON object is a LOUD AdapterParseError (upstream: "LM
+  # response cannot be serialized to a JSON object."), never a lenient re-parse
+  # through the chat dialect.
   def parse(signature, raw, opts) when is_binary(raw) do
     validate_opts!(opts, "#{inspect(__MODULE__)}.parse/3")
 
-    with {:ok, decoded} <- Jason.decode(extract_json(raw)),
-         true <- is_map(decoded),
-         {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, decoded, opts),
-         :ok <-
-           Imp.Schema.validate_fields(
-             signature.outputs,
-             Imp.Prediction.to_map(prediction)
-           ) do
-      {:ok, prediction}
-    else
-      {:error, errors} when is_list(errors) ->
+    case Imp.Adapter.JSONRepair.decode_object(extract_json(raw)) do
+      {:ok, decoded} ->
+        with {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, decoded, opts),
+             :ok <-
+               Imp.Schema.validate_fields(
+                 signature.outputs,
+                 Imp.Prediction.to_map(prediction)
+               ) do
+          {:ok, prediction}
+        else
+          {:error, errors} when is_list(errors) ->
+            {:error,
+             %Imp.AdapterParseError{
+               message: Imp.Schema.retry_feedback(errors),
+               reason: raw
+             }}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      :error ->
         {:error,
          %Imp.AdapterParseError{
-           message: Imp.Schema.retry_feedback(errors),
+           message: "LM response cannot be serialized to a JSON object.",
            reason: raw
          }}
-
-      {:error, reason} ->
-        {:error, reason}
-
-      _ ->
-        Imp.Adapter.Chat.parse(signature, raw, opts)
     end
   end
 

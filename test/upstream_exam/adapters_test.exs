@@ -10,9 +10,12 @@ defmodule UpstreamExam.AdaptersTest do
     * assertions check the SAME behavior as upstream, not a look-alike;
     * exact prompt strings are used exactly (Imp claims byte-compatible
       rendered prompts for chat/json/xml/two_step);
-    * a failing port is a FINDING, not something to fix here: it is tagged
-      @tag :upstream_fail and skipped with the failure output preserved in a
-      comment, so the suite stays green while every divergence stays loud.
+    * a failing port is a FINDING: it gets tagged @tag :upstream_fail and
+      skipped with the failure output preserved in a comment until the
+      divergence is fixed in lib (never by weakening the assertion). The
+      original 14 findings from PR #68 were all fixed (dee-coia, dee-16qm,
+      dee-jbav, dee-xyhv, dee-4fuy, dee-pkvp, dee-1nkd); every test here now
+      runs unskipped.
   """
 
   use ExUnit.Case, async: true
@@ -54,17 +57,8 @@ defmodule UpstreamExam.AdaptersTest do
 
   describe "test_adapter_utils.py" do
     # Upstream: tests/adapters/test_adapter_utils.py::test_parse_value_str_annotation
-    # FINDING (upstream_fail): DSPy parse_value renders scalars through Python
-    # str(): True -> "True", None -> "None", [1, 2, 3] -> "[1, 2, 3]". Imp's
-    # chat coercion gives to_string(true) == "true", drops nil (missing-field
-    # error), and leaves a list un-stringified (schema validation error).
-    # Failure output:
-    #   Assertion with == failed
-    #   code:  assert parse_one(:string, true) == {:ok, "True"}
-    #   left:  {:ok, "true"}
-    #   right: {:ok, "True"}
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-jbav — str-annotated fields render through
+    # Python str(): True -> "True", None -> "None", [1, 2, 3] -> "[1, 2, 3]".)
     test "parse_value str annotation" do
       assert parse_one(%{name: :value, type: :string}, 123) == {:ok, "123"}
       assert parse_one(%{name: :value, type: :string}, true) == {:ok, "True"}
@@ -91,18 +85,8 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_adapter_utils.py::test_parse_value_literal
-    # FINDING (upstream_fail): DSPy parse_value strips wrapping quotes and
-    # `Literal[...]` / `str[...]` prefixes before matching a Literal value
-    # ("'option1'" -> "option1"). Imp validates enum membership on the raw
-    # string, so every quoted/prefixed spelling is rejected.
-    # Failure output:
-    #   Assertion with == failed
-    #   code:  assert parse_one(literal_field, "'option1'") == {:ok, "option1"}
-    #   left:  {:error, %Imp.AdapterParseError{message: "Validation failed. Retry
-    #          with corrected output:\n- value: must be one of [\"option1\", \"option2\"]", ...}}
-    #   right: {:ok, "option1"}
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-jbav — quote and `Literal[...]`/`str[...]`
+    # wrappers are stripped before enum matching, exactly as parse_value does.)
     test "parse_value literal" do
       literal_field = %{name: :value, type: :string, constraints: %{enum: ["option1", "option2"]}}
 
@@ -118,17 +102,8 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_adapter_utils.py::test_parse_value_json_repair
-    # FINDING (upstream_fail): DSPy repairs Python-dict spellings via
-    # json_repair / ast.literal_eval ("{'key': 'value'}" -> dict). Imp only
-    # accepts strict JSON, so the single-quoted form fails schema validation.
-    # Failure output:
-    #   Assertion with == failed
-    #   code:  assert parse_one(dict_field, "{'key': 'value'}") == {:ok, %{"key" => "value"}}
-    #   left:  {:error, %Imp.AdapterParseError{message: "Validation failed. Retry
-    #          with corrected output:\n- value: expected object", ...}}
-    #   right: {:ok, %{"key" => "value"}}
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-16qm — Imp.Adapter.JSONRepair ports the
+    # json_repair/ast.literal_eval ladder for Python-dict spellings.)
     test "parse_value json repair" do
       dict_field = %{name: :value, type: :object}
 
@@ -145,17 +120,8 @@ defmodule UpstreamExam.AdaptersTest do
   describe "test_audio.py" do
     # Upstream: tests/adapters/test_audio.py::test_normalize_audio_format
     # (parameterized; ported over Imp's audio-format surface: the provider
-    # block's `format` is derived from the mime type in Types.to_openai/1.)
-    # FINDING (upstream_fail): DSPy normalizes non-standard "x-" prefixed
-    # audio formats (audio/x-wav -> "wav"). Imp passes the subtype through
-    # unchanged ("x-wav").
-    # Failure output:
-    #   Assertion with == failed
-    #   code:  assert audio_format("x-wav") == "wav"
-    #   left:  "x-wav"
-    #   right: "wav"
-    @tag :upstream_fail
-    @tag :skip
+    # block's `format` is derived from the mime type in Types.to_openai/1.
+    # Was a finding; fixed by dee-pkvp — one leading "x-" is stripped.)
     test "normalize audio format strips x- prefixes" do
       audio_format = fn format ->
         %{input_audio: %{format: normalized}} =
@@ -208,17 +174,9 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_quotes_literals_as_expected
-    # (scenario 5: mixed-type Literal[1, 'bar'] / Literal[True, 3, 'foo'])
-    # FINDING (upstream_fail): DSPy renders non-string Literal members bare
-    # (Literal[1, 'bar']); Imp coerces every enum member to a quoted string
-    # (Literal['1', 'bar']).
-    # Failure output:
-    #   Assertion with =~ failed
-    #   code:  assert content =~ "Literal[1, 'bar']"
-    #   left:  "...1. `input_text` (Literal['1', 'bar']):\n...
-    #          1. `output_text` (Literal['true', '3', 'foo']): ..."
-    @tag :upstream_fail
-    @tag :skip
+    # (scenario 5: mixed-type Literal[1, 'bar'] / Literal[True, 3, 'foo'].
+    # Was a finding; fixed by dee-xyhv — non-string Literal members render
+    # bare via Python str(), only string members are quoted.)
     test "chat adapter quotes literals as expected (mixed-type literal)" do
       signature =
         Imp.Signature.new(%{
@@ -274,16 +232,9 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_exception_raised_on_failure
-    # FINDING (upstream_fail): DSPy ChatAdapter.parse raises AdapterParseError
-    # when the completion carries no [[ ## field ## ]] sections. Imp's Chat
-    # parse has a single-output leniency (whole completion stuffed into the
-    # lone output field), so the same completion "succeeds".
-    # Failure output:
-    #   match (=) failed
-    #   code:  assert {:error, _reason} = Imp.Adapter.Chat.parse(...)
-    #   right: {:ok, %Imp.Prediction{fields: %{answer: "{'output':'mismatched value'}"}, ...}}
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-coia — a completion with no
+    # [[ ## field ## ]] sections is a loud parse error, exactly as DSPy's
+    # ChatAdapter.parse raises AdapterParseError.)
     test "chat adapter exception raised on failure" do
       signature = Imp.signature("question -> answer")
 
@@ -391,19 +342,9 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_fallback_to_json_adapter_on_exception
-    # FINDING (upstream_fail): with a completion only JSONAdapter can parse
-    # ("{'answer': 'Paris'}"), DSPy's chat parse fails, the JSON fallback
-    # fires, and the result is answer == "Paris". Imp's single-output leniency
-    # makes chat parse "succeed" with the raw text as the answer, so the
-    # JSON fallback (which Imp.Predict does implement) never fires — and the
-    # single-quoted JSON would also not be repaired.
-    # Failure output:
-    #   Assertion with == failed
-    #   code:  assert Imp.get(prediction, :answer) == "Paris"
-    #   left:  "{'answer': 'Paris'}"
-    #   right: "Paris"
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-coia + dee-16qm — strict chat parse fails on
+    # the marker-less completion, Imp.Predict's JSON fallback fires a second LM
+    # call, and JSONRepair decodes the single-quoted object.)
     test "chat adapter fallback to json adapter on exception" do
       lm = capture_lm(fn _messages -> {:ok, "{'answer': 'Paris'}"} end)
       program = Imp.predict("question -> answer", adapter: Imp.Adapter.Chat, lm: lm)
@@ -417,16 +358,9 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_respects_use_json_adapter_fallback_flag
-    # (Imp spells use_json_adapter_fallback=False as config: [json_fallback: false])
-    # FINDING (upstream_fail): DSPy raises AdapterParseError on "nonsense"
-    # with the fallback disabled. Imp's single-output leniency accepts the
-    # nonsense as the answer instead of failing.
-    # Failure output:
-    #   match (=) failed
-    #   code:  assert {:error, _reason} = Imp.call(program, ...)
-    #   right: {:ok, %Imp.Prediction{fields: %{answer: "nonsense"}, ...}}
-    @tag :upstream_fail
-    @tag :skip
+    # (Imp spells use_json_adapter_fallback=False as config: [json_fallback: false].
+    # Was a finding; fixed by dee-coia — with the fallback disabled, "nonsense"
+    # is a loud parse error after exactly one LM call.)
     test "chat adapter respects use_json_adapter_fallback flag" do
       lm = capture_lm(fn _messages -> {:ok, "nonsense"} end)
 
@@ -927,16 +861,9 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_two_step_adapter.py::test_two_step_adapter_parse_errors
-    # FINDING (upstream_fail): DSPy's extraction path fails loudly
-    # (ValueError "Failed to parse response") when the extraction LM returns
-    # unusable text. Imp's Chat single-output leniency accepts "invalid
-    # response" as the lone `answer` field, so extraction "succeeds".
-    # Failure output:
-    #   match (=) failed
-    #   code:  assert {:error, {:two_step_extraction_failed, _, _}} = ...
-    #   right: {:ok, %Imp.Prediction{fields: %{answer: "invalid response"}, ...}}
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-coia — strict chat parse rejects the
+    # unusable extraction text, the JSON retry also fails, and the loud
+    # two_step_extraction_failed error surfaces, matching DSPy's ValueError.)
     test "two step adapter parse errors" do
       extraction_lm = fn _messages, _opts -> {:ok, "invalid response"} end
       signature = Imp.signature("question -> answer")
@@ -977,17 +904,8 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_tool.py::test_tool_calls_format_basic (parameterized)
-    # FINDING (upstream_fail): DSPy ToolCalls.format() emits the OpenAI wire
-    # shape {"tool_calls": [{"type": "function", "function": {"name": ...,
-    # "arguments": ...}}]}. Imp ToolCalls.format/1 emits the parse-level shape
-    # %{tool_calls: [%{name: ..., args: ...}]} — no type/function/arguments
-    # envelope.
-    # Failure output:
-    #   Assertion with == failed
-    #   left:  %{tool_calls: [%{name: "search", args: %{"query" => "hello"}}]}
-    #   right: %{tool_calls: [%{type: "function", function: %{name: "search", arguments: %{"query" => "hello"}}}]}
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-4fuy — ToolCalls.format emits the OpenAI
+    # wire shape {"type": "function", "function": {"name", "arguments"}}.)
     test "tool calls format basic" do
       cases = [
         {[], %{tool_calls: []}},
@@ -1024,15 +942,7 @@ defmodule UpstreamExam.AdaptersTest do
     end
 
     # Upstream: tests/adapters/test_tool.py::test_tool_calls_format_from_dict_list
-    # FINDING (upstream_fail): same wire-shape divergence as above — Imp's
-    # formatted entries carry :name/:args, not "function"/"name".
-    # Failure output:
-    #   Assertion with == failed
-    #   code:  assert get_in(first, [:function, :name]) == "search"
-    #   left:  nil
-    #   right: "search"
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-4fuy — same wire shape via from_dict_list.)
     test "tool calls format from dict list" do
       tool_calls =
         Types.ToolCalls.from_dict_list([
