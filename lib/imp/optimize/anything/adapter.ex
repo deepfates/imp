@@ -607,28 +607,24 @@ defmodule Imp.Optimize.Anything.Adapter do
     |> Enum.take(limit)
   end
 
+  # The store is supervised under Imp.Optimize.Anything.StateStoreSupervisor so
+  # it survives the exit of whichever process happened to call new/3 — the
+  # adapter struct is a value and may be used from any process. Its lifecycle
+  # ends through exactly one path: an explicit close/1 (or application
+  # shutdown, when the supervisor terminates it). `restart: :temporary` keeps
+  # the supervisor from resurrecting a closed store.
   defp start_optimization_state_store do
-    owner = self()
-    {:ok, store} = Agent.start(fn -> %{} end)
-    ready = make_ref()
+    {:ok, store} =
+      DynamicSupervisor.start_child(
+        Imp.Optimize.Anything.StateStoreSupervisor,
+        %{
+          id: __MODULE__.OptimizationStateStore,
+          start: {Agent, :start_link, [fn -> %{} end]},
+          restart: :temporary
+        }
+      )
 
-    spawn(fn ->
-      owner_monitor = Process.monitor(owner)
-      store_monitor = Process.monitor(store)
-      send(owner, {ready, :optimization_state_store_monitoring})
-
-      receive do
-        {:DOWN, ^owner_monitor, :process, ^owner, _reason} ->
-          Process.exit(store, :shutdown)
-
-        {:DOWN, ^store_monitor, :process, ^store, _reason} ->
-          :ok
-      end
-    end)
-
-    receive do
-      {^ready, :optimization_state_store_monitoring} -> store
-    end
+    store
   end
 
   defp validate_adapter!(adapter) do
