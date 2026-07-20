@@ -429,14 +429,18 @@ defmodule ImpTest do
   end
 
   test "predict formats through adapter and parses model output" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> "Answer: Paris" end]}
+    # DSPy's ChatAdapter only parses `[[ ## field ## ]]`-marked completions; a
+    # bare "Answer: Paris" label line is a parse error upstream (dee-coia), so
+    # the fixture LM speaks the marker dialect.
+    raw = "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> raw end]}
     program = Imp.predict("question -> answer", lm: lm)
 
     assert {:ok, prediction} =
              Imp.Predict.Predict.call(program, question: "Capital of France?")
 
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
-    assert %{messages: [_system, _user], raw: "Answer: Paris"} = prediction.metadata.trace
+    assert %{messages: [_system, _user], raw: ^raw} = prediction.metadata.trace
   end
 
   test "chain of thought adds reasoning before answer" do

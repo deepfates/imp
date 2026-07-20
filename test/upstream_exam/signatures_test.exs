@@ -92,12 +92,8 @@ defmodule UpstreamExam.SignaturesTest do
     end
 
     # Upstream: tests/signatures/test_signature.py::test_duplicate_input_output_field_names_raise
-    # FINDING (upstream_fail): DSPy raises ValueError("...distinct names...")
-    # for Signature("value -> value"). Imp accepts the duplicate silently.
-    # Failure output:
-    #   Expected exception Imp.Signature.ParseError but nothing was raised
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-1nkd — a name on both sides of the arrow is
+    # a loud ParseError, matching DSPy's "distinct names" ValueError.)
     test "duplicate input/output field names raise" do
       assert_raise Imp.Signature.ParseError, fn ->
         Imp.signature("value -> value")
@@ -193,17 +189,8 @@ defmodule UpstreamExam.SignaturesTest do
     end
 
     # Upstream: tests/signatures/test_signature.py::test_infer_prefix
-    # FINDING (upstream_fail): DSPy infer_prefix splits camelCase/underscores
-    # and title-cases every word ("some_attribute_name" -> "Some Attribute
-    # Name"). Imp's Field prefix only capitalizes the first word ("Some
-    # attribute name:") and does not split camelCase at all.
-    # Failure output:
-    #   Assertion with == failed
-    #   code:  assert Field.new(:some_attribute_name, :input).prefix == "Some Attribute Name:"
-    #   left:  "Some attribute name:"
-    #   right: "Some Attribute Name:"
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-1nkd — Field.new ports DSPy's infer_prefix
+    # casing rules: camelCase/digit splitting, Title Case, acronyms preserved.)
     test "infer prefix" do
       assert Field.new(:someAttributeName42IsCool, :input).prefix ==
                "Some Attribute Name 42 Is Cool:"
@@ -230,17 +217,8 @@ defmodule UpstreamExam.SignaturesTest do
     end
 
     # Upstream: tests/signatures/test_signature.py::test_typed_signatures_basic_types
-    # FINDING (upstream_fail): DSPy accepts "str" as a type name in string
-    # signatures ("input2: str"). Imp's parser type table has "int"/"string"/
-    # "bool"/etc. but NOT "str", so the same spec raises a ParseError
-    # (unknown field type "str", did you mean "string"?).
-    # Failure output:
-    #   ** (Imp.Signature.ParseError) invalid signature at position 20: unknown field type "str"
-    #   input1: int, input2: str -> output: float
-    #                       ^
-    #   did you mean "string"?
-    @tag :upstream_fail
-    @tag :skip
+    # (was a finding; fixed by dee-1nkd — the parser accepts the Python
+    # spellings "str" and "dict" for the types Imp models.)
     test "typed signatures basic types" do
       sig = Imp.signature("input1: int, input2: str -> output: float")
 

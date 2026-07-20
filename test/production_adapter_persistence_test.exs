@@ -137,7 +137,7 @@ defmodule ProductionAdapterPersistenceTest do
              Imp.Adapter.JSON.parse(signature, ~s({"answer": "Paris"}), [])
   end
 
-  test "chat adapter parses delimited output and falls back to JSON" do
+  test "chat adapter parses delimited output; a bare JSON completion is a loud parse error" do
     signature = Imp.signature("question -> answer: string, score: number")
 
     assert {:ok, delimited} =
@@ -155,20 +155,26 @@ defmodule ProductionAdapterPersistenceTest do
     assert Imp.Prediction.get(delimited, :answer) == "Paris"
     assert Imp.Prediction.get(delimited, :score) == 1.0
 
-    assert {:ok, json} =
+    # DSPy ChatAdapter.parse raises AdapterParseError on a marker-less JSON
+    # completion (verified against dspy 3.2.1: "Expected to find output fields
+    # in the LM response"); the JSON fallback is a SECOND LM call at the
+    # Predict level, never an in-parse decode (dee-coia).
+    assert {:error, {:missing_output_fields, [:answer, :score]}} =
              Imp.Adapter.Chat.parse(signature, ~s({"answer":"Paris","score":1.0}), [])
-
-    assert Imp.Prediction.get(json, :score) == 1.0
   end
 
   test "chat adapter reports structured field type errors without crashing" do
-    signature = Imp.signature("question -> answer: string")
+    # DSPy parse_value stringifies ANY value for a str-annotated field
+    # (str({'nested': True}) == "{'nested': True}"), so the loud-type-error
+    # contract is exercised on an int field, where a non-numeric value fails
+    # validation in both DSPy and Imp.
+    signature = Imp.signature("question -> answer: int")
 
     assert {:error, %Imp.AdapterParseError{} = error} =
-             Imp.Adapter.Chat.parse(signature, %{"answer" => %{"nested" => true}}, [])
+             Imp.Adapter.Chat.parse(signature, %{"answer" => "not a number"}, [])
 
-    assert error.message =~ "answer: expected string"
-    assert error.reason == %{answer: %{"nested" => true}}
+    assert error.message =~ "answer: expected integer"
+    assert error.reason == %{answer: "not a number"}
   end
 
   test "XML adapter validates parsed fields through the shared adapter contract" do
@@ -393,7 +399,11 @@ defmodule ProductionAdapterPersistenceTest do
     refute_received {:lm_call, _retry_messages, _retry_opts}
   end
 
-  test "chat adapter strips adjacent completed markers from delimited output" do
+  test "chat adapter keeps a same-line completed marker inside the field value" do
+    # DSPy's section split is LINE-based: a completed marker on the same line
+    # as the value stays part of the value (verified against dspy 3.2.1:
+    # {'answer': 'The Conversation[[ ## completed ## ]]'}). The old Imp
+    # behavior stripped it — a lenient divergence removed by dee-coia.
     signature = Imp.signature("question -> answer")
 
     assert {:ok, prediction} =
@@ -403,13 +413,19 @@ defmodule ProductionAdapterPersistenceTest do
                []
              )
 
-    assert Imp.Prediction.get(prediction, :answer) == "The Conversation"
+    assert Imp.Prediction.get(prediction, :answer) ==
+             "The Conversation[[ ## completed ## ]]"
   end
 
-  test "chat adapter tolerates provider field markers with a missing closing hash pair" do
+  test "chat adapter rejects field markers with a missing closing hash pair" do
+    # `[[ ## answer ]]` is NOT a field header to DSPy (the pattern requires
+    # both `##` pairs), so the answer field is missing and the parse is a loud
+    # error (verified against dspy 3.2.1: AdapterParseError "Expected to find
+    # output fields ... [reasoning, answer]"). The old Imp regex tolerated the
+    # malformed marker — a lenient divergence removed by dee-coia.
     signature = Imp.signature("question -> reasoning, answer")
 
-    assert {:ok, prediction} =
+    assert {:error, {:missing_output_fields, [:answer]}} =
              Imp.Adapter.Chat.parse(
                signature,
                """
@@ -421,8 +437,6 @@ defmodule ProductionAdapterPersistenceTest do
                """,
                []
              )
-
-    assert Imp.Prediction.get(prediction, :answer) == "48"
   end
 
   test "JSON adapter supplies provider response format options and retry feedback" do

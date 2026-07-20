@@ -810,7 +810,10 @@ defmodule BenchmarkTruthTest do
           module: Imp.LM.Static,
           opts: [
             handler: fn _messages, _opts ->
-              "[[ ## reasoning ## ]] subtotal plus fees [[ ## answer ## ]] 29.00 [[ ## completed ## ]]"
+              # DSPy field headers must start their own line (ChatAdapter.parse
+              # matches per-line; dee-coia), so the fixture completion uses the
+              # real multi-line marker dialect.
+              "[[ ## reasoning ## ]]\nsubtotal plus fees\n\n[[ ## answer ## ]]\n29.00\n\n[[ ## completed ## ]]"
             end
           ]
         },

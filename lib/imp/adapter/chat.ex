@@ -67,24 +67,16 @@ defmodule Imp.Adapter.Chat do
   defp do_parse(_signature, %Imp.Prediction{} = prediction), do: {:ok, prediction}
   defp do_parse(signature, map) when is_map(map), do: build_prediction(signature, map)
 
+  # Faithful port of DSPy 3.2.1 ChatAdapter.parse (dspy/adapters/chat_adapter.py):
+  # the completion is split into `[[ ## field ## ]]`-headed sections; the FIRST
+  # section for each output field wins; a completion whose sections do not cover
+  # every output field is a LOUD parse error. There is deliberately no
+  # single-output leniency (stuffing an unstructured completion into the lone
+  # output field) and no in-parse JSON decode: a bad parse must FAIL so the
+  # ChatAdapter->JSONAdapter fallback in Imp.Predict (DSPy `__call__`'s
+  # fallback, a second LM call) can fire — nothing-silent (dee-coia).
   defp do_parse(signature, text) when is_binary(text) do
-    outputs = Imp.Signature.output_names(signature)
-    parsed = parse_labelled_text(signature, text)
-
-    fields =
-      if parsed == %{} and length(outputs) == 1 do
-        %{hd(outputs) => String.trim(text)}
-      else
-        Map.take(parsed, outputs)
-      end
-
-    case build_prediction(signature, fields) do
-      {:ok, prediction} ->
-        {:ok, prediction}
-
-      {:error, _reason} = error ->
-        parse_json_fallback(signature, text, error)
-    end
+    build_prediction(signature, parse_marker_sections(signature, text))
   end
 
   defp do_parse(_signature, raw), do: {:error, {:unsupported_lm_output, raw}}
@@ -102,19 +94,22 @@ defmodule Imp.Adapter.Chat do
       |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
       |> Enum.map(& &1.name)
 
-    output_names = Imp.Signature.output_names(signature)
-
+    # PRESENT fields (even present-nil) are collected, then coerced with DSPy's
+    # parse_value semantics BEFORE the required-field check: a str-annotated
+    # field renders a present nil as "None" (Python str(None)); any field left
+    # nil after coercion is genuinely absent/unusable and feeds the loud
+    # missing-fields error.
     fields =
-      Map.new(output_names, fn name ->
-        {name, fetch_field(fields, name)}
-      end)
+      signature.outputs
+      |> Enum.filter(&field_present?(fields, &1.name))
+      |> Map.new(fn field -> {field.name, fetch_field(fields, field.name)} end)
+      |> then(&coerce_fields(signature, &1))
       |> Enum.reject(fn {_name, value} -> is_nil(value) end)
       |> Map.new()
 
     missing = Enum.reject(required, &Map.has_key?(fields, &1))
 
     with true <- missing == [],
-         fields <- coerce_fields(signature, Map.take(fields, output_names)),
          :ok <- Imp.Schema.validate_fields(signature.outputs, fields) do
       {:ok, Imp.Prediction.new(fields)}
     else
@@ -134,15 +129,82 @@ defmodule Imp.Adapter.Chat do
     signature.outputs
     |> Enum.reduce(fields, fn field, acc ->
       if Map.has_key?(acc, field.name),
-        do: Map.update!(acc, field.name, &coerce_value(&1, field.type)),
+        do: Map.update!(acc, field.name, &coerce_field(field, &1)),
         else: acc
     end)
   end
 
-  defp coerce_value(value, :string) when is_atom(value) or is_number(value) or is_boolean(value),
-    do: to_string(value)
+  # DSPy parse_value (dspy/adapters/utils.py) dispatch, in upstream order:
+  # a Literal (Imp: enum-constrained string) gets quote/prefix stripping; a str
+  # annotation gets Python `str(value)`; everything else keeps the typed
+  # coercion clauses below.
+  defp coerce_field(field, value) do
+    case enum_constraint(field) do
+      values when is_list(values) -> coerce_literal(value, values)
+      _no_enum -> coerce_value(value, field.type)
+    end
+  end
 
-  defp coerce_value(value, :string), do: value
+  # parse_value's Literal branch: the raw value if allowed; otherwise (strings
+  # only) strip a wrapping `Literal[...]`/`str[...]` spelling, then one pair of
+  # wrapping quotes, and accept the stripped form when allowed. Anything else
+  # keeps the raw value so schema validation reports the honest enum error
+  # (dee-jbav).
+  defp coerce_literal(value, allowed) do
+    cond do
+      value in allowed ->
+        value
+
+      is_binary(value) ->
+        stripped =
+          value
+          |> String.trim()
+          |> strip_literal_wrapper()
+          |> strip_wrapping_quotes()
+
+        if stripped in allowed, do: stripped, else: value
+
+      true ->
+        value
+    end
+  end
+
+  # Python: `if v.startswith(("Literal[", "str[")) and v.endswith("]"):
+  #            v = v[v.find("[") + 1 : -1]`
+  defp strip_literal_wrapper(value) do
+    if (String.starts_with?(value, "Literal[") or String.starts_with?(value, "str[")) and
+         String.ends_with?(value, "]") do
+      {index, 1} = :binary.match(value, "[")
+      binary_part(value, index + 1, byte_size(value) - index - 2)
+    else
+      value
+    end
+  end
+
+  # Python: `if len(v) > 1 and v[0] == v[-1] and v[0] in "\"'": v = v[1:-1]`
+  defp strip_wrapping_quotes(value) do
+    with true <- String.length(value) > 1,
+         first when first in ["\"", "'"] <- String.first(value),
+         true <- first == String.last(value) do
+      String.slice(value, 1..-2//1)
+    else
+      _no_strip -> value
+    end
+  end
+
+  defp enum_constraint(field) do
+    field.metadata
+    |> fetch_meta(:constraints, %{})
+    |> case do
+      constraints when is_map(constraints) -> fetch_meta(constraints, :enum)
+      _other -> nil
+    end
+  end
+
+  # parse_value's `if annotation is str: return str(value)` — Python str() of
+  # the parsed value: "None"/"True"/"False" spellings, repr-style rendering for
+  # lists and dicts ("[1, 2, 3]"), floats in repr form (dee-jbav).
+  defp coerce_value(value, :string), do: py_str(value)
 
   defp coerce_value(value, :integer) when is_binary(value) do
     case Integer.parse(String.trim(value)) do
@@ -176,23 +238,57 @@ defmodule Imp.Adapter.Chat do
   end
 
   # Composite field types arrive from the chat wire as text (e.g. `["a","b"]`
-  # or `{"k":1}`). DSPy's `parse_value` JSON-decodes non-str field values before
-  # handing them to validation (utils.py: `candidate = json_repair.loads(value)`
-  # then `TypeAdapter(annotation).validate_python(candidate)`); on a decode miss
-  # it falls back to the raw value and lets validation raise. We mirror that here:
-  # decode the binary, and on failure return it unchanged so schema validation
-  # produces the honest "expected array/object" error instead of swallowing it.
+  # or `{'k': 1}`). DSPy's `parse_value` decodes non-str field values through
+  # the json_repair/ast.literal_eval ladder before handing them to validation
+  # (utils.py: `candidate = json_repair.loads(value)`, ast fallback, then
+  # `TypeAdapter(annotation).validate_python(candidate)`); on a decode miss it
+  # falls back to the raw value and lets validation raise. We mirror that here
+  # via Imp.Adapter.JSONRepair (strict JSON, then Python-dict spellings —
+  # dee-16qm): decode the binary, and on failure return it unchanged so schema
+  # validation produces the honest "expected array/object" error instead of
+  # swallowing it.
   defp coerce_value(value, :array) when is_binary(value), do: decode_composite(value)
   defp coerce_value(value, :object) when is_binary(value), do: decode_composite(value)
 
   defp coerce_value(value, _type), do: value
 
   defp decode_composite(value) do
-    case Jason.decode(value) do
+    case Imp.Adapter.JSONRepair.decode(value) do
       {:ok, decoded} -> decoded
-      {:error, _reason} -> value
+      :error -> value
     end
   end
+
+  # Python `str(...)` as parse_value applies it to a str-annotated field.
+  defp py_str(value) when is_binary(value), do: value
+  defp py_str(nil), do: "None"
+  defp py_str(true), do: "True"
+  defp py_str(false), do: "False"
+  defp py_str(value) when is_integer(value), do: Integer.to_string(value)
+  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
+
+  defp py_str(value) when is_list(value),
+    do: "[" <> Enum.map_join(value, ", ", &py_repr/1) <> "]"
+
+  defp py_str(value) when is_map(value) and not is_struct(value),
+    do:
+      "{" <> Enum.map_join(value, ", ", fn {k, v} -> py_repr(k) <> ": " <> py_repr(v) end) <> "}"
+
+  defp py_str(value) when is_atom(value), do: to_string(value)
+  defp py_str(value), do: inspect(value)
+
+  # Python `repr(...)` for elements nested in a str()-rendered list/dict:
+  # strings quote (single quotes unless the string itself contains one and no
+  # double quote); other scalars render as py_str.
+  defp py_repr(value) when is_binary(value) do
+    if String.contains?(value, "'") and not String.contains?(value, "\"") do
+      "\"" <> value <> "\""
+    else
+      "'" <> String.replace(value, "'", "\\'") <> "'"
+    end
+  end
+
+  defp py_repr(value), do: py_str(value)
 
   defp fetch_field(fields, name) do
     string_name = to_string(name)
@@ -787,48 +883,53 @@ defmodule Imp.Adapter.Chat do
     ]
   end
 
-  defp parse_labelled_text(signature, text) do
-    allowed =
-      signature
-      |> Imp.Signature.output_names()
-      |> Map.new(fn name -> {name |> to_string() |> String.downcase(), name} end)
+  # DSPy's `field_header_pattern = re.compile(r"\[\[ ## (\w+) ## \]\]")`,
+  # matched (re.match) against each STRIPPED line.
+  @field_header_pattern ~r/^\[\[ ## (\w+) ## \]\]/u
 
-    delimiter_fields =
-      Regex.scan(
-        ~r/\[\[\s*##\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:##)?\s*\]\]\s*(.*?)(?=\s*\[\[\s*##|\z)/s,
-        text
-      )
-      |> Enum.reduce(%{}, fn [_line, key, value], acc ->
-        key = key |> String.trim() |> String.downcase()
+  # ChatAdapter.parse section scanning, ported line-for-line:
+  #   * `completion.splitlines()`;
+  #   * a line whose stripped form starts with the header pattern opens a new
+  #     section; the remainder of the line past the match becomes the first
+  #     content line when non-empty (upstream slices the ORIGINAL line at the
+  #     stripped match end — that quirk is reproduced);
+  #   * every other line appends to the current section;
+  #   * sections are joined with "\n" and stripped;
+  #   * only headers naming an output field count, FIRST occurrence wins,
+  #     name match is exact (no downcasing, no `name:` label lines).
+  defp parse_marker_sections(signature, text) do
+    allowed = Map.new(signature.outputs, fn field -> {to_string(field.name), field.name} end)
 
-        case Map.fetch(allowed, key) do
-          {:ok, field_name} -> Map.put(acc, field_name, String.trim(value))
-          :error -> acc
+    text
+    |> String.split(~r/\r\n|\r|\n/)
+    |> Enum.reduce([{nil, []}], fn line, [{header, lines} | rest] ->
+      trimmed = String.trim(line)
+
+      case Regex.run(@field_header_pattern, trimmed) do
+        [full, section_header] ->
+          remaining = line |> String.slice(String.length(full)..-1//1) |> String.trim()
+          content = if remaining == "", do: [], else: [remaining]
+          [{section_header, content}, {header, lines} | rest]
+
+        nil ->
+          [{header, [line | lines]} | rest]
+      end
+    end)
+    |> Enum.reverse()
+    |> Enum.reduce(%{}, fn
+      {nil, _lines}, acc ->
+        acc
+
+      {header, lines}, acc ->
+        case Map.fetch(allowed, header) do
+          {:ok, field_name} ->
+            value = lines |> Enum.reverse() |> Enum.join("\n") |> String.trim()
+            Map.put_new(acc, field_name, value)
+
+          :error ->
+            acc
         end
-      end)
-
-    labelled_fields =
-      Regex.scan(~r/^([A-Za-z][A-Za-z0-9_ ]*):\s*(.*)$/m, text)
-      |> Enum.reduce(%{}, fn [_line, key, value], acc ->
-        key =
-          key |> String.trim() |> String.downcase() |> String.replace(" ", "_")
-
-        case Map.fetch(allowed, key) do
-          {:ok, field_name} -> Map.put(acc, field_name, String.trim(value))
-          :error -> acc
-        end
-      end)
-
-    Map.merge(labelled_fields, delimiter_fields)
-  end
-
-  defp parse_json_fallback(signature, text, original_error) do
-    with {:ok, decoded} <- Jason.decode(String.trim(text)),
-         true <- is_map(decoded) do
-      build_prediction(signature, decoded)
-    else
-      _other -> original_error
-    end
+    end)
   end
 
   defp existing_atom(name) do

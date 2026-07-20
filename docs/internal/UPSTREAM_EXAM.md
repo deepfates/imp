@@ -1,14 +1,15 @@
 # Upstream Exam — Tranche 1: DSPy 3.2.1 adapters/ and signatures/ tests vs Imp
 
 The DSPy authors' own test suite (dspy-3.2.1, `tests/adapters/` — 13 files —
-and `tests/signatures/` — 4 files) run against Imp for the first time. Every
-upstream test function is accounted for below. Ported tests live in
+and `tests/signatures/` — 4 files) run against Imp. Every upstream test
+function is accounted for below. Ported tests live in
 `test/upstream_exam/adapters_test.exs` and
 `test/upstream_exam/signatures_test.exs` (`mix test --only upstream_exam`).
-Failures are real findings: each is tagged `@tag :upstream_fail` and skipped
-with the failure output preserved in a comment — re-enable by deleting the
-`@tag :skip` line. **No Imp code was changed in this tranche; this is a map,
-not a fix.**
+The exam landed as a map (PR #68, 14 real divergences tagged
+`@tag :upstream_fail` + `:skip`); the fix pass (dee-coia, dee-16qm, dee-jbav,
+dee-xyhv, dee-4fuy, dee-pkvp, dee-1nkd) closed all 14 without weakening a
+single ported assertion, and the skip tags are gone — every ported test runs
+and passes.
 
 ## Totals
 
@@ -16,57 +17,55 @@ not a fix.**
 |---|---|
 | Upstream test functions in scope | **243** (adapters 149, signatures 94) |
 | Ported | **80** (81 ExUnit tests; one upstream test split in two) |
-| — pass | **66** |
-| — FAIL (real divergence found by upstream's own test) | **14** |
+| — pass | **80** |
+| — FAIL (real divergence found by upstream's own test) | **0** (14 found by the exam; all fixed) |
 | — unclear | 0 |
 | Blocked (behavior should/could exist in Imp; not expressible yet) | **78** |
 | Not applicable (Python/pydantic/litellm/asyncio specific, or deliberate Imp design substitution) | **85** |
 
-### The 14 FAILs, clustered by root cause
+### The 14 original FAILs, clustered by root cause — all fixed
 
-1. **Chat parse single-output leniency** (4 fails): Imp's `Chat.parse` stuffs
-   an unstructured completion into the lone output field where DSPy raises
-   `AdapterParseError`. Breaks: `test_chat_adapter_exception_raised_on_failure`,
-   `test_chat_adapter_fallback_to_json_adapter_on_exception` (fallback never
-   fires because the bad parse "succeeds"),
-   `test_chat_adapter_respects_use_json_adapter_fallback_flag`,
-   `test_two_step_adapter_parse_errors`.
-2. **No json-repair** (2 fails): DSPy repairs Python-dict spellings
-   (`{'key': 'value'}`) via json_repair/ast.literal_eval; Imp only accepts
-   strict JSON. Breaks `test_parse_value_json_repair` and contributes to the
-   fallback fail above.
-3. **parse_value scalar/str semantics** (2 fails): `str(True)`/`str(None)`/
-   `str([1,2,3])` conversions and Literal quote/prefix stripping
-   (`"'option1'"` → `option1`) are absent. Breaks
-   `test_parse_value_str_annotation`, `test_parse_value_literal`.
-4. **Literal rendering of non-string members** (1 fail): Imp quotes every enum
-   member as a string (`Literal['1', 'bar']` vs DSPy `Literal[1, 'bar']`).
-   Breaks scenario 5 of `test_chat_adapter_quotes_literals_as_expected`
-   (scenarios 1–4 pass byte-for-byte).
-5. **ToolCalls.format wire shape** (2 fails): DSPy emits the OpenAI shape
-   `{"type": "function", "function": {"name", "arguments"}}`; Imp emits
-   `%{name:, args:}`. Breaks `test_tool_calls_format_basic`,
-   `test_tool_calls_format_from_dict_list`.
-6. **Audio x- format normalization** (1 fail): `audio/x-wav` should send
-   format `"wav"`; Imp sends `"x-wav"`. Breaks `test_normalize_audio_format`.
-7. **Signature-surface gaps** (3 fails): duplicate field names accepted
-   silently (DSPy raises); `infer_prefix` does no camelCase/title-casing
-   (`"Some attribute name:"` vs `"Some Attribute Name:"`); the parser rejects
-   `str` as a type name in string specs (DSPy accepts `a: str`). Breaks
-   `test_duplicate_input_output_field_names_raise`, `test_infer_prefix`,
-   `test_typed_signatures_basic_types`.
+1. **Chat parse single-output leniency** (4, fixed by dee-coia): `Chat.parse`
+   now ports DSPy `ChatAdapter.parse` exactly — line-based
+   `[[ ## field ## ]]` section split, first occurrence wins, loud error when
+   any output field is missing. The single-output stuffing, the lenient
+   `name: value` label parsing, and the in-parse JSON decode are gone; the
+   chat→JSON fallback (a second LM call in `Imp.Predict`) now fires exactly
+   as upstream's does.
+2. **No json-repair** (2, fixed by dee-16qm; closes dee-q2w2):
+   `Imp.Adapter.JSONRepair` ports the json_repair/ast.literal_eval ladder
+   (strict JSON, then Python-dict spellings: single quotes, True/False/None,
+   trailing commas) and the balanced-`{...}`-block extraction
+   `JSONAdapter.parse` performs; used by chat field coercion and JSON parse.
+3. **parse_value scalar/str semantics** (2, fixed by dee-jbav): str-annotated
+   fields render through Python `str()` (`True`→"True", `None`→"None",
+   `[1, 2, 3]`→"[1, 2, 3]"); Literal parsing strips `Literal[...]`/`str[...]`
+   wrappers and wrapping quotes before enum matching.
+4. **Literal rendering of non-string members** (1, fixed by dee-xyhv):
+   non-string Literal members render bare via Python `str()`
+   (`Literal[1, 'bar']`, `Literal[True, 3, 'foo']`); only string members are
+   quoted.
+5. **ToolCalls.format wire shape** (2, fixed by dee-4fuy): `ToolCalls.format`
+   emits the OpenAI shape `{"type": "function", "function": {"name",
+   "arguments"}}` (Imp's stable id rides at the top level when present).
+6. **Audio x- format normalization** (1, fixed by dee-pkvp): one leading
+   `x-` is stripped from the audio subtype (`audio/x-wav` → `"wav"`).
+7. **Signature-surface gaps** (3, fixed by dee-1nkd): duplicate names across
+   the arrow raise a ParseError; `infer_prefix` ports DSPy's camelCase/digit
+   splitting and Title Case with acronym preservation; the string-spec parser
+   accepts the Python spellings `str` and `dict`.
 
-Notable **passes**: all exact-prompt/byte-level tests pass — chat, JSON, and
-XML `format_system_message` (full-string equality including type notes and
+Notable byte-level passes throughout: chat, JSON, and XML
+`format_system_message` (full-string equality including type notes and
 JSON-schema escapes), conversation-history message shapes for chat and JSON,
 the two-step main+extraction round trip, XML parse/cast/missing-field errors,
-and string-Literal quoting.
+and Literal quoting across all five scenarios.
 
 ## Legend
 
 - **pass** — ported faithfully; passes against Imp.
-- **FAIL** — ported faithfully; fails against Imp (skipped + tagged
-  `:upstream_fail`; failure output in the test comment).
+- **pass (was FAIL)** — the exam found a real divergence here; the fix pass
+  closed it without weakening the ported assertion (ticket in the note).
 - **blocked** — the behavior should or could exist in Imp but the test cannot
   be expressed (missing type, missing API surface). Includes work deferred to
   the teleprompt tranche.
@@ -80,18 +79,18 @@ and string-Literal quoting.
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_parse_value_str_annotation | **FAIL** | Imp coerces `true`→`"true"` not `"True"`, drops `nil` (required-field error) instead of `"None"`, leaves lists unconverted instead of `"[1, 2, 3]"`. |
+| test_parse_value_str_annotation | pass (was FAIL) | Fixed by dee-jbav: str-annotated fields render through Python `str()` (`True`→"True", `None`→"None", `[1, 2, 3]`→"[1, 2, 3]"). |
 | test_parse_value_pydantic_types | n/a | Pydantic BaseModel validation; Imp has no user-defined model field types. |
 | test_parse_value_basic_types | pass | int/float/bool/list[int] conversions match, incl. JSON-decoding `"[1, 2, 3]"` for an array field. |
-| test_parse_value_literal | **FAIL** | Bare values pass; DSPy's quote/prefix stripping (`"'option1'"`, `"Literal[option1]"`, `"str[option1]"`) is absent — Imp rejects them at enum validation. |
+| test_parse_value_literal | pass (was FAIL) | Fixed by dee-jbav: `Literal[...]`/`str[...]` wrappers and wrapping quotes stripped before enum matching, exactly as parse_value does. |
 | test_parse_value_union | blocked | Imp signatures have no Optional/Union type surface. |
-| test_parse_value_json_repair | **FAIL** | Strict JSON passes; single-quoted Python-dict repair (`{'key': 'value'}`) absent. Malformed input errors correctly. |
+| test_parse_value_json_repair | pass (was FAIL) | Fixed by dee-16qm: `Imp.Adapter.JSONRepair` ports the json_repair/ast.literal_eval ladder for Python-dict spellings; malformed input still errors loudly. |
 
 ## tests/adapters/test_audio.py (1)
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_normalize_audio_format | **FAIL** | Ported over `Types.to_openai/1` (mime→format). DSPy strips `x-` prefixes (`x-wav`→`wav`); Imp passes the subtype through unchanged. |
+| test_normalize_audio_format | pass (was FAIL) | Fixed by dee-pkvp: ported over `Types.to_openai/1` (mime→format); one leading `x-` is stripped (`x-wav`→`wav`), interior runs preserved. |
 
 ## tests/adapters/test_baml_adapter.py (21)
 
@@ -133,12 +132,12 @@ prior-art). Most also require pydantic model schemas. One row each:
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_chat_adapter_quotes_literals_as_expected | **FAIL** (partial) | Scenarios 1–4 (string Literals with quote mixes, incl. escapes) pass byte-for-byte. Scenario 5 fails: Imp renders `Literal['1', 'bar']` where DSPy renders `Literal[1, 'bar']` (non-string enum members coerced to quoted strings). |
+| test_chat_adapter_quotes_literals_as_expected | pass (was FAIL, partial) | Scenarios 1–4 always passed byte-for-byte; scenario 5 fixed by dee-xyhv — non-string Literal members render bare (`Literal[1, 'bar']`). |
 | test_chat_adapter_sync_call | pass | Predict + chat adapter + fixture LM returning the marker completion → answer "Paris". |
 | test_chat_adapter_async_call | n/a | asyncio variant of the previous test; BEAM concurrency model. |
 | test_chat_adapter_with_pydantic_models | n/a | Nested pydantic input/output classes; assertions are on Python class names as annotations. |
 | test_chat_adapter_signature_information | pass | System/user message structure assertions all hold. |
-| test_chat_adapter_exception_raised_on_failure | **FAIL** | DSPy raises AdapterParseError on a marker-less completion; Imp's single-output leniency returns `{:ok, answer: "{'output':'mismatched value'}"}`. |
+| test_chat_adapter_exception_raised_on_failure | pass (was FAIL) | Fixed by dee-coia: a marker-less completion is a loud parse error, matching DSPy's AdapterParseError. |
 | test_chat_adapter_formats_image | pass | 3-chunk text/image/text content; Imp keeps the typed struct in adapter output, `Types.to_openai/1` yields the exact image_url block. |
 | test_chat_adapter_formats_image_with_few_shot_examples | pass | 6 messages, completed markers in assistant turns, right image in each user turn. |
 | test_chat_adapter_formats_image_with_nested_images | n/a | Images nested in pydantic wrapper models; no model-traversal surface in Imp. |
@@ -148,8 +147,8 @@ prior-art). Most also require pydantic model schemas. One row each:
 | test_code_output_field_omits_json_schema_in_prompt | blocked | Same missing Code field-type surface. |
 | test_citations_output_field_keeps_json_schema_in_prompt | blocked | DSPy `Citations` custom type not modeled (see test_citation.py). |
 | test_chat_adapter_formats_conversation_history | pass | Exact-string message contents for both history turns. |
-| test_chat_adapter_fallback_to_json_adapter_on_exception | **FAIL** | Imp.Predict has the chat→JSON fallback, but it never fires: single-output leniency makes chat parse "succeed" with the raw `{'answer': 'Paris'}` text; single-quoted JSON also would not decode. |
-| test_chat_adapter_respects_use_json_adapter_fallback_flag | **FAIL** | Imp spells the flag `config: [json_fallback: false]`; with it, "nonsense" should be a parse error but leniency accepts it as the answer. |
+| test_chat_adapter_fallback_to_json_adapter_on_exception | pass (was FAIL) | Fixed by dee-coia + dee-16qm: strict chat parse fails, Imp.Predict's JSON fallback fires a second LM call, and JSONRepair decodes the single-quoted object. |
+| test_chat_adapter_respects_use_json_adapter_fallback_flag | pass (was FAIL) | Fixed by dee-coia: with `config: [json_fallback: false]`, "nonsense" is a loud parse error after exactly one LM call. |
 | test_chat_adapter_fallback_to_json_adapter_on_exception_async | n/a | asyncio variant. |
 | test_chat_adapter_toolcalls_native_function_calling | blocked | Native function-calling adapter option (`use_native_function_calling`) absent. |
 | test_chat_adapter_toolcalls_vague_match | blocked | Parsing marker text into a ToolCalls output field requires the typed tool_calls field surface. |
@@ -211,7 +210,7 @@ renders as a text block.
 | test_json_adapter_sync_call | pass | Predict + JSON adapter + strict-JSON completion → answer "Paris". |
 | test_json_adapter_async_call | n/a | asyncio variant. |
 | test_json_adapter_on_pydantic_model | n/a | Pydantic User/Answer models; exact pydantic-schema prompt strings. |
-| test_json_adapter_parse_raise_error_on_mismatch_fields | pass | Loud error confirmed. Caveat: DSPy repairs the single-quoted JSON then reports missing fields ("Expected to find output fields... [answer]"); Imp fails earlier with a JSON decode error, so the AdapterParseError detail assertions (adapter_name/parsed_result/message) have no counterpart. |
+| test_json_adapter_parse_raise_error_on_mismatch_fields | pass | Loud error confirmed. Since dee-16qm, Imp repairs the single-quoted JSON exactly as DSPy does and then reports the missing `answer` field (`{:missing_output_fields, [:answer]}` — Imp's error tuple in place of upstream's adapter_name/parsed_result exception attributes). |
 | test_json_adapter_formats_image | pass | Same 3-chunk structure as chat. |
 | test_json_adapter_formats_image_with_few_shot_examples | pass | 6 messages, images in the right user turns. |
 | test_json_adapter_formats_image_with_nested_images | n/a | Pydantic wrapper traversal. |
@@ -272,8 +271,8 @@ n/a wholesale.
 | test_async_tool_with_kwargs | n/a | asyncio + kwargs. |
 | test_async_concurrent_calls | n/a | asyncio.gather timing. |
 | test_async_tool_call_in_sync_mode | n/a | asyncio/sync conversion flag. |
-| test_tool_calls_format_basic | **FAIL** | DSPy `ToolCalls.format()` emits OpenAI wire shape (`type: "function"`, `function: {name, arguments}`); Imp emits `%{name:, args:}` — no wire envelope. (Empty-list case matches.) |
-| test_tool_calls_format_from_dict_list | **FAIL** | Same wire-shape divergence via `from_dict_list`. |
+| test_tool_calls_format_basic | pass (was FAIL) | Fixed by dee-4fuy: `ToolCalls.format` emits the OpenAI wire shape (`type: "function"`, `function: {name, arguments}`). |
+| test_tool_calls_format_from_dict_list | pass (was FAIL) | Fixed by dee-4fuy: same wire shape via `from_dict_list`. |
 | test_toolcalls_vague_match | pass (partial) | Single dict → ToolCall, list → ToolCalls, invalid raises. The bare `{"tool_calls": [...]}` dict shape has no single validator on the type (it is handled in the chat adapter's history normalizer) — that case blocked. |
 | test_tool_convert_input_schema_to_tool_args_no_input_params | blocked | No `convert_input_schema_to_tool_args` equivalent; Imp.MCP keeps schemas as maps. |
 | test_tool_convert_input_schema_to_tool_args_lang_chain | blocked | Same. |
@@ -286,8 +285,8 @@ n/a wholesale.
 |---|---|---|
 | test_two_step_adapter_call | pass | Main persona prompt + `name: value` user turn, then extraction call over `text -> outputs`; answer coerces to 12.0 (== 12). Extraction LM configured via `two_step_extraction_lm` setting (DSPy: constructor arg). |
 | test_two_step_adapter_async_call | n/a | asyncio variant. |
-| test_two_step_adapter_parse | pass | Extraction JSON (via chat parse's JSON fallback) yields tags list + 0.87 confidence. |
-| test_two_step_adapter_parse_errors | **FAIL** | DSPy fails loudly ("Failed to parse response"); Imp's chat single-output leniency accepts "invalid response" as the lone answer field, so extraction "succeeds". |
+| test_two_step_adapter_parse | pass | Extraction JSON yields tags list + 0.87 confidence (chat extraction fails on the bare JSON, TwoStep's JSONAdapter retry parses it — DSPy's own fallback path). |
+| test_two_step_adapter_parse_errors | pass (was FAIL) | Fixed by dee-coia: strict chat parse rejects the unusable text, the JSON retry also fails, and the loud `two_step_extraction_failed` error matches DSPy's ValueError. |
 
 ## tests/adapters/test_xml_adapter.py (12)
 
@@ -315,7 +314,7 @@ n/a wholesale.
 | test_no_input_output2 | n/a | Same for a plain pydantic.Field. |
 | test_all_fields_have_prefix | pass | Custom prefix kept; default output prefix "Output:". |
 | test_signature_parsing | pass | |
-| test_duplicate_input_output_field_names_raise | **FAIL** | DSPy raises ValueError("...distinct names"); Imp accepts `"value -> value"` silently. |
+| test_duplicate_input_output_field_names_raise | pass (was FAIL) | Fixed by dee-1nkd: `"value -> value"` raises a ParseError ("...distinct names..."), matching DSPy's ValueError. |
 | test_with_signature | pass | `with_instructions` → struct update; immutability inherent to Elixir values. |
 | test_with_updated_field | n/a | Immutable-class field-update plumbing; on plain structs this is ordinary map update, nothing to port. |
 | test_empty_signature | pass | `Imp.signature("")` raises ParseError. |
@@ -329,12 +328,12 @@ n/a wholesale.
 | test_signature_reverse | pass | `to_spec/1` round trip. |
 | test_insert_field_at_various_positions | pass | Appends via `extend/3`, output-prepend via `prepend_output/2`, input-prepend via struct update (no dedicated API — noted). |
 | test_order_preserved_with_mixed_annotations | pass | |
-| test_infer_prefix | **FAIL** | DSPy title-cases and splits camelCase/digits ("Some Attribute Name 42 Is Cool"); Imp only capitalizes the first word and never splits camelCase. |
+| test_infer_prefix | pass (was FAIL) | Fixed by dee-1nkd: `Field.new` ports DSPy's infer_prefix (camelCase/digit splitting, Title Case, acronyms preserved). |
 | test_insantiating | n/a | Signature classes as instantiable value containers; Python class semantics. |
 | test_insantiating2 | n/a | Same. |
 | test_multiline_instructions | pass | Multiline instructions + no-input predict flow. |
 | test_dump_and_load_state | blocked | DSPy's `dump_state` schema (`fields: [{prefix, description}]`) is not Imp's persistence format; Imp dump/load uses name/kind/type maps. If DSPy-artifact compatibility ever matters, this is the contract to port. |
-| test_typed_signatures_basic_types | **FAIL** | Imp's string-spec parser rejects `str` as a type name (ParseError: unknown field type "str", did you mean "string"?); DSPy accepts `a: str`. `int`/`float` parse fine. |
+| test_typed_signatures_basic_types | pass (was FAIL) | Fixed by dee-1nkd: the parser accepts the Python spellings `str` and `dict`; `int`/`float` already parsed. `list[...]` deliberately keeps its guided error pointing at `array[...]`. |
 | test_typed_signatures_generics | blocked | `list[int]` is deliberately spelled `array[integer]` in Imp; `dict[str, float]` and `tuple[...]` generics do not exist. |
 | test_typed_signatures_unions_and_optionals | blocked | No Optional/Union types. |
 | test_typed_signatures_any | blocked | No Any type. |
@@ -448,8 +447,9 @@ and encode at the provider boundary (`Types.to_openai/1`). Not modeled:
 - **Signature classes inline**: nearly every upstream test declares a
   class-form signature with pydantic annotations. The porting pattern that
   worked here: Imp map form with explicit `type:`/`desc:`/`constraints:`;
-  string specs only where upstream used string specs (note `str` is not
-  accepted by Imp's parser — finding #7).
+  string specs only where upstream used string specs (`str`/`dict` are
+  accepted Python spellings since the dee-1nkd fix; `list[...]` still gets
+  the guided `array[...]` error).
 - **Async twins**: upstream duplicates many tests as `@pytest.mark.asyncio`
   with `acall`/`litellm.acompletion`. These are mechanical asyncio variants —
   counted n/a here; the same policy will cut predict/teleprompt scope roughly

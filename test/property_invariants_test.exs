@@ -28,10 +28,17 @@ defmodule PropertyInvariantsTest do
   end
 
   defp signature_spec do
+    # Names must be distinct ACROSS the arrow too: duplicate input/output
+    # names now raise, matching upstream (dee-1nkd; the raise itself is
+    # covered by the ported upstream test). A round-trip property should
+    # generate valid signatures, so uniqueness is enforced over the union.
     gen all(
-          inputs <- uniq_list_of(field_spec(), min_length: 1, max_length: 3),
-          outputs <- uniq_list_of(field_spec(), min_length: 1, max_length: 3)
+          names <- uniq_list_of(identifier(), min_length: 2, max_length: 6),
+          types <- list_of(field_type(), length: length(names)),
+          split <- integer(1..(length(names) - 1))
         ) do
+      fields = Enum.zip_with(names, types, fn name, type -> "#{name}: #{type}" end)
+      {inputs, outputs} = Enum.split(fields, split)
       Enum.join(inputs, ", ") <> " -> " <> Enum.join(outputs, ", ")
     end
   end

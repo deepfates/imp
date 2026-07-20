@@ -10,7 +10,10 @@ defmodule ProtocolTrainingProviderLifecycleTest do
          id: "resp_trained_model",
          model: to_string(model),
          context: ReqLLM.Context.new(messages),
-         message: ReqLLM.Context.assistant("Answer: 4")
+         # Chat parse is now upstream-exact (dee-coia): responses must speak the
+         # marker dialect; the old "Answer: 4" label line is a parse error to
+         # real DSPy and to Imp.
+         message: ReqLLM.Context.assistant("[[ ## answer ## ]]\n4\n\n[[ ## completed ## ]]")
        }}
     end
   end

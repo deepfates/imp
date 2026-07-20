@@ -128,12 +128,33 @@ defmodule Imp.Signature.Field do
   defp normalize_type_alias("boolean"), do: :boolean
   defp normalize_type_alias(other), do: existing_atom_or_string(other)
 
+  # Faithful port of DSPy `infer_prefix` (dspy/signatures/signature.py):
+  # camelCase and digit boundaries become underscores, then each word is
+  # title-cased with all-caps acronyms preserved ("someAttributeName42IsCool"
+  # -> "Some Attribute Name 42 Is Cool", "isHTTPSecure" -> "Is HTTP Secure").
+  # The trailing ":" is Imp's prefix convention (DSPy appends it at the
+  # InputField/OutputField default). (dee-1nkd)
   defp infer_prefix(name) do
     name
     |> to_string()
-    |> String.replace("_", " ")
-    |> String.capitalize()
+    # Step 1: camelCase -> snake_case ("camelCase" -> "camel_Case"), then
+    # consecutive capitals ("camel_Case" -> "camel_case" boundaries).
+    |> then(&Regex.replace(~r/(.)([A-Z][a-z]+)/, &1, "\\1_\\2"))
+    |> then(&Regex.replace(~r/([a-z0-9])([A-Z])/, &1, "\\1_\\2"))
+    # Step 2: underscores around digit runs ("text2number" -> "text_2_number").
+    |> then(&Regex.replace(~r/([A-Za-z])(\d)/, &1, "\\1_\\2"))
+    |> then(&Regex.replace(~r/(\d)([A-Za-z])/, &1, "\\1_\\2"))
+    # Step 3: Title Case per word, preserving acronyms (Python str.isupper()).
+    |> String.split("_")
+    |> Enum.map_join(" ", fn word ->
+      if python_isupper?(word), do: word, else: String.capitalize(word)
+    end)
     |> Kernel.<>(":")
+  end
+
+  # Python `str.isupper/0`: at least one cased character and no lowercase ones.
+  defp python_isupper?(word) do
+    String.match?(word, ~r/\p{Lu}/u) and not String.match?(word, ~r/\p{Ll}/u)
   end
 
   defp existing_atom_or_string(value) do

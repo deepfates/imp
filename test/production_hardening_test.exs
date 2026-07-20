@@ -14,7 +14,11 @@ defmodule ProductionHardeningTest do
            id: "resp_flaky",
            model: to_string(model),
            context: ReqLLM.Context.new(messages),
-           message: ReqLLM.Context.assistant("Answer: recovered")
+           # Chat parse accepts only the [[ ## field ## ]] marker dialect
+           # (DSPy ChatAdapter.parse; dee-coia) — a bare "Answer: ..." label
+           # would be a parse error and trigger the JSON-fallback retry.
+           message:
+             ReqLLM.Context.assistant("[[ ## answer ## ]]\nrecovered\n\n[[ ## completed ## ]]")
          }}
       end
     end
