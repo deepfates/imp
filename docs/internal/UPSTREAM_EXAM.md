@@ -1,4 +1,9 @@
-# Upstream Exam — Tranche 1: DSPy 3.2.1 adapters/ and signatures/ tests vs Imp
+# Upstream Exam: DSPy 3.2.1's own tests vs Imp
+
+Tranche 1: `tests/adapters/` + `tests/signatures/` (below).
+Tranche 2: `tests/predict/` (second half of this document).
+
+## Tranche 1 — adapters/ and signatures/
 
 The DSPy authors' own test suite (dspy-3.2.1, `tests/adapters/` — 13 files —
 and `tests/signatures/` — 4 files) run against Imp. Every upstream test
@@ -458,3 +463,351 @@ and encode at the provider boundary (`Types.to_openai/1`). Not modeled:
   test_adapter_file.py and test_adapter_image.py use
   `dspy.teleprompt.LabeledFewShot` — they are recorded blocked here and
   should be picked up by the teleprompt tranche.
+
+---
+
+# Tranche 2 — predict/
+
+The DSPy authors' `tests/predict/` suite (dspy-3.2.1, 13 files, 198 test
+functions including two commented-out artifacts) run against Imp. Every
+upstream test function is accounted for below. Ported tests live in
+`test/upstream_exam/predict_test.exs` (63 ExUnit tests; one upstream test —
+`test_call_predict_with_chat_history` — is split into its two adapter
+parameterizations). `mix test --only upstream_exam` runs both tranches.
+
+Owner steer honored: API-boundary behavior first, internals least. Where Imp
+carries a documented design substitution (Elixir sandbox for the Deno Python
+interpreter; `{:error, reason}` tuples for exceptions; `:history` entries for
+the trajectory dict; `majority/2` returning the winning value), the port
+asserts the substituted surface at full strength and the seam is named in the
+row.
+
+## Totals (tranche 2)
+
+| Metric | Count |
+|---|---|
+| Upstream test functions in scope | **198** (aggregation 6, best_of_n 3, chain_of_thought 4, code_act 5, knn 3, multi_chain_comparison 1, parallel 7, predict 66, program_of_thought 6, react 9, refine 3, retry 3, rlm 82) |
+| Ported | **62** (63 ExUnit tests) |
+| — pass | **62** |
+| — FAIL (real divergence found by upstream's own test) | **0** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **32** |
+| Not applicable (Python/pydantic/litellm/asyncio/Deno specific, or a documented Imp design substitution) | **104** |
+
+### Gaps the classification surfaced (fix-wave candidates)
+
+No ported assertion failed, but the blocked rows point at real, buildable
+surface. Ranked by owner-steer relevance (API boundary first):
+
+1. **No `n=` multi-completion surface on `Imp.Predict`** (test_multi_output,
+   test_multi_output2): DSPy samples n completions and exposes
+   `result.completions.field[i]`. `Imp.Prediction` has a `completions` list
+   but nothing fills it.
+2. **Extra inputs are silently ignored** (test_extra_fields_warning): DSPy
+   warns "not in signature"; Imp drops them without a word — tension with the
+   nothing-silent law, independent of the exam.
+3. **No input type-mismatch warnings** (16 warning-family tests): DSPy
+   soft-validates inputs against annotations and logs mismatches
+   (`warn_on_type_mismatch`). Imp renders whatever it is given.
+4. **Constraints are not rendered into prompts** (test_field_constraints):
+   ge/le/min_length never reach the LM as text. Same seam tranche 1 recorded
+   for test_signature_field_with_constraints.
+5. **No `fail_count` on BestOfN** (test_refine_module_custom_fail_count,
+   best_of_n variant): Refine has the failure budget; BestOfN runs all N.
+6. **No per-prediction usage ledger** (test_lm_usage*): no `get_lm_usage`
+   analog.
+7. **RLM has no reserved-tool-name guard**
+   (test_tool_validation_reserved_names): upstream rejects tools named
+   `llm_query`/`SUBMIT`/`print`; Imp accepts a tool named `llm_query` with
+   unspecified shadowing behavior.
+8. **No input-field default values** (test_input_field_default_value).
+9. **No per-call LM kwargs pass-through**
+   (test_predicted_outputs_piped_from_predict_to_lm_call).
+10. **RLM interpreter allowlist has no sum/reduce** (noted while porting
+    test_with_input_variables_e2e; the port spells the sum with `Enum.at`).
+11. **No datetime field type** (test_datetime_inputs_and_outputs).
+
+### Tranche 1's 78-blocked bucket, re-scrutinized (ticket ask)
+
+Reviewed against predict-level machinery: **none unlock**. The bucket is
+dominated by BAMLAdapter (21), pydantic model/typed-field surfaces, Citations
+(7), native function calling, and union/generic types — all still absent.
+The teleprompt-deferred rows (test_save_load_file_signature,
+test_save_load_complex_default_types/_types) still need
+teleprompt.LabeledFewShot and stay with the teleprompt tranche.
+
+## tests/predict/test_aggregation.py (6)
+
+Imp's `majority/2` returns the winning value; DSPy returns a Prediction whose
+first completion is the winner (no Completions container in Imp — documented
+substitution; all ports assert the winning value).
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_majority_with_prediction | pass | List of `%Imp.Prediction{}` + `field: :answer` → "2". |
+| test_majority_with_completions | n/a | DSPy's `Completions` container type; the same voting path is covered by the list port. |
+| test_majority_with_list | pass | Plain maps + `field: :answer` → "2". |
+| test_majority_with_normalize | pass | normalize_text analog (trim+downcase) groups " 2" with "2". |
+| test_majority_with_field | pass | `field: :other` → "1". |
+| test_majority_with_no_majority | pass | Tie keeps the first completion ("2"). |
+
+## tests/predict/test_best_of_n.py (3)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_refine_forward_success_first_attempt | pass | DummyModule port (test struct implementing `Imp.Module`); reward never hits threshold → module runs exactly N=3 times; tie-first keeps "Brussels". |
+| test_refine_module_default_fail_count | pass | Always-raising module → loud `{:error, {:no_successful_predictions, _}}` (DSPy: ValueError). |
+| test_refine_module_custom_fail_count | blocked | `Imp.Predict.BestOfN` has no `fail_count` option (Refine has one); the run-aborts-after-budget behavior is not expressible. |
+
+## tests/predict/test_chain_of_thought.py (4)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_initialization_with_string_signature | pass | Output fields exactly `[:reasoning, :answer]`; call answers "2". |
+| test_async_chain_of_thought | n/a | asyncio twin. |
+| test_chain_of_thought_with_native_reasoning | pass | Ported with the mocked marker completion verbatim (including upstream's stray `[[ ## completion ## ]]` tail, which parses as an unknown section exactly as in DSPy); answer "Paris", reasoning the exact string. |
+| test_chain_of_thought_with_manual_reasoning | n/a | The distinguishing surface is litellm's `Choices.reasoning` attribute; the content-side assertions are identical to the previous row's port. |
+
+## tests/predict/test_knn.py (3)
+
+DummyVectorizer ported as the same algorithm (char-bigram counts bucketed by a
+polynomial hash, mean-centered, L2-normalized) with fixed coefficients —
+Python's `random.seed(123)` stream is not reproducible on the BEAM; the
+geometry the assertions rely on is preserved. The `np.ndarray` type assertion
+half is n/a (lists of floats in Imp).
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_knn_initialization | pass | k == 2; 3 trainset vectors. |
+| test_knn_query | pass | "What is 3+3?" retrieves "What is 2+2?" first (answer "4"), 2 samples. |
+| test_knn_query_specificity | pass | "capital of Germany" retrieves the France example ("Paris" among answers). |
+
+## tests/predict/test_multi_chain_comparison.py (1)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_basic_example | pass | Three rationale/answer completions in, `final_pred.rationale == "my rationale"`, `answer == "blue"`. |
+
+## tests/predict/test_parallel.py (7)
+
+`Imp.Predict.Parallel.map/3` is one-program-many-inputs; DSPy's
+`Parallel([(predictor, input), ...])` heterogeneous pair list has no Imp
+surface. Batch semantics are ported; pair-list shapes are blocked.
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_parallel_module | pass (adapted) | Five parallel calls over one program each consume one scripted response; all five outputs come back (order-free set assertion, as upstream). |
+| test_batch_module | pass (adapted) | Second batch through an `input -> output, reasoning` program; each result's reasoning number matches its output number. |
+| test_nested_parallel_module | blocked | Nested heterogeneous (program, input) pair lists not expressible in `Parallel.map`'s contract. |
+| test_nested_batch_method | blocked | A module forward returning nested raw result lists violates `Imp.Module`'s Prediction-only return contract. |
+| test_batch_with_failed_examples | pass (adapted) | One raising input → its own `{:error, reason}` slot carrying "test error"; other slots succeed (DSPy: None slot + failed_examples/exceptions lists). |
+| test_parallel_timeout_and_straggler_limit_params | blocked | No `straggler_limit` (Python thread-pool machinery); `:timeout` exists but defaults to 30_000 ms, not DSPy's 120 s — parameter surface not mirrored. |
+| test_batch_timeout_and_straggler_limit_params | pass (partial) | The timeout half: custom module batch with explicit `timeout:` returns [2, 4, 6] in order. straggler_limit half blocked as above. |
+
+## tests/predict/test_predict.py (66)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_initialization_with_string_signature | pass | Default instructions byte-equal: "Given the fields `input1`, `input2`, produce the fields `output`." |
+| test_reset_method | n/a | In-place mutable reset; Imp programs are immutable values. |
+| test_lm_after_dump_and_load_state | n/a | litellm LM kwargs dump_state contract; Imp LMs are validated refs / portable ReqLLM clients. |
+| test_call_method | pass | |
+| test_instructions_after_dump_and_load_state | pass | `Imp.dump/1` → `Imp.load/1` preserves "original instructions". |
+| test_demos_after_dump_and_load_state | pass | Demos survive dump → JSON round trip → load with content intact ("¿Qué tal?"). |
+| test_typed_demos_after_dump_and_load_state | n/a | pydantic models inside demos. |
+| test_typed_demos_after_dump_and_load_state (commented duplicate) | n/a | Commented out upstream (TypedPredictor removed). |
+| test_signature_fields_after_dump_and_load_state | pass (adapted) | `Imp.save!/load!` file round trip; loaded signature dump equals the original and differs from a maliciously re-declared one. (Imp.load! returns the program; no merge-into-instance surface.) |
+| test_lm_field_after_dump_and_load_state | n/a | pickle + litellm LM state. |
+| test_load_ignores_serialized_endpoint_override_by_default | n/a | litellm endpoint-override security plumbing. Imp never serializes provider endpoints — non-portable LMs fail loudly at dump (portable-LM doctrine), so the attack surface does not exist. |
+| test_load_allows_serialized_endpoint_override_with_opt_in | n/a | Same. |
+| test_load_state_ignores_serialized_endpoint_override_by_default | n/a | Same. |
+| test_load_state_allows_serialized_endpoint_override_with_opt_in | n/a | Same. |
+| test_load_state_ignores_serialized_model_list_endpoint_override_by_default | n/a | Same. |
+| test_load_prevents_serialized_endpoint_override_reaching_litellm | n/a | Same. |
+| test_load_blocks_serialized_model_list_unless_opted_in | n/a | Same. |
+| test_load_uses_env_api_key_without_honoring_serialized_endpoint_override | n/a | Same (env API keys are provider-client concerns; secret values are owner-only). |
+| test_forward_method | pass | |
+| test_forward_method2 | pass | |
+| test_config_management | n/a | `update_config`/`get_config` mutators; Imp config is plain data on an immutable struct. |
+| test_multi_output | blocked | No `n=` multi-completion sampling / `completions` population on Imp.Predict (gap #1 above). |
+| test_multi_output2 | blocked | Same. |
+| test_datetime_inputs_and_outputs | blocked | No datetime field type. |
+| test_explicitly_valued_enum_inputs_and_outputs | pass (partial) | Enum-constrained output parses "in_progress". Imp enums are string constraints; no Python Enum member identity. |
+| test_enum_inputs_and_outputs_with_shared_names_and_values | n/a | Python Enum name/value aliasing semantics. |
+| test_auto_valued_enum_inputs_and_outputs | n/a | `enum.auto` value semantics. |
+| test_named_predictors | pass (adapted) | `Imp.ProgramParameters.predictors/1` exposes the inner Predict of a composite. The deepcopy half is n/a (immutability inherent). |
+| test_output_only | pass | `" -> output"` signature; empty-input call answers. |
+| test_load_state_chaining | n/a | Return-self fluent API. |
+| test_call_predict_with_chat_history | pass | Both parameterizations ported (chat markers; json with single-quoted json-repair response). 4 messages; history turns and final question land in the right turns. |
+| test_lm_usage | blocked | No `get_lm_usage` per-prediction usage aggregation surface (gap #6). |
+| test_lm_usage_with_parallel | blocked | Same. |
+| test_lm_usage_with_async | n/a | asyncio twin. |
+| test_positional_arguments | pass (adapted) | Bare-value call → loud `{:error, {:invalid_predict_inputs, _}}` (DSPy: ValueError with keyword-argument guidance; message shape differs). |
+| test_error_message_on_invalid_lm_setup | pass (partial) | No LM → `{:error, :lm_not_configured}`. A bogus LM value raises at construction (Imp validates in `new/2`; DSPy at call time). The BaseLM-instance message half has no Imp counterpart. |
+| test_field_constraints | blocked | ge/le/min_length are machine constraints only, never rendered into the system message (gap #4; tranche 1 seam). |
+| test_async_predict | n/a | asyncio twin. |
+| test_predicted_outputs_piped_from_predict_to_lm_call | blocked | No per-call LM kwargs / predicted-outputs pass-through surface (gap #9). |
+| test_dump_state_pydantic_non_primitive_types | n/a | pydantic `serialize_object`. |
+| test_trace_size_limit | n/a | Design substitution: no global mutable `settings.trace`; Imp uses optimizer trace capture + telemetry. |
+| test_disable_trace | n/a | Same. |
+| test_per_module_history_size_limit | n/a | No mutable per-module history on immutable programs; observability owns history. |
+| test_per_module_history_disabled | n/a | Same. |
+| test_input_field_default_value | blocked | No input-field default-value surface (gap #8). |
+| test_extra_fields_warning | blocked | Extra inputs are silently ignored — no warning subsystem (gap #2; nothing-silent tension). |
+| test_warning_images | blocked | Type-mismatch warning subsystem absent (also Image string-sniffing constructor n/a). |
+| test_type_mismatch_warning | blocked | Warning subsystem absent (gap #3). |
+| test_correct_types_no_warning | n/a | Vacuously true without the warning subsystem; nothing to assert. |
+| test_list_type_validation | blocked | Warning subsystem absent. |
+| test_literal_type_validation | blocked | Warning subsystem absent. |
+| test_literal_union_type_validation | blocked | Warning subsystem + no union types. |
+| test_list_string | blocked | Warning subsystem absent. |
+| test_nested_list_type_validation | blocked | Warning subsystem absent. |
+| test_nested_dict_type_validation | blocked | Warning subsystem + no dict[k,v] generics. |
+| test_nested_tuple_type_validation | blocked | Warning subsystem + no tuple types. |
+| test_literal_type_validation_string_signature | blocked | Warning subsystem + `Literal[...]` string-spec syntax unsupported. |
+| test_list_type_validation_string_signature | blocked | Warning subsystem + `list[...]` deliberately spelled `array[...]`. |
+| test_dict_type_validation_string_signature | blocked | Warning subsystem + dict generics. |
+| test_tuple_type_validation_string_signature | blocked | Warning subsystem + tuple types. |
+| test_union_type_validation_string_signature | blocked | Warning subsystem + union types. |
+| test_basic_types_string_signature | blocked | Warning subsystem + `warn_on_type_mismatch` setting absent. |
+| test_untyped_string_signature | n/a | Vacuous (asserts no warning; there is no warning machinery). |
+| test_untyped_class_signature | n/a | Same. |
+| test_string_to_list_signature | n/a | Same. |
+| test_custom_signature_types | blocked | Custom pydantic types in string specs — tranche 1 seam (no custom-type system). |
+
+## tests/predict/test_program_of_thought.py (6)
+
+Design substitution throughout: Imp PoT generates a safe **Elixir** expression
+executed in `Imp.Sandbox` (no Deno/Python, no `interpreter.deno_process`
+assertions), and projects the value directly instead of a second extraction LM
+call when it satisfies the declared outputs.
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_pot_code_generation | pass (adapted) | Planner emits `1+1`; sandbox executes; answer 2 (direct projection; upstream's "2" is its scripted extraction LM's string). |
+| test_old_style_pot | n/a | Legacy Python markdown-fence/no-SUBMIT format compatibility for old finetuned models. |
+| test_pot_support_multiple_fields | pass (adapted) | Program yields both outputs (`%{maximum: "6", minimum: "2"}`); both asserted. |
+| test_pot_code_generation_with_one_error | pass | First program fails at runtime (unknown variable), regeneration succeeds; answer 2. |
+| test_pot_code_generation_persistent_errors | pass | Always-failing program exhausts `max_iters: 3` → loud `{:error, _}` (DSPy: RuntimeError "Max hops reached"). |
+| test_pot_code_parse_error | pass (partial) | Unparsable program exhausts max_iters loudly. The `_execute_code`-never-called half is Python mock internals. |
+
+## tests/predict/test_code_act.py (5)
+
+Design substitution: Imp CodeAct plans discrete steps — a tool call OR a safe
+Elixir program over the accumulated `observation` — rather than generating
+Python that calls tools inline. Trajectory-dict byte assertions map to the
+step/trace surface.
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_codeact_code_generation | pass (adapted) | Tool step (`add` → 2), then finished program over `observation`, extraction answers "2". |
+| test_codeact_support_multiple_fields | pass (adapted) | Tool returns max/min map; extraction produces both outputs. |
+| test_codeact_code_parse_failure | pass | Unparsable program is a recoverable observation; the next generation succeeds. |
+| test_codeact_code_execution_failure | pass | Unknown-variable failure is recoverable; next generation succeeds. |
+| test_codeact_tool_validation | pass (adapted) | Invalid tool entries raise ArgumentError at construction (DSPy: ValueError for callable objects — Imp has no function/callable-object distinction; anything not an `Imp.Tool` is rejected). |
+
+## tests/predict/test_react.py (9)
+
+Ports run ReAct in `:dspy_3_2_1` mode (the faithful reproduction of
+dspy/predict/react.py). DSPy's `result.trajectory` dict maps to Imp's
+`:history` entries (`%{thought, tool, arguments, result}` per tool call).
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_tool_observation_preserves_custom_type | n/a | PIL images + ChatAdapter subclass spying. |
+| test_tool_calling_with_pydantic_args | blocked | pydantic-model tool args / typed input fields; the trajectory flow itself is covered by the without_typehint port. |
+| test_react_with_tools_skips_native_response_issubclass_for_generic_alias | n/a | Python `issubclass` monkeypatch regression. |
+| test_tool_calling_without_typehint | pass | One tool call then finish then extraction; c == 3; history records thought/tool/args, observation 3, and "Completed." for finish — the trajectory contract at full strength. |
+| test_trajectory_truncation | n/a | Requires swapping the inner react predictor attribute at runtime (Python mock); Imp's truncation ladder is regression-tested in-repo (`faithful_trajectory_call`). |
+| test_context_window_exceeded_after_retries | n/a | Same inner-attribute mocking (+ asyncio half). |
+| test_error_retry | pass | Always-raising tool; invocation-local `max_iters: 2`; extraction still answers c == 3; both history entries carry the exact thought/tool/args and an observation containing "tool error". |
+| test_async_tool_calling_with_pydantic_args | n/a | asyncio twin. |
+| test_async_error_retry | n/a | asyncio twin. |
+
+## tests/predict/test_refine.py (3)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_refine_forward_success_first_attempt | pass | DummyModule port; reward below threshold on all attempts → module runs exactly 3 times; best answer "Brussels"; reward called. |
+| test_refine_module_default_fail_count | pass | Always-raising module → loud error. |
+| test_refine_module_custom_fail_count | pass | `fail_count: 1`: the second failure aborts (`{:error, {:refine_fail_count_exceeded, _}}`); module called exactly 2 times. |
+
+## tests/predict/test_retry.py (3)
+
+The entire file is commented out at the 3.2.1 pin (dspy.Retry / assertions
+retired upstream).
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_retry_simple | n/a | Commented out upstream. |
+| test_retry_forward_with_feedback | n/a | Commented out upstream. |
+| test_retry_forward_with_typed_predictor | n/a | Commented out upstream (doubly: nested comment block). |
+
+## tests/predict/test_rlm.py (82)
+
+Design substitution: Imp RLM's controller writes constrained **Elixir**
+(`submit/1`, `print/1`, `llm_query/1`, registered tools) interpreted by an
+AST-allowlist interpreter — no Deno/Pyodide, no markdown fences, no Python
+REPL type classes. Upstream's MockInterpreter/PythonInterpreter/REPLTypes
+strata test its own fixtures and interpreter; the RLM *behavior* stratum is
+ported.
+
+| Upstream test | Status | Note |
+|---|---|---|
+| TestMockInterpreter::test_scripted_responses | n/a | Tests upstream's own mock fixture, not the library. |
+| TestMockInterpreter::test_returns_final_output_result | n/a | Same. |
+| TestMockInterpreter::test_raises_exception_from_responses | n/a | Same. |
+| TestMockInterpreter::test_records_call_history | n/a | Same. |
+| test_basic_initialization | pass | max_iterations 5; tools empty; signature input/output fields present. |
+| test_custom_signature | pass | |
+| test_custom_tools | pass | One user tool registered; internal llm_query tools not counted. |
+| test_tool_validation_invalid_identifier | n/a | Python-identifier validity for names injected into a Python sandbox; Imp tool names are atoms, not injected identifiers. |
+| test_tool_validation_reserved_names | blocked | Imp has no reserved-name guard: a tool named `llm_query` is accepted with unspecified shadowing behavior (gap #7 — fix-wave candidate). |
+| test_tool_validation_not_callable | pass | Non-tool entries ("not a function", 123) raise ArgumentError at construction. |
+| test_tools_dict_rejected | n/a | dict-vs-list tools API affordance; Imp's contract is a list of Imp.Tool structs (anything else is rejected by the same boundary as the previous row). |
+| test_optional_parameters | pass (partial) | Defaults: max_llm_calls 50, sub_lm nil. The `interpreter=` injection half is n/a (no pluggable interpreter object). |
+| test_forward_validates_required_inputs | pass | Missing `query` → `{:error, {:missing_input_fields, [:query]}}` (single-missing case; the multi-missing report rides the same surface). |
+| test_batched_query_errors_have_clear_markers | blocked | `_make_llm_tools` internal surface; Imp's llm_query error path is interpreter-level (own suite) with no [ERROR]-marker contract to assert. |
+| test_tools_call_counter_is_thread_safe | n/a | Python threading/ThreadPoolExecutor; BEAM processes + budget ledger design. |
+| test_strip_code_fences | n/a | Markdown-fence stripping is upstream's controller output format; Imp's controller contract is fence-less JSON reasoning/code. |
+| test_strip_code_fences_rejects_non_python_lang | n/a | Same. |
+| TestRLMFormatting::test_format_history | n/a | REPLHistory prompt-formatting internals; Imp has its own trace/compaction machinery. |
+| TestRLMFormatting::test_format_history_empty | n/a | Same. |
+| TestRLMFormatting::test_action_signature_has_iteration_field | n/a | Internal controller-signature layout is Imp's own design. |
+| TestRLMFormatting::test_format_output | n/a | Formatting internals. |
+| TestRLMFormatting::test_format_output_empty | n/a | Same. |
+| TestRLMFormatting::test_format_output_passthrough | n/a | Same. |
+| TestRLMFormatting::test_format_variable_info_string | n/a | REPLVariable preview internals (Imp: max_preview_chars machinery, own tests). |
+| TestRLMFormatting::test_format_variable_info_dict | n/a | Same. |
+| TestRLMFormatting::test_build_variables_multiple | n/a | Same. |
+| TestREPLTypes (11 tests) | n/a | Python REPL type classes (REPLHistory/REPLEntry/REPLVariable) — upstream's own data structures, not an Imp surface. Rows collapsed; all 11 carry this one reason. |
+| TestRLMCallMethod::test_call_is_alias_for_forward | n/a | `__call__`/forward alias; Imp has a single call surface. |
+| test_max_iterations_triggers_extract | pass | Three non-submitting turns exhaust max_iterations 3; the extraction fallback answers "extracted_answer". |
+| test_tool_exception_returns_error_in_output | pass | Raising registered tool → recorded error; controller recovers and submits "recovered". |
+| test_runtime_error_history_uses_stripped_code | n/a | Fence-stripping bookkeeping (fence-less controller contract). |
+| test_syntax_error_from_execute_is_recoverable | pass | Unparsable code is an iteration error; controller recovers and submits. |
+| test_syntax_error_from_strip_code_fences_is_recoverable | n/a | Fence stripping. |
+| TestRLMDynamicSignature::test_action_signature_structure | n/a | Internal controller-signature layout (Imp's instructions enumerate llm_query/submit in its own JSON contract). |
+| TestRLMDynamicSignature::test_extract_signature_structure | n/a | Same. |
+| TestPythonInterpreter (13 tests) | n/a | Deno/Pyodide interpreter integration (start/idempotence/injection/tools/state/errors). Imp's sandbox and interpreter have their own in-repo suites (rlm_interpreter_test.exs etc.). Rows collapsed; all 13 carry this one reason. |
+| TestSandboxSecurity::test_no_network_access | n/a | Deno permission flags; Imp's interpreter executes an AST allowlist — there is no network capability to deny. |
+| TestSandboxSecurity::test_imports_work | n/a | Python stdlib imports. |
+| TestRLMAsyncMock (3 tests) | n/a | asyncio twins of ported behavior. |
+| TestRLMTypeCoercionMock::test_type_coercion | pass (partial) | int/float/bool/array[integer] submissions come back as declared types. The `Literal['yes','no']` case rides the next row's enum port. |
+| TestRLMTypeCoercionMock::test_type_error_retries | pass | Invalid enum submission rejected; controller retries and the valid value lands. |
+| TestRLMTypeCoercion (deno) ::test_type_coercion | n/a | Deno variant of the ported mock coercion (the dict[str,str] case also lacks generics). |
+| TestRLMTypeCoercion (deno) ::test_submit_extracts_typed_value | n/a | Deno variant. |
+| test_multi_output_final_kwargs | pass | Imp submit/1 takes one map of all output fields; both outputs typed and present. |
+| test_multi_output_final_positional | n/a | Python positional-args convention; collapses to the map form ported above. |
+| test_multi_output_three_fields | n/a | Same kwargs convention; covered by the map-form port. |
+| test_multi_output_final_missing_field_errors | pass | Submit missing `count` is an error; retry with both fields succeeds. |
+| test_multi_output_submit_vars | n/a | Positional variable-passing convention; map form covers it. |
+| test_multi_output_type_coercion | n/a | Kwargs convention; coercion itself ported in TestRLMTypeCoercionMock row. |
+| test_simple_computation_e2e | pass | Controller computes and submits; typed int 5 returns. |
+| test_multi_turn_computation_e2e | pass | Interpreter state (`x = 10`) persists to the next turn; answer 20. |
+| test_with_input_variables_e2e | pass (adapted) | Inputs are live interpreter variables. Adapted spelling: the allowlist has no Enum.sum/reduce (gap #10), so the sum uses Enum.at chains. |
+| test_with_tool_e2e | pass | Registered host-side tool callable from generated code; "apple" → "red". |
+| test_aforward_simple_computation_e2e | n/a | asyncio twin. |
+| test_aforward_multi_turn_e2e | n/a | asyncio twin. |
+| test_aforward_with_input_variables_e2e | n/a | asyncio twin. |
+| TestRLMIntegration::test_simple_computation | n/a | Skipped upstream ("Requires actual LM and Deno"). |
+| TestRLMIntegration::test_with_llm_query | n/a | Same. |
