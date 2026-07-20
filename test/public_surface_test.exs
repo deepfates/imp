@@ -1022,7 +1022,16 @@ defmodule PublicSurfaceTest do
 
     docs =
       ["README.md" | Path.wildcard("docs/**/*.md")]
-      |> Enum.reject(&(&1 in ["docs/PRIOR_ART.md", "docs/internal/RESEARCH_LANDSCAPE.md"]))
+      |> Enum.reject(
+        # These documents exist to NAME other systems: prior art, the research
+        # landscape, and the upstream exam (which must account for every
+        # upstream test, including adapters we deliberately do not ship).
+        &(&1 in [
+            "docs/PRIOR_ART.md",
+            "docs/internal/RESEARCH_LANDSCAPE.md",
+            "docs/internal/UPSTREAM_EXAM.md"
+          ])
+      )
       |> Enum.map_join("\n", &File.read!/1)
 
     refute docs =~ borrowed_name
