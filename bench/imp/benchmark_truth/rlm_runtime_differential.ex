@@ -19,7 +19,7 @@ defmodule Imp.BenchmarkTruth.RLMRuntimeDifferential do
     "lib/imp/predict/rlm/session.ex"
   ]
   @harness_sources [
-    "lib/imp/benchmark_truth/rlm_runtime_differential.ex",
+    "bench/imp/benchmark_truth/rlm_runtime_differential.ex",
     "lib/mix/tasks/imp.benchmark.rlm_runtime_differential.ex",
     "scripts/rlm_runtime_differential.py"
   ]

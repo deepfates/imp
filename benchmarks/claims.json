@@ -915,7 +915,7 @@
       "comparison": "imp_native",
       "gate_policy": "blocking",
       "sources": [
-        "lib/imp/benchmark_truth/failure_campaign.ex",
+        "bench/imp/benchmark_truth/failure_campaign.ex",
         "test/failure_campaign_test.exs"
       ],
       "requirements": [
@@ -951,7 +951,7 @@
       "comparison": "imp_native",
       "gate_policy": "blocking",
       "sources": [
-        "lib/imp/benchmark_truth/failure_campaign.ex",
+        "bench/imp/benchmark_truth/failure_campaign.ex",
         "test/failure_campaign_test.exs"
       ],
       "requirements": [
