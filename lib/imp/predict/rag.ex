@@ -70,7 +70,7 @@ defmodule Imp.Predict.RAG do
          {:ok, retrieval} <- retrieve_hops(rag, query),
          {:ok, context} <- render_context(retrieval.docs),
          enriched <- Map.put(inputs, rag.context_field, context) do
-      call_wrapped_program(rag, enriched, query, retrieval)
+      call_wrapped_program(rag, drop_consumed_query_fields(rag, enriched), query, retrieval)
     end
   end
 
@@ -136,6 +136,31 @@ defmodule Imp.Predict.RAG do
         {:error, {:invalid_rag_result, inspect(other)}}
     end
   end
+
+  # Query fields RAG has already consumed for retrieval are RAG's own input,
+  # not the wrapped program's; when the wrapped program's signature does not
+  # declare them, they are dropped here ON PURPOSE so Predict's extra-input
+  # warning (de-hzcv gap #2) does not fire on RAG-consumed keys. When the
+  # wrapped program has no readable signature nothing is dropped and the
+  # program's own validation applies.
+  defp drop_consumed_query_fields(rag, enriched) do
+    case declared_input_names(rag.program) do
+      nil ->
+        enriched
+
+      declared ->
+        rag.query_field
+        |> List.wrap()
+        |> Enum.reject(&MapSet.member?(declared, to_string(&1)))
+        |> Enum.flat_map(&[&1, to_string(&1)])
+        |> then(&Map.drop(enriched, &1))
+    end
+  end
+
+  defp declared_input_names(%{signature: %Imp.Signature{inputs: inputs}}),
+    do: MapSet.new(inputs, &to_string(&1.name))
+
+  defp declared_input_names(_program), do: nil
 
   defp normalize_inputs(inputs) do
     {:ok, Map.new(inputs)}

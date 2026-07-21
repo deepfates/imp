@@ -121,9 +121,19 @@ defmodule RefineFeedbackTest do
     program = Imp.Predict.Predict.new("question -> answer", lm: lm)
     metric = fn _example, prediction -> Imp.Prediction.get(prediction, :answer) == "fixed" end
 
-    assert {:ok, prediction} =
-             Imp.Predict.Refine.new(program, metric, max_attempts: 2)
-             |> Imp.Predict.Refine.call(%{question: "q", api_key: "sk-live-secret"})
+    # :api_key is a deliberate extra input (redaction probe); since de-hzcv
+    # gap #2 it correctly draws the extra-input warning, captured here.
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, prediction} =
+                 Imp.Predict.Refine.new(program, metric, max_attempts: 2)
+                 |> Imp.Predict.Refine.call(%{question: "q", api_key: "sk-live-secret"})
+
+        send(parent, {:refine_prediction, prediction})
+      end)
+
+    assert log =~ "not in signature"
+    assert_received {:refine_prediction, prediction}
 
     assert Imp.Prediction.get(prediction, :answer) == "fixed"
     assert_receive {:feedback_prompt, prompt}

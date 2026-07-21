@@ -89,6 +89,11 @@ defmodule Imp.Predict.ReActV2 do
          {max_iters, inputs} <- pop_max_iters(inputs, react.max_iters),
          :ok <- validate_call_max_iters(max_iters),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
+      # ReActV2 filters inputs down to signature names before any Predict call,
+      # so extra keys would vanish silently here; warn at this boundary the same
+      # way Imp.Predict.Predict does (:history is a documented call-time key).
+      :ok = Imp.Predict.Predict.warn_extra_inputs(react.signature, inputs, [:history])
+
       pending =
         react.signature
         |> Imp.Signature.input_names()
