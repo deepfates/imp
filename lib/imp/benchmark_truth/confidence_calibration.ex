@@ -242,7 +242,7 @@ defmodule Imp.BenchmarkTruth.ConfidenceCalibration do
     source_ids = Enum.map(rows, & &1["source_id"])
 
     valid? =
-      rows != [] and calibration_rows != [] and heldout_rows != [] and unique?(ids) and
+      not Enum.empty?(rows) and calibration_rows != [] and heldout_rows != [] and unique?(ids) and
         unique?(source_ids) and Enum.all?(rows, &valid_row?(&1, task_id, task)) and
         disjoint?(calibration_rows, heldout_rows, "source_id") and
         disjoint?(calibration_rows, heldout_rows, "group_id") and

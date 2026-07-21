@@ -2,7 +2,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Evaluator do
   @moduledoc false
 
   @type score :: number()
-  @type diagnostics :: %{optional(String.t()) => Jason.Encoder.value()}
+  @type diagnostics :: %{optional(String.t()) => term()}
 
   @callback id() :: String.t()
   @callback artifact_class() :: String.t()
@@ -11,5 +11,5 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Evaluator do
   @callback trainset() :: list()
   @callback valset() :: list()
   @callback evaluate(artifact :: String.t(), example :: map()) :: {score(), diagnostics()}
-  @callback metadata() :: %{optional(String.t()) => Jason.Encoder.value()}
+  @callback metadata() :: %{optional(String.t()) => term()}
 end

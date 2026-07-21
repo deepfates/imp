@@ -364,7 +364,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
 
     if String.starts_with?(downcased, ["anthropic:", "gemini:", "google:"]) do
       Mix.raise(
-        "--dspy-model expects a Python DSPy/LiteLLM model id such as #{String.replace(model, ":", "/", parts: 2)}; " <>
+        "--dspy-model expects a Python DSPy/LiteLLM model id such as #{String.replace(model, ":", "/", global: false)}; " <>
           "ReqLLM provider specs such as #{inspect(model)} belong in --model. Omit --dspy-model to let Imp derive the matching LiteLLM id."
       )
     end

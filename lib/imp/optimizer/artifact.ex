@@ -498,7 +498,7 @@ defmodule Imp.Optimizer.Artifact do
     do: raise(ArgumentError, "optimizer artifact checksum is invalid")
 
   defp exact_keys!(map, expected, context) when is_map(map) do
-    unless MapSet.new(Map.keys(map)) == expected do
+    unless MapSet.equal?(MapSet.new(Map.keys(map)), expected) do
       raise ArgumentError, "#{context} has unexpected or missing keys"
     end
   end

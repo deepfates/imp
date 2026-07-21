@@ -8,7 +8,11 @@ defmodule Imp.Adapters.Types do
   attachment and should fail at this boundary instead of becoming provider text.
   """
 
-  defmodule Image, do: defstruct([:url, :data, :mime_type, metadata: %{}])
+  defmodule Image do
+    defstruct [:url, :data, :mime_type, metadata: %{}]
+    @type t :: %__MODULE__{}
+  end
+
   defmodule Audio, do: defstruct([:url, :data, :mime_type, metadata: %{}])
   defmodule File, do: defstruct([:path, :url, :data, :mime_type, metadata: %{}])
   defmodule Document, do: defstruct([:text, metadata: %{}])

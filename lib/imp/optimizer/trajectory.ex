@@ -1046,7 +1046,7 @@ defmodule Imp.Optimizer.Trajectory do
   defp fetch(map, key, default \\ nil) when is_map(map) do
     string_key = to_string(key)
 
-    if key != string_key and Map.has_key?(map, key) and Map.has_key?(map, string_key),
+    if not is_binary(key) and Map.has_key?(map, key) and Map.has_key?(map, string_key),
       do: invalid!("map contains both #{inspect(key)} and #{inspect(string_key)}"),
       else: Map.get(map, key, Map.get(map, string_key, default))
   end

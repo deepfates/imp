@@ -425,13 +425,13 @@ defmodule Imp.Optimizer.Report do
   defp validate_report_keys!(state) do
     keys = state |> Map.keys() |> Enum.map(&encode_key/1) |> MapSet.new()
 
-    if keys != @report_keys do
+    unless MapSet.equal?(keys, @report_keys) do
       raise ArgumentError, "malformed optimizer report state"
     end
   end
 
   defp validate_exact_tag!(state, expected_keys, tag_name) do
-    if MapSet.new(Map.keys(state)) != expected_keys do
+    unless MapSet.equal?(MapSet.new(Map.keys(state)), expected_keys) do
       raise ArgumentError, "malformed Imp #{tag_name} JSON tag"
     end
   end
@@ -456,7 +456,7 @@ defmodule Imp.Optimizer.Report do
   end
 
   defp valid_image_state?(state) do
-    MapSet.new(Map.keys(state)) == @image_tag_keys and
+    MapSet.equal?(MapSet.new(Map.keys(state)), @image_tag_keys) and
       state["schema_version"] == @image_schema_version and
       optional_binary?(state["url"]) and
       optional_binary?(state["data"]) and

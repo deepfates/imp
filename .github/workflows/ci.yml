@@ -201,6 +201,37 @@ jobs:
       - uses: ./.github/actions/elixir-setup
       - run: mix quality.check
 
+  dialyzer:
+    name: dialyzer.check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
+        id: setup
+      # PLT cache: exact key on OTP + Elixir + mix.lock, WITH a restore-keys
+      # prefix fallback. That fallback is safe HERE and only here, unlike the
+      # ~/.hex cache (see the poisoning history in
+      # .github/actions/elixir-setup/action.yml): a PLT is not trusted as-is.
+      # `mix dialyzer` re-checks the restored PLT against the current deps
+      # every run and adds/rebuilds whatever is missing or stale, so a
+      # partial ancestor PLT only saves build time — it cannot silently
+      # define the result. The updated PLT is then saved under the new exact
+      # key. This job is the only writer of this cache.
+      - name: Cache dialyzer PLTs
+        uses: actions/cache@v4
+        with:
+          path: priv/plts
+          key: plt-v1-${{ runner.os }}-otp${{ steps.setup.outputs.otp-version }}-elixir${{ steps.setup.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            plt-v1-${{ runner.os }}-otp${{ steps.setup.outputs.otp-version }}-elixir${{ steps.setup.outputs.elixir-version }}-
+      # Fails on any warning not pinned in .dialyzer_ignore.exs (one reason
+      # per entry there) and on stale ignore entries (list_unused_filters).
+      - run: mix dialyzer.check
+
   docs:
     name: docs.check
     runs-on: ubuntu-latest

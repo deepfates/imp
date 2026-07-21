@@ -805,7 +805,7 @@ defmodule Imp.Clients.ReqLLM do
       |> native_reasoning_metadata()
       |> Map.put(:req_llm, response_metadata(response, model_spec))
 
-    if metadata == %{} do
+    if Enum.empty?(metadata) do
       raw
     else
       %{__imp_lm_output__: raw, __imp_lm_metadata__: metadata}

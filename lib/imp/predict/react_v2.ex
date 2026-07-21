@@ -13,6 +13,8 @@ defmodule Imp.Predict.ReActV2 do
 
   defstruct [:signature, :react, tools: %{}, max_iters: 20, tool_policy: :allow]
 
+  @type t :: %__MODULE__{}
+
   @option_schema [
     lm: [type: {:custom, Imp.LM, :validate_lm, []}],
     adapter: [type: {:custom, Imp.Adapter, :validate_adapter, []}],
