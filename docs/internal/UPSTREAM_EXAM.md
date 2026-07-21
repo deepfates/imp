@@ -489,11 +489,11 @@ row.
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **198** (aggregation 6, best_of_n 3, chain_of_thought 4, code_act 5, knn 3, multi_chain_comparison 1, parallel 7, predict 66, program_of_thought 6, react 9, refine 3, retry 3, rlm 82) |
-| Ported | **70** (71 ExUnit tests) |
-| — pass | **70** |
+| Ported | **82** (80 ExUnit tests; several one-port-covers-two rows) |
+| — pass | **82** |
 | — FAIL (real divergence found by upstream's own test) | **0** |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **24** |
-| Not applicable (Python/pydantic/litellm/asyncio/Deno specific, or a documented Imp design substitution) | **104** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **13** |
+| Not applicable (Python/pydantic/litellm/asyncio/Deno specific, or a documented Imp design substitution) | **103** |
 
 ### Gaps the classification surfaced (fix-wave candidates)
 
@@ -510,9 +510,19 @@ surface. Ranked by owner-steer relevance (API boundary first):
 2. **FIXED (de-hzcv)** — extra inputs now warn loudly
    (test_extra_fields_warning): `Imp.Predict.Predict.warn_extra_inputs/3`
    matches DSPy's logger.warning-and-proceed semantics.
-3. **No input type-mismatch warnings** (16 warning-family tests): DSPy
-   soft-validates inputs against annotations and logs mismatches
-   (`warn_on_type_mismatch`). Imp renders whatever it is given.
+3. **FIXED (de-hzcv)** — input type-mismatch warnings (the 16-test warning
+   family): with the new `warn_on_type_mismatch` setting on (default true,
+   as upstream), `Imp.Predict.Predict` soft-validates each provided input
+   against its field's declared type/enum/array-items and logs a warning
+   ("type mismatch for field '...': expected ...") while the call proceeds —
+   DSPy's logger.warning semantics, at the same boundary as the extra-inputs
+   warning. Two documented seams: nil values are skipped (upstream skips
+   None), and plain `:string` fields without an enum constraint are skipped
+   at the field level (Imp defaults untyped fields to :string, so an
+   implicit string is indistinguishable from a declared one — the Imp analog
+   of upstream's IS_TYPE_UNDEFINED skip; string element types nested in
+   `array[...]` are checked strictly). 10 of the 16 rows flip to pass;
+   dict/tuple/union generics and custom types stay honestly blocked per row.
 4. **Constraints are not rendered into prompts** (test_field_constraints):
    ge/le/min_length never reach the LM as text. Same seam tranche 1 recorded
    for test_signature_field_with_constraints.
@@ -531,7 +541,11 @@ surface. Ranked by owner-steer relevance (API boundary first):
    ArgumentError for a tool named after any interpreter builtin (llm_query,
    llm_query_batched, rlm_query, rlm_query_batched, recurse, load, print,
    submit, show_vars, SHOW_VARS), as upstream's `_RESERVED_TOOL_NAMES` does.
-8. **No input-field default values** (test_input_field_default_value).
+8. **FIXED (de-hzcv)** — input-field defaults
+   (test_input_field_default_value): a field declared with `default:` fills
+   the input when the caller omits it, before the extra/type/missing checks
+   (upstream `_forward_preprocess` order). Fields without a default stay
+   loudly required — the default machinery cannot mask a missing input.
 9. **FIXED (de-hzcv)** — per-call LM kwargs pass-through
    (test_predicted_outputs_piped_from_predict_to_lm_call):
    `Imp.Predict.Predict.call/3` takes a per-call config keyword list merged
@@ -544,7 +558,14 @@ surface. Ranked by owner-steer relevance (API boundary first):
     interpreter has no anonymous functions, so a lambda-taking reduce is not
     expressible; sum/product are the function-free aggregations upstream's
     Python `sum()` maps to.
-11. **No datetime field type** (test_datetime_inputs_and_outputs).
+11. **FIXED (de-hzcv)** — datetime field type
+    (test_datetime_inputs_and_outputs): `datetime` is a first-class field
+    type (`"when: datetime"` in string specs, `type: :datetime` in maps).
+    Inputs render as ISO 8601 text (upstream's JSON-serialized datetime
+    form); outputs parse ISO 8601 back into `DateTime` (offset present) or
+    `NaiveDateTime` (naive), with schema validation and a type-mismatch
+    warning for non-datetime inputs. Datetimes nested inside pydantic models
+    remain out of scope (no custom-model type system — tranche 1 seam).
 
 ### Tranche 1's 78-blocked bucket, re-scrutinized (ticket ask)
 
@@ -650,7 +671,7 @@ surface. Batch semantics are ported; pair-list shapes are blocked.
 | test_config_management | n/a | `update_config`/`get_config` mutators; Imp config is plain data on an immutable struct. |
 | test_multi_output | pass (was blocked) | `n=` multi-completion landed (de-hzcv, gap #1): `config: [n: 2]`, completions filled, first primary. |
 | test_multi_output2 | pass (was blocked) | Same surface; both output fields index per completion. |
-| test_datetime_inputs_and_outputs | blocked | No datetime field type. |
+| test_datetime_inputs_and_outputs | pass (adapted, was blocked) | Fixed by de-hzcv gap #11: `datetime` field type; input renders ISO 8601 into the prompt, "2024-11-27T14:00:00" output parses to `~N[2024-11-27 14:00:00]`. Adapted: upstream nests datetimes in pydantic models; Imp declares the datetime field directly (no custom-model type system — tranche 1 seam). |
 | test_explicitly_valued_enum_inputs_and_outputs | pass (partial) | Enum-constrained output parses "in_progress". Imp enums are string constraints; no Python Enum member identity. |
 | test_enum_inputs_and_outputs_with_shared_names_and_values | n/a | Python Enum name/value aliasing semantics. |
 | test_auto_valued_enum_inputs_and_outputs | n/a | `enum.auto` value semantics. |
@@ -671,27 +692,27 @@ surface. Batch semantics are ported; pair-list shapes are blocked.
 | test_disable_trace | n/a | Same. |
 | test_per_module_history_size_limit | n/a | No mutable per-module history on immutable programs; observability owns history. |
 | test_per_module_history_disabled | n/a | Same. |
-| test_input_field_default_value | blocked | No input-field default-value surface (gap #8). |
+| test_input_field_default_value | pass (was blocked) | Fixed by de-hzcv gap #8: `default:` on an input field fills the omitted input before the checks; the default value reaches the rendered prompt. The port also pins that a field WITHOUT a default stays a loud `{:error, {:missing_input_fields, _}}`. |
 | test_extra_fields_warning | pass (was blocked) | Fixed by de-hzcv gap #2: `Imp.Predict.Predict.warn_extra_inputs/3` logs a per-call warning ("not in signature", offending keys, expected keys) and the call proceeds — DSPy's exact semantics (logger.warning, extras ignored). ReActV2 warns at its own entry (it filters inputs before Predict); PoT/CodeAct loop-state carrier keys and RAG-consumed query fields are documented exemptions. |
-| test_warning_images | blocked | Type-mismatch warning subsystem absent (also Image string-sniffing constructor n/a). |
-| test_type_mismatch_warning | blocked | Warning subsystem absent (gap #3). |
-| test_correct_types_no_warning | n/a | Vacuously true without the warning subsystem; nothing to assert. |
-| test_list_type_validation | blocked | Warning subsystem absent. |
-| test_literal_type_validation | blocked | Warning subsystem absent. |
-| test_literal_union_type_validation | blocked | Warning subsystem + no union types. |
-| test_list_string | blocked | Warning subsystem absent. |
-| test_nested_list_type_validation | blocked | Warning subsystem absent. |
-| test_nested_dict_type_validation | blocked | Warning subsystem + no dict[k,v] generics. |
-| test_nested_tuple_type_validation | blocked | Warning subsystem + no tuple types. |
-| test_literal_type_validation_string_signature | blocked | Warning subsystem + `Literal[...]` string-spec syntax unsupported. |
-| test_list_type_validation_string_signature | blocked | Warning subsystem + `list[...]` deliberately spelled `array[...]`. |
-| test_dict_type_validation_string_signature | blocked | Warning subsystem + dict generics. |
-| test_tuple_type_validation_string_signature | blocked | Warning subsystem + tuple types. |
-| test_union_type_validation_string_signature | blocked | Warning subsystem + union types. |
-| test_basic_types_string_signature | blocked | Warning subsystem + `warn_on_type_mismatch` setting absent. |
-| test_untyped_string_signature | n/a | Vacuous (asserts no warning; there is no warning machinery). |
+| test_warning_images | blocked | Warning subsystem now exists (gap #3), but there is no Image SIGNATURE field type to declare a mismatch against (Image is an adapter content type), and the string-sniffing `dspy.Image(...)` constructor is n/a. |
+| test_type_mismatch_warning | pass (was blocked) | Fixed by de-hzcv gap #3: string on an `:integer` field logs "type mismatch for field 'count': expected integer" and the call proceeds. |
+| test_correct_types_no_warning | pass (was n/a) | Meaningful now the warning subsystem exists: correct types produce no extra-field and no type-mismatch warnings. |
+| test_list_type_validation | pass (adapted, was blocked) | Non-list on `array[str]` warns "expected array[string]"; a list of strings does not. Adapted: Imp spells `list[str]` as `array[str]`; one port covers this and the string-signature row below. |
+| test_literal_type_validation | pass (adapted, was blocked) | Out-of-set value on an enum-constrained field warns "expected enum[pending, approved, rejected]". Adapted: `Literal[...]` is Imp `enum[...]`; enum values are strings, so integer literals match through their string spelling. One port covers this and the string-signature row below. |
+| test_literal_union_type_validation | pass (adapted, was blocked) | `Literal[...] \| None` maps to enum constraint + optional: literals pass, nil is skipped by the check (upstream skips None), out-of-set values warn. No general union types. |
+| test_list_string | pass (was blocked) | Covered by the nested-list port: `[1, 2, 3, nil]` on `array[str]` warns "expected array[string]"; a list of strings does not. (The str-annotated-field-with-list half is the documented `:string` field-level skip.) |
+| test_nested_list_type_validation | pass (was blocked) | Element types inside `array[int]`/`array[str]` are checked recursively; empty lists are valid. |
+| test_nested_dict_type_validation | blocked | Warning subsystem landed, but `:object` has no key/value generics — `dict[str, int]` element mismatches are not expressible. |
+| test_nested_tuple_type_validation | blocked | No tuple types. |
+| test_literal_type_validation_string_signature | pass (adapted, was blocked) | Same port as test_literal_type_validation (Imp's string spec spells `Literal[...]` as `enum[...]`). |
+| test_list_type_validation_string_signature | pass (adapted, was blocked) | Same port as test_list_type_validation/test_nested_list_type_validation (`list[...]` spelled `array[...]`). |
+| test_dict_type_validation_string_signature | blocked | No dict[k,v] generics (same as test_nested_dict_type_validation). |
+| test_tuple_type_validation_string_signature | blocked | No tuple types. |
+| test_union_type_validation_string_signature | blocked | No union syntax in string specs; the nil-acceptance half is covered by the literal-union port (class form). |
+| test_basic_types_string_signature | pass (was blocked) | Fixed by de-hzcv gap #3: the `warn_on_type_mismatch` setting (default true) gates the check; off → silent, on → "expected integer" warning. Both parametrizations ported in one test. |
+| test_untyped_string_signature | n/a | True by design: untyped fields default to `:string`, and plain `:string` fields are skipped by the check (the documented implicit-string seam). |
 | test_untyped_class_signature | n/a | Same. |
-| test_string_to_list_signature | n/a | Same. |
+| test_string_to_list_signature | n/a | Same seam (upstream's str-accepts-list-of-str special case is subsumed by the `:string` field-level skip). |
 | test_custom_signature_types | blocked | Custom pydantic types in string specs — tranche 1 seam (no custom-type system). |
 
 ## tests/predict/test_program_of_thought.py (6)

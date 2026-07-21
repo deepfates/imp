@@ -125,6 +125,7 @@ defmodule Imp.Predict.Predict do
     with {:ok, lm} <- require_lm(resolve_lm(predict)),
          adapter <- resolve_adapter(predict),
          {:ok, inputs} <- normalize_inputs(inputs),
+         inputs = apply_input_defaults(predict.signature, inputs),
          :ok <- validate_inputs(predict.signature, inputs),
          {:ok, messages} <-
            format_with_adapter(adapter, predict.signature, inputs, demos: predict.demos),
@@ -251,8 +252,182 @@ defmodule Imp.Predict.Predict do
     :ok
   end
 
+  # DSPy 3.2.1 Predict._forward_preprocess: "Populate default values for
+  # missing input fields" — an input field declared with a default fills in
+  # when the caller omits it, BEFORE the extra/type/missing checks
+  # (test_input_field_default_value). Fields without a default are untouched,
+  # so a genuinely missing required field still fails loudly.
+  defp apply_input_defaults(signature, inputs) do
+    Enum.reduce(signature.inputs, inputs, fn field, acc ->
+      case Map.fetch(field.metadata, :default) do
+        {:ok, default} ->
+          if input_present?(acc, field.name), do: acc, else: Map.put(acc, field.name, default)
+
+        :error ->
+          case Map.fetch(field.metadata, "default") do
+            {:ok, default} ->
+              if input_present?(acc, field.name),
+                do: acc,
+                else: Map.put(acc, field.name, default)
+
+            :error ->
+              acc
+          end
+      end
+    end)
+  end
+
+  # DSPy 3.2.1 Predict._forward_preprocess soft-validates provided inputs
+  # against the signature's declared types when `settings.warn_on_type_mismatch`
+  # is on (the default): a mismatch logs a warning and the call proceeds —
+  # never an error (test_type_mismatch_warning and family). Imp matches, with
+  # two documented seams:
+  #   * nil values are skipped (upstream skips None);
+  #   * plain `:string` fields without an enum constraint are skipped: Imp
+  #     defaults every untyped field to :string, so an implicit string is
+  #     indistinguishable from a declared one — this mirrors upstream's
+  #     IS_TYPE_UNDEFINED skip for unannotated fields (upstream also
+  #     special-cases a list of strings as str-compatible, so no upstream
+  #     test asserts a plain-str mismatch warning).
+  defp warn_type_mismatches(signature, inputs) do
+    if Map.get(Imp.Settings.get(), :warn_on_type_mismatch, true) do
+      Enum.each(signature.inputs, fn field ->
+        value = fetch_input(inputs, field.name)
+
+        unless is_nil(value) or skip_field?(field) or
+                 input_type_compatible?(value, field_descriptor(field)) do
+          require Logger
+
+          Logger.warning(
+            "Imp.Predict: type mismatch for field '#{field.name}': " <>
+              "expected #{descriptor_label(field_descriptor(field))} based on the signature, " <>
+              "but the provided value is incompatible: #{inspect(value)}."
+          )
+        end
+      end)
+    end
+
+    :ok
+  end
+
+  # The implicit-string seam (see the note above): a plain `:string` field
+  # without an enum constraint is skipped at the FIELD level only — a string
+  # element type nested inside `array[...]` was declared explicitly and is
+  # checked strictly.
+  defp skip_field?(field) do
+    field.type == :string and not is_list(fetch_meta(field_descriptor(field), :enum))
+  end
+
+  # A flat type descriptor for a field: its type plus its inline constraint
+  # keys (`enum`, `items`), the same shape Imp.Signature.Parser stores for
+  # array elements — so the compatibility walk recurses uniformly.
+  defp field_descriptor(field) do
+    constraints =
+      case fetch_meta(field.metadata, :constraints) do
+        constraints when is_map(constraints) -> constraints
+        _other -> %{}
+      end
+
+    Map.merge(%{type: field.type}, constraints)
+  end
+
+  defp input_type_compatible?(value, descriptor) do
+    case fetch_meta(descriptor, :enum) do
+      allowed when is_list(allowed) ->
+        value in allowed or (scalar?(value) and to_string(value) in allowed)
+
+      _no_enum ->
+        type_compatible?(value, fetch_meta(descriptor, :type), descriptor)
+    end
+  end
+
+  defp type_compatible?(value, type, descriptor) do
+    case type do
+      :string ->
+        is_binary(value)
+
+      :integer ->
+        is_integer(value)
+
+      :float ->
+        is_number(value)
+
+      :number ->
+        is_number(value)
+
+      :boolean ->
+        is_boolean(value)
+
+      :object ->
+        is_map(value) and not is_struct(value)
+
+      :datetime ->
+        match?(%DateTime{}, value) or match?(%NaiveDateTime{}, value)
+
+      :array ->
+        case fetch_meta(descriptor, :items) do
+          items when is_map(items) ->
+            is_list(value) and Enum.all?(value, &input_type_compatible?(&1, items))
+
+          _untyped_items ->
+            is_list(value)
+        end
+
+      # Unknown/custom types are skipped (no type system to check against).
+      _skip ->
+        true
+    end
+  end
+
+  defp scalar?(value),
+    do: is_binary(value) or is_atom(value) or is_number(value)
+
+  # Human label for the warning, in Imp's own type spellings: `integer`,
+  # `array[integer]`, `enum[pending, approved]` (upstream prints Python's:
+  # `int`, `list[int]`, `Literal['pending', 'approved']`).
+  defp descriptor_label(descriptor) do
+    case fetch_meta(descriptor, :enum) do
+      allowed when is_list(allowed) ->
+        "enum[#{Enum.join(allowed, ", ")}]"
+
+      _no_enum ->
+        case {fetch_meta(descriptor, :type), fetch_meta(descriptor, :items)} do
+          {:array, items} when is_map(items) -> "array[#{descriptor_label(items)}]"
+          {type, _items} -> to_string(type)
+        end
+    end
+  end
+
+  # Constraint maps may arrive with atom or string keys (loaded signatures).
+  defp fetch_meta(map, key) when is_map(map),
+    do: Map.get(map, key, Map.get(map, to_string(key)))
+
+  defp fetch_meta(_map, _key), do: nil
+
+  defp fetch_input(inputs, name) do
+    string_name = to_string(name)
+
+    cond do
+      Map.has_key?(inputs, name) ->
+        Map.fetch!(inputs, name)
+
+      Map.has_key?(inputs, string_name) ->
+        Map.fetch!(inputs, string_name)
+
+      is_binary(name) ->
+        case existing_atom(name) do
+          atom when is_atom(atom) -> Map.get(inputs, atom)
+          _string -> nil
+        end
+
+      true ->
+        nil
+    end
+  end
+
   defp validate_inputs(signature, inputs) do
     :ok = warn_extra_inputs(signature, inputs)
+    :ok = warn_type_mismatches(signature, inputs)
 
     required =
       signature.inputs

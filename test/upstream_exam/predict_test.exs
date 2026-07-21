@@ -810,6 +810,290 @@ defmodule UpstreamExam.PredictTest do
       assert log =~ "another"
     end
 
+    # Upstream: test_type_mismatch_warning — a provided input whose type does
+    # not match the signature's declared type logs a warning (never an error)
+    # and the call proceeds (dspy/predict/predict.py, settings.
+    # warn_on_type_mismatch default True). Regression for de-hzcv gap #3:
+    # pre-fix Imp rendered whatever it was given silently, so the log
+    # assertion fails on pre-fix code.
+    test "type mismatch warning" do
+      lm = dummy_lm([%{result: "test output"}])
+
+      signature =
+        Imp.Signature.new(%{
+          inputs: [count: [type: :integer], name: []],
+          outputs: [:result]
+        })
+
+      program = Imp.predict(signature, lm: lm)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{count: "not an int", name: "test"})
+        end)
+
+      assert log =~ "type mismatch for field 'count'"
+      assert log =~ "expected integer"
+    end
+
+    # Upstream: test_correct_types_no_warning — correctly typed inputs produce
+    # no extra-field and no type-mismatch warnings.
+    test "correct types no warning" do
+      lm = dummy_lm([%{result: "test output"}])
+
+      signature =
+        Imp.Signature.new(%{
+          inputs: [count: [type: :integer], name: []],
+          outputs: [:result]
+        })
+
+      program = Imp.predict(signature, lm: lm)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{count: 42, name: "test"})
+        end)
+
+      refute log =~ "not in signature"
+      refute log =~ "type mismatch"
+    end
+
+    # Upstream: test_list_type_validation / test_list_type_validation_string_
+    # signature — a non-list on a list-typed field warns; a well-typed list
+    # does not (Imp spells list[...] as array[...]).
+    test "list type validation (string signature)" do
+      lm = dummy_lm(List.duplicate(%{result: "test output"}, 2))
+      program = Imp.predict("items: array[str] -> result", lm: lm)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{items: "not a list"})
+        end)
+
+      assert log =~ "type mismatch for field 'items'"
+      assert log =~ "expected array[string]"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{items: ["a", "b", "c"]})
+        end)
+
+      refute log =~ "type mismatch for field 'items'"
+    end
+
+    # Upstream: test_list_string / test_nested_list_type_validation /
+    # test_list_type_validation_string_signature — element types inside a
+    # typed list are checked; empty lists are valid.
+    test "nested list element type validation" do
+      lm = dummy_lm(List.duplicate(%{result: "test output"}, 4))
+      program = Imp.predict("numbers: array[int], names: array[str] -> result", lm: lm)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} =
+                   Imp.call(program, %{numbers: [1, 2, 3], names: ["alice", "bob"]})
+        end)
+
+      refute log =~ "type mismatch"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} =
+                   Imp.call(program, %{numbers: ["1", "2", "3"], names: ["alice", "bob"]})
+        end)
+
+      assert log =~ "type mismatch for field 'numbers'"
+      assert log =~ "expected array[integer]"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{numbers: [1, 2, 3], names: [1, 2, 3]})
+        end)
+
+      assert log =~ "type mismatch for field 'names'"
+      assert log =~ "expected array[string]"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{numbers: [], names: []})
+        end)
+
+      refute log =~ "type mismatch"
+    end
+
+    # Upstream: test_literal_type_validation / test_literal_type_validation_
+    # string_signature — Literal-constrained inputs warn on out-of-set values
+    # (Imp spells Literal[...] as enum[...]; enum values are strings, so an
+    # integer literal matches through its string spelling).
+    test "literal (enum) type validation" do
+      lm = dummy_lm(List.duplicate(%{result: "test output"}, 3))
+
+      program =
+        Imp.predict(
+          "status: enum[pending, approved, rejected], priority: enum[1, 2, 3] -> result",
+          lm: lm
+        )
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{status: "approved", priority: 2})
+        end)
+
+      refute log =~ "type mismatch"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{status: "invalid", priority: 2})
+        end)
+
+      assert log =~ "type mismatch for field 'status'"
+      assert log =~ "expected enum[pending, approved, rejected]"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{status: "approved", priority: 5})
+        end)
+
+      assert log =~ "type mismatch for field 'priority'"
+      assert log =~ "expected enum[1, 2, 3]"
+    end
+
+    # Upstream: test_literal_union_type_validation — `Literal[...] | None`
+    # accepts the literals and None; other values warn. Imp's port: nil input
+    # values are skipped by the check (upstream skips None), out-of-set
+    # values warn.
+    test "literal union with nil" do
+      lm = dummy_lm(List.duplicate(%{result: "test output"}, 3))
+
+      signature =
+        Imp.Signature.new(%{
+          inputs: [
+            mode: [constraints: %{enum: ["auto", "manual"]}, metadata: %{optional: true}]
+          ],
+          outputs: [:result]
+        })
+
+      program = Imp.predict(signature, lm: lm)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{mode: "auto"})
+        end)
+
+      refute log =~ "type mismatch"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{mode: nil})
+        end)
+
+      refute log =~ "type mismatch"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{mode: "invalid"})
+        end)
+
+      assert log =~ "type mismatch for field 'mode'"
+    end
+
+    # Upstream: test_basic_types_string_signature (parametrized
+    # enable_type_warnings False/True) — the `warn_on_type_mismatch` setting
+    # gates the whole check.
+    test "warn_on_type_mismatch setting gates the check" do
+      lm = dummy_lm(List.duplicate(%{result: "test output"}, 2))
+      program = Imp.predict("count: int, name: str -> result", lm: lm)
+
+      log =
+        Imp.Settings.context([warn_on_type_mismatch: false], fn ->
+          ExUnit.CaptureLog.capture_log(fn ->
+            assert {:ok, _prediction} = Imp.call(program, %{count: "not an int", name: "test"})
+          end)
+        end)
+
+      refute log =~ "type mismatch"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} = Imp.call(program, %{count: "not an int", name: "test"})
+        end)
+
+      assert log =~ "type mismatch for field 'count'"
+      assert log =~ "expected integer"
+    end
+
+    # Upstream: test_input_field_default_value — an input field declared with
+    # a default fills in when the caller omits it, and the default value
+    # reaches the rendered prompt. Regression for de-hzcv gap #8: pre-fix Imp
+    # had no default surface, so the omitted field was a loud
+    # {:error, {:missing_input_fields, [:context]}} instead. The second half
+    # pins that a default never masks a genuinely missing required field
+    # without one.
+    test "input field default value" do
+      lm = capture_lm(fn _messages -> {:ok, %{answer: "test"}} end)
+
+      signature =
+        Imp.Signature.new(%{
+          inputs: [context: [default: "DEFAULT_CONTEXT"], question: []],
+          outputs: [:answer]
+        })
+
+      program = Imp.predict(signature, lm: lm)
+      assert {:ok, _prediction} = Imp.call(program, %{question: "test"})
+
+      assert_received {:lm_call, messages, _opts}
+      user_message = messages |> List.last() |> Map.fetch!(:content)
+      assert user_message =~ "DEFAULT_CONTEXT"
+
+      # A field WITHOUT a default stays required: the default machinery must
+      # not mask a missing input.
+      assert {:error, {:missing_input_fields, [:question]}} =
+               Imp.call(program, %{})
+    end
+
+    # Upstream: test_datetime_inputs_and_outputs — datetime-typed fields
+    # round-trip: the input renders into the prompt as ISO 8601 text and the
+    # LM's ISO 8601 output parses back into a datetime value. Regression for
+    # de-hzcv gap #11: pre-fix Imp had no :datetime field type (the string
+    # spec raised "unknown field type") and returned the output as raw text.
+    # Adapted: upstream nests datetimes in pydantic models; Imp declares the
+    # datetime field directly (no custom-model type system — exam seam).
+    test "datetime inputs and outputs" do
+      lm =
+        capture_lm(fn _messages ->
+          {:ok, %{summary: "All events are processed", next_event_time: "2024-11-27T14:00:00"}}
+        end)
+
+      program =
+        Imp.predict("event_name, event_time: datetime -> summary, next_event_time: datetime",
+          lm: lm
+        )
+
+      assert {:ok, prediction} =
+               Imp.call(program, %{
+                 event_name: "Event 1",
+                 event_time: ~N[2024-11-25 10:00:00]
+               })
+
+      assert Imp.Prediction.get(prediction, :summary) == "All events are processed"
+      assert Imp.Prediction.get(prediction, :next_event_time) == ~N[2024-11-27 14:00:00]
+
+      assert_received {:lm_call, messages, _opts}
+      user_message = messages |> List.last() |> Map.fetch!(:content)
+      assert user_message =~ "2024-11-25T10:00:00"
+
+      # A datetime-typed input given a non-datetime value warns (type-mismatch
+      # family) but still proceeds.
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} =
+                   Imp.call(program, %{event_name: "Event 2", event_time: "tomorrow"})
+        end)
+
+      assert log =~ "type mismatch for field 'event_time'"
+      assert log =~ "expected datetime"
+    end
+
     # Upstream: test_error_message_on_invalid_lm_setup — no LM is a loud
     # error; a bogus LM value is rejected loudly (Imp validates at
     # construction rather than at call time; seam recorded in the exam table).

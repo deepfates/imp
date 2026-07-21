@@ -76,6 +76,7 @@ defmodule Imp.Schema do
         :boolean -> is_boolean(value)
         :array -> is_list(value)
         :object -> is_map(value)
+        :datetime -> match?(%DateTime{}, value) or match?(%NaiveDateTime{}, value)
         _ -> true
       end
 
@@ -263,6 +264,10 @@ defmodule Imp.Schema do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  # Datetimes travel the wire as ISO 8601 strings (JSON has no datetime type);
+  # the chat adapter parses them back into DateTime/NaiveDateTime structs.
+  defp json_type(:datetime), do: "string"
+  defp json_type("datetime"), do: "string"
   defp json_type(:integer), do: "integer"
   defp json_type(:float), do: "number"
   defp json_type(:number), do: "number"
@@ -290,6 +295,7 @@ defmodule Imp.Schema do
       "object" -> :object
       "string" -> :string
       "str" -> :string
+      "datetime" -> :datetime
       type -> type
     end
   end

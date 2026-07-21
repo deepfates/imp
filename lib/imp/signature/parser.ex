@@ -49,6 +49,7 @@ defmodule Imp.Signature.Parser do
     "float" => :float,
     "boolean" => :boolean,
     "bool" => :boolean,
+    "datetime" => :datetime,
     "object" => :object,
     "map" => :object,
     "dict" => :object

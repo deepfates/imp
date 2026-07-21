@@ -20,7 +20,10 @@ defmodule Imp.Settings do
     callbacks: [],
     async_max_workers: 8,
     max_errors: 10,
-    track_usage: false
+    track_usage: false,
+    # DSPy `warn_on_type_mismatch` (settings.py, default True): log a warning
+    # when a provided input value does not match the field's declared type.
+    warn_on_type_mismatch: true
   }
   @context_key :imp_context_stack
   @snapshot_key :imp_settings_snapshot
@@ -32,7 +35,8 @@ defmodule Imp.Settings do
     "lm" => :lm,
     "max_errors" => :max_errors,
     "retriever" => :retriever,
-    "track_usage" => :track_usage
+    "track_usage" => :track_usage,
+    "warn_on_type_mismatch" => :warn_on_type_mismatch
   }
 
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)
