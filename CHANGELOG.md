@@ -3,6 +3,16 @@
 All notable Imp changes will be recorded here. Imp follows Semantic
 Versioning once the first public package is released.
 
+## Unreleased
+
+### Deprecated
+
+- Passing an LM as a `%{module: module, opts: keyword}` map or as a bare
+  arity-2 function is deprecated. Both still work and now log one loud
+  warning per VM. Use an LM struct (`Imp.LM.Static.new(opts)`,
+  `Imp.req_llm/2`) or a plain LM module instead. Support for the
+  deprecated shapes will be removed in a future release.
+
 ## 0.2.1 — 2026-07-18
 
 ### Changed
