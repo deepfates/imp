@@ -347,4 +347,56 @@ defmodule Imp.RedactionTest do
     assert metadata.prose == prose
     assert metadata.ordinary_url == ordinary_url
   end
+
+  # de-4hmp: security-token key suffixes and provider-shaped secret values.
+  # All values here are FAKE, example-shaped strings (AWS's own documented
+  # example key id, padded canaries) — never real secrets.
+
+  test "redacts security_token and x-amz-security-token key suffixes" do
+    redacted =
+      Imp.Redaction.redact(%{
+        "x-amz-security-token" => "CANARY_AMZ_SECURITY_TOKEN_77aa1",
+        "X-Amz-Security-Token" => "CANARY_AMZ_SECURITY_TOKEN_CASED_31b09",
+        security_token: "CANARY_SECURITY_TOKEN_9f1e2",
+        awsSecurityToken: "CANARY_AWS_SECURITY_TOKEN_CAMEL_5c4d3"
+      })
+
+    assert redacted.security_token == "[REDACTED]"
+    assert redacted["x-amz-security-token"] == "[REDACTED]"
+    assert redacted["X-Amz-Security-Token"] == "[REDACTED]"
+    assert redacted.awsSecurityToken == "[REDACTED]"
+  end
+
+  test "redacts AKIA/ASIA and AIza value shapes inside free text" do
+    # AWS's documented fake example access key id, and an example-shaped
+    # Google key (AIza + 35 filler chars). Neither is a real credential.
+    fake_akia = "AKIAIOSFODNN7EXAMPLE"
+    fake_asia = "ASIAIOSFODNN7EXAMPLE"
+    fake_aiza = "AIza" <> String.duplicate("Xy-_9", 7)
+
+    assert Imp.Redaction.redact(%{note: "creds #{fake_akia} in prose"}).note == "[REDACTED]"
+    assert Imp.Redaction.redact(%{note: fake_asia}).note == "[REDACTED]"
+    assert Imp.Redaction.redact(%{note: "key=#{fake_aiza}."}).note == "[REDACTED]"
+
+    # Near-miss shapes survive: short AKIA prefix, AKIA embedded in a word.
+    assert Imp.Redaction.redact(%{note: "AKIA1234 is too short"}).note ==
+             "AKIA1234 is too short"
+
+    assert Imp.Redaction.redact(%{note: "NAKIAIOSFODNN7EXAMPLES"}).note ==
+             "NAKIAIOSFODNN7EXAMPLES"
+  end
+
+  test "redacts long hex values only inside credential assignments" do
+    fake_hex = String.duplicate("0badcafe", 5)
+
+    assert Imp.Redaction.redact(%{log: "token=#{fake_hex}"}).log == "[REDACTED]"
+    assert Imp.Redaction.redact(%{log: "api_key: #{fake_hex}"}).log == "[REDACTED]"
+    assert Imp.Redaction.redact(%{log: ~s(secret="#{fake_hex}")}).log == "[REDACTED]"
+
+    # Bare digests (git SHAs, cache keys) are data, not secrets — untouched.
+    assert Imp.Redaction.redact(%{sha: fake_hex}).sha == fake_hex
+
+    assert Imp.Redaction.redact(%{log: "cache hit #{fake_hex}"}).log ==
+             "cache hit #{fake_hex}"
+  end
 end

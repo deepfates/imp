@@ -62,6 +62,7 @@ defmodule Imp.Redaction do
     ["access", "key"],
     ["access", "key", "id"],
     ["secret", "key"],
+    ["security", "token"],
     ["secret", "access", "key"],
     ["client", "secret"],
     ["private", "key"],
@@ -531,8 +532,35 @@ defmodule Imp.Redaction do
       value,
       ~r/(?:\A|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{8,}(?=\z|[^A-Za-z0-9_-])/
     ) or bearer_credential?(trimmed) or basic_credential?(trimmed) or
-      session_assignment?(value)
+      session_assignment?(value) or aws_access_key_id?(value) or google_api_key?(value) or
+      hex_credential_assignment?(value)
   end
+
+  # AWS access key ids have a fixed, distinctive shape: a 4-letter prefix
+  # (AKIA long-term, ASIA temporary) followed by exactly 16 uppercase
+  # base-32-ish characters. Distinctive enough to redact standalone.
+  defp aws_access_key_id?(value),
+    do: String.match?(value, ~r/(?:\A|[^A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?=\z|[^A-Z0-9])/)
+
+  # Google API keys are "AIza" followed by exactly 35 url-safe base64 chars.
+  defp google_api_key?(value),
+    do:
+      String.match?(
+        value,
+        ~r/(?:\A|[^A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?=\z|[^A-Za-z0-9_-])/
+      )
+
+  # Long hex strings alone are NOT treated as secrets — this codebase passes
+  # SHA-1/SHA-256 digests around as cache keys and git identities, and blanket
+  # hex redaction would destroy them. A long hex value is only redacted when it
+  # sits in an explicit credential assignment (`token=<hex>`, `secret: <hex>`),
+  # where the key name already says what it is.
+  defp hex_credential_assignment?(value),
+    do:
+      String.match?(
+        value,
+        ~r/(?:secret|token|password|api[_-]?key|credential)s?\s*[=:]\s*"?[0-9a-fA-F]{32,}"?(?=\z|[^0-9a-fA-F])/i
+      )
 
   defp bearer_credential?(value),
     do:

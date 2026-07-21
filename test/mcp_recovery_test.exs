@@ -1,6 +1,8 @@
 defmodule MCPRecoveryTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias Imp.MCP
 
   defmodule ScriptedTransport do
@@ -242,5 +244,29 @@ defmodule MCPRecoveryTest do
       Process.sleep(10)
       eventually(fun, attempts - 1)
     end
+  end
+
+  # de-4hmp: an unparsable Retry-After used to be swallowed by a blanket
+  # rescue. The fallback to exponential backoff stays, but it must be loud.
+  test "unparsable Retry-After warns and falls back to exponential backoff" do
+    client =
+      client(
+        %{
+          "tools/list" => [
+            {:http, 429, [{"retry-after", "not-a-date-or-seconds"}]},
+            :ok
+          ]
+        },
+        max_retry_after: 10
+      )
+
+    log =
+      capture_log(fn ->
+        assert [tool] = MCP.import_tools(client)
+        assert tool.name == :recoverable
+      end)
+
+    assert log =~ "unparsable Retry-After"
+    assert log =~ "falling back to exponential backoff"
   end
 end

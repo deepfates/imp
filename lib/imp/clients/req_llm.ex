@@ -11,6 +11,27 @@ defmodule Imp.Clients.ReqLLM do
 
   require Logger
 
+  # ── Provider-era-pinned constants ─────────────────────────────────────────
+  # Both values below encode provider behavior as of a specific date and WILL
+  # rot as providers ship new betas and model families. They are collected
+  # here so there is one place to update.
+  #
+  # To update:
+  # - @anthropic_structured_outputs_beta: check Anthropic's structured-outputs
+  #   beta header name (docs.anthropic.com, "structured outputs"); replace the
+  #   dated string when the beta graduates or is renamed.
+  # - @openai_reasoning_model_pattern: add new OpenAI reasoning-model family
+  #   prefixes as they ship. A model this regex misses is silently treated as
+  #   a NON-reasoning model (:max_tokens is not renamed to
+  #   :max_completion_tokens), which the provider then rejects or req_llm
+  #   papers over with a per-call warning.
+  #
+  # A registry-driven replacement (deriving both from ReqLLM's model registry
+  # instead of pinning) is the real fix and is out of scope here; see ticket
+  # de-4hmp.
+  @anthropic_structured_outputs_beta "structured-outputs-2025-11-13"
+  @openai_reasoning_model_pattern ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/
+
   defstruct model: nil,
             opts: [],
             req_module: ReqLLM
@@ -64,24 +85,44 @@ defmodule Imp.Clients.ReqLLM do
   # difference — the gating logic itself is byte-identical to DSPy's.
   @spec response_format_capability(t()) :: Imp.LM.Capability.t()
   def response_format_capability(%__MODULE__{model: model_spec}) do
-    with {:ok, model} <- resolve_model(model_spec),
-         %{} = json <- json_capability(model) do
-      schema? = truthy?(Map.get(json, :schema))
-      native? = truthy?(Map.get(json, :native))
-      %Imp.LM.Capability{response_format: native? or schema?, response_schema: schema?}
-    else
-      _ -> Imp.LM.Capability.none()
+    case resolve_model(model_spec) do
+      {:ok, model} ->
+        case json_capability(model) do
+          %{} = json ->
+            schema? = truthy?(Map.get(json, :schema))
+            native? = truthy?(Map.get(json, :native))
+            %Imp.LM.Capability{response_format: native? or schema?, response_schema: schema?}
+
+          _no_json_entry ->
+            # Documented loud-by-omission: the registry resolved the model but
+            # does not advertise a `json` capability, so no response_format is
+            # sent. Not a failure — see the moduledoc note above.
+            Imp.LM.Capability.none()
+        end
+
+      {:error, reason} ->
+        Logger.warning(
+          "Imp: model registry lookup failed for #{inspect(model_spec)} " <>
+            "(#{inspect(reason)}); assuming no structured-output capability " <>
+            "(Capability.none) — no response_format will be sent"
+        )
+
+        Imp.LM.Capability.none()
     end
   end
 
   defp resolve_model(%{capabilities: _} = model), do: {:ok, model}
 
   defp resolve_model(model_spec) do
-    ReqLLM.model(model_spec)
+    case ReqLLM.model(model_spec) do
+      {:ok, model} -> {:ok, model}
+      {:error, reason} -> {:error, reason}
+      other -> {:error, {:unexpected_registry_result, other}}
+    end
   rescue
-    _ -> :error
+    error -> {:error, error}
   catch
-    _, _ -> :error
+    kind, reason -> {:error, {kind, reason}}
   end
 
   defp json_capability(%{capabilities: %{json: json}}) when is_map(json), do: json
@@ -367,9 +408,7 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp build_message(role, content, tool_calls) do
-    role = role |> to_string() |> String.to_existing_atom()
-
-    case role do
+    case normalize_role(role) do
       :system ->
         ReqLLM.Context.system(content_to_req(content))
 
@@ -381,11 +420,42 @@ defmodule Imp.Clients.ReqLLM do
       :tool ->
         ReqLLM.Context.tool_result(tool_call_id(tool_calls), content_to_text(content))
 
-      _ ->
+      :user ->
+        ReqLLM.Context.user(content_to_req(content))
+
+      other ->
+        # The coercion to :user is kept (DSPy does the same), but it must be
+        # visible: an unknown role means the caller built a message we do not
+        # understand. Warn once per distinct role, not per message.
+        warn_unknown_role_once(other)
         ReqLLM.Context.user(content_to_req(content))
     end
+  end
+
+  defp normalize_role(role) when is_atom(role), do: role
+
+  defp normalize_role(role) when is_binary(role) do
+    String.to_existing_atom(role)
   rescue
-    ArgumentError -> ReqLLM.Context.user(content_to_text(content))
+    # Unknown string role (no such atom): return it as-is so the catch-all
+    # branch above warns and coerces to :user. Never atomizes unknown input.
+    ArgumentError -> role
+  end
+
+  defp normalize_role(role), do: role
+
+  defp warn_unknown_role_once(role) do
+    key = {__MODULE__, :unknown_role_warned, role}
+
+    unless :persistent_term.get(key, false) do
+      :persistent_term.put(key, true)
+
+      Logger.warning(
+        "Imp: unknown message role #{inspect(role)} coerced to :user " <>
+          "(known roles: :system, :assistant, :tool, :user); " <>
+          "warning once per distinct role"
+      )
+    end
   end
 
   defp content_to_req(content) when is_binary(content), do: content
@@ -646,13 +716,13 @@ defmodule Imp.Clients.ReqLLM do
       opts,
       :provider_options,
       [
-        anthropic_beta: ["structured-outputs-2025-11-13"],
+        anthropic_beta: [@anthropic_structured_outputs_beta],
         output_format: %{type: "json_schema", schema: schema}
       ],
       fn provider_opts ->
         provider_opts
-        |> Keyword.update(:anthropic_beta, ["structured-outputs-2025-11-13"], fn betas ->
-          ["structured-outputs-2025-11-13" | List.wrap(betas)]
+        |> Keyword.update(:anthropic_beta, [@anthropic_structured_outputs_beta], fn betas ->
+          [@anthropic_structured_outputs_beta | List.wrap(betas)]
         end)
         |> Keyword.put(:output_format, %{type: "json_schema", schema: schema})
         |> Keyword.delete(:response_format)
@@ -723,7 +793,7 @@ defmodule Imp.Clients.ReqLLM do
     id = model |> model_id() |> String.downcase()
 
     model_provider(model) == :openai and
-      (String.match?(id, ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/) or
+      (String.match?(id, @openai_reasoning_model_pattern) or
          String.contains?(id, "reasoning"))
   end
 
