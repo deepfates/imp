@@ -951,7 +951,35 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       )
   end
 
+  # Loading the reproduction registry re-reads, re-hashes, and re-validates
+  # every admitted artifact (~800ms per call). The registry file pins each
+  # artifact by its content-addressed path and SHA-256, so for a fixed repo
+  # checkout the outcome (success or the exact validation error) is
+  # deterministic per registry-file digest. Cache the outcome on that digest
+  # for the life of the VM: a normal CLI run loads once either way, but the
+  # test suite invokes this task dozens of times in one VM and was paying the
+  # full validation cost every time. Editing the registry file changes the
+  # digest and forces a fresh validated load; editing an admitted artifact or
+  # validator source mid-VM is not detectable here, which no single-shot CLI
+  # run can observe.
   defp load_reproduction_registry do
+    key =
+      {__MODULE__, :reproduction_registry,
+       :crypto.hash(:sha256, File.read!("benchmarks/reproductions.json"))}
+
+    try do
+      :persistent_term.get(key)
+    rescue
+      ArgumentError ->
+        result = load_reproduction_registry_uncached()
+        :persistent_term.put(key, result)
+        result
+    end
+  rescue
+    error -> {:error, Exception.message(error)}
+  end
+
+  defp load_reproduction_registry_uncached do
     {:ok, Imp.ReproductionRegistry.load!()}
   rescue
     error -> {:error, Exception.message(error)}
