@@ -132,9 +132,7 @@ defmodule UpstreamExam.EvaluateTest do
     example = Imp.example(question: "What is 1+1?", response: "2")
     pred = Imp.prediction(response: "2")
 
-    assert {:ok, result} =
-             SemanticF1.new(lm: lm) |> SemanticF1.call(%{example: example, pred: pred})
-
+    assert {:ok, result} = SemanticF1.new(lm: lm) |> SemanticF1.call(%{example: example, pred: pred})
     assert %Imp.Prediction{} = result
     assert is_number(result.score) or is_boolean(result.score)
   end
@@ -166,8 +164,7 @@ defmodule UpstreamExam.EvaluateTest do
     example = Imp.example(question: "test", response: "answer")
     pred = Imp.prediction(response: "response")
 
-    assert {:ok, result} =
-             SemanticF1.new(lm: lm) |> SemanticF1.call(%{example: example, pred: pred})
+    assert {:ok, result} = SemanticF1.new(lm: lm) |> SemanticF1.call(%{example: example, pred: pred})
 
     expected_f1 = 2 * (0.8 * 0.6) / (0.8 + 0.6)
     assert_in_delta result.score, expected_f1, 0.001

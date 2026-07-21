@@ -105,8 +105,7 @@ defmodule UpstreamExam.TelepromptTest do
     bootstrap =
       BootstrapFewShot.new(simple_metric(), max_bootstrapped_demos: 1, max_labeled_demos: 1)
 
-    compiled =
-      BootstrapFewShot.compile(bootstrap, student, bootstrap_trainset(), teacher: teacher)
+    compiled = BootstrapFewShot.compile(bootstrap, student, bootstrap_trainset(), teacher: teacher)
 
     # Upstream asserts compiled_student._compiled is set; Imp has no mutable
     # compilation flag — the optimizer report is the compilation evidence.
@@ -123,8 +122,7 @@ defmodule UpstreamExam.TelepromptTest do
     bootstrap =
       BootstrapFewShot.new(simple_metric(), max_bootstrapped_demos: 1, max_labeled_demos: 1)
 
-    compiled =
-      BootstrapFewShot.compile(bootstrap, student, bootstrap_trainset(), teacher: teacher)
+    compiled = BootstrapFewShot.compile(bootstrap, student, bootstrap_trainset(), teacher: teacher)
 
     assert [demo] = compiled.demos
     assert Imp.Example.get(demo, :input) == "What is the color of the sky?"
@@ -181,9 +179,7 @@ defmodule UpstreamExam.TelepromptTest do
     bootstrap =
       BootstrapFewShot.new(simple_metric(), max_bootstrapped_demos: 1, max_labeled_demos: 1)
 
-    compiled =
-      BootstrapFewShot.compile(bootstrap, student, bootstrap_trainset(), teacher: teacher)
-
+    compiled = BootstrapFewShot.compile(bootstrap, student, bootstrap_trainset(), teacher: teacher)
     assert length(compiled.demos) >= 1
   end
 
