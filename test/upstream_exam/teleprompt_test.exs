@@ -460,6 +460,355 @@ defmodule UpstreamExam.TelepromptTest do
   end
 
   # ---------------------------------------------------------------------------
+  # tests/teleprompt/test_gepa.py — component_selector option surface
+  #
+  # Upstream's `component_selector` maps to Imp's `:module_selector`:
+  # "round_robin"/"all" strings become the :round_robin/:all atoms, and custom
+  # Python functions become arity-five Elixir functions receiving the same
+  # context (state, trajectories, subsample scores, candidate index, candidate).
+  # Upstream's `instruction_proposer` maps to Imp's `:reflection_strategy`: a
+  # __call__(candidate, reflective_dataset, components_to_update) -> dict
+  # object becomes an arity-three function returning a proposal map.
+  # ---------------------------------------------------------------------------
+
+  # Upstream MultiComponentModule (test_gepa.py): classifier + generator.
+  defmodule MultiComponentProgram do
+    @behaviour Imp.Module
+
+    defstruct [:classifier, :generator]
+
+    def new do
+      %__MODULE__{
+        classifier:
+          Imp.predict("input -> category",
+            lm: %{
+              module: Imp.LM.Static,
+              opts: [handler: fn _messages, _opts -> %{category: "test_category"} end]
+            }
+          ),
+        generator:
+          Imp.predict("category, input -> output",
+            lm: %{
+              module: Imp.LM.Static,
+              opts: [handler: fn _messages, _opts -> %{output: "test_output"} end]
+            }
+          )
+      }
+    end
+
+    def optimizer_predictors(program),
+      do: [classifier: program.classifier, generator: program.generator]
+
+    def update_optimizer_predictor(program, :classifier, update),
+      do: %{program | classifier: update.(program.classifier)}
+
+    def update_optimizer_predictor(program, :generator, update),
+      do: %{program | generator: update.(program.generator)}
+
+    @impl true
+    def call(%__MODULE__{} = program, inputs) do
+      inputs = Map.new(inputs)
+
+      with {:ok, classified} <- Imp.Module.call(program.classifier, %{input: inputs[:input]}),
+           category = Imp.Prediction.fetch!(classified, :category),
+           {:ok, generated} <-
+             Imp.Module.call(program.generator, %{category: category, input: inputs[:input]}) do
+        {:ok,
+         Imp.Prediction.new(
+           [category: category, output: Imp.Prediction.fetch!(generated, :output)],
+           metadata: generated.metadata
+         )}
+      end
+    end
+  end
+
+  # Upstream component_selection_metric: fixed score with textual feedback.
+  defp component_selection_metric do
+    fn _example, _prediction -> %{score: 0.3, feedback: "Test feedback"} end
+  end
+
+  # Upstream reflection_lm DummyLM({"improved_instruction": ...}); Imp's
+  # reflection contract is JSON with an instruction field.
+  defp selector_reflection_lm do
+    static_lm(fn _messages, _opts ->
+      Jason.encode!(%{
+        "instruction" => "Improved instruction #{System.unique_integer([:positive])}."
+      })
+    end)
+  end
+
+  defp selector_trainset do
+    [Imp.example(input: "test", output: "expected") |> Imp.with_inputs(:input)]
+  end
+
+  defp compile_multi_component(opts) do
+    Imp.Optimizer.GEPA.new(
+      component_selection_metric(),
+      Keyword.merge([reflection_lm: selector_reflection_lm(), generations: 2], opts)
+    )
+    |> Imp.Optimizer.GEPA.compile(
+      MultiComponentProgram.new(),
+      selector_trainset(),
+      selector_trainset()
+    )
+  end
+
+  # test_component_selector_functionality
+  test "gepa: custom component selector function selects single or multiple components" do
+    owner = self()
+
+    test_selector = fn _state, _trajectories, _scores, candidate_idx, candidate ->
+      send(owner, {:selector_call, candidate_idx, Map.keys(candidate) |> Enum.sort()})
+      if candidate_idx == 0, do: [:classifier], else: [:classifier, :generator]
+    end
+
+    result = compile_multi_component(module_selector: test_selector)
+
+    assert_received {:selector_call, _idx, components}
+    assert :classifier in components, "Should receive all available components"
+    assert :generator in components, "Should receive all available components"
+    assert %MultiComponentProgram{} = result
+  end
+
+  # test_component_selector_default_behavior
+  test "gepa: default behavior without a custom selector is round-robin" do
+    assert %MultiComponentProgram{} = compile_multi_component([])
+
+    assert %Imp.Optimizer.GEPA{module_selector: :round_robin} =
+             Imp.Optimizer.GEPA.new(component_selection_metric())
+  end
+
+  # test_component_selector_string_round_robin (upstream string "round_robin"
+  # is the :round_robin atom in Imp)
+  test "gepa: round_robin selector compiles" do
+    assert %MultiComponentProgram{} = compile_multi_component(module_selector: :round_robin)
+  end
+
+  # test_component_selector_string_all: with :all, the first accepted candidate
+  # updates every component; with :round_robin, exactly one.
+  test "gepa: all selector updates every component per candidate, round_robin one" do
+    optimize = fn selector ->
+      {_compiled, report} =
+        Imp.Optimizer.GEPA.new(
+          component_selection_metric(),
+          reflection_lm: selector_reflection_lm(),
+          generations: 2,
+          module_selector: selector,
+          acceptance_policy: :equal_or_better
+        )
+        |> Imp.Optimizer.GEPA.compile_with_report(
+          MultiComponentProgram.new(),
+          selector_trainset(),
+          selector_trainset()
+        )
+
+      baseline = Enum.find(report.candidates, &(&1.mutation == "baseline"))
+      accepted = Enum.find(report.candidates, &(&1.mutation == "accepted reflection"))
+      {baseline.parameters, accepted.parameters}
+    end
+
+    {baseline_rr, accepted_rr} = optimize.(:round_robin)
+
+    changed_rr =
+      Enum.filter([:classifier, :generator], &(baseline_rr[&1] != accepted_rr[&1]))
+
+    assert length(changed_rr) == 1,
+           "First candidate should have only one component updated with round_robin"
+
+    {baseline_all, accepted_all} = optimize.(:all)
+
+    assert baseline_all[:classifier] != accepted_all[:classifier] and
+             baseline_all[:generator] != accepted_all[:generator],
+           "First candidate should have both components updated with all selector"
+  end
+
+  # test_component_selector_custom_random
+  test "gepa: custom random component selector compiles" do
+    random_component_selector = fn _state, _trajectories, _scores, _candidate_idx, candidate ->
+      component_names = Map.keys(candidate)
+      num_to_select = max(1, div(length(component_names), 2))
+      Enum.take_random(component_names, num_to_select)
+    end
+
+    assert %MultiComponentProgram{} =
+             compile_multi_component(module_selector: random_component_selector)
+  end
+
+  # test_alternating_half_component_selector: state.i is state.iteration in Imp.
+  test "gepa: alternating half selector optimizes different halves on even/odd iterations" do
+    owner = self()
+
+    alternating_half_selector = fn state, _trajectories, _scores, _candidate_idx, candidate ->
+      components = candidate |> Map.keys() |> Enum.sort()
+      mid_point = div(length(components), 2)
+
+      selected =
+        cond do
+          length(components) <= 1 -> components
+          rem(state.iteration, 2) == 0 -> Enum.take(components, mid_point)
+          true -> Enum.drop(components, mid_point)
+        end
+
+      send(owner, {:selection, state.iteration, selected, components})
+      selected
+    end
+
+    result = compile_multi_component(module_selector: alternating_half_selector, generations: 3)
+
+    assert %MultiComponentProgram{} = result
+
+    selections = drain_selections([])
+    assert length(selections) >= 2, "Should have made multiple selections"
+
+    for {iteration, selected, _all} <- selections do
+      if rem(iteration, 2) == 0 do
+        assert selected == [:classifier],
+               "Even iteration #{iteration} should select the first half"
+      else
+        assert selected == [:generator],
+               "Odd iteration #{iteration} should select the second half"
+      end
+    end
+  end
+
+  defp drain_selections(acc) do
+    receive do
+      {:selection, iteration, selected, all} ->
+        drain_selections(acc ++ [{iteration, selected, all}])
+    after
+      0 -> acc
+    end
+  end
+
+  # test_workflow_with_custom_instruction_proposer_and_component_selector
+  # (adapted): upstream replays a dspy.Image fixture file through its
+  # MultiModalInstructionProposer; Imp has no dspy.Image example type, so the
+  # port asserts the same boundary — compile completes with a custom proposer
+  # (:reflection_strategy) plus a custom all-components selector, and the
+  # proposer receives every selected component.
+  test "gepa: compile flow runs with a custom instruction proposer and component selector" do
+    owner = self()
+
+    all_component_selector = fn _state, _trajectories, _scores, _candidate_idx, candidate ->
+      candidate |> Map.keys() |> Enum.sort()
+    end
+
+    custom_proposer = fn candidate, _reflective_dataset, components_to_update ->
+      send(owner, {:proposer_call, Enum.sort(components_to_update)})
+
+      %{
+        new_texts:
+          Map.new(components_to_update, fn component ->
+            {component, "Improved: #{candidate[component]}"}
+          end)
+      }
+    end
+
+    result =
+      Imp.Optimizer.GEPA.new(
+        component_selection_metric(),
+        reflection_strategy: custom_proposer,
+        module_selector: all_component_selector,
+        generations: 2
+      )
+      |> Imp.Optimizer.GEPA.compile(
+        MultiComponentProgram.new(),
+        selector_trainset(),
+        selector_trainset()
+      )
+
+    assert %MultiComponentProgram{} = result
+    assert_received {:proposer_call, [:classifier, :generator]}
+  end
+
+  # ---------------------------------------------------------------------------
+  # tests/teleprompt/test_gepa_instruction_proposer.py
+  # ---------------------------------------------------------------------------
+
+  # test_custom_proposer_without_reflection_lm: a custom proposer manages its
+  # own external reflection LM; GEPA itself gets no reflection_lm.
+  test "gepa: custom proposer works without a reflection_lm on the optimizer" do
+    owner = self()
+
+    external_reflection_lm = fn instruction ->
+      send(owner, :external_reflection_lm_called)
+      "Externally-improved: #{instruction}"
+    end
+
+    proposer_with_external_lm = fn candidate, _reflective_dataset, components_to_update ->
+      %{
+        new_texts:
+          Map.new(components_to_update, fn name ->
+            {name, external_reflection_lm.(candidate[name])}
+          end)
+      }
+    end
+
+    student =
+      Imp.predict("text -> label",
+        lm: static_lm(fn _messages, _opts -> %{label: "test"} end)
+      )
+
+    trainset = [Imp.example(text: "test input", label: "test") |> Imp.with_inputs(:text)]
+
+    metric = fn _example, _prediction -> %{score: 0.7, feedback: "ok"} end
+
+    result =
+      Imp.Optimizer.GEPA.new(metric,
+        reflection_strategy: proposer_with_external_lm,
+        generations: 2
+      )
+      |> Imp.Optimizer.GEPA.compile(student, trainset, trainset)
+
+    assert %Imp.Predict.Predict{} = result
+
+    assert_received :external_reflection_lm_called,
+                    "External reflection LM should have been called by the custom proposer"
+  end
+
+  # test_default_proposer (adapted, no dspy.Image): without a custom proposer
+  # the default reflection path calls the configured reflection LM and compile
+  # completes without reflection errors surfacing.
+  test "gepa: default proposer calls the reflection LM and completes" do
+    owner = self()
+
+    reflection_lm =
+      static_lm(fn _messages, _opts ->
+        send(owner, :reflection_lm_called)
+        Jason.encode!(%{"instruction" => "Be more specific."})
+      end)
+
+    student =
+      Imp.predict("text -> label",
+        lm: static_lm(fn _messages, _opts -> %{label: "cat"} end)
+      )
+
+    trainset = [
+      Imp.example(text: "photo one", label: "cat") |> Imp.with_inputs(:text),
+      Imp.example(text: "photo two", label: "animal") |> Imp.with_inputs(:text)
+    ]
+
+    metric = fn _example, _prediction -> %{score: 0.3, feedback: "look closer"} end
+
+    {result, report} =
+      Imp.Optimizer.GEPA.new(metric, reflection_lm: reflection_lm, generations: 2)
+      |> Imp.Optimizer.GEPA.compile_with_report(student, trainset, trainset)
+
+    assert %Imp.Predict.Predict{} = result
+
+    # Upstream asserts "Exception during reflection/proposal" never surfaces;
+    # Imp records reflection failures as loud report errors, so none of the
+    # recorded diagnostics may come from the reflection/proposal path. (The
+    # 0.3-score candidates are legitimately rejected by strict improvement and
+    # carry their metric feedback as diagnostics; that is not an error.)
+    refute Enum.any?(report.errors, fn error ->
+             error |> inspect() |> String.contains?(["reflection", "proposal"])
+           end)
+
+    assert_received :reflection_lm_called, "Reflection LM should have been called"
+  end
+
+  # ---------------------------------------------------------------------------
   # tests/teleprompt/test_bettertogether.py
   # ---------------------------------------------------------------------------
 

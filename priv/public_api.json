@@ -3676,6 +3676,7 @@
         "merge_val_overlap_floor",
         "metric",
         "minibatch_size",
+        "module_selector",
         "proposal_concurrency",
         "proposal_timeout",
         "raise_on_exception",
