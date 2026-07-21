@@ -467,10 +467,10 @@ defmodule Imp.Clients.ReqLLM do
 
   defp content_to_req(content), do: content_to_text(content)
 
-  defp content_part(%Imp.Adapters.Types.Image{url: url, metadata: metadata}) when is_binary(url),
+  defp content_part(%Imp.Adapter.Types.Image{url: url, metadata: metadata}) when is_binary(url),
     do: [ReqLLM.Message.ContentPart.image_url(url, metadata)]
 
-  defp content_part(%Imp.Adapters.Types.Image{
+  defp content_part(%Imp.Adapter.Types.Image{
          data: data,
          mime_type: mime_type,
          metadata: metadata
@@ -478,7 +478,7 @@ defmodule Imp.Clients.ReqLLM do
        when is_binary(data),
        do: [ReqLLM.Message.ContentPart.image(data, mime_type || "image/png", metadata)]
 
-  defp content_part(%Imp.Adapters.Types.File{data: data, mime_type: mime_type})
+  defp content_part(%Imp.Adapter.Types.File{data: data, mime_type: mime_type})
        when is_binary(data),
        do: [
          ReqLLM.Message.ContentPart.file(
@@ -488,7 +488,7 @@ defmodule Imp.Clients.ReqLLM do
          )
        ]
 
-  defp content_part(%Imp.Adapters.Types.File{path: path, mime_type: mime_type})
+  defp content_part(%Imp.Adapter.Types.File{path: path, mime_type: mime_type})
        when is_binary(path) do
     [
       ReqLLM.Message.ContentPart.file(
@@ -499,13 +499,13 @@ defmodule Imp.Clients.ReqLLM do
     ]
   end
 
-  defp content_part(%Imp.Adapters.Types.Document{text: text}),
+  defp content_part(%Imp.Adapter.Types.Document{text: text}),
     do: [ReqLLM.Message.ContentPart.text(to_string(text))]
 
-  defp content_part(%Imp.Adapters.Types.Code{code: code, language: language}),
+  defp content_part(%Imp.Adapter.Types.Code{code: code, language: language}),
     do: [ReqLLM.Message.ContentPart.text("```#{language || ""}\n#{code}\n```")]
 
-  defp content_part(%Imp.Adapters.Types.Reasoning{text: text}),
+  defp content_part(%Imp.Adapter.Types.Reasoning{text: text}),
     do: [ReqLLM.Message.ContentPart.thinking(to_string(text))]
 
   defp content_part(value) when is_binary(value), do: [ReqLLM.Message.ContentPart.text(value)]
@@ -517,9 +517,9 @@ defmodule Imp.Clients.ReqLLM do
     content
     |> Enum.map_join("\n", fn
       value when is_binary(value) -> value
-      %Imp.Adapters.Types.Document{text: text} -> to_string(text)
-      %Imp.Adapters.Types.Code{code: code} -> to_string(code)
-      %Imp.Adapters.Types.Reasoning{text: text} -> to_string(text)
+      %Imp.Adapter.Types.Document{text: text} -> to_string(text)
+      %Imp.Adapter.Types.Code{code: code} -> to_string(code)
+      %Imp.Adapter.Types.Reasoning{text: text} -> to_string(text)
       value -> inspect(value)
     end)
   end
@@ -558,7 +558,7 @@ defmodule Imp.Clients.ReqLLM do
 
   defp normalize_tool_calls(nil), do: nil
 
-  defp normalize_tool_calls(%Imp.Adapters.Types.ToolCalls{tool_calls: tool_calls}),
+  defp normalize_tool_calls(%Imp.Adapter.Types.ToolCalls{tool_calls: tool_calls}),
     do: normalize_tool_calls(tool_calls)
 
   defp normalize_tool_calls(tool_calls) when is_list(tool_calls) do
@@ -569,7 +569,7 @@ defmodule Imp.Clients.ReqLLM do
 
   defp normalize_tool_call(%ReqLLM.ToolCall{} = call), do: call
 
-  defp normalize_tool_call(%Imp.Adapters.Types.ToolCall{} = call) do
+  defp normalize_tool_call(%Imp.Adapter.Types.ToolCall{} = call) do
     ReqLLM.ToolCall.new(
       tool_call_id(call),
       to_string(call.name),
@@ -578,10 +578,10 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp normalize_tool_call(%{function: _function} = call),
-    do: call |> Imp.Adapters.Types.ToolCall.from_map() |> normalize_tool_call()
+    do: call |> Imp.Adapter.Types.ToolCall.from_map() |> normalize_tool_call()
 
   defp normalize_tool_call(%{"function" => _function} = call),
-    do: call |> Imp.Adapters.Types.ToolCall.from_map() |> normalize_tool_call()
+    do: call |> Imp.Adapter.Types.ToolCall.from_map() |> normalize_tool_call()
 
   defp normalize_tool_call(%{id: id, name: name, arguments: arguments}) do
     ReqLLM.ToolCall.new(
@@ -619,7 +619,7 @@ defmodule Imp.Clients.ReqLLM do
 
   defp tool_call_id([%{id: id} | _]), do: id
   defp tool_call_id([%{"id" => id} | _]), do: id
-  defp tool_call_id(%Imp.Adapters.Types.ToolCall{id: id}) when not is_nil(id), do: id
+  defp tool_call_id(%Imp.Adapter.Types.ToolCall{id: id}) when not is_nil(id), do: id
   defp tool_call_id(name) when is_atom(name) or is_binary(name), do: "call_#{name}"
   defp tool_call_id(_), do: "tool_result"
 

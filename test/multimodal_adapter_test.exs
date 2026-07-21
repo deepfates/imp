@@ -1,7 +1,7 @@
 defmodule MultimodalAdapterTest do
   use ExUnit.Case
 
-  alias Imp.Adapters.Types
+  alias Imp.Adapter.Types
 
   @fixtures Path.join(__DIR__, "fixtures/multimodal")
 
@@ -151,15 +151,15 @@ defmodule MultimodalAdapterTest do
 
   test "reports malformed typed content at the adapter boundary" do
     assert_raise ArgumentError,
-                 ~r/Imp\.Adapters\.Types\.File expects binary :url, binary :path, or binary :data/,
+                 ~r/Imp\.Adapter\.Types\.File expects binary :url, binary :path, or binary :data/,
                  fn -> Types.to_openai(%Types.File{}) end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Adapters\.Types\.Image expects binary :url or binary :data/,
+                 ~r/Imp\.Adapter\.Types\.Image expects binary :url or binary :data/,
                  fn -> Types.to_openai(%Types.Image{url: 123}) end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Adapters\.Types\.Document expects binary :text and map :metadata/,
+                 ~r/Imp\.Adapter\.Types\.Document expects binary :text and map :metadata/,
                  fn -> Types.to_openai(%Types.Document{text: nil}) end
 
     assert_raise ArgumentError,

@@ -230,7 +230,7 @@ Status: `conformant`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
-Imp modules: `Imp.Adapters.Types`
+Imp modules: `Imp.Adapter.Types`
 Semantic invariants:
 
 - encoding support is not evidence of model reasoning quality

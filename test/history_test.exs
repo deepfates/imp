@@ -1,7 +1,7 @@
 defmodule Imp.HistoryTest do
   use ExUnit.Case
 
-  alias Imp.Adapters.Types
+  alias Imp.Adapter.Types
 
   test "builds immutable signature-shaped history through the public facade" do
     history =
@@ -125,7 +125,7 @@ defmodule Imp.HistoryTest do
            ] = Types.to_openai(%Types.History{messages: [%{role: :user, content: "hello"}]})
 
     assert_raise ArgumentError,
-                 ~r/provider chat messages use Imp\.Adapters\.Types\.History/,
+                 ~r/provider chat messages use Imp\.Adapter\.Types\.History/,
                  fn -> Types.to_openai(Imp.history([%{question: "Q?", answer: "A"}])) end
   end
 end

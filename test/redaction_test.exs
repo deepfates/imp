@@ -1,7 +1,7 @@
 defmodule Imp.RedactionTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Adapters.Types.Image
+  alias Imp.Adapter.Types.Image
 
   @credential_canaries [
     auth: "CANARY_BARE_AUTH_7f913",

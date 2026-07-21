@@ -907,19 +907,19 @@ fail-fast behavior.
 
 ### Tool Call Primitives
 
-Use `Imp.Adapters.Types.ToolCall` and `ToolCalls` when you need to inspect,
+Use `Imp.Adapter.Types.ToolCall` and `ToolCalls` when you need to inspect,
 persist, or pass provider-native tool-call values outside a full ReAct loop.
 They normalize Imp maps and OpenAI-style nested function calls into the same
 shape:
 
 ```elixir
 calls =
-  Imp.Adapters.Types.ToolCalls.from_dict_list([
+  Imp.Adapter.Types.ToolCalls.from_dict_list([
     %{id: "call_lookup", name: "lookup", arguments: %{query: "beam"}},
     %{id: "call_translate", function: %{name: "translate", arguments: ~s({"text":"hello"})}}
   ])
 
-Imp.Adapters.Types.ToolCalls.format(calls)
+Imp.Adapter.Types.ToolCalls.format(calls)
 ```
 
 ReqLLM-backed assistant messages accept the same primitive values through the

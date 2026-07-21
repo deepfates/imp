@@ -1,7 +1,7 @@
 defmodule Imp.Optimize.Anything.Multimodal do
   @moduledoc false
 
-  alias Imp.Adapters.Types.Image
+  alias Imp.Adapter.Types.Image
 
   @spec render(term()) :: {String.t(), [Image.t()]}
   def render(term) do

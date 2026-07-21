@@ -22,7 +22,7 @@ defmodule Imp.SavingSecretSafetyTest do
           token_count: 7,
           basic_header: basic,
           cookie_line: session,
-          image: %Imp.Adapters.Types.Image{
+          image: %Imp.Adapter.Types.Image{
             url: "https://example.test/private/#{image_secret}",
             data: "aW1hZ2U=",
             mime_type: "image/png"

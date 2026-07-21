@@ -414,14 +414,14 @@ defmodule Imp.Adapter.Chat do
   defp format_blob(blob), do: format_blob(to_string(blob))
 
   defp native_content?(value) when is_list(value), do: Enum.any?(value, &native_content?/1)
-  defp native_content?(%Imp.Adapters.Types.Image{}), do: true
-  defp native_content?(%Imp.Adapters.Types.Audio{}), do: true
-  defp native_content?(%Imp.Adapters.Types.File{}), do: true
-  defp native_content?(%Imp.Adapters.Types.Document{}), do: true
-  defp native_content?(%Imp.Adapters.Types.Code{}), do: true
-  defp native_content?(%Imp.Adapters.Types.Reasoning{}), do: true
-  defp native_content?(%Imp.Adapters.Types.Citation{}), do: true
-  defp native_content?(%Imp.Adapters.Types.Type{}), do: true
+  defp native_content?(%Imp.Adapter.Types.Image{}), do: true
+  defp native_content?(%Imp.Adapter.Types.Audio{}), do: true
+  defp native_content?(%Imp.Adapter.Types.File{}), do: true
+  defp native_content?(%Imp.Adapter.Types.Document{}), do: true
+  defp native_content?(%Imp.Adapter.Types.Code{}), do: true
+  defp native_content?(%Imp.Adapter.Types.Reasoning{}), do: true
+  defp native_content?(%Imp.Adapter.Types.Citation{}), do: true
+  defp native_content?(%Imp.Adapter.Types.Type{}), do: true
   defp native_content?(_value), do: false
 
   defp native_content_parts(values) when is_list(values),
@@ -801,8 +801,8 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  defp normalize_history_tool_calls(%Imp.Adapters.Types.ToolCalls{tool_calls: calls}),
-    do: Enum.map(calls, &Imp.Adapters.Types.ToolCall.format/1)
+  defp normalize_history_tool_calls(%Imp.Adapter.Types.ToolCalls{tool_calls: calls}),
+    do: Enum.map(calls, &Imp.Adapter.Types.ToolCall.format/1)
 
   # Redaction intentionally converts structs to credential-safe maps before an
   # event is stored in history. Preserve the collection envelope so replay still
@@ -815,7 +815,7 @@ defmodule Imp.Adapter.Chat do
 
   defp normalize_history_tool_calls(calls) when is_list(calls) do
     calls
-    |> Imp.Adapters.Types.ToolCalls.new()
+    |> Imp.Adapter.Types.ToolCalls.new()
     |> normalize_history_tool_calls()
   end
 

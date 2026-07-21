@@ -1,4 +1,4 @@
-defmodule Imp.Adapters.Types do
+defmodule Imp.Adapter.Types do
   @moduledoc """
   Lightweight multimodal and tool-call value structs matching Imp's adapter vocabulary.
 
@@ -134,7 +134,7 @@ defmodule Imp.Adapters.Types do
     defstruct tool_calls: []
 
     def new(tool_calls \\ []),
-      do: %__MODULE__{tool_calls: Enum.map(tool_calls, &Imp.Adapters.Types.ToolCall.from_map/1)}
+      do: %__MODULE__{tool_calls: Enum.map(tool_calls, &Imp.Adapter.Types.ToolCall.from_map/1)}
 
     def from_dict_list(tool_calls) when is_list(tool_calls), do: new(tool_calls)
 
@@ -144,7 +144,7 @@ defmodule Imp.Adapters.Types do
     end
 
     def format(%__MODULE__{tool_calls: tool_calls}) do
-      %{tool_calls: Enum.map(tool_calls, &Imp.Adapters.Types.ToolCall.format/1)}
+      %{tool_calls: Enum.map(tool_calls, &Imp.Adapter.Types.ToolCall.format/1)}
     end
   end
 
@@ -156,13 +156,13 @@ defmodule Imp.Adapters.Types do
       do: %__MODULE__{tool_call_results: Enum.map(results, &normalize_result/1)}
 
     def format(%__MODULE__{tool_call_results: results}) do
-      %{tool_call_results: Enum.map(results, &Imp.Adapters.Types.ToolResult.format/1)}
+      %{tool_call_results: Enum.map(results, &Imp.Adapter.Types.ToolResult.format/1)}
     end
 
-    defp normalize_result(%Imp.Adapters.Types.ToolResult{} = result), do: result
+    defp normalize_result(%Imp.Adapter.Types.ToolResult{} = result), do: result
 
     defp normalize_result(%{} = result) do
-      Imp.Adapters.Types.ToolResult.new(
+      Imp.Adapter.Types.ToolResult.new(
         Map.get(result, :name, Map.get(result, "name")),
         Map.get(result, :result, Map.get(result, "result")),
         id: Map.get(result, :id, Map.get(result, "id"))
@@ -177,15 +177,15 @@ defmodule Imp.Adapters.Types do
   are still rendered as text, which keeps simple prompts ergonomic while making
   malformed attachments visible.
 
-      iex> alias Imp.Adapters.Types
+      iex> alias Imp.Adapter.Types
       iex> Types.to_openai(%Types.Image{url: "https://example.com/cat.png"})
       %{type: "image_url", image_url: %{url: "https://example.com/cat.png"}}
 
-      iex> Imp.Adapters.Types.to_openai("hello")
+      iex> Imp.Adapter.Types.to_openai("hello")
       %{type: "text", text: "hello"}
 
-      iex> Imp.Adapters.Types.to_openai(%Imp.Adapters.Types.File{})
-      ** (ArgumentError) Imp.Adapters.Types.File expects binary :url, binary :path, or binary :data; got: %Imp.Adapters.Types.File{path: nil, url: nil, data: nil, mime_type: nil, metadata: %{}}
+      iex> Imp.Adapter.Types.to_openai(%Imp.Adapter.Types.File{})
+      ** (ArgumentError) Imp.Adapter.Types.File expects binary :url, binary :path, or binary :data; got: %Imp.Adapter.Types.File{path: nil, url: nil, data: nil, mime_type: nil, metadata: %{}}
 
   """
   def to_openai(%Image{url: url}) when is_binary(url) do
@@ -245,7 +245,7 @@ defmodule Imp.Adapters.Types do
     do:
       invalid_type!(
         Imp.History,
-        "provider chat messages use Imp.Adapters.Types.History; Imp.History stores signature-shaped field turns",
+        "provider chat messages use Imp.Adapter.Types.History; Imp.History stores signature-shaped field turns",
         history
       )
 
@@ -272,11 +272,11 @@ defmodule Imp.Adapters.Types do
   @doc """
   Converts a single value or list of values into OpenAI-compatible content blocks.
 
-      iex> alias Imp.Adapters.Types
+      iex> alias Imp.Adapter.Types
       iex> Types.content_to_openai(["hello", %Types.Document{text: "world"}])
       [%{type: "text", text: "hello"}, %{type: "text", text: "world"}]
 
-      iex> Imp.Adapters.Types.content_to_openai("hello")
+      iex> Imp.Adapter.Types.content_to_openai("hello")
       [%{type: "text", text: "hello"}]
 
   """
@@ -290,15 +290,15 @@ defmodule Imp.Adapters.Types do
   `input_audio`, `file`, or `text` block, it must have the expected payload.
   Unknown future provider block types pass through unchanged.
 
-      iex> alias Imp.Adapters.Types
+      iex> alias Imp.Adapter.Types
       iex> Types.from_openai(%{"type" => "text", "text" => "notes"})
-      %Imp.Adapters.Types.Document{text: "notes", metadata: %{}}
+      %Imp.Adapter.Types.Document{text: "notes", metadata: %{}}
 
       iex> future = %{"type" => "provider_future_block", "payload" => %{}}
-      iex> Imp.Adapters.Types.from_openai(future)
+      iex> Imp.Adapter.Types.from_openai(future)
       %{"type" => "provider_future_block", "payload" => %{}}
 
-      iex> Imp.Adapters.Types.from_openai(%{"type" => "file", "file" => %{}})
+      iex> Imp.Adapter.Types.from_openai(%{"type" => "file", "file" => %{}})
       ** (ArgumentError) OpenAI-compatible content block "file" has malformed payload: %{"file" => %{}, "type" => "file"}
 
   """
@@ -346,9 +346,9 @@ defmodule Imp.Adapters.Types do
   @doc """
   Decodes a single OpenAI-compatible content block or a list of blocks.
 
-      iex> alias Imp.Adapters.Types
+      iex> alias Imp.Adapter.Types
       iex> Types.content_from_openai([%{"type" => "text", "text" => "hello"}])
-      [%Imp.Adapters.Types.Document{text: "hello", metadata: %{}}]
+      [%Imp.Adapter.Types.Document{text: "hello", metadata: %{}}]
 
   """
   def content_from_openai(values) when is_list(values), do: Enum.map(values, &from_openai/1)
@@ -360,7 +360,7 @@ defmodule Imp.Adapters.Types do
 
   defp message_to_openai(message) do
     raise ArgumentError,
-          "Imp.Adapters.Types.History messages must be maps with :role and :content; got: #{inspect(message)}"
+          "Imp.Adapter.Types.History messages must be maps with :role and :content; got: #{inspect(message)}"
   end
 
   defp invalid_type!(module, expectation, value) do

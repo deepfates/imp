@@ -167,7 +167,7 @@ defmodule Imp.Redaction do
   """
   def redact(value, keys \\ @default_redact_keys)
 
-  def redact(%Imp.Adapters.Types.Image{} = image, keys) do
+  def redact(%Imp.Adapter.Types.Image{} = image, keys) do
     %{image | url: redact(image.url, keys), metadata: redact(image.metadata, keys)}
   end
 

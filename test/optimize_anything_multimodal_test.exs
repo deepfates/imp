@@ -1,7 +1,7 @@
 defmodule Imp.Optimize.Anything.MultimodalTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Adapters.Types.Image
+  alias Imp.Adapter.Types.Image
   alias Imp.Optimize.Anything.Multimodal
 
   test "extracts nested images depth-first with deterministic map ordering" do

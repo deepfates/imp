@@ -1,7 +1,7 @@
 defmodule ImpDoctestTest do
   use ExUnit.Case, async: true
 
-  doctest Imp.Adapters.Types
+  doctest Imp.Adapter.Types
   doctest Imp.Adapter.JSON
   doctest Imp.Cache
   doctest Imp.Errors

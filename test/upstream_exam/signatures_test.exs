@@ -17,7 +17,7 @@ defmodule UpstreamExam.SignaturesTest do
 
   @moduletag :upstream_exam
 
-  alias Imp.Adapters.Types
+  alias Imp.Adapter.Types
   alias Imp.Signature.Field
 
   defp count_structs(term, module) do
