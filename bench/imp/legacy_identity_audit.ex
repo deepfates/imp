@@ -26,9 +26,9 @@ defmodule Imp.LegacyIdentityAudit do
     "benchmarks/authorities.json" => "benchmark authority provenance",
     "benchmarks/config/failure-recovery-live.json" => "historical live campaign configuration",
     "identity/DECISION.md" => "historical naming decision record",
-    "lib/imp/benchmark_truth/local_mlx_campaign.ex" => "benchmark provenance adapter",
-    "lib/imp/benchmark_truth/provider_training_campaign.ex" => "benchmark provenance adapter",
-    "lib/imp/legacy_identity_audit.ex" => "the audit's own token matcher and policy",
+    "bench/imp/benchmark_truth/local_mlx_campaign.ex" => "benchmark provenance adapter",
+    "bench/imp/benchmark_truth/provider_training_campaign.ex" => "benchmark provenance adapter",
+    "bench/imp/legacy_identity_audit.ex" => "the audit's own token matcher and policy",
     "scripts/legacy_identity_audit.exs" => "the audit's release-gate entrypoint",
     "test/evidence_provenance_test.exs" =>
       "dead-command lint (dee-1t1w): grandfather annotations name the retired dsex command being linted"

@@ -252,7 +252,7 @@ defmodule Imp.UpstreamFidelity do
       source: "dspy/adapters/types; dspy/experimental",
       disposition: :conformant,
       ticket: "de-ezg9",
-      imp: [Imp.Adapters.Types],
+      imp: [Imp.Adapter.Types],
       invariants: ["encoding support is not evidence of model reasoning quality"],
       evidence: %{
         tests: ["test/multimodal_adapter_test.exs", "test/multimodal_quality_benchmark_test.exs"],

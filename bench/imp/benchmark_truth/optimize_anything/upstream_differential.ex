@@ -13,7 +13,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
                              )
 
   @task_source Path.expand(
-                 "../../../mix/tasks/imp.benchmark.optimize_anything_upstream_differential.ex",
+                 "../../../../lib/mix/tasks/imp.benchmark.optimize_anything_upstream_differential.ex",
                  __DIR__
                )
 

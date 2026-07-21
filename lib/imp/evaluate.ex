@@ -220,7 +220,7 @@ defmodule Imp.Evaluate do
     |> Enum.with_index()
     |> Enum.chunk_every(effective_concurrency)
     |> Stream.flat_map(fn wave ->
-      case Imp.Optimizer.GEPA.Coordinator.remaining(evaluator.deadline) do
+      case Imp.Deadline.remaining(evaluator.deadline) do
         0 -> Enum.map(wave, fn _item -> {:exit, :timeout} end)
         remaining -> run_evaluation_wave(wave, evaluator, program, remaining)
       end
@@ -283,7 +283,7 @@ defmodule Imp.Evaluate do
          example,
          index
        ) do
-    Imp.Optimizer.GEPA.Coordinator.with_deadline({:deadline, deadline}, fn ->
+    Imp.Deadline.with_deadline({:deadline, deadline}, fn ->
       evaluate_row(evaluator, program, example, index)
     end)
   end

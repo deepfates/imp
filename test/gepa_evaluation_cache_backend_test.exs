@@ -1,7 +1,7 @@
 defmodule Imp.Optimizer.GEPA.EvaluationCacheBackendTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Adapters.Types.Image
+  alias Imp.Adapter.Types.Image
   alias Imp.Optimizer.GEPA.EvaluationCache.{Codec, Disk, Memory}
   alias Imp.Optimizer.GEPA.Result
 

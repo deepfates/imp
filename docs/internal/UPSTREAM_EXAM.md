@@ -170,7 +170,7 @@ prior-art). Most also require pydantic model schemas. One row each:
 
 DSPy's `Citations` is the Anthropic citations type (`cited_text`,
 `document_index`, `start/end_char_index`, `char_location`).
-`Imp.Adapters.Types.Citation` is a different, simpler `{text, source}` struct
+`Imp.Adapter.Types.Citation` is a different, simpler `{text, source}` struct
 — none of the upstream shape is expressible.
 
 | Upstream test | Status | Note |
@@ -381,7 +381,7 @@ pytest itself only runs 6 of the 7.
 
 ## tests/signatures/test_adapter_file.py (28)
 
-Imp files (`Imp.Adapters.Types.File`) carry `path`/`url`/`data`/`mime_type`
+Imp files (`Imp.Adapter.Types.File`) carry `path`/`url`/`data`/`mime_type`
 and encode at the provider boundary (`Types.to_openai/1`). Not modeled:
 `filename`, `file_id`, string-sniffing constructors, Python repr/str.
 

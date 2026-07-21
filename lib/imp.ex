@@ -13,10 +13,7 @@ defmodule Imp do
 
   ## A tiny deterministic program
 
-      lm = %{
-        module: Imp.LM.Static,
-        opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-      }
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
       Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
 
@@ -182,32 +179,9 @@ defmodule Imp do
   @doc "Attaches demonstrations to a demo-bearing Imp program or example."
   def with_demos(program_or_example, demos)
 
-  def with_demos(%Predict{} = predict, demos), do: Predict.with_demos(predict, demos)
-
-  def with_demos(%ChainOfThought{predict: predict} = cot, demos),
-    do: %{cot | predict: Predict.with_demos(predict, demos)}
-
-  def with_demos(%ProgramOfThought{predict: predict} = pot, demos),
-    do: %{pot | predict: Predict.with_demos(predict, demos)}
-
-  def with_demos(%CodeAct{program_of_thought: pot} = code_act, demos),
-    do: %{code_act | program_of_thought: with_demos(pot, demos)}
-
-  def with_demos(%RAG{program: program} = rag, demos),
-    do: %{rag | program: with_demos(program, demos)}
-
-  def with_demos(%ReAct{react: predict} = react, demos),
-    do: %{react | react: with_demos(predict, demos)}
-
-  def with_demos(%ReActV2{react: predict} = react, demos),
-    do: %{react | react: with_demos(predict, demos)}
-
   def with_demos(%Example{} = example, demos), do: Example.with_demos(example, demos)
 
-  def with_demos(program_or_example, _demos) do
-    raise ArgumentError,
-          "Imp.with_demos/2 supports Predict, ChainOfThought, ProgramOfThought, CodeAct, RAG wrappers, and examples; got: #{inspect(program_or_example)}"
-  end
+  def with_demos(program, demos), do: Imp.ProgramAccess.put_demos(program, demos)
 
   @doc "Creates a program that asks for reasoning before final outputs."
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
@@ -267,11 +241,11 @@ defmodule Imp do
 
   @doc "Creates a program-of-thought module backed by the BEAM-safe sandbox."
   def program_of_thought(signature, opts \\ []),
-    do: Imp.Predict.ProgramOfThought.new(signature, opts)
+    do: ProgramOfThought.new(signature, opts)
 
   @doc "Creates a CodeAct-style module backed by the BEAM-safe sandbox."
   def code_act(signature, tools \\ [], opts \\ []),
-    do: Imp.Predict.CodeAct.new(signature, tools, opts)
+    do: CodeAct.new(signature, tools, opts)
 
   @doc "Creates a recursive controller loop for large-context exploration."
   def rlm(signature, opts \\ []), do: Imp.Predict.RLM.new(signature, opts)
@@ -353,39 +327,77 @@ defmodule Imp do
   @doc """
   Compiles a program with an optimizer.
 
+  Returns `{:ok, compiled_program}` or `{:error, reason}`, mirroring
+  `Imp.train/4`. Use `Imp.optimize!/3` when you want the compiled program
+  directly and a raise on failure.
+
   Optimizer modules declare their dataset requirements through the
   `Imp.Optimizer` behaviour. Use `Imp.optimize/4` for optimizers that need a
   validation set and `Imp.optimize/3` for trainset-only optimizers. Invocation
   options for checkpoint-aware optimizers belong in `Imp.optimize/5`.
   """
   def optimize(program, optimizer, trainset),
-    do: run_optimizer!(program, optimizer, [trainset: trainset], :program, "Imp.optimize/3")
+    do: run_optimizer(program, optimizer, [trainset: trainset], :program)
 
   def optimize(program, optimizer, trainset, validation),
     do:
-      run_optimizer!(
+      run_optimizer(
         program,
         optimizer,
         [trainset: trainset, validation: validation],
-        :program,
-        "Imp.optimize/4"
+        :program
       )
 
   def optimize(program, optimizer, trainset, validation, opts) when is_list(opts) do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "Imp.optimize/5 expects keyword invocation options")
 
-    run_optimizer!(
+    run_optimizer(
       program,
       optimizer,
       Keyword.merge(opts, trainset: trainset, validation: validation),
-      :program,
-      "Imp.optimize/5"
+      :program
     )
   end
 
   def optimize(_program, _optimizer, _trainset, _validation, _opts),
     do: raise(ArgumentError, "Imp.optimize/5 expects keyword invocation options")
+
+  @doc """
+  Compiles a program with an optimizer, raising on failure.
+
+  Same contract as `optimize/3`, `optimize/4`, and `optimize/5`, but returns
+  the compiled program directly and raises `ArgumentError` with a diagnostic
+  message instead of returning an error tuple.
+  """
+  def optimize!(program, optimizer, trainset),
+    do: run_optimizer!(program, optimizer, [trainset: trainset], :program, "Imp.optimize!/3")
+
+  def optimize!(program, optimizer, trainset, validation),
+    do:
+      run_optimizer!(
+        program,
+        optimizer,
+        [trainset: trainset, validation: validation],
+        :program,
+        "Imp.optimize!/4"
+      )
+
+  def optimize!(program, optimizer, trainset, validation, opts) when is_list(opts) do
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "Imp.optimize!/5 expects keyword invocation options")
+
+    run_optimizer!(
+      program,
+      optimizer,
+      Keyword.merge(opts, trainset: trainset, validation: validation),
+      :program,
+      "Imp.optimize!/5"
+    )
+  end
+
+  def optimize!(_program, _optimizer, _trainset, _validation, _opts),
+    do: raise(ArgumentError, "Imp.optimize!/5 expects keyword invocation options")
 
   @doc """
   Executes a training optimizer through the explicit training lifecycle.

@@ -67,7 +67,7 @@ held-out score (30% to 85% in the committed runs, for about a cent), and a reada
 diff of what changed. The shape is:
 
 ```elixir
-compiled = Imp.optimize(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
+compiled = Imp.optimize!(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
 ```
 
 `LabeledFewShot` attaches labeled examples as demonstrations and costs
@@ -75,8 +75,8 @@ nothing to compile. (This line feeds it the four measurement examples just to
 show the shape — in a real run, train on data you are not scoring against, as
 the tutorial does.) Search optimizers — `RandomSearch`, `MIPROv2`, `GEPA` —
 compare many candidate programs with the same metric. `RandomSearch` fits the
-`Imp.optimize/3` shape above; `MIPROv2` and `GEPA` also require a validation
-set as a fourth argument (`Imp.optimize/4`). They spend model calls, so they
+`Imp.optimize!/3` shape above; `MIPROv2` and `GEPA` also require a validation
+set as a fourth argument (`Imp.optimize!/4`). They spend model calls, so they
 cost dollars and take minutes, and the tutorial states both for its runs. An optimization counts
 as an improvement when a held-out score shows it, and not before.
 

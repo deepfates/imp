@@ -153,7 +153,7 @@ defmodule Imp.Optimizer.Report do
     }
   end
 
-  defp dump_value(%Imp.Adapters.Types.Image{} = image) do
+  defp dump_value(%Imp.Adapter.Types.Image{} = image) do
     %{
       "__imp_type__" => "image",
       "schema_version" => @image_schema_version,
@@ -207,7 +207,7 @@ defmodule Imp.Optimizer.Report do
     }
   end
 
-  defp dump_projection(%Imp.Adapters.Types.Image{} = image) do
+  defp dump_projection(%Imp.Adapter.Types.Image{} = image) do
     %{
       "__imp_type__" => "image",
       "schema_version" => @image_schema_version,
@@ -336,7 +336,7 @@ defmodule Imp.Optimizer.Report do
 
   defp load_value(%{"__imp_type__" => "image"} = state) do
     if valid_image_state?(state) do
-      %Imp.Adapters.Types.Image{
+      %Imp.Adapter.Types.Image{
         url: state["url"],
         data: state["data"],
         mime_type: state["mime_type"],

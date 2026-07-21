@@ -122,7 +122,7 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
   end
 
   defp multimodal_primitive_boundary_check do
-    alias Imp.Adapters.Types
+    alias Imp.Adapter.Types
 
     values = [
       %Types.Image{url: "https://example.com/image.png"},

@@ -711,14 +711,14 @@ defmodule Imp.Optimizer.Trajectory do
 
   defp encode_term(%module{} = value)
        when module in [
-              Imp.Adapters.Types.Image,
-              Imp.Adapters.Types.Audio,
-              Imp.Adapters.Types.File,
-              Imp.Adapters.Types.Document,
-              Imp.Adapters.Types.Code,
-              Imp.Adapters.Types.Reasoning,
-              Imp.Adapters.Types.ToolCall,
-              Imp.Adapters.Types.ToolResult
+              Imp.Adapter.Types.Image,
+              Imp.Adapter.Types.Audio,
+              Imp.Adapter.Types.File,
+              Imp.Adapter.Types.Document,
+              Imp.Adapter.Types.Code,
+              Imp.Adapter.Types.Reasoning,
+              Imp.Adapter.Types.ToolCall,
+              Imp.Adapter.Types.ToolResult
             ] do
     %{
       "__trajectory_type__" => module |> Module.split() |> List.last() |> Macro.underscore(),
@@ -865,25 +865,25 @@ defmodule Imp.Optimizer.Trajectory do
 
   defp typed_modules do
     %{
-      "image" => Imp.Adapters.Types.Image,
-      "audio" => Imp.Adapters.Types.Audio,
-      "file" => Imp.Adapters.Types.File,
-      "document" => Imp.Adapters.Types.Document,
-      "code" => Imp.Adapters.Types.Code,
-      "reasoning" => Imp.Adapters.Types.Reasoning,
-      "tool_call" => Imp.Adapters.Types.ToolCall,
-      "tool_result" => Imp.Adapters.Types.ToolResult,
+      "image" => Imp.Adapter.Types.Image,
+      "audio" => Imp.Adapter.Types.Audio,
+      "file" => Imp.Adapter.Types.File,
+      "document" => Imp.Adapter.Types.Document,
+      "code" => Imp.Adapter.Types.Code,
+      "reasoning" => Imp.Adapter.Types.Reasoning,
+      "tool_call" => Imp.Adapter.Types.ToolCall,
+      "tool_result" => Imp.Adapter.Types.ToolResult,
       "failure" => Failure
     }
   end
 
-  defp redact_value(%Imp.Adapters.Types.Image{} = value, keys),
+  defp redact_value(%Imp.Adapter.Types.Image{} = value, keys),
     do: redact_attachment(value, [:data], keys)
 
-  defp redact_value(%Imp.Adapters.Types.Audio{} = value, keys),
+  defp redact_value(%Imp.Adapter.Types.Audio{} = value, keys),
     do: redact_attachment(value, [:data], keys)
 
-  defp redact_value(%Imp.Adapters.Types.File{} = value, keys),
+  defp redact_value(%Imp.Adapter.Types.File{} = value, keys),
     do: redact_attachment(value, [:data], keys)
 
   defp redact_value(value, keys) when is_struct(value) do

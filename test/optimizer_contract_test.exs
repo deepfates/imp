@@ -192,7 +192,7 @@ defmodule Imp.OptimizerContractTest do
     optimizer = %CapturingProgramOptimizer{owner: self()}
 
     assert ^program =
-             Imp.optimize(program, optimizer, trainset, validation, checkpoint_fn: :checkpoint)
+             Imp.optimize!(program, optimizer, trainset, validation, checkpoint_fn: :checkpoint)
 
     assert_receive {:optimizer_options, opts}
     assert opts[:trainset] == trainset
@@ -205,7 +205,7 @@ defmodule Imp.OptimizerContractTest do
     optimizer = Imp.Optimizer.MIPROv2.new(metric)
 
     assert_raise ArgumentError, ~r/requires a validation set/, fn ->
-      Imp.optimize(Imp.predict("question -> answer"), optimizer, [])
+      Imp.optimize!(Imp.predict("question -> answer"), optimizer, [])
     end
   end
 
@@ -249,7 +249,7 @@ defmodule Imp.OptimizerContractTest do
     optimizer = Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end)
 
     assert_raise ArgumentError, ~r/training optimizer; use Imp\.train\/4/, fn ->
-      Imp.optimize(Imp.predict("question -> answer"), optimizer, [], [])
+      Imp.optimize!(Imp.predict("question -> answer"), optimizer, [], [])
     end
   end
 
@@ -272,8 +272,8 @@ defmodule Imp.OptimizerContractTest do
     optimizer = Imp.Optimizer.SIMBA.new(Imp.exact_match(:answer))
 
     for options <- [%{}, {:bad, :options}, [:not_keyword]] do
-      assert_raise ArgumentError, ~r/Imp\.optimize\/5 expects keyword/, fn ->
-        Imp.optimize(program, optimizer, [], [], options)
+      assert_raise ArgumentError, ~r/Imp\.optimize!\/5 expects keyword/, fn ->
+        Imp.optimize!(program, optimizer, [], [], options)
       end
 
       assert_raise ArgumentError, ~r/Imp\.train\/4 expects keyword/, fn ->
@@ -290,7 +290,7 @@ defmodule Imp.OptimizerContractTest do
              Imp.Optimizer.run(ensemble, [program], [])
 
     assert_raise ArgumentError, ~r/kind :constructor/, fn ->
-      Imp.optimize(program, ensemble, [])
+      Imp.optimize!(program, ensemble, [])
     end
   end
 
@@ -309,7 +309,7 @@ defmodule Imp.OptimizerContractTest do
     Process.delete(key)
     program = Imp.predict("question -> answer")
 
-    assert ^program = Imp.optimize(program, %FlippingCapabilities{}, [])
+    assert ^program = Imp.optimize!(program, %FlippingCapabilities{}, [])
     assert Process.get(key) == 1
   end
 
@@ -411,7 +411,7 @@ defmodule Imp.OptimizerContractTest do
              Imp.Optimizer.capabilities(%RaisingCapabilities{})
 
     assert_raise ArgumentError, ~r/capability probe exploded/, fn ->
-      Imp.optimize(Imp.predict("question -> answer"), %RaisingCapabilities{}, [])
+      Imp.optimize!(Imp.predict("question -> answer"), %RaisingCapabilities{}, [])
     end
   end
 

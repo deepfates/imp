@@ -74,7 +74,7 @@ magic training; it is ordinary data being rendered by the adapter.
 ```elixir
 compiled =
   Imp.Optimizer.LabeledFewShot.new(k: 1)
-  |> then(&Imp.optimize(program, &1, trainset))
+  |> then(&Imp.optimize!(program, &1, trainset))
 
 Imp.evaluate(compiled, devset, metric)
 ```
@@ -89,7 +89,7 @@ inspectable optimization report.
 compiled =
   metric
   |> Imp.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
-  |> then(&Imp.optimize(program, &1, trainset, devset))
+  |> then(&Imp.optimize!(program, &1, trainset, devset))
 
 {
   Imp.evaluate(compiled, devset, metric),
@@ -219,7 +219,7 @@ case live_lm.(max_completion_tokens: 100) do
     end
 
     compiled =
-      Imp.optimize(
+      Imp.optimize!(
         live_program,
         Imp.Optimizer.RandomSearch.new(live_metric, candidates: 2, demos_per_candidate: 1),
         live_trainset,

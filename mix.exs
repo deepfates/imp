@@ -139,7 +139,12 @@ defmodule Imp.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  # bench/ holds the parity-forensics module families (benchmark truth,
+  # upstream fidelity, research portfolio, reproduction registry, evidence
+  # authorities, legacy identity audit). They compile in dev and test so the
+  # gates and mix tasks keep working, and never ship in the package.
+  defp elixirc_paths(:test), do: ["lib", "bench", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "bench"]
   defp elixirc_paths(_env), do: ["lib"]
 
   defp package do
@@ -154,19 +159,14 @@ defmodule Imp.MixProject do
   end
 
   defp package_files do
+    # Parity-forensics module families live under bench/ (compiled only in
+    # dev/test via elixirc_paths), so they never enter the lib/ wildcard.
     excluded_lib =
       Path.wildcard("lib/mix/tasks/**/*.ex") ++
         Path.wildcard("lib/imp/benchmark*.ex") ++
-        Path.wildcard("lib/imp/benchmark_truth/**/*.ex") ++
-        Path.wildcard("lib/imp/reproduction_registry.ex") ++
         [
-          "lib/imp/evidence_authorities.ex",
           "lib/imp/optimizer/playbook/campaign.ex",
-          "lib/imp/optimizer/playbook/equation_search.ex",
-          "lib/imp/legacy_identity_audit.ex",
-          "lib/imp/research_portfolio.ex",
-          "lib/imp/upstream_authority_registry.ex",
-          "lib/imp/upstream_fidelity.ex"
+          "lib/imp/optimizer/playbook/equation_search.ex"
         ]
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++

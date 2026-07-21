@@ -24,7 +24,7 @@ conformance table below shows which is which, per surface.
 | `dspy.Prediction` | `%Imp.Prediction{}` — read fields with `Imp.get/2` |
 | `dspy.Evaluate` | `Imp.evaluate/4` — returns score plus per-example rows |
 | `metric(gold, pred, trace)` | Two- or three-arity function, or `Imp.exact_match(:field)` |
-| `optimizer.compile(program, trainset=...)` | `Imp.optimize(program, optimizer, trainset)` |
+| `optimizer.compile(program, trainset=...)` | `Imp.optimize!(program, optimizer, trainset)` |
 | `LabeledFewShot`, `BootstrapFewShot`, `BootstrapRS` | Same names, `Imp.Optimizer.*` |
 | `KNNFewShot` | Same name, same semantics: per-call embedding retrieval (required `vectorizer:`) plus a metric/teacher-driven BootstrapFewShot over the neighbors, proven against real DSPy by a deterministic-embedder differential |
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
@@ -100,7 +100,7 @@ against a pinned current upstream, with the receipts executable.
 # dspy.Predict("q -> a")      →  program = Imp.predict("q -> a", lm: lm)
 # program(q="...")            →  {:ok, pred} = Imp.call(program, %{q: "..."})
 # pred.a                      →  Imp.get(pred, :a)
-# optimizer.compile(...)      →  compiled = Imp.optimize(program, optimizer, trainset)
+# optimizer.compile(...)      →  compiled = Imp.optimize!(program, optimizer, trainset)
 ```
 
 Then take the [Learning Path](LEARNING_PATH.md) — it will feel familiar in

@@ -1,7 +1,7 @@
 defmodule Imp.Optimize.Anything.RunnerTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Adapters.Types.Image
+  alias Imp.Adapter.Types.Image
   alias Imp.Optimize.Anything
   alias Imp.Optimize.Anything.{Config, Result}
 

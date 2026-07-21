@@ -17,49 +17,53 @@
   # defensive clause for non-covered content shapes
   {"lib/imp/adapter/chat.ex", :pattern_match_cov, {623, 8}},
   # defensive clause for non-covered budget shapes
-  {"lib/imp/benchmark_truth/campaign_budget.ex", :pattern_match_cov, {359, 8}},
+  {"bench/imp/benchmark_truth/campaign_budget.ex", :pattern_match_cov, {359, 8}},
   # defensive guard success typing proves redundant
-  {"lib/imp/benchmark_truth/failure_campaign.ex", :guard_fail, {746, 38}},
+  {"bench/imp/benchmark_truth/failure_campaign.ex", :guard_fail, {746, 38}},
   # defensive clause for non-covered result shapes
-  {"lib/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {169, 13}},
+  {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {169, 13}},
   # MapSet opacity on a campaign id set
-  {"lib/imp/benchmark_truth/gepa_campaign.ex", :call_without_opaque, {1414, 50}},
+  {"bench/imp/benchmark_truth/gepa_campaign.ex", :call_without_opaque, {1414, 50}},
+  # defensive nil-deadline clause kept as a seam; Imp.Deadline.resolve/1's
+  # spec (new in the shallow design pass) proves callers pass resolved
+  # deadlines only
+  {"bench/imp/benchmark_truth/gepa_campaign.ex", :pattern_match, {1824, 8}},
   # MapSet opacity on metric sets typed through campaign JSON
-  {"lib/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {1785, 20}},
+  {"bench/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {1785, 20}},
   # MapSet opacity on metric sets typed through campaign JSON
-  {"lib/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {336, 31}},
+  {"bench/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {336, 31}},
   # MapSet opacity on metric sets typed through campaign JSON
-  {"lib/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {348, 36}},
+  {"bench/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {348, 36}},
   # MapSet opacity on metric sets typed through campaign JSON
-  {"lib/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {395, 35}},
+  {"bench/imp/benchmark_truth/gepa_metrics.ex", :call_without_opaque, {395, 35}},
   # defensive guard success typing proves redundant
-  {"lib/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 1926},
+  {"bench/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 1926},
   # defensive guard success typing proves redundant
-  {"lib/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 2034},
+  {"bench/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 2034},
   # MapSet opacity on the doc-id set
-  {"lib/imp/benchmark_truth/hover_bm25.ex", :call_without_opaque, {191, 36}},
+  {"bench/imp/benchmark_truth/hover_bm25.ex", :call_without_opaque, {191, 36}},
   # defensive clause for non-covered task shapes
-  {"lib/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {343, 16}},
+  {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {343, 16}},
   # defensive clause dialyzer pins to the module head (line 1)
-  {"lib/imp/benchmark_truth/optimize_anything/pricing_policy.ex", :pattern_match, 1},
+  {"bench/imp/benchmark_truth/optimize_anything/pricing_policy.ex", :pattern_match, 1},
   # MapSet opacity: MapSet.equal? against a literal-typed expected set
-  {"lib/imp/benchmark_truth/optimize_anything/scheduling_heuristic.ex", :call_without_opaque, {232, 30}},
+  {"bench/imp/benchmark_truth/optimize_anything/scheduling_heuristic.ex", :call_without_opaque, {232, 30}},
   # defensive clause for non-covered differential rows
-  {"lib/imp/benchmark_truth/optimize_anything/upstream_differential.ex", :pattern_match_cov, {228, 10}},
+  {"bench/imp/benchmark_truth/optimize_anything/upstream_differential.ex", :pattern_match_cov, {228, 10}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 21)
-  {"lib/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 21}},
+  {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 21}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 53)
-  {"lib/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 53}},
+  {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 53}},
   # MapSet opacity on case-id sets typed through campaign JSON
-  {"lib/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {816, 52}},
+  {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {816, 52}},
   # MapSet opacity on case-id sets typed through campaign JSON
-  {"lib/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {820, 53}},
+  {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {820, 53}},
   # defensive clause for non-covered campaign rows
-  {"lib/imp/benchmark_truth/rlm_campaign.ex", :pattern_match_cov, {421, 8}},
+  {"bench/imp/benchmark_truth/rlm_campaign.ex", :pattern_match_cov, {421, 8}},
   # helper only referenced from paths dialyzer marks no-return
-  {"lib/imp/benchmark_truth/rlm_protocol.ex", :unused_fun, {133, 8}},
+  {"bench/imp/benchmark_truth/rlm_protocol.ex", :unused_fun, {133, 8}},
   # defensive guard success typing proves redundant
-  {"lib/imp/benchmark_truth/runner.ex", :guard_fail, {651, 55}},
+  {"bench/imp/benchmark_truth/runner.ex", :guard_fail, {651, 55}},
   # defensive clause: ReqLLM.model/1 contracts to ok/error tuples only; the
   # catch-all turns any unexpected registry result into a loud error (#75)
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {120, 7}},
@@ -77,9 +81,9 @@
   # defensive fallback paired with the 904 clause
   {"lib/imp/clients/training.ex", :pattern_match_cov, {976, 7}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/lm.ex", :pattern_match, {135, 8}},
-  # defensive fallback paired with the 135 clause
-  {"lib/imp/lm.ex", :pattern_match_cov, {136, 8}},
+  {"lib/imp/lm.ex", :pattern_match, {176, 8}},
+  # defensive fallback paired with the 176 clause
+  {"lib/imp/lm.ex", :pattern_match_cov, {177, 8}},
   # defensive fallback: fetch_optional/3 non-atom-key clause; callers pass
   # atom keys only today
   {"lib/imp/mcp.ex", :pattern_match_cov, {1051, 8}},

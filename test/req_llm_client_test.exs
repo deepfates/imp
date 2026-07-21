@@ -856,7 +856,7 @@ defmodule ReqLLMClientTest do
     assert {:ok, _prediction} =
              Imp.Clients.ReqLLM.generate(
                lm,
-               [%{role: :user, content: [%Imp.Adapters.Types.File{path: path}]}],
+               [%{role: :user, content: [%Imp.Adapter.Types.File{path: path}]}],
                []
              )
 
@@ -1034,7 +1034,7 @@ defmodule ReqLLMClientTest do
                  %{
                    role: :user,
                    content: [
-                     %Imp.Adapters.Types.Reasoning{text: "prior native reasoning"},
+                     %Imp.Adapter.Types.Reasoning{text: "prior native reasoning"},
                      "question"
                    ]
                  }
@@ -1118,8 +1118,8 @@ defmodule ReqLLMClientTest do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 
     calls =
-      Imp.Adapters.Types.ToolCalls.new([
-        Imp.Adapters.Types.ToolCall.new(:lookup, %{query: "beam"}, id: "call_lookup"),
+      Imp.Adapter.Types.ToolCalls.new([
+        Imp.Adapter.Types.ToolCall.new(:lookup, %{query: "beam"}, id: "call_lookup"),
         %{
           id: "call_translate",
           function: %{name: "translate", arguments: ~s({"text":"world"})}

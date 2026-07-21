@@ -57,6 +57,7 @@
       "modules": [
         "Imp.Agent",
         "Imp.Agent.Runtime",
+        "Imp.Deadline",
         "Imp.FieldSelector",
         "Imp.FunctionContract",
         "Imp.Observability.Inspection",
