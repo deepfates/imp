@@ -1,7 +1,9 @@
 # Upstream Exam: DSPy 3.2.1's own tests vs Imp
 
 Tranche 1: `tests/adapters/` + `tests/signatures/` (below).
-Tranche 2: `tests/predict/` (second half of this document).
+Tranche 2: `tests/predict/` (second section of this document).
+Tranche 3: `tests/teleprompt/` + `tests/evaluate/` + `tests/streaming/`
+(third section).
 
 ## Tranche 1 — adapters/ and signatures/
 
@@ -811,3 +813,310 @@ ported.
 | test_aforward_with_input_variables_e2e | n/a | asyncio twin. |
 | TestRLMIntegration::test_simple_computation | n/a | Skipped upstream ("Requires actual LM and Deno"). |
 | TestRLMIntegration::test_with_llm_query | n/a | Same. |
+
+---
+
+# Tranche 3 — teleprompt/, evaluate/, streaming/
+
+The DSPy authors' `tests/teleprompt/` (14 files, 65 test functions),
+`tests/evaluate/` (3 files, 21), and `tests/streaming/` (1 file, 37) suites
+run against Imp. Every upstream test function is accounted for below. Ported
+tests live in `test/upstream_exam/teleprompt_test.exs`,
+`test/upstream_exam/evaluate_test.exs`, and
+`test/upstream_exam/streaming_test.exs`. `mix test --only upstream_exam` runs
+all three tranches.
+
+This tranche examines the least-reviewed code in the repo (the optimizer
+internals). Design substitutions that recur in the rows:
+
+- **Report, not attributes**: DSPy attaches mutable attributes to the
+  compiled program (`_compiled`, `total_calls`, `results_best`,
+  `candidate_programs`, `flag_compilation_error_occurred`); Imp attaches an
+  `Imp.Optimizer.Report` (fetched via `Report.fetch/1`) carrying the same
+  facts as data.
+- **Scores are fractions**: Imp.Evaluate scores are 0..1; DSPy's are 0..100.
+- **Enumerable streaming**: DSPy streams via asyncio generators wrapped by
+  `streamify`; Imp streams via Enumerables and
+  `Imp.Streaming.Messages.StreamListener.attach/2`. Ports feed the listener
+  the SAME provider chunk sequences upstream's mocked litellm streams yield.
+
+## Totals (tranche 3)
+
+| Metric | Count |
+|---|---|
+| Upstream test functions in scope | **123** (teleprompt 65, evaluate 21, streaming 37) |
+| Ported | **60** (59 ExUnit tests; some ports cover two same-surface upstream fns, some upstream fns split across two ports) |
+| — pass | **59** |
+| — FAIL (real divergence found by upstream's own test) | **1** (chat stream listener trailing-whitespace trim; tagged `@tag :upstream_fail` + `:skip`, failing output preserved in the test comment) |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **37** |
+| Not applicable (Python/pydantic/litellm/asyncio specific, or a documented Imp design substitution) | **26** |
+
+### The FAIL
+
+**Chat stream listener does not trim trailing section whitespace when the end
+marker arrives split across chunks** (streaming_test.exs, tagged). With
+upstream's recorded gpt-4o-mini token split (`"!\n\n[[ ##"`, `" completed"`,
+`" ##"`, `" ]]"`), DSPy's listener yields `"!"` as the final content chunk
+(trailing `\n\n` trimmed, `is_last_chunk` on it). Imp's chat parser emits the
+untrimmed `"!\n\n"` — the whitespace precedes a then-unconfirmed marker
+prefix and is flushed as content — then marks doneness on a separate
+nil-content terminal chunk. Concatenated listener output therefore differs
+from upstream by the trailing whitespace. When the full end marker arrives in
+ONE chunk, Imp does drop the preceding whitespace, so the divergence is
+specific to split markers. JSON and XML extraction are content-exact
+(JSON byte-exact including chunk boundaries and the done flag).
+
+### Gaps and notable findings (fix-wave candidates)
+
+1. **Chat listener trailing-whitespace FAIL** above — the one place
+   upstream's own test catches Imp emitting different bytes.
+2. **BetterTogether accepts a non-optimizer at construction**
+   (test_bettertogether_initialization_invalid_optimizer): DSPy raises
+   TypeError at `__init__`; Imp accepts `%{p: "not_a_teleprompter"}` silently
+   and only surfaces `{:not_an_optimizer, _}` when the strategy step runs.
+   The error is loud at compile, so no silent failure — but construction-time
+   validation is absent (the ported test asserts Imp's boundary; seam in the
+   row).
+3. **Terminal chunk carries `chunk: nil`, not `""`** (streaming): upstream's
+   "empty last chunk" is an empty string; Imp's is nil. Cosmetic but it
+   forces `chunk || ""` on every consumer that joins chunks.
+4. **No list-of-acceptable-answers exact-match helper**
+   (test_answer_exact_match_list): upstream's `answer_exact_match` accepts
+   `str | list`; `Imp.Metrics.exact_match/1` compares one value. The port
+   spells the list semantics inline per Imp's metrics-are-functions doctrine;
+   a built-in would close the gap.
+5. **Bootstrap max_errors raises a budget error, not the underlying
+   exception** (test_error_handling_during_bootstrap): DSPy re-raises
+   "Simulated error"; Imp raises "bootstrap error budget exhausted: 1 errors
+   (maximum 1)". Loud either way; the original error is in the message chain
+   but not re-raised.
+6. **No per-tool/module status-message provider** (5 streaming status tests):
+   DSPy's `StatusMessageProvider` hooks lm/tool/module start+end and streams
+   "Calling tool ..." messages; Imp's StatusMessage vocabulary covers
+   listener lifecycle only (:started/:completed/:error/:cancelled).
+7. **No GEPA component_selector / instruction_proposer surfaces** (7 gepa
+   tests): custom per-iteration component selection ("round_robin"/"all"/
+   custom fn) and pluggable instruction proposers (incl. multimodal
+   reflection with structured images) have no Imp constructor options; Imp's
+   module_selector/reflection strategy are internal.
+8. **No public minibatch-eval / n-fewshot-candidates utility surface**
+   (test_utils.py): `eval_candidate_program` and
+   `create_n_fewshot_demo_sets` equivalents are internal
+   (`Imp.Optimizer.DemoCandidates`, MIPROv2 internals). Upstream's
+   metric_threshold regression (#9308) does not apply: DemoCandidates applies
+   the threshold uniformly to every round, seed schedule included.
+
+## tests/teleprompt/test_teleprompt.py (1)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_get_params | n/a | `Teleprompter.get_params` reads `self.__dict__`; Imp optimizers are structs whose params are plain visible fields — nothing to port. |
+
+## tests/teleprompt/test_bootstrap.py (5)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_bootstrap_initialization | pass | metric + demo caps stored on the struct. |
+| test_compile_with_predict_instances | pass (adapted) | Compiled program returned; `_compiled` flag substituted by the attached optimizer Report. |
+| test_bootstrap_effectiveness | pass (adapted) | Exactly one bootstrapped demo with the trainset's input/output; the follow-examples half is scripted (the fn-LM echoes the demo found in its own prompt, so a missing demo fails loudly) since Imp has no DummyLM(follow_examples). |
+| test_error_handling_during_bootstrap | pass (adapted) | Raising teacher + `max_errors: 1` → loud RuntimeError "bootstrap error budget exhausted" (DSPy re-raises the underlying error; seam noted, gap #5). |
+| test_validation_set_usage | pass | `length(compiled.demos) >= 1`. |
+
+## tests/teleprompt/test_random_search.py (1)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_basic_workflow | pass | RandomSearch compile over the 2-example trainset with a teacher completes and returns a program. |
+
+## tests/teleprompt/test_copro_optimizer.py (5)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_signature_optimizer_initialization | pass | metric/breadth/depth/init_temperature stored. |
+| test_signature_optimizer_optimization_process | pass | `optimized != student` after compile with a scripted proposer LM (Imp: `proposer_lm` option; DSPy: global settings LM). |
+| test_signature_optimizer_statistics_tracking | pass (adapted) | `track_stats: true` → total_calls/results_best/results_latest on the Report (DSPy: attributes on the program). One port covers this and the row below. |
+| test_optimization_and_output_verification | pass | Optimized student answers "Paris". |
+| test_statistics_tracking_during_optimization | pass (adapted) | Same surface as statistics_tracking; `total_calls > 0`, results populated. |
+
+## tests/teleprompt/test_ensemble.py (4)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_ensemble_without_reduction | pass | 5 programs → prediction with 5 outputs (Imp wraps the list in a Prediction; DSPy returns the bare list). |
+| test_ensemble_with_reduction | pass | reduce_fn over the 5 predictions → mean 2.0. |
+| test_ensemble_with_size_limitation | pass | size: 3 → 3 outputs. |
+| test_ensemble_deterministic_behavior | n/a | Upstream asserts its own `NotImplemented`/TODO stub raises; Imp implements deterministic selection (`deterministic: true` + seed), so the stub-assertion has nothing to port. |
+
+## tests/teleprompt/test_knn_fewshot.py (2)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_knn_few_shot_initialization | pass | `knn.k == 2`, 3 trainset examples (stub vectorizer; geometry not exercised here). |
+| _test_knn_few_shot_compile | n/a | Disabled upstream ("Test not working yet" — leading underscore, pytest never runs it). Imp's per-call KNN compile semantics are covered in-repo (knn_few_shot_test.exs). |
+
+## tests/teleprompt/test_utils.py (4)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_eval_candidate_program_full_trainset | blocked | No public `eval_candidate_program`; minibatch-vs-full evaluation lives inside MIPROv2/optimizer internals with no callback_metadata surface. |
+| test_eval_candidate_program_minibatch | blocked | Same. |
+| test_eval_candidate_program_failure | blocked | Same (the failure→score-0 contract is internal). |
+| test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled | n/a | Regression for upstream #9308 (threshold dropped on the seed=-1 arm). Imp's `Imp.Optimizer.DemoCandidates.build/4` applies `:metric_threshold` uniformly to every round by construction; the buggy code shape does not exist. |
+
+## tests/teleprompt/test_bootstrap_finetune.py (3)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_bootstrap_finetune_initialization | pass | metric stored; `multitask` defaults true. |
+| test_compile_with_predict_instances | blocked | Requires mocking `finetune_lms` and a `_compiled` flag; Imp's training boundary is a Trainer provider returning `Imp.Clients.TrainingJob` — no in-process mock seam equivalent to `patch.object(bootstrap, "finetune_lms")`. Provider-training semantics are covered in-repo (bootstrap_finetune_test.exs, provider_training_lifecycle_test.exs). |
+| test_error_handling_missing_lm | pass (adapted) | Compile without a configured trainer/LM is a loud error, never a silent no-op (DSPy: ValueError "does not have an LM assigned"). |
+
+## tests/teleprompt/test_bootstrap_trace.py (2)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_bootstrap_trace_data | blocked | `bootstrap_trace_data`'s row shape (`example/prediction/trace/example_ind/score` + FailedPrediction with format_reward) has no public Imp equivalent; trajectory capture is internal (`Imp.Optimizer.TrajectoryRunner`) with its own contract tests. If GRPO-style failed-parse rewards ever land, this is the contract to port. |
+| test_bootstrap_trace_data_passes_callback_metadata | n/a | Monkeypatched Evaluate + callback_metadata plumbing; Imp has no BaseCallback system (telemetry is the substitution). |
+
+## tests/teleprompt/test_grpo.py (3)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_grpo_dataset_shuffler | blocked | `select_training_sample_and_update_shuffled_trainset` is not a public Imp surface; GRPO's epoch shuffling is internal state. The uniform-coverage property (each example seen equally often across steps) is worth a property test on Imp's own boundary. |
+| test_grpo_dataset_shuffler_with_num_ex_per_step_less_dataset | blocked | Same. |
+| test_grpo_dataset_shuffler_with_num_ex_per_step_greater_dataset | blocked | Same. |
+
+## tests/teleprompt/test_gepa.py (11)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_gepa_adapter_disables_logging_on_minibatch_eval | n/a | callback_metadata/logging plumbing on the DspyAdapter internals. |
+| test_basic_workflow | pass (adapted) | Upstream replays byte-exact prompt fixtures (gepa_dummy_lm.json) through its reflection prompts; Imp's GEPA proposal contract differs (JSON instruction proposals), so the port asserts the boundary: compile completes against scripted task + reflection LMs and returns a program. The 2,000-char instruction-string equality is not reproducible by design. |
+| test_workflow_with_custom_instruction_proposer_and_component_selector | blocked | No `instruction_proposer` or `component_selector` constructor options (gap #7); also dspy.Image fixtures. |
+| test_metric_requires_feedback_signature | n/a | TypeError from Python arity introspection of the metric; Imp metrics are arity-2/3 functions returning score/feedback data — the 5-arg feedback signature does not exist. |
+| test_gepa_compile_with_track_usage_no_tuple_error | n/a | litellm track_usage regression ("'tuple' object has no attribute 'set_lm_usage'"); no usage-tracking tuples in Imp. |
+| test_component_selector_functionality | blocked | No component_selector surface (gap #7). |
+| test_component_selector_default_behavior | blocked | Same. |
+| test_component_selector_string_round_robin | blocked | Same. |
+| test_component_selector_string_all | blocked | Same (also detailed_results.candidates surface). |
+| test_component_selector_custom_random | blocked | Same. |
+| test_alternating_half_component_selector | blocked | Same (state.i iteration counter surface). |
+
+## tests/teleprompt/test_gepa_instruction_proposer.py (4)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_reflection_lm_gets_structured_images | blocked | MultiModalInstructionProposer + structured-image reflection messages absent (gap #7). |
+| test_custom_proposer_without_reflection_lm | blocked | Pluggable proposer protocol absent. |
+| test_image_serialization_into_strings | blocked | Same (+ CUSTOM-TYPE split markers are DSPy's serialization). |
+| test_default_proposer (parametrized reasoning=True/False) | blocked | Default single-component proposer prompt surface not exposed; Imp's reflection prompt is its own contract. |
+
+## tests/teleprompt/test_bettertogether.py (20)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_bettertogether_import | n/a | Python import smoke test. |
+| test_bettertogether_initialization_default | pass | Defaults: p → RandomSearch (BootstrapFewShotWithRandomSearch port), w → BootstrapFinetune. |
+| test_bettertogether_initialization_custom | pass | Custom p/w kept. |
+| test_bettertogether_initialization_invalid_optimizer | pass (adapted) | DSPy raises TypeError at `__init__`; Imp records loud `{:not_an_optimizer, _}` when the step runs (gap #2 — construction-time validation absent; rejection asserted at Imp's boundary). |
+| test_strategy_validation | pass | Valid strategies validate; unknown key "x" is a recorded step error; empty strategy raises. |
+| test_compile_basic | pass | Mock optimizer's compile is called; Report carries candidates + compilation_error_occurred (DSPy: attributes on the program). |
+| test_trainset_validation | pass | Empty trainset raises "cannot be empty". |
+| test_valset_ratio_validation | pass | Ratio 1.0 and -0.1 raise "[0, 1)". |
+| test_optimizer_compile_args_validation | pass | Non-keyword args rejected. One port covers this and the row below. |
+| test_student_in_optimizer_compile_args | pass | `student:` override rejected. |
+| test_compile_args_passed_to_optimizer | pass | num_trials/max_bootstrapped_demos reach the step invocation. |
+| test_compile_args_multi_optimizer_strategy | pass | p gets only p's args, w only w's. |
+| test_compile_args_override_global_params | blocked | Imp compile args are invocation options; trainset/valset/teacher are positional compile parameters and cannot be overridden per step. |
+| test_trainset_shuffling_between_steps | pass | Both steps receive the same example multiset (order may differ; Imp uses its deterministic seeded sampler, not Python's RNG). |
+| test_strategy_execution_order | pass | "p -> w -> p" executes in order, each step receiving the prior step's output (path carried via program metadata; DSPy: ad-hoc attributes). |
+| test_lm_lifecycle_management | n/a | `launch_lms`/`kill_lms` manage local litellm servers; Imp's training boundary is provider TrainingJobs — no local LM lifecycle to manage. |
+| test_error_handling_returns_best_program | pass | Failing second step: best program still returned, error recorded, candidates present. |
+| test_program_selection (valset / no-valset) | pass | Both parametrizations: with valset the best score wins; without (valset_ratio: 0) the latest successful step wins. |
+| test_candidate_programs_structure | pass (adapted) | Report candidates: baseline + one per step, numeric scores, strategy labels; best_score selected. DSPy sorts candidates best-first; Imp keeps execution order with best_score/selection separate (seam). |
+| test_empty_valset_handling | pass | `[]` and nil both select the latest program. |
+
+## tests/evaluate/test_metrics.py (3)
+
+Upstream's `answer_exact_match` helper is ported inline as a plain metric
+function per Imp's metrics-are-functions doctrine (gap #4: no built-in
+list-of-answers exact match).
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_answer_exact_match_string | pass | |
+| test_answer_exact_match_list | pass (adapted) | Any-member match; the list semantics live in the ported metric fn, not an Imp built-in. |
+| test_answer_exact_match_no_match | pass | |
+
+## tests/evaluate/test_evaluate.py (12)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_evaluate_initialization | pass | devset/metric stored (num_threads → max_concurrency default 1; display flags n/a — no progress UI). |
+| test_evaluate_call | pass | Score 1.0 (Imp fraction; DSPy 100.0). |
+| test_evaluate_single_thread_runs_in_main_thread | n/a | Python threading identity; BEAM tasks are the concurrency model. |
+| test_construct_result_df | n/a | pandas DataFrame construction. |
+| test_multithread_evaluate_call | pass | max_concurrency: 2 → 1.0. |
+| test_multi_thread_evaluate_call_cancelled | n/a | SIGINT/KeyboardInterrupt process signaling. |
+| test_evaluate_call_wrong_answer | pass | Score 0.0. |
+| test_evaluate_display_table | n/a | IPython/pandas display plumbing. |
+| test_evaluate_callback | n/a | BaseCallback on_evaluate_start/end; Imp's substitution is telemetry events (observability suite). |
+| test_evaluation_result_repr | n/a | Python `__repr__` format. |
+| test_evaluate_save_as_json_with_history | blocked | No `save_as_json`/`save_as_csv` options on Imp.Evaluate (and dspy.History-in-example serialization). Result rows are plain data callers can dump, but the built-in file surface is absent. |
+| test_evaluate_save_as_csv_with_history | blocked | Same. |
+
+## tests/evaluate/test_auto_evaluation.py (6)
+
+SemanticF1/CompleteAndGrounded accept upstream's exact `(example, pred,
+trace)` shape as a `%{example:, pred:, trace:}` map.
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_semantic_f1_returns_prediction_without_trace | pass | Prediction with numeric score. |
+| test_semantic_f1_returns_prediction_with_trace | pass | Boolean threshold truth with trace. |
+| test_semantic_f1_score_value | pass | Harmonic mean 0.6857 from precision 0.8 / recall 0.6, byte-equal formula. |
+| test_complete_and_grounded_returns_prediction_without_trace | pass | Two independent judgments combined. |
+| test_complete_and_grounded_returns_prediction_with_trace | pass | Boolean threshold truth. |
+| test_semantic_f1_prediction_can_be_compared | pass | result2.score > result1.score. |
+
+## tests/streaming/test_streaming.py (37)
+
+| Upstream test | Status | Note |
+|---|---|---|
+| test_streamify_yields_expected_response_chunks | pass (adapted) | litellm test-server deltas → `Imp.Streaming.stream/3` local chunking; chunks assemble the full answer. |
+| test_streaming_response_yields_expected_response_chunks | n/a | `dspy.streaming.streaming_response` OpenAI-SSE re-encoding helper; no Imp counterpart by design (callers own their transport). |
+| test_default_status_streaming | blocked | Tool/module status-message provider absent (gap #6); Imp statuses cover listener lifecycle only. |
+| test_custom_status_streaming | blocked | Same (StatusMessageProvider subclass hooks). |
+| test_concurrent_status_message_providers | blocked | Same. |
+| test_stream_listener_chat_adapter | n/a | `@pytest.mark.llm_call` — requires a real LM. |
+| test_default_status_streaming_in_async_program | n/a | asyncio twin. |
+| test_stream_listener_json_adapter | n/a | llm_call. |
+| test_streaming_handles_space_correctly | pass | Joined chunks == "How are you doing?" byte-exact. |
+| test_sync_streaming | n/a | llm_call (and Imp streaming is already synchronous — the sync/async split collapses). |
+| test_sync_status_streaming | blocked | Status provider absent (gap #6). |
+| test_stream_listener_returns_correct_chunk_chat_adapter | **FAIL** | The one real divergence: split end marker → Imp emits untrimmed "!\n\n" and a separate nil terminal chunk; upstream trims to "!" with is_last_chunk. Tagged `@tag :upstream_fail` + `:skip`; observed output preserved in the test. |
+| test_stream_listener_returns_correct_chunk_json_adapter | pass | Byte-exact including quotes in chunks, chunk boundaries, and done on the final content chunk; split-key ("jud"/"gement") half also ported. |
+| test_stream_listener_returns_correct_chunk_chat_adapter_untokenized_stream | pass | Whole-section chunks; done marked on the terminal boundary chunk (nil-chunk seam, gap #3). |
+| test_stream_listener_missing_completion_marker_chat_adapter | pass | All tokens flushed, terminal done, nothing lost. |
+| test_stream_listener_returns_correct_chunk_json_adapter_untokenized_stream | pass (adapted) | Joined content byte-exact incl. quotes; upstream's single-chunk granularity is its buffering artifact (Imp may split at fed-chunk seams). |
+| test_status_message_non_blocking | pass (adapted) | Listener status stream: exactly one :started and one :completed around the pulled events (Imp's status vocabulary; upstream's is tool-status + async timing). |
+| test_status_message_non_blocking_async_program | n/a | asyncio twin. |
+| test_stream_listener_allow_reuse | pass (adapted) | Same listener extracts its field from two consecutive streams; markers fed unsplit so the recorded FAIL does not mask the reuse behavior. |
+| test_stream_listener_returns_correct_chunk_xml_adapter | pass | Joined content byte-exact for both fields; done on terminal boundary chunk (nil-chunk seam). |
+| test_streaming_allows_custom_chunk_types | n/a | Arbitrary user dataclasses passing through streamify; Imp streams are ordinary Enumerables — any term already passes through (nothing to gate). |
+| test_streaming_allows_custom_streamable_type | blocked | No custom Type.is_streamable/parse_stream_chunk protocol; typed partial-value streaming absent. |
+| test_streaming_with_citations | blocked | Anthropic citations streaming (tranche-1 Citations type absent). |
+| test_chat_adapter_simple_pydantic_streaming | blocked | Pydantic-typed field streaming (typed output models absent). |
+| test_chat_adapter_with_generic_type_annotation | blocked | Same (list[str]-typed field streaming). |
+| test_chat_adapter_nested_pydantic_streaming | blocked | Same. |
+| test_chat_adapter_mixed_fields_streaming | blocked | Same. |
+| test_json_adapter_simple_pydantic_streaming | blocked | Same. |
+| test_json_adapter_bracket_balance_detection | blocked | Same (nested-object value streaming; Imp's JSON lexer streams string values). |
+| test_json_adapter_multiple_fields_detection | blocked | Same. |
+| test_stream_listener_could_form_end_identifier_chat_adapter | n/a | `_could_form_end_identifier` is upstream's private buffering predicate; Imp's equivalent retention logic is asserted behaviorally by the chunk tests above. |
+| test_stream_listener_could_form_end_identifier_json_adapter | n/a | Same. |
+| test_stream_listener_could_form_end_identifier_xml_adapter | n/a | Same. |
+| test_streaming_reasoning_model | blocked | Native `reasoning_content` delta streaming (Reasoning type + provider reasoning deltas absent; tranche-1 seam). |
+| test_stream_listener_empty_last_chunk_chat_adapter | pass | Both fields' final chunk is done (Imp: nil-content terminal chunk; upstream: empty string — gap #3). |
+| test_stream_listener_empty_last_chunk_json_adapter | pass | Same for the JSON framing. |
+| test_streaming_reasoning_fallback | blocked | Reasoning-field fallback streaming; same absent surface. |
