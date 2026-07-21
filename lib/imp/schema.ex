@@ -107,6 +107,9 @@ defmodule Imp.Schema do
     errors
     |> maybe_min(field, value, constraints)
     |> maybe_max(field, value, constraints)
+    |> maybe_gt(field, value, constraints)
+    |> maybe_lt(field, value, constraints)
+    |> maybe_multiple_of(field, value, constraints)
   end
 
   defp validate_number(errors, _field, _value, _constraints), do: errors
@@ -174,6 +177,29 @@ defmodule Imp.Schema do
     do: errors ++ [error(field, :max, "must be <= #{max}")]
 
   defp maybe_max(errors, _field, _value, _constraints), do: errors
+
+  defp maybe_gt(errors, field, value, %{gt: min}) when value <= min,
+    do: errors ++ [error(field, :gt, "must be > #{min}")]
+
+  defp maybe_gt(errors, _field, _value, _constraints), do: errors
+
+  defp maybe_lt(errors, field, value, %{lt: max}) when value >= max,
+    do: errors ++ [error(field, :lt, "must be < #{max}")]
+
+  defp maybe_lt(errors, _field, _value, _constraints), do: errors
+
+  defp maybe_multiple_of(errors, field, value, %{multiple_of: divisor})
+       when is_number(divisor) and divisor != 0 do
+    remainder = :math.fmod(value * 1.0, divisor * 1.0)
+
+    if remainder == 0.0 do
+      errors
+    else
+      errors ++ [error(field, :multiple_of, "must be a multiple of #{divisor}")]
+    end
+  end
+
+  defp maybe_multiple_of(errors, _field, _value, _constraints), do: errors
 
   defp maybe_min_length(errors, field, value, %{min_length: min}) when byte_size(value) < min,
     do: errors ++ [error(field, :min_length, "length must be >= #{min}")]
@@ -348,16 +374,26 @@ defmodule Imp.Schema do
   defp normalize_constraint_value(value), do: value
 
   defp normalize_constraint_key(:answerShape), do: :answer_shape
+  # The pydantic spellings ge/le are Imp's inclusive :min/:max (dspy field.py
+  # PYDANTIC_CONSTRAINT_MAP; rendered by Imp.Adapter.FieldConstraints).
+  defp normalize_constraint_key(:ge), do: :min
+  defp normalize_constraint_key(:le), do: :max
   defp normalize_constraint_key(key) when is_atom(key), do: key
   defp normalize_constraint_key("minLength"), do: :min_length
   defp normalize_constraint_key("maxLength"), do: :max_length
   defp normalize_constraint_key("answerShape"), do: :answer_shape
+  defp normalize_constraint_key("ge"), do: :min
+  defp normalize_constraint_key("le"), do: :max
 
   defp normalize_constraint_key(key)
        when key in [
               "enum",
               "min",
               "max",
+              "gt",
+              "lt",
+              "multiple_of",
+              "allow_inf_nan",
               "items",
               "properties",
               "type",
