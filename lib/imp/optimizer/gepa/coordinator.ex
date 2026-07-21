@@ -2,7 +2,6 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
   @moduledoc false
 
   @supervisor Imp.UnlinkedTaskSupervisor
-  @deadline_key {__MODULE__, :deadline}
 
   def run(items, timeout, fun) when is_list(items) and is_function(fun, 1) do
     run(items, timeout, max(length(items), 1), fun)
@@ -42,42 +41,18 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
     }
   end
 
-  def current_deadline, do: Process.get(@deadline_key, :infinity)
+  # Deadline arithmetic lives in Imp.Deadline (a neutral core module) so
+  # Imp.Evaluate and the LM clients no longer depend on this optimizer
+  # internal. These delegates keep the Coordinator's historical surface.
+  defdelegate current_deadline, to: Imp.Deadline, as: :current
 
   @doc false
-  def remaining(deadline) do
-    case deadline do
-      :infinity -> :infinity
-      absolute when is_integer(absolute) -> max(absolute - System.monotonic_time(:millisecond), 0)
-    end
-  end
+  defdelegate remaining(deadline), to: Imp.Deadline
 
   @doc false
-  def with_deadline(timeout, fun) when is_function(fun, 0) do
-    deadline = deadline(timeout)
-    previous = Process.get(@deadline_key, :__imp_missing_deadline__)
-    Process.put(@deadline_key, deadline)
+  defdelegate with_deadline(timeout, fun), to: Imp.Deadline
 
-    try do
-      fun.()
-    after
-      case previous do
-        :__imp_missing_deadline__ -> Process.delete(@deadline_key)
-        value -> Process.put(@deadline_key, value)
-      end
-    end
-  end
-
-  def deadline(timeout) do
-    requested =
-      case timeout do
-        :infinity -> :infinity
-        {:deadline, absolute} -> absolute
-        milliseconds -> System.monotonic_time(:millisecond) + milliseconds
-      end
-
-    minimum_deadline(current_deadline(), requested)
-  end
+  defdelegate deadline(timeout), to: Imp.Deadline, as: :resolve
 
   defp schedule(state, deadline, max_concurrency, snapshot, fun) do
     state = launch_available(state, deadline, max_concurrency, snapshot, fun)
@@ -179,12 +154,7 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
   defp terminal?(%{status: :error}), do: true
   defp terminal?(_result), do: false
 
-  defp minimum_deadline(:infinity, deadline), do: deadline
-  defp minimum_deadline(deadline, :infinity), do: deadline
-  defp minimum_deadline(left, right), do: min(left, right)
-
-  defp expired?(:infinity), do: false
-  defp expired?(deadline), do: remaining(deadline) == 0
+  defp expired?(deadline), do: Imp.Deadline.expired?(deadline)
 
   defp guarded(owner, snapshot, deadline, fun) do
     Process.flag(:trap_exit, true)
@@ -195,7 +165,7 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
     {worker, worker_monitor} =
       :erlang.spawn_opt(
         fn ->
-          Process.put(@deadline_key, deadline)
+          Imp.Deadline.bind(deadline)
 
           result =
             try do

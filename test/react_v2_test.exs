@@ -254,7 +254,7 @@ defmodule ReActV2Test do
           question: "prior",
           next_thought: "checking",
           tool_calls:
-            Imp.Adapters.Types.ToolCalls.new([
+            Imp.Adapter.Types.ToolCalls.new([
               %{id: "call-1", name: "lookup", arguments: %{query: "beam"}}
             ])
             |> Imp.Redaction.redact(),

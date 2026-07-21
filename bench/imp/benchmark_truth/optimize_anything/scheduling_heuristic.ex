@@ -229,7 +229,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.SchedulingHeuristic do
   defp exact_keys(value, expected, context) when is_map(value) do
     actual = value |> Map.keys() |> MapSet.new()
 
-    if actual == expected,
+    if MapSet.equal?(actual, expected),
       do: :ok,
       else: {:error, "#{context} has missing or unknown fields"}
   end

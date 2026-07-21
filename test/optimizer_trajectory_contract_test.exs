@@ -2,7 +2,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias Imp.Adapters.Types.{ToolCall, ToolCallResults, ToolCalls, ToolResult}
+  alias Imp.Adapter.Types.{ToolCall, ToolCallResults, ToolCalls, ToolResult}
   alias Imp.Optimizer.Trajectory
   alias Imp.Optimizer.Trajectory.{Cache, DecodeError, Event, Failure, Parameter, Timing, Usage}
 
@@ -33,7 +33,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
   end
 
   test "wire envelope covers multimodal values, accounting, cache, failures, and parameters" do
-    image = %Imp.Adapters.Types.Image{
+    image = %Imp.Adapter.Types.Image{
       data: "aW1hZ2U=",
       mime_type: "image/png",
       metadata: %{alt: "map"}
@@ -85,7 +85,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
 
     assert {:ok, restored} = Trajectory.load(Jason.decode!(json))
 
-    assert %Imp.Adapters.Types.Image{} =
+    assert %Imp.Adapter.Types.Image{} =
              Imp.Example.get(restored.example, :prompt) |> List.last()
 
     assert %Failure{kind: :provider} = restored.error
@@ -192,7 +192,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
       Trajectory.project(:evaluation, %{
         index: 0,
         example: %{
-          image: %Imp.Adapters.Types.Image{
+          image: %Imp.Adapter.Types.Image{
             data: payload,
             metadata: %{api_key: "sk-test-secret-1234567890"}
           }
@@ -205,7 +205,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     wire = Trajectory.dump(trajectory)
     assert {:ok, restored} = wire |> Jason.encode!() |> Jason.decode!() |> Trajectory.load()
 
-    assert %Imp.Adapters.Types.Image{
+    assert %Imp.Adapter.Types.Image{
              data: ^payload,
              metadata: %{"api_key" => "[REDACTED]"}
            } = restored.example["image"]

@@ -1,7 +1,7 @@
 defmodule Imp.Optimizer.ReportMultimodalTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Adapters.Types.Image
+  alias Imp.Adapter.Types.Image
   alias Imp.Optimizer.Report
 
   defmodule OrdinaryStruct do

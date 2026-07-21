@@ -1,7 +1,7 @@
 defmodule Imp.BenchmarkTruth.MultimodalRunner do
   @moduledoc false
 
-  alias Imp.Adapters.Types
+  alias Imp.Adapter.Types
   alias Imp.BenchmarkTruth.MultimodalCheckpoint, as: Checkpoint
   alias Imp.BenchmarkTruth.MultimodalManifest, as: Manifest
 
@@ -241,7 +241,7 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
       metadata: %{asset_id: asset_id}
     }
 
-    {value, intent_shape(asset_id, asset, "Imp.Adapters.Types.Image", "image_url")}
+    {value, intent_shape(asset_id, asset, "Imp.Adapter.Types.Image", "image_url")}
   end
 
   defp attachment(%{"delivery" => "typed_native_file", "asset_ids" => [asset_id]}, assets) do
@@ -253,7 +253,7 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
       metadata: %{asset_id: asset_id}
     }
 
-    {value, intent_shape(asset_id, asset, "Imp.Adapters.Types.File", "file")}
+    {value, intent_shape(asset_id, asset, "Imp.Adapter.Types.File", "file")}
   end
 
   defp intent_shape(asset_id, asset, imp_type, req_llm_type) do

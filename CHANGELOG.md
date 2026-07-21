@@ -3,6 +3,29 @@
 All notable Imp changes will be recorded here. Imp follows Semantic
 Versioning once the first public package is released.
 
+## Unreleased
+
+### Changed
+
+- **Breaking:** `Imp.optimize/3`, `/4`, and `/5` now return
+  `{:ok, compiled_program}` or `{:error, reason}`, mirroring `Imp.train/4`.
+  The old raising behavior lives on unchanged as `Imp.optimize!/3`, `/4`,
+  and `/5`. Migration: rename `Imp.optimize(...)` to `Imp.optimize!(...)`
+  to keep the exact previous semantics, or match on the tuple.
+- **Breaking:** `Imp.Adapters.Types` (and its nested value structs such as
+  `Imp.Adapters.Types.Image` and `Imp.Adapters.Types.ToolCall`) is renamed
+  to `Imp.Adapter.Types`, folding the stray `adapters/` directory into
+  `adapter/`. Migration: replace the `Imp.Adapters.` prefix with
+  `Imp.Adapter.`.
+
+### Deprecated
+
+- Passing an LM as a `%{module: module, opts: keyword}` map or as a bare
+  arity-2 function is deprecated. Both still work and now log one loud
+  warning per VM. Use an LM struct (`Imp.LM.Static.new(opts)`,
+  `Imp.req_llm/2`) or a plain LM module instead. Support for the
+  deprecated shapes will be removed in a future release.
+
 ## 0.2.1 — 2026-07-18
 
 ### Changed

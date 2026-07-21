@@ -147,6 +147,6 @@ nonzero if the claim gate rejects any required evidence.
 ## Scope
 
 This campaign proves only the pinned six-sample image and native-PDF lane. It is
-not a broad multimodal leaderboard. `Imp.Adapters.Types.Document` remains text
+not a broad multimodal leaderboard. `Imp.Adapter.Types.Document` remains text
 content, not document vision. Audio is unsupported and unproven. Provider or
 pricing drift requires a new campaign identity and fresh live evidence.

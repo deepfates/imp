@@ -35,7 +35,7 @@ defmodule LabeledFewShotSelectionTest do
 
     facade_sets =
       for _ <- 1..5 do
-        program |> Imp.optimize(optimizer, trainset) |> demos()
+        program |> Imp.optimize!(optimizer, trainset) |> demos()
       end
 
     direct = optimizer |> Imp.Optimizer.LabeledFewShot.compile(program, trainset) |> demos()

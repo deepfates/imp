@@ -26,7 +26,7 @@ Example / inputs
 - retrieval: `Imp.memory/2`, `Imp.retrieve/3`, `Imp.rag/3`
 - execution: `Imp.call/2`, `Imp.stream/3`, `Imp.collect/3`, `Imp.with_demos/2`, `Imp.with_playbook/2`, `Imp.with_lm/2`
 - evaluation and metrics: `Imp.evaluate/4`, `Imp.exact_match/1`, `Imp.extractive_qa/3`, `Imp.classification/3`, `Imp.classification_report/2`
-- optimization: `Imp.optimize/3`, `Imp.optimize/4`, `Imp.optimize/5`, `Imp.train/4`, `Imp.optimizer_capabilities/1`
+- optimization: `Imp.optimize!/3`, `Imp.optimize!/4`, `Imp.optimize!/5`, `Imp.train/4`, `Imp.optimizer_capabilities/1`
 - persistence: `Imp.dump/1`, `Imp.dump/2`, `Imp.load/1`, `Imp.load/2`, `Imp.save!/2`, `Imp.save!/3`, `Imp.load!/1`, `Imp.load!/2`
 - observability: `Imp.inspect_history/2`, `Imp.trace/2`, `Imp.subscribe_optimizer_progress/1`, `Imp.unsubscribe_optimizer_progress/1`, `Imp.enable_logging/0`, `Imp.disable_logging/0`
 - provider helper: `Imp.req_llm/2`
@@ -295,10 +295,10 @@ optimizer implementation validates dataset contents, split relationships, and
 its own options. This keeps split routing centralized without claiming that the
 behaviour can validate optimizer-specific data semantics.
 
-The facade enforces lifecycle separation. `Imp.optimize/3-5` accepts only
+The facade enforces lifecycle separation. `Imp.optimize!/3-5` accepts only
 `:program` optimizers and returns the compiled program, raising `ArgumentError`
-for contract failures. Validation-required optimizers use `optimize/4` or
-`optimize/5`; optional-validation optimizers can use `optimize/3` or supply the
+for contract failures. Validation-required optimizers use `optimize!/4` or
+`optimize!/5`; optional-validation optimizers can use `optimize!/3` or supply the
 split. `Imp.train/3` and `Imp.train/4` accept only `:training` optimizers and
 return `{:ok, %Imp.Optimizer.TrainingResult{}} | {:error, reason}`.
 Constructor and workflow kinds retain their explicit module APIs rather than being routed

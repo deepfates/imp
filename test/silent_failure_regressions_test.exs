@@ -64,6 +64,11 @@ defmodule SilentFailureRegressionsTest do
     end
   end
 
+  # The next three tests guard behavior that is IDENTICAL on pre-#61 code
+  # (RLM's raise predates the fix; the portable and dynamic round-trips were
+  # never broken), so they cannot fail on pre-fix lib/ by construction. Their
+  # teeth are proven by defect injection instead: each fails when its target
+  # defect is introduced into current lib/ (transcripts in the de-tp5x PR).
   test "P03: RLM's existing pinned-LM raise is covered directly" do
     rlm = Imp.Predict.RLM.new("question -> answer", lm: static_lm(%{answer: "PINNED"}))
 
@@ -133,7 +138,7 @@ defmodule SilentFailureRegressionsTest do
     assert log =~ "time budget"
   end
 
-  test "P09: an infinite timeout still runs the sequential path to completion" do
+  test "P09: an infinite timeout runs sequentially; an explicit max_concurrency: 1 still kills" do
     program = %Program{handler: fn _inputs -> {:ok, Imp.prediction(answer: "ok")} end}
     metric = fn _example, _prediction -> true end
 
@@ -143,6 +148,30 @@ defmodule SilentFailureRegressionsTest do
       |> Imp.Evaluate.run(program)
 
     assert result.score == 1.0
+
+    # Teeth (de-tp5x): the kill contract must also hold when the caller PASSES
+    # max_concurrency: 1 explicitly, not just via the default. The pre-#61
+    # sequential path matched on max_concurrency: 1 regardless of how it was
+    # set and skipped the timeout machinery entirely, so this half fails on
+    # pre-fix lib/.
+    slow = %Program{
+      handler: fn _inputs ->
+        Process.sleep(300)
+        {:ok, Imp.prediction(answer: "late")}
+      end
+    }
+
+    {result, log} =
+      with_log(fn ->
+        [example("slow?", "late")]
+        |> Imp.Evaluate.new(metric, timeout: 50, max_concurrency: 1)
+        |> Imp.Evaluate.run(slow)
+      end)
+
+    assert [%{prediction: nil, passed?: false, error: {:evaluation_task_exit, :timeout}}] =
+             result.rows
+
+    assert log =~ "killed row 0"
   end
 
   # ---------------------------------------------------------------------------
@@ -301,7 +330,7 @@ defmodule SilentFailureRegressionsTest do
     end)
   end
 
-  test "P14: an error-free run never cancels, even at max_errors: 0" do
+  test "P14: an error-free run never cancels at max_errors: 0; the first error halts loudly" do
     program = %Program{handler: fn _inputs -> {:ok, Imp.prediction(answer: "ok")} end}
     metric = fn _example, _prediction -> true end
 
@@ -311,6 +340,20 @@ defmodule SilentFailureRegressionsTest do
       |> Imp.Evaluate.run(program)
 
     assert result.score == 1.0
+
+    # Teeth (de-tp5x): at max_errors: 0 the very first error must RAISE. The
+    # pre-#61 code halted at this budget too (1 > 0) but returned a
+    # normal-looking partial Result instead of raising, so this half fails on
+    # pre-fix lib/.
+    failing = %Program{handler: fn _inputs -> {:error, :boom} end}
+
+    capture_log(fn ->
+      assert_raise Imp.EvaluationCancelledError, fn ->
+        [example("q", "a"), example("q2", "a2")]
+        |> Imp.Evaluate.new(metric, max_errors: 0)
+        |> Imp.Evaluate.run(failing)
+      end
+    end)
   end
 
   # ---------------------------------------------------------------------------
@@ -327,21 +370,12 @@ defmodule SilentFailureRegressionsTest do
              Imp.Adapter.XML.parse(signature, "no xml tags here, just prose", [])
   end
 
-  test "P05: XML parse still accepts well-formed tagged output" do
-    signature = Imp.signature("question -> answer")
-
-    assert {:ok, prediction} =
-             Imp.Adapter.XML.parse(signature, "<answer>Paris</answer>", [])
-
-    assert Imp.Prediction.get(prediction, :answer) == "Paris"
-  end
-
-  test "P05: XML parse requires every output field in tags (DSPy contract)" do
-    signature = Imp.signature("question -> answer, score")
-
-    assert {:error, {:missing_output_fields, [:score]}} =
-             Imp.Adapter.XML.parse(signature, "<answer>Paris</answer> and some prose", [])
-  end
+  # de-tp5x: two decorative P05 tests deleted here. "accepts well-formed
+  # tagged output" and "requires every output field in tags" both passed on
+  # pre-#61 code (partial-tag rejection already worked via Chat.parse; only
+  # the ZERO-tag fallback was the defect, guarded above) and both are exact
+  # duplicates of test/upstream_exam/adapters_test.exs ("xml adapter format
+  # and parse basic" / "xml adapter parse errors on missing field").
 
   # ---------------------------------------------------------------------------
   # P13 (dee-x50b): the public GSM8K metric must score the repo's own fetched

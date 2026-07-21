@@ -45,6 +45,11 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Deadline",
+      "source": "lib/imp/deadline.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.FieldSelector",
       "source": "lib/imp/field_selector.ex"
     },
@@ -399,6 +404,9 @@
         "memory/2",
         "multi_chain_comparison/2",
         "nearest/2",
+        "optimize!/3",
+        "optimize!/4",
+        "optimize!/5",
         "optimize/3",
         "optimize/4",
         "optimize/5",
@@ -540,6 +548,15 @@
           ],
           "nearest/2": [
             "nearest(knn, inputs)"
+          ],
+          "optimize!/3": [
+            "optimize!(program, optimizer, trainset)"
+          ],
+          "optimize!/4": [
+            "optimize!(program, optimizer, trainset, validation)"
+          ],
+          "optimize!/5": [
+            "optimize!(program, optimizer, trainset, validation, opts)"
           ],
           "optimize/3": [
             "optimize(program, optimizer, trainset)"
@@ -756,6 +773,154 @@
     {
       "callbacks": [],
       "category": "stable",
+      "functions": [
+        "content_from_openai/1",
+        "content_to_openai/1",
+        "from_openai/1",
+        "to_openai/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapter.Types",
+      "signatures": {
+        "functions": {
+          "content_from_openai/1": [
+            "content_from_openai(values)"
+          ],
+          "content_to_openai/1": [
+            "content_to_openai(values)"
+          ],
+          "from_openai/1": [
+            "from_openai(value)"
+          ],
+          "to_openai/1": [
+            "to_openai(image)"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "from_map/1",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.ToolCall",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(call)"
+          ],
+          "from_map/1": [
+            "from_map(call)"
+          ],
+          "new/3": [
+            "new(name, arguments \\\\ %{}, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "arguments",
+        "id",
+        "name"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.ToolCallResults",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(tool_call_results)"
+          ],
+          "new/1": [
+            "new(results \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "tool_call_results"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "from_dict_list/1",
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.ToolCalls",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(tool_calls)"
+          ],
+          "from_dict_list/1": [
+            "from_dict_list(tool_calls)"
+          ],
+          "new/1": [
+            "new(tool_calls \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "tool_calls"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "format/1",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.ToolResult",
+      "signatures": {
+        "functions": {
+          "format/1": [
+            "format(result)"
+          ],
+          "new/3": [
+            "new(name, result, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "id",
+        "name",
+        "result"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
       "functions": [],
       "kind": "module",
       "macros": [],
@@ -778,154 +943,6 @@
         "__exception__",
         "message",
         "reason"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "content_from_openai/1",
-        "content_to_openai/1",
-        "from_openai/1",
-        "to_openai/1"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.Adapters.Types",
-      "signatures": {
-        "functions": {
-          "content_from_openai/1": [
-            "content_from_openai(values)"
-          ],
-          "content_to_openai/1": [
-            "content_to_openai(values)"
-          ],
-          "from_openai/1": [
-            "from_openai(value)"
-          ],
-          "to_openai/1": [
-            "to_openai(image)"
-          ]
-        }
-      },
-      "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "format/1",
-        "from_map/1",
-        "new/3"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Adapters.Types.ToolCall",
-      "signatures": {
-        "functions": {
-          "format/1": [
-            "format(call)"
-          ],
-          "from_map/1": [
-            "from_map(call)"
-          ],
-          "new/3": [
-            "new(name, arguments \\\\ %{}, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [
-        "arguments",
-        "id",
-        "name"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "format/1",
-        "new/1"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Adapters.Types.ToolCallResults",
-      "signatures": {
-        "functions": {
-          "format/1": [
-            "format(tool_call_results)"
-          ],
-          "new/1": [
-            "new(results \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [
-        "tool_call_results"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "format/1",
-        "from_dict_list/1",
-        "new/1"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Adapters.Types.ToolCalls",
-      "signatures": {
-        "functions": {
-          "format/1": [
-            "format(tool_calls)"
-          ],
-          "from_dict_list/1": [
-            "from_dict_list(tool_calls)"
-          ],
-          "new/1": [
-            "new(tool_calls \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [
-        "tool_calls"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "format/1",
-        "new/3"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Adapters.Types.ToolResult",
-      "signatures": {
-        "functions": {
-          "format/1": [
-            "format(result)"
-          ],
-          "new/3": [
-            "new(name, result, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/adapters/types.ex",
-      "struct_fields": [
-        "id",
-        "name",
-        "result"
       ],
       "types": []
     },
@@ -2674,13 +2691,27 @@
     {
       "callbacks": [],
       "category": "stable",
-      "functions": [],
-      "kind": "module",
+      "functions": [
+        "generate/3",
+        "new/1"
+      ],
+      "kind": "struct",
       "macros": [],
       "module": "Imp.LM.Static",
-      "signatures": {},
+      "signatures": {
+        "functions": {
+          "generate/3": [
+            "generate(static, messages, opts)"
+          ],
+          "new/1": [
+            "new(opts \\\\ [])"
+          ]
+        }
+      },
       "source": "lib/imp/lm/static.ex",
-      "struct_fields": [],
+      "struct_fields": [
+        "opts"
+      ],
       "types": []
     },
     {
@@ -5324,6 +5355,9 @@
           "new/3": [
             "new(signature, tools, opts \\\\ [])"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/predict/react.ex",
@@ -5335,7 +5369,12 @@
         "tool_policy",
         "tools"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -5351,6 +5390,9 @@
           "new/3": [
             "new(signature, tools, opts \\\\ [])"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/predict/react_v2.ex",
@@ -5361,7 +5403,12 @@
         "tool_policy",
         "tools"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],

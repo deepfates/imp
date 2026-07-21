@@ -22,7 +22,7 @@ defmodule UpstreamExam.AdaptersTest do
 
   @moduletag :upstream_exam
 
-  alias Imp.Adapters.Types
+  alias Imp.Adapter.Types
 
   # ---------------------------------------------------------------------------
   # Helpers

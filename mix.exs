@@ -22,7 +22,8 @@ defmodule Imp.MixProject do
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
-      aliases: aliases()
+      aliases: aliases(),
+      dialyzer: dialyzer()
     ]
   end
 
@@ -121,11 +122,29 @@ defmodule Imp.MixProject do
       {:mox, "~> 1.2", only: :test},
       {:stream_data, "~> 1.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false}
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp dialyzer do
+    [
+      # PLTs live in a stable directory so CI can cache them across runs.
+      plt_core_path: "priv/plts/core",
+      plt_local_path: "priv/plts/local",
+      plt_add_apps: [:mix, :ex_unit],
+      # Every entry in the ignore file carries a one-line reason.
+      ignore_warnings: ".dialyzer_ignore.exs",
+      list_unused_filters: true
+    ]
+  end
+
+  # bench/ holds the parity-forensics module families (benchmark truth,
+  # upstream fidelity, research portfolio, reproduction registry, evidence
+  # authorities, legacy identity audit). They compile in dev and test so the
+  # gates and mix tasks keep working, and never ship in the package.
+  defp elixirc_paths(:test), do: ["lib", "bench", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "bench"]
   defp elixirc_paths(_env), do: ["lib"]
 
   defp package do
@@ -140,19 +159,14 @@ defmodule Imp.MixProject do
   end
 
   defp package_files do
+    # Parity-forensics module families live under bench/ (compiled only in
+    # dev/test via elixirc_paths), so they never enter the lib/ wildcard.
     excluded_lib =
       Path.wildcard("lib/mix/tasks/**/*.ex") ++
         Path.wildcard("lib/imp/benchmark*.ex") ++
-        Path.wildcard("lib/imp/benchmark_truth/**/*.ex") ++
-        Path.wildcard("lib/imp/reproduction_registry.ex") ++
         [
-          "lib/imp/evidence_authorities.ex",
           "lib/imp/optimizer/playbook/campaign.ex",
-          "lib/imp/optimizer/playbook/equation_search.ex",
-          "lib/imp/legacy_identity_audit.ex",
-          "lib/imp/research_portfolio.ex",
-          "lib/imp/upstream_authority_registry.ex",
-          "lib/imp/upstream_fidelity.ex"
+          "lib/imp/optimizer/playbook/equation_search.ex"
         ]
 
     (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
@@ -342,6 +356,13 @@ defmodule Imp.MixProject do
       ],
       "legacy_identity.check": [
         "run scripts/legacy_identity_audit.exs"
+      ],
+      # Static type gate (de-xmi1). Runs in dev (PLTs are built per-env; dev
+      # matches local use). Fails on any warning not pinned with a reason in
+      # .dialyzer_ignore.exs, and reports ignore entries that stopped
+      # matching (list_unused_filters) so the ignore file cannot rot.
+      "dialyzer.check": [
+        "dialyzer"
       ],
       "quality.check": [
         "legacy_identity.check",

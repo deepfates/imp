@@ -21,7 +21,7 @@ defmodule Imp.BenchmarkTruth.Paths do
   def canonical_path!(path, base) when is_binary(path) and is_binary(base) do
     path
     |> Path.expand(base)
-    |> resolve_path!(MapSet.new(), 0)
+    |> resolve_path!(%{}, 0)
   end
 
   def canonical_path!(path, _base),
@@ -156,7 +156,7 @@ defmodule Imp.BenchmarkTruth.Paths do
   defp resolve_symlink!(candidate, parent, rest, seen, depth) do
     symlink_step = {candidate, rest}
 
-    if depth >= @max_symlink_depth or MapSet.member?(seen, symlink_step) do
+    if depth >= @max_symlink_depth or Map.has_key?(seen, symlink_step) do
       raise ArgumentError, "cannot canonicalize cyclic benchmark symlink: #{candidate}"
     end
 
@@ -170,7 +170,7 @@ defmodule Imp.BenchmarkTruth.Paths do
 
     [expanded_target | rest]
     |> Path.join()
-    |> resolve_path!(MapSet.put(seen, symlink_step), depth + 1)
+    |> resolve_path!(Map.put(seen, symlink_step, true), depth + 1)
   end
 
   defp contained?("/", path), do: String.starts_with?(path, "/")

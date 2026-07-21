@@ -251,7 +251,7 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
 
     {digest, row_count, counts, _tail} =
       Enum.reduce(
-        File.stream!(path, [], @metadata_chunk_size),
+        File.stream!(path, @metadata_chunk_size),
         {digest, 0, Map.new(markers, fn {key, _} -> {key, 0} end), <<>>},
         fn chunk, {digest, row_count, counts, tail} ->
           data = tail <> chunk
@@ -532,7 +532,7 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
   defp jsonl_ranges!(path) do
     {offset, line_start, ranges} =
       path
-      |> File.stream!([], @metadata_chunk_size)
+      |> File.stream!(@metadata_chunk_size)
       |> Enum.reduce({0, 0, []}, fn chunk, {offset, line_start, ranges} ->
         {line_start, ranges} =
           Enum.reduce(:binary.matches(chunk, "\n"), {line_start, ranges}, fn {at, 1},
@@ -679,7 +679,7 @@ defmodule Imp.BenchmarkTruth.RLMDataset do
   defp sha256_file!(path) do
     digest =
       path
-      |> File.stream!([], @metadata_chunk_size)
+      |> File.stream!(@metadata_chunk_size)
       |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
 
     digest |> :crypto.hash_final() |> Base.encode16(case: :lower)

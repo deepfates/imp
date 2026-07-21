@@ -1962,7 +1962,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
         is_binary(requirement["id"]) and is_binary(requirement["lane"]) and
           requirement["evidence"] in ~w(passing full) and is_binary(requirement["kind"]) and
           is_binary(requirement["threshold"]) and
-          (is_nil(known_lanes) or requirement["lane"] in known_lanes)
+          (not is_list(known_lanes) or requirement["lane"] in known_lanes)
       end)
   end
 

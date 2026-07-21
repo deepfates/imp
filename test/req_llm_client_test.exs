@@ -856,7 +856,7 @@ defmodule ReqLLMClientTest do
     assert {:ok, _prediction} =
              Imp.Clients.ReqLLM.generate(
                lm,
-               [%{role: :user, content: [%Imp.Adapters.Types.File{path: path}]}],
+               [%{role: :user, content: [%Imp.Adapter.Types.File{path: path}]}],
                []
              )
 
@@ -1034,7 +1034,7 @@ defmodule ReqLLMClientTest do
                  %{
                    role: :user,
                    content: [
-                     %Imp.Adapters.Types.Reasoning{text: "prior native reasoning"},
+                     %Imp.Adapter.Types.Reasoning{text: "prior native reasoning"},
                      "question"
                    ]
                  }
@@ -1118,8 +1118,8 @@ defmodule ReqLLMClientTest do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 
     calls =
-      Imp.Adapters.Types.ToolCalls.new([
-        Imp.Adapters.Types.ToolCall.new(:lookup, %{query: "beam"}, id: "call_lookup"),
+      Imp.Adapter.Types.ToolCalls.new([
+        Imp.Adapter.Types.ToolCall.new(:lookup, %{query: "beam"}, id: "call_lookup"),
         %{
           id: "call_translate",
           function: %{name: "translate", arguments: ~s({"text":"world"})}
@@ -1549,5 +1549,91 @@ defmodule ReqLLMClientTest do
     Enum.each(@credential_canaries, fn {_key, canary} ->
       refute rendered =~ canary, "credential canary leaked: #{canary}"
     end)
+  end
+
+  # ── de-4hmp regressions: silent degradations made loud ──────────────────
+
+  test "unknown message role warns loudly once per role and still coerces to :user" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub, cache: false)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, _} =
+                 Imp.Clients.ReqLLM.generate(lm, [%{role: :function, content: "pong?"}], [])
+      end)
+
+    assert log =~ "unknown message role"
+    assert log =~ ":function"
+
+    assert_received {:req_llm_generate, _model, [%ReqLLM.Message{role: :user}], _opts}
+
+    # Second occurrence of the same role: coercion still happens, warning does not.
+    log2 =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, _} =
+                 Imp.Clients.ReqLLM.generate(lm, [%{role: :function, content: "pong?"}], [])
+      end)
+
+    refute log2 =~ "unknown message role"
+    assert_received {:req_llm_generate, _model, [%ReqLLM.Message{role: :user}], _opts}
+  end
+
+  test "unknown STRING role (never atomized) warns and coerces to :user" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub, cache: false)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, _} =
+                 Imp.Clients.ReqLLM.generate(
+                   lm,
+                   [%{"role" => "de_4hmp_no_such_role", "content" => "pong?"}],
+                   []
+                 )
+      end)
+
+    assert log =~ "unknown message role"
+    assert log =~ "de_4hmp_no_such_role"
+    assert_received {:req_llm_generate, _model, [%ReqLLM.Message{role: :user}], _opts}
+  end
+
+  test "model registry lookup failure warns and yields Capability.none" do
+    lm =
+      Imp.req_llm("de_4hmp_no_such_provider:fake-model",
+        test_pid: self(),
+        req_module: TextStub
+      )
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert Imp.Clients.ReqLLM.response_format_capability(lm) == Imp.LM.Capability.none()
+      end)
+
+    assert log =~ "model registry lookup failed"
+    assert log =~ "de_4hmp_no_such_provider"
+  end
+
+  test "provider-era-pinned reasoning-model pattern routes current pinned families" do
+    for id <- ["o1-preview", "o3-mini", "o4-mini", "gpt-5", "gpt-5.4-mini"] do
+      model = %{provider: :openai, id: id}
+      lm = Imp.req_llm(model, test_pid: self(), req_module: InlineModelStub, max_tokens: 80)
+
+      assert {:ok, _} =
+               Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "pong?"}], [])
+
+      assert_received {:inline_model_generate, ^model, opts}
+
+      assert Keyword.fetch!(opts, :max_completion_tokens) == 80,
+             "pinned reasoning model #{id} was not routed to the reasoning branch"
+
+      refute Keyword.has_key?(opts, :max_tokens)
+    end
+
+    # Control: a non-reasoning model keeps :max_tokens untouched.
+    model = %{provider: :openai, id: "gpt-4o-mini"}
+    lm = Imp.req_llm(model, test_pid: self(), req_module: InlineModelStub, max_tokens: 80)
+    assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "pong?"}], [])
+    assert_received {:inline_model_generate, ^model, opts}
+    assert Keyword.fetch!(opts, :max_tokens) == 80
+    refute Keyword.has_key?(opts, :max_completion_tokens)
   end
 end

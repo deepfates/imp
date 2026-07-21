@@ -78,7 +78,7 @@ defmodule Imp.BenchmarkTruth.HoverBM25 do
 
   defp file_checksum(path) do
     path
-    |> File.stream!([], 1_048_576)
+    |> File.stream!(1_048_576)
     |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
     |> :crypto.hash_final()
     |> Base.encode16(case: :lower)
@@ -96,7 +96,7 @@ defmodule Imp.BenchmarkTruth.HoverBM25 do
 
       context =
         path
-        |> File.stream!([], 1_048_576)
+        |> File.stream!(1_048_576)
         |> Enum.reduce(context, &:crypto.hash_update(&2, &1))
 
       :crypto.hash_update(context, <<0>>)

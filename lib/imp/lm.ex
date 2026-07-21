@@ -55,7 +55,10 @@ defmodule Imp.LM do
     end
   end
 
-  def validate_lm(fun) when is_function(fun, 2), do: {:ok, fun}
+  def validate_lm(fun) when is_function(fun, 2) do
+    warn_deprecated_shape(:bare_fun)
+    {:ok, fun}
+  end
 
   def validate_lm(%module{} = lm) do
     if Code.ensure_loaded?(module) and
@@ -67,6 +70,8 @@ defmodule Imp.LM do
   end
 
   def validate_lm(%{module: module, opts: opts} = lm) when is_atom(module) do
+    warn_deprecated_shape(:module_opts_map)
+
     cond do
       not Keyword.keyword?(opts) ->
         {:error, "expected configured LM :opts to be a keyword list"}
@@ -80,8 +85,42 @@ defmodule Imp.LM do
   end
 
   def validate_lm(_lm) do
-    {:error,
-     "expected nil, an LM module, an LM struct, a configured %{module: module, opts: keyword} map, or an arity-2 callback"}
+    {:error, "expected nil, an LM module, or an LM struct"}
+  end
+
+  @deprecated_shape_messages %{
+    module_opts_map:
+      "the %{module: module, opts: keyword} LM shape is deprecated; " <>
+        "use an LM struct instead (for example Imp.LM.Static.new(opts) or Imp.req_llm/2). " <>
+        "Support will be removed in a future release.",
+    bare_fun:
+      "passing a bare arity-2 function as an LM is deprecated; " <>
+        "use an LM struct instead (for example Imp.LM.Static.new(handler: fun)). " <>
+        "Support will be removed in a future release."
+  }
+
+  @doc false
+  # Loud, once-per-VM deprecation warning for LM shapes kept only for
+  # compatibility. `reset_deprecation_warnings/0` re-arms it (tests).
+  def warn_deprecated_shape(shape) do
+    key = {__MODULE__, :deprecated_shape_warned, shape}
+
+    unless :persistent_term.get(key, false) do
+      :persistent_term.put(key, true)
+      require Logger
+      Logger.warning("Imp.LM: " <> Map.fetch!(@deprecated_shape_messages, shape))
+    end
+
+    :ok
+  end
+
+  @doc false
+  def reset_deprecation_warnings do
+    for shape <- Map.keys(@deprecated_shape_messages) do
+      :persistent_term.erase({__MODULE__, :deprecated_shape_warned, shape})
+    end
+
+    :ok
   end
 
   defp dispatch_generate(module, messages, opts) when is_atom(module) do
@@ -106,11 +145,13 @@ defmodule Imp.LM do
   end
 
   defp dispatch_generate(%{module: module, opts: client_opts}, messages, opts) do
+    warn_deprecated_shape(:module_opts_map)
     client_opts = validate_opts!(client_opts, "Imp.LM.generate/3 client :opts")
     dispatch_generate(module, messages, Keyword.merge(client_opts, opts))
   end
 
   defp dispatch_generate(fun, messages, opts) when is_function(fun, 2) do
+    warn_deprecated_shape(:bare_fun)
     call_lm(fn -> fun.(messages, opts) end, fun)
   end
 

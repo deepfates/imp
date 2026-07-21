@@ -1015,7 +1015,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
     ids = MapSet.new(rows, & &1["id"])
     expected = MapSet.new(@live_row_ids)
 
-    unless ids == expected do
+    unless MapSet.equal?(ids, expected) do
       Mix.raise(
         "#{runner} live rows must be exactly #{inspect(@live_row_ids)}, got: #{inspect(MapSet.to_list(ids))}"
       )
@@ -1137,7 +1137,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
     provider_free_complete = Enum.all?(provider_free_rows, & &1["passing"])
 
     live_complete =
-      MapSet.new(live_rows, & &1["id"]) == MapSet.new(@live_row_ids) and
+      MapSet.equal?(MapSet.new(live_rows, & &1["id"]), MapSet.new(@live_row_ids)) and
         Enum.all?(live_rows, & &1["passing"])
 
     full = provider_free_complete and live_complete

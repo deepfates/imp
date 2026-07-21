@@ -223,7 +223,7 @@ metric = Imp.exact_match(:answer)
 
 compiled =
   program
-  |> Imp.optimize(
+  |> Imp.optimize!(
     Imp.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1),
     trainset,
     devset

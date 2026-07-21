@@ -192,29 +192,29 @@ defmodule Imp.Settings do
 
   defp ensure_started do
     case Process.whereis(@name) do
-      nil -> start_application_or_agent()
+      nil -> start_application()
       _pid -> :ok
     end
   end
 
-  defp start_application_or_agent do
+  # The settings Agent lives under the :imp supervision tree. If the
+  # application cannot start we fail loudly instead of falling back to an
+  # unsupervised Agent: a silent unsupervised fallback survives its first
+  # crash as amnesia (settings reset to defaults with no restart report).
+  defp start_application do
     case Application.ensure_all_started(:imp) do
       {:ok, _apps} ->
         :ok
 
       {:error, reason} ->
-        if Application.spec(:imp) do
-          raise "failed to start :imp application for Imp.Settings: #{inspect(reason)}"
-        else
-          start_unlinked()
-        end
-    end
-  end
+        raise """
+        Imp.Settings requires the :imp application, and starting it failed: #{inspect(reason)}
 
-  defp start_unlinked do
-    case Agent.start(fn -> @defaults end, name: @name) do
-      {:ok, _pid} -> :ok
-      {:error, {:already_started, _pid}} -> :ok
+        Imp's settings Agent runs under the :imp supervision tree. Add :imp
+        to your application's dependencies (Mix starts it automatically), or
+        start it explicitly with Application.ensure_all_started(:imp) before
+        calling Imp.
+        """
     end
   end
 

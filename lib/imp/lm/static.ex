@@ -9,6 +9,23 @@ defmodule Imp.LM.Static do
 
   @behaviour Imp.LM
 
+  defstruct opts: []
+
+  @doc """
+  Builds a configured static LM struct.
+
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
+      Imp.configure(lm: lm)
+  """
+  def new(opts \\ []) do
+    %__MODULE__{opts: validate_opts!(opts, "#{inspect(__MODULE__)}.new/1")}
+  end
+
+  @doc "Generates through a configured `Imp.LM.Static` struct."
+  def generate(%__MODULE__{opts: configured}, messages, opts) do
+    generate(messages, Keyword.merge(configured, opts))
+  end
+
   @impl true
   def generate(messages, opts) do
     opts = validate_opts!(opts, "#{inspect(__MODULE__)}.generate/2")

@@ -293,10 +293,10 @@ defmodule ImpFacadeTest do
     assert %Imp.Evaluate.Result{score: 1.0} = Imp.evaluate(program, devset, metric)
 
     assert %{demos: [_]} =
-             Imp.optimize(program, Imp.Optimizer.LabeledFewShot.new(k: 1), trainset)
+             Imp.optimize!(program, Imp.Optimizer.LabeledFewShot.new(k: 1), trainset)
 
     random_search = Imp.Optimizer.RandomSearch.new(metric, candidates: 1, demos_per_candidate: 1)
-    compiled = Imp.optimize(program, random_search, trainset, devset)
+    compiled = Imp.optimize!(program, random_search, trainset, devset)
 
     assert %Imp.Optimizer.Report{optimizer: :random_search} =
              Imp.Optimizer.Report.fetch(compiled)
@@ -323,6 +323,36 @@ defmodule ImpFacadeTest do
     assert report["accuracy"] == 0.5
   end
 
+  test "optimize returns tuples and optimize! raises, mirroring train" do
+    program =
+      Imp.predict("question -> answer",
+        lm: fn _messages, _opts -> %{answer: "Paris"} end
+      )
+
+    trainset = [
+      Imp.example(question: "Eiffel Tower city?", answer: "Paris") |> Imp.with_inputs(:question)
+    ]
+
+    optimizer = Imp.Optimizer.LabeledFewShot.new(k: 1)
+
+    assert {:ok, %{demos: [_]}} = Imp.optimize(program, optimizer, trainset)
+
+    assert {:error, {:optimizer_kind_mismatch, :program, :training}} =
+             Imp.optimize(
+               program,
+               Imp.Optimizer.BootstrapFinetune.new(Imp.exact_match(:answer)),
+               trainset
+             )
+
+    assert_raise ArgumentError, ~r/received a training optimizer; use Imp\.train\/4/, fn ->
+      Imp.optimize!(
+        program,
+        Imp.Optimizer.BootstrapFinetune.new(Imp.exact_match(:answer)),
+        trainset
+      )
+    end
+  end
+
   test "facade reports unsupported demos and optimizers clearly" do
     assert_raise ArgumentError, ~r/Imp\.with_demos\/2 supports Predict/, fn ->
       Imp.with_demos(:not_a_program, [])
@@ -330,12 +360,12 @@ defmodule ImpFacadeTest do
 
     program = Imp.predict("question -> answer")
 
-    assert_raise ArgumentError, ~r/Imp\.optimize\/3 expects an optimizer struct/, fn ->
-      Imp.optimize(program, :not_an_optimizer, [])
+    assert_raise ArgumentError, ~r/Imp\.optimize!\/3 expects an optimizer struct/, fn ->
+      Imp.optimize!(program, :not_an_optimizer, [])
     end
 
-    assert_raise ArgumentError, ~r/Imp\.optimize\/4 expects an optimizer struct/, fn ->
-      Imp.optimize(program, :not_an_optimizer, [], [])
+    assert_raise ArgumentError, ~r/Imp\.optimize!\/4 expects an optimizer struct/, fn ->
+      Imp.optimize!(program, :not_an_optimizer, [], [])
     end
   end
 

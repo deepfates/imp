@@ -33,6 +33,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
     @moduledoc false
     @enforce_keys [:id, :candidate, :validation]
     defstruct [:id, :candidate, :validation, parent_ids: [], next_component: 0, discovered_at: 0]
+
+    @type t :: %__MODULE__{}
   end
 
   defmodule State do
@@ -64,6 +66,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
               reflection_strategy: nil,
               reflection_strategy_initial: nil,
               stop_reason: nil
+
+    @type t :: %__MODULE__{}
   end
 
   @type proposer ::

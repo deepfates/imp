@@ -9,9 +9,11 @@ defmodule Imp.Predict.ReActV2 do
 
   @behaviour Imp.Module
 
-  alias Imp.Adapters.Types.{ToolCall, ToolCalls, ToolResult}
+  alias Imp.Adapter.Types.{ToolCall, ToolCalls, ToolResult}
 
   defstruct [:signature, :react, tools: %{}, max_iters: 20, tool_policy: :allow]
+
+  @type t :: %__MODULE__{}
 
   @option_schema [
     lm: [type: {:custom, Imp.LM, :validate_lm, []}],

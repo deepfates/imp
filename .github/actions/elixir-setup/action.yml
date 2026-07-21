@@ -67,6 +67,14 @@ inputs:
     required: false
     default: "false"
 
+outputs:
+  otp-version:
+    description: Resolved OTP version (for callers building their own cache keys).
+    value: ${{ steps.beam.outputs.otp-version }}
+  elixir-version:
+    description: Resolved Elixir version (for callers building their own cache keys).
+    value: ${{ steps.beam.outputs.elixir-version }}
+
 runs:
   using: composite
   steps:

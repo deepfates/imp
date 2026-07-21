@@ -37,8 +37,8 @@ defmodule Imp.Optimizer.GEPA.Pareto do
       |> Enum.reduce(MapSet.new(), &MapSet.union/2)
       |> Enum.sort_by(&{Map.get(aggregate_scores, &1, 1), inspect(&1)})
 
-    dominated = remove_until_stable(programs, mapping, MapSet.new())
-    dominators = MapSet.difference(MapSet.new(programs), dominated)
+    dominated = remove_until_stable(programs, mapping, %{})
+    dominators = MapSet.difference(MapSet.new(programs), MapSet.new(Map.keys(dominated)))
 
     Map.new(mapping, fn {key, front} -> {key, MapSet.intersection(front, dominators)} end)
   end
@@ -74,17 +74,20 @@ defmodule Imp.Optimizer.GEPA.Pareto do
 
   defp remove_until_stable(programs, mapping, dominated) do
     case Enum.find(programs, fn candidate ->
-           not MapSet.member?(dominated, candidate) and
+           not Map.has_key?(dominated, candidate) and
              dominated?(candidate, programs, mapping, dominated)
          end) do
       nil -> dominated
-      candidate -> remove_until_stable(programs, mapping, MapSet.put(dominated, candidate))
+      candidate -> remove_until_stable(programs, mapping, Map.put(dominated, candidate, true))
     end
   end
 
   defp dominated?(candidate, programs, mapping, dominated) do
     remaining =
-      programs |> MapSet.new() |> MapSet.delete(candidate) |> MapSet.difference(dominated)
+      programs
+      |> MapSet.new()
+      |> MapSet.delete(candidate)
+      |> MapSet.difference(MapSet.new(Map.keys(dominated)))
 
     mapping
     |> Map.values()

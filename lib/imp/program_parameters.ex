@@ -179,13 +179,14 @@ defmodule Imp.ProgramParameters do
     do: {:error, {:changes_must_be_a_list, changes}}
 
   @doc "Replaces a non-reserved ReAct or ReActV2 tool description."
-  @spec put_tool_description(ReAct | ReActV2, name(), String.t()) :: ReAct | ReActV2
+  @spec put_tool_description(ReAct.t() | ReActV2.t(), name(), String.t()) ::
+          ReAct.t() | ReActV2.t()
   def put_tool_description(program, name, description) when is_binary(description) do
     update_tool(program, name, fn tool -> %{tool | description: description} end)
   end
 
   @doc "Replaces a non-reserved ReAct or ReActV2 tool JSON schema."
-  @spec put_tool_schema(ReAct | ReActV2, name(), map()) :: ReAct | ReActV2
+  @spec put_tool_schema(ReAct.t() | ReActV2.t(), name(), map()) :: ReAct.t() | ReActV2.t()
   def put_tool_schema(program, name, schema) when is_map(schema) do
     schema = runtime_json_value!(schema, "tool schema")
     update_tool(program, name, fn tool -> %{tool | schema: schema} end)

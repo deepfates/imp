@@ -174,7 +174,7 @@ baseline = Imp.evaluate(program, devset, metric)
 
 compiled =
   program
-  |> Imp.optimize(
+  |> Imp.optimize!(
     Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1),
     trainset,
     devset
@@ -623,7 +623,7 @@ devset = [
 
 metric = Imp.exact_match(:answer)
 optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-compiled = Imp.optimize(program, optimizer, trainset, devset)
+compiled = Imp.optimize!(program, optimizer, trainset, devset)
 
 Imp.Optimizer.Report.fetch(compiled)
 ```
@@ -639,8 +639,8 @@ returns its validated declaration:
 - `result` declares the expected result shape; workflows name their concrete
   result module.
 
-Use `Imp.optimize/3` when a program optimizer does not require validation,
-`Imp.optimize/4` when supplying validation, and `Imp.optimize/5` when also
+Use `Imp.optimize!/3` when a program optimizer does not require validation,
+`Imp.optimize!/4` when supplying validation, and `Imp.optimize!/5` when also
 passing invocation options such as checkpoint controls. This choice follows the
 declared split requirements; Imp does not infer argument meaning from an
 optimizer module's exported function arities. The behaviour layer checks that
@@ -777,7 +777,7 @@ avatar_optimizer =
     max_iters: 2
   )
 
-compiled_avatar = Imp.optimize(avatar, avatar_optimizer, trainset)
+compiled_avatar = Imp.optimize!(avatar, avatar_optimizer, trainset)
 ```
 
 Avatar records typed action observations, treats unknown, denied, and failed
@@ -907,19 +907,19 @@ fail-fast behavior.
 
 ### Tool Call Primitives
 
-Use `Imp.Adapters.Types.ToolCall` and `ToolCalls` when you need to inspect,
+Use `Imp.Adapter.Types.ToolCall` and `ToolCalls` when you need to inspect,
 persist, or pass provider-native tool-call values outside a full ReAct loop.
 They normalize Imp maps and OpenAI-style nested function calls into the same
 shape:
 
 ```elixir
 calls =
-  Imp.Adapters.Types.ToolCalls.from_dict_list([
+  Imp.Adapter.Types.ToolCalls.from_dict_list([
     %{id: "call_lookup", name: "lookup", arguments: %{query: "beam"}},
     %{id: "call_translate", function: %{name: "translate", arguments: ~s({"text":"hello"})}}
   ])
 
-Imp.Adapters.Types.ToolCalls.format(calls)
+Imp.Adapter.Types.ToolCalls.format(calls)
 ```
 
 ReqLLM-backed assistant messages accept the same primitive values through the
