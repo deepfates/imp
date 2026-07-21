@@ -38,8 +38,9 @@ description: >
 #      cold-compiles all four gates once (~3-4 min); a poisoned cache costs
 #      far more (nondeterministic production.check failures until the next
 #      key bump).
-#   b) Single deterministic cache writer: only production.check saves (the
-#      save-cache input below). The light gates restore read-only, so a fast
+#   b) Single deterministic cache writer: only package.check saves (the
+#      save-cache input below; before the heavy job was split it was
+#      production.check). The other gates restore read-only, so a fast
 #      gate can never define ~/.hex for the job that actually needs it.
 #   c) The warm step below runs EVERY time and makes ~/.hex a deterministic
 #      function of mix.lock, independent of cache ancestry: it guarantees
@@ -60,9 +61,9 @@ inputs:
   save-cache:
     description: >
       "true" to save the deps/_build/~/.hex cache at job end (actions/cache
-      post step). Exactly one job — production.check, the only one with
+      post step). Exactly one job — package.check, the only one with
       offline ~/.hex requirements — passes true, so the cache has a single
-      deterministic writer instead of four racing gates.
+      deterministic writer instead of many racing gates.
     required: false
     default: "false"
 
