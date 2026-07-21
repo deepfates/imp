@@ -124,10 +124,19 @@ defmodule Imp.Predict.RLM do
     persistent: [type: :boolean, default: false]
   ]
 
+  # Names already bound inside the constrained interpreter: registered
+  # callbacks (llm_query, llm_query_batched, rlm_query, rlm_query_batched,
+  # recurse, load) and interpreter intrinsics (print, submit, show_vars —
+  # SHOW_VARS is rewritten to show_vars before evaluation). A user tool with
+  # one of these names would be shadowed by the builtin, so it is rejected at
+  # construction (DSPy rlm.py `_RESERVED_TOOL_NAMES`).
+  @reserved_tool_names ~w(llm_query llm_query_batched rlm_query rlm_query_batched recurse load print submit show_vars SHOW_VARS)
+
   def new(signature, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.RLM.new/2")
     tools = Imp.Tool.index_tools!(opts[:tools], "Imp.Predict.RLM.new/2")
+    validate_tool_names!(tools)
 
     persistent = opts[:persistent]
     session = if persistent, do: start_persistent_session!(), else: nil
@@ -159,6 +168,16 @@ defmodule Imp.Predict.RLM do
       dynamic_sub_lm?: not Keyword.has_key?(opts, :sub_lm) and not Keyword.has_key?(opts, :lm),
       dynamic_adapter?: not Keyword.has_key?(opts, :adapter)
     }
+  end
+
+  defp validate_tool_names!(tools) do
+    Enum.each(tools, fn {name, _tool} ->
+      if to_string(name) in @reserved_tool_names do
+        raise ArgumentError,
+              "Imp.Predict.RLM.new/2 tool name #{inspect(name)} conflicts with a built-in " <>
+                "interpreter function; reserved names: #{Enum.join(@reserved_tool_names, ", ")}"
+      end
+    end)
   end
 
   @doc false

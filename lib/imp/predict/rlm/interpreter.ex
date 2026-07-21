@@ -651,7 +651,12 @@ defmodule Imp.Predict.RLM.Interpreter do
     concat: 1,
     member?: 2,
     min: 1,
-    max: 1
+    max: 1,
+    # DSPy's sandbox is full Python, where sum() is a builtin; these are the
+    # function-free aggregations expressible in this fn-less interpreter
+    # (Enum.reduce needs a lambda, which generated code cannot write here).
+    sum: 1,
+    product: 1
   }
 
   defp eval_allowlisted(module, function, args, state) do

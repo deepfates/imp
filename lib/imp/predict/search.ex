@@ -87,6 +87,7 @@ defmodule Imp.Predict.Search do
     max_concurrency: [type: :pos_integer, default: System.schedulers_online()],
     timeout: [type: {:or, [:timeout, :pos_integer]}, default: :infinity],
     threshold: [type: {:or, [:integer, :float, nil]}, default: nil],
+    fail_budget: [type: {:or, [:non_neg_integer, nil]}, default: nil],
     tie_policy: [type: {:in, [:first, :last]}, default: :first],
     budget: [type: {:custom, __MODULE__, :validate_budget, []}, default: :infinity]
   ]
@@ -196,9 +197,16 @@ defmodule Imp.Predict.Search do
       outcome = run_sequential(indexed, evaluator, outcomes, opts[:timeout])
       outcomes = outcomes ++ [outcome]
 
-      if threshold_reached?(outcome, opts[:threshold]),
-        do: {:halt, {outcomes, {:threshold_reached, outcome.candidate_id}}},
-        else: {:cont, {outcomes, :completed}}
+      cond do
+        threshold_reached?(outcome, opts[:threshold]) ->
+          {:halt, {outcomes, {:threshold_reached, outcome.candidate_id}}}
+
+        fail_budget_exceeded?(outcomes, opts[:fail_budget]) ->
+          {:halt, {outcomes, {:fail_budget_exceeded, outcome.candidate_id}}}
+
+        true ->
+          {:cont, {outcomes, :completed}}
+      end
     end)
   end
 
@@ -216,10 +224,23 @@ defmodule Imp.Predict.Search do
       outcome = concurrent_outcome(task_result)
       outcomes = outcomes ++ [outcome]
 
-      if threshold_reached?(outcome, opts[:threshold]),
-        do: {:halt, {outcomes, {:threshold_reached, outcome.candidate_id}}},
-        else: {:cont, {outcomes, :completed}}
+      cond do
+        threshold_reached?(outcome, opts[:threshold]) ->
+          {:halt, {outcomes, {:threshold_reached, outcome.candidate_id}}}
+
+        fail_budget_exceeded?(outcomes, opts[:fail_budget]) ->
+          {:halt, {outcomes, {:fail_budget_exceeded, outcome.candidate_id}}}
+
+        true ->
+          {:cont, {outcomes, :completed}}
+      end
     end)
+  end
+
+  defp fail_budget_exceeded?(_outcomes, nil), do: false
+
+  defp fail_budget_exceeded?(outcomes, fail_budget) do
+    Enum.count(outcomes, &(&1.status != :ok)) > fail_budget
   end
 
   defp run_sequential(indexed, evaluator, outcomes, timeout) do
@@ -341,7 +362,8 @@ defmodule Imp.Predict.Search do
           MapSet.member?(rejected_indexes, index) ->
             base_provenance(candidate, index, :budget_exceeded)
 
-          match?({:threshold_reached, _id}, stop_reason) ->
+          match?({:threshold_reached, _id}, stop_reason) or
+              match?({:fail_budget_exceeded, _id}, stop_reason) ->
             base_provenance(candidate, index, :cancelled)
             |> Map.put(:reason, stop_reason)
 
@@ -369,6 +391,9 @@ defmodule Imp.Predict.Search do
     do: base_outcome(candidate, index, status) |> Map.delete(:value)
 
   defp normalize_stop_reason({:threshold_reached, _id} = reason, _rejected, _candidates),
+    do: reason
+
+  defp normalize_stop_reason({:fail_budget_exceeded, _id} = reason, _rejected, _candidates),
     do: reason
 
   defp normalize_stop_reason(_reason, [_ | _] = rejected, _candidates),
