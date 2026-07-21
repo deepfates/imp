@@ -377,7 +377,7 @@ defmodule PackageContractTest do
       |> Imp.with_inputs([:question])
 
     compiled =
-      Imp.optimize(
+      Imp.optimize!(
         program,
         Imp.Optimizer.LabeledFewShot.new(k: 1),
         [demo]

@@ -60,7 +60,7 @@ defmodule TutorialTicketRoutingExperiment do
         t0 = System.monotonic_time(:millisecond)
 
         baseline = Imp.evaluate(router, testset, metric, max_concurrency: 8, timeout: 60_000)
-        compiled = Imp.optimize(router, optimizer, trainset)
+        compiled = Imp.optimize!(router, optimizer, trainset)
         optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout: 60_000)
 
         duration_ms = System.monotonic_time(:millisecond) - t0

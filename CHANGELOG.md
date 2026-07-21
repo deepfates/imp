@@ -5,6 +5,19 @@ Versioning once the first public package is released.
 
 ## Unreleased
 
+### Changed
+
+- **Breaking:** `Imp.optimize/3`, `/4`, and `/5` now return
+  `{:ok, compiled_program}` or `{:error, reason}`, mirroring `Imp.train/4`.
+  The old raising behavior lives on unchanged as `Imp.optimize!/3`, `/4`,
+  and `/5`. Migration: rename `Imp.optimize(...)` to `Imp.optimize!(...)`
+  to keep the exact previous semantics, or match on the tuple.
+- **Breaking:** `Imp.Adapters.Types` (and its nested value structs such as
+  `Imp.Adapters.Types.Image` and `Imp.Adapters.Types.ToolCall`) is renamed
+  to `Imp.Adapter.Types`, folding the stray `adapters/` directory into
+  `adapter/`. Migration: replace the `Imp.Adapters.` prefix with
+  `Imp.Adapter.`.
+
 ### Deprecated
 
 - Passing an LM as a `%{module: module, opts: keyword}` map or as a bare

@@ -21,7 +21,7 @@ defmodule AvatarOptimizerTest do
           })
       )
 
-    compiled = Imp.optimize(student, optimizer, trainset)
+    compiled = Imp.optimize!(student, optimizer, trainset)
     report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :avatar
@@ -62,7 +62,7 @@ defmodule AvatarOptimizerTest do
         lm: static_lm(%{feedback: "unused", new_instruction: "unused"})
       )
 
-    compiled = Imp.optimize(student, optimizer, trainset)
+    compiled = Imp.optimize!(student, optimizer, trainset)
     report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.best_score == 1.0
