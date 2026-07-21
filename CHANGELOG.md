@@ -5,6 +5,26 @@ Versioning once the first public package is released.
 
 ## Unreleased
 
+### Added
+
+- `n=` multi-completion on `Imp.Predict.Predict` (DSPy `Predict(n=K)`):
+  `config: [n: K]` asks the LM for K completions and fills
+  `Imp.Prediction.completions` with all K parsed predictions (the first is
+  the primary). Low or unset temperature bumps to 0.7 as upstream does. A
+  parse failure on any completion fails the call loudly with the failing
+  index, and an LM that ignores `:n` is a loud error. The req_llm client
+  refuses `n > 1` explicitly (its canonical response carries only the first
+  choice); `Imp.LM.Static` and custom clients support the list contract.
+- Per-prediction LM usage ledger (DSPy `track_usage` /
+  `Prediction.get_lm_usage()`): with the `:track_usage` setting on,
+  predictions carry a per-model merged usage map, read via
+  `Imp.Prediction.get_lm_usage/1`. The tracker (`Imp.Usage`) is
+  per-process, so parallel runs report per-result usage.
+- Per-call LM config on `Imp.Predict.Predict.call/3` (DSPy call-time
+  `config={...}` and predicted-outputs `prediction=`): a keyword list merged
+  over the program's config for that invocation only, without mutating the
+  program; every entry reaches the LM request.
+
 ### Changed
 
 - **Breaking:** `Imp.optimize/3`, `/4`, and `/5` now return

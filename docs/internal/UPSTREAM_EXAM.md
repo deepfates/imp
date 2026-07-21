@@ -473,7 +473,7 @@ and encode at the provider boundary (`Types.to_openai/1`). Not modeled:
 The DSPy authors' `tests/predict/` suite (dspy-3.2.1, 13 files, 198 test
 functions including two commented-out artifacts) run against Imp. Every
 upstream test function is accounted for below. Ported tests live in
-`test/upstream_exam/predict_test.exs` (63 ExUnit tests; one upstream test —
+`test/upstream_exam/predict_test.exs` (69 ExUnit tests; one upstream test —
 `test_call_predict_with_chat_history` — is split into its two adapter
 parameterizations). `mix test --only upstream_exam` runs both tranches.
 
@@ -489,10 +489,10 @@ row.
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **198** (aggregation 6, best_of_n 3, chain_of_thought 4, code_act 5, knn 3, multi_chain_comparison 1, parallel 7, predict 66, program_of_thought 6, react 9, refine 3, retry 3, rlm 82) |
-| Ported | **63** (64 ExUnit tests) |
-| — pass | **63** |
+| Ported | **68** (69 ExUnit tests) |
+| — pass | **68** |
 | — FAIL (real divergence found by upstream's own test) | **0** |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **31** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **26** |
 | Not applicable (Python/pydantic/litellm/asyncio/Deno specific, or a documented Imp design substitution) | **104** |
 
 ### Gaps the classification surfaced (fix-wave candidates)
@@ -500,10 +500,13 @@ row.
 No ported assertion failed, but the blocked rows point at real, buildable
 surface. Ranked by owner-steer relevance (API boundary first):
 
-1. **No `n=` multi-completion surface on `Imp.Predict`** (test_multi_output,
-   test_multi_output2): DSPy samples n completions and exposes
-   `result.completions.field[i]`. `Imp.Prediction` has a `completions` list
-   but nothing fills it.
+1. **FIXED (de-hzcv)** — `n=` multi-completion (test_multi_output,
+   test_multi_output2): `config: [n: K]` flows to the LM, which returns one
+   output per completion; `Imp.Prediction.completions` holds all K parsed
+   predictions (first is primary). Low/unset temperature bumps to 0.7 as
+   upstream does. The req_llm client refuses `n > 1` loudly (its canonical
+   response drops non-first choices); LMs honoring the list contract
+   (`Imp.LM.Static`, custom clients) support it.
 2. **FIXED (de-hzcv)** — extra inputs now warn loudly
    (test_extra_fields_warning): `Imp.Predict.Predict.warn_extra_inputs/3`
    matches DSPy's logger.warning-and-proceed semantics.
@@ -515,15 +518,21 @@ surface. Ranked by owner-steer relevance (API boundary first):
    for test_signature_field_with_constraints.
 5. **No `fail_count` on BestOfN** (test_refine_module_custom_fail_count,
    best_of_n variant): Refine has the failure budget; BestOfN runs all N.
-6. **No per-prediction usage ledger** (test_lm_usage*): no `get_lm_usage`
-   analog.
+6. **FIXED (de-hzcv)** — per-prediction usage ledger (test_lm_usage*):
+   with the `:track_usage` setting on, `Imp.Predict.Predict.call` runs in an
+   `Imp.Usage` tracker and `Imp.Prediction.get_lm_usage/1` returns the
+   per-model merged usage, as upstream's `Prediction.get_lm_usage()` does.
 7. **RLM has no reserved-tool-name guard**
    (test_tool_validation_reserved_names): upstream rejects tools named
    `llm_query`/`SUBMIT`/`print`; Imp accepts a tool named `llm_query` with
    unspecified shadowing behavior.
 8. **No input-field default values** (test_input_field_default_value).
-9. **No per-call LM kwargs pass-through**
-   (test_predicted_outputs_piped_from_predict_to_lm_call).
+9. **FIXED (de-hzcv)** — per-call LM kwargs pass-through
+   (test_predicted_outputs_piped_from_predict_to_lm_call):
+   `Imp.Predict.Predict.call/3` takes a per-call config keyword list merged
+   over the program config for that invocation only (the program is not
+   mutated); every entry — including a predicted-outputs `prediction`
+   payload — reaches the LM request. Signature inputs never do.
 10. **RLM interpreter allowlist has no sum/reduce** (noted while porting
     test_with_input_variables_e2e; the port spells the sum with `Enum.at`).
 11. **No datetime field type** (test_datetime_inputs_and_outputs).
@@ -630,8 +639,8 @@ surface. Batch semantics are ported; pair-list shapes are blocked.
 | test_forward_method | pass | |
 | test_forward_method2 | pass | |
 | test_config_management | n/a | `update_config`/`get_config` mutators; Imp config is plain data on an immutable struct. |
-| test_multi_output | blocked | No `n=` multi-completion sampling / `completions` population on Imp.Predict (gap #1 above). |
-| test_multi_output2 | blocked | Same. |
+| test_multi_output | pass (was blocked) | `n=` multi-completion landed (de-hzcv, gap #1): `config: [n: 2]`, completions filled, first primary. |
+| test_multi_output2 | pass (was blocked) | Same surface; both output fields index per completion. |
 | test_datetime_inputs_and_outputs | blocked | No datetime field type. |
 | test_explicitly_valued_enum_inputs_and_outputs | pass (partial) | Enum-constrained output parses "in_progress". Imp enums are string constraints; no Python Enum member identity. |
 | test_enum_inputs_and_outputs_with_shared_names_and_values | n/a | Python Enum name/value aliasing semantics. |
@@ -640,14 +649,14 @@ surface. Batch semantics are ported; pair-list shapes are blocked.
 | test_output_only | pass | `" -> output"` signature; empty-input call answers. |
 | test_load_state_chaining | n/a | Return-self fluent API. |
 | test_call_predict_with_chat_history | pass | Both parameterizations ported (chat markers; json with single-quoted json-repair response). 4 messages; history turns and final question land in the right turns. |
-| test_lm_usage | blocked | No `get_lm_usage` per-prediction usage aggregation surface (gap #6). |
-| test_lm_usage_with_parallel | blocked | Same. |
+| test_lm_usage | pass (was blocked) | Usage ledger landed (de-hzcv, gap #6): `:track_usage` + `Imp.Prediction.get_lm_usage/1`. |
+| test_lm_usage_with_parallel | pass (was blocked) | Parallel runs are separate BEAM processes, so each prediction carries only its own usage — the isolation upstream's race-condition fix pins. |
 | test_lm_usage_with_async | n/a | asyncio twin. |
 | test_positional_arguments | pass (adapted) | Bare-value call → loud `{:error, {:invalid_predict_inputs, _}}` (DSPy: ValueError with keyword-argument guidance; message shape differs). |
 | test_error_message_on_invalid_lm_setup | pass (partial) | No LM → `{:error, :lm_not_configured}`. A bogus LM value raises at construction (Imp validates in `new/2`; DSPy at call time). The BaseLM-instance message half has no Imp counterpart. |
 | test_field_constraints | blocked | ge/le/min_length are machine constraints only, never rendered into the system message (gap #4; tranche 1 seam). |
 | test_async_predict | n/a | asyncio twin. |
-| test_predicted_outputs_piped_from_predict_to_lm_call | blocked | No per-call LM kwargs / predicted-outputs pass-through surface (gap #9). |
+| test_predicted_outputs_piped_from_predict_to_lm_call | pass (was blocked) | Per-call config landed (de-hzcv, gap #9): `call/3` config reaches the LM request; a signature input named `prediction` does not. Imp's channel is the explicit `call/3` config (upstream shape-sniffs the kwarg). |
 | test_dump_state_pydantic_non_primitive_types | n/a | pydantic `serialize_object`. |
 | test_trace_size_limit | n/a | Design substitution: no global mutable `settings.trace`; Imp uses optimizer trace capture + telemetry. |
 | test_disable_trace | n/a | Same. |

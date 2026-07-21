@@ -36,7 +36,20 @@ defmodule Imp.LM.Static do
             "#{inspect(__MODULE__)}.generate/2 expects :handler to be a two-argument function, got: #{inspect(handler)}"
     end
 
-    {:ok, handler.(messages, opts)}
+    # Multi-completion (DSPy `n=`): like upstream's DummyLM, the handler is
+    # invoked once per requested completion so stateful handlers can script
+    # distinct answers. `n: 1` (the default) keeps the single-output shape.
+    case Keyword.get(opts, :n, 1) do
+      1 ->
+        {:ok, handler.(messages, opts)}
+
+      n when is_integer(n) and n > 1 ->
+        {:ok, Enum.map(1..n, fn _i -> handler.(messages, opts) end)}
+
+      other ->
+        raise ArgumentError,
+              "#{inspect(__MODULE__)}.generate/2 expects :n to be a positive integer, got: #{inspect(other)}"
+    end
   end
 
   defp default_handler(messages, _opts) do

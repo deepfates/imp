@@ -80,6 +80,48 @@ defmodule Imp.Predict.Predict do
   """
   @impl true
   def call(%__MODULE__{} = predict, inputs) when is_list(inputs) or is_map(inputs) do
+    if Map.get(Imp.Settings.get(), :track_usage, false) do
+      # DSPy `track_usage=True`: the call runs inside a usage tracker and the
+      # aggregate lands on the prediction (`Imp.Prediction.get_lm_usage/1`).
+      {result, usage} = Imp.Usage.track(fn -> do_call(predict, inputs) end)
+
+      case result do
+        {:ok, prediction} -> {:ok, Imp.Prediction.set_lm_usage(prediction, usage)}
+        error -> error
+      end
+    else
+      do_call(predict, inputs)
+    end
+  end
+
+  def call(%__MODULE__{}, inputs),
+    do:
+      {:error,
+       {:invalid_predict_inputs, "expected a map or field pair list, got: #{inspect(inputs)}"}}
+
+  @doc """
+  Calls the program with a per-call config override.
+
+  `config` is a keyword list merged over the program's stored config for this
+  invocation only — the program itself is not mutated. This is the Imp analog
+  of DSPy's call-time `config={...}` override (and of its predicted-outputs
+  `prediction=` pass-through): every merged entry flows to the LM request.
+
+      Imp.Predict.Predict.call(program, %{question: "..."},
+        temperature: 0.2,
+        prediction: %{type: "content", content: "..."}
+      )
+  """
+  def call(%__MODULE__{} = predict, inputs, config) do
+    unless Keyword.keyword?(config) do
+      raise ArgumentError,
+            "Imp.Predict.Predict.call/3 expects per-call config as a keyword list, got: #{inspect(config)}"
+    end
+
+    call(%{predict | config: Keyword.merge(predict.config, config)}, inputs)
+  end
+
+  defp do_call(%__MODULE__{} = predict, inputs) do
     with {:ok, lm} <- require_lm(resolve_lm(predict)),
          adapter <- resolve_adapter(predict),
          {:ok, inputs} <- normalize_inputs(inputs),
@@ -87,7 +129,9 @@ defmodule Imp.Predict.Predict do
          {:ok, messages} <-
            format_with_adapter(adapter, predict.signature, inputs, demos: predict.demos),
          {:ok, lm_opts} <- adapter_lm_opts(adapter, predict.signature, predict.config, lm),
+         {:ok, lm_opts} <- multi_completion_opts(lm_opts),
          {:ok, raw} <- Imp.LM.generate(lm, messages, provider_lm_opts(lm_opts)),
+         :ok <- validate_completion_shape(lm_opts, raw),
          {:ok, prediction, trace_messages, trace_raw, trace_lm_metadata} <-
            parse_with_retry(
              adapter,
@@ -104,11 +148,6 @@ defmodule Imp.Predict.Predict do
       {:ok, prediction}
     end
   end
-
-  def call(%__MODULE__{}, inputs),
-    do:
-      {:error,
-       {:invalid_predict_inputs, "expected a map or field pair list, got: #{inspect(inputs)}"}}
 
   @doc "Returns a copy of the program with demonstrations attached."
   def with_demos(%__MODULE__{} = predict, demos),
@@ -321,6 +360,75 @@ defmodule Imp.Predict.Predict do
 
   defp ensure_adapter_loaded(adapter), do: {:error, {:invalid_adapter, adapter}}
 
+  # DSPy `n=` multi-completion (Predict._forward_preprocess): with n > 1 and an
+  # unset or near-zero temperature, the samples would collapse; upstream bumps
+  # temperature to 0.7 and Imp matches. `:n` itself flows to the LM request.
+  defp multi_completion_opts(opts) do
+    case Keyword.get(opts, :n, 1) do
+      1 ->
+        {:ok, opts}
+
+      n when is_integer(n) and n > 1 ->
+        temperature = Keyword.get(opts, :temperature)
+
+        if is_nil(temperature) or temperature <= 0.15 do
+          {:ok, Keyword.put(opts, :temperature, 0.7)}
+        else
+          {:ok, opts}
+        end
+
+      other ->
+        {:error, {:invalid_multi_completion_count, other}}
+    end
+  end
+
+  # An LM asked for n > 1 completions must return a list of outputs. An LM
+  # that ignores :n and returns a single output would silently produce one
+  # completion for an n=K request — that is an error, never a quiet fallback.
+  defp validate_completion_shape(opts, raw) do
+    n = Keyword.get(opts, :n, 1)
+
+    if n > 1 and not is_list(raw) do
+      {:error,
+       {:multi_completion_not_returned, n,
+        "the LM returned a single output for an n=#{n} request; " <>
+          "multi-completion LMs must return a list with one output per completion"}}
+    else
+      :ok
+    end
+  end
+
+  # Multi-completion parse: the K completions parse independently; the first is
+  # the primary prediction and `completions` holds all K in order (DSPy
+  # `Prediction.from_completions` / `result.completions.field[i]`). A parse
+  # failure on ANY completion fails the whole call loudly with the failing
+  # index — matching upstream, where one bad completion raises for the call
+  # (after the chat->JSON fallback, which Imp also applies to the whole call).
+  defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos)
+       when is_list(raw) do
+    case parse_completions(adapter, signature, raw) do
+      {:ok, prediction} ->
+        {:ok, prediction, messages, raw, %{}}
+
+      {:error, _reason} = error ->
+        if chat_json_fallback?(adapter, opts) do
+          retry_completions_with_json_adapter(
+            error,
+            signature,
+            lm,
+            opts,
+            inputs,
+            demos,
+            messages,
+            raw
+          )
+        else
+          emit_parse_error(adapter, signature, error)
+          parse_error(error, messages, raw)
+        end
+    end
+  end
+
   defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos) do
     with {:ok, output, lm_metadata} <- Imp.LM.Result.split(raw) do
       case adapter.parse(signature, output, []) do
@@ -366,6 +474,68 @@ defmodule Imp.Predict.Predict do
     do: Keyword.get(opts, :json_fallback, true)
 
   defp chat_json_fallback?(_adapter, _opts), do: false
+
+  defp parse_completions(_adapter, _signature, []),
+    do: {:error, {:empty_completions, "the LM returned an empty completion list"}}
+
+  defp parse_completions(adapter, signature, raw_completions) do
+    raw_completions
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {raw, index}, {:ok, acc} ->
+      with {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
+           {:ok, prediction} <- adapter.parse(signature, output, []) do
+        {:cont, {:ok, [prediction | acc]}}
+      else
+        {:error, reason} -> {:halt, {:error, {:completion_parse_failed, index, reason}}}
+      end
+    end)
+    |> case do
+      {:ok, reversed} ->
+        [first | _rest] = predictions = Enum.reverse(reversed)
+        {:ok, %{first | completions: predictions}}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  # Multi-completion twin of retry_with_json_adapter/8: the whole call is
+  # retried through the JSON adapter (as upstream's ChatAdapter fallback
+  # retries the whole call), and the retry must again return one output per
+  # completion.
+  defp retry_completions_with_json_adapter(
+         error,
+         signature,
+         lm,
+         opts,
+         inputs,
+         demos,
+         original_messages,
+         original_raw
+       ) do
+    Imp.Telemetry.execute([:imp, :adapter, :parse, :json_fallback], %{count: 1}, %{
+      adapter: Imp.Adapter.Chat,
+      signature: Imp.Signature.to_spec(signature),
+      error: parse_error_message(error)
+    })
+
+    retry_messages = Imp.Adapter.JSON.format(signature, inputs, demos: demos)
+
+    retry_opts =
+      opts
+      |> Keyword.merge(
+        Imp.Adapter.JSON.lm_opts(signature, opts, Imp.LM.response_format_capability(lm))
+      )
+      |> Keyword.put(:json_fallback, false)
+
+    with {:ok, retry_raw} when is_list(retry_raw) <-
+           Imp.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
+         {:ok, prediction} <- parse_completions(Imp.Adapter.JSON, signature, retry_raw) do
+      {:ok, prediction, retry_messages, retry_raw, %{}}
+    else
+      _retry_failure -> parse_error(error, original_messages, original_raw)
+    end
+  end
 
   defp retry_with_json_adapter(
          error,
