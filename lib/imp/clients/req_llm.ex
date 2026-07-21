@@ -644,12 +644,12 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp cap_transport_timeouts(opts) do
-    case Imp.Optimizer.GEPA.Coordinator.current_deadline() do
+    case Imp.Deadline.current() do
       :infinity ->
         opts
 
       deadline ->
-        remaining = Imp.Optimizer.GEPA.Coordinator.remaining(deadline)
+        remaining = Imp.Deadline.remaining(deadline)
 
         # Cap :connect_options only when the caller supplied it — ReqLLM's
         # option schema rejects the key, so fabricating it here made every
