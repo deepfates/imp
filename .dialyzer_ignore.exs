@@ -24,6 +24,12 @@
   {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {169, 13}},
   # MapSet opacity on a campaign id set
   {"bench/imp/benchmark_truth/gepa_campaign.ex", :call_without_opaque, {1414, 50}},
+  # MapSet opacity on the stopword set (this one renders only under
+  # --format raw; the default formatter drops it, the count still sees it)
+  {"bench/imp/benchmark_truth/hover_bm25.ex", :call_without_opaque, {191, 36}},
+  # defensive clause: remaining_timeout/2 nil-deadline clause; after #80's
+  # deadline inversion fix callers always pass a deadline (or :infinity)
+  {"bench/imp/benchmark_truth/gepa_campaign.ex", :pattern_match, {1824, 8}},
   # defensive nil-deadline clause kept as a seam; Imp.Deadline.resolve/1's
   # spec (new in the shallow design pass) proves callers pass resolved
   # deadlines only
@@ -40,8 +46,6 @@
   {"bench/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 1926},
   # defensive guard success typing proves redundant
   {"bench/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 2034},
-  # MapSet opacity on the doc-id set
-  {"bench/imp/benchmark_truth/hover_bm25.ex", :call_without_opaque, {191, 36}},
   # defensive clause for non-covered task shapes
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {343, 16}},
   # defensive clause dialyzer pins to the module head (line 1)
@@ -160,15 +164,17 @@
   # MapSet opacity on run-id sets typed through MLflow JSON
   {"lib/imp/tracking/mlflow.ex", :call_without_opaque, {361, 8}},
   # MapSet opacity on gate-name sets typed through evidence JSON
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1211, 33}},
+  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1239, 33}},
   # MapSet opacity on gate-name sets typed through evidence JSON
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1711, 59}},
+  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1739, 59}},
   # MapSet opacity on gate-name sets typed through evidence JSON
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1715, 22}},
-  # defensive nil-fallback clause for optional dashboard sections
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :pattern_match, {2547, 8}},
-  # defensive nil-fallback clause for optional dashboard sections
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :pattern_match, {2552, 8}},
+  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1743, 22}},
+  # defensive clause: policy_candidate?/3 :age policy clause; callers pass
+  # a narrower policy set today
+  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :pattern_match, {2575, 8}},
+  # defensive clause: policy_candidate?/3 :immutable_admission clause, same
+  # narrowed policy set as 2575
+  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :pattern_match, {2580, 8}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"lib/mix/tasks/imp.benchmark.fast_slow.ex", :pattern_match, 1},
   # MapSet opacity on the hop-id set from analysis JSON

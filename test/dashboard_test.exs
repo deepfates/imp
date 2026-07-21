@@ -1,5 +1,10 @@
 defmodule DashboardTest do
-  use ExUnit.Case, async: false
+  # Async is safe here: every test writes only to its own unique tmp dir
+  # (tmp_dir/1 uses System.unique_integer), the dashboard task is invoked as a
+  # direct module call (no Mix.Task invocation-table state), output is captured
+  # per-process with capture_io, and no test mutates env vars, cwd, named
+  # processes, or shared repo paths.
+  use ExUnit.Case, async: true
 
   import ExUnit.CaptureIO
 
@@ -2454,9 +2459,20 @@ defmodule DashboardTest do
     path
   end
 
+  # Called many times per test to stamp fixtures; the HEAD sha cannot change
+  # mid-run, so shell out to git once per VM instead of ~30ms per call.
   defp dashboard_git_sha do
-    {sha, 0} = System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true)
-    String.trim(sha)
+    key = {__MODULE__, :git_sha}
+
+    try do
+      :persistent_term.get(key)
+    rescue
+      ArgumentError ->
+        {sha, 0} = System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true)
+        sha = String.trim(sha)
+        :persistent_term.put(key, sha)
+        sha
+    end
   end
 
   defp write_gate_evidence!(dir, gate, mix_task, opts \\ []) do
