@@ -60,10 +60,14 @@
   {"lib/imp/benchmark_truth/rlm_protocol.ex", :unused_fun, {133, 8}},
   # defensive guard success typing proves redundant
   {"lib/imp/benchmark_truth/runner.ex", :guard_fail, {651, 55}},
-  # defensive guard success typing proves redundant
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 818},
-  # defensive clause for non-covered provider payloads
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {846, 8}},
+  # defensive clause: ReqLLM.model/1 contracts to ok/error tuples only; the
+  # catch-all turns any unexpected registry result into a loud error (#75)
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {120, 7}},
+  # defensive `|| %{}` on provider_meta success typing proves already a map
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 888},
+  # defensive fallback: sanitize_usage/1 clause for usage that is neither
+  # nil nor a map; success typing says those are the only shapes today
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {916, 8}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1199, 8}},
   # defensive error clause on an always-ok internal call
@@ -76,8 +80,9 @@
   {"lib/imp/lm.ex", :pattern_match, {135, 8}},
   # defensive fallback paired with the 135 clause
   {"lib/imp/lm.ex", :pattern_match_cov, {136, 8}},
-  # defensive clause for non-covered MCP frames
-  {"lib/imp/mcp.ex", :pattern_match_cov, {1039, 8}},
+  # defensive fallback: fetch_optional/3 non-atom-key clause; callers pass
+  # atom keys only today
+  {"lib/imp/mcp.ex", :pattern_match_cov, {1051, 8}},
   # MapSet opacity: MapSet.equal? against a literal-typed expected set
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {501, 53}},
   # defensive error clause on an always-ok internal call
@@ -136,7 +141,7 @@
   # defensive clause for non-covered REPL outcomes
   {"lib/imp/predict/rlm.ex", :pattern_match, {1535, 8}},
   # MapSet opacity on the redaction key set
-  {"lib/imp/redaction.ex", :call_without_opaque, {482, 51}},
+  {"lib/imp/redaction.ex", :call_without_opaque, {483, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on
   # purpose so bad input crashes loudly
   {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {154, 9}},
