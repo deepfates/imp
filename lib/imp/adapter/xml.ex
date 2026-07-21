@@ -132,7 +132,8 @@ defmodule Imp.Adapter.XML do
     fields
     |> Enum.with_index(1)
     |> Enum.map_join("\n", fn {field, index} ->
-      "#{index}. `#{field.name}` (#{field_annotation_name(field)}): #{field_desc(field)}"
+      "#{index}. `#{field.name}` (#{field_annotation_name(field)}): #{field_desc(field)}" <>
+        Imp.Adapter.FieldConstraints.suffix(field)
     end)
     |> String.trim()
   end

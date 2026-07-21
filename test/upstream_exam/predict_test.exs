@@ -1108,6 +1108,75 @@ defmodule UpstreamExam.PredictTest do
       end
     end
 
+    # Upstream: test_field_constraints (parametrized chat/json) — field
+    # constraints reach the LM as text: DSPy renders pydantic
+    # gt/lt/ge/le/min_length/max_length/multiple_of into the system message's
+    # field descriptions as "Constraints: ..." lines
+    # (dspy/signatures/field.py PYDANTIC_CONSTRAINT_MAP +
+    # dspy/adapters/utils.py get_field_description_string). Regression for
+    # de-hzcv gap #4: pre-fix Imp kept constraints machine-only, so none of
+    # the phrases below appeared in the system message.
+    test "field constraints (chat adapter)" do
+      lm = capture_lm(fn _messages -> {:ok, %{score: "0.5", count: "2"}} end)
+
+      program = Imp.predict(constrained_signature(), lm: lm)
+      assert {:ok, _prediction} = Imp.call(program, %{text: "hello world", number: 5})
+
+      assert_received {:lm_call, messages, _opts}
+      assert_constraints_in_system_message(messages)
+    end
+
+    # Upstream: test_field_constraints (json adapter half) — the JSON adapter
+    # shares get_field_description_string, so the same constraint text lands
+    # in its system message; the LM answers with the single-quoted JSON the
+    # upstream SpyLM returns (json-repair path).
+    test "field constraints (json adapter)" do
+      lm = capture_lm(fn _messages -> {:ok, "{'score':'0.5', 'count':'2'}"} end)
+
+      program = Imp.predict(constrained_signature(), adapter: Imp.Adapter.JSON, lm: lm)
+      assert {:ok, _prediction} = Imp.call(program, %{text: "hello world", number: 5})
+
+      assert_received {:lm_call, messages, _opts}
+      assert_constraints_in_system_message(messages)
+    end
+
+    # Upstream ConstrainedSignature (tests/predict/test_predict.py::test_field_constraints).
+    defp constrained_signature do
+      Imp.Signature.new(
+        %{
+          inputs: [
+            text: [desc: "Input text", constraints: %{min_length: 5, max_length: 100}],
+            number: [
+              type: :integer,
+              desc: "A number between 0 and 10",
+              constraints: %{gt: 0, lt: 10}
+            ]
+          ],
+          outputs: [
+            score: [
+              type: :float,
+              desc: "Score between 0 and 1",
+              constraints: %{ge: 0.0, le: 1.0}
+            ],
+            count: [type: :integer, desc: "Even number count", constraints: %{multiple_of: 2}]
+          ]
+        },
+        "Test signature with constrained fields."
+      )
+    end
+
+    defp assert_constraints_in_system_message(messages) do
+      system_message = messages |> List.first() |> Map.fetch!(:content) |> to_string()
+
+      assert system_message =~ "minimum length: 5"
+      assert system_message =~ "maximum length: 100"
+      assert system_message =~ "greater than: 0"
+      assert system_message =~ "less than: 10"
+      assert system_message =~ "greater than or equal to: 0.0"
+      assert system_message =~ "less than or equal to: 1.0"
+      assert system_message =~ "a multiple of the given number: 2"
+    end
+
     # Upstream: test_explicitly_valued_enum_inputs_and_outputs — an
     # enum-constrained output parses the enum value. (Partial: Imp enums are
     # string-valued constraints, not Python Enum members.)

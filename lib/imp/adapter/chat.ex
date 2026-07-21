@@ -534,7 +534,8 @@ defmodule Imp.Adapter.Chat do
     fields
     |> Enum.with_index(1)
     |> Enum.map(fn {field, index} ->
-      "#{index}. `#{field.name}` (#{field_annotation(field)}): #{field_description(field)}"
+      "#{index}. `#{field.name}` (#{field_annotation(field)}): #{field_description(field)}" <>
+        Imp.Adapter.FieldConstraints.suffix(field)
     end)
     |> Enum.join("\n")
     |> String.trim()

@@ -23,11 +23,11 @@ and passes.
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **243** (adapters 149, signatures 94) |
-| Ported | **80** (81 ExUnit tests; one upstream test split in two) |
-| — pass | **80** |
+| Ported | **81** (82 ExUnit tests; one upstream test split in two) |
+| — pass | **81** |
 | — FAIL (real divergence found by upstream's own test) | **0** (14 found by the exam; all fixed) |
 | — unclear | 0 |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **78** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **77** |
 | Not applicable (Python/pydantic/litellm/asyncio specific, or deliberate Imp design substitution) | **85** |
 
 ### The 14 original FAILs, clustered by root cause — all fixed
@@ -348,7 +348,7 @@ n/a wholesale.
 | test_typed_signatures_from_dict | blocked | (type, Field) tuples with dict/tuple generics. |
 | test_typed_signatures_complex_combinations | blocked | Same. |
 | test_make_signature_from_string | blocked | dict/Union in string specs. |
-| test_signature_field_with_constraints | blocked | DSPy renders ge/le/min_length as a human-readable `constraints` description string; Imp keeps machine constraints (validated by Imp.Schema) with no description rendering. |
+| test_signature_field_with_constraints | pass (was blocked) | Fixed by de-hzcv gap #4: `Imp.Adapter.FieldConstraints.description/1` renders the machine constraints into DSPy's `json_schema_extra["constraints"]` string (PYDANTIC_CONSTRAINT_MAP phrases; `ge`/`le` are Imp's `:min`/`:max`). |
 | test_basic_custom_type | blocked | `custom_types=`/auto-resolution of user classes in string specs; no Imp custom-type system. |
 | test_custom_type_from_different_module | n/a | Resolving `Path` from Python module scope. |
 | test_pep604_union_type_inline | blocked | No union types. |
@@ -489,10 +489,10 @@ row.
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **198** (aggregation 6, best_of_n 3, chain_of_thought 4, code_act 5, knn 3, multi_chain_comparison 1, parallel 7, predict 66, program_of_thought 6, react 9, refine 3, retry 3, rlm 82) |
-| Ported | **82** (80 ExUnit tests; several one-port-covers-two rows) |
-| — pass | **82** |
+| Ported | **83** (82 ExUnit tests; several one-port-covers-two rows) |
+| — pass | **83** |
 | — FAIL (real divergence found by upstream's own test) | **0** |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **13** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **12** |
 | Not applicable (Python/pydantic/litellm/asyncio/Deno specific, or a documented Imp design substitution) | **103** |
 
 ### Gaps the classification surfaced (fix-wave candidates)
@@ -523,9 +523,16 @@ surface. Ranked by owner-steer relevance (API boundary first):
    of upstream's IS_TYPE_UNDEFINED skip; string element types nested in
    `array[...]` are checked strictly). 10 of the 16 rows flip to pass;
    dict/tuple/union generics and custom types stay honestly blocked per row.
-4. **Constraints are not rendered into prompts** (test_field_constraints):
-   ge/le/min_length never reach the LM as text. Same seam tranche 1 recorded
-   for test_signature_field_with_constraints.
+4. **FIXED (de-hzcv)** — constraints render into prompts
+   (test_field_constraints): `Imp.Adapter.FieldConstraints` renders the
+   machine constraints into DSPy's human-readable string
+   (dspy/signatures/field.py PYDANTIC_CONSTRAINT_MAP) and the chat, JSON,
+   and XML adapters append the upstream `\nConstraints: ...` suffix to the
+   field description line (dspy/adapters/utils.py
+   get_field_description_string). `ge`/`le` are the pydantic spellings of
+   Imp's inclusive `:min`/`:max`; `gt`/`lt`/`multiple_of` are now also
+   validated by Imp.Schema so nothing renders unvalidated. Same fix closes
+   tranche 1's test_signature_field_with_constraints.
 5. **FIXED (de-hzcv)** — BestOfN takes `fail_count`
    (test_refine_module_custom_fail_count, best_of_n variant): the failure
    budget flows through `Imp.Predict.Search`'s `:fail_budget` stop rule; one
@@ -684,7 +691,7 @@ surface. Batch semantics are ported; pair-list shapes are blocked.
 | test_lm_usage_with_async | n/a | asyncio twin. |
 | test_positional_arguments | pass (adapted) | Bare-value call → loud `{:error, {:invalid_predict_inputs, _}}` (DSPy: ValueError with keyword-argument guidance; message shape differs). |
 | test_error_message_on_invalid_lm_setup | pass (partial) | No LM → `{:error, :lm_not_configured}`. A bogus LM value raises at construction (Imp validates in `new/2`; DSPy at call time). The BaseLM-instance message half has no Imp counterpart. |
-| test_field_constraints | blocked | ge/le/min_length are machine constraints only, never rendered into the system message (gap #4; tranche 1 seam). |
+| test_field_constraints | pass (was blocked) | Fixed by de-hzcv gap #4: field descriptions carry the upstream `\nConstraints: ...` suffix in chat, JSON, and XML system messages. Both adapter halves ported. |
 | test_async_predict | n/a | asyncio twin. |
 | test_predicted_outputs_piped_from_predict_to_lm_call | pass (was blocked) | Per-call config landed (de-hzcv, gap #9): `call/3` config reaches the LM request; a signature input named `prediction` does not. Imp's channel is the explicit `call/3` config (upstream shape-sniffs the kwarg). |
 | test_dump_state_pydantic_non_primitive_types | n/a | pydantic `serialize_object`. |

@@ -230,6 +230,36 @@ defmodule UpstreamExam.SignaturesTest do
       assert hd(sig.outputs).type == :float
     end
 
+    # Upstream: tests/signatures/test_signature.py::test_signature_field_with_constraints
+    # — OutputField(min_length=5, max_length=10) / OutputField(ge=5, le=10)
+    # produce a human-readable json_schema_extra["constraints"] string
+    # (dspy/signatures/field.py PYDANTIC_CONSTRAINT_MAP). Imp's analog is
+    # Imp.Adapter.FieldConstraints.description/1, rendered from the machine
+    # constraints on the field. Regression for de-hzcv gap #4: pre-fix Imp had
+    # no constraints description surface at all.
+    test "signature field with constraints" do
+      signature =
+        Imp.Signature.new(%{
+          inputs: [:inputs],
+          outputs: [
+            outputs1: [constraints: %{min_length: 5, max_length: 10}],
+            outputs2: [type: :integer, constraints: %{ge: 5, le: 10}]
+          ]
+        })
+
+      assert [outputs1, outputs2] = signature.outputs
+      assert outputs1.name == :outputs1
+      assert outputs2.name == :outputs2
+
+      outputs1_constraints = Imp.Adapter.FieldConstraints.description(outputs1)
+      assert outputs1_constraints =~ "minimum length: 5"
+      assert outputs1_constraints =~ "maximum length: 10"
+
+      outputs2_constraints = Imp.Adapter.FieldConstraints.description(outputs2)
+      assert outputs2_constraints =~ "greater than or equal to: 5"
+      assert outputs2_constraints =~ "less than or equal to: 10"
+    end
+
     # Upstream: tests/signatures/test_signature.py::test_signature_cloudpickle_roundtrip
     # (cloudpickle -> Imp.Signature.dump/load, the Imp serialization surface)
     test "signature serialization roundtrip" do
