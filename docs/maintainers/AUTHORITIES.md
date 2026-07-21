@@ -75,8 +75,8 @@ open.
 | Tools, MCP, ReAct, CodeAct, and ProgramOfThought | algorithm | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | present | pinned | present |
 | Recursive Language Models | algorithm | 3.3.0b1 @ b2829b7ae3b6 | pinned | present | partial | partial |
 | Refinement, evaluation, and metrics | algorithm | 3.2.1 @ 29448ae12756 | pinned | present | not_applicable | present |
-| Few-shot, KNN, and random search optimizers | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | partial |
-| COPRO, InstructionSearch, InferRules, and SignatureOptimizer | optimizer | 3.2.1 @ 29448ae12756 | no_primary_authority | partial | protocol_defined | partial |
+| Few-shot, KNN, and random search optimizers | optimizer | 3.2.1 @ 29448ae12756 | pinned | present | protocol_defined | partial |
+| COPRO, InstructionSearch, InferRules, and SignatureOptimizer | optimizer | 3.2.1 @ 29448ae12756 | pinned | partial | protocol_defined | partial |
 | MIPROv2 | optimizer | 3.3.0b1 @ b2829b7ae3b6 | pinned | absent | partial | partial |
 | SIMBA | optimizer | 3.3.0b1 @ b2829b7ae3b6 | no_primary_authority | absent | protocol_defined | partial |
 | GEPA prompt and program optimization | optimizer | 0.1.4 @ 8b0ce6cd99a2 | pinned | partial | protocol_defined | partial |
