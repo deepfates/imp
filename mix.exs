@@ -52,6 +52,8 @@ defmodule Imp.MixProject do
     base_preferred_envs = [
       "production.check": :test,
       "fast.check": :test,
+      "heavy.check": :test,
+      "campaign.check": :test,
       "docs.check": :test,
       "parity.check": :test,
       "public_surface.check": :test,
@@ -71,6 +73,7 @@ defmodule Imp.MixProject do
       base_preferred_envs ++
         [
           "evidence.check": :test,
+          "benchmark.failure_campaign.check": :test,
           "benchmark.truth.check": :test,
           "benchmark.live.check": :test,
           "benchmark.dashboard": :test,
@@ -266,6 +269,26 @@ defmodule Imp.MixProject do
         "legacy_identity.check",
         "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package"
       ],
+      # Heavy gates without the unit suite (dee-9k5m). fast.check is the sole
+      # unit-suite gate in CI; production.check keeps the suite for local
+      # one-shot use, but the CI production lane runs these parts instead so
+      # the 110s suite is not paid twice per PR. In CI the parts run as three
+      # parallel jobs (campaign.check / package.check / docs.check); this
+      # alias is the serial local equivalent.
+      "heavy.check": [
+        "benchmark.failure_campaign.check",
+        "package.check",
+        "livebook.check",
+        "docs.clean",
+        "docs"
+      ],
+      # CI campaign lane (dee-9k5m): the failure campaign plus the
+      # prompt-template parity gate, which needs the tmp/dspy-parity-venv
+      # reference runtime the campaign CI job builds (or restores from cache).
+      "campaign.check": [
+        "benchmark.failure_campaign.check",
+        "parity.check"
+      ],
       # Docs-only path for path-filtered CI (dee-4g0z): render docs + validate
       # livebooks, without the package build / campaign / Python differentials.
       "docs.check": [
@@ -276,7 +299,7 @@ defmodule Imp.MixProject do
       # Prompt-template fidelity gate (dee-3e4v): run the golden-trace differential
       # test (Imp vs the pinned DSPy 3.2.1 venv) so a byte-parity regression FAILS
       # the build per-PR, not only on the weekly evidence-full lane. Requires the
-      # tmp/dspy-parity-venv the heavy CI job builds; runs after that setup.
+      # tmp/dspy-parity-venv the campaign CI job builds; runs after that setup.
       "parity.check": [
         "test --raise test/golden_trace_test.exs --include evidence_infrastructure"
       ],
