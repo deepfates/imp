@@ -2249,6 +2249,9 @@
           "validate_max_errors/1": [
             "validate_max_errors(value)"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/evaluate.ex",
@@ -2262,7 +2265,12 @@
         "metric",
         "timeout"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2292,18 +2300,38 @@
     {
       "callbacks": [],
       "category": "stable",
-      "functions": [],
+      "functions": [
+        "save_as_csv/2",
+        "save_as_json/2"
+      ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Evaluate.Result",
-      "signatures": {},
+      "signatures": {
+        "functions": {
+          "save_as_csv/2": [
+            "save_as_csv(result, path)"
+          ],
+          "save_as_json/2": [
+            "save_as_json(result, path)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/evaluate.ex",
       "struct_fields": [
         "errors",
         "rows",
         "score"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -4442,6 +4470,38 @@
         }
       },
       "source": "lib/imp/optimizer/trajectory.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "bootstrap_trace_data/4",
+        "create_minibatch/3",
+        "create_n_fewshot_demo_sets/5",
+        "eval_candidate_program/5"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.Utils",
+      "signatures": {
+        "functions": {
+          "bootstrap_trace_data/4": [
+            "bootstrap_trace_data(program, dataset, metric, opts \\\\ [])"
+          ],
+          "create_minibatch/3": [
+            "create_minibatch(trainset, batch_size, rng)"
+          ],
+          "create_n_fewshot_demo_sets/5": [
+            "create_n_fewshot_demo_sets(program, num_candidate_sets, trainset, metric, opts \\\\ [])"
+          ],
+          "eval_candidate_program/5": [
+            "eval_candidate_program(batch_size, trainset, candidate_program, evaluator, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/utils.ex",
       "struct_fields": [],
       "types": []
     },
