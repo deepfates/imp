@@ -50,6 +50,8 @@ defmodule Imp.MCP do
   defmodule HTTPRecovery do
     @moduledoc false
 
+    require Logger
+
     @transient_statuses [408, 429, 500, 502, 503, 504]
 
     def option_schema do
@@ -293,7 +295,17 @@ defmodule Imp.MCP do
       |> Req.Response.new()
       |> Req.Response.get_retry_after()
     rescue
-      _error -> nil
+      # Only parse failures are rescued (Req raises ArgumentError on a
+      # Retry-After value that is neither delta-seconds nor an HTTP date).
+      # Anything else propagates. The fallback to exponential backoff is
+      # kept, but never silently.
+      error in ArgumentError ->
+        Logger.warning(
+          "Imp.MCP: unparsable Retry-After header " <>
+            "(#{Exception.message(error)}); falling back to exponential backoff"
+        )
+
+        nil
     end
 
     defp backoff(base, cap, exponent), do: min(base * Integer.pow(2, exponent), cap)
