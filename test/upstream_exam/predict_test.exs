@@ -270,6 +270,35 @@ defmodule UpstreamExam.PredictTest do
       assert {:error, _reason} =
                Imp.call(best_of_n, %{question: "What is the capital of Belgium?"})
     end
+
+    # Upstream: test_refine_module_custom_fail_count (BestOfN variant) — with
+    # fail_count=1 the second failure aborts the run: the module is called
+    # exactly 2 times even though n=3.
+    test "best_of_n with custom fail count" do
+      lm = dummy_lm([%{answer: "Brussels"}])
+
+      {:ok, module_calls} = Agent.start_link(fn -> 0 end)
+
+      raise_on_first_two = fn module, inputs ->
+        calls = Agent.get_and_update(module_calls, &{&1 + 1, &1 + 1})
+
+        if calls <= 2 do
+          raise "Deliberately failing"
+        else
+          Imp.Predict.Predict.call(module.predictor, inputs)
+        end
+      end
+
+      program = DummyModule.new("question -> answer", raise_on_first_two, lm: lm)
+
+      best_of_n =
+        Imp.best_of_n(program, fn _, _ -> 1.0 end, n: 3, threshold: 0.0, fail_count: 1)
+
+      assert {:error, {:best_of_n_fail_count_exceeded, _reason}} =
+               Imp.call(best_of_n, %{question: "What is the capital of Belgium?"})
+
+      assert Agent.get(module_calls, & &1) == 2
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -1195,6 +1224,20 @@ defmodule UpstreamExam.PredictTest do
       end
     end
 
+    # Upstream: TestRLMInitialization::test_tool_validation_reserved_names —
+    # a tool named after a built-in sandbox function is rejected loudly at
+    # construction (upstream parametrizes llm_query/SUBMIT/print; Imp's
+    # intrinsics are llm_query/submit/print).
+    test "rlm tool validation reserved names" do
+      for name <- [:llm_query, :submit, :print] do
+        tool = Imp.tool(name, "shadowing tool", fn _args -> "result" end)
+
+        assert_raise ArgumentError, ~r/conflicts with a built-in/, fn ->
+          Imp.rlm("context -> answer", tools: [tool])
+        end
+      end
+    end
+
     # Upstream: TestRLMInitialization::test_optional_parameters — defaults.
     test "rlm optional parameters" do
       rlm = Imp.rlm("context -> answer")
@@ -1245,18 +1288,14 @@ defmodule UpstreamExam.PredictTest do
     end
 
     # Upstream: TestRLMWithDummyLM::test_with_input_variables_e2e — inputs are
-    # live variables inside the interpreter. (Adapted: Imp's constrained
-    # interpreter allowlist has no Enum.sum/reduce, so the sum is spelled with
-    # allowlisted Enum.at — the behavior under test, computing over an injected
-    # input variable, is unchanged. Gap recorded in the exam table.)
+    # live variables inside the interpreter, and the sum is spelled directly
+    # (Enum.sum is allowlisted; upstream's sandbox has Python's sum builtin).
     test "rlm with input variables e2e" do
       lm =
         dummy_lm([
           %{
             reasoning: "Sum the numbers in the list",
-            code:
-              "submit(%{total: Enum.at(numbers, 0) + Enum.at(numbers, 1) + " <>
-                "Enum.at(numbers, 2) + Enum.at(numbers, 3) + Enum.at(numbers, 4)})"
+            code: "submit(%{total: Enum.sum(numbers)})"
           }
         ])
 

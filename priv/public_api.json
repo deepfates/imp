@@ -5021,6 +5021,7 @@
       },
       "source": "lib/imp/predict/best_of_n.ex",
       "struct_fields": [
+        "fail_count",
         "feedback_fn",
         "metric",
         "n",

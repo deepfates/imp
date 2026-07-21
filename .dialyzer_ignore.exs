@@ -147,7 +147,7 @@
   # defensive fallback paired with the 129 clause
   {"lib/imp/predict/rag.ex", :pattern_match_cov, {135, 7}},
   # defensive clause for non-covered REPL outcomes
-  {"lib/imp/predict/rlm.ex", :pattern_match, {1535, 8}},
+  {"lib/imp/predict/rlm.ex", :pattern_match, {1554, 8}},
   # MapSet opacity on the redaction key set
   {"lib/imp/redaction.ex", :call_without_opaque, {483, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on

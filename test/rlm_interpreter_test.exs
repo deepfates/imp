@@ -3,6 +3,17 @@ defmodule Imp.Predict.RLM.InterpreterTest do
 
   alias Imp.Predict.RLM.Interpreter
 
+  test "Enum.sum and Enum.product are allowlisted aggregations" do
+    interpreter = Interpreter.new(%{numbers: [1, 2, 3, 4, 5]}, %{}, nil)
+
+    assert {:ok, 15, interpreter} = Interpreter.execute(interpreter, "Enum.sum(numbers)")
+    assert {:ok, 120, interpreter} = Interpreter.execute(interpreter, "Enum.product(numbers)")
+
+    # A lambda-taking Enum function stays out of the fn-less allowlist.
+    assert {:error, {:function_not_allowed, :Enum, :reduce, 3}, _next} =
+             Interpreter.execute(interpreter, "Enum.reduce(numbers, 0, fn x, acc -> x + acc end)")
+  end
+
   test "assignments persist across executions" do
     interpreter = Interpreter.new(%{seed: 2}, %{}, nil)
     assert {:ok, 5, interpreter} = Interpreter.execute(interpreter, "total = seed + 3")

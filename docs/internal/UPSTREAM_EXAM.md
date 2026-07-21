@@ -489,10 +489,10 @@ row.
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **198** (aggregation 6, best_of_n 3, chain_of_thought 4, code_act 5, knn 3, multi_chain_comparison 1, parallel 7, predict 66, program_of_thought 6, react 9, refine 3, retry 3, rlm 82) |
-| Ported | **68** (69 ExUnit tests) |
-| — pass | **68** |
+| Ported | **70** (71 ExUnit tests) |
+| — pass | **70** |
 | — FAIL (real divergence found by upstream's own test) | **0** |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **26** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **24** |
 | Not applicable (Python/pydantic/litellm/asyncio/Deno specific, or a documented Imp design substitution) | **104** |
 
 ### Gaps the classification surfaced (fix-wave candidates)
@@ -516,16 +516,21 @@ surface. Ranked by owner-steer relevance (API boundary first):
 4. **Constraints are not rendered into prompts** (test_field_constraints):
    ge/le/min_length never reach the LM as text. Same seam tranche 1 recorded
    for test_signature_field_with_constraints.
-5. **No `fail_count` on BestOfN** (test_refine_module_custom_fail_count,
-   best_of_n variant): Refine has the failure budget; BestOfN runs all N.
+5. **FIXED (de-hzcv)** — BestOfN takes `fail_count`
+   (test_refine_module_custom_fail_count, best_of_n variant): the failure
+   budget flows through `Imp.Predict.Search`'s `:fail_budget` stop rule; one
+   more failure than the budget aborts the run with
+   `{:error, {:best_of_n_fail_count_exceeded, reason}}` (defaults to `n`,
+   matching upstream's `fail_count or N`).
 6. **FIXED (de-hzcv)** — per-prediction usage ledger (test_lm_usage*):
    with the `:track_usage` setting on, `Imp.Predict.Predict.call` runs in an
    `Imp.Usage` tracker and `Imp.Prediction.get_lm_usage/1` returns the
    per-model merged usage, as upstream's `Prediction.get_lm_usage()` does.
-7. **RLM has no reserved-tool-name guard**
-   (test_tool_validation_reserved_names): upstream rejects tools named
-   `llm_query`/`SUBMIT`/`print`; Imp accepts a tool named `llm_query` with
-   unspecified shadowing behavior.
+7. **FIXED (de-hzcv)** — RLM rejects reserved tool names
+   (test_tool_validation_reserved_names): `Imp.Predict.RLM.new/2` raises
+   ArgumentError for a tool named after any interpreter builtin (llm_query,
+   llm_query_batched, rlm_query, rlm_query_batched, recurse, load, print,
+   submit, show_vars, SHOW_VARS), as upstream's `_RESERVED_TOOL_NAMES` does.
 8. **No input-field default values** (test_input_field_default_value).
 9. **FIXED (de-hzcv)** — per-call LM kwargs pass-through
    (test_predicted_outputs_piped_from_predict_to_lm_call):
@@ -533,8 +538,12 @@ surface. Ranked by owner-steer relevance (API boundary first):
    over the program config for that invocation only (the program is not
    mutated); every entry — including a predicted-outputs `prediction`
    payload — reaches the LM request. Signature inputs never do.
-10. **RLM interpreter allowlist has no sum/reduce** (noted while porting
-    test_with_input_variables_e2e; the port spells the sum with `Enum.at`).
+10. **FIXED (de-hzcv)** — `Enum.sum/1` and `Enum.product/1` are allowlisted
+    (noted while porting test_with_input_variables_e2e; the port now spells
+    `Enum.sum(numbers)` directly). `Enum.reduce` stays out: the constrained
+    interpreter has no anonymous functions, so a lambda-taking reduce is not
+    expressible; sum/product are the function-free aggregations upstream's
+    Python `sum()` maps to.
 11. **No datetime field type** (test_datetime_inputs_and_outputs).
 
 ### Tranche 1's 78-blocked bucket, re-scrutinized (ticket ask)
@@ -567,7 +576,7 @@ substitution; all ports assert the winning value).
 |---|---|---|
 | test_refine_forward_success_first_attempt | pass | DummyModule port (test struct implementing `Imp.Module`); reward never hits threshold → module runs exactly N=3 times; tie-first keeps "Brussels". |
 | test_refine_module_default_fail_count | pass | Always-raising module → loud `{:error, {:no_successful_predictions, _}}` (DSPy: ValueError). |
-| test_refine_module_custom_fail_count | blocked | `Imp.Predict.BestOfN` has no `fail_count` option (Refine has one); the run-aborts-after-budget behavior is not expressible. |
+| test_refine_module_custom_fail_count | pass (was blocked) | Fixed by de-hzcv gap #5: `fail_count: 1` → the second failure aborts (`{:error, {:best_of_n_fail_count_exceeded, _}}`); module called exactly 2 times. |
 
 ## tests/predict/test_chain_of_thought.py (4)
 
@@ -772,7 +781,7 @@ ported.
 | test_custom_signature | pass | |
 | test_custom_tools | pass | One user tool registered; internal llm_query tools not counted. |
 | test_tool_validation_invalid_identifier | n/a | Python-identifier validity for names injected into a Python sandbox; Imp tool names are atoms, not injected identifiers. |
-| test_tool_validation_reserved_names | blocked | Imp has no reserved-name guard: a tool named `llm_query` is accepted with unspecified shadowing behavior (gap #7 — fix-wave candidate). |
+| test_tool_validation_reserved_names | pass (was blocked) | Fixed by de-hzcv gap #7: tools named after interpreter builtins (llm_query/submit/print and the rest of the reserved set) raise ArgumentError at construction. |
 | test_tool_validation_not_callable | pass | Non-tool entries ("not a function", 123) raise ArgumentError at construction. |
 | test_tools_dict_rejected | n/a | dict-vs-list tools API affordance; Imp's contract is a list of Imp.Tool structs (anything else is rejected by the same boundary as the previous row). |
 | test_optional_parameters | pass (partial) | Defaults: max_llm_calls 50, sub_lm nil. The `interpreter=` injection half is n/a (no pluggable interpreter object). |
@@ -815,7 +824,7 @@ ported.
 | test_multi_output_type_coercion | n/a | Kwargs convention; coercion itself ported in TestRLMTypeCoercionMock row. |
 | test_simple_computation_e2e | pass | Controller computes and submits; typed int 5 returns. |
 | test_multi_turn_computation_e2e | pass | Interpreter state (`x = 10`) persists to the next turn; answer 20. |
-| test_with_input_variables_e2e | pass (adapted) | Inputs are live interpreter variables. Adapted spelling: the allowlist has no Enum.sum/reduce (gap #10), so the sum uses Enum.at chains. |
+| test_with_input_variables_e2e | pass | Inputs are live interpreter variables; the sum is spelled `Enum.sum(numbers)` (gap #10 fixed by de-hzcv: sum/product allowlisted). |
 | test_with_tool_e2e | pass | Registered host-side tool callable from generated code; "apple" → "red". |
 | test_aforward_simple_computation_e2e | n/a | asyncio twin. |
 | test_aforward_multi_turn_e2e | n/a | asyncio twin. |

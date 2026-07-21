@@ -4,7 +4,7 @@ defmodule Imp.Predict.BestOfN do
   alias Imp.Predict.{Attempt, Search}
   alias Imp.Predict.Search.Candidate
 
-  defstruct [:program, :metric, :feedback_fn, n: 3, threshold: 1.0]
+  defstruct [:program, :metric, :feedback_fn, :fail_count, n: 3, threshold: 1.0]
 
   @option_schema [
     n: [type: :non_neg_integer, default: 3],
@@ -12,6 +12,7 @@ defmodule Imp.Predict.BestOfN do
       type: {:custom, __MODULE__, :validate_feedback_fn, []},
       default: nil
     ],
+    fail_count: [type: {:or, [:non_neg_integer, nil]}, default: nil],
     threshold: [type: {:or, [:integer, :float, nil]}, default: 1.0]
   ]
 
@@ -24,6 +25,7 @@ defmodule Imp.Predict.BestOfN do
       metric: metric,
       n: opts[:n],
       feedback_fn: opts[:feedback_fn],
+      fail_count: opts[:fail_count],
       threshold: opts[:threshold]
     }
   end
@@ -56,9 +58,16 @@ defmodule Imp.Predict.BestOfN do
       end,
       mode: :sequential,
       threshold: best.threshold,
+      # DSPy best_of_n.py: `fail_count = fail_count or N` — one more failure
+      # than the budget aborts the whole run, even when a best exists.
+      fail_budget: best.fail_count || best.n,
       tie_policy: :first
     )
     |> case do
+      %{stop_reason: {:fail_budget_exceeded, _id}, outcomes: outcomes} ->
+        last_error = outcomes |> Enum.reverse() |> Enum.find_value(&Map.get(&1, :error))
+        {:error, {:best_of_n_fail_count_exceeded, last_error}}
+
       %{best: nil, outcomes: outcomes} ->
         errors = Enum.map(outcomes, &%{attempt: &1.candidate_id, error: &1.error})
         {:error, no_successful_predictions_error(rollout_ids, errors)}
