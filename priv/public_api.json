@@ -5324,6 +5324,9 @@
           "new/3": [
             "new(signature, tools, opts \\\\ [])"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/predict/react.ex",
@@ -5335,7 +5338,12 @@
         "tool_policy",
         "tools"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -5351,6 +5359,9 @@
           "new/3": [
             "new(signature, tools, opts \\\\ [])"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/predict/react_v2.ex",
@@ -5361,7 +5372,12 @@
         "tool_policy",
         "tools"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],

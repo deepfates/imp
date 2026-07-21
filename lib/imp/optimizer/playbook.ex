@@ -695,7 +695,7 @@ defmodule Imp.Optimizer.Playbook do
 
     actual = Map.keys(reservations) |> Enum.map(&normalize_stage!/1) |> MapSet.new()
 
-    if actual == MapSet.new(@stages),
+    if MapSet.equal?(actual, MapSet.new(@stages)),
       do: normalized,
       else: raise(ArgumentError, "reservations must contain exactly #{inspect(@stages)}")
   end

@@ -892,7 +892,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
     do: raise(ArgumentError, "evaluation evidence is missing for #{domain}")
 
   defp validate_evaluation_evidence_row!(row, domain, isolation, sequence) when is_map(row) do
-    unless MapSet.new(Map.keys(row)) == MapSet.new(~w(sequence candidate observed)) and
+    unless MapSet.equal?(MapSet.new(Map.keys(row)), MapSet.new(~w(sequence candidate observed))) and
              row["sequence"] == sequence and is_binary(row["candidate"]) and
              row["candidate"] != "" do
       raise ArgumentError, "invalid evaluator evidence row #{sequence} for #{domain}"
@@ -906,7 +906,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
     do: raise(ArgumentError, "invalid evaluator evidence row #{sequence} for #{domain}")
 
   defp validate_verification_evidence!(row, domain, isolation) when is_map(row) do
-    unless MapSet.new(Map.keys(row)) == MapSet.new(~w(sequence candidate observed)) and
+    unless MapSet.equal?(MapSet.new(Map.keys(row)), MapSet.new(~w(sequence candidate observed))) and
              is_integer(row["sequence"]) and row["sequence"] > 0 and
              is_binary(row["candidate"]) and row["candidate"] != "" do
       raise ArgumentError, "invalid independent verification evidence for #{domain}"

@@ -187,7 +187,7 @@ defmodule Imp.Optimizer.GEPA.EvaluationCache.Disk do
   defp validate_payload(_payload, _checksum), do: {:error, :invalid}
 
   defp exact_keys(map, keys) do
-    if MapSet.new(Map.keys(map)) == keys, do: :ok, else: {:error, :invalid}
+    if MapSet.equal?(MapSet.new(Map.keys(map)), keys), do: :ok, else: {:error, :invalid}
   end
 
   defp restore_entry(payload) do

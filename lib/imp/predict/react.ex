@@ -79,6 +79,8 @@ defmodule Imp.Predict.ReAct do
     mode: :provider_native
   ]
 
+  @type t :: %__MODULE__{}
+
   @option_schema [
     lm: [type: {:custom, Imp.LM, :validate_lm, []}],
     adapter: [type: {:custom, Imp.Adapter, :validate_adapter, []}],
