@@ -891,10 +891,10 @@ internals). Design substitutions that recur in the rows:
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **123** (teleprompt 65, evaluate 21, streaming 37) |
-| Ported | **69** (68 ExUnit tests; some ports cover two same-surface upstream fns, some upstream fns split across two ports) |
-| — pass | **68** |
+| Ported | **75** (76 ExUnit tests; some ports cover two same-surface upstream fns, some upstream fns split across two ports) |
+| — pass | **74** |
 | — FAIL (real divergence found by upstream's own test) | **1** (chat stream listener trailing-whitespace trim; tagged `@tag :upstream_fail` + `:skip`, failing output preserved in the test comment) |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **26** (11 flipped by the dee-r67q GEPA selector/proposer batch: 9 to pass, 2 to n/a) |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **20** (17 flipped by the two dee-r67q batches: GEPA selector/proposer 9 to pass + 2 to n/a; utility surface 6 to pass — save_as_json/csv, eval_candidate_program x3, bootstrap_trace_data) |
 | Not applicable (Python/pydantic/litellm/asyncio specific, or a documented Imp design substitution) | **28** |
 
 ### The FAIL
@@ -926,11 +926,10 @@ specific to split markers. JSON and XML extraction are content-exact
 3. **Terminal chunk carries `chunk: nil`, not `""`** (streaming): upstream's
    "empty last chunk" is an empty string; Imp's is nil. Cosmetic but it
    forces `chunk || ""` on every consumer that joins chunks.
-4. **No list-of-acceptable-answers exact-match helper**
-   (test_answer_exact_match_list): upstream's `answer_exact_match` accepts
-   `str | list`; `Imp.Metrics.exact_match/1` compares one value. The port
-   spells the list semantics inline per Imp's metrics-are-functions doctrine;
-   a built-in would close the gap.
+4. **No list-of-acceptable-answers exact-match helper** — CLOSED
+   (dee-r67q batch): `Imp.Metrics.exact_match/1` now accepts a list example
+   answer and passes on any member after `normalize_text`, matching
+   upstream's `answer_exact_match` str-or-list contract.
 5. **Bootstrap max_errors raises a budget error, not the underlying
    exception** (test_error_handling_during_bootstrap): DSPy re-raises
    "Simulated error"; Imp raises "bootstrap error budget exhausted: 1 errors
@@ -950,12 +949,14 @@ specific to split markers. JSON and XML extraction are content-exact
    are validated loudly (non-empty, known components, no duplicates).
    Multimodal (dspy.Image) reflection remains out of scope — no image
    example type in Imp.
-8. **No public minibatch-eval / n-fewshot-candidates utility surface**
-   (test_utils.py): `eval_candidate_program` and
-   `create_n_fewshot_demo_sets` equivalents are internal
-   (`Imp.Optimizer.DemoCandidates`, MIPROv2 internals). Upstream's
-   metric_threshold regression (#9308) does not apply: DemoCandidates applies
-   the threshold uniformly to every round, seed schedule included.
+8. **No public minibatch-eval / n-fewshot-candidates utility surface** —
+   CLOSED (dee-r67q batch): `Imp.Optimizer.Utils` exposes
+   `eval_candidate_program/5`, `create_minibatch/3`,
+   `create_n_fewshot_demo_sets/5`, and `bootstrap_trace_data/4` as thin
+   wrappers over `Imp.Evaluate`, `Imp.Optimizer.DemoCandidates`, and
+   `Imp.Optimizer.TrajectoryRunner`. Upstream's metric_threshold regression
+   (#9308) still does not apply: DemoCandidates applies the threshold
+   uniformly to every round, seed schedule included.
 
 ## tests/teleprompt/test_teleprompt.py (1)
 
@@ -1009,9 +1010,9 @@ specific to split markers. JSON and XML extraction are content-exact
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_eval_candidate_program_full_trainset | blocked | No public `eval_candidate_program`; minibatch-vs-full evaluation lives inside MIPROv2/optimizer internals with no callback_metadata surface. |
-| test_eval_candidate_program_minibatch | blocked | Same. |
-| test_eval_candidate_program_failure | blocked | Same (the failure→score-0 contract is internal). |
+| test_eval_candidate_program_full_trainset | pass (adapted) | `Imp.Optimizer.Utils.eval_candidate_program/5` (thin wrapper over `Imp.Evaluate`). Upstream asserts a mock evaluate saw the whole trainset plus `callback_metadata={"metric_key": "eval_full"}`; Imp has no callback system (telemetry substitution), so the port asserts the real evaluation produced one row per trainset example. |
+| test_eval_candidate_program_minibatch | pass (adapted) | Same surface; a seeded `create_minibatch/3` draw of `batch_size` rows. |
+| test_eval_candidate_program_failure | pass (adapted) | An evaluation that raises returns score 0.0 (upstream's contract) — but loudly: the error is logged and recorded in `Result.errors`, never a bare silent zero. |
 | test_create_n_fewshot_demo_sets_passes_metric_threshold_for_unshuffled | n/a | Regression for upstream #9308 (threshold dropped on the seed=-1 arm). Imp's `Imp.Optimizer.DemoCandidates.build/4` applies `:metric_threshold` uniformly to every round by construction; the buggy code shape does not exist. |
 
 ## tests/teleprompt/test_bootstrap_finetune.py (3)
@@ -1026,7 +1027,7 @@ specific to split markers. JSON and XML extraction are content-exact
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_bootstrap_trace_data | blocked | `bootstrap_trace_data`'s row shape (`example/prediction/trace/example_ind/score` + FailedPrediction with format_reward) has no public Imp equivalent; trajectory capture is internal (`Imp.Optimizer.TrajectoryRunner`) with its own contract tests. If GRPO-style failed-parse rewards ever land, this is the contract to port. |
+| test_bootstrap_trace_data | pass (adapted) | `Imp.Optimizer.Utils.bootstrap_trace_data/4` (thin wrapper over `Imp.Optimizer.TrajectoryRunner`) returns upstream's row shape: `example/prediction/trace/example_ind/score`, dataset order, traces of `(predictor, inputs, outputs)`. Seam: no `FailedPrediction` type — a failed example keeps its row with `prediction: nil`, `score: 0.0`, and the failure under `:error`; `raise_on_error: true` (upstream's default) raises loudly instead. The failed-parse `completion_text`/`format_reward` surface still does not exist; if GRPO-style failed-parse rewards land, that half is the remaining contract to port. |
 | test_bootstrap_trace_data_passes_callback_metadata | n/a | Monkeypatched Evaluate + callback_metadata plumbing; Imp has no BaseCallback system (telemetry is the substitution). |
 
 ## tests/teleprompt/test_grpo.py (3)
@@ -1090,14 +1091,16 @@ specific to split markers. JSON and XML extraction are content-exact
 ## tests/evaluate/test_metrics.py (3)
 
 Upstream's `answer_exact_match` helper is ported inline as a plain metric
-function per Imp's metrics-are-functions doctrine (gap #4: no built-in
-list-of-answers exact match).
+function per Imp's metrics-are-functions doctrine. Gap #4 is closed:
+`Imp.Metrics.exact_match/1` now carries the str-or-list semantics itself
+(any-member match on a list answer), and the three tests run again against
+the built-in.
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_answer_exact_match_string | pass | |
-| test_answer_exact_match_list | pass (adapted) | Any-member match; the list semantics live in the ported metric fn, not an Imp built-in. |
-| test_answer_exact_match_no_match | pass | |
+| test_answer_exact_match_string | pass | Also passes against the built-in `Imp.Metrics.exact_match/1`. |
+| test_answer_exact_match_list | pass | `Imp.Metrics.exact_match/1` accepts a list of acceptable answers (any-member match after `normalize_text`), closing gap #4; the inline ported fn remains as the literal port. |
+| test_answer_exact_match_no_match | pass | Also passes against the built-in. |
 
 ## tests/evaluate/test_evaluate.py (12)
 
@@ -1113,8 +1116,8 @@ list-of-answers exact match).
 | test_evaluate_display_table | n/a | IPython/pandas display plumbing. |
 | test_evaluate_callback | n/a | BaseCallback on_evaluate_start/end; Imp's substitution is telemetry events (observability suite). |
 | test_evaluation_result_repr | n/a | Python `__repr__` format. |
-| test_evaluate_save_as_json_with_history | blocked | No `save_as_json`/`save_as_csv` options on Imp.Evaluate (and dspy.History-in-example serialization). Result rows are plain data callers can dump, but the built-in file surface is absent. |
-| test_evaluate_save_as_csv_with_history | blocked | Same. |
+| test_evaluate_save_as_json_with_history | pass (adapted) | `Imp.Evaluate.Result.save_as_json/2`. Seam: upstream passes `save_as_json=` to the Evaluate constructor; Imp's file surface lives on the result (rows are plain data). Row semantics are upstream's `_prepare_results_output` (example+prediction merge with `example_`/`pred_` collision prefixes; `Imp.History` serializes as `{"messages": [...]}`); the metric-name column is always `score` (Imp metrics are anonymous functions). |
+| test_evaluate_save_as_csv_with_history | pass (adapted) | `Imp.Evaluate.Result.save_as_csv/2`, same rows. Header is the sorted union of row keys with `score` last (upstream takes the first row's keys and fails on ragged rows); non-scalar cells are JSON-encoded; an empty result raises instead of writing a headerless file. |
 
 ## tests/evaluate/test_auto_evaluation.py (6)
 

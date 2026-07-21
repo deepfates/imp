@@ -1241,4 +1241,159 @@ defmodule UpstreamExam.TelepromptTest do
       assert Imp.ProgramAccess.get_metadata(result, :marker) == "optimized"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # tests/teleprompt/test_utils.py
+  # ---------------------------------------------------------------------------
+
+  # A program whose call raises, standing in for upstream's
+  # Mock(side_effect=ValueError) evaluate.
+  defmodule RaisingProgram do
+    defstruct []
+    def optimizer_predictors(_program), do: []
+    def call(_program, _inputs), do: raise(ArgumentError, "Error")
+  end
+
+  defp utils_trainset do
+    for n <- 1..5 do
+      Imp.example(input: "q#{n}", output: "a#{n}") |> Imp.with_inputs(:input)
+    end
+  end
+
+  defp echo_program do
+    Imp.predict("input -> output",
+      lm:
+        static_lm(fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
+          [_, n] = Regex.run(~r/q(\d+)/, prompt)
+          %{output: "a#{n}"}
+        end)
+    )
+  end
+
+  # test_eval_candidate_program_full_trainset
+  test "utils: eval_candidate_program evaluates the full trainset when batch_size covers it" do
+    trainset = utils_trainset()
+    evaluator = Imp.Evaluate.new(trainset, simple_metric())
+
+    result =
+      Imp.Optimizer.Utils.eval_candidate_program(10, trainset, echo_program(), evaluator)
+
+    # Upstream asserts the evaluate mock saw the whole trainset; Imp asserts
+    # the real evaluation produced one row per trainset example.
+    assert length(result.rows) == length(trainset)
+    assert result.score == 1.0
+  end
+
+  # test_eval_candidate_program_minibatch
+  test "utils: eval_candidate_program draws a minibatch when batch_size is smaller" do
+    trainset = utils_trainset()
+    evaluator = Imp.Evaluate.new(trainset, simple_metric())
+
+    result =
+      Imp.Optimizer.Utils.eval_candidate_program(3, trainset, echo_program(), evaluator)
+
+    assert length(result.rows) == 3
+    assert result.score == 1.0
+  end
+
+  # test_eval_candidate_program_failure
+  test "utils: eval_candidate_program returns score 0.0 when evaluation raises" do
+    trainset = utils_trainset()
+    # A raising program plus max_errors: 1 makes Imp.Evaluate.run raise
+    # (EvaluationCancelledError), standing in for upstream's
+    # Mock(side_effect=ValueError) evaluate.
+    evaluator = Imp.Evaluate.new(trainset, simple_metric(), max_errors: 1)
+
+    {result, log} =
+      ExUnit.CaptureLog.with_log(fn ->
+        Imp.Optimizer.Utils.eval_candidate_program(3, trainset, %RaisingProgram{}, evaluator)
+      end)
+
+    assert result.score == 0.0
+    # Deviation from upstream noted in the exam row: the failure is loud
+    # (logged and recorded in :errors), never a silent zero.
+    assert log =~ "eval_candidate_program"
+    assert [%{stage: :eval_candidate_program}] = result.errors
+  end
+
+  # ---------------------------------------------------------------------------
+  # tests/teleprompt/test_bootstrap_trace.py
+  # ---------------------------------------------------------------------------
+
+  # test_bootstrap_trace_data
+  test "utils: bootstrap_trace_data returns upstream-shaped rows with failures kept" do
+    # 5 examples; the LM answers q1..q4 correctly and RAISES on q5, standing
+    # in for upstream's malformed-JSON AdapterParseError on one call.
+    program =
+      Imp.predict("input -> output",
+        lm:
+          static_lm(fn messages, _opts ->
+            prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
+
+            if prompt =~ "q5" do
+              raise "This is an invalid JSON!"
+            else
+              [_, n] = Regex.run(~r/q(\d+)/, prompt)
+              %{output: "a#{n}"}
+            end
+          end)
+      )
+
+    rows =
+      Imp.Optimizer.Utils.bootstrap_trace_data(
+        program,
+        utils_trainset(),
+        simple_metric(),
+        raise_on_error: false
+      )
+
+    assert length(rows) == 5
+
+    for {row, index} <- Enum.with_index(rows) do
+      assert Map.has_key?(row, :example)
+      assert Map.has_key?(row, :prediction)
+      assert Map.has_key?(row, :trace)
+      assert Map.has_key?(row, :score)
+      assert row.example_ind == index
+    end
+
+    {failed, successful} = Enum.split_with(rows, &(&1.error != nil))
+
+    # Upstream: 4 successful predictions, 1 FailedPrediction. Imp keeps the
+    # failed row with prediction: nil, score 0.0, and the error recorded
+    # (no FailedPrediction/format_reward surface; seam in the exam row).
+    assert length(successful) == 4
+    assert [failure] = failed
+    assert failure.prediction == nil
+    assert failure.score == 0.0
+
+    for row <- successful do
+      assert Imp.Prediction.get(row.prediction, :output) =~ ~r/^a\d$/
+      assert row.score == 1.0
+      # Upstream: each trace entry is (predictor, inputs, prediction).
+      assert row.trace != []
+
+      for entry <- row.trace do
+        assert %{predictor: _, inputs: _, outputs: _} = entry
+      end
+    end
+  end
+
+  # test_bootstrap_trace_data (raise_on_error default): upstream raises on
+  # the underlying error when raise_on_error=True.
+  test "utils: bootstrap_trace_data raises loudly on failure by default" do
+    program =
+      Imp.predict("input -> output",
+        lm: static_lm(fn _messages, _opts -> raise "boom" end)
+      )
+
+    assert_raise RuntimeError, ~r/bootstrap_trace_data failed on example 0/, fn ->
+      Imp.Optimizer.Utils.bootstrap_trace_data(
+        program,
+        Enum.take(utils_trainset(), 1),
+        simple_metric()
+      )
+    end
+  end
 end

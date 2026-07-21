@@ -164,6 +164,7 @@
         "Imp.Optimizer.TrainingResult",
         "Imp.Optimizer.Trajectory",
         "Imp.Optimizer.TrajectoryRunner",
+        "Imp.Optimizer.Utils",
         "Imp.Playbook",
         "Imp.Playbook.Delta",
         "Imp.Playbook.Entry",

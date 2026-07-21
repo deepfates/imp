@@ -5,9 +5,154 @@ defmodule Imp.Evaluate.Result do
   Rows keep the original example, prediction, normalized metric score,
   pass/fail state, feedback, metric metadata, and any program error. Optimizers
   use the same structure that you can inspect in tests and notebooks.
+
+  `save_as_json/2` and `save_as_csv/2` port DSPy's `save_as_json`/`save_as_csv`
+  evaluator options (dspy/evaluate/evaluate.py). Deviation from upstream: the
+  file surface lives here on the result — the rows are already plain data — not
+  as evaluator constructor options. Row semantics match upstream's
+  `_prepare_results_output`: example fields merged with prediction fields (a
+  key present on both sides becomes `example_<key>` and `pred_<key>`), plus a
+  `score` column (upstream names this column after the metric function; Imp
+  metrics are anonymous functions, so the column is always `score`). An
+  `Imp.History` value serializes as `%{"messages" => [...]}`, matching
+  upstream's History-in-example serialization.
   """
 
   defstruct [:score, rows: [], errors: []]
+
+  @type t :: %__MODULE__{score: number() | nil, rows: [map()], errors: [map()]}
+
+  @doc """
+  Writes the per-example rows to `path` as a JSON array of flat objects.
+
+  Mirrors DSPy `Evaluate(save_as_json=...)`: one object per devset row with
+  the example fields, the prediction fields, and the score.
+  """
+  def save_as_json(%__MODULE__{} = result, path) when is_binary(path) do
+    rows = output_rows(result)
+    File.write!(path, Jason.encode!(rows))
+    :ok
+  end
+
+  @doc """
+  Writes the per-example rows to `path` as CSV.
+
+  Mirrors DSPy `Evaluate(save_as_csv=...)`. The header is the union of row
+  keys (sorted, `score` last; upstream takes the first row's keys and fails
+  on ragged rows — the union keeps every column and is deterministic).
+  Non-scalar cells are JSON-encoded, mirroring upstream's stringified dicts.
+  Saving an empty result raises: an empty file with no header would be a
+  silent failure.
+  """
+  def save_as_csv(%__MODULE__{rows: []}, _path) do
+    raise ArgumentError,
+          "Imp.Evaluate.Result.save_as_csv/2 has no rows to save; " <>
+            "refusing to write a headerless empty CSV"
+  end
+
+  def save_as_csv(%__MODULE__{} = result, path) when is_binary(path) do
+    rows = output_rows(result)
+
+    header =
+      rows
+      |> Enum.flat_map(&Map.keys/1)
+      |> Enum.uniq()
+      |> List.delete("score")
+      |> Enum.sort()
+      |> Kernel.++(["score"])
+
+    lines =
+      [header | Enum.map(rows, fn row -> Enum.map(header, &csv_cell(Map.get(row, &1))) end)]
+
+    csv =
+      Enum.map_join(lines, "\r\n", fn fields -> Enum.map_join(fields, ",", &csv_escape/1) end)
+
+    File.write!(path, csv <> "\r\n")
+    :ok
+  end
+
+  @doc false
+  # One flat map per row, upstream `_prepare_results_output` semantics.
+  def output_rows(%__MODULE__{rows: rows}) do
+    Enum.map(rows, &output_row/1)
+  end
+
+  defp output_row(row) do
+    example_fields = fields_of(row.example)
+
+    merged =
+      case row.prediction do
+        %Imp.Prediction{} = prediction ->
+          merge_fields(example_fields, fields_of(prediction))
+
+        other ->
+          Map.put(example_fields, "prediction", json_safe(other))
+      end
+
+    Map.put(merged, "score", json_safe(row.score))
+  end
+
+  defp fields_of(%Imp.Example{} = example),
+    do: example |> Imp.Example.items() |> Map.new(fn {k, v} -> {to_key(k), json_safe(v)} end)
+
+  defp fields_of(%Imp.Prediction{} = prediction),
+    do:
+      prediction |> Imp.Prediction.to_map() |> Map.new(fn {k, v} -> {to_key(k), json_safe(v)} end)
+
+  defp fields_of(nil), do: %{}
+
+  # Upstream merge_dicts: keys on both sides become example_<k> / pred_<k>;
+  # unique keys stay bare.
+  defp merge_fields(example_fields, prediction_fields) do
+    example_part =
+      Map.new(example_fields, fn {key, value} ->
+        if Map.has_key?(prediction_fields, key),
+          do: {"example_" <> key, value},
+          else: {key, value}
+      end)
+
+    prediction_part =
+      Map.new(prediction_fields, fn {key, value} ->
+        if Map.has_key?(example_fields, key),
+          do: {"pred_" <> key, value},
+          else: {key, value}
+      end)
+
+    Map.merge(example_part, prediction_part)
+  end
+
+  defp json_safe(%Imp.History{messages: messages}), do: %{"messages" => json_safe(messages)}
+
+  defp json_safe(%Imp.Example{} = example), do: fields_of(example)
+  defp json_safe(%Imp.Prediction{} = prediction), do: fields_of(prediction)
+  defp json_safe(%_{} = struct), do: struct |> Map.from_struct() |> json_safe()
+
+  defp json_safe(map) when is_map(map),
+    do: Map.new(map, fn {k, v} -> {to_key(k), json_safe(v)} end)
+
+  defp json_safe(list) when is_list(list), do: Enum.map(list, &json_safe/1)
+  defp json_safe(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> json_safe()
+  defp json_safe(value) when is_binary(value) or is_number(value), do: value
+  defp json_safe(value) when is_boolean(value) or is_nil(value), do: value
+  defp json_safe(value) when is_atom(value), do: Atom.to_string(value)
+  defp json_safe(other), do: inspect(other)
+
+  defp to_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp to_key(key) when is_binary(key), do: key
+  defp to_key(key), do: inspect(key)
+
+  defp csv_cell(nil), do: ""
+  defp csv_cell(value) when is_binary(value), do: value
+  defp csv_cell(value) when is_number(value) or is_boolean(value), do: to_string(value)
+  defp csv_cell(value), do: Jason.encode!(value)
+
+  defp csv_escape(field) do
+    if String.contains?(field, [",", "\"", "\n", "\r"]) do
+      "\"" <> String.replace(field, "\"", "\"\"") <> "\""
+    else
+      field
+    end
+  end
 end
 
 defmodule Imp.EvaluationCancelledError do
@@ -82,6 +227,17 @@ defmodule Imp.Evaluate do
     timeout: :infinity,
     deadline: nil
   ]
+
+  @type t :: %__MODULE__{
+          devset: Enumerable.t(),
+          metric: function(),
+          display_progress: boolean(),
+          failure_score: number(),
+          max_errors: non_neg_integer() | :infinity,
+          max_concurrency: pos_integer(),
+          timeout: timeout(),
+          deadline: term()
+        }
 
   @option_schema [
     display_progress: [type: :boolean, default: false],

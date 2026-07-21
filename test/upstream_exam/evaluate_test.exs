@@ -69,6 +69,19 @@ defmodule UpstreamExam.EvaluateTest do
     refute answer_exact_match(example, pred)
   end
 
+  # test_answer_exact_match_string / _list / _no_match against the BUILT-IN
+  # metric: Imp.Metrics.exact_match/1 now carries upstream answer_exact_match's
+  # str-or-list semantics (any-member match on a list answer), closing gap #4.
+  test "metrics: built-in exact_match accepts string and list answers" do
+    metric = Imp.Metrics.exact_match(:answer)
+
+    assert metric.(new_example("What is 1+1?", "2"), Imp.prediction(answer: "2"))
+    assert metric.(new_example("What is 1+1?", ["2", "two"]), Imp.prediction(answer: "2"))
+    assert metric.(new_example("What is 1+1?", ["2", "two"]), Imp.prediction(answer: "Two"))
+    refute metric.(new_example("What is 1+1?", "2"), Imp.prediction(answer: "3"))
+    refute metric.(new_example("What is 1+1?", ["2", "two"]), Imp.prediction(answer: "3"))
+  end
+
   # ---------------------------------------------------------------------------
   # tests/evaluate/test_evaluate.py
   # ---------------------------------------------------------------------------
@@ -116,6 +129,100 @@ defmodule UpstreamExam.EvaluateTest do
     evaluator = Imp.Evaluate.new(devset, &answer_exact_match/2)
     result = Imp.Evaluate.run(evaluator, program)
     assert result.score == 0.0
+  end
+
+  # test_evaluate_save_as_json_with_history
+  test "evaluate: save_as_json writes rows with serialized history", %{test: test_name} do
+    history1 = Imp.History.new([%{question: "Previous Q1", answer: "Previous A1"}])
+
+    history2 =
+      Imp.History.new([
+        %{question: "Previous Q2", answer: "Previous A2"},
+        %{question: "Previous Q3", answer: "Previous A3"}
+      ])
+
+    devset = [
+      Imp.example(question: "What is 1+1?", answer: "2", history: history1)
+      |> Imp.with_inputs(:question),
+      Imp.example(question: "What is 2+2?", answer: "4", history: history2)
+      |> Imp.with_inputs(:question)
+    ]
+
+    program = qa_program([{"What is 1+1?", "2"}, {"What is 2+2?", "4"}])
+    evaluator = Imp.Evaluate.new(devset, &answer_exact_match/2)
+    result = Imp.Evaluate.run(evaluator, program)
+
+    # DSPy: 100.0 (percentage). Imp: 1.0 (fraction).
+    assert result.score == 1.0
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "upstream_exam_#{:erlang.phash2(test_name)}_save.json"
+      )
+
+    on_exit(fn -> File.rm(path) end)
+
+    # Seam: upstream passes save_as_json= to the Evaluate constructor; Imp's
+    # file surface lives on the result (rows are plain data).
+    assert :ok = Imp.Evaluate.Result.save_as_json(result, path)
+
+    data = path |> File.read!() |> Jason.decode!()
+    assert length(data) == 2
+
+    [first, second] = data
+
+    assert %{"messages" => [message]} = first["history"]
+    assert message == %{"question" => "Previous Q1", "answer" => "Previous A1"}
+
+    assert %{"messages" => [m1, m2]} = second["history"]
+    assert m1 == %{"question" => "Previous Q2", "answer" => "Previous A2"}
+    assert m2 == %{"question" => "Previous Q3", "answer" => "Previous A3"}
+
+    # Row semantics (upstream merge_dicts): the prediction only carries
+    # :answer, so :question stays a bare column while the shared :answer key
+    # splits into example_answer / pred_answer.
+    assert first["question"] == "What is 1+1?"
+    assert first["example_answer"] == "2"
+    assert first["pred_answer"] == "2"
+    assert first["score"] == 1.0
+  end
+
+  # test_evaluate_save_as_csv_with_history
+  test "evaluate: save_as_csv writes a header row and stringified history", %{test: test_name} do
+    history = Imp.History.new([%{question: "Previous Q", answer: "Previous A"}])
+
+    devset = [
+      Imp.example(question: "What is 1+1?", answer: "2", history: history)
+      |> Imp.with_inputs(:question)
+    ]
+
+    program = qa_program([{"What is 1+1?", "2"}])
+    evaluator = Imp.Evaluate.new(devset, &answer_exact_match/2)
+    result = Imp.Evaluate.run(evaluator, program)
+    assert result.score == 1.0
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "upstream_exam_#{:erlang.phash2(test_name)}_save.csv"
+      )
+
+    on_exit(fn -> File.rm(path) end)
+
+    assert :ok = Imp.Evaluate.Result.save_as_csv(result, path)
+
+    [header_line | row_lines] = path |> File.read!() |> String.trim() |> String.split("\r\n")
+    header = String.split(header_line, ",")
+
+    assert length(row_lines) == 1
+    assert "history" in header
+
+    # CSV carries the string representation of the history dict (upstream
+    # asserts `"messages" in rows[0]["history"]`); the cell is JSON-encoded
+    # and therefore quoted, so assert on the raw row.
+    assert hd(row_lines) =~ "messages"
+    assert hd(row_lines) =~ "Previous Q"
   end
 
   # ---------------------------------------------------------------------------

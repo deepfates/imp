@@ -549,11 +549,27 @@ defmodule Imp.Metrics do
 
   This is the normal first metric for classification, short-span QA, and
   beginner optimizer examples.
+
+  Mirrors DSPy's `answer_exact_match` (dspy/evaluate/metrics.py): when the
+  example field holds a LIST of acceptable answers, the prediction passes if
+  it matches ANY member after `normalize_text/1`.
+
+      iex> metric = Imp.Metrics.exact_match(:answer)
+      iex> example = Imp.example(question: "What is 1+1?", answer: ["2", "two"])
+      iex> metric.(example, Imp.prediction(answer: "Two"))
+      true
   """
   def exact_match(field \\ :answer) do
     fn example, prediction ->
-      normalize_text(Imp.Example.get(example, field)) ==
-        normalize_text(Imp.Prediction.get(prediction, field))
+      predicted = normalize_text(Imp.Prediction.get(prediction, field))
+
+      case Imp.Example.get(example, field) do
+        answers when is_list(answers) ->
+          Enum.any?(answers, &(normalize_text(&1) == predicted))
+
+        answer ->
+          normalize_text(answer) == predicted
+      end
     end
   end
 
