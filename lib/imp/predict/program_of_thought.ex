@@ -277,7 +277,17 @@ defmodule Imp.Predict.ProgramOfThought do
     end
   end
 
+  # Loop-state keys PoT/CodeAct deliberately carry in the inputs map between
+  # iterations. Each per-step signature declares only the subset it renders, so
+  # the carriers a step does not use are dropped here ON PURPOSE (they are the
+  # module's own state, not user input) — otherwise Predict's extra-input
+  # warning (de-hzcv gap #2) would fire on every loop step.
+  @carried_loop_keys [:observation, :code_act_history, :previous_program, :error]
+
   defp call_with_signature(pot, signature, inputs) do
+    declared = MapSet.new(signature.inputs, & &1.name)
+    inputs = Map.drop(inputs, Enum.reject(@carried_loop_keys, &MapSet.member?(declared, &1)))
+
     pot.predict
     |> Predict.with_signature(signature)
     |> Predict.call(inputs)

@@ -183,7 +183,38 @@ defmodule Imp.Predict.Predict do
       {:error, {:invalid_predict_inputs, "expected inputs as {key, value} pairs"}}
   end
 
+  @doc false
+  # DSPy 3.2.1 Predict.forward warns (logger.warning, "not in signature") on
+  # every call that carries input keys outside the signature, then proceeds —
+  # the extras are ignored, not fatal (dspy/predict/predict.py,
+  # test_extra_fields_warning). Imp matches: loud per-call warning, call
+  # continues. Public (doc-false) so entry points that filter inputs before
+  # reaching Predict (ReActV2) can emit the same warning at their boundary.
+  def warn_extra_inputs(signature, inputs, except \\ []) do
+    expected = Enum.map(signature.inputs, & &1.name)
+    allowed = MapSet.new(Enum.map(expected, &to_string/1) ++ Enum.map(except, &to_string/1))
+
+    extra =
+      inputs
+      |> Map.keys()
+      |> Enum.reject(&MapSet.member?(allowed, to_string(&1)))
+
+    if extra != [] do
+      require Logger
+
+      Logger.warning(
+        "Imp.Predict: input contains fields not in signature. " <>
+          "These fields will be ignored: #{inspect(extra)}. " <>
+          "Expected fields: #{inspect(expected)}."
+      )
+    end
+
+    :ok
+  end
+
   defp validate_inputs(signature, inputs) do
+    :ok = warn_extra_inputs(signature, inputs)
+
     required =
       signature.inputs
       |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))

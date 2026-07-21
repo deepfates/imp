@@ -625,6 +625,31 @@ defmodule UpstreamExam.PredictTest do
                Imp.call(program, "What is the capital of France?")
     end
 
+    # Upstream: test_extra_fields_warning — input keys not in the signature
+    # log a warning containing "not in signature" and the offending key names;
+    # the extras are ignored and the call still succeeds
+    # (dspy/predict/predict.py logger.warning). Regression for de-hzcv gap #2:
+    # pre-fix Imp dropped the extra keys silently, so the log assertions below
+    # fail on pre-fix code.
+    test "extra fields warning" do
+      lm = dummy_lm([%{answer: "test output"}])
+      program = Imp.predict("question -> answer", lm: lm)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, _prediction} =
+                   Imp.call(program, %{
+                     question: "test",
+                     extra_field: "should warn",
+                     another: "also warn"
+                   })
+        end)
+
+      assert log =~ "not in signature"
+      assert log =~ "extra_field"
+      assert log =~ "another"
+    end
+
     # Upstream: test_error_message_on_invalid_lm_setup — no LM is a loud
     # error; a bogus LM value is rejected loudly (Imp validates at
     # construction rather than at call time; seam recorded in the exam table).

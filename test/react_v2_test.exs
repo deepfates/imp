@@ -78,6 +78,38 @@ defmodule ReActV2Test do
     assert_received {:lm_call, _opts}
   end
 
+  # Regression for de-hzcv gap #2: ReActV2 filters inputs down to signature
+  # names before any Predict call, so pre-fix an extra key vanished silently.
+  # Now the entry point warns (same "not in signature" surface as Predict);
+  # :history and max_iters are documented call-time keys and stay silent.
+  test "warns loudly on extra input keys but ignores them and still runs" do
+    lm =
+      action_lm([
+        %{
+          next_thought: "answer directly",
+          tool_calls: [%{id: "submit-1", name: "submit", arguments: %{answer: "BEAM"}}]
+        }
+      ])
+
+    program = Imp.react_v2("question -> answer", [], lm: lm)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, prediction} =
+                 Imp.call(program, %{
+                   question: "What runtime?",
+                   extra_field: "should warn",
+                   max_iters: 5
+                 })
+
+        assert Imp.get(prediction, :answer) == "BEAM"
+      end)
+
+    assert log =~ "not in signature"
+    assert log =~ "extra_field"
+    refute log =~ "max_iters"
+  end
+
   test "unknown and failing tools remain history observations instead of aborting the loop" do
     broken = Imp.tool(:broken, "broken", fn _args -> raise "boom" end)
 

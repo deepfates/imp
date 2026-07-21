@@ -489,10 +489,10 @@ row.
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **198** (aggregation 6, best_of_n 3, chain_of_thought 4, code_act 5, knn 3, multi_chain_comparison 1, parallel 7, predict 66, program_of_thought 6, react 9, refine 3, retry 3, rlm 82) |
-| Ported | **62** (63 ExUnit tests) |
-| — pass | **62** |
+| Ported | **63** (64 ExUnit tests) |
+| — pass | **63** |
 | — FAIL (real divergence found by upstream's own test) | **0** |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **32** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **31** |
 | Not applicable (Python/pydantic/litellm/asyncio/Deno specific, or a documented Imp design substitution) | **104** |
 
 ### Gaps the classification surfaced (fix-wave candidates)
@@ -504,9 +504,9 @@ surface. Ranked by owner-steer relevance (API boundary first):
    test_multi_output2): DSPy samples n completions and exposes
    `result.completions.field[i]`. `Imp.Prediction` has a `completions` list
    but nothing fills it.
-2. **Extra inputs are silently ignored** (test_extra_fields_warning): DSPy
-   warns "not in signature"; Imp drops them without a word — tension with the
-   nothing-silent law, independent of the exam.
+2. **FIXED (de-hzcv)** — extra inputs now warn loudly
+   (test_extra_fields_warning): `Imp.Predict.Predict.warn_extra_inputs/3`
+   matches DSPy's logger.warning-and-proceed semantics.
 3. **No input type-mismatch warnings** (16 warning-family tests): DSPy
    soft-validates inputs against annotations and logs mismatches
    (`warn_on_type_mismatch`). Imp renders whatever it is given.
@@ -654,7 +654,7 @@ surface. Batch semantics are ported; pair-list shapes are blocked.
 | test_per_module_history_size_limit | n/a | No mutable per-module history on immutable programs; observability owns history. |
 | test_per_module_history_disabled | n/a | Same. |
 | test_input_field_default_value | blocked | No input-field default-value surface (gap #8). |
-| test_extra_fields_warning | blocked | Extra inputs are silently ignored — no warning subsystem (gap #2; nothing-silent tension). |
+| test_extra_fields_warning | pass (was blocked) | Fixed by de-hzcv gap #2: `Imp.Predict.Predict.warn_extra_inputs/3` logs a per-call warning ("not in signature", offending keys, expected keys) and the call proceeds — DSPy's exact semantics (logger.warning, extras ignored). ReActV2 warns at its own entry (it filters inputs before Predict); PoT/CodeAct loop-state carrier keys and RAG-consumed query fields are documented exemptions. |
 | test_warning_images | blocked | Type-mismatch warning subsystem absent (also Image string-sniffing constructor n/a). |
 | test_type_mismatch_warning | blocked | Warning subsystem absent (gap #3). |
 | test_correct_types_no_warning | n/a | Vacuously true without the warning subsystem; nothing to assert. |
