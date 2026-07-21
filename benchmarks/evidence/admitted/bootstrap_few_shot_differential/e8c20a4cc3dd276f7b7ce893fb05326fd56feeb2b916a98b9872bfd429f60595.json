@@ -1,140 +1,143 @@
 {
-  "dspy_report": {
+  "comparison": {
+    "dspy": {
+      "accepted_questions": [
+        "q0",
+        "q2"
+      ],
+      "attempt_count": 3,
+      "augmented_answers": [
+        "generated",
+        "generated"
+      ],
+      "compiled_demo_count": 2,
+      "teacher_questions": [
+        "q0",
+        "q1",
+        "q2"
+      ]
+    },
+    "imp": {
+      "accepted_questions": [
+        "q0",
+        "q2"
+      ],
+      "attempt_count": 3,
+      "augmented_answers": [
+        "generated",
+        "generated"
+      ],
+      "compiled_demo_count": 2,
+      "teacher_questions": [
+        "q0",
+        "q1",
+        "q2"
+      ]
+    },
+    "matched": true
+  },
+  "dspy_receipt": {
     "credential_environment": {
       "provider_credential_names_present": []
     },
-    "fixture_id": "dspy-copro-isolation-v3",
+    "fixture_id": "dspy-classical-optimizer-c1-v1",
     "fixture_identity": {
-      "config_sha256": "fa037e03911ae42639afe92eb87d0e8446bef16391b18f8cf07e1e122856bb48",
-      "script_sha256": "f1091a228768d22bc1842670f1f69ba304a14628d6dd22d3de39d5b7fe6c894d"
+      "config_sha256": "413f5f736f2821450c47560cb92e4bb6ddabc733b0e2d2279c151f07759e9c1b",
+      "script_sha256": "39f4a11f88d8701d31c10e178e7a063cd1230c116a8836bb39929c78049529b0"
     },
     "isolation": {
-      "isolated_process": true,
-      "parent_poison_model": "fake/poisoned-parent-state",
-      "poison_marker_seen": false,
-      "worker_lm_model": "fake/copro-isolation-fixture"
+      "isolated_process": true
     },
     "observations": {
-      "candidate_program_count": 3,
-      "candidate_program_order": [
-        "candidate_b",
-        "candidate_a",
-        "base"
-      ],
-      "candidate_programs": [
-        {
-          "depth": 0,
-          "instruction": "Candidate B",
-          "key": "candidate_b",
-          "prefix": "B:",
-          "score": 75.0
-        },
-        {
-          "depth": 0,
-          "instruction": "Candidate A",
-          "key": "candidate_a",
-          "prefix": "A:",
-          "score": 25.0
-        },
-        {
-          "depth": 0,
-          "instruction": "Answer the fixture question.",
-          "key": "base",
-          "prefix": "Answer:",
-          "score": 0.0
-        }
-      ],
-      "evaluation_order": [
-        "candidate_a",
-        "candidate_a",
-        "candidate_b",
-        "base"
-      ],
-      "lm_history_call_count": 5,
-      "proposal_call_history": [
-        {
-          "history_index": 0,
-          "requested_n": 3,
-          "response_choice_count": 3,
-          "responses": [
-            {
-              "choice_index": 0,
-              "instruction": "Candidate A",
-              "prefix": "A:",
-              "response_sha256": "25e900823fc6b01a57f6a0cf42f6727f6e5d75894a655cc81198fa5d96e4686d"
-            },
-            {
-              "choice_index": 1,
-              "instruction": "Candidate A",
-              "prefix": "A:",
-              "response_sha256": "25e900823fc6b01a57f6a0cf42f6727f6e5d75894a655cc81198fa5d96e4686d"
-            },
-            {
-              "choice_index": 2,
-              "instruction": "Candidate B",
-              "prefix": "B:",
-              "response_sha256": "b3e8d848796d35904402e2710988257034f5fa011c31dc70f8d26da188ac64f5"
-            }
+      "bootstrap_few_shot": {
+        "accepted_questions": [
+          "q0",
+          "q2"
+        ],
+        "attempt_count": 3,
+        "augmented_answers": [
+          "generated",
+          "generated"
+        ],
+        "compiled_demo_count": 2,
+        "teacher_questions": [
+          "q0",
+          "q1",
+          "q2"
+        ]
+      },
+      "random_search": {
+        "candidate_kinds": [
+          "zero_shot",
+          "labels_only",
+          "unshuffled_bootstrap",
+          "shuffled_bootstrap",
+          "shuffled_bootstrap",
+          "shuffled_bootstrap"
+        ],
+        "candidate_seeds": [
+          -3,
+          -2,
+          -1,
+          0,
+          1,
+          2
+        ],
+        "demo_counts": [
+          0,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "ranked_seeds": [
+          -3,
+          -2,
+          -1,
+          0,
+          1,
+          2
+        ],
+        "scores": [
+          100.0,
+          100.0,
+          100.0,
+          100.0,
+          100.0,
+          100.0
+        ],
+        "subscores": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0
+          ],
+          [
+            1.0,
+            1.0
           ]
-        }
-      ],
-      "proposal_n": [
-        3
-      ],
-      "proposal_order": [
-        {
-          "instruction": "Candidate A",
-          "prefix": "A:"
-        },
-        {
-          "instruction": "Candidate A",
-          "prefix": "A:"
-        },
-        {
-          "instruction": "Candidate B",
-          "prefix": "B:"
-        }
-      ],
-      "proposal_request_count": 1,
-      "results_best": {
-        "average": [
-          33.333333333333336
-        ],
-        "depth": [
-          0
-        ],
-        "max": [
-          75.0
-        ],
-        "min": [
-          0.0
-        ],
-        "std": [
-          31.18047822311618
         ]
-      },
-      "results_latest": {
-        "average": [
-          31.25
-        ],
-        "depth": [
-          0
-        ],
-        "max": [
-          75.0
-        ],
-        "min": [
-          0.0
-        ],
-        "std": [
-          27.24311839712921
-        ]
-      },
-      "total_calls": 4
+      }
     },
-    "runner": "python-dspy-copro-isolation-differential",
+    "runner": "python-dspy-classical-optimizer-differential",
     "runtime_identity": {
-      "authority_ledger_sha256": "13ce88b1f4355e8c38aad78bca345e2bf4e79d89669ec6fe63c48c5d0c09fc3e",
+      "authority_ledger_sha256": "f2d0ec7d103276e65398d654fc88f5a34c6f4bcf8b059ca39451048440842cc8",
       "authority_manifest_sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
       "authority_manifest_verified_files": 296,
       "distribution_version": "3.2.1",
@@ -145,62 +148,83 @@
       "source_root": "tmp/dspy-3.2.1"
     },
     "schema_version": 1,
-    "scope": {
-      "claims": [
-        "COPRO starts with a process-isolated DSPy global LM",
-        "COPRO fans out the requested proposal count in deterministic order",
-        "COPRO evaluates proposals in proposal order before score sorting",
-        "COPRO directly removes an equal-score duplicate candidate",
-        "COPRO exposes pinned results_latest and results_best statistics"
-      ],
-      "not_claimed": [
-        "exact Python RNG parity",
-        "provider behavior or effectiveness",
-        "full optimizer parity"
-      ],
-      "source_supported": [
-        "The pinned COPRO source's greater-than-or-equal score guard retains the first record for an identical instruction/prefix duplicate"
-      ]
+    "scopes": {
+      "bootstrap_few_shot": {
+        "claims": [
+          "Imp and pinned DSPy 3.2.1 traverse the same unshuffled bootstrap examples until the accepted-demo cap",
+          "Imp and pinned DSPy 3.2.1 apply the same exact-match acceptance decisions in the fixture",
+          "Imp and pinned DSPy 3.2.1 assemble the same ordered augmented generated-output demonstrations"
+        ],
+        "not_claimed": [
+          "exact Python RNG parity",
+          "repeated-predictor-call sampling parity",
+          "provider behavior or effectiveness",
+          "full optimizer parity"
+        ]
+      },
+      "random_search": {
+        "claims": [
+          "Imp and pinned DSPy 3.2.1 enumerate the same restricted candidate seed schedule and baseline kinds",
+          "Imp and pinned DSPy 3.2.1 preserve evaluation order across equal-score stable ranking",
+          "Imp and pinned DSPy 3.2.1 produce the same percentage scores, subscores, and demo counts in the fixture"
+        ],
+        "not_claimed": [
+          "exact Python RNG parity",
+          "shuffled training-row order parity",
+          "provider behavior or effectiveness",
+          "full optimizer parity"
+        ]
+      }
     },
     "source": {
-      "authority_family": "family.optimizer_instruction_search",
-      "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
-      "copro_source": {
-        "path": "dspy/teleprompt/copro_optimizer.py",
-        "sha256": "43470ce80ebf29bc34b3bbb7c7d92c09fa5953d9c773ef32e261505a071b78f1"
+      "authority_family": "family.optimizer_few_shot_search",
+      "bootstrap_source": {
+        "path": "dspy/teleprompt/bootstrap.py",
+        "sha256": "0a588f11f09a358a5306540cc42401d905073c9452e54d32348b13d12bbb1255"
       },
+      "bootstrap_upstream_test": {
+        "path": "tests/teleprompt/test_bootstrap.py",
+        "sha256": "54092d2c983a810ae33932ef507d22a7496f5b69510a0e6f31d1ef54527b4cc2"
+      },
+      "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
       "git_ref": "refs/tags/3.2.1",
+      "random_search_source": {
+        "path": "dspy/teleprompt/random_search.py",
+        "sha256": "76c92034e192451eefa91d7942ff0c7a82eb976baf4aee5c76e2e377d5378791"
+      },
+      "random_search_upstream_test": {
+        "path": "tests/teleprompt/test_random_search.py",
+        "sha256": "3301e2f1544e5271cf8a31990c6ff61bd138dc85401a4b1bc3722083ff98f058"
+      },
       "repository": "https://github.com/stanfordnlp/dspy",
       "source_manifest": {
         "file_count": 296,
         "path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
         "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a"
       },
-      "upstream_test": {
-        "path": "tests/teleprompt/test_copro_optimizer.py",
-        "sha256": "a9561ce73c056f60ed3ad9fd51c59da27d7acb6d271a16868f94d339eff0db47"
-      },
       "version": "3.2.1"
     },
     "status": "passing"
   },
   "evidence_tier": "C1",
-  "generated_at": "2026-07-19T12:25:57Z",
-  "git_sha": "fd48e27387abd3aa7e6ebbc18335d61615b4817d",
-  "protocol_id": "copro-isolation-c1-v1",
+  "family": "bootstrap_few_shot",
+  "generated_at": "2026-07-21T12:50:01Z",
+  "git_sha": "1855786b2b79b0cc776048c3fbc65c06e49222bc",
+  "protocol_id": "bootstrap-few-shot-c1-v1",
   "provider_free": true,
+  "registry_protocol_id": "bootstrap_few_shot_differential",
   "run_context": {
     "code": {
-      "identity": "deepfates/imp@fd48e27387abd3aa7e6ebbc18335d61615b4817d",
-      "revision": "fd48e27387abd3aa7e6ebbc18335d61615b4817d",
+      "identity": "deepfates/imp@1855786b2b79b0cc776048c3fbc65c06e49222bc",
+      "revision": "1855786b2b79b0cc776048c3fbc65c06e49222bc",
       "source": "imp"
     },
-    "completed_at": "2026-07-19T12:25:57Z",
-    "envelope_sha256": "sha256:fe4e92e2514a076e394c78981acddc7fca6827e3c1579c354ca356f1f0041e9f",
+    "completed_at": "2026-07-21T12:50:01Z",
+    "envelope_sha256": "sha256:3f8164ebeb63dff7e177bf10fac4ac2f52aebef5bdb0698ee403cef20eaf6737",
     "environment": {
       "dependencies": {
-        "mix_exs_sha256": "sha256:9d63d56e4c64787827cd0ebc9ce558c41b9bf164d28b190d84d63e7d6ef343bc",
-        "mix_lock_sha256": "sha256:c0a1feb4f3225fd4e118327b83b03e07bf574c0caa117455e60c12a91bb82ee7",
+        "mix_exs_sha256": "sha256:0e002623ee50a0de6a6be86cbb2a117c23c6a208a96e6490785a665e6c884463",
+        "mix_lock_sha256": "sha256:42df3c3a67ef79116c4fbc6f6f8a0dc64c7b28b3226487447e197a016a0fd247",
         "resolved": [
           {
             "app": "abnf_parsec",
@@ -235,6 +259,14 @@
             "version": "1.7.19"
           },
           {
+            "app": "dialyxir",
+            "checksum": "dda948fcee52962e4b6c5b4b16b2d8fa7d50d8645bbae8b8685c3f9ecb7f5f4d",
+            "outer_checksum": "b34527202e6eb8cee198efec110996c25c5898f43a4094df157f8d28f27d9efe",
+            "package": "dialyxir",
+            "source": "hex",
+            "version": "1.4.7"
+          },
+          {
             "app": "dotenvy",
             "checksum": "00e318f3c51de9fafc4b48598447e386f19204dc18ca69886905bb8f8b08b667",
             "outer_checksum": "c8269471b5701e9e56dc86509c1199ded2b33dce088c3471afcfef7839766d8e",
@@ -257,6 +289,14 @@
             "package": "elixir_make",
             "source": "hex",
             "version": "0.10.0"
+          },
+          {
+            "app": "erlex",
+            "checksum": "7debbbaa9f4f368b8cd648983e0f1d7963028508e9c59e9d4ed504e94ef52a55",
+            "outer_checksum": "8cfffc0ec7159e6d73de2ab28a588064de80f88b2798d5cbe4482cbbc200178b",
+            "package": "erlex",
+            "source": "hex",
+            "version": "0.2.9"
           },
           {
             "app": "ex_aws_auth",
@@ -548,7 +588,7 @@
           }
         ]
       },
-      "fingerprint": "sha256:b49524d0720e6cee60ddc079c6bc3aa05243e1b609c6b98d125377e61e85bc94",
+      "fingerprint": "sha256:9e95782aab5ee0687cca2907733a3f25ca21d6da7eedfeee16a76243a86c2d82",
       "kind": "beam",
       "runtime": {
         "architecture": "aarch64-apple-darwin25.3.0",
@@ -563,22 +603,22 @@
       }
     },
     "inputs": {
-      "authority_ledger_sha256": "sha256:13ce88b1f4355e8c38aad78bca345e2bf4e79d89669ec6fe63c48c5d0c09fc3e",
+      "authority_ledger_sha256": "sha256:f2d0ec7d103276e65398d654fc88f5a34c6f4bcf8b059ca39451048440842cc8",
       "authority_manifest_sha256": "sha256:c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
-      "config_sha256": "sha256:fa037e03911ae42639afe92eb87d0e8446bef16391b18f8cf07e1e122856bb48",
+      "config_sha256": "sha256:413f5f736f2821450c47560cb92e4bb6ddabc733b0e2d2279c151f07759e9c1b",
       "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
-      "imp_copro_source_sha256": "sha256:18405d776ebe54a07028fb2b0d9ad321b9a4ffba4f4fc8268ff7cb2d64682677",
-      "protocol_id": "copro-isolation-c1-v1",
-      "script_sha256": "sha256:f1091a228768d22bc1842670f1f69ba304a14628d6dd22d3de39d5b7fe6c894d",
-      "task_sha256": "sha256:c56167fb15b92d5a6358a7f36918c0df774cac4f7c8e6645b502f45d1feba221"
+      "imp_optimizer_source_sha256": "sha256:a316c237f9bc67b1d45746279043a68ee04aabd3a5c7d1c9f67d17971a75548b",
+      "protocol_id": "bootstrap-few-shot-c1-v1",
+      "script_sha256": "sha256:39f4a11f88d8701d31c10e178e7a063cd1230c116a8836bb39929c78049529b0",
+      "task_sha256": "sha256:bc176b036991053e255e485938f85916502a937b88996c441c213ac08b4db804"
     },
-    "payload_sha256": "sha256:d61b85c113203f934ee5ecadf4139c5afb06317b5d5d647e79a63a77056d21e7",
+    "payload_sha256": "sha256:cc910272faa6eef9308f4dd17920487c32e8a2c18e2cc208ce6f1d94cd49d64a",
     "schema_version": 2,
     "source_commits": {
       "dspy": "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
-      "imp": "deepfates/imp@fd48e27387abd3aa7e6ebbc18335d61615b4817d"
+      "imp": "deepfates/imp@1855786b2b79b0cc776048c3fbc65c06e49222bc"
     },
-    "started_at": "2026-07-19T12:25:54Z",
+    "started_at": "2026-07-21T12:49:58Z",
     "workspace": {
       "reproducible": true,
       "state": "clean"
@@ -587,37 +627,34 @@
   "schema_version": 1,
   "scope": {
     "claims": [
-      "COPRO starts with a process-isolated DSPy global LM",
-      "COPRO fans out the requested proposal count in deterministic order",
-      "COPRO evaluates proposals in proposal order before score sorting",
-      "COPRO directly removes an equal-score duplicate candidate",
-      "COPRO exposes pinned results_latest and results_best statistics"
+      "Imp and pinned DSPy 3.2.1 traverse the same unshuffled bootstrap examples until the accepted-demo cap",
+      "Imp and pinned DSPy 3.2.1 apply the same exact-match acceptance decisions in the fixture",
+      "Imp and pinned DSPy 3.2.1 assemble the same ordered augmented generated-output demonstrations"
     ],
     "not_claimed": [
       "exact Python RNG parity",
+      "repeated-predictor-call sampling parity",
       "provider behavior or effectiveness",
       "full optimizer parity"
-    ],
-    "source_supported": [
-      "The pinned COPRO source's greater-than-or-equal score guard retains the first record for an identical instruction/prefix duplicate"
     ]
   },
   "source_bindings": {
-    "authority_ledger_sha256": "sha256:13ce88b1f4355e8c38aad78bca345e2bf4e79d89669ec6fe63c48c5d0c09fc3e",
+    "authority_ledger_sha256": "sha256:f2d0ec7d103276e65398d654fc88f5a34c6f4bcf8b059ca39451048440842cc8",
     "authority_manifest_sha256": "sha256:c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
-    "config_sha256": "sha256:fa037e03911ae42639afe92eb87d0e8446bef16391b18f8cf07e1e122856bb48",
+    "config_sha256": "sha256:413f5f736f2821450c47560cb92e4bb6ddabc733b0e2d2279c151f07759e9c1b",
     "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
-    "imp_copro_source_sha256": "sha256:18405d776ebe54a07028fb2b0d9ad321b9a4ffba4f4fc8268ff7cb2d64682677",
-    "protocol_id": "copro-isolation-c1-v1",
-    "script_sha256": "sha256:f1091a228768d22bc1842670f1f69ba304a14628d6dd22d3de39d5b7fe6c894d",
-    "task_sha256": "sha256:c56167fb15b92d5a6358a7f36918c0df774cac4f7c8e6645b502f45d1feba221"
+    "imp_optimizer_source_sha256": "sha256:a316c237f9bc67b1d45746279043a68ee04aabd3a5c7d1c9f67d17971a75548b",
+    "protocol_id": "bootstrap-few-shot-c1-v1",
+    "script_sha256": "sha256:39f4a11f88d8701d31c10e178e7a063cd1230c116a8836bb39929c78049529b0",
+    "task_sha256": "sha256:bc176b036991053e255e485938f85916502a937b88996c441c213ac08b4db804"
   },
   "status": "passing",
   "summary": {
     "authenticated_dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
-    "deterministic_observations_verified": 5,
+    "matched_claim_count": 3,
     "retained_exclusions": [
       "exact Python RNG parity",
+      "repeated-predictor-call sampling parity",
       "provider behavior or effectiveness",
       "full optimizer parity"
     ]

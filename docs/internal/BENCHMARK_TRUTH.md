@@ -246,8 +246,8 @@ mix imp.benchmark.bootstrap_few_shot_differential --require-clean --out tmp/boot
 mix imp.benchmark.random_search_differential --require-clean --out tmp/random-search-differential
 ```
 
-The canonical BootstrapFewShot (`9b89dac9…`), RandomSearch (`f7e49685…`), and
-COPRO (`5cf88e79…`) receipts were captured from a clean Imp commit reachable
+The canonical BootstrapFewShot (`e8c20a4c…`), RandomSearch (`bf190374…`), and
+COPRO (`c6d6964f…`) receipts were captured from a clean Imp commit reachable
 from `origin/main` (`fd48e27`) after the honesty-pass merge changed the
 authority-ledger bytes the previous receipts bound (an earlier generation had
 also bound a never-pushed local commit, `0e96d62`, invisible to fresh clones). Their validators

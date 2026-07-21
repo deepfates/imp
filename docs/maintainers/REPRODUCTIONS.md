@@ -23,10 +23,10 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | CompleteAndGrounded auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
 | Best-of-N and refinement | adaptation | confidence_calibration | NONE | none |
 | LabeledFewShot | replication | optimizer_lift | NONE | none |
-| BootstrapFewShot | replication | bootstrap_few_shot_differential<br>optimizer_lift<br>instruction_live | T1 | benchmarks/evidence/admitted/bootstrap_few_shot_differential/9b89dac91786fb2360c810f3122d2a755fc930228253730cd91de6a3b2df2094.json |
-| BootstrapRS and RandomSearch | replication | random_search_differential<br>optimizer_lift | T1 | benchmarks/evidence/admitted/random_search_differential/f7e496859639514877a23800cd4e3b8eb5b7d4e6d71aafecfde675dcb8acd19b.json |
+| BootstrapFewShot | replication | bootstrap_few_shot_differential<br>optimizer_lift<br>instruction_live | T1 | benchmarks/evidence/admitted/bootstrap_few_shot_differential/e8c20a4cc3dd276f7b7ce893fb05326fd56feeb2b916a98b9872bfd429f60595.json |
+| BootstrapRS and RandomSearch | replication | random_search_differential<br>optimizer_lift | T1 | benchmarks/evidence/admitted/random_search_differential/bf190374f3c3d591b73fb7a036ee9793249e8d6849e6d0d2fbae7a46cb4ae411.json |
 | KNNFewShot | replication | optimizer_lift | NONE | none |
-| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e.json |
+| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/c6d6964f88a140edf666be8c52880d0d38eeee98135a8c8e51447d3aea04fbd6.json |
 | InstructionSearch | native_extension | optimizer_lift | NONE | none |
 | InferRules | adaptation | optimizer_lift | NONE | none |
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |

@@ -239,7 +239,7 @@
     },
     "runner": "python-dspy-classical-optimizer-differential",
     "runtime_identity": {
-      "authority_ledger_sha256": "13ce88b1f4355e8c38aad78bca345e2bf4e79d89669ec6fe63c48c5d0c09fc3e",
+      "authority_ledger_sha256": "f2d0ec7d103276e65398d654fc88f5a34c6f4bcf8b059ca39451048440842cc8",
       "authority_manifest_sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
       "authority_manifest_verified_files": 296,
       "distribution_version": "3.2.1",
@@ -310,23 +310,23 @@
   },
   "evidence_tier": "C1",
   "family": "random_search",
-  "generated_at": "2026-07-19T12:26:12Z",
-  "git_sha": "fd48e27387abd3aa7e6ebbc18335d61615b4817d",
+  "generated_at": "2026-07-21T12:50:11Z",
+  "git_sha": "1855786b2b79b0cc776048c3fbc65c06e49222bc",
   "protocol_id": "random-search-c1-v1",
   "provider_free": true,
   "registry_protocol_id": "random_search_differential",
   "run_context": {
     "code": {
-      "identity": "deepfates/imp@fd48e27387abd3aa7e6ebbc18335d61615b4817d",
-      "revision": "fd48e27387abd3aa7e6ebbc18335d61615b4817d",
+      "identity": "deepfates/imp@1855786b2b79b0cc776048c3fbc65c06e49222bc",
+      "revision": "1855786b2b79b0cc776048c3fbc65c06e49222bc",
       "source": "imp"
     },
-    "completed_at": "2026-07-19T12:26:12Z",
-    "envelope_sha256": "sha256:ca1953a642bcd6fb05893bc4a0fefcc3b8c09baf149be11f0eb7538fe6566183",
+    "completed_at": "2026-07-21T12:50:11Z",
+    "envelope_sha256": "sha256:597d66ac34a35af826c993c019c2d64240da42be72b7ec14bc0cd580bb5e1bb5",
     "environment": {
       "dependencies": {
-        "mix_exs_sha256": "sha256:9d63d56e4c64787827cd0ebc9ce558c41b9bf164d28b190d84d63e7d6ef343bc",
-        "mix_lock_sha256": "sha256:c0a1feb4f3225fd4e118327b83b03e07bf574c0caa117455e60c12a91bb82ee7",
+        "mix_exs_sha256": "sha256:0e002623ee50a0de6a6be86cbb2a117c23c6a208a96e6490785a665e6c884463",
+        "mix_lock_sha256": "sha256:42df3c3a67ef79116c4fbc6f6f8a0dc64c7b28b3226487447e197a016a0fd247",
         "resolved": [
           {
             "app": "abnf_parsec",
@@ -361,6 +361,14 @@
             "version": "1.7.19"
           },
           {
+            "app": "dialyxir",
+            "checksum": "dda948fcee52962e4b6c5b4b16b2d8fa7d50d8645bbae8b8685c3f9ecb7f5f4d",
+            "outer_checksum": "b34527202e6eb8cee198efec110996c25c5898f43a4094df157f8d28f27d9efe",
+            "package": "dialyxir",
+            "source": "hex",
+            "version": "1.4.7"
+          },
+          {
             "app": "dotenvy",
             "checksum": "00e318f3c51de9fafc4b48598447e386f19204dc18ca69886905bb8f8b08b667",
             "outer_checksum": "c8269471b5701e9e56dc86509c1199ded2b33dce088c3471afcfef7839766d8e",
@@ -383,6 +391,14 @@
             "package": "elixir_make",
             "source": "hex",
             "version": "0.10.0"
+          },
+          {
+            "app": "erlex",
+            "checksum": "7debbbaa9f4f368b8cd648983e0f1d7963028508e9c59e9d4ed504e94ef52a55",
+            "outer_checksum": "8cfffc0ec7159e6d73de2ab28a588064de80f88b2798d5cbe4482cbbc200178b",
+            "package": "erlex",
+            "source": "hex",
+            "version": "0.2.9"
           },
           {
             "app": "ex_aws_auth",
@@ -674,7 +690,7 @@
           }
         ]
       },
-      "fingerprint": "sha256:b49524d0720e6cee60ddc079c6bc3aa05243e1b609c6b98d125377e61e85bc94",
+      "fingerprint": "sha256:9e95782aab5ee0687cca2907733a3f25ca21d6da7eedfeee16a76243a86c2d82",
       "kind": "beam",
       "runtime": {
         "architecture": "aarch64-apple-darwin25.3.0",
@@ -689,7 +705,7 @@
       }
     },
     "inputs": {
-      "authority_ledger_sha256": "sha256:13ce88b1f4355e8c38aad78bca345e2bf4e79d89669ec6fe63c48c5d0c09fc3e",
+      "authority_ledger_sha256": "sha256:f2d0ec7d103276e65398d654fc88f5a34c6f4bcf8b059ca39451048440842cc8",
       "authority_manifest_sha256": "sha256:c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
       "config_sha256": "sha256:413f5f736f2821450c47560cb92e4bb6ddabc733b0e2d2279c151f07759e9c1b",
       "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
@@ -698,13 +714,13 @@
       "script_sha256": "sha256:39f4a11f88d8701d31c10e178e7a063cd1230c116a8836bb39929c78049529b0",
       "task_sha256": "sha256:bc176b036991053e255e485938f85916502a937b88996c441c213ac08b4db804"
     },
-    "payload_sha256": "sha256:d3e453cb884ab7f91d5a386bec0d319c83c3e40035d690a006dc5b2cbf1c932a",
+    "payload_sha256": "sha256:70c1851a2ab788829db8356db86ddd79aa30f1aeda9ad368e36c1f8a882fd4b9",
     "schema_version": 2,
     "source_commits": {
       "dspy": "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
-      "imp": "deepfates/imp@fd48e27387abd3aa7e6ebbc18335d61615b4817d"
+      "imp": "deepfates/imp@1855786b2b79b0cc776048c3fbc65c06e49222bc"
     },
-    "started_at": "2026-07-19T12:26:09Z",
+    "started_at": "2026-07-21T12:50:08Z",
     "workspace": {
       "reproducible": true,
       "state": "clean"
@@ -725,7 +741,7 @@
     ]
   },
   "source_bindings": {
-    "authority_ledger_sha256": "sha256:13ce88b1f4355e8c38aad78bca345e2bf4e79d89669ec6fe63c48c5d0c09fc3e",
+    "authority_ledger_sha256": "sha256:f2d0ec7d103276e65398d654fc88f5a34c6f4bcf8b059ca39451048440842cc8",
     "authority_manifest_sha256": "sha256:c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a",
     "config_sha256": "sha256:413f5f736f2821450c47560cb92e4bb6ddabc733b0e2d2279c151f07759e9c1b",
     "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
