@@ -19,7 +19,8 @@ defmodule Imp.Settings do
     retriever: nil,
     callbacks: [],
     async_max_workers: 8,
-    max_errors: 10
+    max_errors: 10,
+    track_usage: false
   }
   @context_key :imp_context_stack
   @snapshot_key :imp_settings_snapshot
@@ -30,7 +31,8 @@ defmodule Imp.Settings do
     "callbacks" => :callbacks,
     "lm" => :lm,
     "max_errors" => :max_errors,
-    "retriever" => :retriever
+    "retriever" => :retriever,
+    "track_usage" => :track_usage
   }
 
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)

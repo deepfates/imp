@@ -72,10 +72,10 @@
   # catch-all turns any unexpected registry result into a loud error (#75)
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {120, 7}},
   # defensive `|| %{}` on provider_meta success typing proves already a map
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 888},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 904},
   # defensive fallback: sanitize_usage/1 clause for usage that is neither
   # nil nor a map; success typing says those are the only shapes today
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {916, 8}},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {932, 8}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1199, 8}},
   # defensive error clause on an always-ok internal call
@@ -85,9 +85,9 @@
   # defensive fallback paired with the 904 clause
   {"lib/imp/clients/training.ex", :pattern_match_cov, {976, 7}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/lm.ex", :pattern_match, {176, 8}},
-  # defensive fallback paired with the 176 clause
-  {"lib/imp/lm.ex", :pattern_match_cov, {177, 8}},
+  {"lib/imp/lm.ex", :pattern_match, {187, 8}},
+  # defensive fallback paired with the 187 clause
+  {"lib/imp/lm.ex", :pattern_match_cov, {188, 8}},
   # defensive fallback: fetch_optional/3 non-atom-key clause; callers pass
   # atom keys only today
   {"lib/imp/mcp.ex", :pattern_match_cov, {1051, 8}},

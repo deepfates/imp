@@ -158,10 +158,26 @@ defmodule Imp.Clients.ReqLLM do
     opts = Keyword.delete(opts, :cache)
     cache_key = cache_key(lm, messages, maybe_put_rollout_id(opts, rollout_id))
 
-    if cache? do
-      generate_cached(lm, messages, opts, cache_key)
-    else
-      generate_uncached(lm, messages, opts)
+    case Keyword.get(opts, :n, 1) do
+      n when is_integer(n) and n > 1 ->
+        # LOUD by design: req_llm's canonical ReqLLM.Response surfaces only the
+        # first choice (its decoders drop `choices[1..]` and strip "choices"
+        # from provider_meta), so a single n=K request cannot return K
+        # completions here. Passing :n through and returning one completion
+        # would be a silent 1-of-K fallback. Multi-completion works with LMs
+        # that honor the list contract (for example Imp.LM.Static).
+        {:error,
+         {:multi_completion_unsupported, __MODULE__,
+          "n=#{n} multi-completion is not supported over the req_llm client: " <>
+            "ReqLLM.Response carries only the first choice, so the other " <>
+            "#{n - 1} completions would be silently dropped"}}
+
+      _single ->
+        if cache? do
+          generate_cached(lm, messages, opts, cache_key)
+        else
+          generate_uncached(lm, messages, opts)
+        end
     end
   end
 

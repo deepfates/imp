@@ -83,6 +83,20 @@ defmodule Imp.Prediction do
   @doc "Returns the prediction field map."
   def to_map(%__MODULE__{fields: fields}), do: fields
 
+  @doc """
+  Returns the LM usage ledger for this prediction.
+
+  Ports DSPy's `Prediction.get_lm_usage()`: a map of model key (for example
+  `"openai/gpt-4o-mini"`) to merged usage counters, populated when the
+  `:track_usage` setting is true during the program call. Returns an empty map
+  when usage was not tracked.
+  """
+  def get_lm_usage(%__MODULE__{metadata: metadata}), do: Map.get(metadata, :lm_usage, %{})
+
+  @doc "Returns a copy of the prediction with the LM usage ledger set (see `get_lm_usage/1`)."
+  def set_lm_usage(%__MODULE__{metadata: metadata} = prediction, usage) when is_map(usage),
+    do: %{prediction | metadata: Map.put(metadata, :lm_usage, usage)}
+
   @doc "Converts an example into a prediction, preserving fields and applying prediction options."
   def from_example(%Imp.Example{} = example, opts \\ []),
     do: new(Imp.Example.to_map(example), opts)

@@ -4,7 +4,7 @@ defmodule Imp.LM do
   """
 
   @callback generate(messages :: list(map()), opts :: keyword()) ::
-              {:ok, map() | binary() | Imp.Prediction.t()} | {:error, term()}
+              {:ok, map() | binary() | Imp.Prediction.t() | list()} | {:error, term()}
   @callback stream(lm :: term(), messages :: list(map()), opts :: keyword()) :: Enumerable.t()
   @optional_callbacks stream: 3
 
@@ -42,7 +42,15 @@ defmodule Imp.LM do
 
   def generate(lm, messages, opts) do
     opts = validate_opts!(opts, "Imp.LM.generate/3")
-    dispatch_generate(lm, messages, opts)
+
+    case dispatch_generate(lm, messages, opts) do
+      {:ok, value} = success ->
+        Imp.Usage.maybe_record(value)
+        success
+
+      other ->
+        other
+    end
   end
 
   def validate_lm(nil), do: {:ok, nil}
@@ -161,6 +169,9 @@ defmodule Imp.LM do
     case fun.() do
       {:ok, %Imp.Prediction{}} = success -> success
       {:ok, value} when is_binary(value) or is_map(value) -> {:ok, value}
+      # Multi-completion contract: an LM asked for n > 1 completions returns
+      # a list of outputs, one per completion (DSPy: n choices on one request).
+      {:ok, completions} when is_list(completions) -> {:ok, completions}
       {:error, _reason} = error -> error
       {:ok, other} -> {:error, {:invalid_lm_result, other}}
       other -> {:error, {:invalid_lm_result, other}}

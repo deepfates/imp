@@ -5170,6 +5170,7 @@
       "category": "advanced",
       "functions": [
         "call/2",
+        "call/3",
         "dump/1",
         "new/2",
         "with_demos/2",
@@ -5183,6 +5184,9 @@
         "functions": {
           "call/2": [
             "call(predict, inputs)"
+          ],
+          "call/3": [
+            "call(predict, inputs, config)"
           ],
           "dump/1": [
             "dump(predict)"
@@ -5480,8 +5484,10 @@
         "fetch!/2",
         "from_example/2",
         "get/3",
+        "get_lm_usage/1",
         "new/2",
         "put/3",
+        "set_lm_usage/2",
         "to_map/1"
       ],
       "kind": "struct",
@@ -5498,11 +5504,17 @@
           "get/3": [
             "get(prediction, key, default \\\\ nil)"
           ],
+          "get_lm_usage/1": [
+            "get_lm_usage(prediction)"
+          ],
           "new/2": [
             "new(fields \\\\ %{}, opts \\\\ [])"
           ],
           "put/3": [
             "put(prediction, key, value)"
+          ],
+          "set_lm_usage/2": [
+            "set_lm_usage(prediction, usage)"
           ],
           "to_map/1": [
             "to_map(prediction)"
@@ -7560,6 +7572,38 @@
           "name": "t/0"
         }
       ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "maybe_record/1",
+        "record/2",
+        "track/1",
+        "tracking?/0"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Usage",
+      "signatures": {
+        "functions": {
+          "maybe_record/1": [
+            "maybe_record(result)"
+          ],
+          "record/2": [
+            "record(model_key, usage)"
+          ],
+          "track/1": [
+            "track(fun)"
+          ],
+          "tracking?/0": [
+            "tracking?()"
+          ]
+        }
+      },
+      "source": "lib/imp/usage.ex",
+      "struct_fields": [],
+      "types": []
     }
   ],
   "package_version": "0.2.1",

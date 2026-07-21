@@ -215,7 +215,8 @@
         "Imp.Training.FastSlow.Runner.Context",
         "Imp.Training.FastSlow.State",
         "Imp.Training.FastSlow.Terminal",
-        "Imp.Training.FastSlow.Theta"
+        "Imp.Training.FastSlow.Theta",
+        "Imp.Usage"
       ]
     }
   ],

@@ -68,17 +68,42 @@ defmodule UpstreamExam.PredictTest do
   # backed by an Agent that pops the next scripted response (and keeps
   # returning the last one when exhausted, so count-sensitive tests fail on
   # counts rather than on artificial LM crashes).
+  # Honors :n like upstream DummyLM.forward, which pops one scripted answer
+  # per requested completion and returns them as that request's choices.
   defp dummy_lm(responses) do
     {:ok, agent} = Agent.start_link(fn -> responses end)
 
-    fn _messages, _opts ->
-      response =
-        Agent.get_and_update(agent, fn
-          [last] -> {last, [last]}
-          [next | rest] -> {next, rest}
+    fn _messages, opts ->
+      n = Keyword.get(opts, :n, 1)
+
+      popped =
+        Agent.get_and_update(agent, fn state ->
+          Enum.map_reduce(1..n, state, fn _i, remaining ->
+            case remaining do
+              [last] -> {last, [last]}
+              [next | rest] -> {next, rest}
+            end
+          end)
         end)
 
-      {:ok, response}
+      case {n, popped} do
+        {1, [response]} -> {:ok, response}
+        {_n, completions} -> {:ok, completions}
+      end
+    end
+  end
+
+  # Upstream test_lm_usage's mocked litellm ModelResponse: fixed answer plus a
+  # usage entry, delivered through the Imp LM metadata envelope.
+  defp usage_reporting_lm do
+    fn _messages, _opts ->
+      {:ok,
+       %{
+         __imp_lm_output__: %{answer: "Paris"},
+         __imp_lm_metadata__: %{
+           req_llm: %{provider: "openai", model: "gpt-4o-mini", usage: %{total_tokens: 10}}
+         }
+       }}
     end
   end
 
@@ -482,6 +507,112 @@ defmodule UpstreamExam.PredictTest do
       assert {:ok, prediction} = Imp.call(program, %{question: "What is 1+1?"})
       assert Imp.get(prediction, :answer1) == "my first answer"
       assert Imp.get(prediction, :answer2) == "my second answer"
+    end
+
+    # Upstream: test_multi_output — Predict(n=2) samples two completions;
+    # `completions` holds one prediction per sample in order, the first being
+    # the primary prediction (DSPy: results.completions.answer[i]).
+    test "multi output" do
+      lm = dummy_lm([%{answer: "my first answer"}, %{answer: "my second answer"}])
+      program = Imp.predict("question -> answer", lm: lm, config: [n: 2])
+
+      assert {:ok, results} = Imp.call(program, %{question: "What is 1+1?"})
+
+      answers = Enum.map(results.completions, &Imp.get(&1, :answer))
+      assert Enum.at(answers, 0) == "my first answer"
+      assert Enum.at(answers, 1) == "my second answer"
+      assert Imp.get(results, :answer) == "my first answer"
+    end
+
+    # Upstream: test_multi_output2 — two output fields across two completions;
+    # each field indexes per completion.
+    test "multi output2" do
+      lm =
+        dummy_lm([
+          %{answer1: "my 0 answer", answer2: "my 2 answer"},
+          %{answer1: "my 1 answer", answer2: "my 3 answer"}
+        ])
+
+      program = Imp.predict("question -> answer1, answer2", lm: lm, config: [n: 2])
+
+      assert {:ok, results} = Imp.call(program, %{question: "What is 1+1?"})
+
+      assert results.completions |> Enum.at(0) |> Imp.get(:answer1) == "my 0 answer"
+      assert results.completions |> Enum.at(1) |> Imp.get(:answer1) == "my 1 answer"
+      assert results.completions |> Enum.at(0) |> Imp.get(:answer2) == "my 2 answer"
+      assert results.completions |> Enum.at(1) |> Imp.get(:answer2) == "my 3 answer"
+    end
+
+    # Upstream: test_lm_usage — with track_usage on, the prediction carries a
+    # per-model usage ledger: get_lm_usage()["openai/gpt-4o-mini"]["total_tokens"] == 10.
+    test "lm usage" do
+      program = Imp.predict("question -> answer", lm: usage_reporting_lm())
+
+      Imp.context([track_usage: true], fn ->
+        assert {:ok, result} = Imp.call(program, %{question: "What is the capital of France?"})
+        assert Imp.get(result, :answer) == "Paris"
+        assert Imp.Prediction.get_lm_usage(result)["openai/gpt-4o-mini"][:total_tokens] == 10
+      end)
+    end
+
+    # Upstream: test_lm_usage_with_parallel — parallel runs of the same
+    # program each carry their OWN usage (10 each, never pooled across runs;
+    # the race condition upstream pins with sleeps cannot occur across BEAM
+    # processes, which is the isolation this asserts).
+    test "lm usage with parallel" do
+      program = Imp.predict("question -> answer", lm: usage_reporting_lm())
+
+      Imp.context([track_usage: true], fn ->
+        results =
+          Imp.Predict.Parallel.map(program, [
+            %{question: "What is the capital of France?"},
+            %{question: "What is the capital of France?"}
+          ])
+
+        assert [{:ok, first}, {:ok, second}] = results
+        assert Imp.get(first, :answer) == "Paris"
+        assert Imp.get(second, :answer) == "Paris"
+        assert Imp.Prediction.get_lm_usage(first)["openai/gpt-4o-mini"][:total_tokens] == 10
+        assert Imp.Prediction.get_lm_usage(second)["openai/gpt-4o-mini"][:total_tokens] == 10
+      end)
+    end
+
+    # Upstream: test_predicted_outputs_piped_from_predict_to_lm_call — a
+    # call-time `prediction` config entry (the OpenAI predicted-outputs
+    # payload) reaches the LM request; a signature INPUT named `prediction`
+    # does not. Imp's call-time channel is explicit (`call/3` config) where
+    # upstream shape-sniffs the kwarg, so the second half is structural here.
+    test "predicted outputs piped from predict to lm call" do
+      program =
+        Imp.predict("question -> answer",
+          lm: capture_lm(fn _messages -> {:ok, %{answer: "To get to the other side"}} end)
+        )
+
+      payload = %{type: "content", content: "A chicken crossing the kitchen"}
+
+      assert {:ok, _prediction} =
+               Imp.Predict.Predict.call(
+                 program,
+                 %{question: "Why did a chicken cross the kitchen?"},
+                 prediction: payload
+               )
+
+      assert_received {:lm_call, _messages, opts}
+      assert opts[:prediction] == payload
+
+      judge =
+        Imp.predict("question, prediction -> judgement",
+          lm: capture_lm(fn _messages -> {:ok, %{judgement: "correct"}} end)
+        )
+
+      assert {:ok, _prediction} =
+               Imp.call(judge, %{
+                 question: "Why did a chicken cross the kitchen?",
+                 prediction: "To get to the other side!"
+               })
+
+      assert_received {:lm_call, _messages, judge_opts}
+      refute Keyword.has_key?(judge_opts, :prediction)
     end
 
     # Upstream: test_output_only
