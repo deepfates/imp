@@ -87,6 +87,32 @@ defmodule Imp.ProgramAccess do
     end
   end
 
+  def put_demos(%Predict{} = program, demos), do: Predict.with_demos(program, demos)
+
+  def put_demos(%ChainOfThought{predict: predict} = program, demos),
+    do: %{program | predict: put_demos(predict, demos)}
+
+  def put_demos(%ProgramOfThought{predict: predict} = program, demos),
+    do: %{program | predict: put_demos(predict, demos)}
+
+  def put_demos(%CodeAct{program_of_thought: pot} = program, demos),
+    do: %{program | program_of_thought: put_demos(pot, demos)}
+
+  def put_demos(%RAG{program: inner} = program, demos),
+    do: %{program | program: put_demos(inner, demos)}
+
+  def put_demos(%ReAct{react: predict} = program, demos),
+    do: %{program | react: put_demos(predict, demos)}
+
+  def put_demos(%ReActV2{react: predict} = program, demos),
+    do: %{program | react: put_demos(predict, demos)}
+
+  def put_demos(program, _demos) do
+    raise ArgumentError,
+          "Imp.with_demos/2 supports Predict, ChainOfThought, ProgramOfThought, CodeAct, " <>
+            "RAG, ReAct, and ReActV2 programs, and Imp.Example; got: #{inspect(program)}"
+  end
+
   def put_lm(%Predict{} = program, lm), do: Predict.with_lm(program, lm)
 
   def put_lm(%ChainOfThought{predict: predict} = program, lm),

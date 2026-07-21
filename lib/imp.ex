@@ -182,32 +182,9 @@ defmodule Imp do
   @doc "Attaches demonstrations to a demo-bearing Imp program or example."
   def with_demos(program_or_example, demos)
 
-  def with_demos(%Predict{} = predict, demos), do: Predict.with_demos(predict, demos)
-
-  def with_demos(%ChainOfThought{predict: predict} = cot, demos),
-    do: %{cot | predict: Predict.with_demos(predict, demos)}
-
-  def with_demos(%ProgramOfThought{predict: predict} = pot, demos),
-    do: %{pot | predict: Predict.with_demos(predict, demos)}
-
-  def with_demos(%CodeAct{program_of_thought: pot} = code_act, demos),
-    do: %{code_act | program_of_thought: with_demos(pot, demos)}
-
-  def with_demos(%RAG{program: program} = rag, demos),
-    do: %{rag | program: with_demos(program, demos)}
-
-  def with_demos(%ReAct{react: predict} = react, demos),
-    do: %{react | react: with_demos(predict, demos)}
-
-  def with_demos(%ReActV2{react: predict} = react, demos),
-    do: %{react | react: with_demos(predict, demos)}
-
   def with_demos(%Example{} = example, demos), do: Example.with_demos(example, demos)
 
-  def with_demos(program_or_example, _demos) do
-    raise ArgumentError,
-          "Imp.with_demos/2 supports Predict, ChainOfThought, ProgramOfThought, CodeAct, RAG wrappers, and examples; got: #{inspect(program_or_example)}"
-  end
+  def with_demos(program, demos), do: Imp.ProgramAccess.put_demos(program, demos)
 
   @doc "Creates a program that asks for reasoning before final outputs."
   def chain_of_thought(signature, opts \\ []), do: ChainOfThought.new(signature, opts)
@@ -267,11 +244,11 @@ defmodule Imp do
 
   @doc "Creates a program-of-thought module backed by the BEAM-safe sandbox."
   def program_of_thought(signature, opts \\ []),
-    do: Imp.Predict.ProgramOfThought.new(signature, opts)
+    do: ProgramOfThought.new(signature, opts)
 
   @doc "Creates a CodeAct-style module backed by the BEAM-safe sandbox."
   def code_act(signature, tools \\ [], opts \\ []),
-    do: Imp.Predict.CodeAct.new(signature, tools, opts)
+    do: CodeAct.new(signature, tools, opts)
 
   @doc "Creates a recursive controller loop for large-context exploration."
   def rlm(signature, opts \\ []), do: Imp.Predict.RLM.new(signature, opts)
