@@ -75,10 +75,27 @@ defmodule Imp.Signature.Field do
     metadata = Map.get(attrs, :metadata, Map.get(attrs, "metadata", %{}))
     constraints = Map.get(attrs, :constraints, Map.get(attrs, "constraints"))
 
-    if constraints do
-      Map.put(metadata, :constraints, constraints)
-    else
-      metadata
+    metadata =
+      if constraints do
+        Map.put(metadata, :constraints, constraints)
+      else
+        metadata
+      end
+
+    # DSPy InputField(default=...): an input field may carry a default value
+    # that fills the input when the caller omits it (Predict fills it before
+    # the missing-field check; test_input_field_default_value). Key presence,
+    # not truthiness, decides — an explicit nil default is a real default.
+    case fetch_default(attrs) do
+      {:ok, default} -> Map.put(metadata, :default, default)
+      :error -> metadata
+    end
+  end
+
+  defp fetch_default(attrs) do
+    case Map.fetch(attrs, :default) do
+      {:ok, default} -> {:ok, default}
+      :error -> Map.fetch(attrs, "default")
     end
   end
 
@@ -126,6 +143,7 @@ defmodule Imp.Signature.Field do
   defp normalize_type_alias("number"), do: :number
   defp normalize_type_alias("bool"), do: :boolean
   defp normalize_type_alias("boolean"), do: :boolean
+  defp normalize_type_alias("datetime"), do: :datetime
   defp normalize_type_alias(other), do: existing_atom_or_string(other)
 
   # Faithful port of DSPy `infer_prefix` (dspy/signatures/signature.py):

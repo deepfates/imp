@@ -247,6 +247,26 @@ defmodule Imp.Adapter.Chat do
   # dee-16qm): decode the binary, and on failure return it unchanged so schema
   # validation produces the honest "expected array/object" error instead of
   # swallowing it.
+  # Datetime fields parse from the ISO 8601 text the LM returns
+  # (test_datetime_inputs_and_outputs: "2024-11-27T14:00:00" -> datetime).
+  # An offset-carrying string yields a DateTime; a naive string yields a
+  # NaiveDateTime. An unparsable string stays raw so schema validation
+  # reports the honest "expected datetime" error.
+  defp coerce_value(value, :datetime) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    case DateTime.from_iso8601(trimmed) do
+      {:ok, datetime, _offset} ->
+        datetime
+
+      {:error, _reason} ->
+        case NaiveDateTime.from_iso8601(trimmed) do
+          {:ok, naive} -> naive
+          {:error, _reason} -> value
+        end
+    end
+  end
+
   defp coerce_value(value, :array) when is_binary(value), do: decode_composite(value)
   defp coerce_value(value, :object) when is_binary(value), do: decode_composite(value)
 
@@ -274,6 +294,8 @@ defmodule Imp.Adapter.Chat do
     do:
       "{" <> Enum.map_join(value, ", ", fn {k, v} -> py_repr(k) <> ": " <> py_repr(v) end) <> "}"
 
+  defp py_str(%DateTime{} = value), do: DateTime.to_iso8601(value)
+  defp py_str(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   defp py_str(value) when is_atom(value), do: to_string(value)
   defp py_str(value), do: inspect(value)
 
@@ -686,6 +708,11 @@ defmodule Imp.Adapter.Chat do
 
   def format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
     do: to_string(value)
+
+  # Datetimes render as ISO 8601 (upstream serializes datetimes to their JSON
+  # string form, e.g. "2024-11-25T10:00:00", before the prompt is built).
+  def format_value(%DateTime{} = value), do: DateTime.to_iso8601(value)
+  def format_value(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
 
   def format_value(value), do: inspect(value)
 

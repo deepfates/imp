@@ -15,7 +15,7 @@
 #   exsss export shape; the construction is intentional and correct.
 [
   # defensive clause for non-covered content shapes
-  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {623, 8}},
+  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {645, 8}},
   # defensive clause for non-covered budget shapes
   {"bench/imp/benchmark_truth/campaign_budget.ex", :pattern_match_cov, {359, 8}},
   # defensive guard success typing proves redundant
@@ -160,7 +160,7 @@
   # behaviour callback specs term(); impl narrows on purpose (see retrieve.ex)
   {"lib/imp/retrievers/http.ex", :callback_arg_type_mismatch, {95, 7}},
   # defensive clause for non-covered schema nodes
-  {"lib/imp/schema.ex", :pattern_match_cov, {324, 8}},
+  {"lib/imp/schema.ex", :pattern_match_cov, {330, 8}},
   # MapSet opacity on run-id sets typed through MLflow JSON
   {"lib/imp/tracking/mlflow.ex", :call_without_opaque, {361, 8}},
   # MapSet opacity on gate-name sets typed through evidence JSON
