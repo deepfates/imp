@@ -898,13 +898,27 @@ missing()|)
       valid_upstream_tests?(manifest, artifact["upstream_tests"]),
       get_in(artifact, ["fixture", "sha256"]) == sha256_file(manifest_path),
       expected_ids == actual_ids,
-      Map.keys(artifact["harness_files"] || %{}) |> Enum.sort() == Enum.sort(@harness_sources),
+      harness_file_keys(artifact) == Enum.sort(@harness_sources),
       get_in(artifact, ["runtimes", "imp", "runtime"]) == "beam_constrained_elixir",
       get_in(artifact, ["runtimes", "official", "runtime"]) == "official"
     ]
 
     unless Enum.all?(conditions),
       do: raise(ArgumentError, "standalone RLM artifact identity mismatch")
+  end
+
+  # Admitted artifacts are immutable and may record harness files under the
+  # pre-move path (the forensics harness lived in lib/imp/benchmark_truth/
+  # until the 2026-07 design pass moved it to bench/imp/benchmark_truth/).
+  # Normalize only that known relocation; any other key difference still
+  # fails the identity check.
+  defp harness_file_keys(artifact) do
+    (artifact["harness_files"] || %{})
+    |> Map.keys()
+    |> Enum.map(fn key ->
+      String.replace_prefix(key, "lib/imp/benchmark_truth/", "bench/imp/benchmark_truth/")
+    end)
+    |> Enum.sort()
   end
 
   defp validate_artifact_row!(row, case) do

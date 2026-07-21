@@ -515,7 +515,7 @@
       ],
       "implementation_paths": [
         "lib/imp/adapter.ex",
-        "lib/imp/adapters/types.ex",
+        "lib/imp/adapter/types.ex",
         "lib/imp/schema.ex"
       ],
       "classification": "adaptation",
@@ -750,7 +750,7 @@
       ],
       "implementation_paths": [
         "lib/imp/evaluate/auto_evaluation.ex",
-        "lib/imp/benchmark_truth/auto_evaluation_contract.ex"
+        "bench/imp/benchmark_truth/auto_evaluation_contract.ex"
       ],
       "classification": "replication",
       "protocol_ids": [
@@ -775,7 +775,7 @@
       ],
       "implementation_paths": [
         "lib/imp/evaluate/auto_evaluation.ex",
-        "lib/imp/benchmark_truth/auto_evaluation_contract.ex"
+        "bench/imp/benchmark_truth/auto_evaluation_contract.ex"
       ],
       "classification": "replication",
       "protocol_ids": [
@@ -1074,7 +1074,7 @@
       ],
       "implementation_paths": [
         "lib/imp/optimizer/gepa.ex",
-        "lib/imp/benchmark_truth/gepa_campaign_manifest.ex"
+        "bench/imp/benchmark_truth/gepa_campaign_manifest.ex"
       ],
       "classification": "replication",
       "protocol_ids": [
@@ -1435,7 +1435,7 @@
       ],
       "implementation_paths": [
         "lib/imp/benchmarks.ex",
-        "lib/imp/benchmark_truth/hotpot_multi_hop.ex"
+        "bench/imp/benchmark_truth/hotpot_multi_hop.ex"
       ],
       "classification": "replication",
       "protocol_ids": [
@@ -1480,7 +1480,7 @@
         "Imp.BenchmarkTruth.GepaMetrics.AIME"
       ],
       "implementation_paths": [
-        "lib/imp/benchmark_truth/gepa_metrics.ex"
+        "bench/imp/benchmark_truth/gepa_metrics.ex"
       ],
       "classification": "replication",
       "protocol_ids": [
@@ -1505,8 +1505,8 @@
         "Imp.BenchmarkTruth.HoverMultiHop"
       ],
       "implementation_paths": [
-        "lib/imp/benchmark_truth/hover_bm25.ex",
-        "lib/imp/benchmark_truth/hover_multi_hop.ex"
+        "bench/imp/benchmark_truth/hover_bm25.ex",
+        "bench/imp/benchmark_truth/hover_multi_hop.ex"
       ],
       "classification": "adaptation",
       "protocol_ids": [
@@ -1530,7 +1530,7 @@
         "Imp.BenchmarkTruth.IFBenchFeedback"
       ],
       "implementation_paths": [
-        "lib/imp/benchmark_truth/ifbench_feedback.ex"
+        "bench/imp/benchmark_truth/ifbench_feedback.ex"
       ],
       "classification": "replication",
       "protocol_ids": [
@@ -1554,7 +1554,7 @@
         "Imp.BenchmarkTruth.GepaMetrics.LiveBenchMath"
       ],
       "implementation_paths": [
-        "lib/imp/benchmark_truth/gepa_metrics.ex"
+        "bench/imp/benchmark_truth/gepa_metrics.ex"
       ],
       "classification": "replication",
       "protocol_ids": [
@@ -1578,7 +1578,7 @@
         "Imp.BenchmarkTruth.Papillon"
       ],
       "implementation_paths": [
-        "lib/imp/benchmark_truth/papillon.ex"
+        "bench/imp/benchmark_truth/papillon.ex"
       ],
       "classification": "adaptation",
       "protocol_ids": [
