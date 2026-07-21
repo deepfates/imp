@@ -23,6 +23,14 @@ defmodule Imp.Optimizer.GEPA do
   applied by proposal slot. This is separate from ComBee aggregation: it does
   not combine worker proposals or use map-shuffle-reduce voting.
 
+  `:module_selector` picks which named components each reflective mutation
+  updates: `:round_robin` (default, one component per mutation in stable
+  order), `:all` (every component per mutation), an arity-five function, or a
+  selector module/struct implementing the `Imp.Optimizer.GEPA.ModuleSelector`
+  contract. Custom selectors receive the engine state, captured trajectories,
+  minibatch scores, candidate index, and candidate map, and must return a
+  non-empty list of the candidate's component names; anything else raises.
+
   `:combee` accepts `true` or its documented keyword options. ComBee duplicates
   and deterministically shuffles reflection records, reduces `floor(sqrt(n))`
   balanced groups concurrently, and performs one ordered final reduction.
@@ -49,6 +57,7 @@ defmodule Imp.Optimizer.GEPA do
     callbacks: [],
     component_feedback: %{},
     feedback_fn: nil,
+    module_selector: :round_robin,
     generations: 4,
     combee: false,
     sampling_strategy: :single,
@@ -78,6 +87,10 @@ defmodule Imp.Optimizer.GEPA do
     callbacks: [type: {:custom, Callback, :validate, []}, default: []],
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
+    module_selector: [
+      type: {:custom, __MODULE__, :validate_module_selector, []},
+      default: :round_robin
+    ],
     generations: [type: :non_neg_integer, default: 4],
     combee: [type: {:custom, ComBee.Options, :validate, []}, default: false],
     sampling_strategy: [type: :any, default: :single],
@@ -139,6 +152,7 @@ defmodule Imp.Optimizer.GEPA do
       callbacks: opts[:callbacks],
       component_feedback: opts[:component_feedback],
       feedback_fn: opts[:feedback_fn],
+      module_selector: opts[:module_selector],
       generations: opts[:generations],
       combee: opts[:combee],
       sampling_strategy: validate_sampling_strategy!(opts[:sampling_strategy]),
@@ -210,6 +224,7 @@ defmodule Imp.Optimizer.GEPA do
     engine_opts =
       [
         max_iterations: optimizer.generations,
+        module_selector: optimizer.module_selector,
         combee: optimizer.combee,
         sampling_strategy: optimizer.sampling_strategy,
         selection_strategy: optimizer.selection_strategy,
@@ -547,6 +562,14 @@ defmodule Imp.Optimizer.GEPA do
 
   def validate_feedback_fn(feedback_fn) do
     {:error, "expected nil or an arity-1 function, got: #{inspect(feedback_fn)}"}
+  end
+
+  @doc false
+  def validate_module_selector(selector) do
+    Imp.Optimizer.GEPA.ModuleSelector.validate!(selector)
+    {:ok, selector}
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
   end
 
   def validate_proposal_concurrency(:auto), do: {:ok, :auto}

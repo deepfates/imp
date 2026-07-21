@@ -2,8 +2,9 @@ defmodule Imp.Optimizer.GEPA.ModuleSelector do
   @moduledoc """
   Component-selection contract for reflective GEPA mutations.
 
-  A custom selector may be a module implementing `select_modules/5` or a
-  struct whose module implements `select_modules/6`. The callbacks receive the
+  A custom selector may be an arity-five function, a module implementing
+  `select_modules/5`, or a struct whose module implements `select_modules/6`.
+  The functions and callbacks receive the
   engine state, captured trajectories, minibatch scores, candidate index, and
   complete candidate, and must return a non-empty list of candidate components.
   """
@@ -35,6 +36,14 @@ defmodule Imp.Optimizer.GEPA.ModuleSelector do
   @spec validate!(term()) :: :ok
   def validate!(selector) when selector in @built_ins, do: :ok
 
+  def validate!(selector) when is_function(selector, 5), do: :ok
+
+  def validate!(selector) when is_function(selector) do
+    raise ArgumentError,
+          ":module_selector functions must take (state, trajectories, scores, candidate_idx, candidate), " <>
+            "got a function of arity #{arity(selector)}"
+  end
+
   def validate!(%module{} = selector) do
     ensure_callback!(module, :select_modules, 6, selector)
   end
@@ -45,8 +54,8 @@ defmodule Imp.Optimizer.GEPA.ModuleSelector do
 
   def validate!(selector) do
     raise ArgumentError,
-          ":module_selector must be :round_robin, :all, a selector module, or a selector struct, got: " <>
-            inspect(selector)
+          ":module_selector must be :round_robin, :all, an arity-five function, a selector module, " <>
+            "or a selector struct, got: " <> inspect(selector)
   end
 
   @doc false
@@ -80,6 +89,11 @@ defmodule Imp.Optimizer.GEPA.ModuleSelector do
   defp invoke(:all, _state, _trajectories, _scores, _candidate_idx, candidate),
     do: component_order(candidate)
 
+  defp invoke(selector, state, trajectories, scores, candidate_idx, candidate)
+       when is_function(selector, 5) do
+    selector.(state, trajectories, scores, candidate_idx, candidate)
+  end
+
   defp invoke(%module{} = selector, state, trajectories, scores, candidate_idx, candidate) do
     module.select_modules(selector, state, trajectories, scores, candidate_idx, candidate)
   end
@@ -108,6 +122,11 @@ defmodule Imp.Optimizer.GEPA.ModuleSelector do
     raise ArgumentError,
           "GEPA module selector must return a non-empty list of candidate components, got: " <>
             inspect(result)
+  end
+
+  defp arity(fun) do
+    {:arity, arity} = Function.info(fun, :arity)
+    arity
   end
 
   defp ensure_callback!(module, function, arity, selector) do

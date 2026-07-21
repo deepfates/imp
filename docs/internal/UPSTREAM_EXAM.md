@@ -891,11 +891,11 @@ internals). Design substitutions that recur in the rows:
 | Metric | Count |
 |---|---|
 | Upstream test functions in scope | **123** (teleprompt 65, evaluate 21, streaming 37) |
-| Ported | **60** (59 ExUnit tests; some ports cover two same-surface upstream fns, some upstream fns split across two ports) |
-| — pass | **59** |
+| Ported | **69** (68 ExUnit tests; some ports cover two same-surface upstream fns, some upstream fns split across two ports) |
+| — pass | **68** |
 | — FAIL (real divergence found by upstream's own test) | **1** (chat stream listener trailing-whitespace trim; tagged `@tag :upstream_fail` + `:skip`, failing output preserved in the test comment) |
-| Blocked (behavior should/could exist in Imp; not expressible yet) | **37** |
-| Not applicable (Python/pydantic/litellm/asyncio specific, or a documented Imp design substitution) | **26** |
+| Blocked (behavior should/could exist in Imp; not expressible yet) | **26** (11 flipped by the dee-r67q GEPA selector/proposer batch: 9 to pass, 2 to n/a) |
+| Not applicable (Python/pydantic/litellm/asyncio specific, or a documented Imp design substitution) | **28** |
 
 ### The FAIL
 
@@ -940,11 +940,16 @@ specific to split markers. JSON and XML extraction are content-exact
    DSPy's `StatusMessageProvider` hooks lm/tool/module start+end and streams
    "Calling tool ..." messages; Imp's StatusMessage vocabulary covers
    listener lifecycle only (:started/:completed/:error/:cancelled).
-7. **No GEPA component_selector / instruction_proposer surfaces** (7 gepa
-   tests): custom per-iteration component selection ("round_robin"/"all"/
-   custom fn) and pluggable instruction proposers (incl. multimodal
-   reflection with structured images) have no Imp constructor options; Imp's
-   module_selector/reflection strategy are internal.
+7. **No GEPA component_selector / instruction_proposer surfaces** — LANDED
+   (dee-r67q): `Imp.Optimizer.GEPA.new/2` now takes `:module_selector`
+   (upstream `component_selector`: `:round_robin` default, `:all`, an
+   arity-five custom function, or a ModuleSelector module/struct) and the
+   already-public `:reflection_strategy` is the `instruction_proposer`
+   equivalent (arity-three candidate/dataset/components function returning a
+   proposal map; works with `reflection_lm: nil`). Custom selector returns
+   are validated loudly (non-empty, known components, no duplicates).
+   Multimodal (dspy.Image) reflection remains out of scope — no image
+   example type in Imp.
 8. **No public minibatch-eval / n-fewshot-candidates utility surface**
    (test_utils.py): `eval_candidate_program` and
    `create_n_fewshot_demo_sets` equivalents are internal
@@ -1038,24 +1043,24 @@ specific to split markers. JSON and XML extraction are content-exact
 |---|---|---|
 | test_gepa_adapter_disables_logging_on_minibatch_eval | n/a | callback_metadata/logging plumbing on the DspyAdapter internals. |
 | test_basic_workflow | pass (adapted) | Upstream replays byte-exact prompt fixtures (gepa_dummy_lm.json) through its reflection prompts; Imp's GEPA proposal contract differs (JSON instruction proposals), so the port asserts the boundary: compile completes against scripted task + reflection LMs and returns a program. The 2,000-char instruction-string equality is not reproducible by design. |
-| test_workflow_with_custom_instruction_proposer_and_component_selector | blocked | No `instruction_proposer` or `component_selector` constructor options (gap #7); also dspy.Image fixtures. |
+| test_workflow_with_custom_instruction_proposer_and_component_selector | pass (adapted) | Custom `:reflection_strategy` (instruction_proposer) + custom arity-5 `:module_selector` (component_selector) compile end to end; the proposer receives every selected component. Adapted: upstream replays dspy.Image fixtures and asserts the fixture instructions; Imp has no image example type, so the port asserts the boundary. |
 | test_metric_requires_feedback_signature | n/a | TypeError from Python arity introspection of the metric; Imp metrics are arity-2/3 functions returning score/feedback data — the 5-arg feedback signature does not exist. |
 | test_gepa_compile_with_track_usage_no_tuple_error | n/a | litellm track_usage regression ("'tuple' object has no attribute 'set_lm_usage'"); no usage-tracking tuples in Imp. |
-| test_component_selector_functionality | blocked | No component_selector surface (gap #7). |
-| test_component_selector_default_behavior | blocked | Same. |
-| test_component_selector_string_round_robin | blocked | Same. |
-| test_component_selector_string_all | blocked | Same (also detailed_results.candidates surface). |
-| test_component_selector_custom_random | blocked | Same. |
-| test_alternating_half_component_selector | blocked | Same (state.i iteration counter surface). |
+| test_component_selector_functionality | pass | Custom arity-5 `:module_selector` function is invoked with the full candidate (both components) and may return single or multiple components. |
+| test_component_selector_default_behavior | pass | No selector option → `:round_robin` default on the struct; compile completes. |
+| test_component_selector_string_round_robin | pass | Upstream string "round_robin" is the `:round_robin` atom in Imp. |
+| test_component_selector_string_all | pass (adapted) | `:all` updates every component in the first accepted candidate; `:round_robin` exactly one. Adapted: candidate parameters read from the Report's candidates (Imp's `detailed_results.candidates` equivalent), acceptance via `:equal_or_better` since the port's metric is constant. |
+| test_component_selector_custom_random | pass | Random-half custom function selector compiles. |
+| test_alternating_half_component_selector | pass | Upstream `state.i` is `state.iteration` on Imp's `Engine.State`; even iterations select the first half, odd the second, verified over multiple selections. |
 
 ## tests/teleprompt/test_gepa_instruction_proposer.py (4)
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_reflection_lm_gets_structured_images | blocked | MultiModalInstructionProposer + structured-image reflection messages absent (gap #7). |
-| test_custom_proposer_without_reflection_lm | blocked | Pluggable proposer protocol absent. |
-| test_image_serialization_into_strings | blocked | Same (+ CUSTOM-TYPE split markers are DSPy's serialization). |
-| test_default_proposer (parametrized reasoning=True/False) | blocked | Default single-component proposer prompt surface not exposed; Imp's reflection prompt is its own contract. |
+| test_reflection_lm_gets_structured_images | n/a | Tests DSPy's MultiModalInstructionProposer emitting structured image_url messages for dspy.Image inputs; Imp has no image example type, so there is no multimodal reflection path to assert. The pluggable proposer surface itself is covered by the ported rows below. |
+| test_custom_proposer_without_reflection_lm | pass | `:reflection_strategy` (the instruction_proposer equivalent) manages its own external reflection source; GEPA compiles with `reflection_lm` unset and the external source is called. |
+| test_image_serialization_into_strings | n/a | Asserts DSPy's CUSTOM-TYPE-START-IDENTIFIER text-serialization of dspy.Image objects — DSPy's own serialization format for a type Imp does not have. |
+| test_default_proposer (parametrized reasoning=True/False) | pass (adapted) | Without a custom proposer the default reflection path calls the configured reflection LM and no reflection/proposal error is recorded (upstream: "Exception during reflection/proposal" absent from logs). Adapted: no dspy.Image inputs, and the reasoning parametrization is DummyLM-specific. |
 
 ## tests/teleprompt/test_bettertogether.py (20)
 
