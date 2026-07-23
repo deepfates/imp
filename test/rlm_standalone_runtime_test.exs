@@ -519,7 +519,7 @@ submit(%{answer: answer})|}
 submit(%{answer: Enum.join(answers, ",")})|}
           else
             send(parent, :slow_child_started)
-            Process.sleep(200)
+            Process.sleep(1_000)
             %{code: ~S|submit(%{answer: context})|}
           end
         end
@@ -531,7 +531,10 @@ submit(%{answer: Enum.join(answers, ",")})|}
         lm: lm,
         max_iterations: 1,
         max_recursion_depth: 2,
-        max_time_ms: 40
+        # Leave enough wall-clock room for the recursive child to be scheduled
+        # even when the complete suite is running under load. The child itself
+        # remains well beyond the budget, which is the behavior under test.
+        max_time_ms: 250
       )
 
     assert {:error, reason} = RLM.call(rlm, %{context: "parent"})
