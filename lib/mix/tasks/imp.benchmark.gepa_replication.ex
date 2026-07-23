@@ -24,7 +24,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
 
   @shortdoc "Validate GEPA paper-replication rows"
 
-  @default_out_dir Imp.BenchmarkTruth.Paths.runs("gepa-replication")
+  @default_out_dir "benchmarks/runs/gepa-replication"
 
   @impl true
   def run(args) do

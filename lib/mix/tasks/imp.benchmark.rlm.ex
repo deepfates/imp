@@ -15,7 +15,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Rlm do
   @shortdoc "Run RLM benchmark parity evidence"
 
   @default_data "test/fixtures/benchmarks/hotpotqa-small.jsonl"
-  @default_out_dir Imp.BenchmarkTruth.Paths.runs("rlm")
+  @default_out_dir "benchmarks/runs/rlm"
 
   @impl true
   def run(args) do

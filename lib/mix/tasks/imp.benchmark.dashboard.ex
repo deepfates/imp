@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
 
   @shortdoc "Aggregate parity and performance evidence into a dashboard"
 
-  @default_results_dir Imp.BenchmarkTruth.Paths.runs_root()
+  @default_results_dir "benchmarks/runs"
   @default_claims_file "benchmarks/claims.json"
   @failure_case_ids ~w(
     task_cancellation_releases_admission

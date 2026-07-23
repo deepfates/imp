@@ -15,10 +15,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
   alias Mix.Tasks.Imp.Benchmark.FastSlow.Backend
 
   @shortdoc "Run deterministic Fast-Slow protocol evidence"
-  @default_out Path.join(
-                 Imp.BenchmarkTruth.Paths.runs("fast-slow"),
-                 "fast-slow-protocol.json"
-               )
+  @default_out "benchmarks/runs/fast-slow/fast-slow-protocol.json"
   @modes ~w(prompt_only slow_only combined)
 
   @impl true

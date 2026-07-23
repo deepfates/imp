@@ -21,7 +21,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolAgent do
 
   @shortdoc "Run RAG/tool/agent parity and production-semantics checks"
 
-  @default_out_dir Imp.BenchmarkTruth.Paths.runs("rag-tool-agent")
+  @default_out_dir "benchmarks/runs/rag-tool-agent"
   @fixture_path "test/fixtures/benchmarks/rag-tool-agent-provider-free.json"
   @script_path "scripts/dspy_rag_tool_agent.py"
   @task_path "lib/mix/tasks/imp.benchmark.rag_tool_agent.ex"

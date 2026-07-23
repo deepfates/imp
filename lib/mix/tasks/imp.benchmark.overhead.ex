@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
 
   @shortdoc "Run provider-free Imp-vs-DSPy overhead benchmarks"
 
-  @default_out_dir Imp.BenchmarkTruth.Paths.runs("overhead")
+  @default_out_dir "benchmarks/runs/overhead"
   @dspy_script "scripts/dspy_overhead_benchmark.py"
   alias Imp.BenchmarkTruth.{ArtifactFile, OverheadPolicy, RunContext}
 

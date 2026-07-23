@@ -25,7 +25,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
   alias Imp.BenchmarkTruth.OptimizeAnything.PricingPolicy
 
   @shortdoc "Validate Optimize Anything replication evidence"
-  @default_out_dir Imp.BenchmarkTruth.Paths.runs("optimize-anything")
+  @default_out_dir "benchmarks/runs/optimize-anything"
   @impl true
   def run(args) do
     Mix.Task.run("app.start")

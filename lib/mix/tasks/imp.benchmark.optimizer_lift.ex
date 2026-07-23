@@ -20,7 +20,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
 
   @shortdoc "Run Imp-vs-DSPy matched-mechanism optimizer lift parity checks"
 
-  @default_out_dir Imp.BenchmarkTruth.Paths.runs("optimizer-lift")
+  @default_out_dir "benchmarks/runs/optimizer-lift"
 
   @impl true
   def run(args) do

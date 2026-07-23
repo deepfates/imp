@@ -13,12 +13,8 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
 
   @shortdoc "Aggregate live matched-model parity campaigns into a matrix"
 
-  @default_in Path.join(
-                Imp.BenchmarkTruth.Paths.runs("parity"),
-                "imp-dspy-parity-campaign-*.json"
-              )
+  @default_in "benchmarks/runs/parity/imp-dspy-parity-campaign-*.json"
   @default_out "tmp/live-matrix"
-  @current_prompt_contract Imp.BenchmarkTruth.Contract.current_prompt_contract()
   @current_evidence_policy_version 2
 
   @impl true
@@ -366,7 +362,7 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
         "wire_api_matched" => generation_proof["wire_api_matched"],
         "prompt_contract_current" => generation_proof["prompt_contract_current"],
         "prompt_contract" => generation_proof["prompt_contract"],
-        "expected_prompt_contract" => @current_prompt_contract
+        "expected_prompt_contract" => current_prompt_contract()
       },
       "score" =>
         Map.take(artifact["aggregate"] || %{}, ["imp_score", "dspy_score", "score_delta"]),
@@ -410,7 +406,7 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
       "matched" => effective["matched"] == true,
       "wire_api_matched" => effective["wire_api_matched"] == true,
       "prompt_contract" => prompt_contract,
-      "prompt_contract_current" => prompt_contract == @current_prompt_contract
+      "prompt_contract_current" => prompt_contract == current_prompt_contract()
     }
   end
 
@@ -431,7 +427,7 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
           wire_api_family(imp_generation["wire_api"]) ==
             wire_api_family(dspy_generation["wire_api"]),
       "prompt_contract" => prompt_contract,
-      "prompt_contract_current" => prompt_contract == @current_prompt_contract
+      "prompt_contract_current" => prompt_contract == current_prompt_contract()
     }
   end
 
@@ -444,7 +440,7 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
       "matched" => false,
       "wire_api_matched" => false,
       "prompt_contract" => prompt_contract,
-      "prompt_contract_current" => prompt_contract == @current_prompt_contract
+      "prompt_contract_current" => prompt_contract == current_prompt_contract()
     }
   end
 
@@ -556,7 +552,7 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
       "models_with_current_prompt_contract" => length(current),
       "total_models" => length(models),
       "complete" => models != [] and length(current) == length(models),
-      "expected" => @current_prompt_contract,
+      "expected" => current_prompt_contract(),
       "by_model" =>
         Map.new(models, fn model ->
           {
@@ -1456,6 +1452,11 @@ defmodule Mix.Tasks.Imp.Benchmark.LiveMatrix do
 
   defp file_sha256(path),
     do: :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
+
+  # Benchmark helpers compile only in source checkouts. Resolve this at task
+  # runtime so Imp remains a cleanly compilable dependency of another project.
+  defp current_prompt_contract,
+    do: Imp.BenchmarkTruth.Contract.current_prompt_contract()
 
   defp git_sha do
     case System.cmd("git", ["rev-parse", "HEAD"], stderr_to_stdout: true) do
