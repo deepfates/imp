@@ -79,11 +79,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     # gates response_format on the SAME tier the DSPy FixtureLM declares
     # (dee-ps19). `lm_capability` is optional; absent => DSPy BaseLM default
     # (none), matching the historical fixtures.
-    lm = %Imp.BenchmarkTruth.GoldenTraceFixtureLM{
-      queue: queue,
-      calls: calls,
-      capability: Imp.LM.Capability.from_tier(case["lm_capability"])
-    }
+    lm =
+      struct!(Imp.BenchmarkTruth.GoldenTraceFixtureLM,
+        queue: queue,
+        calls: calls,
+        capability: Imp.LM.Capability.from_tier(case["lm_capability"])
+      )
 
     try do
       signature = Imp.signature(case["signature"], case["instructions"] || "")

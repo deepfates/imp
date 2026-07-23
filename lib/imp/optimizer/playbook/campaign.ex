@@ -393,7 +393,10 @@ defmodule Imp.Optimizer.Playbook.Campaign do
         cache: false
       )
 
-    %BudgetedLM{inner: inner, budget: budget}
+    # BudgetedLM belongs to the source-checkout benchmark lane (`bench/`), not
+    # the published runtime. Resolve it only when this campaign actually runs
+    # so Imp remains compilable as another project's production dependency.
+    struct!(BudgetedLM, inner: inner, budget: budget)
   end
 
   defp rebind_lm(program, lm) do
