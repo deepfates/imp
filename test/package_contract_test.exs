@@ -89,6 +89,75 @@ defmodule PackageContractTest do
     assert is_list(Keyword.fetch!(aliases, :"package.clean"))
   end
 
+  test "source checkout retains its local research task surface" do
+    assert Mix.Task.get("imp.benchmark.run") == Mix.Tasks.Imp.Benchmark.Run
+    assert Mix.Task.get("imp.package.clean_room") == Mix.Tasks.Imp.Package.CleanRoom
+    assert Code.ensure_loaded?(Imp.BenchmarkTruth)
+    assert Code.ensure_loaded?(Imp.Optimizer.Playbook.Campaign)
+  end
+
+  @tag timeout: 180_000
+  test "ordinary path consumption compiles only the quiet runtime surface" do
+    root = File.cwd!()
+    consumer = Path.join(root, "tmp/path-dependency-contract")
+    File.rm_rf!(consumer)
+    File.mkdir_p!(consumer)
+
+    File.write!(
+      Path.join(consumer, "mix.exs"),
+      """
+      defmodule ImpPathConsumer.MixProject do
+        use Mix.Project
+
+        def project do
+          [
+            app: :imp_path_consumer,
+            version: "0.0.0",
+            elixir: "~> 1.19",
+            deps: [{:imp, path: #{inspect(root)}}]
+          ]
+        end
+      end
+      """
+    )
+
+    File.cp!(Path.join(root, "mix.lock"), Path.join(consumer, "mix.lock"))
+    on_exit(fn -> File.rm_rf(consumer) end)
+
+    {get_output, get_status} =
+      System.cmd("mix", ["deps.get"],
+        cd: consumer,
+        env: [{"MIX_ENV", "dev"}],
+        stderr_to_stdout: true
+      )
+
+    assert get_status == 0, get_output
+
+    {output, status} =
+      System.cmd("mix", ["compile"],
+        cd: consumer,
+        env: [{"MIX_ENV", "dev"}],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+    assert output =~ "==> imp\nCompiling"
+
+    imp_output = output |> String.split("==> imp\n") |> List.last()
+    refute imp_output =~ "warning:"
+
+    beams =
+      consumer
+      |> Path.join("_build/dev/lib/imp/ebin/*.beam")
+      |> Path.wildcard()
+      |> Enum.map(&Path.basename/1)
+
+    assert "Elixir.Imp.beam" in beams
+    refute Enum.any?(beams, &String.starts_with?(&1, "Elixir.Mix.Tasks.Imp."))
+    refute "Elixir.Imp.BenchmarkTruth.beam" in beams
+    refute "Elixir.Imp.Optimizer.Playbook.Campaign.beam" in beams
+  end
+
   test "root project declares the Imp OTP application contract" do
     assert Mix.Project.config()[:app] == :imp
     assert Imp.MixProject.application()[:mod] == {Imp.Application, []}

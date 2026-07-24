@@ -139,13 +139,26 @@ defmodule Imp.MixProject do
     ]
   end
 
-  # bench/ holds the parity-forensics module families (benchmark truth,
-  # upstream fidelity, research portfolio, reproduction registry, evidence
-  # authorities, legacy identity audit). They compile in dev and test so the
-  # gates and mix tasks keep working, and never ship in the package.
+  # bench/ and source_checkout_files/ form Imp's local research control plane.
+  # They remain available in a top-level dev/test checkout. Mix compiles
+  # dependencies in :prod by default, where we select the same runtime source
+  # files that the Hex package ships instead of compiling local control tasks.
   defp elixirc_paths(:test), do: ["lib", "bench", "test/support"]
   defp elixirc_paths(:dev), do: ["lib", "bench"]
-  defp elixirc_paths(_env), do: ["lib"]
+  defp elixirc_paths(_env), do: runtime_source_files()
+
+  defp runtime_source_files do
+    Path.wildcard("lib/**/*.ex") -- source_checkout_files()
+  end
+
+  defp source_checkout_files do
+    Path.wildcard("lib/mix/tasks/**/*.ex") ++
+      Path.wildcard("lib/imp/benchmark*.ex") ++
+      [
+        "lib/imp/optimizer/playbook/campaign.ex",
+        "lib/imp/optimizer/playbook/equation_search.ex"
+      ]
+  end
 
   defp package do
     [
@@ -159,17 +172,10 @@ defmodule Imp.MixProject do
   end
 
   defp package_files do
-    # Parity-forensics module families live under bench/ (compiled only in
-    # dev/test via elixirc_paths), so they never enter the lib/ wildcard.
-    excluded_lib =
-      Path.wildcard("lib/mix/tasks/**/*.ex") ++
-        Path.wildcard("lib/imp/benchmark*.ex") ++
-        [
-          "lib/imp/optimizer/playbook/campaign.ex",
-          "lib/imp/optimizer/playbook/equation_search.ex"
-        ]
-
-    (Path.wildcard("lib/**/*.ex") -- excluded_lib) ++
+    # Keep packaging and dependency compilation on one canonical runtime list.
+    # Local benchmark/evidence control files remain available only to a
+    # top-level dev/test checkout.
+    runtime_source_files() ++
       Path.wildcard("examples/deployment/**/*") ++
       product_docs() ++
       livebooks() ++
