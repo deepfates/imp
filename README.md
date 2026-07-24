@@ -129,8 +129,9 @@ maps every name you already know and states exactly what differs.
 
 ## Where this is going
 
-First, a Hex release. Second, an interactive-fiction environment package,
-where an optimizer teaches an agent to survive a classic dungeon and every
-episode is a replayable, branchable log. Third, the bet that belongs to
-this runtime: optimization as a resident process, programs improving from
-their own recorded history, under supervision, while they run.
+First, a Hex release. The interactive-fiction environment is now
+[Grue](https://github.com/deepfates/grue): its optional benchmark harness runs
+Imp policies against forkable Z-machine sessions and records replayable Lync
+episodes. The next bet belongs to this runtime: optimization as a resident
+process, programs improving from their own recorded history, under supervision,
+while they run.
