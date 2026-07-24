@@ -295,7 +295,12 @@
       "task": "imp.benchmark.instruction_optimizer_contract",
       "args": [],
       "manifest": null,
-      "artifact_validator": null
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
     },
     "instruction_live": {
       "mode": "live",
@@ -319,7 +324,12 @@
       "task": "imp.benchmark.gepa_contract",
       "args": [],
       "manifest": null,
-      "artifact_validator": null
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Imp.BenchmarkTruth.ReproductionArtifactValidator",
+        "function": "validate!",
+        "arity": 2
+      }
     },
     "gepa_live": {
       "mode": "live",

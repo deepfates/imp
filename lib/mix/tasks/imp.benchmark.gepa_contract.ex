@@ -98,7 +98,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
         "generated_at" =>
           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
         "git_sha" => git_sha(),
-        "gepa" => upstream["gepa"]
+        "gepa" => sanitized_gepa_identity(upstream["gepa"])
       })
 
     path =
@@ -587,6 +587,12 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
   defp current_gepa_python do
     System.get_env("IMP_GEPA_V011_PYTHON") || System.get_env("IMP_GEPA_PYTHON") ||
       "python3"
+  end
+
+  defp sanitized_gepa_identity(identity) do
+    identity
+    |> Map.drop(["checkout"])
+    |> Map.put("source_materialization", "exact pinned git checkout")
   end
 
   defp resolve_executable!(path) do

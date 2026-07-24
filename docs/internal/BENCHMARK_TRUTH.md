@@ -227,8 +227,7 @@ process differential against the stable authority, DSPy `3.2.1` at commit
 `29448ae12756abdd14bd8796c819247ebb83673c`. Prepare an absent environment with:
 
 ```sh
-git clone https://github.com/stanfordnlp/dspy.git tmp/dspy-3.2.1
-git -C tmp/dspy-3.2.1 checkout --detach 29448ae12756abdd14bd8796c819247ebb83673c
+scripts/setup_dspy_stable_source.sh
 IMP_DSPY_VENV=tmp/dspy-parity-venv scripts/setup_dspy_parity_env.sh
 ```
 

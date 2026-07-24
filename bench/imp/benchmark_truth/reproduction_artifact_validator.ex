@@ -11,6 +11,88 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
   @instruction_identity_sha256 "sha256:18820f43f5c0a66a974f6efd333a8a92bc35cd609a24233f1bbf578e61b38140"
   @instruction_manifest_sha256 "sha256:f9837ae3d09eed6b5460470725e610bd87071801d134db7516705e61c643f0bf"
   @instruction_dspy_commit "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+  @instruction_contract_sources %{
+    "dspy/propose/grounded_proposer.py" =>
+      "c9900b74c0997410f915f2a470d39dcd9d55c1fa8b9cdf35799915ec0b1617e3",
+    "dspy/teleprompt/bootstrap.py" =>
+      "0a588f11f09a358a5306540cc42401d905073c9452e54d32348b13d12bbb1255",
+    "dspy/teleprompt/mipro_optimizer_v2.py" =>
+      "6bf7632836d3a54ab0da3f38a8f1963813472312e9c0e3f2ff19b4377af407f3",
+    "dspy/teleprompt/simba.py" =>
+      "4de72e1d0cb1cd30a180569c21973c41fa272c3ebb82a365e3f307986ab67a55",
+    "dspy/teleprompt/simba_utils.py" =>
+      "ed745647ffcfcf4090e5d5b5489cd0b13ebfff1d38a22559563f4f606b31fb2c",
+    "dspy/teleprompt/utils.py" =>
+      "218c38c25dde75aab9b1d452a15c75687c2e1842d7157dcc6c695f5adbcaf182"
+  }
+  @instruction_contract_row_ids ~w(
+    mipro_auto_light_false
+    mipro_auto_light_true
+    mipro_auto_medium_false
+    mipro_auto_medium_true
+    mipro_auto_heavy_false
+    mipro_auto_heavy_true
+    mipro_manual_budget
+    mipro_recommended_trials
+    mipro_demo_arms_with_labels
+    mipro_demo_arms_zero_labels
+    bootstrap_repeated_predictor_calls_behavior
+    mipro_proposal_rotation_0
+    mipro_proposal_rotation_1
+    mipro_proposal_rotation_2
+    mipro_minibatch_schedule_10
+    mipro_minibatch_schedule_12
+    mipro_categorical_with_demos
+    mipro_categorical_without_demos
+    simba_batch_bucket_ordering
+    simba_finalists_0
+    simba_finalists_3
+    simba_finalists_8
+    simba_finalists_6
+    simba_rollouts_without_teacher
+    simba_rollouts_with_teacher
+    simba_tie_at_lower_boundary
+    simba_tie_at_upper_boundary
+    simba_tie_strictly_between
+    simba_eviction_7_0_4
+    simba_eviction_7_2_4
+    simba_eviction_7_4_4
+    simba_eviction_5_4_4
+    simba_eviction_7_3_0
+  )
+  @gepa_contract_commit "b4dbb55b7601dac448cdb836d5a401ca7d9eb920"
+  @gepa_contract_sources %{
+    "src/gepa/core/engine.py" =>
+      "92627720354261b9eb5359337b9b237a2a29ebf179b22a4b724b737bde81a088",
+    "src/gepa/core/result.py" =>
+      "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85",
+    "src/gepa/core/state.py" =>
+      "08108908eb922808c2ad134c9717d32b107581a5766e6b99199c248d538999e5",
+    "src/gepa/gepa_utils.py" =>
+      "60aca7024e31a3e273a01187a6329f381f297a77ec7b6add4b9c90b4d64e9b6c",
+    "src/gepa/proposer/merge.py" =>
+      "cd0a3254927e399d0cae4a212076f7577161027b3c4ff19d03c3d2150408ee5a",
+    "src/gepa/strategies/component_selector.py" =>
+      "248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568",
+    "src/gepa/utils/stop_condition.py" =>
+      "3f18fa989a376711dc198d60963dc9b866da6d5a81f5c5339e242b3301764a0c"
+  }
+  @gepa_contract_row_ids ~w(
+    strict_mutation_acceptance
+    equal_or_better_merge_acceptance
+    weighted_pareto_selection
+    round_robin_component_rotation
+    common_ancestor_merge_filtering
+    common_ancestor_merge_crossover
+    common_ancestor_merge_overlap_gate
+    frontier_mapping_instance
+    frontier_mapping_objective
+    frontier_mapping_hybrid
+    frontier_mapping_cartesian
+    budget_and_stopper_boundaries
+    json_result_resume_and_rng
+    named_program_mutation
+  )
   @multimodal_campaign "ds" <>
                          "ex-multimodal-quality-openai-gpt-4.1-mini-2025-04-14-responses-v3"
   @multimodal_sample_set_sha256 "4adcd95c8a4c89a855d6d37481839cb4fe26d55c31319bcc2af90c496cf9db4e"
@@ -246,6 +328,120 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
     require!(
       Map.keys(artifact["runtimes"] || %{}) |> Enum.sort() == ["dspy", "imp"],
       "wrong instruction runtime contract"
+    )
+  end
+
+  def validate!("instruction_contract", artifact) do
+    dspy = artifact["dspy"] || %{}
+
+    require!(credential_safe_artifact?(artifact), "instruction contract is not credential-safe")
+    require!(artifact["schema_version"] == 1, "wrong instruction contract schema")
+
+    require!(
+      artifact["evidence_tier"] == "t1_instruction_optimizer_differential_contract",
+      "wrong instruction contract tier"
+    )
+
+    require!(
+      artifact["claim_scope"] ==
+        "provider-free MIPROv2/SIMBA structural control-flow semantics",
+      "wrong instruction contract scope"
+    )
+
+    require!(source_revision?(artifact["git_sha"]), "invalid instruction source revision")
+
+    require!(
+      Map.take(dspy, ["version", "commit"]) == %{
+        "version" => "3.3.0b1",
+        "commit" => @instruction_dspy_commit
+      } and source_map(dspy["sources"]) == @instruction_contract_sources,
+      "wrong instruction authority materialization"
+    )
+
+    require!(
+      artifact["summary"] == %{
+        "exact_sampler_sequence_parity" => false,
+        "full_optimizer_parity" => false,
+        "paper_protocol_complete" => false,
+        "required_cases" => 33,
+        "required_passing" => 33,
+        "structural_contract_complete" => true,
+        "total_cases" => 33
+      },
+      "wrong instruction contract summary"
+    )
+
+    validate_contract_rows!(artifact["rows"], @instruction_contract_row_ids)
+
+    require!(
+      deviation_ids(artifact) ==
+        ~w(
+          bootstrap_repeated_predictor_calls
+          grounded_proposer_call_graph
+          mipro_sampler_sequence
+          optimizer_rng_sequence
+        ),
+      "wrong instruction native-deviation boundary"
+    )
+  end
+
+  def validate!("gepa_contract", artifact) do
+    gepa = artifact["gepa"] || %{}
+
+    require!(credential_safe_artifact?(artifact), "GEPA contract is not credential-safe")
+    require!(artifact["schema_version"] == 1, "wrong GEPA contract schema")
+
+    require!(
+      artifact["evidence_tier"] == "t1_gepa_v011_structural_differential_contract",
+      "wrong GEPA contract tier"
+    )
+
+    require!(
+      artifact["claim_scope"] ==
+        "provider-free GEPA v0.1.1 structural semantics; not effectiveness evidence",
+      "wrong GEPA contract scope"
+    )
+
+    require!(source_revision?(artifact["git_sha"]), "invalid GEPA source revision")
+
+    require!(
+      Map.take(gepa, [
+        "version",
+        "tag",
+        "commit",
+        "project_metadata_version",
+        "source_materialization"
+      ]) == %{
+        "version" => "0.1.1",
+        "tag" => "v0.1.1",
+        "commit" => @gepa_contract_commit,
+        "project_metadata_version" => "0.1.0",
+        "source_materialization" => "exact pinned git checkout"
+      } and not Map.has_key?(gepa, "checkout") and
+        source_map(gepa["sources"]) == @gepa_contract_sources,
+      "wrong GEPA authority materialization"
+    )
+
+    require!(
+      artifact["summary"] == %{
+        "exact_rng_sequence_parity" => false,
+        "full_optimizer_parity" => false,
+        "optimizer_effectiveness" => false,
+        "paper_reproduction" => false,
+        "required_cases" => 14,
+        "required_passing" => 14,
+        "structural_contract_complete" => true,
+        "total_cases" => 14
+      },
+      "wrong GEPA contract summary"
+    )
+
+    validate_contract_rows!(artifact["rows"], @gepa_contract_row_ids)
+
+    require!(
+      deviation_ids(artifact) ==
+        ~w(optimizer_rng_sequence release_metadata_version resume_rng_persistence),
+      "wrong GEPA native-deviation boundary"
     )
   end
 
@@ -515,6 +711,42 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
   end
 
   defp nonempty_string?(value), do: is_binary(value) and value != ""
+
+  defp source_revision?(value),
+    do: is_binary(value) and byte_size(value) == 40 and String.match?(value, ~r/\A[0-9a-f]{40}\z/)
+
+  defp source_map(sources) when is_list(sources) do
+    Map.new(sources, fn source -> {source["path"], source["sha256"]} end)
+  end
+
+  defp source_map(_sources), do: %{}
+
+  defp deviation_ids(artifact) do
+    artifact
+    |> Map.get("declared_native_deviations", [])
+    |> Enum.map(& &1["id"])
+    |> Enum.sort()
+  end
+
+  defp validate_contract_rows!(rows, expected_ids) when is_list(rows) do
+    require!(
+      Enum.map(rows, & &1["id"]) |> Enum.sort() == Enum.sort(expected_ids),
+      "contract row set differs from the admitted scope"
+    )
+
+    require!(
+      Enum.all?(rows, fn row ->
+        row["required"] == true and row["passing"] == true and row["status"] == "matched" and
+          row["errors"] == []
+      end),
+      "contract contains a non-matching required row"
+    )
+
+    :ok
+  end
+
+  defp validate_contract_rows!(_rows, _expected_ids),
+    do: raise(ArgumentError, "contract rows must be a list")
 
   defp multimodal_runner do
     %{

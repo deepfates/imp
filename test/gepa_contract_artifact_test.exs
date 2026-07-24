@@ -5,6 +5,23 @@ defmodule GEPAContractArtifactTest do
 
   alias Mix.Tasks.Imp.Benchmark.GepaContract
 
+  @gepa_sources %{
+    "src/gepa/core/engine.py" =>
+      "92627720354261b9eb5359337b9b237a2a29ebf179b22a4b724b737bde81a088",
+    "src/gepa/core/result.py" =>
+      "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85",
+    "src/gepa/core/state.py" =>
+      "08108908eb922808c2ad134c9717d32b107581a5766e6b99199c248d538999e5",
+    "src/gepa/gepa_utils.py" =>
+      "60aca7024e31a3e273a01187a6329f381f297a77ec7b6add4b9c90b4d64e9b6c",
+    "src/gepa/proposer/merge.py" =>
+      "cd0a3254927e399d0cae4a212076f7577161027b3c4ff19d03c3d2150408ee5a",
+    "src/gepa/strategies/component_selector.py" =>
+      "248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568",
+    "src/gepa/utils/stop_condition.py" =>
+      "3f18fa989a376711dc198d60963dc9b866da6d5a81f5c5339e242b3301764a0c"
+  }
+
   test "compare matches all provider-free GEPA v0.1.1 structural cases without T3 claims" do
     artifact = GepaContract.compare(upstream_fixture())
 
@@ -25,6 +42,39 @@ defmodule GEPAContractArtifactTest do
     assert rows["json_result_resume_and_rng"]["actual"]["live_rng_state_preserved"]
     assert rows["named_program_mutation"]["actual"]["after"]["writer"] == "concise writer"
     assert length(artifact["declared_native_deviations"]) == 3
+
+    admitted =
+      Map.merge(artifact, %{
+        "schema_version" => 1,
+        "evidence_tier" => "t1_gepa_v011_structural_differential_contract",
+        "claim_scope" =>
+          "provider-free GEPA v0.1.1 structural semantics; not effectiveness evidence",
+        "generated_at" => "2026-07-24T00:00:00Z",
+        "git_sha" => String.duplicate("a", 40),
+        "gepa" => %{
+          "version" => "0.1.1",
+          "tag" => "v0.1.1",
+          "commit" => "b4dbb55b7601dac448cdb836d5a401ca7d9eb920",
+          "project_metadata_version" => "0.1.0",
+          "project_metadata_version_note" =>
+            "the v0.1.1 tag retains version=0.1.0 in pyproject.toml",
+          "source_materialization" => "exact pinned git checkout",
+          "sources" =>
+            Enum.map(@gepa_sources, fn {path, sha256} -> %{"path" => path, "sha256" => sha256} end)
+        }
+      })
+
+    assert :ok =
+             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
+               "gepa_contract",
+               admitted
+             )
+
+    tampered = put_in(admitted, ["rows", Access.at(0), "passing"], false)
+
+    assert_raise ArgumentError, ~r/non-matching required row/, fn ->
+      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!("gepa_contract", tampered)
+    end
   end
 
   test "Mix task rejects a checkout that does not satisfy the commit, tag, and source pins" do

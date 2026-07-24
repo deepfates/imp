@@ -19,6 +19,8 @@ if [ "$installed_deno_version" != "$DENO_VERSION" ]; then
   exit 1
 fi
 
+scripts/setup_dspy_stable_source.sh
+
 if command -v uv >/dev/null 2>&1; then
   uv venv --clear --python "$DSPY_PYTHON" "$DSPY_VENV"
   uv pip sync --python "$DSPY_VENV/bin/python" "$DSPY_LOCK"
