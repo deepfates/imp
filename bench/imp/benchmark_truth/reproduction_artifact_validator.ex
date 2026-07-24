@@ -398,7 +398,7 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
 
     require!(
       artifact["claim_scope"] ==
-        "provider-free GEPA v0.1.1 structural semantics; not effectiveness evidence",
+        "provider-free GEPA v0.1.1 structural semantics",
       "wrong GEPA contract scope"
     )
 

@@ -47,8 +47,7 @@ defmodule GEPAContractArtifactTest do
       Map.merge(artifact, %{
         "schema_version" => 1,
         "evidence_tier" => "t1_gepa_v011_structural_differential_contract",
-        "claim_scope" =>
-          "provider-free GEPA v0.1.1 structural semantics; not effectiveness evidence",
+        "claim_scope" => "provider-free GEPA v0.1.1 structural semantics",
         "generated_at" => "2026-07-24T00:00:00Z",
         "git_sha" => String.duplicate("a", 40),
         "gepa" => %{

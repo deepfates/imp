@@ -488,14 +488,23 @@ defmodule Imp.UpstreamFidelity do
       invariants: [
         "public names preserve the upstream optimization mechanism",
         "proposal, bootstrapping, search, and selection stages are independently observable",
-        "optimization demonstrates held-out lift under matched budgets"
+        "a source-bound T1 differential matches 33 declared DSPy 3.3.0b1 MIPROv2 and SIMBA structural cases while retaining RNG, sampler, and proposer-call-graph deviations",
+        "the admitted one-seed live AIME preflight is operational T2 evidence only; optimization effectiveness still requires multi-seed held-out lift under matched budgets"
       ],
       evidence: %{
-        tests: ["test/optimizer_behavioral_corpus_test.exs"],
+        tests: [
+          "test/optimizer_behavioral_corpus_test.exs",
+          "test/instruction_optimizer_contract_artifact_test.exs",
+          "test/instruction_optimizer_experiment_test.exs"
+        ],
         docs: ["docs/API_GUIDE.md"],
+        artifacts: [
+          "benchmarks/evidence/admitted/instruction_contract/0d032ab3266c2eb8aef9ea021a1a445688cbdc4e208d9bde9d57037b1f302a49.json",
+          "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json"
+        ],
         missing: [
-          "matched DSPy 3.3.0b1 MIPROv2 differential artifact",
-          "matched DSPy 3.3.0b1 SIMBA differential artifact",
+          "matched upstream differential evidence for InferRules and SignatureOptimizer",
+          "C3 multi-seed held-out MIPROv2 and SIMBA effectiveness under matched controls",
           "paper-scale lift evidence"
         ]
       }
@@ -521,6 +530,7 @@ defmodule Imp.UpstreamFidelity do
       imp: [Imp.Optimizer.GEPA, Imp.Optimize.Anything],
       invariants: [
         "the local engine and adapter contracts track pinned standalone GEPA v0.1.4 structure",
+        "the admitted provider-free T1 differential matches 14 structural cases against the exact historical GEPA v0.1.1 checkout and retains its RNG, resume, and release-metadata deviations",
         "reflective mutation uses per-example feedback and trajectories in focused local tests",
         "candidate lineage, Pareto state, and source-versioned results are retained locally",
         "C1 conformance does not establish matched upstream or paper-family outcomes"
@@ -533,9 +543,13 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_replication_artifact_test.exs"
         ],
         docs: ["docs/ADVANCED.md", "docs/internal/RESEARCH_LANDSCAPE.md"],
+        artifacts: [
+          "benchmarks/evidence/admitted/gepa_contract/2e5a81e9b6202c9f46be14467c7e0eb54c0c708e3adc712f58ee667b28163a58.json"
+        ],
         missing: [
-          "C2 matched upstream differential evidence",
-          "C3 matched live-provider evidence",
+          "C1 matched standalone v0.1.4 differential evidence beyond the admitted v0.1.1 historical contract",
+          "C2 real operational GEPA execution evidence",
+          "C3 multi-seed held-out effectiveness under matched controls",
           "C4 full paper-family campaign evidence",
           "C5 independently reproduced outcome evidence"
         ]
