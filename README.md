@@ -56,6 +56,12 @@ with a scripted model — Livebooks 02–05 and the "Test It Without A Provider"
 step of the [Learning Path](docs/LEARNING_PATH.md) run start to finish with
 no provider and no spend.
 
+For the shortest terminal path, run the
+[provider-free ticket router](examples/provider_free_ticket_router/README.md).
+It measures the same typed program before and after deterministic few-shot
+compilation from an ordinary consumer project; the package gate also runs it
+offline from the built artifact.
+
 ## Because the program is a value, the rest is ordinary engineering
 
 Each stage below is one stop on the [Learning Path](docs/LEARNING_PATH.md),

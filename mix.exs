@@ -14,7 +14,8 @@ defmodule Imp.MixProject do
         main: "Imp",
         assets: %{"assets" => "assets"},
         api_reference: true,
-        extras: ["README.md", "CHANGELOG.md"] ++ product_docs() ++ livebooks(),
+        extras:
+          ["README.md", "CHANGELOG.md", "RELEASE_NOTES.md"] ++ product_docs() ++ livebooks(),
         filter_modules: &public_doc_module?/2,
         skip_undefined_reference_warnings_on: &skip_filtered_doc_reference?/1,
         skip_code_autolink_to: &skip_filtered_doc_reference?/1
@@ -177,12 +178,14 @@ defmodule Imp.MixProject do
     # top-level dev/test checkout.
     runtime_source_files() ++
       Path.wildcard("examples/deployment/**/*") ++
+      Path.wildcard("examples/provider_free_ticket_router/**/*") ++
       product_docs() ++
       livebooks() ++
       [
         ".formatter.exs",
         "CHANGELOG.md",
         "LICENSE",
+        "RELEASE_NOTES.md",
         "assets/imp-with-cards.jpg",
         "priv/public_api.json",
         "priv/tutorial/support_tickets.json",

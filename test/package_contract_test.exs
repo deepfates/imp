@@ -10,8 +10,12 @@ defmodule PackageContractTest do
     "priv/public_api.json",
     "CHANGELOG.md",
     "LICENSE",
+    "RELEASE_NOTES.md",
     "README.md",
     "docs/API_GUIDE.md",
+    "examples/provider_free_ticket_router/README.md",
+    "examples/provider_free_ticket_router/mix.exs",
+    "examples/provider_free_ticket_router/run.exs",
     "livebooks/01_real_lm_front_door.livemd",
     "livebooks/02_programming_not_prompting.livemd"
   ]
@@ -83,6 +87,7 @@ defmodule PackageContractTest do
     assert moduledoc =~ "mix imp.package.clean_room"
     assert moduledoc =~ "--lock"
     assert moduledoc =~ "source checkout's `mix.lock`"
+    assert moduledoc =~ "provider-free"
 
     aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
     assert hd(Keyword.fetch!(aliases, :"package.check")) == "package.clean"

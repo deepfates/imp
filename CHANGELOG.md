@@ -7,6 +7,11 @@ Versioning once the first public package is released.
 
 ### Added
 
+- A packaged provider-free ticket-router consumer now demonstrates the complete
+  typed program → held-out evaluation → deterministic few-shot compilation
+  lifecycle. The Hex clean-room gate copies it outside the package and runs it
+  offline against the built artifact; its scripted 25% → 100% result is a
+  teaching fixture, not a real-model effectiveness claim.
 - `n=` multi-completion on `Imp.Predict.Predict` (DSPy `Predict(n=K)`):
   `config: [n: K]` asks the LM for K completions and fills
   `Imp.Prediction.completions` with all K parsed predictions (the first is

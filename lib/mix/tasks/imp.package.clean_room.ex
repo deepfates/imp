@@ -3,8 +3,9 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
   Prove package deployment and persistence from isolated, offline consumer VMs.
 
   By default the task builds an unpacked Hex package, creates a clean consumer,
-  writes a callback-bearing artifact in one VM, and loads it in a second VM with
-  a separately constructed callback registry. The loader explicitly supplies a
+  runs the packaged provider-free tutorial from that consumer boundary, writes a
+  callback-bearing artifact in one VM, and loads it in a second VM with a
+  separately constructed callback registry. The loader explicitly supplies a
   fresh credential-bearing LM, executes the program, and verifies that a
   modified artifact fails its checksum. It then compiles the deployment example
   shipped in the package as a release and probes it in a third VM.
@@ -44,6 +45,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
 
     package_dir = prepare_package!(opts[:package], output, root)
     lockfile = prepare_lock!(opts[:lock], root)
+    prove_provider_free_tutorial!(package_dir, lockfile, output)
     prove_persistence!(package_dir, lockfile, output)
 
     unless opts[:skip_release] do
@@ -124,6 +126,33 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     )
 
     artifact
+  end
+
+  defp prove_provider_free_tutorial!(package_dir, lockfile, output) do
+    source = Path.join(package_dir, "examples/provider_free_ticket_router")
+
+    unless File.regular?(Path.join(source, "run.exs")) do
+      Mix.raise("package does not contain examples/provider_free_ticket_router")
+    end
+
+    tutorial_dir = Path.join(output, "provider-free-ticket-router")
+    File.cp_r!(source, tutorial_dir)
+    File.cp!(lockfile, Path.join(tutorial_dir, "mix.lock"))
+
+    env = [{"IMP_PATH", package_dir}]
+    offline_mix!(tutorial_dir, ["deps.get"], env)
+    offline_mix!(tutorial_dir, ["compile", "--warnings-as-errors"], env)
+
+    output =
+      offline_mix!(
+        tutorial_dir,
+        ["run", "--no-compile", "--no-deps-check", "run.exs"],
+        env
+      )
+
+    unless output =~ "provider-free tutorial passed: 25% -> 100%" do
+      Mix.raise("provider-free tutorial did not report its expected measured lift")
+    end
   end
 
   defp prove_release!(package_dir, lockfile, output) do
@@ -321,5 +350,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     if status != 0 do
       Mix.raise("command failed (#{status}): #{command} #{Enum.join(args, " ")}")
     end
+
+    output
   end
 end

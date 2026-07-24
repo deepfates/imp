@@ -20,6 +20,12 @@ install from a source checkout:
 Documentation ships in the repository under `docs/` and will land on
 hexdocs.pm with the Hex release.
 
+The `v0.2.1` tag is the last named 0.2.x source candidate. Current `main`
+contains additional unreleased changes, including the breaking changes listed
+under `Unreleased` in `CHANGELOG.md`; it must not be published as a 0.2.x patch
+without an explicit version disposition. Package checks on `main` establish
+artifact and consumer integrity, not a release-version decision.
+
 ## What you are getting
 
 Be precise about what kind of thing this release is, in three layers:
@@ -66,8 +72,15 @@ evaluation fan-out, tools in isolated tasks under their own timeouts, scripted
 deterministic testing with `Imp.LM.Static` through the same seams production
 uses, compiled programs as checksummed artifacts with no secrets inside,
 credentials bound at runtime, and redacted telemetry on every call, retry, and
-tool step. The [deployment example](examples/deployment) is a complete OTP
+tool step. The [deployment example](examples/deployment/README.md) is a complete OTP
 application.
+
+The packaged
+[provider-free ticket router](examples/provider_free_ticket_router/README.md)
+is the cold-start product proof: a separate consumer compiles a typed router,
+measures a deterministic 25% baseline, attaches four reviewable demonstrations,
+and measures 100% after compilation. Its scripted LM proves the package and
+program/evaluation/optimizer lifecycle, not real-model effectiveness.
 
 ## Since v0.1.0
 
@@ -99,4 +112,5 @@ APIs may change before 1.0. Known flaky tests are ticketed and public in the
 repository. The evidence ladder is the contract: if a page claims more than
 its receipts support, that is a bug — file it.
 
-Released from the v0.2.0 tag.
+The last named candidate described by these notes is `v0.2.1`; publication to
+Hex has not occurred.
