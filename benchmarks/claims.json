@@ -1214,7 +1214,7 @@
       "claim_state": "asserted",
       "target_rung": "C3",
       "release": "v0.1",
-      "scope": "The exact experiment shipped in docs/TUTORIAL_TICKET_ROUTING.md: LabeledFewShot(k: 8) lift over the zero-shot enum router on the twenty held-out tickets of the shipped sixty-ticket support dataset with openai:gpt-5.4-mini, across three cache-cleared live repeats.",
+      "scope": "The exact experiment shipped in docs/TUTORIAL_TICKET_ROUTING.md: ordered LabeledFewShot(k: 8, sample: false) lift over the zero-shot enum router on the twenty held-out tickets of the shipped sixty-ticket support dataset with openai:gpt-5.4-mini, across three cache-cleared live repeats.",
       "limitations": [
         "One task, one dataset, one model; no generalization beyond the shipped support-ticket dataset, no search-optimizer effectiveness, and no DSPy-matched comparison is claimed.",
         "The tutorial's headline single draw (0.35 -> 0.90) was not reproduced exactly; the committed repeats measured 0.25-0.30 -> 0.85, inside the doc's published repeat ranges (baseline 0.20-0.40, optimized 0.85-0.90)."

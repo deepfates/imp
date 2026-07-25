@@ -424,8 +424,10 @@ defmodule Imp.UpstreamFidelity do
         "BootstrapFewShotWithRandomSearch",
         "BootstrapRS"
       ],
-      source: "dspy/teleprompt/bootstrap.py; random_search.py",
-      disposition: :conformant,
+      source: "dspy/teleprompt/vanilla.py; bootstrap.py; random_search.py",
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "Imp preserves deterministic no-replacement sampling, ordered first-k selection, and one advancing stream across predictors while using explicit serializable BEAM RNG state instead of Python random.Random. The seed is configurable and checkpoint-friendly; exact Python subset ordering for an equal integer seed is intentionally not part of the native contract.",
       imp: [
         Imp.Optimizer.LabeledFewShot,
         Imp.Optimizer.BootstrapFewShot,
@@ -434,16 +436,20 @@ defmodule Imp.UpstreamFidelity do
         Imp.Optimizer.RandomSearch
       ],
       invariants: [
+        "LabeledFewShot defaults to k=16 and deterministic sampled selection, supports the ordered sample=false path, and replaces demos on every exposed predictor",
         "successful traces become module-specific demonstrations",
         "teacher and student programs remain distinct",
         "candidate selection scores candidates on a valset distinct from the trainset (mechanism parity; held-out effectiveness lift remains a separately gated C3 target)"
       ],
       evidence: %{
         tests: [
+          "test/labeled_few_shot_selection_test.exs",
           "test/optimizer_behavioral_corpus_test.exs",
+          "test/classical_optimizer_differential_test.exs",
           "test/optimizer_lift_artifact_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "docs/internal/BENCHMARK_TRUTH.md"]
+        docs: ["docs/API_GUIDE.md", "docs/internal/BENCHMARK_TRUTH.md"],
+        missing: ["family-specific held-out effectiveness under matched controls"]
       }
     },
     %{

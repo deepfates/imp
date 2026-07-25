@@ -44,7 +44,7 @@ defmodule TutorialTicketRoutingExperiment do
       |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
 
     metric = Imp.exact_match(:team)
-    optimizer = Imp.Optimizer.LabeledFewShot.new(k: 8)
+    optimizer = Imp.Optimizer.LabeledFewShot.new(k: 8, sample: false)
 
     runs =
       for run_index <- 1..repeats do

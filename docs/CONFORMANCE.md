@@ -2,8 +2,8 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 26
-Conformant: 16
-Elixir-native equivalents: 6
+Conformant: 15
+Elixir-native equivalents: 7
 Tracking: 2
 Gaps: 2
 Claim-specific non-blocking gaps: 2
@@ -28,7 +28,7 @@ Passing: true
 | agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper |
 | composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |
 | evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
-| optimization.few_shot | optimization | conformant | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
+| optimization.few_shot | optimization | elixir_native_equivalent | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
 | optimization.knn | optimization | conformant | satisfied | KNN, KNNFewShot |
 | optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
 | optimization.gepa | optimization | gap | claim-specific gap | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
@@ -397,20 +397,25 @@ Missing evidence or behavior:
 
 ### `optimization.few_shot`
 
-Status: `conformant`
+Status: `elixir_native_equivalent`
 
-Upstream source: `dspy/teleprompt/bootstrap.py; random_search.py`
+Upstream source: `dspy/teleprompt/vanilla.py; bootstrap.py; random_search.py`
 
 Imp modules: `Imp.Optimizer.LabeledFewShot`, `Imp.Optimizer.BootstrapFewShot`, `Imp.Optimizer.BootstrapFewShotWithRandomSearch`, `Imp.Optimizer.BootstrapRS`, `Imp.Optimizer.RandomSearch`
+Elixir-native rationale: Imp preserves deterministic no-replacement sampling, ordered first-k selection, and one advancing stream across predictors while using explicit serializable BEAM RNG state instead of Python random.Random. The seed is configurable and checkpoint-friendly; exact Python subset ordering for an equal integer seed is intentionally not part of the native contract.
+
 Semantic invariants:
 
+- LabeledFewShot defaults to k=16 and deterministic sampled selection, supports the ordered sample=false path, and replaces demos on every exposed predictor
 - successful traces become module-specific demonstrations
 - teacher and student programs remain distinct
 - candidate selection scores candidates on a valset distinct from the trainset (mechanism parity; held-out effectiveness lift remains a separately gated C3 target)
 
 Executable evidence:
 
+- test: `test/labeled_few_shot_selection_test.exs`
 - test: `test/optimizer_behavioral_corpus_test.exs`
+- test: `test/classical_optimizer_differential_test.exs`
 - test: `test/optimizer_lift_artifact_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
@@ -418,7 +423,7 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- none
+- family-specific held-out effectiveness under matched controls
 
 ### `optimization.knn`
 

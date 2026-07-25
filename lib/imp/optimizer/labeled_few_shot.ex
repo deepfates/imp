@@ -1,51 +1,49 @@
 defmodule Imp.Optimizer.LabeledFewShot do
   @behaviour Imp.Optimizer
   @moduledoc """
-  Compile a predictor by attaching the first labeled examples as demos.
+  Compile a program by attaching labeled examples as demonstrations.
 
   This optimizer does not call the language model or score candidates. It is the
-  deterministic few-shot baseline: take up to `k` examples from the trainset and
-  attach them as demonstrations. The compiled program carries an optimizer
-  report that records the selected examples.
+  deterministic few-shot baseline: select up to `k` examples from the trainset
+  for every exposed predictor and attach them as demonstrations. The compiled
+  program carries an optimizer report that records every selected example.
 
   ## Selection behavior and determinism
 
-  Selection is `Enum.take(trainset, k)`: the first `min(k, length(trainset))`
-  examples in trainset order. No randomness is involved on any path — direct
-  `compile/3` and the `Imp.optimize/3` facade run the same selection, and
-  compiling the same program and trainset always attaches the same demos.
-  When `k` is greater than or equal to the trainset size, the whole trainset
-  is attached in order.
+  Like DSPy 3.2.1, the defaults are `k: 16`, `sample: true`, and seed zero.
+  Repeated compiles therefore select the same no-replacement sample. Set
+  `sample: false` for DSPy's ordered first-`k` path. Multi-predictor programs
+  receive separate draws from one advancing RNG stream, matching the upstream
+  predictor traversal contract.
 
-  If compiled demos vary between runs, the variation comes from upstream of
-  this optimizer — most commonly a shuffled trainset (see the `:seed` option
-  of `Imp.Datasets.split/2`). To attach a different demo subset, reorder the
-  trainset explicitly before compiling, for example with a seeded
-  `Imp.Optimizer.Sampling.shuffle/2`.
-
-  ## Deviation from DSPy
-
-  Upstream `dspy.LabeledFewShot.compile/2` defaults to `sample=True`, which
-  draws `k` demos with a fixed-seed RNG (`random.Random(0)`) — deterministic
-  per trainset, but not first-`k` — and defaults to `k=16`. Imp implements
-  upstream's `sample=False` path (a first-`k` slice) as its only behavior and
-  defaults to `k: 4`. There is no sampling option.
+  Imp exposes `seed:` as a BEAM-native extension and uses its explicit,
+  serializable optimizer RNG instead of Python's process-local `random.Random`.
+  This preserves deterministic sampling semantics and checkpoint-friendly state,
+  but it does not promise Python's incidental exact subset ordering for the same
+  integer seed.
   """
 
-  defstruct k: 4
+  defstruct k: 16, sample: true, seed: 0
 
   @option_schema [
-    k: [type: :non_neg_integer, default: 4]
+    k: [type: :non_neg_integer, default: 16],
+    sample: [type: :boolean, default: true],
+    seed: [type: :integer, default: 0]
   ]
 
   @doc """
-  Builds the optimizer. Accepts `k:` (default `4`), the maximum number of
-  demos to attach. Selection is always the deterministic first-`k` slice of
-  the trainset; there is no sampling, shuffle, or seed option.
+  Builds the optimizer.
+
+  Options:
+
+    * `:k` — maximum demonstrations per predictor (default `16`)
+    * `:sample` — sample without replacement when true; take first `k` when
+      false (default `true`)
+    * `:seed` — deterministic BEAM optimizer seed (default `0`)
   """
   def new(opts \\ []) do
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.LabeledFewShot.new/1")
-    %__MODULE__{k: opts[:k]}
+    %__MODULE__{k: opts[:k], sample: opts[:sample], seed: opts[:seed]}
   end
 
   @impl true
@@ -64,49 +62,78 @@ defmodule Imp.Optimizer.LabeledFewShot do
   end
 
   @doc """
-  Attaches the first `min(k, length(trainset))` trainset examples as demos.
+  Attaches up to `k` trainset examples to every exposed predictor.
 
-  Deterministic: the same program and trainset always produce the same demo
-  set, on this path and through `Imp.optimize/3`.
+  Selection is deterministic for the optimizer's `seed:` on this path and
+  through `Imp.optimize/3`.
   """
-  def compile(%__MODULE__{k: k}, program, trainset) do
-    {demos, errors} = take_demos(trainset, k)
-    compiled = if errors == [], do: put_demos(program, demos), else: program
+  def compile(%__MODULE__{} = optimizer, program, trainset) do
+    {trainset, errors} = materialize_trainset(trainset)
+
+    {compiled, selections} =
+      if errors == [] do
+        attach_predictor_demos(program, trainset, optimizer)
+      else
+        {program, []}
+      end
+
+    candidates =
+      selections
+      |> Enum.flat_map(fn %{predictor: predictor, demos: demos} ->
+        Enum.map(demos, &%{predictor: predictor, example: &1})
+      end)
+      |> Enum.with_index()
+      |> Enum.map(fn {%{predictor: predictor, example: example}, index} ->
+        %{index: index, predictor: predictor, example: example, selected?: true}
+      end)
 
     compiled
     |> Imp.Optimizer.Report.attach(
       Imp.Optimizer.Report.new(%{
         optimizer: :labeled_few_shot,
-        candidate_count: length(demos),
-        candidates:
-          demos
-          |> Enum.with_index()
-          |> Enum.map(fn {example, index} ->
-            %{index: index, example: example, selected?: true}
-          end),
+        candidate_count: length(candidates),
+        candidates: candidates,
         errors: errors,
         metadata: %{
-          requested_k: k,
-          selected_count: length(demos),
+          requested_k: optimizer.k,
+          sample: optimizer.sample,
+          seed: optimizer.seed,
+          predictor_count: length(selections),
+          selected_count: length(candidates),
+          selected_by_predictor: Map.new(selections, &{&1.predictor, length(&1.demos)}),
           status: if(errors == [], do: :ok, else: :trainset_error)
         }
       })
     )
   end
 
-  defp take_demos(trainset, k) do
-    {Enum.take(trainset, k), []}
+  defp materialize_trainset(trainset) do
+    {Enum.to_list(trainset), []}
   rescue
     error -> {[], [%{stage: :trainset, reason: error_message(error)}]}
   catch
     kind, reason -> {[], [%{stage: :trainset, reason: error_message({kind, reason})}]}
   end
 
-  defp put_demos(program, demos) do
-    case Imp.ProgramAccess.predict(program) do
-      nil -> program
-      _predict -> Imp.with_demos(program, demos)
-    end
+  defp attach_predictor_demos(program, trainset, optimizer) do
+    rng = Imp.Optimizer.Sampling.new(optimizer.seed)
+
+    program
+    |> Imp.ProgramParameters.predictors()
+    |> Enum.reduce({program, [], rng}, fn %{name: name}, {compiled, selections, rng} ->
+      {demos, rng} = select_demos(trainset, optimizer.k, optimizer.sample, rng)
+      compiled = Imp.ProgramParameters.put_demos(compiled, name, demos)
+      {compiled, [%{predictor: name, demos: demos} | selections], rng}
+    end)
+    |> then(fn {compiled, selections, _rng} -> {compiled, Enum.reverse(selections)} end)
+  end
+
+  defp select_demos(_trainset, 0, _sample, rng), do: {[], rng}
+  defp select_demos(trainset, k, false, rng), do: {Enum.take(trainset, k), rng}
+
+  defp select_demos(trainset, k, true, rng) do
+    {shuffled, rng} = Imp.Optimizer.Sampling.shuffle(trainset, rng)
+    {Enum.take(shuffled, k), rng}
   end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)

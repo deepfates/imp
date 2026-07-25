@@ -111,13 +111,14 @@ training examples to the program as demonstrations — the model sees eight
 solved tickets before it sees yours:
 
 ```elixir
-optimizer = Imp.Optimizer.LabeledFewShot.new(k: 8)
+optimizer = Imp.Optimizer.LabeledFewShot.new(k: 8, sample: false)
 
 compiled = Imp.optimize!(router, optimizer, trainset)
 ```
 
-This one runs in milliseconds and makes no model calls: it selects the first
-eight training examples (two per squad in the shipped set). Search optimizers
+This one runs in milliseconds and makes no model calls. The explicit ordered
+mode selects the first eight training examples (two per squad in the shipped
+set); the optimizer's general default is deterministic sampling. Search optimizers
 spend real model calls comparing many candidate programs — budget dollars and
 minutes for those the way you would for any experiment. `RandomSearch` takes
 the same `Imp.optimize!/3` shape; `MIPROv2` also requires a validation set, so

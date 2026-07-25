@@ -68,6 +68,10 @@ defmodule Imp.UpstreamFidelityTest do
            ]
 
     assert by_id["primitives.multimodal"].status == :conformant
+    few_shot = by_id["optimization.few_shot"]
+    assert few_shot.status == :elixir_native_equivalent
+    assert few_shot.rationale =~ "explicit serializable BEAM RNG"
+    assert Enum.any?(few_shot.invariants, &String.starts_with?(&1, "LabeledFewShot defaults"))
     assert by_id["agents.rlm"].status == :elixir_native_equivalent
     assert by_id["optimization.instructions"].status == :gap
     refute by_id["optimization.instructions"].release_blocking
@@ -169,6 +173,9 @@ defmodule Imp.UpstreamFidelityTest do
 
     assert body =~
              "| optimization.weights | optimization | elixir_native_equivalent | satisfied |"
+
+    assert body =~
+             "| optimization.few_shot | optimization | elixir_native_equivalent | satisfied |"
 
     assert body =~ "| optimization.instructions | optimization | gap | claim-specific gap |"
     assert body =~ "| optimization.anything | optimization | tracking | tracked |"

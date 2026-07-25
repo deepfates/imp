@@ -661,6 +661,12 @@ Use:
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
 
+`LabeledFewShot.new/1` follows DSPy 3.2.1's user-visible defaults: `k: 16`,
+deterministic sampling without replacement, and seed zero. Use `sample: false`
+for the ordered first-`k` path, or set `seed:` for another reproducible BEAM
+sample. Imp carries this as explicit serializable optimizer RNG state; equal
+integer seeds are not promised to reproduce Python's incidental subset order.
+
 `InferRules` is rule induction, not a renamed instruction search. Give it a
 separate rule LM when you want the task program and optimizer to use different
 models:

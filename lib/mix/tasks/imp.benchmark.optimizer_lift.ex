@@ -141,7 +141,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
 
   defp compile_labeled(_metric, program, {trainset, _devset}),
     do:
-      Imp.Optimizer.LabeledFewShot.new(k: 1)
+      Imp.Optimizer.LabeledFewShot.new(k: 1, sample: false)
       |> Imp.Optimizer.LabeledFewShot.compile(program, trainset)
 
   defp compile_bootstrap(metric, program, {trainset, _devset}),
