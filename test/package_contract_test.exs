@@ -483,6 +483,220 @@ defmodule PackageContractTest do
       raise "saved and loaded program did not remain executable"
     end
 
+    # Package lifecycle fixture only: these planted Static LMs prove that the
+    # unpacked artifact can construct the named core optimizer families, attach
+    # their reports where applicable, and execute the returned programs. The
+    # task LM always returns Paris, so this is constructor/report/call lifecycle
+    # coverage, not proof that a candidate was applied, effective, or general.
+    fixture_trainset = [
+      Imp.example(question: "Train: French landmark city?", answer: "Paris")
+      |> Imp.with_inputs(:question),
+      Imp.example(question: "Train: French capital?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+
+    fixture_selection_set = [
+      Imp.example(question: "Selection: Seine city?", answer: "Paris")
+      |> Imp.with_inputs(:question),
+      Imp.example(question: "Selection: Louvre city?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+
+    fixture_testset = [
+      Imp.example(question: "Test: Arc de Triomphe city?", answer: "Paris")
+      |> Imp.with_inputs(:question),
+      Imp.example(question: "Test: Notre-Dame city?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+
+    prompt_lm = fn response ->
+      Imp.LM.Static.new(handler: fn _messages, _opts -> response end)
+    end
+
+    verify_program_optimizer = fn name, expected_report, optimized ->
+      case Imp.Optimizer.Report.fetch(optimized) do
+        %Imp.Optimizer.Report{optimizer: ^expected_report} -> :ok
+        other -> raise "\#{name} package lifecycle report mismatch: \#{inspect(other)}"
+      end
+
+      case Imp.call(optimized, %{question: "Package lifecycle call"}) do
+        {:ok, prediction} ->
+          unless Imp.get(prediction, :answer) == "Paris" do
+            raise "\#{name} package lifecycle call returned \#{inspect(prediction)}"
+          end
+
+        other ->
+          raise "\#{name} package lifecycle call failed: \#{inspect(other)}"
+      end
+
+      case Imp.evaluate(optimized, fixture_testset, metric) do
+        %Imp.Evaluate.Result{score: 1.0} -> :ok
+        other -> raise "\#{name} package lifecycle test rows failed: \#{inspect(other)}"
+      end
+    end
+
+    labeled_few_shot =
+      Imp.optimize!(
+        program,
+        Imp.Optimizer.LabeledFewShot.new(k: 1, sample: false),
+        fixture_trainset
+      )
+
+    verify_program_optimizer.(
+      :labeled_few_shot,
+      :labeled_few_shot,
+      labeled_few_shot
+    )
+
+    unless match?(%Imp.Predict.Predict{demos: [_]}, labeled_few_shot) do
+      raise "LabeledFewShot package lifecycle did not attach its selected demonstration"
+    end
+
+    bootstrap_few_shot =
+      Imp.optimize!(
+        program,
+        Imp.Optimizer.BootstrapFewShot.new(metric,
+          max_bootstrapped_demos: 1,
+          max_labeled_demos: 0
+        ),
+        fixture_trainset
+      )
+
+    verify_program_optimizer.(
+      :bootstrap_few_shot,
+      :bootstrap_few_shot,
+      bootstrap_few_shot
+    )
+
+    unless match?(%Imp.Predict.Predict{demos: [_]}, bootstrap_few_shot) do
+      raise "BootstrapFewShot package lifecycle did not attach its accepted trace"
+    end
+
+    verify_program_optimizer.(
+      :random_search,
+      :random_search,
+      Imp.optimize!(
+        program,
+        Imp.Optimizer.RandomSearch.new(metric,
+          num_candidate_programs: 0,
+          max_bootstrapped_demos: 1,
+          max_labeled_demos: 1
+        ),
+        fixture_trainset,
+        fixture_selection_set
+      )
+    )
+
+    knn_few_shot =
+      Imp.Optimizer.KNNFewShot.new(1, fixture_trainset,
+        vectorizer: Imp.Embeddings.BagOfWords,
+        few_shot_bootstrap_args: [
+          metric: metric,
+          max_bootstrapped_demos: 1,
+          max_labeled_demos: 0
+        ]
+      )
+      |> Imp.Optimizer.KNNFewShot.compile(program)
+
+    case Imp.call(knn_few_shot, %{question: "Test: nearest French city?"}) do
+      {:ok, %Imp.Prediction{metadata: %{knn_few_shot: %{demo_count: 1}}}} -> :ok
+      other -> raise "KNNFewShot package lifecycle call failed: \#{inspect(other)}"
+    end
+
+    unless Imp.evaluate(knn_few_shot, fixture_testset, metric).score == 1.0 do
+      raise "KNNFewShot package lifecycle test rows failed"
+    end
+
+    copro =
+      Imp.Optimizer.COPRO.new(metric,
+        breadth: 2,
+        depth: 1,
+        proposer_lm:
+          prompt_lm.(
+            Jason.encode!(%{
+              "proposed_instruction" => "Answer with the city only.",
+              "proposed_prefix_for_output_field" => "Answer:"
+            })
+          )
+      )
+
+    verify_program_optimizer.(
+      :copro,
+      :copro,
+      Imp.optimize!(program, copro, fixture_trainset, fixture_selection_set)
+    )
+
+    mipro_v2 =
+      Imp.Optimizer.MIPROv2.new(metric,
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        startup_trials: 1,
+        prompt_lm: prompt_lm.(%{"instructions" => ["Answer with the city only."]})
+      )
+
+    verify_program_optimizer.(
+      :mipro_v2,
+      :mipro_v2,
+      Imp.optimize!(program, mipro_v2, fixture_trainset, fixture_selection_set)
+    )
+
+    simba =
+      Imp.Optimizer.SIMBA.new(metric,
+        bsize: 1,
+        num_candidates: 2,
+        max_steps: 1,
+        max_demos: 0,
+        seed: 3,
+        prompt_lm:
+          prompt_lm.(%{
+            discussion: "Keep returning the requested city.",
+            module_advice: %{main: "Answer with the city only."}
+          })
+      )
+
+    verify_program_optimizer.(
+      :simba,
+      :simba,
+      Imp.optimize!(program, simba, fixture_trainset, fixture_selection_set)
+    )
+
+    gepa =
+      Imp.Optimizer.GEPA.new(metric,
+        generations: 1,
+        minibatch_size: 1,
+        seed: 3,
+        reflection_lm: prompt_lm.(%{instruction: "Answer with the city only."})
+      )
+
+    verify_program_optimizer.(
+      :gepa,
+      :gepa,
+      Imp.optimize!(program, gepa, fixture_trainset, fixture_selection_set)
+    )
+
+    infer_rules =
+      Imp.Optimizer.InferRules.new(metric,
+        num_candidates: 1,
+        num_rules: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        rule_lm:
+          prompt_lm.(%{
+            reasoning: "Every fixture requests the same city.",
+            natural_language_rules: "Answer with the city only."
+          })
+      )
+
+    verify_program_optimizer.(
+      :infer_rules,
+      :infer_rules,
+      Imp.optimize!(program, infer_rules, fixture_trainset, fixture_selection_set)
+    )
+
     retriever = Imp.memory([[text: "France capital: Paris."]], k: 1)
     {:ok, [doc]} = Imp.retrieve(retriever, "capital France")
 
