@@ -22,3 +22,7 @@ For every public surface advertised in the README and Imp-for-DSPy mapping, the 
 **2026-07-25T16:27:40Z**
 
 2026-07-25 deterministic-truth slice: the committed-evidence dashboard at current HEAD computes 10 proven / 26 blocked / 19 informational, profile_ready=false. Restored docs/EVIDENCE.md to those honest counts and moved the venv-free reconciliation regression into the normal test suite so fast.check catches future prose drift; ephemeral lane directories remain replaced by fresh empty temp paths in the test, so local tmp state cannot promote claims. No evidence was made proven. Focused Mix execution was unavailable because the sandbox forbids Mix.PubSub TCP sockets and the escalation was aborted; git diff --check and the current dashboard JSON were verified. Epic remains open for semantic parity.
+
+**2026-07-25T16:28:25Z**
+
+Principal verification after f1e05c8: mix test test/evidence_reconciliation_test.exs passed 1 test, 0 failures in 1.2s under the ordinary exclusion set, confirming the regression now runs despite evidence_infrastructure being excluded.
