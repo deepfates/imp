@@ -847,8 +847,10 @@ been proven effective, and to what rung, is recorded in [Evidence](EVIDENCE.md).
 
 The primary surface accepts a string, a named map of text components, or `nil`
 for objective-driven seed generation. With no dataset it runs one evaluator
-call per candidate. A `dataset:` selects multi-task optimization; adding a
-non-empty `valset:` selects held-out generalization.
+call per candidate. A `dataset:` supplies proposal/reflection examples; adding
+a non-empty `valset:` supplies separate examples for candidate selection. The
+validation set is not an untouched test set: measure the selected candidate on
+different examples after optimization.
 
 ```elixir
 evaluator = fn candidate, _example ->
@@ -860,12 +862,13 @@ training_examples = [
   %{feedback: "Number each step of the plan."}
 ]
 
-held_out_examples = [%{feedback: "Held-out: numbered steps still required."}]
+validation_examples = [%{feedback: "Validation: numbered steps still required."}]
+test_examples = [%{feedback: "Test: the plan still needs numbered steps."}]
 
-reflection_lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> "Plan with explicit numbered steps." end]
-}
+reflection_lm =
+  Imp.LM.Static.new(
+    handler: fn _messages, _opts -> "Plan with explicit numbered steps." end
+  )
 
 result =
   Imp.Optimize.Anything.run(
@@ -875,18 +878,23 @@ result =
       {score, %{feedback: example.feedback, scores: %{quality: score}}}
     end,
     dataset: training_examples,
-    valset: held_out_examples,
+    valset: validation_examples,
     objective: "Produce correct, concise answers.",
     config: [
       engine: [max_candidate_proposals: 4, max_metric_calls: 20],
       reflection: [reflection_lm: reflection_lm]
     ]
   )
+
+best_candidate = Imp.Optimize.Anything.Result.best_candidate(result)
+test_scores = Enum.map(test_examples, &evaluator.(best_candidate, &1))
 ```
 
 The result retains candidate lineage, per-example validation scores, Pareto
 frontiers, measured budgets, rejected proposals, history, and a resumable
-engine checkpoint. `Imp.Optimize.Anything.run/3` is the sole Optimize Anything
+engine checkpoint. `test_scores` is the only untouched outcome in this example;
+the optimizer has seen both `training_examples` and validation scores.
+`Imp.Optimize.Anything.run/3` is the sole Optimize Anything
 entry point; its execution records remain implementation data rather than
 additional supported module APIs.
 
