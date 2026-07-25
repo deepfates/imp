@@ -181,6 +181,9 @@ defmodule Imp.UpstreamFidelityTest do
     assert body =~ "| optimization.anything | optimization | tracking | tracked |"
 
     assert body =~
+             "schema-v2 multi-seed live effectiveness on distinct train, selection, and untouched test sets"
+
+    assert body =~
              "| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied |"
   end
 end

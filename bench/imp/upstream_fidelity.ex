@@ -694,7 +694,10 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_evaluation_cache_backend_test.exs"
         ],
         docs: ["docs/ADVANCED.md", "docs/internal/BENCHMARK_TRUTH.md"],
-        missing: ["paper-scale upstream comparison"]
+        missing: [
+          "schema-v2 multi-seed live effectiveness on distinct train, selection, and untouched test sets",
+          "paper-scale upstream comparison"
+        ]
       }
     },
     %{

@@ -619,6 +619,7 @@ Executable evidence:
 
 Missing evidence or behavior:
 
+- schema-v2 multi-seed live effectiveness on distinct train, selection, and untouched test sets
 - paper-scale upstream comparison
 
 ### `retrieval.data`
