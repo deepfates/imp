@@ -70,6 +70,16 @@ defmodule Imp.Playbook.WithContext do
     raise ArgumentError, "with_playbook has no optimizer playbook named #{inspect(name)}"
   end
 
+  @doc false
+  def with_lm(%__MODULE__{} = wrapper, lm) do
+    update_predictors(wrapper, &Predict.with_lm(&1, lm))
+  end
+
+  @doc false
+  def with_demos(%__MODULE__{} = wrapper, demos) do
+    update_predictors(wrapper, &Predict.with_demos(&1, demos))
+  end
+
   defp contextualize(program, playbook) do
     case Playbook.render(playbook) do
       "" ->
@@ -85,5 +95,11 @@ defmodule Imp.Playbook.WithContext do
           end)
         end)
     end
+  end
+
+  defp update_predictors(wrapper, update) do
+    Enum.reduce(ProgramParameters.predictors(wrapper), wrapper, fn %{name: name}, current ->
+      ProgramParameters.update_predictor(current, name, update)
+    end)
   end
 end

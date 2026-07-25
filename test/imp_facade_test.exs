@@ -152,6 +152,12 @@ defmodule ImpFacadeTest do
              Imp.with_demos(code_act, [demo])
 
     assert %{program: %{demos: [^demo]}} = Imp.with_demos(rag, [demo])
+
+    assert %{program: %{demos: [^demo]}} =
+             program
+             |> Imp.best_of_n(fn _example, _prediction -> 1.0 end)
+             |> Imp.with_demos([demo])
+
     assert %{demos: [^demo]} = Imp.with_demos(Imp.example(question: "q"), demo)
 
     tool = Imp.tool(:lookup, "lookup", fn %{key: "x"} -> "y" end)

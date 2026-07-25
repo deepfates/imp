@@ -36,6 +36,7 @@ defmodule Imp.ProgramAccess do
   def predict(%BestOfN{program: program}), do: predict(program)
   def predict(%Refine{program: program}), do: predict(program)
   def predict(%MultiChainComparison{predict: predict}), do: predict(predict)
+  def predict(%Imp.Optimizer.KNNFewShot.Program{student: student}), do: predict(student)
   def predict(_program), do: nil
 
   def task_signature(%Predict{signature: signature}), do: signature
@@ -48,6 +49,10 @@ defmodule Imp.ProgramAccess do
   def task_signature(%ReActV2{signature: signature}), do: signature
   def task_signature(%Avatar{signature: signature}), do: signature
   def task_signature(%RLM{signature: signature}), do: signature
+
+  def task_signature(%Imp.Optimizer.KNNFewShot.Program{student: student}),
+    do: task_signature(student)
+
   def task_signature(_program), do: nil
 
   def lm_signature(program) do
@@ -101,16 +106,40 @@ defmodule Imp.ProgramAccess do
   def put_demos(%RAG{program: inner} = program, demos),
     do: %{program | program: put_demos(inner, demos)}
 
+  def put_demos(%Assertions{program: inner} = program, demos),
+    do: %{program | program: put_demos(inner, demos)}
+
+  def put_demos(%BestOfN{program: inner} = program, demos),
+    do: %{program | program: put_demos(inner, demos)}
+
+  def put_demos(%Refine{program: inner} = program, demos),
+    do: %{program | program: put_demos(inner, demos)}
+
+  def put_demos(%MultiChainComparison{predict: predict} = program, demos),
+    do: %{program | predict: put_demos(predict, demos)}
+
   def put_demos(%ReAct{react: predict} = program, demos),
     do: %{program | react: put_demos(predict, demos)}
 
   def put_demos(%ReActV2{react: predict} = program, demos),
     do: %{program | react: put_demos(predict, demos)}
 
+  def put_demos(%Imp.Playbook.WithContext{} = program, demos),
+    do: Imp.Playbook.WithContext.with_demos(program, demos)
+
+  def put_demos(%Imp.Optimizer.KNNFewShot.Program{} = program, demos) do
+    %{
+      program
+      | student: put_demos(program.student, demos),
+        teacher: maybe_put_demos(program.teacher, demos)
+    }
+  end
+
   def put_demos(program, _demos) do
     raise ArgumentError,
-          "Imp.with_demos/2 supports Predict, ChainOfThought, ProgramOfThought, CodeAct, " <>
-            "RAG, ReAct, and ReActV2 programs, and Imp.Example; got: #{inspect(program)}"
+          "Imp.with_demos/2 supports Predict and other demo-bearing Imp programs, " <>
+            "and Imp.Example; " <>
+            "got: #{inspect(program)}"
   end
 
   def put_lm(%Predict{} = program, lm), do: Predict.with_lm(program, lm)
@@ -150,8 +179,13 @@ defmodule Imp.ProgramAccess do
   def put_lm(%RLM{} = program, lm),
     do: %{program | lm: lm, sub_lm: lm, dynamic_lm?: false, dynamic_sub_lm?: false}
 
-  def put_lm(%Imp.Optimizer.KNNFewShot.Program{student: student} = program, lm),
-    do: %{program | student: put_lm(student, lm)}
+  def put_lm(%Imp.Optimizer.KNNFewShot.Program{} = program, lm) do
+    %{
+      program
+      | student: put_lm(program.student, lm),
+        teacher: maybe_put_lm(program.teacher, lm)
+    }
+  end
 
   def put_lm(%Imp.Optimizer.Ensemble.Program{programs: programs} = program, lm),
     do: %{program | programs: Enum.map(programs, &put_lm(&1, lm))}
@@ -159,8 +193,17 @@ defmodule Imp.ProgramAccess do
   def put_lm(%Imp.Evaluate.SemanticF1{predict: predict} = program, lm),
     do: %{program | predict: put_lm(predict, lm)}
 
-  def put_lm(%Imp.Evaluate.CompleteAndGrounded{predict: predict} = program, lm),
-    do: %{program | predict: put_lm(predict, lm)}
+  def put_lm(%Imp.Evaluate.CompleteAndGrounded{} = program, lm) do
+    %{
+      program
+      | predict: maybe_put_lm(program.predict, lm),
+        completeness: maybe_put_lm(program.completeness, lm),
+        groundedness: maybe_put_lm(program.groundedness, lm)
+    }
+  end
+
+  def put_lm(%Imp.Playbook.WithContext{} = program, lm),
+    do: Imp.Playbook.WithContext.with_lm(program, lm)
 
   def put_lm(program, _lm) do
     raise ArgumentError,
@@ -169,6 +212,12 @@ defmodule Imp.ProgramAccess do
 
   defp program_type(%module{}), do: module
   defp program_type(program), do: program
+
+  defp maybe_put_lm(nil, _lm), do: nil
+  defp maybe_put_lm(program, lm), do: put_lm(program, lm)
+
+  defp maybe_put_demos(nil, _demos), do: nil
+  defp maybe_put_demos(program, demos), do: put_demos(program, demos)
 
   def get_metadata(%Avatar{metadata: metadata}, key), do: Map.get(metadata, key)
 
@@ -227,6 +276,9 @@ defmodule Imp.ProgramAccess do
   def put_metadata(%Avatar{metadata: metadata} = program, key, value),
     do: %{program | metadata: Map.put(metadata, key, value)}
 
+  def put_metadata(%Imp.Optimizer.KNNFewShot.Program{student: student} = program, key, value),
+    do: %{program | student: put_metadata(student, key, value)}
+
   def put_metadata(%{__struct__: _module, metadata: metadata} = program, key, value)
       when is_map(metadata),
       do: %{program | metadata: Map.put(metadata, key, value)}
@@ -261,6 +313,9 @@ defmodule Imp.ProgramAccess do
 
   def merge_metadata(%Avatar{metadata: existing} = program, metadata),
     do: %{program | metadata: Map.merge(existing, metadata)}
+
+  def merge_metadata(%Imp.Optimizer.KNNFewShot.Program{student: student} = program, metadata),
+    do: %{program | student: merge_metadata(student, metadata)}
 
   def merge_metadata(program, _metadata), do: program
 end

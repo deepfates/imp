@@ -64,7 +64,109 @@ defmodule SavingRebindTest do
     assert Imp.get(prediction, :answer) == "rebound"
   end
 
+  test "rebind replaces both the KNN student and its per-call bootstrap teacher" do
+    test_pid = self()
+
+    stale_lm =
+      static_lm(fn _messages, _opts ->
+        send(test_pid, :stale_lm_called)
+        %{answer: "stale"}
+      end)
+
+    replacement_lm = static_lm("replacement")
+
+    examples = [
+      Imp.example(question: "capital france", answer: "replacement")
+      |> Imp.with_inputs(:question)
+    ]
+
+    metric = fn example, prediction ->
+      Imp.Example.get(example, :answer) == Imp.Prediction.get(prediction, :answer)
+    end
+
+    program =
+      Imp.Optimizer.KNNFewShot.new(1, examples,
+        vectorizer: Imp.Embeddings.BagOfWords,
+        few_shot_bootstrap_args: [metric: metric, max_labeled_demos: 0]
+      )
+      |> Imp.Optimizer.KNNFewShot.compile(
+        Imp.predict("question -> answer", lm: stale_lm),
+        teacher: Imp.predict("question -> answer", lm: stale_lm)
+      )
+      |> Imp.with_lm(replacement_lm)
+
+    assert Imp.ProgramAccess.lm(program) == replacement_lm
+    assert Imp.ProgramAccess.lm(program.teacher) == replacement_lm
+    assert {:ok, prediction} = Imp.call(program, %{question: "capital france"})
+    assert Imp.get(prediction, :answer) == "replacement"
+    refute_received :stale_lm_called
+  end
+
+  test "rebind reaches every active CompleteAndGrounded judge" do
+    test_pid = self()
+
+    stale_lm =
+      static_lm(fn _messages, _opts ->
+        send(test_pid, :stale_lm_called)
+        %{completeness: 0.0, groundedness: 0.0}
+      end)
+
+    replacement_lm =
+      static_lm(fn _messages, _opts ->
+        %{
+          reasoning: "checked",
+          ground_truth_key_ideas: "Paris",
+          system_response_key_ideas: "Paris",
+          system_response_claims: "Paris",
+          discussion: "supported",
+          completeness: 1.0,
+          groundedness: 1.0
+        }
+      end)
+
+    evaluator =
+      Imp.Evaluate.CompleteAndGrounded.new(lm: stale_lm)
+      |> Imp.with_lm(replacement_lm)
+
+    assert Imp.ProgramAccess.lm(evaluator.completeness) == replacement_lm
+    assert Imp.ProgramAccess.lm(evaluator.groundedness) == replacement_lm
+
+    assert {:ok, prediction} =
+             Imp.call(evaluator, %{
+               question: "Where?",
+               ground_truth: "Paris",
+               system_response: "Paris",
+               retrieved_context: "Paris is in France"
+             })
+
+    assert Imp.get(prediction, :score) == 1.0
+    refute_received :stale_lm_called
+  end
+
+  test "rebind and demo attachment traverse playbook wrappers" do
+    demo = Imp.example(question: "capital france", answer: "Paris") |> Imp.with_inputs(:question)
+    replacement_lm = static_lm("rebound")
+
+    wrapper =
+      Imp.predict("question -> answer", lm: static_lm("stale"))
+      |> Imp.with_playbook(Imp.Playbook.new(id: "rebind"))
+      |> Imp.with_demos([demo])
+      |> Imp.with_lm(replacement_lm)
+
+    assert [%{predictor: %{demos: [^demo], lm: replacement}}] =
+             Imp.ProgramParameters.predictors(wrapper)
+
+    assert replacement == replacement_lm
+    assert {:ok, prediction} = Imp.call(wrapper, %{question: "capital france"})
+    assert Imp.get(prediction, :answer) == "rebound"
+  end
+
   defp static_lm(answer) do
-    %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: answer} end]}
+    handler =
+      if is_function(answer, 2),
+        do: answer,
+        else: fn _messages, _opts -> %{answer: answer} end
+
+    %{module: Imp.LM.Static, opts: [handler: handler]}
   end
 end
