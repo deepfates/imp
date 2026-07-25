@@ -66,8 +66,8 @@ Imp's conformance program tracks 26 upstream surface groups against DSPy
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| Conformant | 16 | Matches pinned DSPy 3.2.1 on its cited evidence — an executable differential against real upstream for the optimizer, adapter, and answer-metric families, a behavioral conformance test elsewhere |
-| Elixir-native equivalent | 6 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
+| Conformant | 15 | Matches pinned DSPy 3.2.1 on the evidence cited by each surface; a family-level status does not imply that every upstream code path or optimizer outcome has been reproduced |
+| Elixir-native equivalent | 7 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, few-shot RNG, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
 | Tracking | 2 | Following DSPy's unreleased 3.3 changes |
 | Gap | 2 | Missing exact-reproduction evidence, non-blocking and ticketed: the instruction-optimizer family and GEPA. Local behavior is tested; upstream-matched outcomes are not claimed |
 
