@@ -697,6 +697,49 @@ defmodule PackageContractTest do
       Imp.optimize!(program, infer_rules, fixture_trainset, fixture_selection_set)
     )
 
+    signature_optimizer =
+      Imp.Optimizer.SignatureOptimizer.new(metric,
+        candidates: ["Answer with the city only."]
+      )
+
+    signature_optimized =
+      Imp.optimize!(
+        program,
+        signature_optimizer,
+        fixture_trainset,
+        fixture_selection_set
+      )
+
+    # SignatureOptimizer deliberately delegates the candidate comparison to
+    # InstructionSearch, so the attached report names the underlying search.
+    verify_program_optimizer.(
+      :signature_optimizer,
+      :instruction_search,
+      signature_optimized
+    )
+
+    unless Imp.Optimizer.InstructionSearch.current_instruction(signature_optimized) ==
+             "Answer with the city only." do
+      raise "SignatureOptimizer package lifecycle did not apply its candidate"
+    end
+
+    ensemble =
+      Imp.Optimizer.Ensemble.new(deterministic: true)
+      |> Imp.Optimizer.Ensemble.compile([program, signature_optimized])
+
+    case Imp.call(ensemble, %{question: "Package ensemble call"}) do
+      {:ok, %Imp.Prediction{fields: %{outputs: outputs}}} when length(outputs) == 2 ->
+        unless Enum.all?(outputs, fn
+                 {:ok, prediction} -> Imp.get(prediction, :answer) == "Paris"
+                 _other -> false
+               end) do
+          raise "Ensemble package lifecycle returned a failed child: \#{inspect(outputs)}"
+        end
+
+      other ->
+        raise "Ensemble package lifecycle call failed: \#{inspect(other)}"
+    end
+
     retriever = Imp.memory([[text: "France capital: Paris."]], k: 1)
     {:ok, [doc]} = Imp.retrieve(retriever, "capital France")
 
