@@ -43,7 +43,8 @@ defmodule Imp.Optimizer.CategoricalTPE do
 
   @spec suggest(t()) :: {assignment(), t()}
   def suggest(%__MODULE__{} = tpe) do
-    if length(tpe.observations) < tpe.startup_trials do
+    if length(tpe.observations) < tpe.startup_trials or
+         distinct_assignment_count(tpe.observations) < 2 do
       random_assignment(tpe)
     else
       model_assignment(tpe)
@@ -129,6 +130,13 @@ defmodule Imp.Optimizer.CategoricalTPE do
   end
 
   defp stable_space(space), do: Enum.sort_by(space, fn {name, _} -> to_string(name) end)
+
+  defp distinct_assignment_count(observations) do
+    observations
+    |> Enum.map(& &1.params)
+    |> MapSet.new()
+    |> MapSet.size()
+  end
 
   defp validate_space!(space) do
     Enum.each(space, fn

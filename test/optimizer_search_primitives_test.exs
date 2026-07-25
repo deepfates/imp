@@ -35,6 +35,24 @@ defmodule Imp.Optimizer.SearchPrimitivesTest do
     assert Enum.count(suggestions, &(&1 == %{instruction: :strong, demos: :good})) >= 12
   end
 
+  test "categorical TPE explores beyond a pre-observed baseline assignment" do
+    tpe =
+      CategoricalTPE.new(%{instruction: [:baseline, :proposed]},
+        seed: 9,
+        startup_trials: 1
+      )
+      |> CategoricalTPE.observe(%{instruction: :baseline}, 0.0)
+
+    {suggestions, _tpe} =
+      Enum.map_reduce(1..4, tpe, fn _, tpe ->
+        {params, tpe} = CategoricalTPE.suggest(tpe)
+        score = if params.instruction == :proposed, do: 1.0, else: 0.0
+        {params, CategoricalTPE.observe(tpe, params, score)}
+      end)
+
+    assert %{instruction: :proposed} in suggestions
+  end
+
   test "joint kernels preserve interactions when every marginal is uninformative" do
     tpe =
       CategoricalTPE.new(%{left: [0, 1], right: [0, 1]},
