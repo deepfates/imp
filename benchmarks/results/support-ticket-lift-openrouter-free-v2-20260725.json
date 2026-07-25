@@ -1,0 +1,441 @@
+{
+  "arms": [
+    "baseline",
+    "labeled_few_shot"
+  ],
+  "budget": {
+    "active_reservations": 0,
+    "exhausted": null,
+    "limits": {
+      "input_tokens": 2000000,
+      "output_tokens": 12288,
+      "requests": 48,
+      "usd": 0.0
+    },
+    "pricing": {
+      "input_per_million": 0.0,
+      "output_per_million": 0.0
+    },
+    "requests": 5,
+    "reservation_ledger_version": 2,
+    "reservations": [],
+    "reserved": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0
+    },
+    "single_attempt_transport_enforced": true,
+    "transport_attempts": 5,
+    "usage": {
+      "input_tokens": 1414,
+      "output_tokens": 1106,
+      "usd": 0.0
+    }
+  },
+  "campaign": "support-ticket-baseline-vs-labeled-few-shot-openrouter-free-v2",
+  "controls": {
+    "cache": false,
+    "json_retries": 0,
+    "logical_request_limit": 48,
+    "max_concurrency": 1,
+    "max_output_tokens": 256,
+    "same_test_rows_and_generation_limits_for_every_arm_seed": true,
+    "selection_visible_to_optimizer": false,
+    "test_opened_only_after_each_program_was_compiled": true,
+    "test_visible_to_optimizer_or_selection": false,
+    "train_visible_to_optimizer": true,
+    "transport_retries": 0
+  },
+  "dataset": {
+    "exact_ticket_overlap": false,
+    "path": "/Users/deepfates/Hacking/github/deepfates/imp/_build/dev/lib/imp/priv/tutorial/support_tickets.json",
+    "selection_rows": 20,
+    "selection_sha256": "sha256:68b792f671914befd6931e3ed161feca5c8e2cf6a0a1c9aa03bc639b7d7dd81d",
+    "sha256": "7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87",
+    "test_indices": [
+      0,
+      1,
+      5,
+      6,
+      10,
+      11,
+      15,
+      16
+    ],
+    "test_sha256": "sha256:c9ef5cace68875be4b5a68f850317143b2af751d589a3cb8b54b728b4a7b077e",
+    "train_rows": 20,
+    "train_sha256": "sha256:e96e2df4724672889d81061305427661a28eb1ed54edf8f74699c1a22bb1f2da",
+    "untouched_test_rows_total": 20,
+    "untouched_test_rows_used": 8
+  },
+  "generated_at": "2026-07-25T20:59:04Z",
+  "git_sha": "8bb684266ff96d77099f4d5f5407dc6537d0f12b",
+  "model": "openai/gpt-oss-20b:free",
+  "model_metadata": {},
+  "protocol_manifest": {
+    "path": "/Users/deepfates/Hacking/github/deepfates/imp/benchmarks/config/support-ticket-lift-openrouter-free-v2.json",
+    "sha256": "e84573d2a0eb738d41999377be109aa85e5e54d1c2a847f5b73adea25ac53959",
+    "status_at_launch": "preregistered_not_run"
+  },
+  "provider_accounting": {
+    "catalog": {
+      "canonical_model": "openai/gpt-oss-20b",
+      "checked_url": "https://openrouter.ai/api/v1/models",
+      "model": "openai/gpt-oss-20b:free",
+      "pricing": {
+        "completion": 0.0,
+        "prompt": 0.0
+      }
+    },
+    "response_ledger": {
+      "halted": null,
+      "responses": [
+        {
+          "actual_model": "openai/gpt-oss-20b:free",
+          "bounded_safe_excerpt": "\"{\\n  \\\"team\\\": \\\"beacon\\\"\\n}\"",
+          "computed_cost_usd": 0.0,
+          "finish_reason": "stop",
+          "gateway_provider": "openrouter",
+          "input_tokens": 287,
+          "logical_requests": 1,
+          "output_tokens": 215,
+          "provider_reported_cost_usd": 0,
+          "raw_response_sha256": "sha256:d050837e13ed09e7c885a070d9fe4543a6fc480bf58c4367940ad7945113a967",
+          "requested_max_output_tokens": 256,
+          "status": "passed",
+          "transport_attempts": 1,
+          "truncation_indicators": {
+            "finish_reason_is_length": false,
+            "output_tokens_reached_ceiling": false
+          },
+          "upstream_provider": "Darkbloom"
+        },
+        {
+          "actual_model": "openai/gpt-oss-20b:free",
+          "bounded_safe_excerpt": "\"{\\n  \\\"team\\\": \\\"atlas\\\"\\n}\"",
+          "computed_cost_usd": 0.0,
+          "finish_reason": "stop",
+          "gateway_provider": "openrouter",
+          "input_tokens": 284,
+          "logical_requests": 2,
+          "output_tokens": 209,
+          "provider_reported_cost_usd": 0,
+          "raw_response_sha256": "sha256:00a460114aa7c7f81a124c28c6f049925c44fe0004e77c0070f9dde3dd9377c1",
+          "requested_max_output_tokens": 256,
+          "status": "passed",
+          "transport_attempts": 2,
+          "truncation_indicators": {
+            "finish_reason_is_length": false,
+            "output_tokens_reached_ceiling": false
+          },
+          "upstream_provider": "Darkbloom"
+        },
+        {
+          "actual_model": "openai/gpt-oss-20b:free",
+          "bounded_safe_excerpt": "\"{\\n  \\\"team\\\": \\\"quill\\\"\\n}\"",
+          "computed_cost_usd": 0.0,
+          "finish_reason": "stop",
+          "gateway_provider": "openrouter",
+          "input_tokens": 279,
+          "logical_requests": 3,
+          "output_tokens": 186,
+          "provider_reported_cost_usd": 0,
+          "raw_response_sha256": "sha256:23c68aceddac15c0a88197a21232eb33f4262bb3cd862163ec11bd07cb15fcf3",
+          "requested_max_output_tokens": 256,
+          "status": "passed",
+          "transport_attempts": 3,
+          "truncation_indicators": {
+            "finish_reason_is_length": false,
+            "output_tokens_reached_ceiling": false
+          },
+          "upstream_provider": "Darkbloom"
+        },
+        {
+          "actual_model": "openai/gpt-oss-20b:free",
+          "bounded_safe_excerpt": "\"{\\n  \\\"team\\\": \\\"beacon\\\"\\n}\"",
+          "computed_cost_usd": 0.0,
+          "finish_reason": "stop",
+          "gateway_provider": "openrouter",
+          "input_tokens": 281,
+          "logical_requests": 4,
+          "output_tokens": 240,
+          "provider_reported_cost_usd": 0,
+          "raw_response_sha256": "sha256:d050837e13ed09e7c885a070d9fe4543a6fc480bf58c4367940ad7945113a967",
+          "requested_max_output_tokens": 256,
+          "status": "passed",
+          "transport_attempts": 4,
+          "truncation_indicators": {
+            "finish_reason_is_length": false,
+            "output_tokens_reached_ceiling": false
+          },
+          "upstream_provider": "Darkbloom"
+        },
+        {
+          "actual_model": "openai/gpt-oss-20b:free",
+          "bounded_safe_excerpt": "\"\"",
+          "computed_cost_usd": 0.0,
+          "finish_reason": "length",
+          "gateway_provider": "openrouter",
+          "input_tokens": 283,
+          "logical_requests": 5,
+          "output_tokens": 256,
+          "provider_reported_cost_usd": 0,
+          "raw_response_sha256": "sha256:150fe982bcb5a537fb89f0b857176b1617bce3a258ffb54f6181d1d7431fd3fd",
+          "requested_max_output_tokens": 256,
+          "status": "passed",
+          "transport_attempts": 5,
+          "truncation_indicators": {
+            "finish_reason_is_length": true,
+            "output_tokens_reached_ceiling": true
+          },
+          "upstream_provider": "Darkbloom"
+        }
+      ]
+    }
+  },
+  "results": [
+    {
+      "arm": "baseline",
+      "budget_delta": {
+        "input_tokens": 1414,
+        "logical_requests": 5,
+        "output_tokens": 1106,
+        "transport_attempts": 5,
+        "usd": 0.0
+      },
+      "failure_detail": {
+        "adapter_or_program_errors": [
+          {
+            "category": "adapter_decode",
+            "index": 4,
+            "message": "LM response cannot be serialized to a JSON object.",
+            "reason": "\"\"",
+            "reason_type": "Imp.AdapterParseError"
+          }
+        ],
+        "max_errors": 1,
+        "message": "Imp.Evaluate execution cancelled: 1 errors reached max_errors 1 after 5 of 8 examples",
+        "partial_rows": [
+          {
+            "error": null,
+            "index": 0,
+            "response": {
+              "actual_model": "openai/gpt-oss-20b:free",
+              "computed_cost_usd": 0.0,
+              "gateway_provider": "openrouter",
+              "input_tokens": 287,
+              "output_tokens": 215,
+              "provider_reported_cost_usd": 0,
+              "upstream_provider": "Darkbloom"
+            },
+            "score": 0.0
+          },
+          {
+            "error": null,
+            "index": 1,
+            "response": {
+              "actual_model": "openai/gpt-oss-20b:free",
+              "computed_cost_usd": 0.0,
+              "gateway_provider": "openrouter",
+              "input_tokens": 284,
+              "output_tokens": 209,
+              "provider_reported_cost_usd": 0,
+              "upstream_provider": "Darkbloom"
+            },
+            "score": 1.0
+          },
+          {
+            "error": null,
+            "index": 2,
+            "response": {
+              "actual_model": "openai/gpt-oss-20b:free",
+              "computed_cost_usd": 0.0,
+              "gateway_provider": "openrouter",
+              "input_tokens": 279,
+              "output_tokens": 186,
+              "provider_reported_cost_usd": 0,
+              "upstream_provider": "Darkbloom"
+            },
+            "score": 0.0
+          },
+          {
+            "error": null,
+            "index": 3,
+            "response": {
+              "actual_model": "openai/gpt-oss-20b:free",
+              "computed_cost_usd": 0.0,
+              "gateway_provider": "openrouter",
+              "input_tokens": 281,
+              "output_tokens": 240,
+              "provider_reported_cost_usd": 0,
+              "upstream_provider": "Darkbloom"
+            },
+            "score": 0.0
+          },
+          {
+            "error": "%{reason: {:error, %Imp.AdapterParseError{message: \"LM response cannot be serialized to a JSON object.\", reason: \"\"}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `ticket` (str):\\nYour output fields are:\\n1. `team` (Literal['atlas', 'harbor', 'beacon', 'quill']):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\nInputs will have the following structure:\\n\\n[[ ## ticket ## ]]\\n{ticket}\\n\\nOutputs will be a JSON object with the following fields.\\n\\n{\\n  \\\"team\\\": \\\"{team}        # note: the value you produce must exactly match (no extra characters) one of: atlas; harbor; beacon; quill\\\"\\n}\\nIn adheri\" <> ...}, %{role: :user, content: \"[[ ## ticket ## ]]\\nCan you confirm whether our data was in the reported breach?\\n\\nRespond with a JSON object in the following order of fields: `team` (must be formatted as a valid Python Literal['atlas', 'harbor', 'beacon', 'quill']).\"}], raw: \"\"}}",
+            "index": 4,
+            "response": null,
+            "score": 0.0
+          }
+        ],
+        "type": "evaluation_cancelled"
+      },
+      "program": null,
+      "provider_failure_context": {
+        "actual_model": "openai/gpt-oss-20b:free",
+        "bounded_safe_excerpt": "\"\"",
+        "computed_cost_usd": 0.0,
+        "finish_reason": "length",
+        "gateway_provider": "openrouter",
+        "input_tokens": 283,
+        "logical_requests": 5,
+        "output_tokens": 256,
+        "provider_reported_cost_usd": 0,
+        "raw_response_sha256": "sha256:150fe982bcb5a537fb89f0b857176b1617bce3a258ffb54f6181d1d7431fd3fd",
+        "requested_max_output_tokens": 256,
+        "status": "passed",
+        "transport_attempts": 5,
+        "truncation_indicators": {
+          "finish_reason_is_length": true,
+          "output_tokens_reached_ceiling": true
+        },
+        "upstream_provider": "Darkbloom"
+      },
+      "seed": 17,
+      "selection_split": "none",
+      "status": "failed",
+      "test_errors": [
+        "%{index: 4, reason: %{reason: {:error, %Imp.AdapterParseError{message: \"LM response cannot be serialized to a JSON object.\", reason: \"\"}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `ticket` (str):\\nYour output fields are:\\n1. `team` (Literal['atlas', 'harbor', 'beacon', 'quill']):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\nInputs will have the following structure:\\n\\n[[ ## ticket ## ]]\\n{ticket}\\n\\nOutputs will be a JSON object with the following fields.\\n\\n{\\n  \\\"team\\\": \\\"{team}        # note: the value you produce must exactly match (no extra characters) one of: atlas; harbor; beacon; quill\\\"\\n}\\nIn adheri\" <> ...}, %{role: :user, content: \"[[ ## ticket ## ]]\\nCan you confirm whether our data was in the reported breach?\\n\\nRespond with a JSON object in the following order of fields: `team` (must be formatted as a valid Python Literal['atlas', 'harbor', 'beacon', 'quill']).\"}], raw: \"\"}}}"
+      ],
+      "test_rows": [],
+      "test_score": null,
+      "wall_seconds": 94.11
+    }
+  ],
+  "runtime": "openrouter_free",
+  "schema_version": 1,
+  "scope": "A three-seed, untouched eight-row support-ticket preflight for baseline versus sampled LabeledFewShot on one model. It is not a matched upstream run, the canonical GSM8K/Banking77 portfolio, or general optimizer effectiveness evidence.",
+  "seeds": [
+    17,
+    23,
+    31
+  ],
+  "summary": {
+    "c3_effectiveness_established": false,
+    "c3_exclusions": [
+      "no independently executed upstream comparator",
+      "not the canonical GSM8K and Banking77 portfolio",
+      "single task and single model",
+      "eight test rows have low statistical resolution"
+    ],
+    "declared_seed_count": 3,
+    "execution_complete": false,
+    "improving_seeds": 0,
+    "mean_test_lift": null,
+    "paired_exact_bootstrap_95_interval": {
+      "lower": null,
+      "upper": null
+    },
+    "paired_scores": [],
+    "stopped_failure": {
+      "adapter_or_program_errors": [
+        {
+          "category": "adapter_decode",
+          "index": 4,
+          "message": "LM response cannot be serialized to a JSON object.",
+          "reason": "\"\"",
+          "reason_type": "Imp.AdapterParseError"
+        }
+      ],
+      "max_errors": 1,
+      "message": "Imp.Evaluate execution cancelled: 1 errors reached max_errors 1 after 5 of 8 examples",
+      "partial_rows": [
+        {
+          "error": null,
+          "index": 0,
+          "response": {
+            "actual_model": "openai/gpt-oss-20b:free",
+            "computed_cost_usd": 0.0,
+            "gateway_provider": "openrouter",
+            "input_tokens": 287,
+            "output_tokens": 215,
+            "provider_reported_cost_usd": 0,
+            "upstream_provider": "Darkbloom"
+          },
+          "score": 0.0
+        },
+        {
+          "error": null,
+          "index": 1,
+          "response": {
+            "actual_model": "openai/gpt-oss-20b:free",
+            "computed_cost_usd": 0.0,
+            "gateway_provider": "openrouter",
+            "input_tokens": 284,
+            "output_tokens": 209,
+            "provider_reported_cost_usd": 0,
+            "upstream_provider": "Darkbloom"
+          },
+          "score": 1.0
+        },
+        {
+          "error": null,
+          "index": 2,
+          "response": {
+            "actual_model": "openai/gpt-oss-20b:free",
+            "computed_cost_usd": 0.0,
+            "gateway_provider": "openrouter",
+            "input_tokens": 279,
+            "output_tokens": 186,
+            "provider_reported_cost_usd": 0,
+            "upstream_provider": "Darkbloom"
+          },
+          "score": 0.0
+        },
+        {
+          "error": null,
+          "index": 3,
+          "response": {
+            "actual_model": "openai/gpt-oss-20b:free",
+            "computed_cost_usd": 0.0,
+            "gateway_provider": "openrouter",
+            "input_tokens": 281,
+            "output_tokens": 240,
+            "provider_reported_cost_usd": 0,
+            "upstream_provider": "Darkbloom"
+          },
+          "score": 0.0
+        },
+        {
+          "error": "%{reason: {:error, %Imp.AdapterParseError{message: \"LM response cannot be serialized to a JSON object.\", reason: \"\"}}, trace: %{messages: [%{role: :system, content: \"Your input fields are:\\n1. `ticket` (str):\\nYour output fields are:\\n1. `team` (Literal['atlas', 'harbor', 'beacon', 'quill']):\\nAll interactions will be structured in the following way, with the appropriate values filled in.\\n\\nInputs will have the following structure:\\n\\n[[ ## ticket ## ]]\\n{ticket}\\n\\nOutputs will be a JSON object with the following fields.\\n\\n{\\n  \\\"team\\\": \\\"{team}        # note: the value you produce must exactly match (no extra characters) one of: atlas; harbor; beacon; quill\\\"\\n}\\nIn adheri\" <> ...}, %{role: :user, content: \"[[ ## ticket ## ]]\\nCan you confirm whether our data was in the reported breach?\\n\\nRespond with a JSON object in the following order of fields: `team` (must be formatted as a valid Python Literal['atlas', 'harbor', 'beacon', 'quill']).\"}], raw: \"\"}}",
+          "index": 4,
+          "response": null,
+          "score": 0.0
+        }
+      ],
+      "type": "evaluation_cancelled"
+    },
+    "stopped_provider_context": {
+      "actual_model": "openai/gpt-oss-20b:free",
+      "bounded_safe_excerpt": "\"\"",
+      "computed_cost_usd": 0.0,
+      "finish_reason": "length",
+      "gateway_provider": "openrouter",
+      "input_tokens": 283,
+      "logical_requests": 5,
+      "output_tokens": 256,
+      "provider_reported_cost_usd": 0,
+      "raw_response_sha256": "sha256:150fe982bcb5a537fb89f0b857176b1617bce3a258ffb54f6181d1d7431fd3fd",
+      "requested_max_output_tokens": 256,
+      "status": "passed",
+      "transport_attempts": 5,
+      "truncation_indicators": {
+        "finish_reason_is_length": true,
+        "output_tokens_reached_ceiling": true
+      },
+      "upstream_provider": "Darkbloom"
+    },
+    "within_task_numeric_go_rule_passed": false
+  }
+}
