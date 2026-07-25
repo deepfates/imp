@@ -92,7 +92,11 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
     config = family_config!(family)
     bindings = bindings || source_bindings(family)
     validate_fixture_authority!()
-    validate_report!(report)
+
+    validate_report!(report,
+      authority_ledger_sha256: bindings["authority_ledger_sha256"]
+    )
+
     imp = local_observations(family)
     dspy = get_in(report, ["observations", family])
 
@@ -130,19 +134,24 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
         raise(ArgumentError, "unknown classical optimizer protocol #{registry_protocol_id}")
 
     artifact = Imp.BenchmarkTruth.RunContext.verify!(artifact)
-    bindings = source_bindings(family)
+    artifact_bindings = artifact["source_bindings"]
+    current_bindings = source_bindings(family)
 
     unless get_in(artifact, ["run_context", "workspace", "state"]) == "clean" do
       raise ArgumentError, "#{family} C1 admission requires a clean checkout"
     end
 
-    unless committed_sources_match?(artifact["git_sha"], family, bindings) and
-             get_in(artifact, ["run_context", "inputs"]) == bindings and
-             artifact["source_bindings"] == bindings do
+    unless is_map(artifact_bindings) and
+             committed_sources_match?(artifact["git_sha"], family, artifact_bindings) and
+             get_in(artifact, ["run_context", "inputs"]) == artifact_bindings do
       raise ArgumentError, "#{family} C1 artifact is not bound to committed Imp source"
     end
 
-    expected = build_artifact!(family, artifact["dspy_receipt"], bindings)
+    unless semantic_bindings(artifact_bindings) == semantic_bindings(current_bindings) do
+      raise ArgumentError, "#{family} C1 artifact does not match current semantic sources"
+    end
+
+    expected = build_artifact!(family, artifact["dspy_receipt"], artifact_bindings)
 
     unless Map.drop(artifact, ["generated_at", "git_sha", "run_context"]) == expected do
       raise ArgumentError, "#{family} C1 artifact content does not recompute"
@@ -152,18 +161,24 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
   end
 
   @doc false
-  def validate_report!(report) when is_map(report) do
+  def validate_report!(report, opts \\ []) when is_map(report) and is_list(opts) do
     fixture = fixture()
     validate_report_envelope!(report, fixture)
-    validate_report_source!(report, fixture["source"])
+
+    validate_report_source!(
+      report,
+      fixture["source"],
+      Keyword.get(opts, :authority_ledger_sha256, file_sha256!(@ledger_path))
+    )
+
     report
   end
 
-  defp validate_report_source!(report, source) do
+  defp validate_report_source!(report, source, authority_ledger_sha256) do
     runtime = report["runtime_identity"]
 
     expected_runtime = %{
-      "authority_ledger_sha256" => raw_file_sha256!(@ledger_path),
+      "authority_ledger_sha256" => String.replace_prefix(authority_ledger_sha256, "sha256:", ""),
       "authority_manifest_sha256" => raw_file_sha256!(@authority_path),
       "authority_manifest_verified_files" => source["source_manifest"]["file_count"],
       "distribution_version" => source["version"],
@@ -429,6 +444,15 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
   end
 
   defp committed_sources_match?(_, _, _), do: false
+
+  # The authority ledger is a multi-family inventory, and this task contains
+  # the validator itself. Changing either must not revoke an immutable artifact
+  # whose exact capture sources are still available at its recorded commit.
+  # The sidecar, fixture, authority manifest, and optimizer implementation stay
+  # in the current compatibility check; the task replays their observations.
+  defp semantic_bindings(bindings) when is_map(bindings),
+    do: Map.drop(bindings, ["authority_ledger_sha256", "task_sha256"])
+
   defp default_python, do: Path.expand("tmp/dspy-parity-venv/bin/python")
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()
   defp file_sha256!(path), do: "sha256:" <> raw_file_sha256!(path)

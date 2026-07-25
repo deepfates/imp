@@ -9,6 +9,7 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
   @python "tmp/dspy-parity-venv/bin/python"
   @script "scripts/dspy_copro_isolation_differential.py"
   @config "benchmarks/config/copro-isolation-differential-v1.json"
+  @admission "benchmarks/evidence/admitted/copro_isolation/5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e.json"
 
   setup_all do
     unless File.exists?(@python) and File.dir?("tmp/dspy-3.2.1/.git") do
@@ -25,7 +26,7 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
       )
 
     report = Jason.decode!(output)
-    artifact = admitted_artifact(report)
+    artifact = @admission |> File.read!() |> Jason.decode!()
     %{artifact: artifact, report: report}
   end
 
@@ -39,7 +40,13 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
 
     assert artifact["evidence_tier"] == "C1"
     assert artifact["provider_free"]
-    assert artifact["source_bindings"] == COPROArtifact.source_bindings()
+
+    assert Map.drop(artifact["source_bindings"], ["authority_ledger_sha256", "task_sha256"]) ==
+             Map.drop(COPROArtifact.source_bindings(), [
+               "authority_ledger_sha256",
+               "task_sha256"
+             ])
+
     assert artifact["dspy_report"]["runtime_identity"]["git_clean"]
 
     assert artifact["dspy_report"]["runtime_identity"]["git_commit"] ==
@@ -66,7 +73,7 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
       artifact
       |> payload()
       |> put_in(["dspy_report", "observations", "evaluation_order"], ["base"])
-      |> rewrap_clean()
+      |> rewrap_clean(artifact["git_sha"])
 
     assert_raise ArgumentError, ~r/deterministic call\/order\/deduplication/, fn ->
       COPROArtifact.validate_artifact!(tampered)
@@ -84,7 +91,7 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
         ["exact Python RNG parity", "full optimizer parity"]
       )
       |> put_in(["scope", "not_claimed"], ["exact Python RNG parity", "full optimizer parity"])
-      |> rewrap_clean()
+      |> rewrap_clean(artifact["git_sha"])
 
     assert_raise ArgumentError, ~r/identity or scope is invalid/, fn ->
       COPROArtifact.validate_artifact!(tampered)
@@ -96,7 +103,7 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
       artifact
       |> payload()
       |> put_in(["dspy_report", "runtime_identity", "git_clean"], false)
-      |> rewrap_clean()
+      |> rewrap_clean(artifact["git_sha"])
 
     assert_raise ArgumentError, ~r/pinned clean DSPy 3.2.1 source/, fn ->
       COPROArtifact.validate_artifact!(tampered)
@@ -106,7 +113,7 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
   test "admission rejects artifacts not captured from clean committed Imp source", %{
     report: report
   } do
-    artifact = report |> COPROArtifact.build_artifact!() |> rewrap("dirty")
+    artifact = report |> COPROArtifact.build_artifact!() |> rewrap("dirty", git_sha!())
 
     assert_raise ArgumentError, ~r/clean checkout/, fn ->
       COPROArtifact.validate_artifact!(artifact)
@@ -148,27 +155,32 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
     end
   end
 
-  defp admitted_artifact(report) do
-    report
-    |> COPROArtifact.build_artifact!()
-    |> rewrap_clean()
+  test "unrelated authority-ledger changes do not revoke the admitted receipt" do
+    artifact = @admission |> File.read!() |> Jason.decode!()
+    historical = artifact["source_bindings"]
+    current = COPROArtifact.source_bindings()
+
+    refute historical["authority_ledger_sha256"] == current["authority_ledger_sha256"]
+
+    assert Map.drop(historical, ["authority_ledger_sha256", "task_sha256"]) ==
+             Map.drop(current, ["authority_ledger_sha256", "task_sha256"])
+
+    assert COPROArtifact.validate_artifact!(artifact) == artifact
   end
 
   defp payload(artifact), do: Map.drop(artifact, ["generated_at", "git_sha", "run_context"])
-  defp rewrap_clean(payload), do: rewrap(payload, "clean")
+  defp rewrap_clean(payload, revision), do: rewrap(payload, "clean", revision)
 
-  defp rewrap(payload, workspace_state) do
-    sha = git_sha!()
-
+  defp rewrap(payload, workspace_state, revision) do
     context =
       RunContext.new!(
         source_commits: %{
-          "imp" => "deepfates/imp@#{sha}",
+          "imp" => "deepfates/imp@#{revision}",
           "dspy" => "stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c"
         },
         workspace_state: workspace_state,
         environment: %{"kind" => "synthetic", "purpose" => "validator-test"},
-        inputs: COPROArtifact.source_bindings()
+        inputs: payload["source_bindings"]
       )
 
     RunContext.finish(context, payload)

@@ -8,6 +8,7 @@ defmodule Imp.BenchmarkTruth.ClassicalOptimizerDifferentialTest do
   @python "tmp/dspy-parity-venv/bin/python"
   @script "scripts/dspy_classical_optimizer_differential.py"
   @config "benchmarks/config/classical-optimizer-differential-v1.json"
+  @bootstrap_admission "benchmarks/evidence/admitted/bootstrap_few_shot_differential/9b89dac91786fb2360c810f3122d2a755fc930228253730cd91de6a3b2df2094.json"
 
   setup_all do
     {output, 0} =
@@ -75,5 +76,19 @@ defmodule Imp.BenchmarkTruth.ClassicalOptimizerDifferentialTest do
         Differential.run_family(family, ["--no-require-clean"], fn -> %{} end)
       end
     end
+  end
+
+  test "an unrelated authority-ledger update does not revoke immutable evidence" do
+    artifact = @bootstrap_admission |> File.read!() |> Jason.decode!()
+    historical = artifact["source_bindings"]
+    current = Differential.source_bindings("bootstrap_few_shot")
+
+    refute historical["authority_ledger_sha256"] == current["authority_ledger_sha256"]
+
+    assert Map.drop(historical, ["authority_ledger_sha256", "task_sha256"]) ==
+             Map.drop(current, ["authority_ledger_sha256", "task_sha256"])
+
+    assert Differential.validate_artifact!("bootstrap_few_shot_differential", artifact) ==
+             artifact
   end
 end

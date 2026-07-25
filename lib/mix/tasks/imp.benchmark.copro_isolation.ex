@@ -83,7 +83,7 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
       when is_map(report) and is_map(bindings) do
     fixture = read_json!(@config_path)
     validate_fixture_authority!(fixture)
-    validate_report!(report, fixture)
+    validate_report!(report, fixture, bindings["authority_ledger_sha256"])
 
     %{
       "schema_version" => 1,
@@ -111,7 +111,8 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
   def validate_artifact!(artifact, opts \\ []) when is_map(artifact) and is_list(opts) do
     artifact = Imp.BenchmarkTruth.RunContext.verify!(artifact)
     fixture = read_json!(@config_path)
-    bindings = source_bindings()
+    artifact_bindings = artifact["source_bindings"]
+    current_bindings = source_bindings()
     validate_fixture_authority!(fixture)
 
     unless get_in(artifact, ["run_context", "workspace", "state"]) == "clean" do
@@ -119,13 +120,17 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
             "COPRO C1 admission requires an artifact captured from a clean checkout"
     end
 
-    unless committed_sources_match?(artifact["git_sha"], bindings) and
-             get_in(artifact, ["run_context", "inputs"]) == bindings and
-             artifact["source_bindings"] == bindings do
+    unless is_map(artifact_bindings) and
+             committed_sources_match?(artifact["git_sha"], artifact_bindings) and
+             get_in(artifact, ["run_context", "inputs"]) == artifact_bindings do
       raise ArgumentError, "COPRO C1 artifact is not bound to committed Imp source"
     end
 
-    expected = build_artifact!(artifact["dspy_report"], bindings)
+    unless semantic_bindings(artifact_bindings) == semantic_bindings(current_bindings) do
+      raise ArgumentError, "COPRO C1 artifact does not match current semantic sources"
+    end
+
+    expected = build_artifact!(artifact["dspy_report"], artifact_bindings)
 
     unless Map.drop(artifact, ["generated_at", "git_sha", "run_context"]) == expected do
       raise ArgumentError, "COPRO C1 artifact content does not recompute"
@@ -133,6 +138,14 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
 
     if Keyword.get(opts, :fresh_replay, false) do
       replay = run_python!(Keyword.get(opts, :python, default_python()))
+      validate_report!(replay, fixture, current_bindings["authority_ledger_sha256"])
+
+      replay =
+        put_in(
+          replay,
+          ["runtime_identity", "authority_ledger_sha256"],
+          get_in(artifact, ["dspy_report", "runtime_identity", "authority_ledger_sha256"])
+        )
 
       unless replay == artifact["dspy_report"] do
         raise ArgumentError, "COPRO C1 fresh replay differs from the admitted receipt"
@@ -222,7 +235,7 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
       do: raise(ArgumentError, "COPRO upstream test is absent from the authority ledger")
   end
 
-  defp validate_report!(report, fixture) do
+  defp validate_report!(report, fixture, authority_ledger_sha256) do
     source = fixture["source"]
     observations = report["observations"]
     runtime = report["runtime_identity"]
@@ -239,7 +252,7 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
       raise ArgumentError, "COPRO sidecar receipt identity or scope is invalid"
     end
 
-    validate_runtime!(runtime, source)
+    validate_runtime!(runtime, source, authority_ledger_sha256)
     validate_isolation!(report["isolation"])
     validate_fixture_identity!(report["fixture_identity"])
     validate_observations!(observations, fixture)
@@ -252,9 +265,9 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
     end
   end
 
-  defp validate_runtime!(runtime, source) do
+  defp validate_runtime!(runtime, source, authority_ledger_sha256) do
     expected = %{
-      "authority_ledger_sha256" => raw_file_sha256!(@ledger_path),
+      "authority_ledger_sha256" => String.replace_prefix(authority_ledger_sha256, "sha256:", ""),
       "authority_manifest_sha256" => raw_file_sha256!(@authority_path),
       "authority_manifest_verified_files" => source["source_manifest"]["file_count"],
       "distribution_version" => source["version"],
@@ -418,6 +431,9 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
   end
 
   defp committed_sources_match?(_git_sha, _bindings), do: false
+
+  defp semantic_bindings(bindings) when is_map(bindings),
+    do: Map.drop(bindings, ["authority_ledger_sha256", "task_sha256"])
 
   defp default_python, do: Path.expand("tmp/dspy-parity-venv/bin/python")
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()
