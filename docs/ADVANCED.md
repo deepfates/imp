@@ -80,6 +80,15 @@ rejected and never cached or selected. This containment is a deliberate safety
 extension to the pinned v0.1.4 batch surface. Callback shape errors such as a
 wrong result count remain fatal.
 
+The pinned custom batch-sampler boundary is exposed as the
+`Imp.Optimizer.GEPA.BatchSampler` behaviour. Put an implementing struct in
+`reflection: [batch_sampler: sampler]`; the sampler supplies its own positive
+minibatch size and returns ordered training indexes with updated state. Imp
+persists that state and a stable consumer-defined identity in every engine
+checkpoint, refuses strategy substitution on resume, and never silently falls
+back to `:epoch_shuffled`. As upstream does, a custom sampler cannot be combined
+with `reflection_minibatch_size`.
+
 When `run_dir` is set, Imp writes atomic JSON checkpoints and seed/best
 validation outputs. Evaluation caching defaults to durable, content-addressed
 JSON storage for run directories and fails closed on corrupt or incompatible

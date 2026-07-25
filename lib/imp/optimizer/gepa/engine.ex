@@ -90,7 +90,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       )
 
     validate_inputs!(seed_candidate, trainset, valset, opts)
-    requested_minibatch_size = Keyword.get(opts, :minibatch_size, min(3, length(trainset)))
+    requested_minibatch_size = requested_minibatch_size(opts, length(trainset))
 
     combee_policy =
       ComBee.resolve(
@@ -3372,7 +3372,11 @@ defmodule Imp.Optimizer.GEPA.Engine do
       stopper_state: new_stopper_state(opts),
       proposal_policy: Keyword.fetch!(opts, :proposal_policy),
       combee_policy: Keyword.fetch!(opts, :combee_policy),
-      batch_sampler: BatchSampler.new(),
+      batch_sampler:
+        BatchSampler.new(
+          Keyword.get(opts, :batch_sampler, :epoch_shuffled),
+          Keyword.fetch!(opts, :effective_minibatch_size)
+        ),
       reflection_strategy: reflection_strategy,
       reflection_strategy_initial: reflection_strategy
     }
@@ -4887,17 +4891,31 @@ defmodule Imp.Optimizer.GEPA.Engine do
     combee_policy =
       load_combee_policy(dumped, schema_version, Keyword.fetch!(opts, :combee_policy))
 
+    requested_batch_sampler = Keyword.get(opts, :batch_sampler, :epoch_shuffled)
+
     batch_sampler =
       case schema_version do
         7 ->
-          dumped |> Map.fetch!("batch_sampler") |> BatchSampler.load!()
+          dumped
+          |> Map.fetch!("batch_sampler")
+          |> BatchSampler.load!(requested_batch_sampler)
 
         6 ->
+          unless requested_batch_sampler == :epoch_shuffled do
+            raise ArgumentError,
+                  "custom GEPA batch samplers cannot resume schema 6 checkpoints"
+          end
+
           dumped
           |> Map.fetch!("batch_sampler")
           |> BatchSampler.load_legacy!(combee_policy.effective_batch_size)
 
         legacy when legacy in [4, 5] ->
+          unless requested_batch_sampler == :epoch_shuffled do
+            raise ArgumentError,
+                  "custom GEPA batch samplers cannot resume schema #{legacy} checkpoints"
+          end
+
           BatchSampler.new(combee_policy.effective_batch_size)
       end
 
@@ -5281,7 +5299,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
     if valset == [], do: raise(ArgumentError, "GEPA valset cannot be empty")
 
     max_iterations = Keyword.get(opts, :max_iterations, 10)
-    minibatch_size = Keyword.get(opts, :minibatch_size, min(3, length(trainset)))
+    BatchSampler.validate_strategy!(Keyword.get(opts, :batch_sampler, :epoch_shuffled))
+    minibatch_size = requested_minibatch_size(opts, length(trainset))
     seed = Keyword.get(opts, :seed, 0)
 
     unless is_integer(max_iterations) and max_iterations >= 0,
@@ -5391,6 +5410,13 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
     validate_acceptance_policy!(acceptance_policy, :acceptance_policy)
     validate_acceptance_policy!(merge_acceptance_policy, :merge_acceptance_policy)
+  end
+
+  defp requested_minibatch_size(opts, trainset_size) do
+    strategy = Keyword.get(opts, :batch_sampler, :epoch_shuffled)
+
+    BatchSampler.strategy_minibatch_size(strategy, Keyword.get(opts, :minibatch_size)) ||
+      min(3, trainset_size)
   end
 
   defp validate_sampling_strategy!(:single), do: :ok

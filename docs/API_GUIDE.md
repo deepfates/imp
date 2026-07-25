@@ -934,6 +934,16 @@ three-tuples cannot substitute their output for the evaluated candidate.
 Contained per-row and whole-call failures remain aligned for diagnostics, but
 incomplete proposals are not cached, selected, or installed as winners.
 
+`reflection.batch_sampler` accepts `:epoch_shuffled` or a stateful struct that
+implements `Imp.Optimizer.GEPA.BatchSampler`. A custom strategy owns its
+minibatch size, so it cannot be combined with `reflection_minibatch_size`. Its
+callback receives the native training examples plus iteration/call context,
+and returns ordered zero-based indexes, updated strategy state, and RNG state.
+Imp checkpoints the strategy module, stable identity, and dumped state; resume
+requires the same strategy identity and restores it before another evaluator
+call. Runtime strategy structs intentionally make the nested config
+non-persistable, while the optimization checkpoint remains JSON-resumable.
+
 ## Tools And ReAct
 
 ```elixir

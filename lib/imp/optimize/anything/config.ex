@@ -8,7 +8,14 @@ defmodule Imp.Optimize.Anything.Config do
   """
 
   alias Imp.Optimize.Anything.Config.{Engine, Merge, Refiner, Reflection, Tracking}
-  alias Imp.Optimizer.GEPA.{Callback, CandidateSelector, ModuleSelector, Stopper}
+
+  alias Imp.Optimizer.GEPA.{
+    BatchSampler,
+    Callback,
+    CandidateSelector,
+    ModuleSelector,
+    Stopper
+  }
 
   defmodule Persistence do
     @moduledoc false
@@ -218,7 +225,8 @@ defmodule Imp.Optimize.Anything.Config do
       values = Imp.Options.validate!(opts, @schema, "#{inspect(__MODULE__)}.new/1")
       config = struct!(__MODULE__, values)
       validate_perfect_score!(config.perfect_score)
-      validate_selector!(config.batch_sampler, :batch_sampler, [:epoch_shuffled])
+      BatchSampler.validate_strategy!(config.batch_sampler)
+      BatchSampler.strategy_minibatch_size(config.batch_sampler, config.reflection_minibatch_size)
       ModuleSelector.validate!(config.module_selector)
       validate_proposer!(config.custom_candidate_proposer)
       config
@@ -230,23 +238,6 @@ defmodule Imp.Optimize.Anything.Config do
     @spec from_map(map()) :: t()
     def from_map(map),
       do: map |> Persistence.options!("#{inspect(__MODULE__)}.from_map/1", @enum_fields) |> new()
-
-    defp validate_selector!(value, field, allowed) do
-      if value in allowed do
-        :ok
-      else
-        validate_custom_selector!(value, field, allowed)
-      end
-    end
-
-    defp validate_custom_selector!(value, _field, _allowed)
-         when is_atom(value) or is_struct(value),
-         do: :ok
-
-    defp validate_custom_selector!(_value, field, allowed) do
-      raise ArgumentError,
-            "#{field} must be one of #{inspect(allowed)} or a strategy module/struct"
-    end
 
     defp validate_proposer!(nil), do: :ok
     defp validate_proposer!(proposer) when is_function(proposer, 4), do: :ok
@@ -429,6 +420,7 @@ defmodule Imp.Optimize.Anything.Config do
       cache_evaluation: engine.cache_evaluation,
       cache_evaluation_storage: cache_storage(engine),
       candidate_selection_strategy: engine.candidate_selection_strategy,
+      batch_sampler: reflection.batch_sampler,
       module_selector: reflection.module_selector,
       track_best_outputs: engine.track_best_outputs,
       evaluation_policy: evaluation_policy(engine.val_evaluation_policy),
