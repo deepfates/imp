@@ -4,7 +4,7 @@ This note records the outside view used to shape Imp. It separates scientific
 authorities, implementation comparators, production complements, and recent
 work that is promising but too new to become a release claim.
 
-The review was refreshed on 2026-07-15. Moving repositories must still be
+The review was refreshed on 2026-07-25. Moving repositories must still be
 re-pinned before their behavior is used in a differential gate.
 
 ## Current GEPA And Optimize Anything Snapshot
@@ -139,6 +139,50 @@ loss, gradients, optimizer step, or resulting model weights. This section does
 not establish end-to-end provider evidence or claim that the Imp implementation
 is a paper reproduction. Revisit the design and parity status when first-party
 code, a revised paper, or an official executable artifact is released.
+
+## Weight-Training Engines
+
+Imp's supported local MLX path is supervised fine-tuning and fused-model
+deployment. It does not supply a GRPO updater. Two distinct candidates were
+inspected for that later boundary; neither is currently installed or bundled.
+
+[TRL `v1.6.0`](https://github.com/huggingface/trl/releases/tag/v1.6.0), pinned
+at `0dac440542c2ef9b575f56534f29f6fca1febe4a`, is the preferred production
+engine candidate. Its GRPO trainer performs causal-LM gradient updates,
+supports PEFT/LoRA and durable checkpoints, and gives reward functions the
+prompts, completions, completion token IDs, and additional dataset columns.
+It has the more mature implementation and test surface, but it is an external
+Python/GPU stack. Apple/MPS feasibility has not been established and must not
+be inferred from isolated MPS fixes in its release history.
+
+[`mlx-lm-lora` `v3.0.0`](https://github.com/Goekdeniz-Guelmez/mlx-lm-lora/tree/v3.0.0),
+pinned at `fb4f39db66fadec3b71a41441e863d9f1bf87844`, is the experimental
+Apple-local candidate. Its GRPO trainer really computes grouped rewards,
+advantages, loss, gradients, optimizer updates, adapter checkpoints, and
+resume state. Adoption is blocked on exact dependency pinning, loss and resume
+differentials, artifact validation, and resolution of a license-metadata
+contradiction (the repository license and package declaration differ). It also
+loads arbitrary reward Python and invokes reward functions once for scores and
+again for metrics. A scorer with effects or cost would therefore be duplicated
+unless a controlled shim used content-bound idempotent caching; that workaround
+would not substitute for correcting or pinning the engine behavior.
+
+The later Imp-to-trainer scoring contract should be a narrow data protocol, not
+an arbitrary Python callback. Imp should send an immutable batch containing a
+schema version, session/update/batch identifiers, prompt identity, completion
+text and token IDs, group position, optional reference, and a payload hash. The
+scorer should return ordered finite numeric rewards or typed row errors plus the
+same hash. A content-bound idempotency key must make a replay return the same
+receipt without evaluating twice. Imp must reject count, order, identity, hash,
+non-finite-score, or duplicate-receipt mismatches; persist the scoring receipt
+before accepting a gradient update; and keep training, selection, and untouched
+test records disjoint. Provider credentials and arbitrary executable callbacks
+must not cross this boundary.
+
+This inspection recommends TRL as the first production integration target and
+`mlx-lm-lora` only as a separately audited Apple-local experiment. It does not
+establish that either engine runs on the owner's hardware, matches DSPy/mmGRPO
+semantics, or produces useful held-out improvement.
 
 ## Repositories And Roles
 
