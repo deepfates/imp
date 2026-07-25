@@ -7,6 +7,9 @@ defmodule Mix.Tasks.Imp.Benchmark.SupportTicketLift do
       mix imp.benchmark.support_ticket_lift --runtime openrouter-free \
         --manifest benchmarks/config/support-ticket-lift-openrouter-free-v2.json \
         --out /tmp/ticket-free-v2.json
+      mix imp.benchmark.support_ticket_lift --runtime openrouter-free \
+        --manifest benchmarks/config/support-ticket-lift-openrouter-free-v3.json \
+        --out /tmp/ticket-free-v3.json
 
   `openrouter-free` requires `OPENROUTER_API_KEY` in the process environment and
   is pinned to 48 logical calls/transport attempts under the exact free-route
@@ -29,6 +32,10 @@ defmodule Mix.Tasks.Imp.Benchmark.SupportTicketLift do
 
     runtime = parse_runtime(Keyword.get(opts, :runtime, "local"))
     out = Keyword.get(opts, :out, "/tmp/imp-support-ticket-lift.json") |> Path.expand()
+
+    if opts[:manifest] && opts[:model] do
+      Mix.raise("--model cannot override a committed campaign manifest")
+    end
 
     campaign_opts =
       [runtime: runtime]
@@ -56,7 +63,7 @@ defmodule Mix.Tasks.Imp.Benchmark.SupportTicketLift do
   defp manifest_options(nil, _runtime), do: []
 
   defp manifest_options(path, :openrouter_free) do
-    Imp.BenchmarkTruth.SupportTicketLiftCampaign.v2_options!(path)
+    Imp.BenchmarkTruth.SupportTicketLiftCampaign.manifest_options!(path)
   end
 
   defp manifest_options(_path, runtime) do

@@ -221,8 +221,10 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
   end
 
   test "v3 preregistration preserves the benchmark and selects only the format-qualified route" do
+    path = "benchmarks/config/support-ticket-lift-openrouter-free-v3.json"
+
     manifest =
-      "benchmarks/config/support-ticket-lift-openrouter-free-v3.json"
+      path
       |> File.read!()
       |> Jason.decode!()
 
@@ -278,5 +280,114 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
 
     assert get_in(schema, ["properties", "team", "enum"]) ==
              ["atlas", "harbor", "beacon", "quill"]
+
+    options = SupportTicketLiftCampaign.manifest_options!(path)
+    assert options[:campaign] == manifest["campaign_id"]
+    assert options[:model] == "google/gemma-4-26b-a4b-it:free"
+    assert options[:max_output_tokens] == 128
+    assert stringify(options[:response_format]) == design["response_format"]
+    assert options[:required_catalog_parameters] == ["response_format", "structured_outputs"]
+
+    assert_raise ArgumentError, ~r/runtime options drifted/, fn ->
+      options
+      |> Keyword.merge(runtime: :openrouter_free, model: "other/model:free")
+      |> SupportTicketLiftCampaign.run()
+    end
   end
+
+  test "v3 full runner serializes and retains the exact guarded schema for every call" do
+    parent = self()
+    model = "google/gemma-4-26b-a4b-it:free"
+
+    base_url =
+      Imp.Test.LocalHTTP.start(fn request ->
+        body = Jason.decode!(request.body)
+        send(parent, {:v3_request, body})
+        {200, v3_response(model)}
+      end)
+
+    catalog = %{
+      "checked_url" => "local no-network fixture",
+      "model" => model,
+      "canonical_model" => String.replace_suffix(model, ":free", ""),
+      "pricing" => %{"prompt" => 0.0, "completion" => 0.0},
+      "supported_parameters" => ["response_format", "structured_outputs"]
+    }
+
+    options =
+      "benchmarks/config/support-ticket-lift-openrouter-free-v3.json"
+      |> SupportTicketLiftCampaign.manifest_options!()
+      |> Keyword.merge(
+        runtime: :openrouter_free,
+        api_key: "not-used",
+        base_url: base_url,
+        catalog: catalog
+      )
+
+    artifact = SupportTicketLiftCampaign.run(options)
+
+    assert artifact["summary"]["execution_complete"]
+    assert artifact["model"] == model
+    assert artifact["budget"]["requests"] == 48
+    assert artifact["budget"]["transport_attempts"] == 48
+    assert get_in(artifact, ["budget", "usage", "usd"]) == 0.0
+
+    rows = get_in(artifact, ["provider_accounting", "response_ledger", "responses"])
+    assert length(rows) == 48
+
+    Enum.each(rows, fn row ->
+      assert row["status"] == "passed"
+      assert row["requested_model"] == model
+      assert row["actual_model"] == model
+      assert row["finish_reason"] == "stop"
+      assert row["provider_reported_cost_usd"] == 0.0
+      assert row["computed_cost_usd"] == 0.0
+      assert row["request_validation"]["passed"]
+
+      assert stringify(get_in(row, ["request_audit", "response_format"])) ==
+               stringify(options[:response_format])
+    end)
+
+    assert get_in(artifact, ["provider_accounting", "response_ledger", "unmatched_request_audits"]) ==
+             []
+
+    for _ <- 1..48 do
+      assert_received {:v3_request, request}
+      assert request["model"] == model
+      assert request["max_tokens"] == 128
+      assert request["provider"] == stringify(OpenRouterFreeGuard.provider_guard())
+      assert request["usage"] == %{"include" => true}
+      assert request["response_format"] == stringify(options[:response_format])
+      assert request["reasoning_effort"] == nil
+    end
+  end
+
+  defp v3_response(model) do
+    %{
+      "id" => "support-v3-local",
+      "model" => model,
+      "provider" => "MockFree",
+      "choices" => [
+        %{
+          "index" => 0,
+          "finish_reason" => "stop",
+          "message" => %{"role" => "assistant", "content" => ~s({"team":"atlas"})}
+        }
+      ],
+      "usage" => %{
+        "prompt_tokens" => 20,
+        "completion_tokens" => 5,
+        "total_tokens" => 25,
+        "completion_tokens_details" => %{"reasoning_tokens" => 0},
+        "cost" => 0.0,
+        "total_cost" => 0.0
+      }
+    }
+  end
+
+  defp stringify(value) when is_map(value),
+    do: Map.new(value, fn {key, nested} -> {to_string(key), stringify(nested)} end)
+
+  defp stringify(value) when is_list(value), do: Enum.map(value, &stringify/1)
+  defp stringify(value), do: value
 end

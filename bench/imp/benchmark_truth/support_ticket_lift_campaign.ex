@@ -11,6 +11,9 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
   @v1_max_output_tokens 64
   @v2_max_output_tokens 256
   @v2_campaign_id "support-ticket-baseline-vs-labeled-few-shot-openrouter-free-v2"
+  @v3_max_output_tokens 128
+  @v3_campaign_id "support-ticket-baseline-vs-labeled-few-shot-openrouter-free-v3"
+  @v3_model "google/gemma-4-26b-a4b-it:free"
   @expected_requests length(@seeds) * length(@arms) * @test_limit
 
   def run(opts) do
@@ -22,6 +25,7 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
     campaign = Keyword.get(opts, :campaign, "support-ticket-baseline-vs-labeled-few-shot")
     max_output_tokens = Keyword.get(opts, :max_output_tokens, @v1_max_output_tokens)
     validate_design!(seeds, arms, test_limit, runtime, campaign, max_output_tokens)
+    validate_manifest_bound_runtime!(campaign, opts)
 
     dataset_path =
       opts
@@ -64,6 +68,7 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
       campaign: campaign,
       protocol_manifest: Keyword.get(opts, :protocol_manifest),
       max_output_tokens: max_output_tokens,
+      response_format: Keyword.get(opts, :response_format),
       budget: budget,
       ledger: ledger,
       catalog: catalog,
@@ -99,6 +104,42 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
     ]
   end
 
+  def manifest_options!(path) do
+    path = Path.expand(path)
+    bytes = File.read!(path)
+    manifest = Jason.decode!(bytes)
+
+    case manifest["campaign_id"] do
+      @v2_campaign_id -> v2_options_from_manifest!(path, bytes, manifest)
+      @v3_campaign_id -> v3_options_from_manifest!(path, bytes, manifest)
+      _other -> raise ArgumentError, "unsupported support-ticket campaign manifest"
+    end
+  end
+
+  defp v2_options_from_manifest!(path, bytes, manifest) do
+    validate_v2_manifest!(manifest)
+
+    [
+      campaign: @v2_campaign_id,
+      max_output_tokens: @v2_max_output_tokens,
+      protocol_manifest: protocol_manifest(path, bytes, manifest)
+    ]
+  end
+
+  defp v3_options_from_manifest!(path, bytes, manifest) do
+    validate_v3_manifest!(manifest)
+    design = manifest["frozen_design"]
+
+    [
+      campaign: @v3_campaign_id,
+      model: @v3_model,
+      max_output_tokens: @v3_max_output_tokens,
+      response_format: runtime_response_format(design["response_format"]),
+      required_catalog_parameters: ["response_format", "structured_outputs"],
+      protocol_manifest: protocol_manifest(path, bytes, manifest)
+    ]
+  end
+
   defp run_schedule(context) do
     schedule = for seed <- context.seeds, arm <- context.arms, do: {seed, arm}
 
@@ -115,7 +156,7 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
   defp run_arm(context, seed, arm) do
     before = CampaignBudget.snapshot(context.budget)
     lm = context.lm_factory.(seed, context.budget, context.ledger)
-    program = base_program(lm)
+    program = base_program(lm, context.response_format)
     started = System.monotonic_time(:millisecond)
 
     try do
@@ -166,12 +207,14 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
     end
   end
 
-  defp base_program(lm) do
+  defp base_program(lm, response_format) do
+    config = [json_retries: 0] |> maybe_put_config(:response_format, response_format)
+
     "ticket -> team: enum[atlas,harbor,beacon,quill]"
     |> Imp.signature(
       "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill."
     )
-    |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 0])
+    |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: config)
   end
 
   defp compile_arm(:baseline, program, _trainset, _seed), do: program
@@ -228,6 +271,7 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
         "cache" => false,
         "max_concurrency" => 1,
         "max_output_tokens" => context.max_output_tokens,
+        "response_format" => context.response_format,
         "json_retries" => 0,
         "transport_retries" => 0,
         "logical_request_limit" => context.request_limit
@@ -378,17 +422,39 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
 
   defp runtime_state(:openrouter_free, opts) do
     {:ok, ledger} = OpenRouterFreeGuard.start_ledger()
-    {ledger, Keyword.get_lazy(opts, :catalog, &OpenRouterFreeGuard.current_catalog!/0)}
+    model = Keyword.get(opts, :model, OpenRouterFreeGuard.model())
+
+    catalog =
+      Keyword.get_lazy(opts, :catalog, fn -> OpenRouterFreeGuard.current_catalog!(model) end)
+
+    validate_catalog_parameters!(catalog, Keyword.get(opts, :required_catalog_parameters, []))
+    {ledger, catalog}
   end
 
   defp runtime_state(:local, _opts), do: {nil, nil}
 
   defp default_lm_factory(:openrouter_free, opts, max_output_tokens) do
     api_key = Keyword.fetch!(opts, :api_key)
+    model = Keyword.get(opts, :model, OpenRouterFreeGuard.model())
+    response_format = Keyword.get(opts, :response_format)
+
+    request_contract =
+      if response_format do
+        %{
+          model: model,
+          response_format: response_format,
+          max_output_tokens: max_output_tokens,
+          reasoning_effort: Keyword.get(opts, :reasoning_effort)
+        }
+      end
 
     fn seed, budget, ledger ->
       OpenRouterFreeGuard.strict_lm(api_key, budget, ledger, seed,
-        max_output_tokens: max_output_tokens
+        model: model,
+        max_output_tokens: max_output_tokens,
+        reasoning_effort: Keyword.get(opts, :reasoning_effort),
+        base_url: Keyword.get(opts, :base_url),
+        request_contract: request_contract
       )
     end
   end
@@ -573,6 +639,9 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
       {:openrouter_free, @v2_campaign_id, @v2_max_output_tokens} ->
         :ok
 
+      {:openrouter_free, @v3_campaign_id, @v3_max_output_tokens} ->
+        :ok
+
       {:local, "support-ticket-baseline-vs-labeled-few-shot", @v1_max_output_tokens} ->
         :ok
 
@@ -643,10 +712,99 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
     :ok
   end
 
+  defp validate_v3_manifest!(manifest) do
+    expected_guard = %{
+      "exact_model_suffix" => ":free",
+      "max_price" => %{"prompt" => 0, "completion" => 0, "request" => 0, "image" => 0},
+      "allow_fallbacks" => false,
+      "require_parameters" => true,
+      "data_collection" => "deny",
+      "usage_include" => true,
+      "fail_closed_on_nonzero_or_ambiguous_cost" => true,
+      "single_transport_attempt_per_logical_request" => true
+    }
+
+    design = manifest["frozen_design"] || %{}
+    dataset = design["dataset"] || %{}
+    execution = design["execution"] || %{}
+    qualification = manifest["format_qualification"] || %{}
+    predecessors = manifest["closed_predecessors"] || []
+
+    checks = [
+      manifest["campaign_id"] == @v3_campaign_id,
+      manifest["status"] == "preregistered_not_run",
+      manifest["authorization"] == "not_launched",
+      length(predecessors) == 2,
+      Enum.all?(predecessors, fn predecessor ->
+        predecessor["disposition"] == "permanently_closed_stopped_incomplete" and
+          predecessor["sha256"] == file_sha256(predecessor["artifact"])
+      end),
+      qualification["selected_candidate"] == @v3_model,
+      qualification["sha256"] == file_sha256(qualification["artifact"]),
+      dataset["path"] == "priv/tutorial/support_tickets.json",
+      dataset["sha256"] == file_sha256(dataset["path"]),
+      dataset["untouched_test_indices"] == @balanced_test_indices,
+      dataset["test_visible_to_optimization_or_selection"] == false,
+      design["seeds"] == @seeds,
+      Enum.map(design["arms"] || [], & &1["id"]) == Enum.map(@arms, &Atom.to_string/1),
+      get_in(design, ["arms", Access.at(1), "options"]) == %{
+        "k" => 8,
+        "sample" => true,
+        "seed" => "campaign_seed"
+      },
+      design["metric"] == "Imp.exact_match(:team)",
+      design["signature"] == "ticket -> team: enum[atlas,harbor,beacon,quill]",
+      design["response_format"] == expected_v3_response_format(),
+      get_in(design, ["model", "requested"]) == @v3_model,
+      get_in(design, ["model", "temperature"]) == 0.0,
+      get_in(design, ["model", "cache"]) == false,
+      get_in(design, ["model", "reasoning_effort"]) == nil,
+      execution["logical_request_limit"] == @expected_requests,
+      execution["transport_attempt_limit"] == @expected_requests,
+      execution["max_concurrency"] == 1,
+      execution["json_retries"] == 0,
+      execution["transport_retries"] == 0,
+      execution["max_output_tokens"] == @v3_max_output_tokens,
+      design["provider_guard"] == expected_guard,
+      manifest["required_prelaunch_validation"] != [],
+      manifest["required_response_evidence"] != [],
+      manifest["stop_rules"] != [],
+      get_in(manifest, ["decision_rules", "within_task_go"]) ==
+        "Mean held-out lift is at least 0.03, the exact paired-bootstrap 95% lower bound is above zero, and at least two of three seeds improve."
+    ]
+
+    unless Enum.all?(checks), do: raise(ArgumentError, "v3 campaign manifest drifted")
+    :ok
+  end
+
+  defp validate_manifest_bound_runtime!(@v3_campaign_id, opts) do
+    checks = [
+      Keyword.get(opts, :model) == @v3_model,
+      Keyword.get(opts, :max_output_tokens) == @v3_max_output_tokens,
+      Keyword.get(opts, :response_format) ==
+        runtime_response_format(expected_v3_response_format()),
+      Keyword.get(opts, :required_catalog_parameters) == [
+        "response_format",
+        "structured_outputs"
+      ],
+      Keyword.get(opts, :reasoning_effort) == nil,
+      is_map(Keyword.get(opts, :protocol_manifest))
+    ]
+
+    unless Enum.all?(checks),
+      do: raise(ArgumentError, "V3 runtime options drifted from the committed manifest")
+
+    :ok
+  end
+
+  defp validate_manifest_bound_runtime!(_campaign, _opts), do: :ok
+
   defp file_sha256(nil), do: nil
   defp file_sha256(path), do: path |> File.read!() |> sha256()
 
-  defp model_name(:openrouter_free, _opts), do: OpenRouterFreeGuard.model()
+  defp model_name(:openrouter_free, opts),
+    do: Keyword.get(opts, :model, OpenRouterFreeGuard.model())
+
   defp model_name(:local, opts), do: Keyword.get(opts, :model, "ollama:llama3.2:3b")
 
   defp elapsed_seconds(started),
@@ -673,4 +831,57 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
 
   defp safe_error(error),
     do: error |> inspect(limit: 20, printable_limit: 500) |> Imp.Redaction.redact()
+
+  defp protocol_manifest(path, bytes, manifest) do
+    %{
+      "path" => path,
+      "sha256" => sha256(bytes),
+      "status_at_launch" => manifest["status"],
+      "authorization_at_preregistration" => manifest["authorization"]
+    }
+  end
+
+  defp validate_catalog_parameters!(_catalog, []), do: :ok
+
+  defp validate_catalog_parameters!(catalog, required) do
+    supported = catalog["supported_parameters"] || []
+
+    unless catalog["model"] == @v3_model and Enum.all?(required, &(&1 in supported)) do
+      raise ArgumentError,
+            "V3 catalog no longer advertises the committed exact model capabilities"
+    end
+
+    :ok
+  end
+
+  defp maybe_put_config(config, _key, nil), do: config
+  defp maybe_put_config(config, key, value), do: Keyword.put(config, key, value)
+
+  defp runtime_response_format(%{
+         "type" => type,
+         "json_schema" => %{"name" => name, "strict" => strict, "schema" => schema}
+       }) do
+    %{type: type, json_schema: %{name: name, strict: strict, schema: schema}}
+  end
+
+  defp expected_v3_response_format do
+    %{
+      "type" => "json_schema",
+      "json_schema" => %{
+        "name" => "imp_support_ticket_team",
+        "strict" => true,
+        "schema" => %{
+          "type" => "object",
+          "properties" => %{
+            "team" => %{
+              "type" => "string",
+              "enum" => ["atlas", "harbor", "beacon", "quill"]
+            }
+          },
+          "required" => ["team"],
+          "additionalProperties" => false
+        }
+      }
+    }
+  end
 end

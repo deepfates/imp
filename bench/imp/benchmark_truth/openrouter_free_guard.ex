@@ -30,6 +30,11 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
         base_url -> %{provider: :openrouter, id: requested_model, base_url: base_url}
       end
 
+    req_http_options =
+      opts
+      |> Keyword.get(:req_http_options, [])
+      |> install_request_contract_audit(ledger, Keyword.get(opts, :request_contract))
+
     lm_opts =
       [
         api_key: api_key,
@@ -44,7 +49,7 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
         ]
       ]
       |> maybe_put_opt(:reasoning_effort, Keyword.get(opts, :reasoning_effort))
-      |> maybe_put_opt(:req_http_options, Keyword.get(opts, :req_http_options))
+      |> maybe_put_opt(:req_http_options, req_http_options)
 
     inner = Imp.req_llm(model, lm_opts)
 
@@ -58,26 +63,96 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
       inner: budgeted,
       budget: budget,
       ledger: ledger,
-      requested_model: requested_model
+      requested_model: requested_model,
+      request_contract: Keyword.get(opts, :request_contract)
     )
   end
 
-  def start_ledger, do: Agent.start_link(fn -> %{halted: nil, rows: []} end)
+  def start_ledger, do: Agent.start_link(fn -> %{halted: nil, rows: [], request_audits: []} end)
 
   def ledger_snapshot(ledger) do
     Agent.get(ledger, fn state ->
       %{
         "halted" => state.halted && safe_error(state.halted),
-        "responses" => Enum.reverse(state.rows)
+        "responses" => Enum.reverse(state.rows),
+        "unmatched_request_audits" => Enum.reverse(state.request_audits)
       }
     end)
   end
 
   @doc false
-  def checked_generate(inner, budget, ledger, messages, opts, requested_model \\ @model) do
+  def checked_generate(
+        inner,
+        budget,
+        ledger,
+        messages,
+        opts,
+        requested_model \\ @model,
+        request_contract \\ nil
+      ) do
     case Agent.get(ledger, & &1.halted) do
-      nil -> do_checked_generate(inner, budget, ledger, messages, opts, requested_model)
-      reason -> {:error, {:openrouter_free_campaign_halted, reason}}
+      nil ->
+        do_checked_generate(
+          inner,
+          budget,
+          ledger,
+          messages,
+          opts,
+          requested_model,
+          request_contract
+        )
+
+      reason ->
+        {:error, {:openrouter_free_campaign_halted, reason}}
+    end
+  end
+
+  @doc false
+  def audit_campaign_request(%Req.Request{} = request, ledger, contract) do
+    body = decode_body(request.body)
+    provider_opts = request.options[:provider_options] || []
+
+    audit = %{
+      "model" => map_value(body, :model) || request.options[:model],
+      "provider" =>
+        map_value(body, :provider) || request.options[:openrouter_provider] ||
+          provider_opts[:openrouter_provider],
+      "usage" =>
+        map_value(body, :usage) || request.options[:openrouter_usage] ||
+          provider_opts[:openrouter_usage],
+      "response_format" =>
+        map_value(body, :response_format) || request.options[:response_format] ||
+          provider_opts[:response_format],
+      "max_tokens" => map_value(body, :max_tokens) || request.options[:max_tokens],
+      "reasoning_effort" =>
+        map_value(body, :reasoning_effort) || request.options[:reasoning_effort]
+    }
+
+    checks = %{
+      "exact_model" => audit["model"] == contract[:model],
+      "provider_guard" => stringify(audit["provider"]) == stringify(provider_guard()),
+      "usage_include" => map_value(audit["usage"], :include) == true,
+      "response_format" =>
+        stringify(audit["response_format"]) == stringify(contract[:response_format]),
+      "max_output_tokens" => audit["max_tokens"] == contract[:max_output_tokens],
+      "reasoning_effort" => audit["reasoning_effort"] == contract[:reasoning_effort]
+    }
+
+    record = %{
+      "request" => audit,
+      "checks" => checks,
+      "passed" => Enum.all?(checks, fn {_key, value} -> value == true end)
+    }
+
+    Agent.update(ledger, fn state ->
+      halted = if record["passed"], do: state.halted, else: {:request_contract_drift, checks}
+      %{state | halted: halted, request_audits: [record | state.request_audits]}
+    end)
+
+    if record["passed"] do
+      request
+    else
+      raise "OpenRouter campaign serialized request drifted from the committed contract"
     end
   end
 
@@ -245,12 +320,28 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     {:error, artifact("failed", catalog, audit, snapshot, nil, safe_error(other))}
   end
 
-  defp do_checked_generate(inner, budget, ledger, messages, opts, requested_model) do
+  defp do_checked_generate(
+         inner,
+         budget,
+         ledger,
+         messages,
+         opts,
+         requested_model,
+         request_contract
+       ) do
     result = Imp.LM.generate(inner, messages, opts)
     snapshot = CampaignBudget.snapshot(budget)
     max_output_tokens = checked_output_limit(inner, opts)
+    request_audit = take_request_audit(ledger)
 
-    case strict_response_accounting(result, snapshot, max_output_tokens, requested_model) do
+    case strict_response_accounting(
+           result,
+           snapshot,
+           max_output_tokens,
+           requested_model,
+           request_contract,
+           request_audit
+         ) do
       {:ok, row} ->
         Agent.update(ledger, fn state -> %{state | rows: [row | state.rows]} end)
         result
@@ -261,12 +352,27 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     end
   end
 
-  defp strict_response_accounting({:ok, raw}, snapshot, max_output_tokens, requested_model) do
+  defp strict_response_accounting(
+         {:ok, raw},
+         snapshot,
+         max_output_tokens,
+         requested_model,
+         request_contract,
+         request_audit
+       ) do
     with {:ok, output, metadata} <- Imp.LM.Result.split(raw) do
       row =
-        response_accounting_row(output, metadata, snapshot, max_output_tokens, requested_model)
+        output
+        |> response_accounting_row(metadata, snapshot, max_output_tokens, requested_model)
+        |> attach_request_audit(request_audit)
 
-      case validate_response(metadata, snapshot, requested_model) do
+      case validate_request_and_response(
+             request_audit,
+             request_contract,
+             metadata,
+             snapshot,
+             requested_model
+           ) do
         :ok ->
           {:ok, Map.put(row, "status", "passed")}
 
@@ -283,12 +389,56 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
          {:error, reason},
          snapshot,
          _max_output_tokens,
-         _requested_model
+         _requested_model,
+         _request_contract,
+         request_audit
        ),
-       do: {:error, {:provider_error, safe_error(reason)}, failed_response_row(reason, snapshot)}
+       do:
+         {:error, {:provider_error, safe_error(reason)},
+          reason |> failed_response_row(snapshot) |> attach_request_audit(request_audit)}
 
-  defp strict_response_accounting(other, snapshot, _max_output_tokens, _requested_model),
-    do: {:error, {:malformed_lm_result, safe_error(other)}, failed_response_row(other, snapshot)}
+  defp strict_response_accounting(
+         other,
+         snapshot,
+         _max_output_tokens,
+         _requested_model,
+         _request_contract,
+         request_audit
+       ),
+       do:
+         {:error, {:malformed_lm_result, safe_error(other)},
+          other |> failed_response_row(snapshot) |> attach_request_audit(request_audit)}
+
+  defp validate_request_and_response(
+         request_audit,
+         request_contract,
+         metadata,
+         snapshot,
+         requested_model
+       ) do
+    with :ok <- validate_request_contract(request_audit, request_contract),
+         :ok <- validate_response(metadata, snapshot, requested_model),
+         :ok <- validate_contract_response_identity(metadata, request_contract) do
+      :ok
+    end
+  end
+
+  defp validate_request_contract(_request_audit, nil), do: :ok
+
+  defp validate_request_contract(%{"passed" => true}, _request_contract), do: :ok
+
+  defp validate_request_contract(_request_audit, _request_contract),
+    do: {:error, :serialized_request_contract_missing_or_drifted}
+
+  defp validate_contract_response_identity(_metadata, nil), do: :ok
+
+  defp validate_contract_response_identity(metadata, %{model: exact_model}) do
+    actual_model = get_in(metadata, [:req_llm, :model])
+
+    if actual_model == exact_model,
+      do: :ok,
+      else: {:error, {:exact_model_response_drift, exact_model, actual_model}}
+  end
 
   defp validate_response(metadata, snapshot, requested_model) do
     with {:ok, provider} <- required_binary(get_in(metadata, [:req_llm, :provider]), :provider),
@@ -413,6 +563,26 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     }
   end
 
+  defp attach_request_audit(row, nil), do: row
+
+  defp attach_request_audit(row, audit) do
+    row
+    |> Map.put("request_audit", audit["request"])
+    |> Map.put("request_validation", %{
+      "passed" => audit["passed"],
+      "checks" => audit["checks"]
+    })
+  end
+
+  defp take_request_audit(ledger) do
+    Agent.get_and_update(ledger, fn state ->
+      case Enum.reverse(state.request_audits) do
+        [audit | rest] -> {audit, %{state | request_audits: Enum.reverse(rest)}}
+        [] -> {nil, state}
+      end
+    end)
+  end
+
   defp validate_identity("openrouter", actual_model, requested_model) do
     canonical = String.replace_suffix(requested_model, ":free", "")
 
@@ -524,6 +694,27 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
   defp maybe_put_opt(opts, _key, nil), do: opts
   defp maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
+  defp install_request_contract_audit(req_http_options, _ledger, nil),
+    do: req_http_options
+
+  defp install_request_contract_audit(req_http_options, ledger, contract) do
+    unless Keyword.keyword?(req_http_options) do
+      raise ArgumentError, "campaign LM :req_http_options must be a keyword list"
+    end
+
+    plugins = Keyword.get(req_http_options, :plugins, [])
+    unless is_list(plugins), do: raise(ArgumentError, "campaign LM Req :plugins must be a list")
+
+    audit_plugin = fn request ->
+      Req.Request.append_request_steps(request,
+        imp_openrouter_campaign_request_audit:
+          {__MODULE__, :audit_campaign_request, [ledger, contract]}
+      )
+    end
+
+    Keyword.put(req_http_options, :plugins, plugins ++ [audit_plugin])
+  end
+
   defp map_value(nil, _key), do: nil
 
   defp map_value(map, key) when is_map(map),
@@ -540,7 +731,13 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM do
 
   @behaviour Imp.LM
 
-  defstruct [:inner, :budget, :ledger, requested_model: "openai/gpt-oss-20b:free"]
+  defstruct [
+    :inner,
+    :budget,
+    :ledger,
+    :request_contract,
+    requested_model: "openai/gpt-oss-20b:free"
+  ]
 
   @impl true
   def generate(_messages, _opts), do: {:error, :checked_lm_instance_required}
@@ -552,7 +749,8 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM do
       lm.ledger,
       messages,
       opts,
-      lm.requested_model
+      lm.requested_model,
+      lm.request_contract
     )
   end
 
