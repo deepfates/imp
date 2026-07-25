@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "campaign_id": "openrouter-free-typed-format-canary-v1",
+  "status": "preregistered_not_run",
+  "purpose": "Measure provider-format completion and Imp content/reasoning mapping on one synthetic typed output. This is not an optimizer, benchmark, or held-out-label campaign.",
+  "synthetic_case": {
+    "signature": "code -> status: enum[ok]",
+    "instructions": "Return the only allowed status for this synthetic format canary.",
+    "input": {"code": "FORMAT-CANARY-7"},
+    "expected": {"status": "ok"},
+    "contains_support_ticket_material": false,
+    "contains_benchmark_labels": false
+  },
+  "adapter": {
+    "module": "Imp.Adapter.JSON",
+    "response_format_mode": "explicit_strict_json_schema",
+    "json_retries": 0
+  },
+  "execution": {
+    "max_calls_per_candidate": 1,
+    "max_concurrency": 1,
+    "transport_retries": 0,
+    "cache": false,
+    "seed": 7
+  },
+  "provider_guard": {
+    "max_price": {"prompt": 0, "completion": 0, "request": 0, "image": 0},
+    "allow_fallbacks": false,
+    "require_parameters": true,
+    "data_collection": "deny",
+    "usage_include": true,
+    "single_transport_attempt_per_logical_request": true
+  },
+  "catalog_observation": {
+    "checked_at": "2026-07-25",
+    "endpoint": "https://openrouter.ai/api/v1/models",
+    "selection_rule": "Exact :free ID with zero prompt/completion catalog pricing and advertised response_format support; prefer advertised structured_outputs and a non-mandatory reasoning route, plus the closed V2 route under a larger format-only envelope."
+  },
+  "candidates": [
+    {
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "max_output_tokens": 128,
+      "reasoning_effort": null,
+      "catalog_supported_parameters": ["response_format", "structured_outputs"],
+      "rationale": "Exact-free instruction model advertising native schema support with reasoning disabled by default in the pinned local registry."
+    },
+    {
+      "id": "nvidia/nemotron-nano-9b-v2:free",
+      "max_output_tokens": 128,
+      "reasoning_effort": null,
+      "catalog_supported_parameters": ["response_format", "structured_outputs"],
+      "rationale": "Compact exact-free text model advertising native schema support; useful independent format route."
+    },
+    {
+      "id": "openai/gpt-oss-20b:free",
+      "max_output_tokens": 512,
+      "reasoning_effort": "low",
+      "catalog_supported_parameters": ["response_format", "structured_outputs", "reasoning_effort"],
+      "rationale": "Same exact-free route as closed V2, but a format-only canary with forced schema, low reasoning effort, and a defensible 2x output envelope."
+    }
+  ],
+  "required_request_evidence": [
+    "exact requested :free model",
+    "zero-price no-fallback data-deny provider object",
+    "usage include",
+    "strict one-field JSON schema",
+    "max output tokens",
+    "reasoning effort when configured"
+  ],
+  "required_response_evidence": [
+    "gateway and upstream provider",
+    "actual model",
+    "finish reason",
+    "content digest and bounded redacted excerpt",
+    "native reasoning presence, digest, bounded redacted excerpt, and byte count",
+    "reasoning-details count and digest",
+    "input, output, and reasoning tokens",
+    "logical and transport attempts",
+    "provider-reported and computed cost",
+    "typed adapter result or structured adapter error"
+  ],
+  "success_rule": "Exactly one logical and transport attempt returns status=ok, finish_reason=stop, non-empty typed content, explicit zero cost, and no route or request drift.",
+  "claim_limits": [
+    "Format completion does not measure optimizer effectiveness or task quality.",
+    "No support-ticket test input or label may be used.",
+    "A successful canary may inform a separate V3 preregistration but cannot launch or admit V3."
+  ]
+}

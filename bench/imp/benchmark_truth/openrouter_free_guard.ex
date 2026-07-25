@@ -4,7 +4,6 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
   alias Imp.BenchmarkTruth.{BudgetedLM, CampaignBudget}
 
   @model "openai/gpt-oss-20b:free"
-  @canonical_model "openai/gpt-oss-20b"
   @catalog_url "https://openrouter.ai/api/v1/models"
   @max_output_tokens 32
 
@@ -19,13 +18,20 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     }
   end
 
-  def current_catalog!, do: fetch_catalog() |> validate_catalog!()
+  def current_catalog!(model \\ @model), do: fetch_catalog() |> validate_catalog!(model)
 
   def strict_lm(api_key, budget, ledger, seed, opts \\ []) do
     max_output_tokens = Keyword.get(opts, :max_output_tokens, 64)
+    requested_model = Keyword.get(opts, :model, @model)
 
-    inner =
-      Imp.req_llm("openrouter:" <> @model,
+    model =
+      case Keyword.get(opts, :base_url) do
+        nil -> "openrouter:" <> requested_model
+        base_url -> %{provider: :openrouter, id: requested_model, base_url: base_url}
+      end
+
+    lm_opts =
+      [
         api_key: api_key,
         temperature: 0.0,
         seed: seed,
@@ -36,7 +42,11 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
           openrouter_provider: provider_guard(),
           openrouter_usage: %{include: true}
         ]
-      )
+      ]
+      |> maybe_put_opt(:reasoning_effort, Keyword.get(opts, :reasoning_effort))
+      |> maybe_put_opt(:req_http_options, Keyword.get(opts, :req_http_options))
+
+    inner = Imp.req_llm(model, lm_opts)
 
     budgeted = %BudgetedLM{
       inner: inner,
@@ -47,7 +57,8 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     struct(Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM,
       inner: budgeted,
       budget: budget,
-      ledger: ledger
+      ledger: ledger,
+      requested_model: requested_model
     )
   end
 
@@ -63,9 +74,9 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
   end
 
   @doc false
-  def checked_generate(inner, budget, ledger, messages, opts) do
+  def checked_generate(inner, budget, ledger, messages, opts, requested_model \\ @model) do
     case Agent.get(ledger, & &1.halted) do
-      nil -> do_checked_generate(inner, budget, ledger, messages, opts)
+      nil -> do_checked_generate(inner, budget, ledger, messages, opts, requested_model)
       reason -> {:error, {:openrouter_free_campaign_halted, reason}}
     end
   end
@@ -73,7 +84,7 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
   def run(opts) do
     api_key = Keyword.fetch!(opts, :api_key)
     catalog_fetcher = Keyword.get(opts, :catalog_fetcher, &fetch_catalog/0)
-    catalog = catalog_fetcher.() |> validate_catalog!()
+    catalog = catalog_fetcher.() |> validate_catalog!(@model)
     owner = self()
 
     {:ok, budget} =
@@ -158,11 +169,11 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     end
   end
 
-  defp validate_catalog!(%{"data" => models}) when is_list(models) do
-    model = Enum.find(models, &(map_value(&1, :id) == @model))
+  defp validate_catalog!(%{"data" => models}, requested_model) when is_list(models) do
+    model = Enum.find(models, &(map_value(&1, :id) == requested_model))
 
     if is_nil(model) do
-      raise "OpenRouter catalog does not list exact model #{@model}"
+      raise "OpenRouter catalog does not list exact model #{requested_model}"
     end
 
     pricing = map_value(model, :pricing)
@@ -175,13 +186,15 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
 
     %{
       "checked_url" => @catalog_url,
-      "model" => @model,
+      "model" => requested_model,
       "canonical_model" => map_value(model, :canonical_slug),
-      "pricing" => %{"prompt" => prompt, "completion" => completion}
+      "pricing" => %{"prompt" => prompt, "completion" => completion},
+      "supported_parameters" => map_value(model, :supported_parameters) || []
     }
   end
 
-  defp validate_catalog!(_other), do: raise("OpenRouter catalog response is malformed")
+  defp validate_catalog!(_other, _requested_model),
+    do: raise("OpenRouter catalog response is malformed")
 
   defp build_result({:ok, raw}, audit, snapshot, catalog) do
     with {:ok, _output, metadata} <- Imp.LM.Result.split(raw),
@@ -232,12 +245,12 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     {:error, artifact("failed", catalog, audit, snapshot, nil, safe_error(other))}
   end
 
-  defp do_checked_generate(inner, budget, ledger, messages, opts) do
+  defp do_checked_generate(inner, budget, ledger, messages, opts, requested_model) do
     result = Imp.LM.generate(inner, messages, opts)
     snapshot = CampaignBudget.snapshot(budget)
     max_output_tokens = checked_output_limit(inner, opts)
 
-    case strict_response_accounting(result, snapshot, max_output_tokens) do
+    case strict_response_accounting(result, snapshot, max_output_tokens, requested_model) do
       {:ok, row} ->
         Agent.update(ledger, fn state -> %{state | rows: [row | state.rows]} end)
         result
@@ -248,11 +261,12 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     end
   end
 
-  defp strict_response_accounting({:ok, raw}, snapshot, max_output_tokens) do
+  defp strict_response_accounting({:ok, raw}, snapshot, max_output_tokens, requested_model) do
     with {:ok, output, metadata} <- Imp.LM.Result.split(raw) do
-      row = response_accounting_row(output, metadata, snapshot, max_output_tokens)
+      row =
+        response_accounting_row(output, metadata, snapshot, max_output_tokens, requested_model)
 
-      case validate_response(metadata, snapshot) do
+      case validate_response(metadata, snapshot, requested_model) do
         :ok ->
           {:ok, Map.put(row, "status", "passed")}
 
@@ -265,17 +279,22 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     end
   end
 
-  defp strict_response_accounting({:error, reason}, snapshot, _max_output_tokens),
-    do: {:error, {:provider_error, safe_error(reason)}, failed_response_row(reason, snapshot)}
+  defp strict_response_accounting(
+         {:error, reason},
+         snapshot,
+         _max_output_tokens,
+         _requested_model
+       ),
+       do: {:error, {:provider_error, safe_error(reason)}, failed_response_row(reason, snapshot)}
 
-  defp strict_response_accounting(other, snapshot, _max_output_tokens),
+  defp strict_response_accounting(other, snapshot, _max_output_tokens, _requested_model),
     do: {:error, {:malformed_lm_result, safe_error(other)}, failed_response_row(other, snapshot)}
 
-  defp validate_response(metadata, snapshot) do
+  defp validate_response(metadata, snapshot, requested_model) do
     with {:ok, provider} <- required_binary(get_in(metadata, [:req_llm, :provider]), :provider),
          {:ok, actual_model} <-
            required_binary(get_in(metadata, [:req_llm, :model]), :actual_model),
-         :ok <- validate_identity(provider, actual_model),
+         :ok <- validate_identity(provider, actual_model, requested_model),
          {:ok, _upstream_provider} <-
            required_binary(
              map_value(get_in(metadata, [:req_llm, :provider_meta]) || %{}, :provider),
@@ -310,7 +329,13 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     }
   end
 
-  defp response_accounting_row(output, metadata, snapshot, max_output_tokens) do
+  defp response_accounting_row(
+         output,
+         metadata,
+         snapshot,
+         max_output_tokens,
+         requested_model
+       ) do
     req = get_in(metadata, [:req_llm]) || %{}
     usage = map_value(req, :usage) || %{}
     provider_meta = map_value(req, :provider_meta) || %{}
@@ -320,6 +345,7 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     %{
       "logical_requests" => snapshot["requests"],
       "transport_attempts" => snapshot["transport_attempts"],
+      "requested_model" => requested_model,
       "gateway_provider" => map_value(req, :provider),
       "upstream_provider" => map_value(provider_meta, :provider),
       "actual_model" => map_value(req, :model),
@@ -327,6 +353,7 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
       "computed_cost_usd" => map_value(usage, :total_cost),
       "input_tokens" => map_value(usage, :input_tokens),
       "output_tokens" => output_tokens,
+      "reasoning_tokens" => map_value(usage, :reasoning_tokens),
       "finish_reason" => finish_reason && to_string(finish_reason),
       "requested_max_output_tokens" => max_output_tokens,
       "truncation_indicators" => %{
@@ -337,6 +364,31 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
       }
     }
     |> Map.merge(response_reference(output))
+    |> Map.merge(reasoning_reference(metadata))
+  end
+
+  defp reasoning_reference(metadata) do
+    reasoning = map_value(metadata, :native_reasoning)
+    details = map_value(metadata, :reasoning_details) || []
+
+    %{
+      "native_reasoning_present" => is_binary(reasoning) and reasoning != "",
+      "native_reasoning_bytes" => if(is_binary(reasoning), do: byte_size(reasoning), else: 0),
+      "native_reasoning_sha256" =>
+        if(is_binary(reasoning), do: CampaignBudget.evidence_digest(reasoning)),
+      "bounded_native_reasoning_excerpt" =>
+        if(is_binary(reasoning), do: bounded_safe_excerpt(reasoning)),
+      "reasoning_details_count" => if(is_list(details), do: length(details), else: 0),
+      "reasoning_details_sha256" =>
+        if(is_list(details) and details != [], do: CampaignBudget.evidence_digest(details))
+    }
+  end
+
+  defp bounded_safe_excerpt(value) do
+    value
+    |> inspect(limit: 20, printable_limit: 256)
+    |> Imp.Redaction.redact()
+    |> String.slice(0, 256)
   end
 
   defp validate_cumulative_budget(%{
@@ -361,12 +413,18 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     }
   end
 
-  defp validate_identity("openrouter", actual_model)
-       when actual_model in [@model, @canonical_model],
-       do: :ok
+  defp validate_identity("openrouter", actual_model, requested_model) do
+    canonical = String.replace_suffix(requested_model, ":free", "")
 
-  defp validate_identity(provider, model),
+    if actual_model in [requested_model, canonical],
+      do: :ok,
+      else: {:error, {:unexpected_provider_or_model, "openrouter", actual_model}}
+  end
+
+  defp validate_identity(provider, model, _requested_model),
     do: {:error, {:unexpected_provider_or_model, provider, model}}
+
+  defp validate_identity(provider, model), do: validate_identity(provider, model, @model)
 
   defp validate_audit(%{
          "model" => @model,
@@ -463,6 +521,9 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
   defp stringify(value) when is_list(value), do: Enum.map(value, &stringify/1)
   defp stringify(value), do: value
 
+  defp maybe_put_opt(opts, _key, nil), do: opts
+  defp maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
   defp map_value(nil, _key), do: nil
 
   defp map_value(map, key) when is_map(map),
@@ -479,7 +540,7 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM do
 
   @behaviour Imp.LM
 
-  defstruct [:inner, :budget, :ledger]
+  defstruct [:inner, :budget, :ledger, requested_model: "openai/gpt-oss-20b:free"]
 
   @impl true
   def generate(_messages, _opts), do: {:error, :checked_lm_instance_required}
@@ -490,7 +551,11 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM do
       lm.budget,
       lm.ledger,
       messages,
-      opts
+      opts,
+      lm.requested_model
     )
   end
+
+  def response_format_capability(%__MODULE__{inner: inner}),
+    do: Imp.LM.response_format_capability(inner)
 end

@@ -494,6 +494,9 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
     end
   end
 
+  def response_format_capability(%__MODULE__{inner: inner}),
+    do: Imp.LM.response_format_capability(inner)
+
   defp bound_output_tokens(nil, opts), do: {:ok, opts}
 
   defp bound_output_tokens(limit, opts) when is_integer(limit) and limit > 0 do
