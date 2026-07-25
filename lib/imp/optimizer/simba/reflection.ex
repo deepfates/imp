@@ -26,12 +26,17 @@ defmodule Imp.Optimizer.SIMBA.Reflection do
     :module_names
   ]
 
+  @typed_input_names [:worse_reward_value, :better_reward_value, :module_names]
+
   def run(prompt_lm, payload) do
+    worse_reward_type = reward_type(Map.get(payload, :worse_reward_value))
+    better_reward_type = reward_type(Map.get(payload, :better_reward_value))
+
     signature =
       ("program_code: string, modules_defn: string, program_inputs: string, oracle_metadata: string, " <>
-         "worse_program_trajectory: string, worse_program_outputs: string, worse_reward_value: float, " <>
+         "worse_program_trajectory: string, worse_program_outputs: string, worse_reward_value: #{worse_reward_type}, " <>
          "worse_reward_info: string, better_program_trajectory: string, better_program_outputs: string, " <>
-         "better_reward_value: float, better_reward_info: string, module_names: array[string] -> " <>
+         "better_reward_value: #{better_reward_type}, better_reward_info: string, module_names: array[string] -> " <>
          "discussion: string, module_advice: map")
       |> Imp.Signature.ensure()
       |> Map.put(:instructions, @instructions)
@@ -51,7 +56,13 @@ defmodule Imp.Optimizer.SIMBA.Reflection do
   defp reflection_inputs(payload) do
     Map.new(@input_names, fn name ->
       value = Map.get(payload, name)
-      {name, if(is_binary(value), do: value, else: encode_value(value))}
+
+      normalized =
+        if name in @typed_input_names,
+          do: json_safe(value),
+          else: if(is_binary(value), do: value, else: encode_value(value))
+
+      {name, normalized}
     end)
   end
 
@@ -85,4 +96,7 @@ defmodule Imp.Optimizer.SIMBA.Reflection do
   defp value_type(value) when is_port(value), do: "port"
   defp value_type(value) when is_reference(value), do: "reference"
   defp value_type(_value), do: "term"
+
+  defp reward_type(value) when is_number(value), do: "float"
+  defp reward_type(_value), do: "string"
 end
