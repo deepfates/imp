@@ -626,15 +626,15 @@ defmodule Imp.UpstreamFidelity do
       category: :optimization,
       upstream: [
         "Learning, Fast and Slow Algorithm 1",
-        "GEPA fast adaptation",
-        "CISPO slow updates"
+        "GEPA fast-adaptation handoff",
+        "external slow-weight optimizer handoff"
       ],
       source: "arXiv:2605.12484v2; official GEPA Fast-Slow project article",
       disposition: :elixir_native_equivalent,
       release_blocking: false,
       ticket: "de-4bkz",
       rationale:
-        "No first-party implementation accompanied the paper; Imp provides a BEAM-native, provider-neutral Algorithm 1 orchestrator with durable effect intents, exact advantage-group accounting, and fail-closed recovery. External CISPO execution and paper-scale effectiveness remain separately gated claims.",
+        "The official code page still says code coming soon. Imp provides a BEAM-native, provider-neutral implementation of Algorithm 1's orchestration order with durable effect intents, enforced operation budgets, ordered events, exact advantage-group accounting, and fail-closed recovery. The slow-weight callback is an external handoff; Imp does not implement or verify CISPO, a gradient step, or resulting model weights.",
       imp: [
         Imp.Training.FastSlow.Runner,
         Imp.Training.FastSlow.Backend,
@@ -644,7 +644,7 @@ defmodule Imp.UpstreamFidelity do
         "each cycle prefetches exactly T slow-learning minibatches under the current policy",
         "GEPA selects a K-member per-instance Pareto prompt population before slow learning",
         "each question uses one shared G-rollout advantage group with G / K rollouts per prompt",
-        "the prompt population remains fixed through exactly T token-aligned slow updates",
+        "the prompt population remains fixed through exactly T token-aligned slow-update handoffs",
         "ambiguous external outcomes are not replayed without provider idempotency proof"
       ],
       evidence: %{
@@ -654,9 +654,9 @@ defmodule Imp.UpstreamFidelity do
           "test/fast_slow_runner_test.exs",
           "test/fast_slow_campaign_test.exs"
         ],
-        docs: ["docs/internal/RESEARCH_LANDSCAPE.md", "docs/API_GUIDE.md"],
+        docs: ["docs/internal/RESEARCH_LANDSCAPE.md", "docs/OPERATIONS_REFERENCE.md"],
         missing: [
-          "external-provider CISPO execution and model-artifact evidence",
+          "external-provider CISPO loss, optimizer execution, and content-bound model-artifact evidence",
           "matched prompt-only, slow-only, and combined provider effectiveness",
           "paper-scale performance and concurrent rollout throughput"
         ]

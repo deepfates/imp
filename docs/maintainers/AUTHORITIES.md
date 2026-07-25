@@ -86,7 +86,7 @@ open.
 | DSPy mmGRPO adaptation | optimizer | 3.2.1 @ 29448ae12756 | pinned | partial | gap | gap |
 | BetterTogether composition | optimizer | 3.2.1 @ 29448ae12756 | pinned | partial | gap | gap |
 | Ensemble composition | optimizer | 3.2.1 @ 29448ae12756 | pinned | present | gap | gap |
-| Fast-Slow interleaved prompt and policy adaptation | optimizer | gap | pinned | absent | partial | partial |
+| Fast-Slow interleaved prompt adaptation and weight-update handoff | optimizer | gap | pinned | absent | partial | partial |
 | Optimize Anything arbitrary artifact optimization | optimizer | 0.1.4 @ 8b0ce6cd99a2 | pinned | partial | protocol_defined | partial |
 | Retrieval, RAG, embeddings, and dataset loading | algorithm | 3.2.1 @ 29448ae12756 | no_primary_authority | present | pinned | present |
 | Async, streaming, cache, observability, and provider-free overhead | runtime | 3.2.1 @ 29448ae12756 | no_primary_authority | present | protocol_defined | present |

@@ -129,15 +129,16 @@ for the slow update. Reuse is a single-claim operation within that cycle; stale,
 duplicate, or mismatched trajectories must fall back to a fresh rollout rather
 than silently altering the off-policy ratio or advantage group.
 
-Imp treats this as a paper-faithful Elixir/BEAM orchestration adaptation, not
-source parity: no first-party Fast-Slow implementation was published with the
-paper as of this review. Its explicit immutable cycle state, bounded concurrent
-rollouts, durable operation intent, and checkpoint recovery may exploit the
-BEAM, but those mechanisms must preserve the ordering and statistical groups
-above. This section does not establish end-to-end provider evidence or claim
-that the Imp implementation is complete. Revisit the design and parity status
-when first-party code, a revised paper, or an official executable artifact is
-released.
+Imp treats this as a paper-ordered Elixir/BEAM orchestration adaptation, not
+source parity: the official code page still said “code coming soon” at this
+review. Its explicit immutable cycle state, sequential deterministic rollout
+planning, durable operation intent, operation budget, event ledger, and
+checkpoint recovery preserve the ordering and statistical groups above. The
+slow phase ends at a backend handoff: Imp does not bundle or verify the CISPO
+loss, gradients, optimizer step, or resulting model weights. This section does
+not establish end-to-end provider evidence or claim that the Imp implementation
+is a paper reproduction. Revisit the design and parity status when first-party
+code, a revised paper, or an official executable artifact is released.
 
 ## Repositories And Roles
 

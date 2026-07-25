@@ -1281,7 +1281,7 @@
     },
     {
       "id": "fast_slow",
-      "name": "Fast-Slow training and CISPO",
+      "name": "Fast-Slow orchestration and CISPO handoff",
       "authority_family": "family.optimizer_fast_slow",
       "surface_tokens": [
         "FastSlow",

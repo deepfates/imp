@@ -467,7 +467,7 @@
     },
     {
       "id": "family.optimizer_fast_slow",
-      "name": "Fast-Slow interleaved prompt and policy adaptation",
+      "name": "Fast-Slow interleaved prompt adaptation and weight-update handoff",
       "kind": "optimizer",
       "surface_tokens": ["FastSlow", "FastSlowTraining", "CISPO"],
       "upstream_surface_ids": ["optimization.fast_slow"],
@@ -475,10 +475,10 @@
       "parity_lanes": ["Lane 3: Optimizer Lift Parity"],
       "upstream_repository": {"status": "gap", "repository": null, "version": null, "git_ref": null, "commit": null, "source_paths": [], "source_manifest": {"path": null, "sha256": null, "file_count": 0}},
       "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2605.12484v2", "revision": "v2", "title": "Learning, Fast and Slow: Towards LLMs That Adapt Continually"},
-      "upstream_tests": {"status": "absent", "references": ["The official Fast-Slow project article states that first-party code is forthcoming."]},
+      "upstream_tests": {"status": "absent", "references": ["https://rishabhtiwari.ai/projects/fst/code/ says code coming soon."]},
       "dataset_protocol": {"status": "partial", "references": ["arXiv:2605.12484v2", "mix imp.benchmark.fast_slow"], "immutable_digests": []},
       "local_differential": {"status": "partial", "artifacts": ["mix imp.benchmark.fast_slow", "test/fast_slow_campaign_test.exs"]},
-      "notes": "Imp currently claims a paper-faithful BEAM orchestration adaptation, not source parity or provider effectiveness. The deterministic campaign proves protocol wiring only."
+      "notes": "Imp claims paper-ordered BEAM orchestration through an external slow-weight handoff, not source parity, CISPO execution, model-weight mutation, or provider effectiveness. The deterministic campaign proves protocol wiring and trainer-option forwarding only."
     },
     {
       "id": "family.optimizer_anything",

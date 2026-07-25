@@ -254,6 +254,14 @@ defmodule Imp.Training.FastSlow.RunnerTest do
     assert_received {:checkpoint, :fast, 0, [:unreconciled], _}
     assert_received {:checkpoint, :slow, 0, [], _}
     assert final.pending_operations == %{}
+    assert final.budgets.used["operations"] == 11
+
+    assert Enum.frequencies_by(final.events, & &1.kind) == %{
+             "operation.confirmed" => 11,
+             "operation.intent" => 11
+           }
+
+    assert Enum.map(final.events, & &1.sequence) == Enum.to_list(0..21)
     assert State.validate!(final) == final
   end
 
@@ -267,6 +275,7 @@ defmodule Imp.Training.FastSlow.RunnerTest do
     assert failed.slow_step == 1
     assert failed.lookahead.consumed_steps == 1
     assert map_size(failed.rollout_ledger) == 8
+    used_before_resume = failed.budgets.used["operations"]
 
     assert [%{kind: "fast_slow.slow_update", reconciliation: :retryable, attempts: 1}] =
              Map.values(failed.pending_operations)
@@ -278,6 +287,8 @@ defmodule Imp.Training.FastSlow.RunnerTest do
     assert final.stage == :terminal
     assert final.slow_step == 2
     assert final.pending_operations == %{}
+    assert final.budgets.used["operations"] == used_before_resume
+    assert Enum.count(final.events, &(&1.kind == "operation.retryable")) == 1
     assert Enum.count(resumed.backend["events"], &(&1["kind"] == "rollout")) == live_before_resume
 
     assert resumed.backend["events"]
@@ -369,6 +380,35 @@ defmodule Imp.Training.FastSlow.RunnerTest do
              Map.values(failed.pending_operations)
   end
 
+  test "stops before dispatch when the durable operation budget is exhausted" do
+    state = initial_state(budgets: %{"operations" => 2})
+
+    assert {:error, {:budget_exhausted, :operations}, exhausted, runtime} =
+             Runner.run(state, FakeBackend, backend_context())
+
+    assert exhausted.stage == :terminal
+    assert exhausted.terminal.reason == :budget_exhausted
+
+    assert exhausted.terminal.details == %{
+             "budget" => "operations",
+             "limit" => 2,
+             "used" => 2
+           }
+
+    assert exhausted.budgets.used == %{"operations" => 2}
+
+    assert Enum.map(exhausted.events, &{&1.kind, &1.data["operation_kind"]}) == [
+             {"operation.intent", "fast_slow.prefetch"},
+             {"operation.confirmed", "fast_slow.prefetch"},
+             {"operation.intent", "fast_slow.gepa"},
+             {"operation.confirmed", "fast_slow.gepa"},
+             {"budget.exhausted", nil}
+           ]
+
+    assert runtime.backend["events"] |> Enum.map(& &1["kind"]) == ["prefetch", "gepa"]
+    assert State.validate!(exhausted) == exhausted
+  end
+
   defp initial_state(options \\ []) do
     config =
       Config.new!(
@@ -385,7 +425,9 @@ defmodule Imp.Training.FastSlow.RunnerTest do
         sampling_config: %{"temperature" => 0.7}
       )
 
-    State.new!(config, %{"version" => 0}, ["seed-prompt"])
+    State.new!(config, %{"version" => 0}, ["seed-prompt"],
+      budgets: Keyword.get(options, :budgets, %{"operations" => 1_000_000})
+    )
   end
 
   defp backend_context(options \\ []) do

@@ -555,6 +555,10 @@ defmodule Imp.Training.FastSlow.State do
     dataset = DatasetState.new!(0, 0, Keyword.get(options, :rng, %{"seed" => 0}))
     budgets = Budget.new!(Keyword.get(options, :budgets, %{"operations" => 1_000_000}))
 
+    unless Map.has_key?(budgets.limits, "operations") do
+      raise ArgumentError, "Fast-Slow state budgets must include an operations limit"
+    end
+
     %__MODULE__{
       config_fingerprint: Config.fingerprint(config),
       sampling_config_digest: Config.digest(config.sampling_config),
@@ -963,10 +967,20 @@ defmodule Imp.Training.FastSlow.State do
   end
 
   defp valid_lookahead?(
-         %__MODULE__{stage: :terminal, lookahead: %Lookahead{} = lookahead} = state
+         %__MODULE__{
+           stage: :terminal,
+           terminal: %Terminal{reason: :completed},
+           lookahead: %Lookahead{} = lookahead
+         } = state
        ) do
     lookahead.cycle == state.cycle and lookahead.consumed_steps == state.t and
       length(lookahead.minibatches) == state.t
+  end
+
+  defp valid_lookahead?(
+         %__MODULE__{stage: :terminal, lookahead: %Lookahead{} = lookahead} = state
+       ) do
+    current_lookahead?(state) and lookahead.consumed_steps == state.slow_step
   end
 
   defp valid_lookahead?(%__MODULE__{} = state) do

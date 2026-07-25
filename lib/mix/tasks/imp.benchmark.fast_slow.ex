@@ -51,8 +51,9 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
         "label" => "synthetic_protocol_behavior",
         "research_effectiveness" => false,
         "provider_effectiveness" => false,
+        "cispo_execution" => false,
         "warning" =>
-          "Held-out scores exercise protocol wiring only and must not be cited as Fast-Slow research or provider effectiveness."
+          "Held-out scores exercise protocol wiring only. The trainer fixture forwards objective=:cispo but does not compute a CISPO loss or mutate model weights."
       },
       "contract" => %{
         "algorithm" => "Learning, Fast and Slow Algorithm 1",
@@ -62,6 +63,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
         "cycles" => 1,
         "rollouts_per_prompt_per_question" => 2,
         "required_order" => ["prefetch", "gepa", "rollouts", "slow_update"],
+        "slow_update_boundary" => "trainer_callback_only_not_cispo_execution",
         "failure_plan" =>
           "definitive failure before applying slow update 1, then checkpoint reload and replay"
       },
@@ -597,7 +599,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
 
       {:ok, updated} =
         Imp.Clients.Trainer.reinforcement_step(
-          Mix.Tasks.Imp.Benchmark.FastSlow.Backend.ProtocolTrainer,
+          Mix.Tasks.Imp.Benchmark.FastSlow.Backend.HandoffTrainer,
           session,
           provider_groups,
           objective: :cispo,
@@ -633,7 +635,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
       end)
     end
 
-    defmodule ProtocolTrainer do
+    defmodule HandoffTrainer do
       @moduledoc false
       @behaviour Imp.Clients.Trainer
 
@@ -649,7 +651,7 @@ defmodule Mix.Tasks.Imp.Benchmark.FastSlow do
         {:ok,
          %{
            session
-           | current_model: "protocol-cispo-theta-#{step}",
+           | current_model: "protocol-weight-handoff-#{step}",
              metadata: %{
                "last_operation_id" => operation_id,
                "objective" => Atom.to_string(objective),

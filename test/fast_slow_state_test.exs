@@ -15,6 +15,12 @@ defmodule Imp.Training.FastSlow.StateTest do
     end
   end
 
+  test "state requires the operation budget consumed by the runner" do
+    assert_raise ArgumentError, ~r/must include an operations limit/, fn ->
+      State.new!(config(), %{"weights" => []}, ["seed"], budgets: %{"tokens" => 10})
+    end
+  end
+
   test "state preserves cycle, theta, population, cursor, budget, and intent invariants" do
     config = config()
 
@@ -182,6 +188,23 @@ defmodule Imp.Training.FastSlow.StateTest do
     assert_raise ArgumentError, ~r/incomplete or inconsistent/, fn ->
       Rollout.validate_complete_group!(malformed, "group-0", 0, 4, 2)
     end
+  end
+
+  test "non-completion terminal states remain valid with a partially consumed lookahead" do
+    state =
+      config()
+      |> State.new!(%{"weights" => []}, ["seed"])
+      |> State.set_stage(:fast)
+      |> then(&State.put_lookahead(&1, lookahead(&1)))
+      |> State.revise_prompts(["a", "b"], population_metadata(["a", "b"]))
+      |> State.set_stage(:slow)
+      |> State.complete_slow_step(%{"weights" => [0.1]})
+
+    terminal = State.terminate(state, :budget_exhausted, %{"budget" => "operations"})
+
+    assert terminal.lookahead.consumed_steps == 1
+    assert terminal.slow_step == 1
+    assert State.validate!(terminal) == terminal
   end
 
   defp config(overrides \\ []) do

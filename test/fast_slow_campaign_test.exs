@@ -17,6 +17,11 @@ defmodule Imp.FastSlowCampaignTest do
     assert artifact["quality_scope"]["label"] == "synthetic_protocol_behavior"
     refute artifact["quality_scope"]["research_effectiveness"]
     refute artifact["quality_scope"]["provider_effectiveness"]
+    refute artifact["quality_scope"]["cispo_execution"]
+
+    assert artifact["contract"]["slow_update_boundary"] ==
+             "trainer_callback_only_not_cispo_execution"
+
     assert artifact["dataset"]["optimizer_callback_access"] == ["train"]
     assert artifact["dataset"]["split_overlap"] == []
     assert artifact["summary"]["all_protocol_claims_verified"]
@@ -97,7 +102,7 @@ defmodule Imp.FastSlowCampaignTest do
       if row["mode"] == "prompt_only" do
         assert final_theta["artifact"] == "theta-0"
       else
-        assert final_theta["artifact"] == "protocol-cispo-theta-2"
+        assert final_theta["artifact"] == "protocol-weight-handoff-2"
       end
 
       assert row["quality"]["label"] == "synthetic_protocol_behavior"

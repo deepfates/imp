@@ -33,7 +33,7 @@ Passing: true
 | optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
 | optimization.gepa | optimization | gap | claim-specific gap | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
 | optimization.weights | optimization | elixir_native_equivalent | satisfied | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble |
-| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied | Learning, Fast and Slow Algorithm 1, GEPA fast adaptation, CISPO slow updates |
+| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied | Learning, Fast and Slow Algorithm 1, GEPA fast-adaptation handoff, external slow-weight optimizer handoff |
 | optimization.anything | optimization | tracking | tracked | optimize_anything, arbitrary text artifacts |
 | retrieval.data | retrieval | elixir_native_equivalent | satisfied | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |
 | runtime.async_stream_cache | runtime | conformant | satisfied | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage |
@@ -561,14 +561,14 @@ Status: `elixir_native_equivalent`
 Upstream source: `arXiv:2605.12484v2; official GEPA Fast-Slow project article`
 
 Imp modules: `Imp.Training.FastSlow.Runner`, `Imp.Training.FastSlow.Backend`, `Imp.Training.FastSlow.Checkpoint`
-Elixir-native rationale: No first-party implementation accompanied the paper; Imp provides a BEAM-native, provider-neutral Algorithm 1 orchestrator with durable effect intents, exact advantage-group accounting, and fail-closed recovery. External CISPO execution and paper-scale effectiveness remain separately gated claims.
+Elixir-native rationale: The official code page still says code coming soon. Imp provides a BEAM-native, provider-neutral implementation of Algorithm 1's orchestration order with durable effect intents, enforced operation budgets, ordered events, exact advantage-group accounting, and fail-closed recovery. The slow-weight callback is an external handoff; Imp does not implement or verify CISPO, a gradient step, or resulting model weights.
 
 Semantic invariants:
 
 - each cycle prefetches exactly T slow-learning minibatches under the current policy
 - GEPA selects a K-member per-instance Pareto prompt population before slow learning
 - each question uses one shared G-rollout advantage group with G / K rollouts per prompt
-- the prompt population remains fixed through exactly T token-aligned slow updates
+- the prompt population remains fixed through exactly T token-aligned slow-update handoffs
 - ambiguous external outcomes are not replayed without provider idempotency proof
 
 Executable evidence:
@@ -578,12 +578,12 @@ Executable evidence:
 - test: `test/fast_slow_runner_test.exs`
 - test: `test/fast_slow_campaign_test.exs`
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/OPERATIONS_REFERENCE.md`
 
 
 Missing evidence or behavior:
 
-- external-provider CISPO execution and model-artifact evidence
+- external-provider CISPO loss, optimizer execution, and content-bound model-artifact evidence
 - matched prompt-only, slow-only, and combined provider effectiveness
 - paper-scale performance and concurrent rollout throughput
 

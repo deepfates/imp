@@ -15,16 +15,20 @@ end
 
 defmodule Imp.Training.FastSlow.Runner do
   @moduledoc """
-  Executes Algorithm 1 from "Learning, Fast and Slow" without binding to a provider.
+  Executes the orchestration order of Algorithm 1 from "Learning, Fast and Slow"
+  without binding to a provider.
 
   The returned context contains runtime-only prefetched data required to resume a
   failed effect. Persisted training invariants remain in `FastSlow.State`.
+  `FastSlow.Backend.update_slow/5` is an external weight-update handoff; this
+  module does not implement or verify CISPO.
   """
 
   alias Imp.Training.FastSlow.{
     AdvantageGroup,
     Config,
     DatasetState,
+    Event,
     Lookahead,
     OperationIntent,
     PromptPopulation,
@@ -426,40 +430,52 @@ defmodule Imp.Training.FastSlow.Runner do
 
   defp with_effect(state, context, backend, kind, payload, checkpoint_fn, effect) do
     intent = OperationIntent.new!(kind, state.cycle, payload)
-    {state, existing?} = ensure_intent(state, intent)
 
-    with :ok <- replay_allowed(backend, intent, context, existing?),
-         :ok <- checkpoint(checkpoint_fn, state, context) do
-      try do
-        case effect.(intent, state, context) do
-          {:ok, state, context, result} ->
-            state = State.reconcile_intent(state, intent.id, :confirmed, result)
+    case ensure_intent(state, intent) do
+      {:ok, state, existing?} ->
+        with :ok <- replay_allowed(backend, intent, context, existing?),
+             :ok <- checkpoint(checkpoint_fn, state, context) do
+          try do
+            case effect.(intent, state, context) do
+              {:ok, state, context, result} ->
+                state =
+                  state
+                  |> State.reconcile_intent(intent.id, :confirmed, result)
+                  |> record_operation_event(intent, "operation.confirmed", "confirmed")
 
-            case checkpoint(checkpoint_fn, state, context) do
-              :ok -> {:ok, state, context}
-              {:error, reason} -> {:error, reason, state, context}
+                case checkpoint(checkpoint_fn, state, context) do
+                  :ok -> {:ok, state, context}
+                  {:error, reason} -> {:error, reason, state, context}
+                end
+
+              {:error, reason, state, context} ->
+                failed = retryable(state, intent, reason)
+                _ = checkpoint(checkpoint_fn, failed, context)
+                {:error, reason, failed, context}
             end
+          rescue
+            error ->
+              failed = retryable(state, intent, {:exception, Exception.message(error)})
 
-          {:error, reason, state, context} ->
-            failed = State.reconcile_intent(state, intent.id, :retryable, error_result(reason))
-            _ = checkpoint(checkpoint_fn, failed, context)
-            {:error, reason, failed, context}
+              _ = checkpoint(checkpoint_fn, failed, context)
+              {:error, {:exception, error}, failed, context}
+          end
+        else
+          {:error, reason} -> {:error, reason, state, context}
         end
-      rescue
-        error ->
-          failed =
-            State.reconcile_intent(
-              state,
-              intent.id,
-              :retryable,
-              error_result({:exception, Exception.message(error)})
-            )
 
-          _ = checkpoint(checkpoint_fn, failed, context)
-          {:error, {:exception, error}, failed, context}
-      end
-    else
-      {:error, reason} -> {:error, reason, state, context}
+      {:error, :exhausted, state} ->
+        exhausted =
+          state
+          |> record_budget_exhausted()
+          |> State.terminate(:budget_exhausted, %{
+            "budget" => "operations",
+            "limit" => state.budgets.limits["operations"],
+            "used" => state.budgets.used["operations"]
+          })
+
+        _ = checkpoint(checkpoint_fn, exhausted, context)
+        {:error, {:budget_exhausted, :operations}, exhausted, context}
     end
   end
 
@@ -670,9 +686,61 @@ defmodule Imp.Training.FastSlow.Runner do
 
   defp ensure_intent(state, intent) do
     case Map.get(state.pending_operations, intent.id) do
-      nil -> {State.put_intent(state, intent), false}
-      %OperationIntent{} -> {state, true}
+      nil ->
+        case State.charge_budget(state, :operations, 1) do
+          {:ok, state} ->
+            state =
+              state
+              |> State.put_intent(intent)
+              |> record_operation_event(intent, "operation.intent", "unreconciled")
+
+            {:ok, state, false}
+
+          {:error, :exhausted} ->
+            {:error, :exhausted, state}
+        end
+
+      %OperationIntent{} ->
+        {:ok, state, true}
     end
+  end
+
+  defp retryable(state, intent, reason) do
+    state
+    |> State.reconcile_intent(intent.id, :retryable, error_result(reason))
+    |> record_operation_event(intent, "operation.retryable", "retryable")
+  end
+
+  defp record_operation_event(state, intent, kind, reconciliation) do
+    State.record_event(
+      state,
+      Event.new!(
+        sequence: length(state.events),
+        kind: kind,
+        cycle: state.cycle,
+        operation_id: intent.id,
+        data: %{
+          "operation_kind" => intent.kind,
+          "reconciliation" => reconciliation
+        }
+      )
+    )
+  end
+
+  defp record_budget_exhausted(state) do
+    State.record_event(
+      state,
+      Event.new!(
+        sequence: length(state.events),
+        kind: "budget.exhausted",
+        cycle: state.cycle,
+        data: %{
+          "budget" => "operations",
+          "limit" => state.budgets.limits["operations"],
+          "used" => state.budgets.used["operations"]
+        }
+      )
+    )
   end
 
   defp replay_allowed(_backend, _intent, _context, false), do: :ok

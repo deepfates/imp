@@ -101,8 +101,8 @@ function calls, a reserved `submit` tool, and fail-fast tool errors rather than
 claiming DSPy's action-field, finish-tool, observation-and-continue semantics.
 
 Multimodal image and native-PDF quality, the BEAM-native RLM controller,
-source-faithful GEPA engine, Fast-Slow orchestration, and the learning path have
-executable product evidence. Their broader paper-scale, audio, external CISPO,
+source-faithful GEPA engine, Fast-Slow orchestration boundary, and the learning path have
+executable product evidence. Their broader paper-scale, audio, external CISPO execution,
 and dominance claims remain explicitly unmade where evidence is incomplete.
 Instruction-optimizer matched campaigns are claim-specific gaps rather than
 universal release blockers.

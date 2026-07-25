@@ -121,7 +121,7 @@ immutable configuration and state with `Imp.Training.FastSlow.Config` and
 `Imp.Training.FastSlow.Backend`. Each cycle prefetches exactly `T` minibatches,
 runs the GEPA fast phase once, allocates exactly `G / K` rollouts to each of the
 `K` retained prompts per question, and keeps that population fixed through the
-`T` slow updates.
+`T` slow-update handoffs.
 
 The checkpoint callback receives `%{state: state, runner_context: context}`.
 Persist `state` with `Imp.Training.FastSlow.Checkpoint` and persist the supplied
@@ -136,7 +136,21 @@ weight update.
 The shared `Imp.Clients.Trainer` reinforcement boundary accepts the resulting
 token-aligned trajectories, including behavior-policy token log probabilities,
 response token IDs and masks, reward, and normalized advantage. The runner is a
-paper-faithful BEAM orchestration adaptation, not a bundled weight trainer.
+paper-ordered BEAM orchestration adaptation, not a bundled weight trainer.
+`Backend.update_slow/5` is only a handoff: Imp does not compute or verify the
+CISPO importance ratio, clipping, loss, gradient, optimizer step, or resulting
+model weights. Passing `objective: :cispo` to a trainer preserves the requested
+objective at that boundary but cannot prove that an arbitrary trainer honored
+it. A backend that advertises CISPO owns that implementation and must return a
+content-bound identity for every resulting policy.
+
+`State.new!/4` accepts an `operations` budget (one unit per new durable provider
+intent). The runner stops before dispatch when that budget is exhausted, and it
+records ordered `operation.intent`, `operation.confirmed`,
+`operation.retryable`, and `budget.exhausted` events in the checkpointed state.
+Retries of an existing intent do not consume a second unit. These contracts are
+operational controls; they are not CISPO execution or optimizer-effectiveness
+evidence.
 
 ## Resumable Provider Batches
 

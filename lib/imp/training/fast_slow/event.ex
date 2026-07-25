@@ -1,5 +1,5 @@
 defmodule Imp.Training.FastSlow.Event do
-  @moduledoc "Ordered durable event emitted by the Fast-Slow state machine."
+  @moduledoc "Ordered durable operation event emitted by the Fast-Slow runner."
 
   alias Imp.Training.FastSlow.Config
 

@@ -105,7 +105,14 @@ defmodule Imp.Training.FastSlow.Backend do
               {:ok, live_rollout_result(), backend_context()}
               | {:error, error_reason(), backend_context()}
 
-  @doc "Performs one slow provider update from one ordered minibatch and its question groups."
+  @doc """
+  Hands one ordered minibatch and its question groups to the slow-weight backend.
+
+  This callback is the provider boundary: the runner does not implement or
+  verify a CISPO loss, gradient update, optimizer step, or model artifact. A
+  backend claiming CISPO must enforce those semantics itself and return a
+  content-bound identity for the resulting policy in `theta_payload`.
+  """
   @callback update_slow(
               State.t(),
               data_minibatch(),
