@@ -252,7 +252,7 @@
       "limitations": ["Imp evaluates rewritten candidates before accepting them; exact Python sampling and RNG order are excluded.", "DSPy 3.2.1 AvatarOptimizer cannot construct as released; upstream observations are captured under a disclosed sidecar monkey-patch of the absent dspy.TypedPredictor and dspy.Predict factories, recorded in the artifact scope."],
       "statement": "Imp has source-bound C1 evidence for the admitted AvatarOptimizer classification, comparator, rewrite, and feedback-propagation observations, with the candidate-evaluation correction explicit.",
       "category": "optimizer", "surface": ["AvatarOptimizer"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_optimizer_differential/581e61073a32d8b0b6555e6d30e59038083cae6f813e28bda926ef007d144f3b.json", "test/avatar_optimizer_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_optimizer_differential/78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317.json", "test/avatar_optimizer_differential_test.exs"],
       "requirements": [{"id": "optimizer.avatar_optimizer.semantic", "kind": "optimizer_conformance", "lane": "avatar_optimizer_differential", "evidence": "full", "threshold": "the canonical AvatarOptimizer artifact verifies its declared observations, native corrections, and exclusions"}]
     },
     {
@@ -292,7 +292,7 @@
       "limitations": ["Exact Python RNG sequences are excluded; durable dispatch, reconciliation, bounded callbacks, and idempotency are Imp-native extensions."],
       "statement": "Imp has source-bound C1 evidence for the admitted mmGRPO dataset-cycling, rollout-grouping, predictor-attribution, reward, and format-failure observations.",
       "category": "optimizer", "surface": ["GRPO", "mmGRPO"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/mmgrpo_differential/a6ed8d44d8b1dad7a608b411829c2a09cae630726658da38f1db1c400f6dac9f.json", "test/mmgrpo_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/mmgrpo_differential/7c54695dcbbd4b6606a3da1d51afad858e663df5e2442adfef2c68f9ed724b51.json", "test/mmgrpo_differential_test.exs"],
       "requirements": [{"id": "optimizer.mmgrpo.semantic", "kind": "optimizer_conformance", "lane": "mmgrpo_differential", "evidence": "full", "threshold": "the canonical mmGRPO artifact verifies the admitted observations, native lifecycle extensions, and exclusions"}]
     },
     {

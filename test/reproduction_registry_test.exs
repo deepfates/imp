@@ -148,10 +148,10 @@ defmodule Imp.ReproductionRegistryTest do
          "190b4002bcb3c96f7a0a3bcea442bb58f2999a935bb2c1b0f1e64c37911beb77"},
       "avatar_optimizer" =>
         {"avatar_optimizer_differential",
-         "581e61073a32d8b0b6555e6d30e59038083cae6f813e28bda926ef007d144f3b"},
+         "78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317"},
       "grpo" =>
         {"mmgrpo_differential",
-         "a6ed8d44d8b1dad7a608b411829c2a09cae630726658da38f1db1c400f6dac9f"},
+         "7c54695dcbbd4b6606a3da1d51afad858e663df5e2442adfef2c68f9ed724b51"},
       "better_together" =>
         {"better_together_differential",
          "547de99c674841e587d307acd46b6e50af6b496a924e1d2d7be79d1afed5bb75"},
