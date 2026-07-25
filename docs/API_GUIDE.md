@@ -886,7 +886,7 @@ result =
     ]
   )
 
-best_candidate = Imp.Optimize.Anything.Result.best_candidate(result)
+best_candidate = Imp.Optimize.Anything.best_candidate(result)
 test_scores = Enum.map(test_examples, &evaluator.(best_candidate, &1))
 ```
 
@@ -894,9 +894,10 @@ The result retains candidate lineage, per-example validation scores, Pareto
 frontiers, measured budgets, rejected proposals, history, and a resumable
 engine checkpoint. `test_scores` is the only untouched outcome in this example;
 the optimizer has seen both `training_examples` and validation scores.
-`Imp.Optimize.Anything.run/3` is the sole Optimize Anything
-entry point; its execution records remain implementation data rather than
-additional supported module APIs.
+`Imp.Optimize.Anything.run/3` is the sole Optimize Anything execution
+entry point; `best_candidate/1` reads its selected artifact while execution
+records remain implementation data rather than additional supported module
+APIs.
 
 ## Tools And ReAct
 

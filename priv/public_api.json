@@ -3205,6 +3205,7 @@
       "callbacks": [],
       "category": "advanced",
       "functions": [
+        "best_candidate/1",
         "run/3"
       ],
       "kind": "module",
@@ -3212,6 +3213,9 @@
       "module": "Imp.Optimize.Anything",
       "signatures": {
         "functions": {
+          "best_candidate/1": [
+            "best_candidate(result)"
+          ],
           "run/3": [
             "run(seed_candidate, evaluator, opts \\\\ [])"
           ]
@@ -3904,7 +3908,7 @@
       "signatures": {
         "functions": {
           "compile/3": [
-            "compile(labeled_few_shot, program, trainset)"
+            "compile(optimizer, program, trainset)"
           ],
           "new/1": [
             "new(opts \\\\ [])"
@@ -3913,7 +3917,9 @@
       },
       "source": "lib/imp/optimizer/labeled_few_shot.ex",
       "struct_fields": [
-        "k"
+        "k",
+        "sample",
+        "seed"
       ],
       "types": []
     },

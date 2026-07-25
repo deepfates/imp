@@ -357,7 +357,7 @@ defmodule DocumentationContractTest do
     parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
     assert api =~ "## Optimize Arbitrary Artifacts"
-    assert api =~ "is the sole Optimize Anything\nentry point"
+    assert api =~ "is the sole Optimize Anything execution\nentry point"
     assert api =~ "Imp.Saving.Registry"
     assert api =~ "proposer_lm:"
     assert api =~ "reject malformed\nvalues when the optimizer is built or run"

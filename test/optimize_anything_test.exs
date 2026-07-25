@@ -15,6 +15,7 @@ defmodule OptimizeAnythingTest do
 
     assert %Result{} = result
     assert Result.best_candidate(result) == "baseline"
+    assert Anything.best_candidate(result) == "baseline"
   end
 
   test "does not export the removed Artifact and Report compatibility functions" do

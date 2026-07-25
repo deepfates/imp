@@ -20,7 +20,7 @@ defmodule Imp.Optimize.Anything do
     defstruct score: 0.0, diagnostics: [], metadata: %{}
   end
 
-  alias Imp.Optimize.Anything.Runner
+  alias Imp.Optimize.Anything.{Result, Runner}
 
   @doc "Runs the canonical Optimize Anything engine and returns a Result."
   @spec run(String.t() | map() | nil, function(), keyword()) :: struct()
@@ -37,6 +37,10 @@ defmodule Imp.Optimize.Anything do
           "Imp.Optimize.Anything.run/3 expects a text/named seed, evaluator function, and keyword options; got: " <>
             "#{inspect(seed_candidate)}, #{inspect(evaluator)}, #{inspect(opts)}"
   end
+
+  @doc "Returns the validation-selected candidate from an Optimize Anything result."
+  @spec best_candidate(struct()) :: map() | String.t()
+  def best_candidate(%Result{} = result), do: Result.best_candidate(result)
 
   @doc false
   def validate_resume_state(nil), do: {:ok, nil}
