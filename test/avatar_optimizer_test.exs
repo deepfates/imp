@@ -72,6 +72,86 @@ defmodule AvatarOptimizerTest do
     assert Imp.get(prediction, :answer) == "Paris"
   end
 
+  test "minimization does not promote a candidate whose calls failed" do
+    actor_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          cond do
+            prompt =~ "Break every actor call." ->
+              raise "rewritten actor failed"
+
+            prompt =~ "Do not request another tool." ->
+              if prompt =~ "expensive",
+                do: %{answer: "expensive"},
+                else: %{answer: "cheap"}
+
+            prompt =~ "tool_output:" ->
+              %{action: %{tool_name: "Finish", tool_input_query: %{}}}
+
+            prompt =~ "expensive" ->
+              %{action: %{tool_name: "lookup", tool_input_query: %{query: "offline"}}}
+
+            true ->
+              %{action: %{tool_name: "Finish", tool_input_query: %{}}}
+          end
+        end
+      )
+
+    lookup = Imp.tool(:lookup, "lookup", fn _arguments -> {:error, :offline} end)
+    student = Imp.avatar("question -> answer", [lookup], lm: actor_lm, max_iters: 2)
+
+    trainset = [
+      Imp.example(question: "cheap train case", answer: "cheap") |> Imp.with_inputs(:question),
+      Imp.example(question: "expensive train case", answer: "expensive")
+      |> Imp.with_inputs(:question)
+    ]
+
+    cost = fn _example, prediction ->
+      if Imp.get(prediction, :answer) == "cheap", do: 0.0, else: 1.0
+    end
+
+    optimizer =
+      Imp.Optimizer.Avatar.new(cost,
+        max_iters: 1,
+        optimize_for: :min,
+        comparator_lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts -> %{feedback: "Replace the instruction."} end
+          ),
+        rewrite_lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts -> %{new_instruction: "Break every actor call."} end
+          )
+      )
+
+    compiled = Imp.optimize!(student, optimizer, trainset)
+    report = Imp.Optimizer.Report.fetch(compiled)
+
+    assert report.best_score == 0.5
+
+    assert [%{baseline: true, selected?: true}, failed_candidate] = report.candidates
+    assert failed_candidate.score == 0.0
+    refute failed_candidate.selected?
+
+    assert Enum.count(report.errors, fn error ->
+             error.iteration == 1 and error.stage == :evaluation
+           end) == 2
+
+    refute Imp.Predict.Avatar.current_instruction(compiled) == "Break every actor call."
+
+    assert {:ok, held_out} = Imp.call(compiled, %{question: "heldout expensive case"})
+    assert Imp.get(held_out, :answer) == "expensive"
+
+    assert [
+             %Imp.Predict.Avatar.ActionOutput{
+               tool_output: {:error, :offline},
+               error?: true
+             }
+           ] = Imp.get(held_out, :actions)
+  end
+
   defp avatar_lm do
     static_lm(fn prompt ->
       cond do

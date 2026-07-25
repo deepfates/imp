@@ -155,7 +155,10 @@ defmodule Imp.Optimizer.Avatar do
              {:ok, instruction} <- rewrite(optimizer, state.program, feedback) do
           candidate = Imp.Predict.Avatar.put_instruction(state.program, instruction)
           evaluation = Imp.Evaluate.run(evaluator, candidate)
-          selected? = better?(optimizer.optimize_for, evaluation.score, state.evaluation.score)
+
+          selected? =
+            evaluation.errors == [] and
+              better?(optimizer.optimize_for, evaluation.score, state.evaluation.score)
 
           record = candidate_record(round, candidate, evaluation.score, false, selected?)
 
