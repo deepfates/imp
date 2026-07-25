@@ -48,8 +48,9 @@ jobs:
   # provenance gates resolve artifact commit SHAs against origin/main. Grow the
   # file list as more files' capture-only rows get the :requires_dspy_capture
   # tag. This lane is the P11/P12 gate (dee-v0zl, dee-di7u): a broken admitted
-  # artifact binding, an orphaned/unpushed evidence commit, a dead reproduction
-  # recipe, or reconciliation-prose drift fails the PR, not the Monday cron.
+  # artifact binding, an orphaned/unpushed evidence commit, or a dead
+  # reproduction recipe fails the PR, not the Monday cron. Reconciliation-prose
+  # drift is a provider-free normal-suite test, so fast.check catches it too.
   evidence-venv-free:
     name: evidence.venv-free
     runs-on: ubuntu-latest
@@ -85,8 +86,7 @@ jobs:
             test/ensemble_differential_test.exs \
             test/mmgrpo_differential_test.exs \
             test/reproduction_registry_test.exs \
-            test/evidence_provenance_test.exs \
-            test/evidence_reconciliation_test.exs
+            test/evidence_provenance_test.exs
 
   # Weekly / manual: the complete evidence suite against the pinned DSPy 3.2.1
   # parity environment. This is the only lane that builds the reference runtimes,

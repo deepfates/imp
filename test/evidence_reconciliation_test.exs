@@ -9,8 +9,6 @@ defmodule EvidenceReconciliationTest do
   # ~2s: the dashboard only reads committed files when the ephemeral lane
   # directories are empty, which is exactly the fresh-checkout semantics the
   # doc describes.
-  @moduletag :evidence_infrastructure
-
   @evidence_doc "docs/EVIDENCE.md"
 
   test "EVIDENCE.md reconciliation block matches the freshly computed dashboard state" do

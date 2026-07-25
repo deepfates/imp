@@ -16,3 +16,9 @@ Carry Imp from its large implemented surface and conflicting evidence systems to
 ## Acceptance Criteria
 
 For every public surface advertised in the README and Imp-for-DSPy mapping, the repository identifies the upstream semantic contract and demonstrates either reproducible behavioral/differential parity or an explicit superior BEAM-native equivalent. Core declaration, execution, adapters, modules, evaluation, retrieval/tool/agent composition, persistence/operation, and optimizer families are usable from an ordinary consumer project. GEPA, Optimize Anything, MIPROv2/SIMBA/COPRO, bootstrap/random-search families, and any other advertised optimizer have meaningful held-out task outcomes rather than structural smoke alone; matched comparisons state model/provider/cost/seed/splits and disagreements. One killer end-to-end optimization example shows material improvement on unseen data and leaves an inspectable reusable program artifact. Generated conformance, claims, docs, and executable dashboards agree from a clean checkout. Missing upstream features stay visibly open; package or release readiness alone cannot close this epic.
+
+## Notes
+
+**2026-07-25T16:27:40Z**
+
+2026-07-25 deterministic-truth slice: the committed-evidence dashboard at current HEAD computes 10 proven / 26 blocked / 19 informational, profile_ready=false. Restored docs/EVIDENCE.md to those honest counts and moved the venv-free reconciliation regression into the normal test suite so fast.check catches future prose drift; ephemeral lane directories remain replaced by fresh empty temp paths in the test, so local tmp state cannot promote claims. No evidence was made proven. Focused Mix execution was unavailable because the sandbox forbids Mix.PubSub TCP sockets and the escalation was aborted; git diff --check and the current dashboard JSON were verified. Epic remains open for semantic parity.
