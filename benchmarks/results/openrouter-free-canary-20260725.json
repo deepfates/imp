@@ -1,0 +1,74 @@
+{
+  "budget": {
+    "active_reservations": 0,
+    "exhausted": null,
+    "limits": {
+      "input_tokens": 20000,
+      "output_tokens": 32,
+      "requests": 1,
+      "usd": 0.0
+    },
+    "pricing": {
+      "input_per_million": 0.0,
+      "output_per_million": 0.0,
+      "source_url": "https://openrouter.ai/docs/guides/routing/model-variants/free"
+    },
+    "requests": 1,
+    "reservation_ledger_version": 2,
+    "reservations": [],
+    "reserved": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0
+    },
+    "single_attempt_transport_enforced": true,
+    "transport_attempts": 1,
+    "usage": {
+      "input_tokens": 74,
+      "output_tokens": 32,
+      "usd": 0.0
+    }
+  },
+  "campaign": "openrouter-free-canary",
+  "catalog": {
+    "canonical_model": "openai/gpt-oss-20b",
+    "checked_url": "https://openrouter.ai/api/v1/models",
+    "model": "openai/gpt-oss-20b:free",
+    "pricing": {
+      "completion": 0.0,
+      "prompt": 0.0
+    }
+  },
+  "error": null,
+  "generated_at": "2026-07-25T20:30:01Z",
+  "requested_model": "openai/gpt-oss-20b:free",
+  "response_accounting": {
+    "actual_model": "openai/gpt-oss-20b:free",
+    "computed_cost_usd": 0.0,
+    "gateway_provider": "openrouter",
+    "input_tokens": 74,
+    "output_tokens": 32,
+    "provider_reported_cost_usd": 0.0,
+    "upstream_provider": "Darkbloom"
+  },
+  "schema_version": 1,
+  "scope": "One non-sensitive logical call proving the exact free-route, zero-cost, and single-transport-attempt boundary; no optimizer effectiveness evidence.",
+  "serialized_request_guard": {
+    "model": "openai/gpt-oss-20b:free",
+    "provider": {
+      "max_price": {
+        "request": 0,
+        "completion": 0,
+        "image": 0,
+        "prompt": 0
+      },
+      "allow_fallbacks": false,
+      "require_parameters": true,
+      "data_collection": "deny"
+    },
+    "usage": {
+      "include": true
+    }
+  },
+  "status": "passed"
+}

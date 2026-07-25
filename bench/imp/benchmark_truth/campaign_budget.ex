@@ -547,8 +547,15 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
 
   defp sanitize_inner(inner), do: inner
 
-  defp install_transport_guard(%Imp.Clients.ReqLLM{}, opts, budget) do
-    http_opts = Keyword.get(opts, :req_http_options, [])
+  defp install_transport_guard(
+         %Imp.Clients.ReqLLM{opts: inner_opts},
+         opts,
+         budget
+       ) do
+    inner_http_opts = Keyword.get(inner_opts, :req_http_options, [])
+    call_http_opts = Keyword.get(opts, :req_http_options, [])
+
+    http_opts = merge_http_opts(inner_http_opts, call_http_opts)
 
     unless Keyword.keyword?(http_opts) do
       raise ArgumentError, "campaign LM :req_http_options must be a keyword list"
@@ -572,6 +579,23 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
   end
 
   defp install_transport_guard(_inner, opts, _budget), do: opts
+
+  defp merge_http_opts(inner, call) do
+    unless Keyword.keyword?(inner) and Keyword.keyword?(call) do
+      raise ArgumentError, "campaign LM :req_http_options must be keyword lists"
+    end
+
+    inner_plugins = Keyword.get(inner, :plugins, [])
+    call_plugins = Keyword.get(call, :plugins, [])
+
+    unless is_list(inner_plugins) and is_list(call_plugins) do
+      raise ArgumentError, "campaign LM Req :plugins must be lists"
+    end
+
+    inner
+    |> Keyword.merge(call)
+    |> Keyword.put(:plugins, inner_plugins ++ call_plugins)
+  end
 
   @doc false
   def enforce_single_transport_attempt(%Req.Request{} = request, budget) do
