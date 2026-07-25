@@ -393,7 +393,7 @@ defmodule ProviderTrainingLifecycleTest do
     job =
       Imp.Clients.TrainingJob.new(%{
         id: "local-job",
-        provider: :mlx_lm,
+        provider: :local,
         model: "qwen-base",
         status: :succeeded,
         result_model: "/artifacts/adapters"
@@ -415,7 +415,7 @@ defmodule ProviderTrainingLifecycleTest do
     assert Imp.ProgramAccess.lm(rebound) == deployment_lm
 
     assert Imp.ProgramAccess.get_metadata(rebound, :training_artifact) == %{
-             provider: :mlx_lm,
+             provider: :local,
              job_id: "local-job",
              base_model: "qwen-base",
              result_model: "/artifacts/adapters"

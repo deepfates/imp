@@ -287,6 +287,8 @@ trainer =
   )
 
 {:ok, job} = Imp.Clients.Trainer.finetune(trainer, deployment_lm, examples)
+{:ok, trained_program} = Imp.Clients.TrainingJob.rebind(job, program)
+{:ok, prediction} = Imp.call(trained_program, %{question: "..."})
 ```
 
 The proven 80-example configuration produced 72 training and 8 validation rows
@@ -297,13 +299,50 @@ sequence length 512, and seed 0. These are the trainer defaults except
 campaign. MLX-LM receives gradient accumulation through its pinned 0.31.3
 `--grad-accumulation-steps` option.
 
-The model snapshot used for training and the returned adapter directory are
-separate artifacts. This backend produces and verifies the adapter only; it
-does not fuse or deploy it. The synchronous callback reports success only after
-the adapter config and weights have been hashed into a durable,
-content-addressed manifest. The executable is invoked directly with an argument
-vector, never through a shell. `executable_args` supports a pinned launcher such
-as `uvx`; these prefix arguments participate in that direct invocation.
+The pinned model snapshot, LoRA adapter, and returned fused directory are
+separate artifacts. The trainer reports success only after the adapter config
+and weights are hashed, the official `mlx_lm.fuse` command succeeds, the whole
+fused tree is inventoried, required model/config files exist, and the fused-tree
+digest differs from the base-tree digest. `job.result_model` is the canonical
+fused directory; the adapter remains available through
+`job.metadata.adapter_path`. A failed or interrupted fusion resumes from the
+verified adapter without repeating the SFT command, while an adapter mutation,
+partial fused tree, base-identical tree, or manifest mutation fails closed.
+
+`TrainingJob.rebind/3` verifies those contents again, starts the manifest-bound
+`mlx_lm.server` under the Imp supervisor, requires `/v1/models` to advertise the
+exact canonical fused path, and pins the program to the returned ReqLLM. Use
+`Imp.Clients.MLXLMDeployment.stop(job)` when the local server is no longer
+needed. Application shutdown also tears down its complete external process
+group. Commands are invoked directly with argument vectors, never through a
+shell. For a pinned `uvx` launcher, the trainer derives `mlx_lm.fuse` and
+`mlx_lm.server` by replacing the final `mlx_lm.lora` argument; explicit
+`fuse_executable`/`fuse_executable_args` and
+`server_executable`/`server_executable_args` pairs override that derivation.
+Those commands are executable local configuration. A manifest checksum proves
+integrity, not provenance: load and rebind MLX training jobs only from trusted
+runs whose recorded command and artifact paths you control.
+
+Training jobs and rebound programs remain checksummed, credential-free data:
+
+```elixir
+:ok = Imp.Clients.TrainingJob.save!(job, "training-job.json")
+:ok = Imp.save!(trained_program, "trained-program.json")
+
+# In a fresh BEAM process, rebind once to verify and restart the exact artifact.
+job = Imp.Clients.TrainingJob.load!("training-job.json")
+program = Imp.load!("trained-program.json")
+{:ok, program} = Imp.Clients.TrainingJob.rebind(job, program)
+{:ok, prediction} = Imp.call(program, %{question: "..."})
+:ok = Imp.Clients.MLXLMDeployment.stop(job)
+```
+
+The deployment and fusion path is SFT infrastructure. It does not implement a
+GRPO update, and a changed fused-tree digest alone is not evidence of useful
+trained behavior. The real acceptance probe compares the pinned base and fused
+model on one frozen task input, then requires the fresh-process consumer to
+reproduce the fused output; that is lifecycle/trained-behavior evidence, not a
+general held-out-effectiveness claim.
 
 #### External process dependency decision
 
@@ -345,9 +384,9 @@ mix imp.benchmark.local_mlx
 ```
 
 The campaign owns the complete local effectiveness proof: immutable dataset and model-tree validation, matched
-base/adapter/fused evaluation, adapter replay verification, fusion, explicit
-deployment-LM rebinding, checksummed save/load, synchronous server cleanup, and
-a verified run envelope. It requires a clean checkout by default and writes a
+base/adapter/fused evaluation, adapter replay verification, the trainer-owned
+fusion artifact, deployment-LM rebinding, checksummed save/load, synchronous
+server cleanup, and a verified run envelope. It requires a clean checkout by default and writes a
 new immutable evidence file rather than overwriting prior results. This evidence
 supports a local weight-training effectiveness claim; it does not by itself
 establish BetterTogether parity.

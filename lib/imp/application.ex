@@ -13,6 +13,8 @@ defmodule Imp.Application do
       Imp.Tasks.Admission,
       {Task.Supervisor, name: Imp.TaskSupervisor},
       {Task.Supervisor, name: Imp.UnlinkedTaskSupervisor},
+      {Registry, keys: :unique, name: Imp.Clients.MLXLMDeployment.Registry},
+      {DynamicSupervisor, name: Imp.Clients.MLXLMDeployment.Supervisor, strategy: :one_for_one},
       {DynamicSupervisor,
        name: Imp.Optimize.Anything.StateStoreSupervisor, strategy: :one_for_one}
     ]

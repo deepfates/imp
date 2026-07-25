@@ -96,7 +96,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     runner = fn executable, argv, opts ->
       send(parent, {:run, executable, argv, opts})
-      write_adapter!(argv)
+      write_mlx_artifact!(argv)
       {:ok, %{exit_status: 0, output: "trained", duration_ms: 12}}
     end
 
@@ -109,10 +109,16 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert Enum.at(argv, index_of(argv, "--grad-accumulation-steps") + 1) == "4"
     assert opts[:cd] |> Path.type() == :absolute
     refute Enum.any?(argv, &String.contains?(&1, ";"))
+    assert_received {:run, "mlx_lm.fuse", fusion_argv, _opts}
+
+    fusion_output = Enum.at(fusion_argv, index_of(fusion_argv, "--save-path") + 1)
+    assert {:ok, first.result_model} == Imp.Clients.MLXLMArtifact.canonical_path(fusion_output)
 
     manifest = read_manifest(Path.expand(first.metadata.manifest, first.result_model))
     assert manifest["status"] == "succeeded"
     assert get_in(manifest, ["artifacts", "adapters.safetensors", "sha256"]) =~ ~r/^[0-9a-f]{64}$/
+    assert get_in(manifest, ["fused_tree", "sha256"]) =~ ~r/^[0-9a-f]{64}$/
+    assert Path.basename(first.result_model) == "fused"
     assert {:ok, ^manifest} = MLXLMTrainer.verify_job(first)
 
     checkpoint = Path.join(context.root, "job.json")
@@ -130,7 +136,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     runner = fn executable, argv, _opts ->
       send(parent, {:run, executable, argv})
-      write_adapter!(argv)
+      write_mlx_artifact!(argv)
       {:ok, %{exit_status: 0}}
     end
 
@@ -145,10 +151,22 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert {:ok, %TrainingJob{status: :succeeded}} = train(trainer)
 
     assert_received {:run, "uvx", ["--from", "mlx-lm==0.31.3", "mlx_lm.lora", "--model" | _rest]}
+
+    assert_received {:run, "uvx", ["--from", "mlx-lm==0.31.3", "mlx_lm.fuse", "--model" | _rest]}
   end
 
   test "rejects missing artifacts, nonzero exits, timeout secrets, and completed-run tampering",
        context do
+    missing_manifest =
+      TrainingJob.new(%{
+        provider: :mlx_lm,
+        status: :succeeded,
+        result_model: context.model_path
+      })
+
+    assert {:error, :mlx_lm_job_manifest_path_missing} =
+             MLXLMTrainer.verify_job(missing_manifest)
+
     missing =
       trainer(context, fn _exe, _argv, _opts -> {:ok, %{exit_status: 0, output: "ok"}} end)
 
@@ -177,14 +195,14 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     good =
       trainer(context, fn _exe, argv, _opts ->
-        write_adapter!(argv)
+        write_mlx_artifact!(argv)
         {:ok, %{exit_status: 0}}
       end)
 
     assert {:ok, job} = train(good)
-    File.write!(Path.join(job.result_model, "adapters.safetensors"), "tampered", [:sync])
-    assert {:error, :mlx_lm_adapter_artifact_tampered} = MLXLMTrainer.verify_job(job)
-    assert {:error, :mlx_lm_adapter_artifact_tampered} = train(good)
+    File.write!(Path.join(job.result_model, "model.safetensors"), "tampered", [:sync])
+    assert {:error, {:mlx_lm_artifact_tree_mismatch, _}} = MLXLMTrainer.verify_job(job)
+    assert {:error, {:mlx_lm_artifact_tree_mismatch, _}} = train(good)
   end
 
   test "resumes only from a valid hashed MLX adapter checkpoint", context do
@@ -192,13 +210,18 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     parent = self()
 
     runner = fn _executable, argv, _opts ->
-      attempt = Agent.get_and_update(counter, &{&1, &1 + 1})
-      send(parent, {:attempt, attempt, argv})
-      write_adapter!(argv)
+      if "--train" in argv do
+        attempt = Agent.get_and_update(counter, &{&1, &1 + 1})
+        send(parent, {:attempt, attempt, argv})
+        write_adapter!(argv)
 
-      if attempt == 0,
-        do: {:error, {:exit_status, 2, %{exit_status: 2, output: "interrupted"}}},
-        else: {:ok, %{exit_status: 0, output: "resumed"}}
+        if attempt == 0,
+          do: {:error, {:exit_status, 2, %{exit_status: 2, output: "interrupted"}}},
+          else: {:ok, %{exit_status: 0, output: "resumed"}}
+      else
+        write_fused!(argv)
+        {:ok, %{exit_status: 0, output: "fused"}}
+      end
     end
 
     trainer = trainer(context, runner)
@@ -212,6 +235,192 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     assert Enum.at(resumed_argv, resume_index + 1)
            |> String.ends_with?("adapter/adapters.safetensors")
+  end
+
+  test "resumes a failed fusion without rerunning training and refuses adapter tampering",
+       context do
+    {:ok, counts} = Agent.start_link(fn -> %{train: 0, fuse: 0} end)
+
+    runner = fn _executable, argv, _opts ->
+      if "--train" in argv do
+        Agent.update(counts, &Map.update!(&1, :train, fn value -> value + 1 end))
+        write_adapter!(argv)
+        {:ok, %{exit_status: 0, output: "trained"}}
+      else
+        attempt =
+          Agent.get_and_update(counts, &{&1.fuse, Map.update!(&1, :fuse, fn v -> v + 1 end)})
+
+        if attempt == 0 do
+          {:error, {:exit_status, 7, %{exit_status: 7, output: "fusion interrupted"}}}
+        else
+          write_fused!(argv)
+          {:ok, %{exit_status: 0, output: "fused"}}
+        end
+      end
+    end
+
+    trainer = trainer(context, runner)
+
+    assert {:error, {:mlx_lm_fusion_failed, {:exit_status, 7, _capture}}} = train(trainer)
+    assert Agent.get(counts, & &1) == %{train: 1, fuse: 1}
+
+    assert {:ok, job} = train(trainer)
+    assert Agent.get(counts, & &1) == %{train: 1, fuse: 2}
+
+    assert {:ok, replayed} = train(trainer)
+    assert replayed.result_model == job.result_model
+    assert Agent.get(counts, & &1) == %{train: 1, fuse: 2}
+
+    Agent.update(counts, &Map.put(&1, :fuse, 0))
+
+    tamper_context = %{
+      context
+      | root: Path.join(context.root, "tamper"),
+        model_path: Path.join([context.root, "tamper", "model", @revision])
+    }
+
+    File.mkdir_p!(tamper_context.model_path)
+    tamper_trainer = trainer(tamper_context, runner)
+
+    assert {:error, {:mlx_lm_fusion_failed, {:exit_status, 7, _capture}}} =
+             train(tamper_trainer)
+
+    run_dir =
+      tamper_trainer.root
+      |> File.ls!()
+      |> List.first()
+      |> then(&Path.join(tamper_trainer.root, &1))
+
+    File.write!(Path.join([run_dir, "adapter", "adapters.safetensors"]), "tampered", [:sync])
+    before_retry = Agent.get(counts, & &1)
+
+    assert {:error, {:mlx_lm_fusion_failed, :mlx_lm_adapter_artifact_tampered}} =
+             train(tamper_trainer)
+
+    assert Agent.get(counts, & &1) == before_retry
+  end
+
+  test "does not admit a fused tree that is byte-identical to the pinned base", context do
+    File.write!(Path.join(context.model_path, "config.json"), Jason.encode!(%{"fused" => true}), [
+      :sync
+    ])
+
+    File.write!(Path.join(context.model_path, "model.safetensors"), "fused-trained-weights", [
+      :sync
+    ])
+
+    File.write!(Path.join(context.model_path, "behavior.txt"), "trained-behavior\n", [:sync])
+
+    assert {:error,
+            {:mlx_lm_fusion_failed, :mlx_lm_fused_artifact_missing_invalid_or_base_identical}} =
+             context |> trainer(&successful_runner/3) |> train()
+  end
+
+  test "deploys the exact fused tree, persists it, and runs it from a fresh process", context do
+    File.write!(Path.join(context.model_path, "behavior.txt"), "base-behavior\n", [:sync])
+    port = available_port()
+    server = Path.expand("support/fake_mlx_server.py", __DIR__)
+
+    trainer =
+      context
+      |> trainer(&successful_runner/3)
+      |> Map.merge(%{
+        server_executable: System.find_executable("python3"),
+        server_executable_args: [server],
+        server_port: port,
+        server_startup_timeout: 5_000
+      })
+
+    assert {:ok, job} = train(trainer)
+    assert File.read!(Path.join(job.result_model, "behavior.txt")) == "trained-behavior\n"
+
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.req_llm("openai:base-placeholder", api_key: "not-used")
+      )
+
+    program_path = Path.join(context.root, "trained-program.json")
+    job_path = Path.join(context.root, "training-job.json")
+
+    assert {:ok, rebound} = TrainingJob.rebind(job, program, path: program_path)
+    assert {:ok, prediction} = Imp.call(rebound, %{question: "frozen probe"})
+    assert Imp.Prediction.get(prediction, :answer) == "trained-behavior"
+
+    lm = Imp.ProgramAccess.lm(rebound)
+    assert lm.model.id == Path.expand(job.result_model)
+    assert lm.model.model == Path.expand(job.result_model)
+
+    assert Imp.ProgramAccess.get_metadata(rebound, :training_artifact).artifact_sha256 ==
+             job.metadata.artifact_sha256
+
+    :ok = TrainingJob.save!(job, job_path)
+    assert :ok = Imp.Clients.MLXLMDeployment.stop(job)
+
+    fresh_result = Path.join(context.root, "fresh-result.json")
+
+    code = """
+    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    loaded = Imp.load!(#{inspect(program_path)})
+    {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, loaded)
+    {:ok, prediction} = Imp.call(rebound, %{question: "frozen probe"})
+    lm = Imp.ProgramAccess.lm(rebound)
+    payload = %{
+      answer: Imp.Prediction.get(prediction, :answer),
+      artifact_path: job.result_model,
+      artifact_sha256: job.metadata["artifact_sha256"],
+      served_model: lm.model.id
+    }
+    File.write!(#{inspect(fresh_result)}, Jason.encode!(payload))
+    :ok = Imp.Clients.MLXLMDeployment.stop(job)
+    """
+
+    {output, status} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+
+    assert %{
+             "answer" => "trained-behavior",
+             "artifact_path" => artifact_path,
+             "artifact_sha256" => artifact_sha256,
+             "served_model" => served_model
+           } = Jason.decode!(File.read!(fresh_result))
+
+    assert artifact_path == Path.expand(job.result_model)
+    assert served_model == artifact_path
+    assert artifact_sha256 == job.metadata.artifact_sha256
+  end
+
+  test "deployment rejects a server that advertises any other model and cleans it up", context do
+    port = available_port()
+
+    trainer =
+      context
+      |> trainer(&successful_runner/3)
+      |> Map.merge(%{
+        server_executable: System.find_executable("python3"),
+        server_executable_args: [
+          Path.expand("support/fake_mlx_server.py", __DIR__),
+          "--advertise-model",
+          "/wrong/base-model"
+        ],
+        server_port: port,
+        server_startup_timeout: 5_000
+      })
+
+    assert {:ok, job} = train(trainer)
+
+    assert {:error,
+            {:mlx_lm_deployment_start_failed,
+             {:mlx_lm_server_model_identity_mismatch, expected, ["/wrong/base-model"]}}} =
+             Imp.Clients.MLXLMDeployment.start(job)
+
+    assert expected == job.result_model
+    assert_port_available!(port)
   end
 
   defp trainer(context, runner) do
@@ -260,6 +469,38 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     File.write!(Path.join(adapter_dir, "adapters.safetensors"), "valid-adapter-weights", [:sync])
     :ok
+  end
+
+  defp write_mlx_artifact!(argv) do
+    if "--train" in argv, do: write_adapter!(argv), else: write_fused!(argv)
+  end
+
+  defp write_fused!(argv) do
+    fused_dir = Enum.at(argv, index_of(argv, "--save-path") + 1)
+    File.mkdir_p!(fused_dir)
+    File.write!(Path.join(fused_dir, "config.json"), Jason.encode!(%{"fused" => true}), [:sync])
+    File.write!(Path.join(fused_dir, "model.safetensors"), "fused-trained-weights", [:sync])
+    File.write!(Path.join(fused_dir, "behavior.txt"), "trained-behavior\n", [:sync])
+    :ok
+  end
+
+  defp successful_runner(_executable, argv, _opts) do
+    write_mlx_artifact!(argv)
+    {:ok, %{exit_status: 0, output: "ok", duration_ms: 1}}
+  end
+
+  defp available_port do
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, ip: {127, 0, 0, 1}, active: false])
+    {:ok, {_ip, port}} = :inet.sockname(socket)
+    :ok = :gen_tcp.close(socket)
+    port
+  end
+
+  defp assert_port_available!(port) do
+    {:ok, socket} =
+      :gen_tcp.listen(port, [:binary, ip: {127, 0, 0, 1}, active: false, reuseaddr: true])
+
+    :ok = :gen_tcp.close(socket)
   end
 
   defp index_of(argv, flag), do: Enum.find_index(argv, &(&1 == flag))

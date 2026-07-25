@@ -111,7 +111,6 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
     examples = Enum.map(dataset["train"], &ProviderTrainingCampaign.example/1)
 
     training_root = Path.join(root, "training")
-    fused_path = Path.join(root, "fused")
     job_path = Path.join(root, "training-job.json")
     program_path = Path.join(root, "program.json")
 
@@ -131,18 +130,21 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
         adapter: Imp.Adapter.Chat,
         stratify_by: [:route],
         executable: executable,
-        executable_args: executable_args ++ ["mlx_lm.lora"]
+        executable_args: executable_args ++ ["mlx_lm.lora"],
+        server_port: port,
+        server_max_tokens: 64
       )
 
     job = train!(trainer, examples)
     TrainingJob.save!(job, job_path)
     verified_job = TrainingJob.load!(job_path)
     manifest = verify_replay!(trainer, examples, job, verified_job)
+    adapter_path = Path.expand(job.metadata.adapter_path, job.result_model)
 
     adapter_inference =
       evaluate_served!(
         model_path,
-        job.result_model,
+        adapter_path,
         signature,
         dataset["held_out"],
         port,
@@ -151,8 +153,16 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
         concurrency: Keyword.get(opts, :concurrency, 1)
       )
 
-    fuse = fuse!(executable, executable_args, model_path, job.result_model, fused_path)
-    fused_tree = FileTree.inventory!(fused_path)
+    fused_path = job.result_model
+    fused_tree = manifest["fused_tree"]
+
+    fuse = %{
+      "command" => %{
+        "executable" => get_in(manifest, ["spec", "fusion", "executable"]),
+        "argv" => manifest["fusion_argv"]
+      },
+      "result" => manifest["fusion_command"]
+    }
 
     if fused_tree["sha256"] == model_tree["sha256"],
       do: raise("fused model tree is identical to the base model tree")
@@ -319,31 +329,6 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
       do: raise("content-addressed trainer replay changed the completed job")
 
     manifest
-  end
-
-  defp fuse!(executable, prefix, model_path, adapter_path, fused_path) do
-    argv =
-      prefix ++
-        [
-          "mlx_lm.fuse",
-          "--model",
-          model_path,
-          "--adapter-path",
-          adapter_path,
-          "--save-path",
-          fused_path
-        ]
-
-    case Imp.ExternalCommand.run(executable, argv, timeout: 900_000, max_output_bytes: 32_768) do
-      {:ok, result} ->
-        %{
-          "command" => %{"executable" => resolve_executable!(executable), "argv" => argv},
-          "result" => json_safe(result)
-        }
-
-      {:error, reason} ->
-        raise "MLX model fusion failed: #{inspect(reason)}"
-    end
   end
 
   defp evaluate_served!(model_path, adapter_path, signature, rows, port, executable, opts) do
@@ -646,13 +631,13 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
       job["status"] == "succeeded" and job["training_data"] == [72, 8] and
       job["model"] == "#{@model}@#{@revision}" and is_binary(job["result_model"]) and
       manifest["artifact_type"] in ["imp_mlx_lm_sft_run", "dsex_mlx_lm_sft_run"] and
-      manifest["schema_version"] == 1 and manifest["status"] == "succeeded" and
+      manifest["schema_version"] in [1, 2] and manifest["status"] == "succeeded" and
       get_in(manifest, ["spec", "mlx_lm_version"]) == @mlx_lm_version and
       get_in(manifest, ["spec", "model"]) == @model and
       get_in(manifest, ["spec", "model_revision"]) == @revision and
       get_in(manifest, ["dataset", "train_count"]) == 72 and
       get_in(manifest, ["dataset", "valid_count"]) == 8 and
-      get_in(manifest, ["command", "exit_status"]) == 0 and
+      successful_training_command?(manifest) and
       positive_file?(adapter) and positive_file?(config) and
       digest_matches_job?(job, "adapters.safetensors", adapter["sha256"]) and
       digest_matches_job?(job, "adapter_config.json", config["sha256"]) and
@@ -708,7 +693,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
         adapter["cleanup"] == "synchronous_process_group_absence_verified" and
         adapter["model_id"] == adapter["advertised_model_path"] and
         adapter["resolved_model_path"] == adapter["advertised_model_path"] and
-        adapter["adapter_path"] == get_in(artifact, ["training", "job", "result_model"])
+        adapter["adapter_path"] == expected_adapter_path(artifact)
 
     legacy =
       baseline["cleanup"] == "synchronous_process_group_absence_verified" and
@@ -737,8 +722,28 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
 
   defp positive_file?(_file), do: false
 
+  defp successful_training_command?(%{"schema_version" => 2} = manifest),
+    do: get_in(manifest, ["training_command", "exit_status"]) == 0
+
+  defp successful_training_command?(%{"schema_version" => 1} = manifest),
+    do: get_in(manifest, ["command", "exit_status"]) == 0
+
+  defp successful_training_command?(_manifest), do: false
+
+  defp expected_adapter_path(artifact) do
+    job = get_in(artifact, ["training", "job"]) || %{}
+
+    case get_in(job, ["metadata", "adapter_path"]) do
+      path when is_binary(path) -> Path.expand(path, job["result_model"])
+      _legacy -> job["result_model"]
+    end
+  end
+
   defp digest_matches_job?(job, filename, digest) do
-    job_digest = get_in(job, ["metadata", "artifact_sha256", filename])
+    job_digest =
+      get_in(job, ["metadata", "adapter_sha256", filename]) ||
+        get_in(job, ["metadata", "artifact_sha256", filename])
+
     is_binary(job_digest) and String.replace(job_digest, ":", "") == digest
   end
 

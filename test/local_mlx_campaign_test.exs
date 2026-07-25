@@ -120,12 +120,20 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
 
   test "validates the current Imp artifact and evaluation contract identities" do
     artifact = @artifact_path |> File.read!() |> Jason.decode!()
+    legacy_command = get_in(artifact, ["training", "manifest", "command"])
+    adapter_digests = get_in(artifact, ["training", "job", "metadata", "artifact_sha256"])
+    fused_tree = get_in(artifact, ["fusion", "tree"])
 
     current =
       reenvelope(artifact, fn value ->
         value
         |> Map.put("artifact_type", "imp_mlx_weight_training_campaign")
         |> put_in(["training", "manifest", "artifact_type"], "imp_mlx_lm_sft_run")
+        |> put_in(["training", "manifest", "schema_version"], 2)
+        |> put_in(["training", "manifest", "training_command"], legacy_command)
+        |> put_in(["training", "manifest", "fused_tree"], fused_tree)
+        |> put_in(["training", "manifest", "spec", "artifact_mode"], "fused_model")
+        |> put_in(["training", "job", "metadata", "adapter_sha256"], adapter_digests)
         |> put_in(["evaluation_contract", "adapter"], "Imp.Adapter.Chat")
         |> put_in(
           ["evaluation_contract", "sha256"],
@@ -193,6 +201,10 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
     artifact = @artifact_path |> File.read!() |> Jason.decode!()
     base_server = get_in(artifact, ["baseline", "server"])
     model_id = base_server["advertised_model_path"]
+    legacy_adapter_path = get_in(artifact, ["training", "job", "result_model"])
+    run_dir = Path.dirname(legacy_adapter_path)
+    fused_path = Path.join(run_dir, "fused")
+    adapter_path = Path.join(run_dir, "adapter")
 
     current_server =
       Map.merge(base_server, %{
@@ -201,11 +213,12 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
         "resolved_model_path" => model_id
       })
 
-    adapter_server =
-      Map.put(current_server, "adapter_path", artifact["training"]["job"]["result_model"])
+    adapter_server = Map.put(current_server, "adapter_path", adapter_path)
 
     current =
       artifact
+      |> put_in(["training", "job", "result_model"], fused_path)
+      |> put_in(["training", "job", "metadata", "adapter_path"], "../adapter")
       |> put_in(["baseline", "server"], current_server)
       |> put_in(["fused", "server"], current_server)
       |> put_in(["reloaded", "server"], current_server)

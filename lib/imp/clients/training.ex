@@ -331,12 +331,7 @@ defmodule Imp.Clients.TrainingJob do
       rebound =
         program
         |> Imp.ProgramAccess.put_lm(lm)
-        |> Imp.ProgramAccess.put_metadata(:training_artifact, %{
-          provider: job.provider,
-          job_id: job.id,
-          base_model: job.model,
-          result_model: job.result_model
-        })
+        |> Imp.ProgramAccess.put_metadata(:training_artifact, training_artifact_metadata(job))
 
       case Keyword.get(opts, :path) do
         nil ->
@@ -556,13 +551,69 @@ defmodule Imp.Clients.TrainingJob do
   defp deployment_lm(job, program, opts) do
     case Keyword.fetch(opts, :lm) do
       {:ok, lm} when not is_nil(lm) ->
-        case Imp.LM.validate_lm(lm) do
-          {:ok, lm} -> {:ok, lm}
-          {:error, message} -> {:error, {:invalid_training_deployment_lm, message}}
+        with {:ok, lm} <- validate_deployment_lm(lm),
+             :ok <- validate_provider_deployment_lm(job, lm) do
+          {:ok, lm}
         end
 
       _missing_or_nil ->
-        rebound_lm(Imp.ProgramAccess.lm(program), job.provider, job.result_model)
+        automatic_deployment_lm(job, program)
+    end
+  end
+
+  defp automatic_deployment_lm(%__MODULE__{provider: :mlx_lm} = job, _program) do
+    with {:ok, deployment} <- Imp.Clients.MLXLMDeployment.start(job) do
+      {:ok, deployment.lm}
+    end
+  end
+
+  defp automatic_deployment_lm(job, program),
+    do: rebound_lm(Imp.ProgramAccess.lm(program), job.provider, job.result_model)
+
+  defp validate_deployment_lm(lm) do
+    case Imp.LM.validate_lm(lm) do
+      {:ok, lm} -> {:ok, lm}
+      {:error, message} -> {:error, {:invalid_training_deployment_lm, message}}
+    end
+  end
+
+  defp validate_provider_deployment_lm(%__MODULE__{provider: :mlx_lm} = job, lm) do
+    with {:ok, _manifest} <- Imp.Clients.MLXLMTrainer.verify_job(job),
+         {:ok, path} <- mlx_lm_model_path(lm),
+         true <- Path.expand(path) == Path.expand(job.result_model) do
+      :ok
+    else
+      false -> {:error, :mlx_lm_deployment_model_identity_mismatch}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_provider_deployment_lm(_job, _lm), do: :ok
+
+  defp mlx_lm_model_path(%Imp.Clients.ReqLLM{model: model}) when is_binary(model),
+    do: {:ok, model}
+
+  defp mlx_lm_model_path(%Imp.Clients.ReqLLM{model: model}) when is_map(model) do
+    case Map.get(model, :id) || Map.get(model, "id") || Map.get(model, :model) ||
+           Map.get(model, "model") do
+      path when is_binary(path) -> {:ok, path}
+      _missing -> {:error, :mlx_lm_deployment_model_identity_missing}
+    end
+  end
+
+  defp mlx_lm_model_path(_lm), do: {:error, :mlx_lm_deployment_requires_req_llm}
+
+  defp training_artifact_metadata(job) do
+    metadata = %{
+      provider: job.provider,
+      job_id: job.id,
+      base_model: job.model,
+      result_model: job.result_model
+    }
+
+    case job.metadata[:artifact_sha256] || job.metadata["artifact_sha256"] do
+      digest when is_binary(digest) -> Map.put(metadata, :artifact_sha256, digest)
+      _missing -> metadata
     end
   end
 

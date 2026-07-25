@@ -105,11 +105,6 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Optimizer.GEPA.Acceptance",
-      "source": "lib/imp/optimizer/gepa/acceptance.ex"
-    },
-    {
-      "category": "internal",
       "module": "Imp.Optimizer.GEPA.Adapter",
       "source": "lib/imp/optimizer/gepa/adapter.ex"
     },
@@ -1123,6 +1118,48 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
+        "lookup/1",
+        "start/2",
+        "stop/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.MLXLMDeployment",
+      "signatures": {
+        "functions": {
+          "lookup/1": [
+            "lookup(training_job)"
+          ],
+          "start/2": [
+            "start(job, opts \\\\ [])"
+          ],
+          "stop/1": [
+            "stop(arg1)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/clients/mlx_lm_deployment.ex",
+      "struct_fields": [
+        "artifact_path",
+        "artifact_sha256",
+        "base_url",
+        "lm",
+        "pid"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
         "new/1",
         "verify_job/1"
       ],
@@ -1149,6 +1186,8 @@
         "batch_size",
         "executable",
         "executable_args",
+        "fuse_executable",
+        "fuse_executable_args",
         "grad_accumulation_steps",
         "iters",
         "kill_grace_ms",
@@ -1164,6 +1203,12 @@
         "runner",
         "save_every",
         "seed",
+        "server_executable",
+        "server_executable_args",
+        "server_host",
+        "server_max_tokens",
+        "server_port",
+        "server_startup_timeout",
         "signature",
         "stratify_by",
         "timeout",
@@ -3722,6 +3767,160 @@
         "use_merge"
       ],
       "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "accept?/4",
+        "callback/1",
+        "decide/4",
+        "default/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.GEPA.Acceptance",
+      "signatures": {
+        "functions": {
+          "accept?/4": [
+            "accept?(policy, before_result, after_result, context \\\\ %{})"
+          ],
+          "callback/1": [
+            "callback(fun)"
+          ],
+          "decide/4": [
+            "decide(policy, before_result, after_result, context \\\\ %{})"
+          ],
+          "default/1": [
+            "default(atom)"
+          ]
+        },
+        "types": {
+          "callback/0": [],
+          "callback_decision/0": [],
+          "context/0": [],
+          "decision/0": [],
+          "operation/0": [],
+          "policy/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/gepa/acceptance.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "callback/0"
+        },
+        {
+          "kind": "type",
+          "name": "callback_decision/0"
+        },
+        {
+          "kind": "type",
+          "name": "context/0"
+        },
+        {
+          "kind": "type",
+          "name": "decision/0"
+        },
+        {
+          "kind": "type",
+          "name": "operation/0"
+        },
+        {
+          "kind": "type",
+          "name": "policy/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [
+        {
+          "name": "dump_state/1",
+          "optional": false
+        },
+        {
+          "name": "identity/1",
+          "optional": false
+        },
+        {
+          "name": "load_state/2",
+          "optional": false
+        },
+        {
+          "name": "minibatch_size/1",
+          "optional": false
+        },
+        {
+          "name": "next_minibatch_ids/4",
+          "optional": false
+        }
+      ],
+      "category": "spi",
+      "functions": [
+        "dump/1",
+        "load!/1",
+        "new/1",
+        "next_batches/6"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.GEPA.BatchSampler",
+      "signatures": {
+        "callbacks": {
+          "dump_state/1": [],
+          "identity/1": [],
+          "load_state/2": [],
+          "minibatch_size/1": [],
+          "next_minibatch_ids/4": []
+        },
+        "functions": {
+          "dump/1": [
+            "dump(sampler)"
+          ],
+          "load!/1": [
+            "load!(state)"
+          ],
+          "new/1": [
+            "new(minibatch_size \\\\ nil)"
+          ],
+          "next_batches/6": [
+            "next_batches(sampler, trainset, size, count, iteration, rng_state)"
+          ]
+        },
+        "types": {
+          "context/0": [],
+          "rng_state/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/gepa/batch_sampler.ex",
+      "struct_fields": [
+        "calls_in_iteration",
+        "current_iteration",
+        "custom_identity",
+        "custom_strategy",
+        "epoch",
+        "id_freqs",
+        "last_trainset_size",
+        "minibatch_size",
+        "shuffled_ids",
+        "trainset_identity"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "context/0"
+        },
+        {
+          "kind": "type",
+          "name": "rng_state/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],

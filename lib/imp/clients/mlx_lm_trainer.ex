@@ -3,8 +3,9 @@ defmodule Imp.Clients.MLXLMTrainer do
   Optional synchronous SFT backend for a pinned local MLX-LM model snapshot.
 
   The trainer ignores the deployment LM supplied to
-  `Imp.Clients.Trainer.finetune/4` and produces adapter artifacts only. It does
-  not fuse or deploy them.
+  `Imp.Clients.Trainer.finetune/4`. A successful job contains an official
+  MLX-LM fused model tree, not merely the LoRA adapter or a changed model name.
+  Both the adapter and complete fused tree are content-verified before success.
 
   MLX-LM is an external optional dependency, pinned to `0.31.3`. Model inputs
   are immutable Hugging Face snapshots: a remote repository name is recorded
@@ -14,7 +15,7 @@ defmodule Imp.Clients.MLXLMTrainer do
 
   @behaviour Imp.Clients.Trainer
 
-  alias Imp.Clients.TrainingJob
+  alias Imp.Clients.{MLXLMArtifact, TrainingJob}
   alias Imp.Training.ChatDataset
 
   @mlx_lm_version "0.31.3"
@@ -30,6 +31,14 @@ defmodule Imp.Clients.MLXLMTrainer do
             root: nil,
             executable: "mlx_lm.lora",
             executable_args: [],
+            fuse_executable: nil,
+            fuse_executable_args: nil,
+            server_executable: nil,
+            server_executable_args: nil,
+            server_host: "127.0.0.1",
+            server_port: 0,
+            server_max_tokens: 512,
+            server_startup_timeout: 120_000,
             runner: Imp.ExternalCommand,
             signature: nil,
             adapter: Imp.Adapter.Chat,
@@ -58,6 +67,14 @@ defmodule Imp.Clients.MLXLMTrainer do
           root: String.t(),
           executable: String.t(),
           executable_args: [String.t()],
+          fuse_executable: String.t() | nil,
+          fuse_executable_args: [String.t()] | nil,
+          server_executable: String.t() | nil,
+          server_executable_args: [String.t()] | nil,
+          server_host: String.t(),
+          server_port: :inet.port_number(),
+          server_max_tokens: pos_integer(),
+          server_startup_timeout: pos_integer(),
           runner: runner(),
           signature: Imp.Signature.t() | nil,
           adapter: module(),
@@ -111,18 +128,14 @@ defmodule Imp.Clients.MLXLMTrainer do
       when is_binary(adapter_dir) do
     manifest_ref = job.metadata[:manifest] || job.metadata["manifest"]
 
-    unless is_binary(manifest_ref),
-      do: raise(ArgumentError, "MLX-LM job manifest path is missing")
+    if is_binary(manifest_ref) do
+      manifest_path = Path.expand(manifest_ref, adapter_dir)
 
-    manifest_path = Path.expand(manifest_ref, adapter_dir)
-
-    with {:ok, manifest} <- read_manifest(manifest_path),
-         true <- manifest["status"] == "succeeded",
-         :ok <- verify_artifact_hashes(adapter_dir, manifest["artifacts"]) do
-      {:ok, manifest}
+      with {:ok, manifest} <- read_manifest(manifest_path) do
+        verify_completed_job(adapter_dir, manifest)
+      end
     else
-      false -> {:error, :mlx_lm_training_not_succeeded}
-      {:error, _reason} = error -> error
+      {:error, :mlx_lm_job_manifest_path_missing}
     end
   end
 
@@ -263,38 +276,58 @@ defmodule Imp.Clients.MLXLMTrainer do
   end
 
   defp prepare_context(trainer, call, model_path, dataset) do
-    spec = %{
-      "adapter" => Atom.to_string(call.adapter),
-      "dataset_sha256" => dataset.dataset_sha256,
-      "mlx_lm_version" => @mlx_lm_version,
-      "model" => trainer.model,
-      "model_path" => model_path,
-      "model_revision" => trainer.model_revision,
-      "training" => training_spec(call)
-    }
+    with {:ok, model_tree} <- MLXLMArtifact.inventory(model_path),
+         {:ok, fusion} <- command_spec(trainer, :fuse),
+         {:ok, deployment} <- deployment_spec(trainer) do
+      spec = %{
+        "adapter" => Atom.to_string(call.adapter),
+        "artifact_mode" => "fused_model",
+        "dataset_sha256" => dataset.dataset_sha256,
+        "deployment" => deployment,
+        "fusion" => fusion,
+        "mlx_lm_version" => @mlx_lm_version,
+        "model" => trainer.model,
+        "model_path" => model_path,
+        "model_revision" => trainer.model_revision,
+        "model_tree_sha256" => model_tree["sha256"],
+        "training" => training_spec(call)
+      }
 
-    run_id = sha256(ChatDataset.canonical_json(spec))
-    run_dir = Path.join(Path.expand(trainer.root), chunk_hash(run_id, "-"))
+      run_id = sha256(ChatDataset.canonical_json(spec))
+      run_dir = Path.join(Path.expand(trainer.root), chunk_hash(run_id, "-"))
 
-    {:ok,
-     %{
-       spec: spec,
-       run_id: run_id,
-       run_dir: run_dir,
-       data_dir: Path.join(run_dir, "data"),
-       adapter_dir: Path.join(run_dir, "adapter"),
-       manifest_path: Path.join(run_dir, "manifest.json"),
-       lock_path: Path.join(run_dir, ".lock"),
-       dataset: dataset
-     }}
+      {:ok,
+       %{
+         spec: spec,
+         run_id: run_id,
+         run_dir: run_dir,
+         data_dir: Path.join(run_dir, "data"),
+         adapter_dir: Path.join(run_dir, "adapter"),
+         fused_dir: Path.join(run_dir, "fused"),
+         manifest_path: Path.join(run_dir, "manifest.json"),
+         lock_path: Path.join(run_dir, ".lock"),
+         dataset: dataset
+       }}
+    end
   end
 
   defp execute_or_replay(trainer, call, context) do
     case load_existing(context) do
-      {:ok, %{"status" => "succeeded"} = manifest} -> completed_job(context, manifest)
-      {:error, _reason} = error -> error
-      {:ok, manifest} -> with_lock(context, fn -> execute(trainer, call, context, manifest) end)
-      :missing -> with_lock(context, fn -> initialize_and_execute(trainer, call, context) end)
+      {:ok, %{"status" => "succeeded"} = manifest} ->
+        completed_job(context, manifest)
+
+      {:ok, %{"status" => status} = manifest}
+      when status in ["trained", "fusing", "fusion_failed"] ->
+        with_lock(context, fn -> execute_fusion(trainer, context, manifest) end)
+
+      {:error, _reason} = error ->
+        error
+
+      {:ok, manifest} ->
+        with_lock(context, fn -> execute(trainer, call, context, manifest) end)
+
+      :missing ->
+        with_lock(context, fn -> initialize_and_execute(trainer, call, context) end)
     end
   end
 
@@ -320,27 +353,98 @@ defmodule Imp.Clients.MLXLMTrainer do
       write_manifest!(context.manifest_path, running)
 
       case run_command(trainer, argv, context.run_dir) do
-        {:ok, %{exit_status: 0} = result} -> finish_success(trainer, context, running, result)
-        {:ok, result} -> finish_failure(context, running, {:unexpected_runner_result, result})
-        {:error, reason} -> finish_failure(context, running, reason)
-        other -> finish_failure(context, running, {:invalid_runner_result, other})
+        {:ok, %{exit_status: 0} = result} ->
+          finish_training_success(trainer, context, running, result)
+
+        {:ok, result} ->
+          finish_failure(context, running, {:unexpected_runner_result, result})
+
+        {:error, reason} ->
+          finish_failure(context, running, reason)
+
+        other ->
+          finish_failure(context, running, {:invalid_runner_result, other})
       end
     end
   end
 
-  defp finish_success(trainer, context, manifest, result) do
+  defp finish_training_success(trainer, context, manifest, result) do
     with {:ok, artifacts} <- valid_artifacts(context.adapter_dir, context.spec["model_path"]) do
-      succeeded =
+      trained =
         manifest
-        |> Map.put("status", "succeeded")
+        |> Map.put("status", "trained")
         |> Map.put("artifacts", artifacts)
-        |> Map.put("command", command_summary(result))
+        |> Map.put("training_command", command_summary(result))
 
-      write_manifest!(context.manifest_path, succeeded)
-      completed_job(context, succeeded, trainer)
+      write_manifest!(context.manifest_path, trained)
+      execute_fusion(trainer, context, trained)
     else
       {:error, reason} -> finish_failure(context, manifest, reason)
     end
+  end
+
+  defp execute_fusion(trainer, context, manifest) do
+    with :ok <- verify_dataset_files(context, manifest),
+         :ok <- verify_artifact_hashes(context.adapter_dir, manifest["artifacts"]),
+         :ok <- reset_fused_output(context.fused_dir),
+         {:ok, command} <- command_spec(trainer, :fuse) do
+      argv =
+        command["args"] ++
+          [
+            "--model",
+            context.spec["model_path"],
+            "--adapter-path",
+            context.adapter_dir,
+            "--save-path",
+            context.fused_dir
+          ]
+
+      fusing = manifest |> Map.put("status", "fusing") |> Map.put("fusion_argv", argv)
+      write_manifest!(context.manifest_path, fusing)
+
+      case run_external(trainer, command["executable"], argv, context.run_dir) do
+        {:ok, %{exit_status: 0} = result} ->
+          finish_fusion_success(context, fusing, result)
+
+        {:ok, result} ->
+          finish_fusion_failure(context, fusing, {:unexpected_runner_result, result})
+
+        {:error, reason} ->
+          finish_fusion_failure(context, fusing, reason)
+
+        other ->
+          finish_fusion_failure(context, fusing, {:invalid_runner_result, other})
+      end
+    else
+      {:error, reason} -> finish_fusion_failure(context, manifest, reason)
+    end
+  end
+
+  defp finish_fusion_success(context, manifest, result) do
+    with {:ok, fused_tree} <-
+           valid_fused_artifact(context.fused_dir, context.spec["model_tree_sha256"]) do
+      succeeded =
+        manifest
+        |> Map.put("status", "succeeded")
+        |> Map.put("fused_tree", fused_tree)
+        |> Map.put("fusion_command", command_summary(result))
+        |> Map.delete("error")
+
+      write_manifest!(context.manifest_path, succeeded)
+      completed_job(context, succeeded)
+    else
+      {:error, reason} -> finish_fusion_failure(context, manifest, reason)
+    end
+  end
+
+  defp finish_fusion_failure(context, manifest, reason) do
+    failed =
+      manifest
+      |> Map.put("status", "fusion_failed")
+      |> Map.put("error", Imp.Redaction.redact(inspect(reason)))
+
+    write_manifest!(context.manifest_path, failed)
+    {:error, {:mlx_lm_fusion_failed, redact_term(reason)}}
   end
 
   defp finish_failure(context, manifest, reason) do
@@ -373,7 +477,10 @@ defmodule Imp.Clients.MLXLMTrainer do
 
   defp completed_job(context, manifest, trainer \\ nil) do
     with :ok <- verify_dataset_files(context, manifest),
-         :ok <- verify_artifact_hashes(context.adapter_dir, manifest["artifacts"]) do
+         :ok <- verify_artifact_hashes(context.adapter_dir, manifest["artifacts"]),
+         :ok <- MLXLMArtifact.validate(context.fused_dir, manifest["fused_tree"]),
+         true <- manifest["fused_tree"]["sha256"] != context.spec["model_tree_sha256"],
+         {:ok, fused_dir} <- MLXLMArtifact.canonical_path(context.fused_dir) do
       trainer =
         trainer ||
           %__MODULE__{
@@ -388,20 +495,26 @@ defmodule Imp.Clients.MLXLMTrainer do
          provider: :mlx_lm,
          model: trainer.model <> "@" <> trainer.model_revision,
          status: :succeeded,
-         result_model: context.adapter_dir,
+         result_model: fused_dir,
          training_data: [context.dataset.train_count, context.dataset.valid_count],
          idempotency_key: "imp-mlx:" <> chunk_hash(context.run_id),
          metadata: %{
            manifest: "../manifest.json",
+           adapter_path: "../adapter",
            dataset_sha256: chunk_hash(context.dataset.dataset_sha256),
+           deployment: manifest["spec"]["deployment"],
            mlx_lm_version: @mlx_lm_version,
            model_revision: chunk_hash(trainer.model_revision),
-           artifact_sha256:
+           artifact_sha256: chunk_hash(manifest["fused_tree"]["sha256"]),
+           adapter_sha256:
              Map.new(manifest["artifacts"], fn {name, attrs} ->
                {name, chunk_hash(attrs["sha256"])}
              end)
          }
        })}
+    else
+      false -> {:error, :mlx_lm_fused_artifact_matches_base}
+      {:error, _reason} = error -> error
     end
   end
 
@@ -459,6 +572,10 @@ defmodule Imp.Clients.MLXLMTrainer do
   end
 
   defp run_command(trainer, argv, cd) do
+    run_external(trainer, trainer.executable, trainer.executable_args ++ argv, cd)
+  end
+
+  defp run_external(trainer, executable, argv, cd) do
     opts = [
       timeout: trainer.timeout,
       kill_grace_ms: trainer.kill_grace_ms,
@@ -468,10 +585,17 @@ defmodule Imp.Clients.MLXLMTrainer do
 
     case trainer.runner do
       runner when is_function(runner, 3) ->
-        runner.(trainer.executable, trainer.executable_args ++ argv, opts)
+        runner.(executable, argv, opts)
 
       runner when is_atom(runner) ->
-        runner.run(trainer.executable, trainer.executable_args ++ argv, opts)
+        runner.run(executable, argv, opts)
+    end
+  end
+
+  defp reset_fused_output(fused_dir) do
+    case File.rm_rf(fused_dir) do
+      {:ok, _entries} -> :ok
+      {:error, reason, path} -> {:error, {:mlx_lm_fused_output_cleanup_failed, path, reason}}
     end
   end
 
@@ -492,6 +616,19 @@ defmodule Imp.Clients.MLXLMTrainer do
     end
   rescue
     File.Error -> {:error, :mlx_lm_adapter_artifact_missing_or_invalid}
+  end
+
+  defp valid_fused_artifact(fused_dir, base_sha256) do
+    with {:ok, inventory} <- MLXLMArtifact.inventory(fused_dir),
+         true <- inventory["files"] != [],
+         true <- inventory["sha256"] != base_sha256,
+         true <- Enum.any?(inventory["files"], &(&1["path"] == "config.json")),
+         true <- Enum.any?(inventory["files"], &String.ends_with?(&1["path"], ".safetensors")) do
+      {:ok, inventory}
+    else
+      false -> {:error, :mlx_lm_fused_artifact_missing_invalid_or_base_identical}
+      {:error, _reason} = error -> error
+    end
   end
 
   defp checkpoint_if_valid(adapter_dir, expected_model_path) do
@@ -547,7 +684,7 @@ defmodule Imp.Clients.MLXLMTrainer do
   defp base_manifest(context, status) do
     %{
       "artifact_type" => "imp_mlx_lm_sft_run",
-      "schema_version" => 1,
+      "schema_version" => 2,
       "run_id" => context.run_id,
       "status" => status,
       "spec" => context.spec,
@@ -665,6 +802,27 @@ defmodule Imp.Clients.MLXLMTrainer do
                )) ->
         raise ArgumentError, "executable_args must be a list of argv strings"
 
+      not valid_optional_command?(trainer.fuse_executable, trainer.fuse_executable_args) ->
+        raise ArgumentError,
+              "fuse_executable and fuse_executable_args must be nil or a command plus argv strings"
+
+      not valid_optional_command?(trainer.server_executable, trainer.server_executable_args) ->
+        raise ArgumentError,
+              "server_executable and server_executable_args must be nil or a command plus argv strings"
+
+      not valid_host?(trainer.server_host) ->
+        raise ArgumentError, "server_host must be a loopback host"
+
+      not (is_integer(trainer.server_port) and trainer.server_port >= 0 and
+               trainer.server_port <= 65_535) ->
+        raise ArgumentError, "server_port must be in 0..65535"
+
+      not positive_integer?(trainer.server_max_tokens) ->
+        raise ArgumentError, "server_max_tokens must be positive"
+
+      not positive_integer?(trainer.server_startup_timeout) ->
+        raise ArgumentError, "server_startup_timeout must be positive"
+
       not valid_runner?(trainer.runner) ->
         raise ArgumentError, "runner must be a module exporting run/3 or an arity-3 function"
 
@@ -688,6 +846,93 @@ defmodule Imp.Clients.MLXLMTrainer do
     do: Code.ensure_loaded?(runner) and function_exported?(runner, :run, 3)
 
   defp valid_runner?(_runner), do: false
+
+  defp valid_optional_command?(nil, nil), do: true
+
+  defp valid_optional_command?(executable, args)
+       when is_binary(executable) and executable != "" and is_list(args),
+       do: Enum.all?(args, &(is_binary(&1) and not String.contains?(&1, <<0>>)))
+
+  defp valid_optional_command?(_executable, _args), do: false
+
+  defp valid_host?(host), do: host in ["127.0.0.1", "localhost", "::1"]
+
+  defp verify_completed_job(result_dir, %{"schema_version" => 2} = manifest) do
+    run_dir = Path.dirname(Path.expand("../manifest.json", result_dir))
+    adapter_dir = Path.join(run_dir, "adapter")
+    expected_fused_dir = Path.join(run_dir, "fused") |> Path.expand()
+
+    with true <- manifest["status"] == "succeeded",
+         true <- manifest["spec"]["artifact_mode"] == "fused_model",
+         true <- Path.expand(result_dir) == expected_fused_dir,
+         :ok <- verify_artifact_hashes(adapter_dir, manifest["artifacts"]),
+         :ok <- MLXLMArtifact.validate(result_dir, manifest["fused_tree"]),
+         true <- manifest["fused_tree"]["sha256"] != manifest["spec"]["model_tree_sha256"] do
+      {:ok, manifest}
+    else
+      false -> {:error, :mlx_lm_completed_artifact_identity_mismatch}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  # Jobs emitted before fused artifacts became the public outcome remain
+  # verifiable as historical adapter-only SFT checkpoints. They are not
+  # deployable and `TrainingJob.rebind/3` will not treat them as such.
+  defp verify_completed_job(adapter_dir, %{"schema_version" => 1} = manifest) do
+    with true <- manifest["status"] == "succeeded",
+         :ok <- verify_artifact_hashes(adapter_dir, manifest["artifacts"]) do
+      {:ok, manifest}
+    else
+      false -> {:error, :mlx_lm_training_not_succeeded}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp verify_completed_job(_result_dir, _manifest),
+    do: {:error, :unsupported_mlx_lm_manifest_schema}
+
+  defp deployment_spec(trainer) do
+    with {:ok, command} <- command_spec(trainer, :server) do
+      {:ok,
+       Map.merge(command, %{
+         "host" => trainer.server_host,
+         "port" => trainer.server_port,
+         "max_tokens" => trainer.server_max_tokens,
+         "startup_timeout" => trainer.server_startup_timeout,
+         "kill_grace_ms" => trainer.kill_grace_ms,
+         "max_output_bytes" => trainer.max_output_bytes
+       })}
+    end
+  end
+
+  defp command_spec(trainer, kind) when kind in [:fuse, :server] do
+    {configured_executable, configured_args, target} =
+      case kind do
+        :fuse -> {trainer.fuse_executable, trainer.fuse_executable_args, "mlx_lm.fuse"}
+        :server -> {trainer.server_executable, trainer.server_executable_args, "mlx_lm.server"}
+      end
+
+    cond do
+      is_binary(configured_executable) and is_list(configured_args) ->
+        {:ok, %{"executable" => configured_executable, "args" => configured_args}}
+
+      Path.basename(trainer.executable) == "mlx_lm.lora" ->
+        executable =
+          case Path.dirname(trainer.executable) do
+            "." -> target
+            directory -> Path.join(directory, target)
+          end
+
+        {:ok, %{"executable" => executable, "args" => trainer.executable_args}}
+
+      List.last(trainer.executable_args) == "mlx_lm.lora" ->
+        args = List.replace_at(trainer.executable_args, -1, target)
+        {:ok, %{"executable" => trainer.executable, "args" => args}}
+
+      true ->
+        {:error, {:mlx_lm_command_not_derivable, kind}}
+    end
+  end
 
   defp hugging_face_snapshot_path(model, revision) do
     encoded = String.replace(model, "/", "--")
