@@ -13,6 +13,7 @@ REQUIRED_AUTHORITIES = {
     "dspy_stable",
     "dspy_instruction_optimizers",
     "gepa_v0_1_1_contract",
+    "gepa_v0_1_4_contract",
     "optimize_anything_artifact",
     "req_llm",
     "swe_bench_verified",
@@ -22,6 +23,7 @@ REQUIRED_CONTRACTS = {
     "optimize_anything_swe_bench_flask_5014_dataset": "swe_bench_verified",
     "optimize_anything_upstream_differential_protocol": "optimize_anything_artifact",
     "req_llm_beam_runtime_dependency": "req_llm",
+    "t1_gepa_v014_structural_differential_contract": "gepa_v0_1_4_contract",
     "t1_gepa_v011_structural_differential_contract": "gepa_v0_1_1_contract",
     "t1_instruction_optimizer_differential_contract": "dspy_instruction_optimizers",
 }

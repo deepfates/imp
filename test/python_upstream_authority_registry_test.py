@@ -50,11 +50,13 @@ class PythonUpstreamAuthorityRegistryTest(unittest.TestCase):
         with fake_dspy_modules():
             cls.dspy_contract = runpy.run_path(str(ROOT / "scripts" / "dspy_instruction_optimizer_contract.py"))
         cls.gepa_contract = runpy.run_path(str(ROOT / "scripts" / "gepa_v011_contract.py"))
+        cls.gepa_current_contract = runpy.run_path(str(ROOT / "scripts" / "gepa_v014_contract.py"))
         cls.registry = cls.dspy_contract["UPSTREAM_REGISTRY"]
 
-    def test_both_contracts_resolve_pins_from_script_relative_registry(self):
+    def test_contracts_resolve_pins_from_script_relative_registry(self):
         dspy = self.registry["authorities"]["dspy_instruction_optimizers"]
         gepa = self.registry["authorities"]["gepa_v0_1_1_contract"]
+        gepa_current = self.registry["authorities"]["gepa_v0_1_4_contract"]
 
         self.assertEqual(self.dspy_contract["REGISTRY_PATH"], REGISTRY_PATH)
         self.assertEqual(self.dspy_contract["EXPECTED_VERSION"], dspy["version"])
@@ -64,9 +66,13 @@ class PythonUpstreamAuthorityRegistryTest(unittest.TestCase):
         self.assertEqual(self.gepa_contract["EXPECTED_VERSION"], gepa["version"])
         self.assertEqual(self.gepa_contract["EXPECTED_COMMIT"], gepa["commit"])
         self.assertEqual(self.gepa_contract["SOURCE_PINS"], gepa["source_hashes"])
+        self.assertEqual(self.gepa_current_contract["REGISTRY_PATH"], REGISTRY_PATH)
+        self.assertEqual(self.gepa_current_contract["EXPECTED_VERSION"], gepa_current["version"])
+        self.assertEqual(self.gepa_current_contract["EXPECTED_COMMIT"], gepa_current["commit"])
+        self.assertEqual(self.gepa_current_contract["SOURCE_PINS"], gepa_current["source_hashes"])
 
-    def test_both_contracts_reject_valid_looking_source_hash_drift(self):
-        for contract in (self.dspy_contract, self.gepa_contract):
+    def test_contracts_reject_valid_looking_source_hash_drift(self):
+        for contract in (self.dspy_contract, self.gepa_contract, self.gepa_current_contract):
             drifted = json.loads(REGISTRY_PATH.read_text())
             authority_id = drifted["contracts"][contract["CONTRACT_ID"]]["authority"]
             authority = contract["AUTHORITY"]
@@ -89,19 +95,19 @@ class PythonUpstreamAuthorityRegistryTest(unittest.TestCase):
             self.assertEqual(len(failures), 1)
             self.assertIn(source, failures[0])
 
-    def test_both_contracts_reject_missing_registry(self):
+    def test_contracts_reject_missing_registry(self):
         missing = ROOT / "benchmarks" / "does-not-exist.json"
-        for contract in (self.dspy_contract, self.gepa_contract):
+        for contract in (self.dspy_contract, self.gepa_contract, self.gepa_current_contract):
             with self.assertRaisesRegex(RuntimeError, "invalid upstream authority registry"):
                 contract["load_authority_registry"](missing)
 
-    def test_both_contracts_reject_incomplete_registry(self):
+    def test_contracts_reject_incomplete_registry(self):
         incomplete = json.loads(REGISTRY_PATH.read_text())
         del incomplete["pinned_sources"]["req_llm"]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "registry.json"
             path.write_text(json.dumps(incomplete))
-            for contract in (self.dspy_contract, self.gepa_contract):
+            for contract in (self.dspy_contract, self.gepa_contract, self.gepa_current_contract):
                 with self.assertRaisesRegex(RuntimeError, "missing required authorities"):
                     contract["load_authority_registry"](path)
 

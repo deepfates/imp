@@ -461,7 +461,7 @@ defmodule Imp.MixProject do
         "imp.benchmark.instruction_optimizer_contract --out tmp/instruction-optimizer-contract"
       ],
       "benchmark.gepa.contract.check": [
-        "imp.benchmark.gepa_contract --out tmp/gepa-v011-contract"
+        "imp.benchmark.gepa_contract --out tmp/gepa-v014-contract"
       ],
       "benchmark.gepa_replication.check": [
         "imp.benchmark.gepa_replication --smoke --out tmp/gepa-replication"

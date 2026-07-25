@@ -60,26 +60,33 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
     simba_eviction_5_4_4
     simba_eviction_7_3_0
   )
-  @gepa_contract_commit "b4dbb55b7601dac448cdb836d5a401ca7d9eb920"
+  @gepa_contract_commit "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
   @gepa_contract_sources %{
     "src/gepa/core/engine.py" =>
-      "92627720354261b9eb5359337b9b237a2a29ebf179b22a4b724b737bde81a088",
+      "ba361b477de74c20eb813b277b0fb85b6898ca534e09c8e878604fb1c8980c53",
     "src/gepa/core/result.py" =>
       "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85",
     "src/gepa/core/state.py" =>
-      "08108908eb922808c2ad134c9717d32b107581a5766e6b99199c248d538999e5",
+      "9ad128c981c7344ba0e89d053c2fe33e98a2d74d830679d620cb7cd0d7b1820c",
     "src/gepa/gepa_utils.py" =>
       "60aca7024e31a3e273a01187a6329f381f297a77ec7b6add4b9c90b4d64e9b6c",
+    "src/gepa/proposer/base.py" =>
+      "75242e6c71758444d97949fb5c38ff84cd52f2f77f5464c894f6229c9beb210c",
     "src/gepa/proposer/merge.py" =>
       "cd0a3254927e399d0cae4a212076f7577161027b3c4ff19d03c3d2150408ee5a",
+    "src/gepa/strategies/acceptance.py" =>
+      "a6234c188fdeab0f7181dd1f01d767fc91779512773ed4ad952df68855c1d3a4",
     "src/gepa/strategies/component_selector.py" =>
       "248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568",
+    "src/gepa/strategies/proposal_selection.py" =>
+      "8866ac697928ab0824653117876e08af7087d4cbfe24a4feaedb8ceef9b75b18",
     "src/gepa/utils/stop_condition.py" =>
-      "3f18fa989a376711dc198d60963dc9b866da6d5a81f5c5339e242b3301764a0c"
+      "d33475e411a38353f34272b12b0b2a7af24bbbeca2c2e4fe6c204fa476e87fdb"
   }
   @gepa_contract_row_ids ~w(
     strict_mutation_acceptance
     equal_or_better_merge_acceptance
+    parallel_proposal_selection
     weighted_pareto_selection
     round_robin_component_rotation
     common_ancestor_merge_filtering
@@ -392,13 +399,13 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
     require!(artifact["schema_version"] == 1, "wrong GEPA contract schema")
 
     require!(
-      artifact["evidence_tier"] == "t1_gepa_v011_structural_differential_contract",
+      artifact["evidence_tier"] == "t1_gepa_v014_structural_differential_contract",
       "wrong GEPA contract tier"
     )
 
     require!(
       artifact["claim_scope"] ==
-        "provider-free GEPA v0.1.1 structural semantics",
+        "provider-free GEPA v0.1.4 structural semantics, including parallel proposal selection",
       "wrong GEPA contract scope"
     )
 
@@ -412,10 +419,10 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
         "project_metadata_version",
         "source_materialization"
       ]) == %{
-        "version" => "0.1.1",
-        "tag" => "v0.1.1",
+        "version" => "0.1.4",
+        "tag" => "v0.1.4",
         "commit" => @gepa_contract_commit,
-        "project_metadata_version" => "0.1.0",
+        "project_metadata_version" => "0.1.3",
         "source_materialization" => "exact pinned git checkout"
       } and not Map.has_key?(gepa, "checkout") and
         source_map(gepa["sources"]) == @gepa_contract_sources,
@@ -428,10 +435,10 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
         "full_optimizer_parity" => false,
         "optimizer_effectiveness" => false,
         "paper_reproduction" => false,
-        "required_cases" => 14,
-        "required_passing" => 14,
+        "required_cases" => 15,
+        "required_passing" => 15,
         "structural_contract_complete" => true,
-        "total_cases" => 14
+        "total_cases" => 15
       },
       "wrong GEPA contract summary"
     )

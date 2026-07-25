@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
   @moduledoc """
-  Run provider-free structural contracts against pinned GEPA v0.1.1.
+  Run provider-free structural contracts against pinned GEPA v0.1.4.
 
   This is T1 control-flow evidence only. It does not reproduce the GEPA paper,
   establish optimizer effectiveness, or prove full optimizer parity.
@@ -17,12 +17,13 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
     Frontier,
     Merge,
     Pareto,
+    ProposalSelection,
     Result,
     Stopper
   }
 
-  @shortdoc "Run matched Imp/GEPA v0.1.1 structural contracts"
-  @default_out "tmp/gepa-v011-contract"
+  @shortdoc "Run matched Imp/GEPA v0.1.4 structural contracts"
+  @default_out "tmp/gepa-v014-contract"
 
   defmodule ContractAdapter do
     @moduledoc false
@@ -93,8 +94,9 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
     artifact =
       Map.merge(comparison, %{
         "schema_version" => 1,
-        "evidence_tier" => "t1_gepa_v011_structural_differential_contract",
-        "claim_scope" => "provider-free GEPA v0.1.1 structural semantics",
+        "evidence_tier" => "t1_gepa_v014_structural_differential_contract",
+        "claim_scope" =>
+          "provider-free GEPA v0.1.4 structural semantics, including parallel proposal selection",
         "generated_at" =>
           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
         "git_sha" => git_sha(),
@@ -102,13 +104,13 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
       })
 
     path =
-      Path.join(out_dir, "gepa-v011-contract-#{timestamp_slug()}.json")
+      Path.join(out_dir, "gepa-v014-contract-#{timestamp_slug()}.json")
       |> ArtifactFile.write_json!(artifact)
 
-    Mix.shell().info("GEPA v0.1.1 T1 structural contract: #{path}")
+    Mix.shell().info("GEPA v0.1.4 T1 structural contract: #{path}")
 
     unless artifact["summary"]["structural_contract_complete"] do
-      Mix.raise("GEPA v0.1.1 T1 structural contract failed; inspect #{path}")
+      Mix.raise("GEPA v0.1.4 T1 structural contract failed; inspect #{path}")
     end
   end
 
@@ -136,6 +138,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
 
   defp contract_rows(upstream) do
     acceptance_rows(upstream["acceptance"]) ++
+      [proposal_selection_row(upstream["proposal_selection"])] ++
       [pareto_row(upstream["pareto_selection"])] ++
       [component_rotation_row(upstream["component_rotation"])] ++
       merge_rows(upstream["merge"]) ++
@@ -147,7 +150,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
 
   defp acceptance_rows(upstream) do
     mutation_actual =
-      Enum.map(upstream["mutation"], fn fixture ->
+      Enum.map(upstream["strict_improvement"], fn fixture ->
         before = result(fixture["before"])
         after_result = result(fixture["after"])
 
@@ -159,21 +162,58 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
       end)
 
     merge_actual =
-      Enum.map(upstream["merge"], fn fixture ->
-        before = fixture["parent_scores"] |> Enum.max() |> result()
+      Enum.map(upstream["improvement_or_equal"], fn fixture ->
+        before = result(fixture["before"])
         after_result = result(fixture["after"])
 
         Map.put(
-          Map.take(fixture, ["parent_scores", "after"]),
+          Map.take(fixture, ["before", "after"]),
           "accepted",
           Acceptance.accept?(:equal_or_better, before, after_result)
         )
       end)
 
     [
-      row("strict_mutation_acceptance", upstream["mutation"], mutation_actual),
-      row("equal_or_better_merge_acceptance", upstream["merge"], merge_actual)
+      row("strict_mutation_acceptance", upstream["strict_improvement"], mutation_actual),
+      row(
+        "equal_or_better_merge_acceptance",
+        upstream["improvement_or_equal"],
+        merge_actual
+      )
     ]
+  end
+
+  defp proposal_selection_row(upstream) do
+    proposals =
+      Enum.map(upstream["proposals"], fn fixture ->
+        %{
+          slot: fixture["id"],
+          margin: Enum.sum(fixture["after"]) - Enum.sum(fixture["before"])
+        }
+      end)
+
+    verdicts =
+      Map.new(upstream["proposals"], fn fixture ->
+        before = result(fixture["before"])
+        after_result = result(fixture["after"])
+        {fixture["id"], Acceptance.decide(:strict_improvement, before, after_result)}
+      end)
+
+    selected = fn strategy ->
+      strategy
+      |> ProposalSelection.select(proposals, %{}, verdicts)
+      |> Enum.map(& &1.slot)
+    end
+
+    expected = Map.take(upstream, ["all_improvements", "best_improvement", "top_k_2"])
+
+    actual = %{
+      "all_improvements" => selected.(:all_improvements),
+      "best_improvement" => selected.(:best_improvement),
+      "top_k_2" => selected.({:top_k, 2})
+    }
+
+    row("parallel_proposal_selection", expected, actual)
   end
 
   defp pareto_row(upstream) do
@@ -442,6 +482,9 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
     row("named_program_mutation", expected, actual)
   end
 
+  defp result(scores) when is_list(scores),
+    do: Result.new(List.duplicate(nil, length(scores)), scores)
+
   defp result(score), do: Result.new([nil], [score])
 
   defp merge_fixture do
@@ -560,8 +603,8 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
       },
       %{
         "id" => "release_metadata_version",
-        "gepa" => "tag v0.1.1 retains project version 0.1.0 in pyproject.toml",
-        "imp" => "contract identifies the release as 0.1.1",
+        "gepa" => "tag v0.1.4 retains project version 0.1.3 in pyproject.toml",
+        "imp" => "contract identifies the release as 0.1.4",
         "consequence" =>
           "tag, commit, project metadata value, and source hashes are pinned independently"
       }
@@ -569,23 +612,23 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
   end
 
   defp run_gepa!(python, gepa_root, out_dir) do
-    path = Path.join(out_dir, "gepa-v011-upstream-#{timestamp_slug()}.json")
+    path = Path.join(out_dir, "gepa-v014-upstream-#{timestamp_slug()}.json")
 
     case System.cmd(
            python,
-           ["scripts/gepa_v011_contract.py", "--gepa-root", gepa_root, "--out", path],
+           ["scripts/gepa_v014_contract.py", "--gepa-root", gepa_root, "--out", path],
            stderr_to_stdout: true
          ) do
       {_output, 0} ->
         path |> File.read!() |> Jason.decode!()
 
       {output, status} ->
-        Mix.raise("GEPA v0.1.1 contract failed with status #{status}:\n#{output}")
+        Mix.raise("GEPA v0.1.4 contract failed with status #{status}:\n#{output}")
     end
   end
 
   defp current_gepa_python do
-    System.get_env("IMP_GEPA_V011_PYTHON") || System.get_env("IMP_GEPA_PYTHON") ||
+    System.get_env("IMP_GEPA_V014_PYTHON") || System.get_env("IMP_GEPA_PYTHON") ||
       "python3"
   end
 
@@ -608,8 +651,8 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaContract do
   end
 
   defp current_gepa_root do
-    System.get_env("IMP_GEPA_V011_ROOT") || System.get_env("IMP_GEPA_ROOT") ||
-      "tmp/gepa-v0.1.1"
+    System.get_env("IMP_GEPA_V014_ROOT") || System.get_env("IMP_GEPA_ROOT") ||
+      "tmp/gepa-v0.1.4"
   end
 
   defp git_sha do

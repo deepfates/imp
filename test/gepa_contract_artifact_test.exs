@@ -7,27 +7,33 @@ defmodule GEPAContractArtifactTest do
 
   @gepa_sources %{
     "src/gepa/core/engine.py" =>
-      "92627720354261b9eb5359337b9b237a2a29ebf179b22a4b724b737bde81a088",
+      "ba361b477de74c20eb813b277b0fb85b6898ca534e09c8e878604fb1c8980c53",
     "src/gepa/core/result.py" =>
       "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85",
     "src/gepa/core/state.py" =>
-      "08108908eb922808c2ad134c9717d32b107581a5766e6b99199c248d538999e5",
+      "9ad128c981c7344ba0e89d053c2fe33e98a2d74d830679d620cb7cd0d7b1820c",
     "src/gepa/gepa_utils.py" =>
       "60aca7024e31a3e273a01187a6329f381f297a77ec7b6add4b9c90b4d64e9b6c",
+    "src/gepa/proposer/base.py" =>
+      "75242e6c71758444d97949fb5c38ff84cd52f2f77f5464c894f6229c9beb210c",
     "src/gepa/proposer/merge.py" =>
       "cd0a3254927e399d0cae4a212076f7577161027b3c4ff19d03c3d2150408ee5a",
+    "src/gepa/strategies/acceptance.py" =>
+      "a6234c188fdeab0f7181dd1f01d767fc91779512773ed4ad952df68855c1d3a4",
     "src/gepa/strategies/component_selector.py" =>
       "248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568",
+    "src/gepa/strategies/proposal_selection.py" =>
+      "8866ac697928ab0824653117876e08af7087d4cbfe24a4feaedb8ceef9b75b18",
     "src/gepa/utils/stop_condition.py" =>
-      "3f18fa989a376711dc198d60963dc9b866da6d5a81f5c5339e242b3301764a0c"
+      "d33475e411a38353f34272b12b0b2a7af24bbbeca2c2e4fe6c204fa476e87fdb"
   }
 
-  test "compare matches all provider-free GEPA v0.1.1 structural cases without T3 claims" do
+  test "compare matches current GEPA v0.1.4 acceptance and proposal-selection semantics without effectiveness claims" do
     artifact = GepaContract.compare(upstream_fixture())
 
     assert artifact["summary"]["structural_contract_complete"]
-    assert artifact["summary"]["required_cases"] == 14
-    assert artifact["summary"]["required_passing"] == 14
+    assert artifact["summary"]["required_cases"] == 15
+    assert artifact["summary"]["required_passing"] == 15
     refute artifact["summary"]["paper_reproduction"]
     refute artifact["summary"]["optimizer_effectiveness"]
     refute artifact["summary"]["full_optimizer_parity"]
@@ -41,22 +47,26 @@ defmodule GEPAContractArtifactTest do
     assert rows["common_ancestor_merge_overlap_gate"]["actual"]
     assert rows["json_result_resume_and_rng"]["actual"]["live_rng_state_preserved"]
     assert rows["named_program_mutation"]["actual"]["after"]["writer"] == "concise writer"
+    assert rows["parallel_proposal_selection"]["status"] == "matched"
+    assert rows["parallel_proposal_selection"]["actual"]["best_improvement"] == [3]
+    assert rows["parallel_proposal_selection"]["actual"]["top_k_2"] == [3, 4]
     assert length(artifact["declared_native_deviations"]) == 3
 
     admitted =
       Map.merge(artifact, %{
         "schema_version" => 1,
-        "evidence_tier" => "t1_gepa_v011_structural_differential_contract",
-        "claim_scope" => "provider-free GEPA v0.1.1 structural semantics",
-        "generated_at" => "2026-07-24T00:00:00Z",
+        "evidence_tier" => "t1_gepa_v014_structural_differential_contract",
+        "claim_scope" =>
+          "provider-free GEPA v0.1.4 structural semantics, including parallel proposal selection",
+        "generated_at" => "2026-07-25T00:00:00Z",
         "git_sha" => String.duplicate("a", 40),
         "gepa" => %{
-          "version" => "0.1.1",
-          "tag" => "v0.1.1",
-          "commit" => "b4dbb55b7601dac448cdb836d5a401ca7d9eb920",
-          "project_metadata_version" => "0.1.0",
+          "version" => "0.1.4",
+          "tag" => "v0.1.4",
+          "commit" => "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+          "project_metadata_version" => "0.1.3",
           "project_metadata_version_note" =>
-            "the v0.1.1 tag retains version=0.1.0 in pyproject.toml",
+            "the v0.1.4 tag retains version=0.1.3 in pyproject.toml",
           "source_materialization" => "exact pinned git checkout",
           "sources" =>
             Enum.map(@gepa_sources, fn {path, sha256} -> %{"path" => path, "sha256" => sha256} end)
@@ -76,9 +86,9 @@ defmodule GEPAContractArtifactTest do
     end
   end
 
-  test "Mix task rejects a checkout that does not satisfy the commit, tag, and source pins" do
+  test "Mix task rejects a checkout that does not satisfy the current commit, tag, and source pins" do
     root = tmp_dir("wrong-gepa-checkout")
-    File.write!(Path.join(root, "pyproject.toml"), "[project]\nversion=\"0.1.0\"\n")
+    File.write!(Path.join(root, "pyproject.toml"), "[project]\nversion=\"0.1.3\"\n")
     {_output, 0} = System.cmd("git", ["init", "--quiet"], cd: root, stderr_to_stdout: true)
     {_output, 0} = System.cmd("git", ["add", "pyproject.toml"], cd: root, stderr_to_stdout: true)
 
@@ -99,8 +109,6 @@ defmodule GEPAContractArtifactTest do
         stderr_to_stdout: true
       )
 
-    out = tmp_dir("wrong-gepa-output")
-
     python =
       System.find_executable("python3") || flunk("python3 is required for the pin-failure test")
 
@@ -115,28 +123,42 @@ defmodule GEPAContractArtifactTest do
             "--gepa-root",
             root,
             "--out",
-            out
+            tmp_dir("wrong-gepa-output")
           ])
         end)
       end
 
     assert error.message =~ "pinned GEPA validation failed"
-    assert error.message =~ "commit: expected b4dbb55b7601dac448cdb836d5a401ca7d9eb920"
+    assert error.message =~ "commit: expected 8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
   end
 
   defp upstream_fixture do
     %{
       "acceptance" => %{
-        "mutation" => [
-          %{"before" => 1.0, "after" => 1.1, "accepted" => true},
-          %{"before" => 1.0, "after" => 1.0, "accepted" => false},
-          %{"before" => 1.0, "after" => 0.9, "accepted" => false}
+        "strict_improvement" => [
+          %{"before" => [0.5, 0.3], "after" => [0.6, 0.4], "accepted" => true},
+          %{"before" => [0.5, 0.3], "after" => [0.5, 0.3], "accepted" => false},
+          %{"before" => [0.5, 0.3], "after" => [0.4, 0.2], "accepted" => false},
+          %{"before" => [], "after" => [], "accepted" => false}
         ],
-        "merge" => [
-          %{"parent_scores" => [1.0, 0.5], "after" => 1.1, "accepted" => true},
-          %{"parent_scores" => [1.0, 0.5], "after" => 1.0, "accepted" => true},
-          %{"parent_scores" => [1.0, 0.5], "after" => 0.9, "accepted" => false}
+        "improvement_or_equal" => [
+          %{"before" => [0.5, 0.3], "after" => [0.6, 0.4], "accepted" => true},
+          %{"before" => [0.5, 0.3], "after" => [0.5, 0.3], "accepted" => true},
+          %{"before" => [0.5, 0.3], "after" => [0.4, 0.2], "accepted" => false},
+          %{"before" => [], "after" => [], "accepted" => true}
         ]
+      },
+      "proposal_selection" => %{
+        "proposals" => [
+          %{"id" => 0, "before" => [0.5], "after" => [0.8]},
+          %{"id" => 1, "before" => [0.5], "after" => [0.3]},
+          %{"id" => 2, "before" => [0.5], "after" => [0.6]},
+          %{"id" => 3, "before" => [0.5], "after" => [0.9]},
+          %{"id" => 4, "before" => [0.5], "after" => [0.9]}
+        ],
+        "all_improvements" => [0, 2, 3, 4],
+        "best_improvement" => [3],
+        "top_k_2" => [3, 4]
       },
       "pareto_selection" => %{
         "mapping" => %{"x" => [0], "y" => [0], "z" => [1]},
