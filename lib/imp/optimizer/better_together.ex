@@ -8,6 +8,13 @@ defmodule Imp.Optimizer.BetterTogether do
   earlier candidates winning ties; without validation it returns the latest
   successful candidate. Compilation stops at the first failed step.
 
+  When `valset_ratio` is positive and no validation set is supplied, Imp keeps
+  at least one row for validation whenever the trainset has two or more rows.
+  This avoids silently changing the default into no-validation/latest-prefix
+  selection on small datasets. A one-row trainset cannot be split while
+  retaining training data, so it remains entirely available for training and
+  uses no automatic validation row.
+
   Training steps contribute a candidate only after returning a completed,
   rebound `Imp.Optimizer.TrainingResult`. `Imp.Clients.TrainingJob` results are
   polled to a terminal state under a bounded timeout and pending jobs receive a
@@ -221,12 +228,18 @@ defmodule Imp.Optimizer.BetterTogether do
         {trainset, nil}
 
       nil ->
-        Enum.split(trainset, floor(ratio * length(trainset)))
+        Enum.split(trainset, automatic_validation_size(length(trainset), ratio))
         |> then(fn {validation, training} -> {training, validation} end)
 
       provided ->
         {trainset, enumerable_to_list!(provided, "valset")}
     end
+  end
+
+  defp automatic_validation_size(trainset_size, _ratio) when trainset_size < 2, do: 0
+
+  defp automatic_validation_size(trainset_size, ratio) do
+    max(floor(ratio * trainset_size), 1)
   end
 
   defp enumerable_to_list!(value, name) do

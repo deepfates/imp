@@ -20,6 +20,14 @@ stable earlier-candidate tie selection with validation, and latest-successful-pr
 without validation. Shuffling is disabled in this fixture, so exact Python shuffle order is
 explicitly excluded.
 
+DSPy 3.2.1 computes an automatic holdout with `int(valset_ratio * len(trainset))`.
+Independent execution of the pinned runtime confirms that its default ratio therefore produces
+an empty validation set for one through nine rows and falls into latest-prefix selection. Imp
+treats that truncation as incidental: with two or more rows and a positive ratio it keeps at
+least one validation row, while retaining a lone row for training when no split is possible.
+This BEAM-native correction has direct consumer coverage; it is outside the admitted shared C1
+observations and is not evidence of BetterTogether effectiveness.
+
 Imp's aggregate launch/cancellation deadlines for BootstrapFinetune and bounded asynchronous
 training lifecycle for BetterTogether are recorded as BEAM-native extensions. They are not
 represented as upstream matches.

@@ -272,6 +272,15 @@ defmodule BetterTogetherTest do
     end
   end
 
+  defmodule ModelAwareLM do
+    defstruct [:model]
+
+    def generate(%__MODULE__{model: model}, _messages, _opts) do
+      answer = if model == "trained-model", do: "trained", else: "base"
+      {:ok, %{answer: answer}}
+    end
+  end
+
   defmodule SlowTrainingTransport do
     def request(:get, _url, _headers, _body, _opts) do
       if owner = Process.whereis(BetterTogetherTest.SlowTransportOwner) do
@@ -505,6 +514,48 @@ defmodule BetterTogetherTest do
     assert report.metadata.trainset_size == 3
     assert report.metadata.validation_size == 1
     assert Enum.all?(report.candidates, &(&1.evaluation.validation_size == 1))
+  end
+
+  test "the public facade keeps a real validation row for a small default split" do
+    trainset = examples()
+
+    original =
+      program()
+      |> Imp.Optimizer.InstructionSearch.put_instruction("Answer every question.")
+
+    optimizer =
+      BetterTogether.new(metric(), %{
+        p: %SetInstruction{instruction: "Answer neither question."}
+      })
+
+    compiled = Imp.optimize!(original, optimizer, trainset)
+    report = Imp.Optimizer.Report.fetch(compiled)
+
+    assert report.metadata.trainset_size == 1
+    assert report.metadata.validation_size == 1
+    assert report.metadata.selected_strategy == ""
+    assert report.best_score == 1.0
+
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) ==
+             "Answer every question."
+  end
+
+  test "a single training row remains usable when an automatic split is impossible" do
+    trainset = [hd(examples())]
+
+    compiled =
+      metric()
+      |> BetterTogether.new(%{capture: %CaptureSets{owner: self()}})
+      |> BetterTogether.compile(program(), trainset, nil,
+        strategy: :capture,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_receive {:prepared_sets, 1, 0}
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.metadata.trainset_size == 1
+    assert report.metadata.validation_size == 0
+    assert report.metadata.selected_strategy == "capture"
   end
 
   test "preserves an explicitly empty validation split instead of carving a holdout" do
@@ -1255,6 +1306,57 @@ defmodule BetterTogetherTest do
     assert Enum.any?(report.candidates, fn candidate ->
              get_in(candidate, [:compile_metadata, :training_status]) == :completed
            end)
+  end
+
+  test "public optimize runs and selects an executable local weight step" do
+    student = Imp.predict("question -> answer", lm: %ModelAwareLM{model: "base-model"})
+    teacher = Imp.predict("question -> answer", lm: %ModelAwareLM{model: "trained-model"})
+
+    trainset = [example("training row", "trained")]
+    selection = [example("selection row", "trained")]
+    held_out = example("held-out row", "trained")
+
+    trainer = fn %ModelAwareLM{model: "base-model"}, [row], _opts ->
+      send(self(), {:local_weight_training, Imp.Example.get(row, :answer)})
+
+      {:ok,
+       Imp.Clients.TrainingJob.new(%{
+         id: "local-better-together-sft",
+         provider: :test,
+         model: "base-model",
+         status: :succeeded,
+         result_model: "trained-model"
+       })}
+    end
+
+    optimizer =
+      BetterTogether.new(metric(), %{
+        w: Imp.Optimizer.BootstrapFinetune.new(metric(), trainer: trainer)
+      })
+
+    compiled =
+      Imp.optimize!(student, optimizer, trainset, selection,
+        strategy: :w,
+        teacher: teacher,
+        shuffle_trainset_between_steps: false
+      )
+
+    assert_received {:local_weight_training, "trained"}
+    assert %ModelAwareLM{model: "trained-model"} = Imp.ProgramAccess.lm(compiled)
+    assert {:ok, prediction} = Imp.call(compiled, %{question: "held-out row"})
+    assert Imp.Prediction.get(prediction, :answer) == "trained"
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.metadata.selected_strategy == "w"
+    assert report.metadata.baseline_score == 0.0
+    assert report.best_score == 1.0
+
+    assert Enum.any?(report.candidates, fn candidate ->
+             candidate.strategy == "w" and
+               get_in(candidate, [:compile_metadata, :training_status]) == :completed
+           end)
+
+    assert Imp.Example.get(held_out, :answer) == "trained"
   end
 
   test "awaits an asynchronous weight job, rebinds, and continues the strategy" do

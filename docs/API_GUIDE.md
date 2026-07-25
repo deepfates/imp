@@ -825,6 +825,12 @@ the latest successful prefix. A typed asynchronous `TrainingJob` is polled
 under the configured deadline, rebound only after terminal success, and given a
 bounded cancellation attempt after timeout or refresh failure.
 
+When no validation set is supplied, the positive `valset_ratio` default keeps
+at least one validation row from trainsets of two or more examples. This makes
+small-dataset prefix selection real instead of silently becoming the
+no-validation/latest-prefix path. A single example remains a training row; pass
+an explicit validation set when selection is required at that size.
+
 Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
 and GEPA-style artifact optimization, use the same explicit LM shapes as
 programs. `proposer_lm:`, `prompt_lm:`, and `reflection_lm:` reject malformed
