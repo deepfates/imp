@@ -219,4 +219,64 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
     assert get_in(artifact, ["summary", "stopped_provider_context", "output_tokens"]) == 256
     assert get_in(artifact, ["summary", "stopped_provider_context", "finish_reason"]) == "length"
   end
+
+  test "v3 preregistration preserves the benchmark and selects only the format-qualified route" do
+    manifest =
+      "benchmarks/config/support-ticket-lift-openrouter-free-v3.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    design = manifest["frozen_design"]
+
+    assert manifest["status"] == "preregistered_not_run"
+    assert manifest["authorization"] == "not_launched"
+
+    assert Enum.all?(
+             manifest["closed_predecessors"],
+             &(&1["disposition"] == "permanently_closed_stopped_incomplete")
+           )
+
+    canary_path = get_in(manifest, ["format_qualification", "artifact"])
+
+    canary_sha =
+      canary_path
+      |> File.read!()
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    assert canary_sha == get_in(manifest, ["format_qualification", "sha256"])
+
+    assert get_in(manifest, ["format_qualification", "selected_candidate"]) ==
+             "google/gemma-4-26b-a4b-it:free"
+
+    assert design["seeds"] == [17, 23, 31]
+    assert Enum.map(design["arms"], & &1["id"]) == ["baseline", "labeled_few_shot"]
+
+    assert get_in(design, ["arms", Access.at(1), "options"]) == %{
+             "k" => 8,
+             "sample" => true,
+             "seed" => "campaign_seed"
+           }
+
+    assert get_in(design, ["dataset", "untouched_test_indices"]) ==
+             [0, 1, 5, 6, 10, 11, 15, 16]
+
+    assert get_in(design, ["model", "requested"]) == "google/gemma-4-26b-a4b-it:free"
+    assert get_in(design, ["execution", "logical_request_limit"]) == 48
+    assert get_in(design, ["execution", "transport_attempt_limit"]) == 48
+    assert get_in(design, ["execution", "max_concurrency"]) == 1
+    assert get_in(design, ["execution", "json_retries"]) == 0
+    assert get_in(design, ["execution", "transport_retries"]) == 0
+    assert get_in(design, ["execution", "max_output_tokens"]) == 128
+
+    assert get_in(design, ["response_format", "type"]) == "json_schema"
+    assert get_in(design, ["response_format", "json_schema", "strict"])
+
+    schema = get_in(design, ["response_format", "json_schema", "schema"])
+    assert schema["required"] == ["team"]
+    assert schema["additionalProperties"] == false
+
+    assert get_in(schema, ["properties", "team", "enum"]) ==
+             ["atlas", "harbor", "beacon", "quill"]
+  end
 end
