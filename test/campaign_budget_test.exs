@@ -1,5 +1,5 @@
 defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Imp.BenchmarkTruth.{BudgetedLM, CampaignBudget}
 
@@ -294,5 +294,56 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
     assert_in_delta resumed_snapshot["usage"]["usd"],
                     checkpoint["usage"]["usd"] + checkpoint["reserved"]["usd"],
                     1.0e-12
+  end
+
+  test "ReqLLM transport guard defeats the dependency retry reset and counts one attempt" do
+    parent = self()
+
+    base_url =
+      Imp.Test.LocalHTTP.start(fn _request ->
+        send(parent, :http_attempt)
+        {429, [{"retry-after", "0"}], %{error: %{message: "rate limited"}}}
+      end)
+
+    model = %{
+      provider: :openrouter,
+      id: "openai/gpt-oss-20b:free",
+      base_url: base_url
+    }
+
+    {:ok, prepared} =
+      ReqLLM.Providers.OpenRouter.prepare_request(
+        :chat,
+        model,
+        "one local request",
+        api_key: "local-test-key",
+        max_retries: 0
+      )
+
+    # Pinned ReqLLM currently overwrites the caller's zero with its default.
+    assert prepared.options.max_retries == 3
+
+    {:ok, budget} =
+      CampaignBudget.start_link(
+        limits: %{requests: 1, input_tokens: 10_000, output_tokens: 32, usd: 0.0},
+        pricing: %{"input_per_million" => 0.0, "output_per_million" => 0.0},
+        default_max_output_tokens: 32
+      )
+
+    lm =
+      %BudgetedLM{
+        inner: Imp.req_llm(model, api_key: "local-test-key"),
+        budget: budget,
+        max_output_tokens: 32
+      }
+
+    assert {:error, _reason} = Imp.LM.generate(lm, [%{role: :user, content: "hello"}], [])
+    assert_received :http_attempt
+    refute_received :http_attempt
+
+    snapshot = CampaignBudget.snapshot(budget)
+    assert snapshot["requests"] == 1
+    assert snapshot["transport_attempts"] == 1
+    assert snapshot["single_attempt_transport_enforced"]
   end
 end

@@ -15,6 +15,10 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
 
   def release(server, reservation), do: GenServer.call(server, {:release, reservation})
   def record_usage(server, usage), do: GenServer.call(server, {:usage, usage})
+
+  def authorize_transport_attempt(server),
+    do: GenServer.call(server, :authorize_transport_attempt)
+
   def snapshot(server), do: GenServer.call(server, :snapshot)
 
   @doc false
@@ -106,6 +110,8 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
       pricing: validate_pricing!(pricing),
       default_max_output_tokens: default_max_output_tokens,
       requests: initial_requests!(initial),
+      transport_attempts: initial_transport_attempts!(initial),
+      single_attempt_transport_enforced: initial_transport_guard!(initial),
       usage: initial_usage!(initial) |> reconcile_reservations(reservations),
       reservations: %{},
       exhausted: nil,
@@ -154,6 +160,21 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
     {:reply, :ok, notify_change(%{state | exhausted: exhausted})}
   end
 
+  def handle_call(:authorize_transport_attempt, _from, state) do
+    if state.transport_attempts < state.limits.requests do
+      state = %{
+        state
+        | transport_attempts: state.transport_attempts + 1,
+          single_attempt_transport_enforced: true
+      }
+
+      {:reply, :ok, notify_change(state)}
+    else
+      state = %{state | exhausted: :requests}
+      {:reply, {:error, :requests}, notify_change(state)}
+    end
+  end
+
   def handle_call(:snapshot, _from, state) do
     reserved = reserved_totals(state.reservations)
 
@@ -162,6 +183,8 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
       "limits" => stringify_limits(state.limits),
       "pricing" => state.pricing,
       "requests" => state.requests,
+      "transport_attempts" => state.transport_attempts,
+      "single_attempt_transport_enforced" => state.single_attempt_transport_enforced,
       "usage" => state.usage,
       "reserved" => reserved,
       "active_reservations" => map_size(state.reservations),
@@ -359,6 +382,33 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
   defp initial_requests!(other),
     do: raise(ArgumentError, "initial campaign budget must be a map, got: #{inspect(other)}")
 
+  defp initial_transport_attempts!(initial) when is_map(initial) do
+    attempts =
+      Map.get(
+        initial,
+        "transport_attempts",
+        Map.get(initial, :transport_attempts, initial_requests!(initial))
+      )
+
+    if is_integer(attempts) and attempts >= 0,
+      do: attempts,
+      else: raise(ArgumentError, "initial transport attempts must be a non-negative integer")
+  end
+
+  defp initial_transport_attempts!(other),
+    do: raise(ArgumentError, "initial campaign budget must be a map, got: #{inspect(other)}")
+
+  defp initial_transport_guard!(initial) when is_map(initial) do
+    Map.get(
+      initial,
+      "single_attempt_transport_enforced",
+      Map.get(initial, :single_attempt_transport_enforced, false)
+    ) == true
+  end
+
+  defp initial_transport_guard!(other),
+    do: raise(ArgumentError, "initial campaign budget must be a map, got: #{inspect(other)}")
+
   defp initial_usage!(initial) do
     initial
     |> Map.get("usage", Map.get(initial, :usage, empty_usage()))
@@ -400,6 +450,8 @@ defmodule Imp.BenchmarkTruth.CampaignBudget do
       "limits" => stringify_limits(state.limits),
       "pricing" => state.pricing,
       "requests" => state.requests,
+      "transport_attempts" => state.transport_attempts,
+      "single_attempt_transport_enforced" => state.single_attempt_transport_enforced,
       "usage" => state.usage,
       "reserved" => reserved,
       "active_reservations" => map_size(state.reservations),
@@ -424,7 +476,9 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
          {:ok, reservation} <-
            Imp.BenchmarkTruth.CampaignBudget.reserve(lm.budget, messages, bounded_opts) do
       try do
-        Imp.LM.generate(sanitize_inner(lm.inner), messages, bounded_opts)
+        inner = sanitize_inner(lm.inner)
+        guarded_opts = install_transport_guard(inner, bounded_opts, lm.budget)
+        Imp.LM.generate(inner, messages, guarded_opts)
       after
         Imp.BenchmarkTruth.CampaignBudget.release(lm.budget, reservation)
       end
@@ -492,6 +546,57 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
   end
 
   defp sanitize_inner(inner), do: inner
+
+  defp install_transport_guard(%Imp.Clients.ReqLLM{}, opts, budget) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+
+    unless Keyword.keyword?(http_opts) do
+      raise ArgumentError, "campaign LM :req_http_options must be a keyword list"
+    end
+
+    plugins = Keyword.get(http_opts, :plugins, [])
+
+    unless is_list(plugins) do
+      raise ArgumentError, "campaign LM Req :plugins must be a list"
+    end
+
+    guard = fn request ->
+      Req.Request.append_request_steps(request,
+        imp_campaign_single_attempt_transport:
+          {__MODULE__, :enforce_single_transport_attempt, [budget]}
+      )
+    end
+
+    guarded_http_opts = Keyword.put(http_opts, :plugins, plugins ++ [guard])
+    Keyword.put(opts, :req_http_options, guarded_http_opts)
+  end
+
+  defp install_transport_guard(_inner, opts, _budget), do: opts
+
+  @doc false
+  def enforce_single_transport_attempt(%Req.Request{} = request, budget) do
+    adapter = request.adapter
+
+    guarded_adapter = fn guarded_request ->
+      case Imp.BenchmarkTruth.CampaignBudget.authorize_transport_attempt(budget) do
+        :ok ->
+          run_adapter(adapter, guarded_request)
+
+        {:error, :requests} ->
+          {guarded_request, RuntimeError.exception("campaign transport-attempt budget exhausted")}
+      end
+    end
+
+    request
+    |> Req.Request.merge_options(retry: false, max_retries: 0)
+    |> Map.put(:adapter, guarded_adapter)
+  end
+
+  defp run_adapter(adapter, request) when is_function(adapter, 1), do: adapter.(request)
+
+  defp run_adapter({module, function, args}, request)
+       when is_atom(module) and is_atom(function) and is_list(args),
+       do: apply(module, function, [request | args])
 
   defp scrub_transport_controls(opts) do
     opts
