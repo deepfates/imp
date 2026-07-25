@@ -241,7 +241,7 @@ defmodule OptimizerReportTest do
              )
   end
 
-  test "InferRules preserves upstream name while using signature optimization" do
+  test "InferRules retains deterministic pre-induced rules for replay" do
     {_train, dev} = sets()
     metric = Imp.Metrics.exact_match(:answer)
     program = Imp.predict("question -> answer", lm: lm())
@@ -254,8 +254,81 @@ defmodule OptimizerReportTest do
     report = Imp.Optimizer.Report.fetch(compiled)
 
     assert report.optimizer == :infer_rules
-    assert report.metadata.implementation == Imp.Optimizer.SignatureOptimizer
-    assert report.metadata.adapter == Imp.Optimizer.InferRules
+    assert report.metadata.implementation == :native_rule_induction
+    assert report.metadata.explicit_candidates
+    assert report.metadata.proposal_calls == 0
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) =~ "Always answer Paris."
+  end
+
+  test "InferRules induces rules from observed values and selects them on validation data" do
+    parent = self()
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "Map France questions to Paris",
+            do: %{answer: "Paris"},
+            else: %{answer: "unknown"}
+        end
+      )
+
+    rule_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(parent, {:infer_rules_prompt, messages, opts})
+
+          %{
+            reasoning: "The examples reveal a country-to-capital mapping.",
+            natural_language_rules: "Map France questions to Paris."
+          }
+        end
+      )
+
+    train = [
+      Imp.example(question: "France capital?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+
+    dev = [
+      Imp.example(question: "Which city is France's capital?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+
+    metric = Imp.Metrics.exact_match(:answer)
+    program = Imp.predict("question -> answer", lm: task_lm)
+
+    compiled =
+      metric
+      |> Imp.Optimizer.InferRules.new(
+        rule_lm: rule_lm,
+        num_candidates: 2,
+        num_rules: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0
+      )
+      |> Imp.Optimizer.InferRules.compile(program, train, dev)
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+
+    assert report.optimizer == :infer_rules
+    assert report.best_score == 1.0
+    assert report.metadata.proposal_calls == 2
+    assert report.metadata.baseline_protected
+    assert report.metadata.trainset_size == 1
+    assert report.metadata.validation_size == 1
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) =~ "Map France"
+
+    prompts =
+      for _ <- 1..2 do
+        assert_receive {:infer_rules_prompt, messages, opts}
+        assert opts[:temperature] == 1.0
+        Enum.map_join(messages, "\n", & &1.content)
+      end
+
+    assert Enum.all?(prompts, &(&1 =~ "question: France capital?"))
+    assert Enum.all?(prompts, &(&1 =~ "answer: Paris"))
   end
 
   test "labeled few-shot reports selected demonstrations without scoring them" do

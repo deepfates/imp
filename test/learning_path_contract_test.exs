@@ -28,13 +28,14 @@ defmodule LearningPathContractTest do
   # eval. If the guide changes, both pins fail loudly and must be re-pinned
   # against the new block inventory — that is the point.
   @api_guide "docs/API_GUIDE.md"
-  @api_guide_blocks 43
+  @api_guide_blocks 44
   @api_guide_skips %{
     1 => {"model = System.fetch_env!(\"OPENAI_MODEL\")", "live provider block (OPENAI_MODEL)"},
     16 => {"lm = Imp.req_llm(\"openai:gpt-5.4-mini\"", "live provider block (OPENAI_API_KEY)"},
     17 => {"def handle_event(\"ask\"", "LiveView module-context sketch, not a script"},
-    36 => {"client = Imp.MCP.HTTPClient.new(", "external MCP service sketch"},
-    42 => {"lm =", "live provider block (OPENAI_MODEL)"}
+    27 => {"rule_lm =", "live provider block (OPENAI_API_KEY)"},
+    37 => {"client = Imp.MCP.HTTPClient.new(", "external MCP service sketch"},
+    43 => {"lm =", "live provider block (OPENAI_MODEL)"}
   }
 
   test "API guide block inventory is pinned and every block parses" do

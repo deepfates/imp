@@ -661,6 +661,35 @@ Use:
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
 
+`InferRules` is rule induction, not a renamed instruction search. Give it a
+separate rule LM when you want the task program and optimizer to use different
+models:
+
+```elixir
+rule_lm =
+  Imp.req_llm("openai:" <> System.fetch_env!("OPENAI_RULE_MODEL"),
+    api_key: System.fetch_env!("OPENAI_API_KEY"),
+    temperature: 1.0
+  )
+
+infer_rules =
+  Imp.Optimizer.InferRules.new(metric,
+    rule_lm: rule_lm,
+    num_candidates: 4,
+    num_rules: 6,
+    max_bootstrapped_demos: 2
+  )
+
+compiled = Imp.optimize!(program, infer_rules, trainset, devset)
+```
+
+Each candidate sees the observed input and output values for each predictor,
+not merely the field names. The selected program carries its induced rules and
+an `:infer_rules` optimizer report. Imp also evaluates the bootstrapped baseline
+and retains it when every induced candidate regresses. For deterministic replay,
+pass already-induced rule strings with `candidates: [...]`; this bypasses rule-LM
+calls but still performs validation selection.
+
 For a manually sized MIPROv2 run, configure the canonical `Config` options and
 the runtime `startup_trials` setting explicitly:
 

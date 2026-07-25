@@ -3772,7 +3772,9 @@
       "callbacks": [],
       "category": "advanced",
       "functions": [
+        "compile/3",
         "compile/4",
+        "compile/5",
         "new/2"
       ],
       "kind": "struct",
@@ -3780,8 +3782,14 @@
       "module": "Imp.Optimizer.InferRules",
       "signatures": {
         "functions": {
+          "compile/3": [
+            "compile(optimizer, program, trainset)"
+          ],
           "compile/4": [
-            "compile(infer_rules, program, trainset, devset)"
+            "compile(optimizer, program, trainset, devset)"
+          ],
+          "compile/5": [
+            "compile(optimizer, program, trainset, devset, opts)"
           ],
           "new/2": [
             "new(metric, opts \\\\ [])"
@@ -3790,7 +3798,13 @@
       },
       "source": "lib/imp/optimizer/infer_rules.ex",
       "struct_fields": [
-        "signature_optimizer"
+        "bootstrap",
+        "candidates",
+        "metric",
+        "num_candidates",
+        "num_rules",
+        "num_threads",
+        "rule_lm"
       ],
       "types": []
     },
