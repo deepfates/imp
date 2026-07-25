@@ -486,7 +486,7 @@ Imp modules: `Imp.Optimizer.GEPA`, `Imp.Optimize.Anything`
 Semantic invariants:
 
 - the local engine and adapter contracts track pinned standalone GEPA v0.1.4 structure
-- the admitted provider-free T1 differential matches 14 structural cases against the exact historical GEPA v0.1.1 checkout and retains its RNG, resume, and release-metadata deviations
+- the admitted provider-free T1 differential matches 15 structural cases against the exact GEPA v0.1.4 checkout and retains its RNG, resume, and release-metadata deviations
 - reflective mutation uses per-example feedback and trajectories in focused local tests
 - candidate lineage, Pareto state, and source-versioned results are retained locally
 - C1 conformance does not establish matched upstream or paper-family outcomes
@@ -499,11 +499,10 @@ Executable evidence:
 - test: `test/gepa_replication_artifact_test.exs`
 - docs: `docs/ADVANCED.md`
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
-- artifact: `benchmarks/evidence/admitted/gepa_contract/2e5a81e9b6202c9f46be14467c7e0eb54c0c708e3adc712f58ee667b28163a58.json`
+- artifact: `benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json`
 
 Missing evidence or behavior:
 
-- C1 matched standalone v0.1.4 differential evidence beyond the admitted v0.1.1 historical contract
 - C2 real operational GEPA execution evidence
 - C3 multi-seed held-out effectiveness under matched controls
 - C4 full paper-family campaign evidence

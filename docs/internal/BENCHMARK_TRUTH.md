@@ -294,13 +294,15 @@ test, which supports T2 live sampled behavior but neither optimizer lift nor
 full parity.
 
 The third command runs a T1 structural differential against standalone GEPA
-`v0.1.1` at commit `b4dbb55b7601dac448cdb836d5a401ca7d9eb920`.
-Set `IMP_GEPA_V011_ROOT` to the exact checkout and, when needed,
-`IMP_GEPA_V011_PYTHON` to its Python environment. The task validates the tag,
+`v0.1.4` at commit `8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`.
+Set `IMP_GEPA_V014_ROOT` to the exact checkout and, when needed,
+`IMP_GEPA_V014_PYTHON` to its Python environment. The task validates the tag,
 commit, tagged project-version anomaly, and source hashes before comparing
-provider-free acceptance, Pareto, component rotation, merge, frontier, budget,
-JSON resume/RNG, and named-program mutation semantics. It explicitly does not
-establish paper reproduction, effectiveness, or full optimizer parity.
+provider-free acceptance, parallel proposal selection, Pareto, component
+rotation, merge, frontier, budget, JSON resume/RNG, and named-program mutation
+semantics. It explicitly does not establish paper reproduction, effectiveness,
+or full optimizer parity. The older v0.1.1 artifact remains immutable history,
+not the selected current contract.
 
 Optimizer lift is outcome evidence, not full optimizer parity. The dashboard
 keeps `full_optimizer_parity` false when the structural artifact is missing,

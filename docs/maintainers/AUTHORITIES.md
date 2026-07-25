@@ -132,10 +132,11 @@ The current standalone GEPA authority is tag `v0.1.4` at full commit
 version `0.1.3` in `pyproject.toml`; tag identity and package metadata are
 recorded separately.
 
-The existing exact executable contract remains GEPA `v0.1.1` at
-`b4dbb55b7601dac448cdb836d5a401ca7d9eb920`. That historical tag retains
-`version="0.1.0"` in `pyproject.toml`. The hashes below belong to this retained
-regression contract, not the current release surface.
+The selected exact executable contract now uses GEPA `v0.1.4`. The older
+`v0.1.1` contract at `b4dbb55b7601dac448cdb836d5a401ca7d9eb920` remains an
+immutable historical receipt. That historical tag retains `version="0.1.0"`
+in `pyproject.toml`; the hashes below describe history, not the current release
+surface.
 
 | Source | SHA-256 |
 | --- | --- |
@@ -147,9 +148,10 @@ regression contract, not the current release surface.
 | `src/gepa/strategies/component_selector.py` | `248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568` |
 | `src/gepa/utils/stop_condition.py` | `3f18fa989a376711dc198d60963dc9b866da6d5a81f5c5339e242b3301764a0c` |
 
-`mix benchmark.gepa.contract.check` executes released provider-free helpers and
-fixtures, then compares equivalent Imp pure-module behavior. Its T1 artifact
-does not satisfy GEPA paper reproduction, effectiveness, or full-parity claims.
+`mix benchmark.gepa.contract.check` executes the v0.1.4 provider-free helpers
+and fixtures, then compares equivalent Imp pure-module behavior across 15
+structural cases. Its admitted T1 artifact does not satisfy GEPA operational,
+paper-reproduction, effectiveness, or full-parity claims.
 
 The ledger pins GEPA `v0.1.4` as the current algorithm authority and `v0.1.1`
 as a historical executable contract, Ax `23.0.0` as an independent

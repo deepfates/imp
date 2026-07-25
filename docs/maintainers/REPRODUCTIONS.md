@@ -32,7 +32,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |
 | MIPROv2 | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
 | SIMBA | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
-| GEPA | replication | gepa_contract<br>gepa_live | T1 | benchmarks/evidence/admitted/gepa_contract/2e5a81e9b6202c9f46be14467c7e0eb54c0c708e3adc712f58ee667b28163a58.json |
+| GEPA | replication | gepa_contract<br>gepa_live | T1 | benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json |
 | Avatar actor | adaptation | provider_training<br>avatar_actor_differential | T1 | benchmarks/evidence/admitted/avatar_actor_differential/190b4002bcb3c96f7a0a3bcea442bb58f2999a935bb2c1b0f1e64c37911beb77.json |
 | Avatar optimizer | adaptation | provider_training<br>avatar_optimizer_differential | T1 | benchmarks/evidence/admitted/avatar_optimizer_differential/581e61073a32d8b0b6555e6d30e59038083cae6f813e28bda926ef007d144f3b.json |
 | BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training<br>bootstrap_finetune_differential | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |

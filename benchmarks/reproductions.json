@@ -1109,8 +1109,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/gepa_contract/2e5a81e9b6202c9f46be14467c7e0eb54c0c708e3adc712f58ee667b28163a58.json",
-        "artifact_sha256": "2e5a81e9b6202c9f46be14467c7e0eb54c0c708e3adc712f58ee667b28163a58",
+        "artifact": "benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json",
+        "artifact_sha256": "3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7",
         "protocol_id": "gepa_contract"
       }
     },
