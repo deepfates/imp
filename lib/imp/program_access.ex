@@ -138,6 +138,9 @@ defmodule Imp.ProgramAccess do
     }
   end
 
+  def put_demos(%Imp.Optimizer.Ensemble.Program{programs: programs} = program, demos),
+    do: %{program | programs: Enum.map(programs, &put_demos(&1, demos))}
+
   def put_demos(program, _demos) do
     raise ArgumentError,
           "Imp.with_demos/2 supports Predict and other demo-bearing Imp programs, " <>

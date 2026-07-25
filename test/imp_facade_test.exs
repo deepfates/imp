@@ -164,6 +164,37 @@ defmodule ImpFacadeTest do
     assert Imp.Tool.call(tool, %{key: "x"}) == "y"
   end
 
+  test "facade attaches demos through compiled ensembles and child wrappers" do
+    demo =
+      Imp.example(question: "demo marker", answer: "demonstrated")
+      |> Imp.with_inputs(:question)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+          %{answer: if(prompt =~ "demo marker", do: "demonstrated", else: "missing")}
+        end
+      )
+
+    child = Imp.predict("question -> answer", lm: lm)
+
+    ensemble =
+      Imp.Optimizer.Ensemble.new(deterministic: true)
+      |> Imp.Optimizer.Ensemble.compile([
+        child,
+        Imp.best_of_n(child, fn _inputs, _prediction -> 1.0 end, n: 1)
+      ])
+      |> Imp.with_demos([demo])
+
+    assert {:ok, prediction} = Imp.call(ensemble, %{question: "consumer question"})
+
+    assert prediction
+           |> Imp.get(:outputs)
+           |> Enum.map(fn {:ok, child_prediction} -> Imp.get(child_prediction, :answer) end) ==
+             ["demonstrated", "demonstrated"]
+  end
+
   test "facade builds and calls local memory retrievers" do
     retriever = Imp.memory([[text: "France has capital Paris"]], k: 1)
 
