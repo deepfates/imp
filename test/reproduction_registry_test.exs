@@ -154,7 +154,7 @@ defmodule Imp.ReproductionRegistryTest do
          "7c54695dcbbd4b6606a3da1d51afad858e663df5e2442adfef2c68f9ed724b51"},
       "better_together" =>
         {"better_together_differential",
-         "547de99c674841e587d307acd46b6e50af6b496a924e1d2d7be79d1afed5bb75"},
+         "0a41f1cfd445c75a60dc930d5242c8bd4dd708dbc2b61e6ede7a8a843a1870c9"},
       "ensemble" =>
         {"ensemble_differential",
          "3a7d990af2dd277371e33f81d53d5640dfa50beac6b843a2511cfe24ac5a61e1"}

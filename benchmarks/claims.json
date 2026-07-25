@@ -312,7 +312,7 @@
       "limitations": ["Exact Python shuffle order is excluded; generic optimizer dispatch and bounded asynchronous cleanup are Imp-native extensions."],
       "statement": "Imp has source-bound C1 evidence for the admitted BetterTogether strategy parsing, prefix enumeration, stable validation tie handling, and no-validation latest-prefix observations.",
       "category": "optimizer", "surface": ["BetterTogether"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/better_together_differential/547de99c674841e587d307acd46b6e50af6b496a924e1d2d7be79d1afed5bb75.json", "test/weight_composition_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/better_together_differential/0a41f1cfd445c75a60dc930d5242c8bd4dd708dbc2b61e6ede7a8a843a1870c9.json", "test/weight_composition_differential_test.exs"],
       "requirements": [{"id": "optimizer.better_together.semantic", "kind": "optimizer_conformance", "lane": "better_together_differential", "evidence": "full", "threshold": "the canonical BetterTogether artifact verifies the admitted observations and retained exclusions"}]
     },
     {
