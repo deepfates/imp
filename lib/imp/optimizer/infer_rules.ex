@@ -4,12 +4,20 @@ defmodule Imp.Optimizer.InferRules do
   Induces natural-language rules from observed examples and selects them on a
   validation set.
 
-  This is a native port of DSPy 3.2.1 `InferRules`: it first runs
+  This follows DSPy 3.2.1 `InferRules`' semantic loop: it first runs
   `BootstrapFewShot`, formats each predictor's observed input/output examples,
   asks a fresh rule-induction program for actionable rules, appends those rules
   to the predictor's instructions, and evaluates each candidate. Imp retains
   the bootstrapped baseline as an additional safety candidate so rule induction
   cannot silently regress the supplied program.
+
+  Candidate programs and signatures remain immutable and isolated, so a later
+  proposal cannot rewrite an already selected candidate through shared Python
+  signature-class state. Proposal and evaluation failures are retained in the
+  optimizer report instead of aborting the whole compile. Unlike upstream,
+  context-window failures are not yet retried with progressively fewer examples.
+  Those are deliberate native control-flow differences, not claims of exact
+  whole-loop equivalence.
 
   Pass `:rule_lm` (or `:prompt_lm`) to keep rule induction separate from the
   task LM. Without one, the program's bound LM is used. `:candidates` accepts
