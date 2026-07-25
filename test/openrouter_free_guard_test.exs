@@ -24,6 +24,7 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuardTest do
            req_llm: %{
              provider: "openrouter",
              model: lm.actual_model,
+             finish_reason: :stop,
              provider_meta: %{"provider" => "MockFree"},
              usage: %{
                "cost" => 0.0,
@@ -102,7 +103,20 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuardTest do
     first = Imp.BenchmarkTruth.CampaignBudget.snapshot(budget)
     assert first["requests"] == 1
     assert first["transport_attempts"] == 1
-    assert OpenRouterFreeGuard.ledger_snapshot(ledger)["halted"] != nil
+
+    ledger_snapshot = OpenRouterFreeGuard.ledger_snapshot(ledger)
+    assert ledger_snapshot["halted"] != nil
+    assert [failed_response] = ledger_snapshot["responses"]
+    assert failed_response["status"] == "failed"
+    assert failed_response["actual_model"] == "paid/model"
+    assert failed_response["upstream_provider"] == "MockFree"
+    assert failed_response["finish_reason"] == "stop"
+    assert failed_response["logical_requests"] == 1
+    assert failed_response["transport_attempts"] == 1
+    assert failed_response["provider_reported_cost_usd"] == 0.0
+    assert failed_response["computed_cost_usd"] == 0.0
+    assert is_binary(failed_response["raw_response_sha256"])
+    assert is_binary(failed_response["bounded_safe_excerpt"])
 
     assert {:error, {:openrouter_free_campaign_halted, _reason}} =
              Imp.LM.generate(checked, [%{role: :user, content: "again"}], max_tokens: 32)

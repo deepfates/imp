@@ -48,7 +48,7 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
 
     context = %{
       runtime: runtime,
-      strict?: runtime == :openrouter_free,
+      strict?: runtime == :openrouter_free or Keyword.get(opts, :strict_failure_capture, false),
       dataset: dataset,
       dataset_meta: dataset_meta,
       seeds: seeds,
@@ -167,7 +167,9 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
       "selection_split" => selection_split(arm),
       "test_score" => nil,
       "test_rows" => [],
-      "test_errors" => [safe_exception(error, stacktrace)],
+      "test_errors" => failure_messages(error, stacktrace),
+      "failure_detail" => failure_detail(error, stacktrace),
+      "provider_failure_context" => last_provider_response(context),
       "program" => nil,
       "budget_delta" => budget_delta(before, after_snapshot),
       "wall_seconds" => elapsed_seconds(started)
@@ -236,6 +238,8 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
         is_number(ci["lower"]) and ci["lower"] > 0 and
         improving >= 2
 
+    failed_row = Enum.find(results, &(&1["status"] == "failed"))
+
     %{
       "execution_complete" => complete?,
       "paired_scores" => paired,
@@ -244,6 +248,8 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
       "improving_seeds" => improving,
       "declared_seed_count" => length(seeds),
       "within_task_numeric_go_rule_passed" => numeric_go?,
+      "stopped_failure" => failed_row && failed_row["failure_detail"],
+      "stopped_provider_context" => failed_row && failed_row["provider_failure_context"],
       "c3_effectiveness_established" => false,
       "c3_exclusions" => [
         "no independently executed upstream comparator",
@@ -343,9 +349,9 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
     }
   end
 
-  defp runtime_state(:openrouter_free, _opts) do
+  defp runtime_state(:openrouter_free, opts) do
     {:ok, ledger} = OpenRouterFreeGuard.start_ledger()
-    {ledger, OpenRouterFreeGuard.current_catalog!()}
+    {ledger, Keyword.get_lazy(opts, :catalog, &OpenRouterFreeGuard.current_catalog!/0)}
   end
 
   defp runtime_state(:local, _opts), do: {nil, nil}
@@ -387,6 +393,90 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
       reason -> raise "OpenRouter free ledger halted: #{reason}"
     end
   end
+
+  defp last_provider_response(%{ledger: nil}), do: nil
+
+  defp last_provider_response(%{ledger: ledger}) do
+    ledger
+    |> OpenRouterFreeGuard.ledger_snapshot()
+    |> Map.get("responses", [])
+    |> List.last()
+  end
+
+  defp failure_messages(%Imp.EvaluationCancelledError{} = error, _stacktrace) do
+    Enum.map(error.errors || [], &safe_error/1)
+  end
+
+  defp failure_messages(error, stacktrace), do: [safe_exception(error, stacktrace)]
+
+  defp failure_detail(%Imp.EvaluationCancelledError{} = error, _stacktrace) do
+    %{
+      "type" => "evaluation_cancelled",
+      "message" => error.message,
+      "max_errors" => error.max_errors,
+      "adapter_or_program_errors" => Enum.map(error.errors || [], &structured_error/1),
+      "partial_rows" => Enum.map(error.rows || [], &partial_failure_row/1)
+    }
+  end
+
+  defp failure_detail(error, stacktrace) do
+    %{"type" => "campaign_exception", "message" => safe_exception(error, stacktrace)}
+  end
+
+  defp partial_failure_row(row) do
+    %{
+      "index" => Map.get(row, :index),
+      "score" => Map.get(row, :score),
+      "error" => Map.get(row, :error) && safe_error(Map.get(row, :error)),
+      "response" => response_accounting(Map.get(row, :prediction))
+    }
+  end
+
+  defp structured_error(%{index: index, reason: %{reason: reason}}) do
+    structured_error(index, reason)
+  end
+
+  defp structured_error(%{index: index, reason: reason}) do
+    structured_error(index, reason)
+  end
+
+  defp structured_error(error) do
+    structured_error(nil, error)
+  end
+
+  defp structured_error(index, {:error, reason}), do: structured_error(index, reason)
+
+  defp structured_error(index, %Imp.AdapterParseError{} = error) do
+    %{
+      "index" => index,
+      "category" => "adapter_decode",
+      "reason_type" => inspect(error.__struct__),
+      "message" => error.message,
+      "reason" => safe_error(error.reason)
+    }
+  end
+
+  defp structured_error(index, error) do
+    %{
+      "index" => index,
+      "category" => "program_or_transport",
+      "reason_type" => reason_type(error),
+      "message" => nil,
+      "reason" => safe_error(error)
+    }
+  end
+
+  defp reason_type(%module{}), do: inspect(module)
+
+  defp reason_type(reason) when is_tuple(reason) and tuple_size(reason) > 0 do
+    case elem(reason, 0) do
+      tag when is_atom(tag) -> Atom.to_string(tag)
+      _other -> "tuple"
+    end
+  end
+
+  defp reason_type(tag) when is_atom(tag), do: Atom.to_string(tag)
+  defp reason_type(_reason), do: "term"
 
   defp load_dataset!(path, _test_limit) do
     bytes = File.read!(path)

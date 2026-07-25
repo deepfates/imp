@@ -235,8 +235,9 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
   defp do_checked_generate(inner, budget, ledger, messages, opts) do
     result = Imp.LM.generate(inner, messages, opts)
     snapshot = CampaignBudget.snapshot(budget)
+    max_output_tokens = checked_output_limit(inner, opts)
 
-    case strict_response_accounting(result, snapshot) do
+    case strict_response_accounting(result, snapshot, max_output_tokens) do
       {:ok, row} ->
         Agent.update(ledger, fn state -> %{state | rows: [row | state.rows]} end)
         result
@@ -247,47 +248,96 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     end
   end
 
-  defp strict_response_accounting({:ok, raw}, snapshot) do
-    with {:ok, _output, metadata} <- Imp.LM.Result.split(raw),
-         {:ok, provider} <- required_binary(get_in(metadata, [:req_llm, :provider]), :provider),
-         {:ok, actual_model} <-
-           required_binary(get_in(metadata, [:req_llm, :model]), :actual_model),
-         :ok <- validate_identity(provider, actual_model),
-         {:ok, upstream_provider} <-
-           required_binary(
-             map_value(get_in(metadata, [:req_llm, :provider_meta]) || %{}, :provider),
-             :upstream_provider
-           ),
-         {:ok, usage} <- required_map(get_in(metadata, [:req_llm, :usage]), :usage),
-         {:ok, provider_cost} <- required_number(map_value(usage, "cost"), :provider_cost),
-         {:ok, computed_cost} <- required_number(map_value(usage, :total_cost), :computed_cost),
-         :ok <- require_zero(provider_cost, :provider_cost),
-         :ok <- require_zero(computed_cost, :computed_cost),
-         :ok <- validate_cumulative_budget(snapshot) do
-      {:ok,
-       %{
-         "status" => "passed",
-         "logical_requests" => snapshot["requests"],
-         "transport_attempts" => snapshot["transport_attempts"],
-         "gateway_provider" => provider,
-         "upstream_provider" => upstream_provider,
-         "actual_model" => actual_model,
-         "provider_reported_cost_usd" => provider_cost,
-         "computed_cost_usd" => computed_cost,
-         "input_tokens" => map_value(usage, :input_tokens),
-         "output_tokens" => map_value(usage, :output_tokens)
-       }}
+  defp strict_response_accounting({:ok, raw}, snapshot, max_output_tokens) do
+    with {:ok, output, metadata} <- Imp.LM.Result.split(raw) do
+      row = response_accounting_row(output, metadata, snapshot, max_output_tokens)
+
+      case validate_response(metadata, snapshot) do
+        :ok ->
+          {:ok, Map.put(row, "status", "passed")}
+
+        {:error, reason} ->
+          {:error, reason, Map.merge(row, failed_response_row(reason, snapshot))}
+      end
     else
       {:error, reason} ->
         {:error, reason, failed_response_row(reason, snapshot)}
     end
   end
 
-  defp strict_response_accounting({:error, reason}, snapshot),
+  defp strict_response_accounting({:error, reason}, snapshot, _max_output_tokens),
     do: {:error, {:provider_error, safe_error(reason)}, failed_response_row(reason, snapshot)}
 
-  defp strict_response_accounting(other, snapshot),
+  defp strict_response_accounting(other, snapshot, _max_output_tokens),
     do: {:error, {:malformed_lm_result, safe_error(other)}, failed_response_row(other, snapshot)}
+
+  defp validate_response(metadata, snapshot) do
+    with {:ok, provider} <- required_binary(get_in(metadata, [:req_llm, :provider]), :provider),
+         {:ok, actual_model} <-
+           required_binary(get_in(metadata, [:req_llm, :model]), :actual_model),
+         :ok <- validate_identity(provider, actual_model),
+         {:ok, _upstream_provider} <-
+           required_binary(
+             map_value(get_in(metadata, [:req_llm, :provider_meta]) || %{}, :provider),
+             :upstream_provider
+           ),
+         {:ok, usage} <- required_map(get_in(metadata, [:req_llm, :usage]), :usage),
+         {:ok, _finish_reason} <-
+           required_finish_reason(get_in(metadata, [:req_llm, :finish_reason]), :finish_reason),
+         {:ok, provider_cost} <- required_number(map_value(usage, "cost"), :provider_cost),
+         {:ok, computed_cost} <- required_number(map_value(usage, :total_cost), :computed_cost),
+         :ok <- require_zero(provider_cost, :provider_cost),
+         :ok <- require_zero(computed_cost, :computed_cost),
+         :ok <- validate_cumulative_budget(snapshot) do
+      :ok
+    end
+  end
+
+  defp checked_output_limit(%BudgetedLM{max_output_tokens: limit}, _opts)
+       when is_integer(limit) and limit > 0,
+       do: limit
+
+  defp checked_output_limit(_inner, opts), do: Keyword.get(opts, :max_tokens)
+
+  defp response_reference(output) do
+    %{
+      "raw_response_sha256" => CampaignBudget.evidence_digest(output),
+      "bounded_safe_excerpt" =>
+        output
+        |> inspect(limit: 20, printable_limit: 256)
+        |> Imp.Redaction.redact()
+        |> String.slice(0, 256)
+    }
+  end
+
+  defp response_accounting_row(output, metadata, snapshot, max_output_tokens) do
+    req = get_in(metadata, [:req_llm]) || %{}
+    usage = map_value(req, :usage) || %{}
+    provider_meta = map_value(req, :provider_meta) || %{}
+    finish_reason = map_value(req, :finish_reason)
+    output_tokens = map_value(usage, :output_tokens)
+
+    %{
+      "logical_requests" => snapshot["requests"],
+      "transport_attempts" => snapshot["transport_attempts"],
+      "gateway_provider" => map_value(req, :provider),
+      "upstream_provider" => map_value(provider_meta, :provider),
+      "actual_model" => map_value(req, :model),
+      "provider_reported_cost_usd" => map_value(usage, "cost"),
+      "computed_cost_usd" => map_value(usage, :total_cost),
+      "input_tokens" => map_value(usage, :input_tokens),
+      "output_tokens" => output_tokens,
+      "finish_reason" => finish_reason && to_string(finish_reason),
+      "requested_max_output_tokens" => max_output_tokens,
+      "truncation_indicators" => %{
+        "finish_reason_is_length" => finish_reason in [:length, "length"],
+        "output_tokens_reached_ceiling" =>
+          is_number(output_tokens) and is_integer(max_output_tokens) and
+            output_tokens >= max_output_tokens
+      }
+    }
+    |> Map.merge(response_reference(output))
+  end
 
   defp validate_cumulative_budget(%{
          "requests" => requests,
@@ -374,6 +424,11 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
   defp required_map(_value, field), do: {:error, {:missing_or_invalid, field}}
   defp required_number(value, _field) when is_number(value), do: {:ok, value * 1.0}
   defp required_number(_value, field), do: {:error, {:missing_or_invalid, field}}
+
+  defp required_finish_reason(value, _field) when value in [:stop, :length, "stop", "length"],
+    do: {:ok, value}
+
+  defp required_finish_reason(_value, field), do: {:error, {:missing_or_invalid, field}}
 
   defp optional_number(value) when is_number(value), do: value * 1.0
   defp optional_number(_value), do: nil
