@@ -37,6 +37,7 @@ defmodule Imp.Optimize.Anything.Runner do
   """
   @option_keys [
     :background,
+    :batch_evaluator,
     :checkpoint_fn,
     :config,
     :dataset,
@@ -50,9 +51,11 @@ defmodule Imp.Optimize.Anything.Runner do
     :valset
   ]
 
-  @spec run(String.t() | map() | nil, function(), keyword()) :: Result.t()
-  def run(seed_candidate, evaluator, opts) when is_function(evaluator) and is_list(opts) do
+  @spec run(String.t() | map() | nil, function() | nil, keyword()) :: Result.t()
+  def run(seed_candidate, evaluator, opts)
+      when (is_function(evaluator) or is_nil(evaluator)) and is_list(opts) do
     validate_options!(opts)
+    validate_evaluation_transports!(evaluator, Keyword.get(opts, :batch_evaluator))
     config = resolve_config(Keyword.get(opts, :config))
     {mode, trainset, valset} = datasets(opts)
     validate_runtime_support!(config, opts)
@@ -69,6 +72,7 @@ defmodule Imp.Optimize.Anything.Runner do
         candidate_key: string_key || @string_candidate_key,
         structured_codec: structured_codec,
         evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
+        batch_evaluator: Keyword.get(opts, :batch_evaluator),
         raise_on_exception: config.engine.raise_on_exception,
         best_example_evals_k: config.engine.best_example_evals_k,
         capture_stdio: config.engine.capture_stdio,
@@ -78,12 +82,13 @@ defmodule Imp.Optimize.Anything.Runner do
       ]
       |> maybe_put(:optimization_state, Keyword.get(opts, :optimization_state))
 
-    {runtime_callbacks, runtime_resources} = runtime_services(config)
-    adapter = open_adapter(evaluator, mode, adapter_opts, runtime_resources)
     resolved_resume_state = resume_state(config, Keyword.get(opts, :resume_state))
 
     if structured_codec,
       do: StructuredCandidate.validate_checkpoint!(structured_codec, resolved_resume_state)
+
+    {runtime_callbacks, runtime_resources} = runtime_services(config)
+    adapter = open_adapter(evaluator, mode, adapter_opts, runtime_resources)
 
     engine_opts =
       config
@@ -128,8 +133,27 @@ defmodule Imp.Optimize.Anything.Runner do
 
   def run(_seed_candidate, evaluator, opts) do
     raise ArgumentError,
-          "Optimize Anything expects an evaluator function and keyword options, got: " <>
+          "Optimize Anything expects an evaluator function or nil and keyword options, got: " <>
             "#{inspect(evaluator)}, #{inspect(opts)}"
+  end
+
+  defp validate_evaluation_transports!(nil, nil) do
+    raise ArgumentError,
+          "Optimize Anything requires :batch_evaluator when evaluator is nil; provide one or both evaluation transports"
+  end
+
+  defp validate_evaluation_transports!(evaluator, batch_evaluator) do
+    unless is_nil(evaluator) or is_function(evaluator) do
+      raise ArgumentError, "Optimize Anything evaluator must be a function or nil"
+    end
+
+    unless is_nil(batch_evaluator) or is_function(batch_evaluator, 1) or
+             is_function(batch_evaluator, 2) do
+      raise ArgumentError,
+            "Optimize Anything :batch_evaluator must have arity 1 (pairs) or arity 2 (pairs, optimization_states)"
+    end
+
+    :ok
   end
 
   defp resolve_config(nil), do: Config.new()

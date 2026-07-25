@@ -7,7 +7,10 @@ defmodule Imp.Optimize.Anything do
   merging, stopping, and tracking through its options. It returns an immutable
   result value. Structured artifacts are an Imp-native extension to GEPA
   v0.1.4's `str | dict[str, str]` candidate contract: their exact shape and
-  value types are derived from the seed and enforced for every proposal.
+  value types are derived from the seed and enforced for every proposal. A
+  pinned-compatible `:batch_evaluator` may replace or accompany the scalar
+  evaluator when an evaluation backend needs all pending candidate/example
+  pairs in one ordered call.
   """
 
   # These structs remain internal execution values for the independent GEPA
@@ -26,18 +29,18 @@ defmodule Imp.Optimize.Anything do
   alias Imp.Optimize.Anything.{Result, Runner}
 
   @doc "Runs Optimize Anything for a text or JSON-safe structured seed and returns a Result."
-  @spec run(String.t() | map() | nil, function(), keyword()) :: struct()
+  @spec run(String.t() | map() | nil, function() | nil, keyword()) :: struct()
   def run(seed_candidate, evaluator, opts \\ [])
 
   def run(seed_candidate, evaluator, opts)
       when (is_binary(seed_candidate) or is_map(seed_candidate) or is_nil(seed_candidate)) and
-             is_function(evaluator) and is_list(opts) do
+             (is_function(evaluator) or is_nil(evaluator)) and is_list(opts) do
     Runner.run(seed_candidate, evaluator, opts)
   end
 
   def run(seed_candidate, evaluator, opts) do
     raise ArgumentError,
-          "Imp.Optimize.Anything.run/3 expects a text/named/structured seed, evaluator function, and keyword options; got: " <>
+          "Imp.Optimize.Anything.run/3 expects a text/named/structured seed, evaluator function or nil, and keyword options; got: " <>
             "#{inspect(seed_candidate)}, #{inspect(evaluator)}, #{inspect(opts)}"
   end
 

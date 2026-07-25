@@ -53,6 +53,144 @@ defmodule Imp.Optimize.Anything.AdapterTest do
     end
   end
 
+  test "batch evaluation is one ordered call with aligned identity, legacy output isolation, and state" do
+    parent = self()
+
+    adapter =
+      Adapter.new(nil, :multi_task,
+        batch_evaluator: fn pairs, states ->
+          send(parent, {:batch, pairs, states})
+
+          Enum.map(pairs, fn {candidate, example} ->
+            {example.score + String.to_integer(candidate.bias), %{forged: true},
+             %{example: example.id}}
+          end)
+        end
+      )
+
+    items = [
+      {%{bias: "0"}, [%{id: :a, score: 1}, %{id: :b, score: 2}]},
+      {%{bias: "10"}, [%{id: :c, score: 3}]}
+    ]
+
+    assert [first, second] = Evaluation.batch_evaluate(adapter, items)
+    assert first.scores == [1, 2]
+    assert second.scores == [13]
+
+    assert Enum.map(first.outputs, &elem(&1, 1)) == [%{bias: "0"}, %{bias: "0"}]
+    assert Enum.map(second.outputs, &elem(&1, 1)) == [%{bias: "10"}]
+
+    assert_receive {:batch,
+                    [
+                      {%{bias: "0"}, %{id: :a, score: 1}},
+                      {%{bias: "0"}, %{id: :b, score: 2}},
+                      {%{bias: "10"}, %{id: :c, score: 3}}
+                    ], states}
+
+    assert Enum.all?(states, &(&1 == %OptimizationState{}))
+
+    persisted = Adapter.get_adapter_state(adapter)
+
+    assert Map.keys(persisted) |> Enum.sort() ==
+             Enum.sort([%{id: :a, score: 1}, %{id: :b, score: 2}, %{id: :c, score: 3}])
+  end
+
+  test "batch evaluation retains aligned partial and whole-call failures without poisoning state" do
+    partial =
+      Adapter.new(nil, :multi_task,
+        raise_on_exception: false,
+        batch_evaluator: fn _pairs ->
+          [1.0, {:error, :provider_unavailable}, {3.0, %{ok: true}}]
+        end
+      )
+
+    result =
+      Evaluation.evaluate(partial, [:first, :failed, :third], %{prompt: "candidate"})
+
+    assert result.scores == [1.0, 0.0, 3.0]
+    assert result.metadata == %{complete?: false, failures: 1, mode: :multi_task}
+    assert Enum.map(result.outputs, &elem(&1, 1)) == List.duplicate(%{prompt: "candidate"}, 3)
+
+    assert get_in(result.side_information, [:prompt, Access.at(1), "error"]) =~
+             "provider_unavailable"
+
+    refute Map.has_key?(Adapter.get_adapter_state(partial), :failed)
+
+    whole =
+      Adapter.new(nil, :multi_task,
+        raise_on_exception: false,
+        batch_evaluator: fn _pairs -> raise "cluster down" end
+      )
+
+    whole_result = Evaluation.evaluate(whole, [:a, :b], %{prompt: "candidate"})
+    assert whole_result.scores == [0.0, 0.0]
+    assert whole_result.metadata.complete? == false
+    assert whole_result.metadata.failures == 2
+
+    assert Enum.all?(whole_result.side_information.prompt, fn side_info ->
+             side_info["_imp_transient_batch_failure"] == true and
+               side_info["error"] =~ "cluster down"
+           end)
+
+    assert Adapter.get_adapter_state(whole) == %{}
+  end
+
+  test "batch result shape errors stay loud under contained evaluator exceptions" do
+    adapter =
+      Adapter.new(nil, :multi_task,
+        raise_on_exception: false,
+        batch_evaluator: fn _pairs -> [1.0] end
+      )
+
+    assert_raise ArgumentError, ~r/returned 1 results but expected 2/, fn ->
+      Evaluation.evaluate(adapter, [:a, :b], %{prompt: "candidate"})
+    end
+
+    malformed =
+      Adapter.new(nil, :multi_task,
+        raise_on_exception: false,
+        batch_evaluator: fn _pairs -> [{1.0, "not a map"}] end
+      )
+
+    assert_raise ArgumentError, ~r/side_info must be a map/, fn ->
+      Evaluation.evaluate(malformed, [:a], %{prompt: "candidate"})
+    end
+
+    streamed =
+      Adapter.new(nil, :multi_task,
+        batch_evaluator: fn pairs -> Stream.map(pairs, fn _pair -> {0.75} end) end
+      )
+
+    assert Evaluation.evaluate(streamed, [:a, :b], %{prompt: "candidate"}).scores == [
+             0.75,
+             0.75
+           ]
+  end
+
+  test "batch state snapshots restore durably" do
+    first = Adapter.new(nil, :multi_task, batch_evaluator: fn _pairs -> [1.0] end)
+    assert Evaluation.evaluate(first, [:task], %{prompt: "one"}).scores == [1.0]
+    snapshot = Adapter.get_adapter_state(first)
+
+    parent = self()
+
+    second =
+      Adapter.new(nil, :multi_task,
+        batch_evaluator: fn _pairs, [state] ->
+          send(parent, {:restored, state})
+          [2.0]
+        end
+      )
+
+    assert %Adapter{} = Adapter.set_adapter_state(second, snapshot)
+    assert Evaluation.evaluate(second, [:task], %{prompt: "two"}).scores == [2.0]
+    assert_receive {:restored, %OptimizationState{best_example_evals: [%{score: 1.0}]}}
+
+    assert_raise ArgumentError, ~r/invalid optimization-state buffer/, fn ->
+      Adapter.set_adapter_state(second, %{task: [%{score: "forged", side_info: %{}}]})
+    end
+  end
+
   test "injects OptimizationState only through the explicit evaluator contract" do
     parent = self()
     state = %OptimizationState{best_example_evals: [%{score: 0.8, side_info: %{hint: "x"}}]}

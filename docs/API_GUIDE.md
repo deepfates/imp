@@ -923,6 +923,17 @@ and custom selectors remain text-only and are rejected up front in structured
 mode rather than receiving an encoded substitute. The `__imp_type__` key is
 reserved at every depth for Imp's durable wire tags.
 
+Pinned GEPA v0.1.4's grouped evaluator surface is available through the same
+entry point: pass `nil` as the scalar evaluator and an arity-one
+`batch_evaluator:` receiving ordered `{candidate, example}` pairs, or use
+arity two to also receive aligned optimization states. One result is required
+per pair. The batch callback sees unwrapped string candidates, `nil` examples
+in single-task mode, and native structured artifacts. When both evaluator
+forms are present, grouped stages prefer the batch callback. Legacy
+three-tuples cannot substitute their output for the evaluated candidate.
+Contained per-row and whole-call failures remain aligned for diagnostics, but
+incomplete proposals are not cached, selected, or installed as winners.
+
 ## Tools And ReAct
 
 ```elixir

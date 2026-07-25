@@ -62,6 +62,24 @@ selector behaviours rather than being special-cased in the runner; the
 structured-mode restriction above prevents an encoded internal candidate from
 being mistaken for the user artifact.
 
+For an external batch backend, pass `nil` as the scalar evaluator and provide
+`batch_evaluator:`. The callback receives every pending `{candidate, example}`
+pair in deterministic order and must return one aligned score or
+`{score, side_information}` per pair. An arity-two callback additionally
+receives aligned optimization-state values. String candidates are unwrapped,
+single-task examples are `nil`, and structured candidates remain native.
+Providing both transports routes grouped work through the batch callback while
+refiner singleton work uses the scalar evaluator. A legacy
+`{score, ignored_output, side_information}` result is accepted, but its output
+slot cannot replace candidate identity.
+
+With `raise_on_exception: false`, a whole callback failure or explicit
+`{:error, reason}` row is retained as aligned score-zero diagnostics. Such an
+incomplete seed aborts; an incomplete proposed or validation candidate is
+rejected and never cached or selected. This containment is a deliberate safety
+extension to the pinned v0.1.4 batch surface. Callback shape errors such as a
+wrong result count remain fatal.
+
 When `run_dir` is set, Imp writes atomic JSON checkpoints and seed/best
 validation outputs. Evaluation caching defaults to durable, content-addressed
 JSON storage for run directories and fails closed on corrupt or incompatible

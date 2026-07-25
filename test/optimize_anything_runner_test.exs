@@ -71,6 +71,121 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     refute_receive {:evaluated, "baseline", :train, _}
   end
 
+  test "public batch evaluator preserves grouped train and selection boundaries" do
+    receiver = self()
+    trainset = [%{split: :train, id: 1}, %{split: :train, id: 2}]
+    valset = [%{split: :selection, id: 3}, %{split: :selection, id: 4}]
+
+    result =
+      Anything.run(
+        "base",
+        nil,
+        dataset: trainset,
+        valset: valset,
+        batch_evaluator: fn pairs ->
+          send(receiver, {:batch, pairs})
+
+          Enum.map(pairs, fn {candidate, example} ->
+            {if(candidate == "better", do: 1.0, else: 0.0),
+             %{split: example.split, id: example.id}}
+          end)
+        end,
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1],
+            reflection: [reflection_minibatch_size: 2]
+          ),
+        fallback_proposer: fn _candidate, _component, _records, _iteration -> "better" end
+      )
+
+    assert Result.best_candidate(result) == "better"
+    assert result.validation_scores == [0.0, 1.0]
+
+    batches = collect_batches([])
+    assert length(batches) == 4
+
+    assert Enum.map(batches, fn pairs ->
+             {pairs |> hd() |> elem(0),
+              Enum.map(pairs, fn {_candidate, example} -> example.split end)}
+           end) == [
+             {"base", [:selection, :selection]},
+             {"base", [:train, :train]},
+             {"better", [:train, :train]},
+             {"better", [:selection, :selection]}
+           ]
+  end
+
+  test "public batch evaluator alone receives nil example in single-task mode" do
+    receiver = self()
+
+    result =
+      Anything.run(
+        "base",
+        nil,
+        batch_evaluator: fn pairs ->
+          send(receiver, {:single_batch, pairs})
+          [1.0]
+        end,
+        config: Config.new(engine: [max_candidate_proposals: 0]),
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          Map.fetch!(candidate, component)
+        end
+      )
+
+    assert Result.best_candidate(result) == "base"
+    assert_receive {:single_batch, [{"base", nil}]}
+  end
+
+  test "partially evaluated proposals are rejected instead of selected" do
+    dataset = [%{id: 1}, %{id: 2}]
+
+    result =
+      Anything.run(
+        "base",
+        nil,
+        dataset: dataset,
+        valset: dataset,
+        batch_evaluator: fn pairs ->
+          Enum.map(pairs, fn {candidate, example} ->
+            if candidate == "better" and example.id == 2 do
+              {:error, :provider_lost_result}
+            else
+              {if(candidate == "better", do: 1.0, else: 0.0), %{id: example.id}}
+            end
+          end)
+        end,
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1, raise_on_exception: false],
+            reflection: [reflection_minibatch_size: 2]
+          ),
+        fallback_proposer: fn _candidate, _component, _records, _iteration -> "better" end
+      )
+
+    assert Result.best_candidate(result) == "base"
+    assert result.candidates == [%{current_candidate: "base"}]
+    assert [%{reason: {:incomplete_evaluation, 1}, status: :rejected}] = result.rejected
+  end
+
+  test "partially evaluated seed validation fails instead of installing a false baseline" do
+    assert_raise ArgumentError,
+                 ~r/cannot evaluate the seed candidate.*incomplete_evaluation/,
+                 fn ->
+                   Anything.run(
+                     "base",
+                     nil,
+                     dataset: [:train],
+                     valset: [:one, :two],
+                     batch_evaluator: fn _pairs -> [1.0, {:error, :missing}] end,
+                     config:
+                       Config.new(engine: [max_candidate_proposals: 0, raise_on_exception: false]),
+                     fallback_proposer: fn candidate, component, _records, _iteration ->
+                       Map.fetch!(candidate, component)
+                     end
+                   )
+                 end
+  end
+
   test "named candidates are passed to the evaluator and returned without string unwrapping" do
     receiver = self()
     candidate = %{planner: "plan carefully", writer: "answer briefly"}
@@ -258,6 +373,14 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     end
   end
 
+  defp collect_batches(acc) do
+    receive do
+      {:batch, pairs} -> collect_batches(acc ++ [pairs])
+    after
+      0 -> acc
+    end
+  end
+
   test "rejects unknown and malformed runner options before execution" do
     assert_raise ArgumentError, ~r/unknown Optimize Anything options: \[:datset\]/, fn ->
       Anything.run("baseline", fn _candidate -> 1.0 end,
@@ -332,6 +455,82 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     assert resumed.validation_scores == uninterrupted.validation_scores
     assert resumed.total_metric_calls == uninterrupted.total_metric_calls
     assert Result.best_candidate(resumed) == "2"
+  end
+
+  test "batch checkpoint resume preserves adapter history and does not duplicate calls" do
+    dataset = [%{target: 2}]
+    proposer = fn _candidate, _component, _records, iteration -> Integer.to_string(iteration) end
+    resumed_log = start_supervised!({Agent, fn -> [] end}, id: :resumed_batch_log)
+    full_log = start_supervised!({Agent, fn -> [] end}, id: :full_batch_log)
+
+    batch_evaluator = fn log ->
+      fn pairs, states ->
+        Agent.update(log, &(&1 ++ [{pairs, states}]))
+
+        Enum.map(pairs, fn {candidate, example} ->
+          {candidate |> String.to_integer() |> min(example.target), %{candidate: candidate}}
+        end)
+      end
+    end
+
+    {:checkpoint, first_checkpoint} =
+      catch_throw(
+        Anything.run(
+          "0",
+          nil,
+          runner_options(2,
+            dataset: dataset,
+            batch_evaluator: batch_evaluator.(resumed_log),
+            fallback_proposer: proposer,
+            checkpoint_fn: fn checkpoint ->
+              if checkpoint["iteration"] == 1,
+                do: throw({:checkpoint, checkpoint}),
+                else: :ok
+            end
+          )
+        )
+      )
+
+    persisted = first_checkpoint |> Jason.encode!() |> Jason.decode!()
+
+    resumed =
+      Anything.run(
+        "0",
+        nil,
+        runner_options(2,
+          dataset: dataset,
+          batch_evaluator: batch_evaluator.(resumed_log),
+          fallback_proposer: proposer,
+          resume_state: persisted
+        )
+      )
+
+    uninterrupted =
+      Anything.run(
+        "0",
+        nil,
+        runner_options(2,
+          dataset: dataset,
+          batch_evaluator: batch_evaluator.(full_log),
+          fallback_proposer: proposer
+        )
+      )
+
+    resumed_calls = Agent.get(resumed_log, & &1)
+    uninterrupted_calls = Agent.get(full_log, & &1)
+
+    assert Enum.map(resumed_calls, &elem(&1, 0)) ==
+             Enum.map(uninterrupted_calls, &elem(&1, 0))
+
+    assert length(resumed_calls) == length(uninterrupted_calls)
+    assert resumed.candidates == uninterrupted.candidates
+    assert resumed.validation_scores == uninterrupted.validation_scores
+
+    assert resumed_calls
+           |> List.last()
+           |> elem(1)
+           |> hd()
+           |> Map.fetch!(:best_example_evals) != []
   end
 
   test "run directories receive seed validation output artifacts" do

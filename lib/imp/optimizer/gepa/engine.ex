@@ -829,6 +829,17 @@ defmodule Imp.Optimizer.GEPA.Engine do
       result = Map.fetch!(parent_results, {task.parent.candidate, task.minibatch_ids})
 
       cond do
+        incomplete_evaluation?(result) ->
+          notify(opts, :on_evaluation_skipped, %{
+            iteration: task.iteration,
+            candidate_idx: task.parent.id,
+            reason: incomplete_evaluation_reason(result),
+            scores: result.scores,
+            is_seed_candidate: task.parent.id == 0
+          })
+
+          {:ok, prepared, state}
+
         not has_trajectories?(result) ->
           notify(opts, :on_evaluation_skipped, %{
             iteration: task.iteration,
@@ -1417,7 +1428,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
     verdicts =
       Map.new(proposals, fn proposal ->
         verdict =
-          Acceptance.decide(policy, proposal.before, proposal.after, %{
+          decide_acceptance(policy, proposal.before, proposal.after, %{
             operation: :mutation,
             iteration: state.iteration + 1,
             parent_id: proposal.parent.id,
@@ -1469,6 +1480,19 @@ defmodule Imp.Optimizer.GEPA.Engine do
     else
       with {:ok, evaluated, state} <-
              batch_strategy_validations(adapter, valset, selected, verdicts, state, opts) do
+        {evaluated, incomplete} =
+          Enum.split_with(evaluated, &complete_evaluation?(&1.validation))
+
+        state =
+          Enum.reduce(incomplete, state, fn item, state ->
+            reject_strategy_proposal(
+              state,
+              item.proposal,
+              {:validation_error, incomplete_evaluation_reason(item.validation)},
+              opts
+            )
+          end)
+
         state =
           Enum.reduce(evaluated, state, fn evaluated, state ->
             add_strategy_candidate(state, evaluated, valset, opts)
@@ -1640,7 +1664,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
                 record_with_reservation(state.budget, actual, plan.reservation, :full)
 
               cache =
-                if cache? and fresh do
+                if (cache? and fresh) && complete_evaluation?(fresh) do
                   backend.put(state.cache, plan.proposal.candidate, plan.missing_batch, fresh)
                 else
                   state.cache
@@ -2721,7 +2745,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
     state = %{state | cache: cache, last_iteration_found_candidate: false}
     policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
 
-    case Acceptance.decide(policy, context.parent_result, context.child_result, %{
+    case decide_acceptance(policy, context.parent_result, context.child_result, %{
            operation: :mutation,
            iteration: context.iteration,
            parent_id: parent.id,
@@ -3432,6 +3456,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
              parent_ids: parent.parent_ids,
              is_seed_candidate: parent.id == 0
            }),
+         :ok <- maybe_skip_incomplete(parent_result, parent, iteration, state, opts),
          :ok <- maybe_skip_perfect(parent_result, parent, iteration, state, opts),
          components <-
            ModuleSelector.select(
@@ -3495,7 +3520,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
            }) do
       policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
 
-      case Acceptance.decide(policy, parent_result, proposed_result, %{
+      case decide_acceptance(policy, parent_result, proposed_result, %{
              operation: :mutation,
              iteration: iteration,
              parent_id: parent.id,
@@ -3660,7 +3685,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
         parent_result = strongest_parent_result(proposal)
         policy = Keyword.get(opts, :merge_acceptance_policy, Acceptance.default(:merge))
 
-        case Acceptance.decide(policy, parent_result, result, %{
+        case decide_acceptance(policy, parent_result, result, %{
                operation: :merge,
                iteration: iteration,
                parent_ids: proposal.parent_ids,
@@ -4036,7 +4061,12 @@ defmodule Imp.Optimizer.GEPA.Engine do
     case evaluate(adapter, batch, candidate, false, :full, state, opts, event) do
       {:ok, result, state} ->
         result = %{result | metadata: Map.put(result.metadata, :validation_ids, ids)}
-        {:ok, result, state}
+
+        if complete_evaluation?(result) do
+          {:ok, result, state}
+        else
+          {:error, incomplete_evaluation_reason(result), %{state | pending_validation: nil}}
+        end
 
       {:error, reason, state} ->
         {:error, reason, %{state | pending_validation: nil}}
@@ -4050,6 +4080,22 @@ defmodule Imp.Optimizer.GEPA.Engine do
         iteration: iteration,
         candidate_idx: parent.id,
         reason: :all_scores_perfect,
+        scores: result.scores,
+        is_seed_candidate: parent.id == 0
+      })
+
+      {:skip, state}
+    else
+      :ok
+    end
+  end
+
+  defp maybe_skip_incomplete(result, parent, iteration, state, opts) do
+    if incomplete_evaluation?(result) do
+      notify(opts, :on_evaluation_skipped, %{
+        iteration: iteration,
+        candidate_idx: parent.id,
+        reason: incomplete_evaluation_reason(result),
         scores: result.scores,
         is_seed_candidate: parent.id == 0
       })
@@ -4253,10 +4299,38 @@ defmodule Imp.Optimizer.GEPA.Engine do
     end
   end
 
-  defp maybe_cache_result(cache, candidate, batch, result, true),
-    do: evaluation_cache_backend(cache).put(cache, candidate, batch, result)
+  defp maybe_cache_result(cache, candidate, batch, result, true) do
+    if complete_evaluation?(result),
+      do: evaluation_cache_backend(cache).put(cache, candidate, batch, result),
+      else: cache
+  end
 
   defp maybe_cache_result(cache, _candidate, _batch, _result, false), do: cache
+
+  defp acceptance_completeness(result) when is_struct(result, Result) do
+    if incomplete_evaluation?(result),
+      do: {:reject, incomplete_evaluation_reason(result)},
+      else: :complete
+  end
+
+  defp decide_acceptance(policy, before, result, context) do
+    case acceptance_completeness(result) do
+      :complete -> Acceptance.decide(policy, before, result, context)
+      verdict -> verdict
+    end
+  end
+
+  defp complete_evaluation?(%Result{} = result), do: not incomplete_evaluation?(result)
+
+  defp incomplete_evaluation?(%Result{metadata: metadata}) do
+    complete? = Map.get(metadata, :complete?, Map.get(metadata, "complete?", true))
+    complete? == false
+  end
+
+  defp incomplete_evaluation_reason(%Result{metadata: metadata}) do
+    failures = Map.get(metadata, :failures, Map.get(metadata, "failures", :unknown))
+    {:incomplete_evaluation, failures}
+  end
 
   defp record_with_reservation(budget, actual_calls, reservation, kind)
        when actual_calls <= reservation,

@@ -23,9 +23,10 @@ defmodule Imp.Optimize.Anything.Adapter do
     @type t :: %__MODULE__{best_example_evals: [evaluation()]}
   end
 
-  @enforce_keys [:evaluator, :mode]
+  @enforce_keys [:mode]
   defstruct [
     :evaluator,
+    :batch_evaluator,
     :mode,
     candidate_format: :named,
     candidate_key: @default_candidate_key,
@@ -45,7 +46,8 @@ defmodule Imp.Optimize.Anything.Adapter do
   @type evaluator_contract :: :standard | :with_optimization_state
   @type candidate_format :: :named | :string | :structured
   @type t :: %__MODULE__{
-          evaluator: function(),
+          evaluator: function() | nil,
+          batch_evaluator: function() | nil,
           mode: mode(),
           candidate_format: candidate_format(),
           candidate_key: atom() | String.t(),
@@ -61,10 +63,10 @@ defmodule Imp.Optimize.Anything.Adapter do
           timeout: timeout()
         }
 
-  @spec new(function(), mode()) :: t()
+  @spec new(function() | nil, mode()) :: t()
   def new(evaluator, mode) when mode in @modes, do: new(evaluator, mode, [])
 
-  @spec new(function(), keyword()) :: t()
+  @spec new(function() | nil, keyword()) :: t()
   def new(evaluator, opts) when is_list(opts) do
     {mode, opts} = Keyword.pop(opts, :mode)
 
@@ -75,13 +77,14 @@ defmodule Imp.Optimize.Anything.Adapter do
     new(evaluator, mode, opts)
   end
 
-  @spec new(function(), mode(), keyword()) :: t()
+  @spec new(function() | nil, mode(), keyword()) :: t()
   def new(evaluator, mode, opts) when is_list(opts) do
     validate_mode!(mode)
     validate_options!(opts)
 
     adapter = %__MODULE__{
       evaluator: evaluator,
+      batch_evaluator: Keyword.get(opts, :batch_evaluator),
       mode: mode,
       candidate_format: Keyword.get(opts, :candidate_format, :named),
       candidate_key: Keyword.get(opts, :candidate_key, @default_candidate_key),
@@ -116,6 +119,87 @@ defmodule Imp.Optimize.Anything.Adapter do
     Candidate.validate!(candidate)
     validate_batch!(adapter.mode, batch)
 
+    if adapter.batch_evaluator && is_nil(adapter.refiner) do
+      adapter
+      |> batch_evaluate([{candidate, batch}], opts)
+      |> hd()
+    else
+      evaluate_individually(adapter, batch, candidate, opts)
+    end
+  end
+
+  @impl true
+  def batch_evaluate(
+        %__MODULE__{batch_evaluator: batch_evaluator, refiner: nil} = adapter,
+        items,
+        opts
+      )
+      when not is_nil(batch_evaluator) and is_list(items) do
+    Enum.each(items, fn {candidate, batch} ->
+      Candidate.validate!(candidate)
+      validate_batch!(adapter.mode, batch)
+    end)
+
+    capture_traces = Keyword.get(opts, :capture_traces, true)
+    state_source = Keyword.get(opts, :optimization_state, adapter.optimization_state)
+
+    contexts =
+      items
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {{candidate, batch}, item_index} ->
+        evaluator_candidate = evaluator_candidate(candidate, adapter)
+        output_candidate = output_candidate(candidate, adapter)
+
+        batch
+        |> Enum.with_index()
+        |> Enum.map(fn {example, example_index} ->
+          %{
+            item_index: item_index,
+            example_index: example_index,
+            example: example,
+            public_example: public_example(adapter.mode, example),
+            candidate: candidate,
+            evaluator_candidate: evaluator_candidate,
+            output_candidate: output_candidate,
+            state: optimization_state(adapter, state_source, example)
+          }
+        end)
+      end)
+
+    evaluations = evaluate_grouped(adapter, contexts)
+
+    Enum.each(Enum.zip(contexts, evaluations), fn {context, evaluation} ->
+      if is_nil(evaluation.trajectory.error) do
+        update_optimization_state(
+          adapter,
+          context.example,
+          evaluation.score,
+          evaluation.side_info
+        )
+      end
+    end)
+
+    evaluations_by_item = Enum.group_by(Enum.zip(contexts, evaluations), &elem(&1, 0).item_index)
+
+    items
+    |> Enum.with_index()
+    |> Enum.map(fn {{candidate, _batch}, item_index} ->
+      item_evaluations =
+        evaluations_by_item
+        |> Map.get(item_index, [])
+        |> Enum.map(&elem(&1, 1))
+
+      result_from_evaluations(adapter, candidate, item_evaluations, capture_traces, true)
+    end)
+  end
+
+  def batch_evaluate(%__MODULE__{} = adapter, items, opts) when is_list(items) do
+    Enum.map(items, fn {candidate, batch} ->
+      evaluate_individually(adapter, batch, candidate, Keyword.put(opts, :capture_traces, true))
+    end)
+  end
+
+  defp evaluate_individually(adapter, batch, candidate, opts) do
     capture_traces = Keyword.get(opts, :capture_traces, false)
     state_source = Keyword.get(opts, :optimization_state, adapter.optimization_state)
 
@@ -132,21 +216,35 @@ defmodule Imp.Optimize.Anything.Adapter do
       )
       |> Enum.map(&resolve_task_result(&1, adapter.raise_on_exception))
 
-    outputs = Enum.map(evaluations, & &1.output)
-    scores = Enum.map(evaluations, & &1.score)
-    objectives = Enum.map(evaluations, & &1.objective_scores)
-    components = Map.keys(candidate)
-    trajectories = Enum.map(evaluations, & &1.trajectory)
+    result_from_evaluations(adapter, candidate, evaluations, capture_traces, false)
+  end
 
-    Result.new(outputs, scores,
-      objective_scores: objectives,
-      trajectories: component_trajectories(components, trajectories, capture_traces),
-      side_information: component_side_information(components, evaluations),
-      metadata: %{
-        failures: Enum.count(evaluations, &(not is_nil(&1.trajectory.error))),
-        mode: adapter.mode
-      }
-    )
+  @impl true
+  def get_adapter_state(%__MODULE__{optimization_state_store: store}),
+    do: Agent.get(store, &Map.new/1)
+
+  @impl true
+  def set_adapter_state(%__MODULE__{optimization_state_store: store} = adapter, state)
+      when is_map(state) do
+    validate_restored_optimization_state!(state, adapter.best_example_evals_k)
+    Agent.update(store, fn _current -> Map.new(state) end)
+    adapter
+  end
+
+  defp validate_restored_optimization_state!(states, limit) do
+    valid? =
+      Enum.all?(states, fn {_example, evaluations} ->
+        is_list(evaluations) and length(evaluations) <= limit and
+          Enum.all?(evaluations, fn
+            %{score: score, side_info: side_info} -> is_number(score) and is_map(side_info)
+            _evaluation -> false
+          end)
+      end)
+
+    unless valid? do
+      raise ArgumentError,
+            "Optimize Anything checkpoint contains an invalid optimization-state buffer"
+    end
   end
 
   @impl true
@@ -196,6 +294,191 @@ defmodule Imp.Optimize.Anything.Adapter do
     end
   end
 
+  defp evaluate_grouped(_adapter, []), do: []
+
+  defp evaluate_grouped(adapter, contexts) do
+    pairs = Enum.map(contexts, &{&1.evaluator_candidate, &1.public_example})
+    states = Enum.map(contexts, & &1.state)
+
+    task_result =
+      [{pairs, states}]
+      |> Imp.Tasks.async_stream(
+        fn {pairs, states} ->
+          invoke_batch_evaluator(adapter.batch_evaluator, pairs, states)
+        end,
+        ordered: true,
+        max_concurrency: 1,
+        timeout: adapter.timeout,
+        on_timeout: :kill_task,
+        zip_input_on_exit: true
+      )
+      |> Enum.at(0)
+
+    case task_result do
+      {:ok, {:ok, raw_results}} ->
+        normalize_batch_results(adapter, contexts, raw_results)
+
+      {:ok, {:raised, kind, reason, stacktrace}} when adapter.raise_on_exception ->
+        :erlang.raise(kind, reason, stacktrace)
+
+      {:ok, {:raised, _kind, reason, _stacktrace}} ->
+        batch_failure_evaluations(contexts, redact_error(reason))
+
+      {:exit, reason} when adapter.raise_on_exception ->
+        raise RuntimeError,
+              "Optimize Anything batch evaluator task exited: #{redact_error(reason)}"
+
+      {:exit, reason} ->
+        batch_failure_evaluations(
+          contexts,
+          "batch evaluator task exited: #{redact_error(reason)}"
+        )
+    end
+  end
+
+  defp invoke_batch_evaluator(batch_evaluator, pairs, states) do
+    {:ok, call_batch_evaluator(batch_evaluator, pairs, states)}
+  rescue
+    exception -> {:raised, :error, exception, __STACKTRACE__}
+  catch
+    kind, reason -> {:raised, kind, reason, __STACKTRACE__}
+  end
+
+  defp call_batch_evaluator(batch_evaluator, pairs, states)
+       when is_function(batch_evaluator, 2),
+       do: batch_evaluator.(pairs, states)
+
+  defp call_batch_evaluator(batch_evaluator, pairs, _states)
+       when is_function(batch_evaluator, 1),
+       do: batch_evaluator.(pairs)
+
+  defp normalize_batch_results(adapter, contexts, raw_results) do
+    raw_results = materialize_batch_results!(raw_results)
+
+    unless length(raw_results) == length(contexts) do
+      count = length(raw_results)
+
+      raise ArgumentError,
+            "Optimize Anything batch evaluator returned #{count} results but expected #{length(contexts)}"
+    end
+
+    contexts
+    |> Enum.zip(raw_results)
+    |> Enum.map(fn {context, raw} -> normalize_batch_evaluation(adapter, context, raw) end)
+  end
+
+  defp materialize_batch_results!(results) when is_list(results), do: results
+
+  defp materialize_batch_results!(results)
+       when (not is_map(results) or is_struct(results)) and not is_binary(results) do
+    if Enumerable.impl_for(results) do
+      Enum.to_list(results)
+    else
+      raise ArgumentError,
+            "Optimize Anything batch evaluator must return an enumerable of aligned results, got: #{inspect(results)}"
+    end
+  end
+
+  defp materialize_batch_results!(results) do
+    raise ArgumentError,
+          "Optimize Anything batch evaluator must return an enumerable of aligned results, got: #{inspect(results)}"
+  end
+
+  defp normalize_batch_evaluation(adapter, context, {:error, reason}) do
+    if adapter.raise_on_exception do
+      raise RuntimeError,
+            "Optimize Anything batch evaluator failed for pair #{context.example_index}: #{redact_error(reason)}"
+    else
+      batch_failure_evaluation(context, redact_error(reason), false)
+    end
+  end
+
+  defp normalize_batch_evaluation(_adapter, context, raw) do
+    raw = normalize_batch_result_shape(raw)
+
+    normalized_evaluation(
+      raw,
+      context.candidate,
+      context.output_candidate,
+      context.example,
+      context.example_index,
+      ""
+    )
+  end
+
+  # Pinned v0.1.4 accepts this legacy transport shape but deliberately ignores
+  # its output slot so candidate/result identity cannot be replaced by a batch
+  # backend. The BEAM tuple is the direct counterpart of the Python 3-tuple.
+  defp normalize_batch_result_shape({score, _ignored_output, side_info}),
+    do: {score, side_info || %{}}
+
+  defp normalize_batch_result_shape({score}), do: score
+  defp normalize_batch_result_shape({score, nil}), do: {score, %{}}
+  defp normalize_batch_result_shape(raw), do: raw
+
+  defp batch_failure_evaluations(contexts, reason) do
+    Enum.map(contexts, &batch_failure_evaluation(&1, reason, true))
+  end
+
+  defp batch_failure_evaluation(context, reason, transient?) do
+    diagnostic =
+      %{"error" => reason}
+      |> maybe_put_transient_failure(transient?)
+      |> Imp.Redaction.redact()
+
+    %{
+      score: 0.0,
+      output: {0.0, Imp.Redaction.redact(context.output_candidate), diagnostic},
+      side_info: diagnostic,
+      objective_scores: %{},
+      trajectory:
+        trajectory(
+          context.example_index,
+          context.example,
+          context.output_candidate,
+          0.0,
+          diagnostic,
+          %{},
+          diagnostic["error"]
+        )
+    }
+  end
+
+  defp maybe_put_transient_failure(diagnostic, true),
+    do: Map.put(diagnostic, "_imp_transient_batch_failure", true)
+
+  defp maybe_put_transient_failure(diagnostic, false), do: diagnostic
+
+  defp result_from_evaluations(
+         adapter,
+         candidate,
+         evaluations,
+         capture_traces,
+         record_completeness?
+       ) do
+    outputs = Enum.map(evaluations, & &1.output)
+    scores = Enum.map(evaluations, & &1.score)
+    objectives = Enum.map(evaluations, & &1.objective_scores)
+    components = Map.keys(candidate)
+    trajectories = Enum.map(evaluations, & &1.trajectory)
+    failures = Enum.count(evaluations, &(not is_nil(&1.trajectory.error)))
+
+    metadata = %{failures: failures, mode: adapter.mode}
+
+    metadata =
+      if record_completeness?, do: Map.put(metadata, :complete?, failures == 0), else: metadata
+
+    Result.new(outputs, scores,
+      objective_scores: objectives,
+      trajectories: component_trajectories(components, trajectories, capture_traces),
+      side_information: component_side_information(components, evaluations),
+      metadata: metadata
+    )
+  end
+
+  defp public_example(:single_task, _example), do: nil
+  defp public_example(_mode, example), do: example
+
   defp call_evaluator_with_stdio(%{capture_stdio: false} = adapter, candidate, example, state) do
     {:ok, evaluate_candidate(adapter, candidate, example, state), ""}
   end
@@ -239,7 +522,8 @@ defmodule Imp.Optimize.Anything.Adapter do
          candidate,
          _,
          _
-       ),
+       )
+       when not is_nil(adapter.evaluator),
        do: adapter.evaluator.(candidate)
 
   defp call_evaluator(
@@ -247,19 +531,40 @@ defmodule Imp.Optimize.Anything.Adapter do
          candidate,
          _,
          state
-       ),
+       )
+       when not is_nil(adapter.evaluator),
        do: adapter.evaluator.(candidate, state)
 
-  defp call_evaluator(%{evaluator_contract: :standard} = adapter, candidate, example, _),
-    do: adapter.evaluator.(candidate, example)
+  defp call_evaluator(%{evaluator_contract: :standard} = adapter, candidate, example, _)
+       when not is_nil(adapter.evaluator),
+       do: adapter.evaluator.(candidate, example)
 
   defp call_evaluator(
          %{evaluator_contract: :with_optimization_state} = adapter,
          candidate,
          example,
          state
-       ),
+       )
+       when not is_nil(adapter.evaluator),
        do: adapter.evaluator.(candidate, example, state)
+
+  defp call_evaluator(%{evaluator: nil} = adapter, candidate, example, state) do
+    public_example = public_example(adapter.mode, example)
+
+    results =
+      adapter.batch_evaluator
+      |> call_batch_evaluator([{candidate, public_example}], [state])
+      |> materialize_batch_results!()
+
+    case results do
+      [raw] ->
+        normalize_batch_result_shape(raw)
+
+      raw ->
+        raise ArgumentError,
+              "Optimize Anything batch evaluator returned #{length(raw)} results but expected 1"
+    end
+  end
 
   defp normalized_evaluation(
          raw,
@@ -600,14 +905,13 @@ defmodule Imp.Optimize.Anything.Adapter do
     state = initial_optimization_state(state_source, example)
     initial_evaluations = top_evaluations(state.best_example_evals, adapter.best_example_evals_k)
 
-    Agent.get_and_update(adapter.optimization_state_store, fn states ->
+    Agent.get(adapter.optimization_state_store, fn states ->
       case Map.fetch(states, example) do
         {:ok, best_example_evals} ->
-          {%OptimizationState{best_example_evals: best_example_evals}, states}
+          %OptimizationState{best_example_evals: best_example_evals}
 
         :error ->
-          {%OptimizationState{best_example_evals: initial_evaluations},
-           Map.put(states, example, initial_evaluations)}
+          %OptimizationState{best_example_evals: initial_evaluations}
       end
     end)
   end
@@ -625,9 +929,14 @@ defmodule Imp.Optimize.Anything.Adapter do
     record = %{score: score, side_info: side_info}
 
     Agent.update(adapter.optimization_state_store, fn states ->
-      Map.update(states, example, [record], fn evaluations ->
-        top_evaluations([record | evaluations], adapter.best_example_evals_k)
-      end)
+      Map.update(
+        states,
+        example,
+        top_evaluations([record], adapter.best_example_evals_k),
+        fn evaluations ->
+          top_evaluations([record | evaluations], adapter.best_example_evals_k)
+        end
+      )
     end)
   end
 
@@ -684,9 +993,19 @@ defmodule Imp.Optimize.Anything.Adapter do
 
     expected_arity = expected_arity(adapter.mode, adapter.evaluator_contract)
 
-    unless is_function(adapter.evaluator, expected_arity) do
+    unless is_nil(adapter.evaluator) or is_function(adapter.evaluator, expected_arity) do
       raise ArgumentError,
             "#{adapter.mode} evaluator with #{adapter.evaluator_contract} contract must have arity #{expected_arity}"
+    end
+
+    unless is_nil(adapter.batch_evaluator) or is_function(adapter.batch_evaluator, 1) or
+             is_function(adapter.batch_evaluator, 2) do
+      raise ArgumentError,
+            "batch evaluator must have arity 1 (pairs) or arity 2 (pairs, optimization_states)"
+    end
+
+    if is_nil(adapter.evaluator) and is_nil(adapter.batch_evaluator) do
+      raise ArgumentError, "Optimize Anything adapter requires evaluator or batch_evaluator"
     end
 
     adapter
@@ -714,6 +1033,7 @@ defmodule Imp.Optimize.Anything.Adapter do
       :optimization_state,
       :refiner,
       :best_example_evals_k,
+      :batch_evaluator,
       :capture_stdio,
       :raise_on_exception,
       :max_concurrency,
