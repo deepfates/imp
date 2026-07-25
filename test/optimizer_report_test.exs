@@ -331,6 +331,41 @@ defmodule OptimizerReportTest do
     assert Enum.all?(prompts, &(&1 =~ "answer: Paris"))
   end
 
+  test "InferRules applies max_errors to public-facade candidate evaluation" do
+    failing_lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> raise "candidate task failure" end)
+
+    dev = [
+      Imp.example(question: "France capital?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+
+    optimizer =
+      Imp.Optimizer.InferRules.new(Imp.Metrics.exact_match(:answer),
+        candidates: ["Map France questions to Paris."],
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        max_errors: 1
+      )
+
+    compiled =
+      Imp.optimize!(
+        Imp.predict("question -> answer", lm: failing_lm),
+        optimizer,
+        [],
+        dev
+      )
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+
+    assert report.metadata.evaluation_max_errors == 1
+    assert Enum.all?(report.candidates, &(&1.status == :error))
+
+    assert Enum.all?(report.candidates, fn candidate ->
+             candidate.error =~ "max_errors 1"
+           end)
+  end
+
   test "labeled few-shot reports selected demonstrations without scoring them" do
     {train, _dev} = sets()
     program = Imp.predict("question -> answer", lm: lm())

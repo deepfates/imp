@@ -131,7 +131,8 @@ defmodule Imp.Optimizer.InferRules do
     {candidates, proposal_errors, proposal_calls} =
       build_candidates(optimizer, baseline, trainset, rule_lm)
 
-    evaluator = evaluator(devset, optimizer)
+    evaluation_max_errors = bootstrap_report.metadata.max_errors
+    evaluator = evaluator(devset, optimizer, evaluation_max_errors)
 
     evaluated =
       [%{program: baseline, index: :baseline, rules: %{}, baseline: true} | candidates]
@@ -172,6 +173,7 @@ defmodule Imp.Optimizer.InferRules do
           num_candidates: candidate_count(optimizer),
           num_rules: optimizer.num_rules,
           proposal_calls: proposal_calls,
+          evaluation_max_errors: evaluation_max_errors,
           predictor_names: Enum.map(Imp.ProgramParameters.predictors(baseline), & &1.name),
           trainset_size: length(trainset),
           validation_size: length(devset),
@@ -329,8 +331,14 @@ defmodule Imp.Optimizer.InferRules do
     end)
   end
 
-  defp evaluator(devset, optimizer) do
-    opts = if optimizer.num_threads, do: [max_concurrency: optimizer.num_threads], else: []
+  defp evaluator(devset, optimizer, max_errors) do
+    opts = [max_errors: max_errors]
+
+    opts =
+      if optimizer.num_threads,
+        do: Keyword.put(opts, :max_concurrency, optimizer.num_threads),
+        else: opts
+
     Imp.Evaluate.new(devset, optimizer.metric, opts)
   end
 
