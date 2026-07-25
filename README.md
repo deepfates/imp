@@ -98,7 +98,7 @@ a worked example for every row.
 | --- | --- |
 | **Declare** | `signature` (string DSL or map form with constraints), `example`, `with_inputs`, `prediction`, `get`, `to_map`, conversation `history` and `append_history` |
 | **Run** | `call`, `stream` and `collect` (provider token streaming, honest local fallback), `req_llm` (any ReqLLM provider), `configure` / `settings` / `context` for defaults and scoped overrides |
-| **Test** | `context` swaps a scripted model into any program with no patching, so signatures, adapters, and metrics run for real in your suite |
+| **Test** | `context` swaps a scripted default into dynamically bound programs; `with_lm` explicitly rebinds pinned program graphs, so signatures, adapters, and metrics run for real in your suite |
 | **Measure** | `evaluate` (score plus every row), `exact_match`, `extractive_qa`, `classification`, `classification_report`, `majority` voting |
 | **Improve** | `optimize`, `train` (weights are deliberately separate), `with_demos`, `with_playbook`, `with_lm`, `optimizer_capabilities`; optimizers: `LabeledFewShot`, `BootstrapFewShot`, `RandomSearch`, `KNNFewShot`, `COPRO`, `SIMBA`, `MIPROv2`, `GEPA`, `InferRules`, `SignatureOptimizer`, `Ensemble`, `BetterTogether`, `BootstrapFinetune`, `GRPO` (local MLX included), and Optimize-Anything for arbitrary text artifacts |
 | **Extend** | program shapes: `predict`, `chain_of_thought`, `react` and `react_v2`, `avatar`, `code_act`, `program_of_thought`, `rlm` with `rlm_serializable` handles; composition: `best_of_n`, `refine`, `assert` / `assertion`, `multi_chain_comparison`, `parallel`; tools and context: `tool`, `Imp.MCP.import_tools`, `memory`, `retrieve`, `rag`, `knn` / `nearest`, `Imp.Datasets` loaders, `Imp.Embeddings` |
@@ -107,20 +107,21 @@ a worked example for every row.
 You will use one or two rows at first; the rest are there when a task
 earns them.
 
-## The port is verified, and you can run the receipts
+## Verification is claim-scoped, and you can run the receipts
 
 Imp is a native BEAM realization of DSPy's research program of programming
-language models instead of prompting them. It tracks DSPy 3.2.1, and its
-optimizer and adapter families carry executable differential tests that run
-real pinned DSPy in a sidecar and compare outputs arm to arm — so "faithful
-port" is a claim you can run yourself, not take on faith. The
-[conformance report](docs/CONFORMANCE.md) then enumerates every surface with
-its own evidence: a differential where a sidecar comparison exists, a
-behavioral conformance test or a deliberate Elixir-native equivalent where
-the BEAM does the job differently, and an honest gap where an exact
-upstream-matched outcome is not yet proven. Where the BEAM offers more, such as supervision and cheap
-concurrency, Imp uses it. [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md)
-maps every name you already know and states exactly what differs.
+language models instead of prompting them. It tracks DSPy 3.2.1. Several
+optimizer and adapter contracts run real pinned DSPy in a sidecar and compare
+declared observations arm to arm; those receipts prove their stated scope, not
+whole-library equivalence or optimizer effectiveness. The [conformance
+report](docs/CONFORMANCE.md) enumerates every surface with its own evidence: a
+differential where one exists, a behavioral contract or deliberate
+Elixir-native equivalent where the mechanics differ, and an honest gap where
+an upstream-matched outcome is not yet proven. Imp uses supervision,
+process isolation, and bounded concurrency as native design choices; it does
+not claim comparative advantage without powered paired evidence. [Imp for DSPy
+users](docs/IMP_FOR_DSPY_USERS.md) maps every name you already know and states
+exactly what differs.
 
 ## Learn
 
