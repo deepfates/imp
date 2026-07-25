@@ -11,12 +11,12 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
   defmodule LengthLimitedMalformedLM do
     @behaviour Imp.LM
 
-    defstruct [:budget]
+    defstruct [:budget, output_tokens: 64]
 
     @impl true
     def generate(_messages, _opts), do: {:error, :length_limited_fixture_instance_required}
 
-    def generate(%__MODULE__{budget: budget}, _messages, _opts) do
+    def generate(%__MODULE__{budget: budget, output_tokens: output_tokens}, _messages, _opts) do
       :ok = CampaignBudget.authorize_transport_attempt(budget)
 
       {:ok,
@@ -32,7 +32,7 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
                "cost" => 0.0,
                total_cost: 0.0,
                input_tokens: 287,
-               output_tokens: 64
+               output_tokens: output_tokens
              }
            }
          }
@@ -141,8 +141,10 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
   end
 
   test "v2 preregistration changes only the bounded output envelope" do
+    path = "benchmarks/config/support-ticket-lift-openrouter-free-v2.json"
+
     manifest =
-      "benchmarks/config/support-ticket-lift-openrouter-free-v2.json"
+      path
       |> File.read!()
       |> Jason.decode!()
 
@@ -184,5 +186,37 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
 
     assert get_in(design, ["execution", "max_output_tokens_change_from_v1"]) ==
              "64_to_256_only"
+
+    v2_options = SupportTicketLiftCampaign.v2_options!(path)
+    assert v2_options[:max_output_tokens] == 256
+
+    factory = fn _seed, budget, ledger ->
+      budgeted = %BudgetedLM{
+        inner: %LengthLimitedMalformedLM{budget: budget, output_tokens: 256},
+        budget: budget,
+        max_output_tokens: 256
+      }
+
+      %OpenRouterFreeGuard.CheckedLM{inner: budgeted, budget: budget, ledger: ledger}
+    end
+
+    artifact =
+      [
+        runtime: :openrouter_free,
+        api_key: "not-used",
+        catalog: %{"source" => "local no-network fixture"},
+        lm_factory: factory
+      ]
+      |> Keyword.merge(v2_options)
+      |> SupportTicketLiftCampaign.run()
+
+    assert artifact["campaign"] == manifest["campaign_id"]
+    assert artifact["protocol_manifest"]["sha256"] != nil
+    assert artifact["controls"]["max_output_tokens"] == 256
+    assert artifact["budget"]["limits"]["output_tokens"] == 48 * 256
+    assert artifact["budget"]["requests"] == 1
+    assert artifact["budget"]["transport_attempts"] == 1
+    assert get_in(artifact, ["summary", "stopped_provider_context", "output_tokens"]) == 256
+    assert get_in(artifact, ["summary", "stopped_provider_context", "finish_reason"]) == "length"
   end
 end

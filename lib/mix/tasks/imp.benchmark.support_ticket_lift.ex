@@ -4,6 +4,9 @@ defmodule Mix.Tasks.Imp.Benchmark.SupportTicketLift do
 
       mix imp.benchmark.support_ticket_lift --runtime local --out /tmp/ticket-local.json
       mix imp.benchmark.support_ticket_lift --runtime openrouter-free --out /tmp/ticket-free.json
+      mix imp.benchmark.support_ticket_lift --runtime openrouter-free \
+        --manifest benchmarks/config/support-ticket-lift-openrouter-free-v2.json \
+        --out /tmp/ticket-free-v2.json
 
   `openrouter-free` requires `OPENROUTER_API_KEY` in the process environment and
   is pinned to 48 logical calls/transport attempts under the exact free-route
@@ -17,7 +20,9 @@ defmodule Mix.Tasks.Imp.Benchmark.SupportTicketLift do
   @impl true
   def run(args) do
     {opts, _argv, invalid} =
-      OptionParser.parse(args, strict: [runtime: :string, model: :string, out: :string])
+      OptionParser.parse(args,
+        strict: [runtime: :string, model: :string, manifest: :string, out: :string]
+      )
 
     if invalid != [], do: Mix.raise("invalid options: #{inspect(invalid)}")
     Mix.Task.run("app.start")
@@ -27,6 +32,7 @@ defmodule Mix.Tasks.Imp.Benchmark.SupportTicketLift do
 
     campaign_opts =
       [runtime: runtime]
+      |> Keyword.merge(manifest_options(opts[:manifest], runtime))
       |> maybe_put(:model, opts[:model])
       |> maybe_put_api_key(runtime)
       |> maybe_put_model_metadata(runtime, opts[:model])
@@ -46,6 +52,16 @@ defmodule Mix.Tasks.Imp.Benchmark.SupportTicketLift do
   defp parse_runtime("local"), do: :local
   defp parse_runtime("openrouter-free"), do: :openrouter_free
   defp parse_runtime(other), do: Mix.raise("unsupported --runtime #{inspect(other)}")
+
+  defp manifest_options(nil, _runtime), do: []
+
+  defp manifest_options(path, :openrouter_free) do
+    Imp.BenchmarkTruth.SupportTicketLiftCampaign.v2_options!(path)
+  end
+
+  defp manifest_options(_path, runtime) do
+    Mix.raise("a campaign manifest is not supported for runtime #{inspect(runtime)}")
+  end
 
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
