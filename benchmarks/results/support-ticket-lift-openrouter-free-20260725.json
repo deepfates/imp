@@ -1,0 +1,152 @@
+{
+  "arms": [
+    "baseline",
+    "labeled_few_shot"
+  ],
+  "budget": {
+    "active_reservations": 0,
+    "exhausted": null,
+    "limits": {
+      "input_tokens": 2000000,
+      "output_tokens": 3072,
+      "requests": 48,
+      "usd": 0.0
+    },
+    "pricing": {
+      "input_per_million": 0.0,
+      "output_per_million": 0.0
+    },
+    "requests": 1,
+    "reservation_ledger_version": 2,
+    "reservations": [],
+    "reserved": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0
+    },
+    "single_attempt_transport_enforced": true,
+    "transport_attempts": 1,
+    "usage": {
+      "input_tokens": 287,
+      "output_tokens": 64,
+      "usd": 0.0
+    }
+  },
+  "campaign": "support-ticket-baseline-vs-labeled-few-shot",
+  "controls": {
+    "cache": false,
+    "json_retries": 0,
+    "logical_request_limit": 48,
+    "max_concurrency": 1,
+    "max_output_tokens": 64,
+    "same_test_rows_and_generation_limits_for_every_arm_seed": true,
+    "selection_visible_to_optimizer": false,
+    "test_opened_only_after_each_program_was_compiled": true,
+    "test_visible_to_optimizer_or_selection": false,
+    "train_visible_to_optimizer": true,
+    "transport_retries": 0
+  },
+  "dataset": {
+    "exact_ticket_overlap": false,
+    "path": "/Users/deepfates/Hacking/github/deepfates/imp/_build/dev/lib/imp/priv/tutorial/support_tickets.json",
+    "selection_rows": 20,
+    "selection_sha256": "sha256:68b792f671914befd6931e3ed161feca5c8e2cf6a0a1c9aa03bc639b7d7dd81d",
+    "sha256": "7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87",
+    "test_indices": [
+      0,
+      1,
+      5,
+      6,
+      10,
+      11,
+      15,
+      16
+    ],
+    "test_sha256": "sha256:c9ef5cace68875be4b5a68f850317143b2af751d589a3cb8b54b728b4a7b077e",
+    "train_rows": 20,
+    "train_sha256": "sha256:e96e2df4724672889d81061305427661a28eb1ed54edf8f74699c1a22bb1f2da",
+    "untouched_test_rows_total": 20,
+    "untouched_test_rows_used": 8
+  },
+  "generated_at": "2026-07-25T20:39:49Z",
+  "git_sha": "9f1316b2f1d0bce88a56ac5a3c06ba82bc275982",
+  "model": "openai/gpt-oss-20b:free",
+  "model_metadata": {},
+  "provider_accounting": {
+    "catalog": {
+      "canonical_model": "openai/gpt-oss-20b",
+      "checked_url": "https://openrouter.ai/api/v1/models",
+      "model": "openai/gpt-oss-20b:free",
+      "pricing": {
+        "completion": 0.0,
+        "prompt": 0.0
+      }
+    },
+    "response_ledger": {
+      "halted": null,
+      "responses": [
+        {
+          "actual_model": "openai/gpt-oss-20b:free",
+          "computed_cost_usd": 0.0,
+          "gateway_provider": "openrouter",
+          "input_tokens": 287,
+          "logical_requests": 1,
+          "output_tokens": 64,
+          "provider_reported_cost_usd": 0.0,
+          "status": "passed",
+          "transport_attempts": 1,
+          "upstream_provider": "Darkbloom"
+        }
+      ]
+    }
+  },
+  "results": [
+    {
+      "arm": "baseline",
+      "budget_delta": {
+        "input_tokens": 287,
+        "logical_requests": 1,
+        "output_tokens": 64,
+        "transport_attempts": 1,
+        "usd": 0.0
+      },
+      "program": null,
+      "seed": 17,
+      "selection_split": "none",
+      "status": "failed",
+      "test_errors": [
+        "\"** (Imp.EvaluationCancelledError) Imp.Evaluate execution cancelled: 1 errors reached max_errors 1 after 1 of 8 examples\\n    (imp 0.2.1) lib/imp/evaluate.ex:299: Imp.Evaluate.run/2\\n    (imp 0.2.1) bench/imp/benchmark_truth/support_ticket_lift_campaign.ex:101: Imp.BenchmarkTruth.SupportTicketLiftCampaign.run_arm/3\\n    (imp 0.2.1) bench/imp/benchmark_truth/support_ticket_lift_campaign.ex:80: anonymous fn/3 in Imp.BenchmarkTruth.SupportTicketLiftCampaign.run_schedule/1\\n    (elixir 1.19.5) lib/enum.e\" <> ..."
+      ],
+      "test_rows": [],
+      "test_score": null,
+      "wall_seconds": 2.067
+    }
+  ],
+  "runtime": "openrouter_free",
+  "schema_version": 1,
+  "scope": "A three-seed, untouched eight-row support-ticket preflight for baseline versus sampled LabeledFewShot on one model. It is not a matched upstream run, the canonical GSM8K/Banking77 portfolio, or general optimizer effectiveness evidence.",
+  "seeds": [
+    17,
+    23,
+    31
+  ],
+  "summary": {
+    "c3_effectiveness_established": false,
+    "c3_exclusions": [
+      "no independently executed upstream comparator",
+      "not the canonical GSM8K and Banking77 portfolio",
+      "single task and single model",
+      "eight test rows have low statistical resolution"
+    ],
+    "declared_seed_count": 3,
+    "execution_complete": false,
+    "improving_seeds": 0,
+    "mean_test_lift": null,
+    "paired_exact_bootstrap_95_interval": {
+      "lower": null,
+      "upper": null
+    },
+    "paired_scores": [],
+    "within_task_numeric_go_rule_passed": false
+  }
+}

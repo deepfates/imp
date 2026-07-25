@@ -3,6 +3,40 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuardTest do
 
   alias Imp.BenchmarkTruth.OpenRouterFreeGuard
 
+  defmodule CheckedFixtureLM do
+    @behaviour Imp.LM
+    defstruct [:budget, :actual_model]
+
+    @impl true
+    def generate(_messages, _opts), do: {:error, :checked_fixture_instance_required}
+
+    def generate(%__MODULE__{} = lm, messages, opts) do
+      {:ok, reservation} =
+        Imp.BenchmarkTruth.CampaignBudget.reserve(lm.budget, messages, opts)
+
+      :ok = Imp.BenchmarkTruth.CampaignBudget.authorize_transport_attempt(lm.budget)
+      :ok = Imp.BenchmarkTruth.CampaignBudget.release(lm.budget, reservation)
+
+      {:ok,
+       %{
+         __imp_lm_output__: "IMP",
+         __imp_lm_metadata__: %{
+           req_llm: %{
+             provider: "openrouter",
+             model: lm.actual_model,
+             provider_meta: %{"provider" => "MockFree"},
+             usage: %{
+               "cost" => 0.0,
+               total_cost: 0.0,
+               input_tokens: 8,
+               output_tokens: 1
+             }
+           }
+         }
+       }}
+    end
+  end
+
   test "passes only with exact serialized guard, one transport attempt, and explicit zero cost" do
     base_url =
       Imp.Test.LocalHTTP.start(fn request ->
@@ -44,6 +78,36 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuardTest do
     assert artifact["status"] == "failed"
     assert artifact["error"] =~ "provider_cost"
     assert get_in(artifact, ["budget", "transport_attempts"]) == 1
+  end
+
+  test "checked campaign LM halts before another call on model-route drift" do
+    {:ok, budget} =
+      Imp.BenchmarkTruth.CampaignBudget.start_link(
+        limits: %{requests: 2, input_tokens: 10_000, output_tokens: 64, usd: 0.0},
+        pricing: %{"input_per_million" => 0.0, "output_per_million" => 0.0},
+        default_max_output_tokens: 32
+      )
+
+    {:ok, ledger} = OpenRouterFreeGuard.start_ledger()
+
+    checked = %OpenRouterFreeGuard.CheckedLM{
+      inner: %CheckedFixtureLM{budget: budget, actual_model: "paid/model"},
+      budget: budget,
+      ledger: ledger
+    }
+
+    assert {:error, {:openrouter_free_validation_failed, _reason}} =
+             Imp.LM.generate(checked, [%{role: :user, content: "hello"}], max_tokens: 32)
+
+    first = Imp.BenchmarkTruth.CampaignBudget.snapshot(budget)
+    assert first["requests"] == 1
+    assert first["transport_attempts"] == 1
+    assert OpenRouterFreeGuard.ledger_snapshot(ledger)["halted"] != nil
+
+    assert {:error, {:openrouter_free_campaign_halted, _reason}} =
+             Imp.LM.generate(checked, [%{role: :user, content: "again"}], max_tokens: 32)
+
+    assert Imp.BenchmarkTruth.CampaignBudget.snapshot(budget) == first
   end
 
   defp catalog do

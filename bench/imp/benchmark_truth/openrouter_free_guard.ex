@@ -19,6 +19,57 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     }
   end
 
+  def current_catalog!, do: fetch_catalog() |> validate_catalog!()
+
+  def strict_lm(api_key, budget, ledger, seed, opts \\ []) do
+    max_output_tokens = Keyword.get(opts, :max_output_tokens, 64)
+
+    inner =
+      Imp.req_llm("openrouter:" <> @model,
+        api_key: api_key,
+        temperature: 0.0,
+        seed: seed,
+        max_tokens: max_output_tokens,
+        max_retries: 0,
+        cache: false,
+        provider_options: [
+          openrouter_provider: provider_guard(),
+          openrouter_usage: %{include: true}
+        ]
+      )
+
+    budgeted = %BudgetedLM{
+      inner: inner,
+      budget: budget,
+      max_output_tokens: max_output_tokens
+    }
+
+    struct(Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM,
+      inner: budgeted,
+      budget: budget,
+      ledger: ledger
+    )
+  end
+
+  def start_ledger, do: Agent.start_link(fn -> %{halted: nil, rows: []} end)
+
+  def ledger_snapshot(ledger) do
+    Agent.get(ledger, fn state ->
+      %{
+        "halted" => state.halted && safe_error(state.halted),
+        "responses" => Enum.reverse(state.rows)
+      }
+    end)
+  end
+
+  @doc false
+  def checked_generate(inner, budget, ledger, messages, opts) do
+    case Agent.get(ledger, & &1.halted) do
+      nil -> do_checked_generate(inner, budget, ledger, messages, opts)
+      reason -> {:error, {:openrouter_free_campaign_halted, reason}}
+    end
+  end
+
   def run(opts) do
     api_key = Keyword.fetch!(opts, :api_key)
     catalog_fetcher = Keyword.get(opts, :catalog_fetcher, &fetch_catalog/0)
@@ -181,6 +232,85 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
     {:error, artifact("failed", catalog, audit, snapshot, nil, safe_error(other))}
   end
 
+  defp do_checked_generate(inner, budget, ledger, messages, opts) do
+    result = Imp.LM.generate(inner, messages, opts)
+    snapshot = CampaignBudget.snapshot(budget)
+
+    case strict_response_accounting(result, snapshot) do
+      {:ok, row} ->
+        Agent.update(ledger, fn state -> %{state | rows: [row | state.rows]} end)
+        result
+
+      {:error, reason, row} ->
+        Agent.update(ledger, fn state -> %{state | halted: reason, rows: [row | state.rows]} end)
+        {:error, {:openrouter_free_validation_failed, reason}}
+    end
+  end
+
+  defp strict_response_accounting({:ok, raw}, snapshot) do
+    with {:ok, _output, metadata} <- Imp.LM.Result.split(raw),
+         {:ok, provider} <- required_binary(get_in(metadata, [:req_llm, :provider]), :provider),
+         {:ok, actual_model} <-
+           required_binary(get_in(metadata, [:req_llm, :model]), :actual_model),
+         :ok <- validate_identity(provider, actual_model),
+         {:ok, upstream_provider} <-
+           required_binary(
+             map_value(get_in(metadata, [:req_llm, :provider_meta]) || %{}, :provider),
+             :upstream_provider
+           ),
+         {:ok, usage} <- required_map(get_in(metadata, [:req_llm, :usage]), :usage),
+         {:ok, provider_cost} <- required_number(map_value(usage, "cost"), :provider_cost),
+         {:ok, computed_cost} <- required_number(map_value(usage, :total_cost), :computed_cost),
+         :ok <- require_zero(provider_cost, :provider_cost),
+         :ok <- require_zero(computed_cost, :computed_cost),
+         :ok <- validate_cumulative_budget(snapshot) do
+      {:ok,
+       %{
+         "status" => "passed",
+         "logical_requests" => snapshot["requests"],
+         "transport_attempts" => snapshot["transport_attempts"],
+         "gateway_provider" => provider,
+         "upstream_provider" => upstream_provider,
+         "actual_model" => actual_model,
+         "provider_reported_cost_usd" => provider_cost,
+         "computed_cost_usd" => computed_cost,
+         "input_tokens" => map_value(usage, :input_tokens),
+         "output_tokens" => map_value(usage, :output_tokens)
+       }}
+    else
+      {:error, reason} ->
+        {:error, reason, failed_response_row(reason, snapshot)}
+    end
+  end
+
+  defp strict_response_accounting({:error, reason}, snapshot),
+    do: {:error, {:provider_error, safe_error(reason)}, failed_response_row(reason, snapshot)}
+
+  defp strict_response_accounting(other, snapshot),
+    do: {:error, {:malformed_lm_result, safe_error(other)}, failed_response_row(other, snapshot)}
+
+  defp validate_cumulative_budget(%{
+         "requests" => requests,
+         "transport_attempts" => attempts,
+         "single_attempt_transport_enforced" => true,
+         "usage" => %{"usd" => usd},
+         "exhausted" => nil
+       })
+       when requests == attempts and (usd == 0 or usd == 0.0),
+       do: :ok
+
+  defp validate_cumulative_budget(_snapshot),
+    do: {:error, :cumulative_attempt_or_cost_budget_mismatch}
+
+  defp failed_response_row(reason, snapshot) do
+    %{
+      "status" => "failed",
+      "logical_requests" => snapshot["requests"],
+      "transport_attempts" => snapshot["transport_attempts"],
+      "error" => safe_error(reason)
+    }
+  end
+
   defp validate_identity("openrouter", actual_model)
        when actual_model in [@model, @canonical_model],
        do: :ok
@@ -287,4 +417,25 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard do
 
   defp safe_error(error),
     do: error |> inspect(limit: 20, printable_limit: 500) |> Imp.Redaction.redact()
+end
+
+defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM do
+  @moduledoc false
+
+  @behaviour Imp.LM
+
+  defstruct [:inner, :budget, :ledger]
+
+  @impl true
+  def generate(_messages, _opts), do: {:error, :checked_lm_instance_required}
+
+  def generate(%__MODULE__{} = lm, messages, opts) do
+    Imp.BenchmarkTruth.OpenRouterFreeGuard.checked_generate(
+      lm.inner,
+      lm.budget,
+      lm.ledger,
+      messages,
+      opts
+    )
+  end
 end
