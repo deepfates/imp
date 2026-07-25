@@ -794,7 +794,13 @@ defmodule GepaCampaignTest do
       |> GepaCampaign.run()
 
     assert_receive {:reflection_call, messages}
-    assert Enum.any?(messages, &(Map.get(&1, :content, "") =~ "Improve exactly one"))
+
+    assert Enum.any?(messages, fn message ->
+             content = Map.get(message, :content, "")
+
+             content =~ "write a new instruction for the assistant" and
+               content =~ "Improve Papillon by matching response exactly"
+           end)
 
     [row] = result.report["rows"]
     assert row["metric_judge"]["model"] == "openai:gpt-4.1-mini-2025-04-14"

@@ -420,10 +420,10 @@ defmodule UpstreamExam.TelepromptTest do
   # ---------------------------------------------------------------------------
 
   # test_basic_workflow (adapted): upstream replays byte-exact prompt/response
-  # fixtures through its own reflection prompts; Imp's GEPA has its own
-  # proposal contract (JSON with an instruction field), so the port asserts the
-  # same boundary behavior — compile completes against scripted task and
-  # reflection LMs and returns an optimized program.
+  # fixtures through its own reflection prompts. Imp ports the standalone
+  # v0.1.4 instruction-proposal prompt/extractor while also accepting typed JSON
+  # adapter responses. This test verifies the decoded replacement is actually
+  # installed and selected, rather than merely observing a reflection call.
   test "gepa: basic compile workflow completes with scripted task and reflection LMs" do
     metric = fn example, prediction ->
       %{
@@ -436,11 +436,28 @@ defmodule UpstreamExam.TelepromptTest do
       }
     end
 
-    task_lm = static_lm(fn _messages, _opts -> %{output: "blue"} end)
+    task_lm =
+      static_lm(fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", & &1.content)
+
+        improved_instruction? =
+          prompt =~ "Answer with the exact expected output." and
+            not String.contains?(prompt, ~s("instruction")) and
+            not String.contains?(prompt, "```")
+
+        output =
+          if improved_instruction? and prompt =~ "What does the fox say?" do
+            "Ring-ding-ding-ding-dingeringeding!"
+          else
+            "blue"
+          end
+
+        %{output: output}
+      end)
 
     reflection_lm =
       static_lm(fn _messages, _opts ->
-        Jason.encode!(%{"instruction" => "Answer with the exact expected output."})
+        "Analysis of the failures.\n```\nAnswer with the exact expected output.\n```"
       end)
 
     student = Imp.predict("input -> output", lm: task_lm)
@@ -457,6 +474,10 @@ defmodule UpstreamExam.TelepromptTest do
       |> Imp.Optimizer.GEPA.compile(student, trainset, trainset)
 
     assert %Imp.Predict.Predict{} = optimized
+
+    assert Imp.Optimizer.GEPA.Candidate.from_program(optimized) == %{
+             main: "Answer with the exact expected output."
+           }
   end
 
   # ---------------------------------------------------------------------------
@@ -527,8 +548,8 @@ defmodule UpstreamExam.TelepromptTest do
     fn _example, _prediction -> %{score: 0.3, feedback: "Test feedback"} end
   end
 
-  # Upstream reflection_lm DummyLM({"improved_instruction": ...}); Imp's
-  # reflection contract is JSON with an instruction field.
+  # Upstream reflection_lm DummyLM({"improved_instruction": ...}); the map form
+  # remains a supported adapter-normalized response at Imp's LM boundary.
   defp selector_reflection_lm do
     static_lm(fn _messages, _opts ->
       Jason.encode!(%{

@@ -44,6 +44,7 @@ defmodule Imp.Optimizer.GEPA do
     ComBee,
     ComponentFeedback,
     Engine,
+    InstructionProposal,
     ProgramAdapter,
     ReflectionStrategy
   }
@@ -212,6 +213,10 @@ defmodule Imp.Optimizer.GEPA do
     trainset = Enum.to_list(trainset)
     devset = Enum.to_list(devset)
     {feedback, feedback_errors} = feedback(optimizer, trainset)
+
+    reflection_feedback =
+      if is_function(optimizer.feedback_fn, 1) and feedback_errors == [], do: feedback
+
     seed_candidate = Candidate.from_program(program)
 
     adapter =
@@ -259,7 +264,7 @@ defmodule Imp.Optimizer.GEPA do
         seed_candidate,
         trainset,
         devset,
-        proposer(optimizer.reflection_lm, feedback),
+        proposer(optimizer.reflection_lm, feedback, reflection_feedback),
         engine_opts
       )
 
@@ -314,11 +319,18 @@ defmodule Imp.Optimizer.GEPA do
     {Report.attach(compiled, report), report}
   end
 
-  defp proposer(reflection_lm, feedback) do
+  defp proposer(reflection_lm, fallback_feedback, reflection_feedback) do
     fn candidate, component, records, generation, aggregation ->
       case reflection_lm do
         nil ->
-          fallback_proposal(candidate, component, records, generation, feedback, aggregation)
+          fallback_proposal(
+            candidate,
+            component,
+            records,
+            generation,
+            fallback_feedback,
+            aggregation
+          )
 
         lm ->
           reflection_proposal(
@@ -327,7 +339,7 @@ defmodule Imp.Optimizer.GEPA do
             component,
             records,
             generation,
-            feedback,
+            reflection_feedback,
             aggregation
           )
       end
@@ -363,56 +375,22 @@ defmodule Imp.Optimizer.GEPA do
          candidate,
          component,
          records,
-         generation,
+         _generation,
          feedback,
-         aggregation
+         _aggregation
        ) do
-    task =
-      case Map.get(aggregation, :phase) do
-        :first_level ->
-          "Extract a candidate context update for exactly one named program component from this reflection group. Return JSON with an instruction field."
-
-        :final ->
-          "Aggregate the ordered intermediate updates into one final instruction for exactly one named program component. Return JSON with an instruction field."
-
-        _phase ->
-          "Improve exactly one named program component from execution traces and feedback. Return JSON with an instruction field."
-      end
-
-    messages = [
-      %{
-        role: :system,
-        content: task
-      },
-      %{
-        role: :user,
-        content:
-          Jason.encode!(%{
-            component: component,
-            current_instruction: Map.fetch!(candidate, component),
-            generation: generation,
-            global_feedback: feedback,
-            aggregation: aggregation,
-            reflective_dataset: records
-          })
-      }
-    ]
+    messages =
+      InstructionProposal.messages(Map.fetch!(candidate, component), records, feedback)
 
     case lm |> Imp.LM.generate(messages, []) |> Imp.LM.Result.unwrap() do
-      {:ok, %{"instruction" => instruction}} when is_binary(instruction) ->
-        instruction
-
-      {:ok, %{instruction: instruction}} when is_binary(instruction) ->
-        instruction
-
-      {:ok, instruction} when is_binary(instruction) ->
-        instruction
+      {:ok, response} ->
+        case InstructionProposal.normalize(response) do
+          {:ok, instruction} -> instruction
+          {:error, reason} -> {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, {:reflection_lm_failed, reason}}
-
-      {:ok, other} ->
-        {:error, {:invalid_reflection_lm_response, other}}
     end
   end
 
