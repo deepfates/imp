@@ -14,6 +14,7 @@ defmodule Imp.Optimize.Anything.Config do
     Callback,
     CandidateSelector,
     ModuleSelector,
+    ProposalSelection,
     Stopper
   }
 
@@ -110,6 +111,9 @@ defmodule Imp.Optimize.Anything.Config do
     @enum_fields [
       :val_evaluation_policy,
       :candidate_selection_strategy,
+      :acceptance_criterion,
+      :sampling_strategy,
+      :selection_strategy,
       :frontier_type,
       :cache_evaluation_storage
     ]
@@ -122,8 +126,15 @@ defmodule Imp.Optimize.Anything.Config do
       max_metric_calls: [type: {:or, [:non_neg_integer, nil]}, default: nil],
       max_candidate_proposals: [type: {:or, [:non_neg_integer, nil]}, default: nil],
       max_full_evaluations: [type: {:or, [:non_neg_integer, nil]}, default: nil],
+      max_reflection_cost: [
+        type: {:custom, __MODULE__, :validate_optional_non_negative_number, []},
+        default: nil
+      ],
       val_evaluation_policy: [type: :any, default: :full_eval],
       candidate_selection_strategy: [type: :any, default: :pareto],
+      acceptance_criterion: [type: :any, default: :strict_improvement],
+      sampling_strategy: [type: :any, default: nil],
+      selection_strategy: [type: :any, default: nil],
       frontier_type: [type: {:in, [:instance, :objective, :hybrid, :cartesian]}, default: :hybrid],
       parallel: [type: :boolean, default: true],
       max_workers: [type: {:or, [:pos_integer, nil]}, default: @default_max_workers],
@@ -141,8 +152,12 @@ defmodule Imp.Optimize.Anything.Config do
               max_metric_calls: nil,
               max_candidate_proposals: nil,
               max_full_evaluations: nil,
+              max_reflection_cost: nil,
               val_evaluation_policy: :full_eval,
               candidate_selection_strategy: :pareto,
+              acceptance_criterion: :strict_improvement,
+              sampling_strategy: nil,
+              selection_strategy: nil,
               frontier_type: :hybrid,
               parallel: true,
               max_workers: @default_max_workers,
@@ -156,6 +171,7 @@ defmodule Imp.Optimize.Anything.Config do
     @spec new(keyword()) :: t()
     def new(opts \\ []) do
       values = Imp.Options.validate!(opts, @schema, "#{inspect(__MODULE__)}.new/1")
+      values = normalize_persisted_strategies(values)
       config = struct!(__MODULE__, values)
       validate_strategies!(config)
       validate_cache!(config)
@@ -168,8 +184,24 @@ defmodule Imp.Optimize.Anything.Config do
     def cache_mode(%__MODULE__{cache_evaluation_storage: :auto}), do: :disk
     def cache_mode(%__MODULE__{cache_evaluation_storage: mode}), do: mode
 
+    @doc false
+    def validate_optional_non_negative_number(nil), do: {:ok, nil}
+
+    def validate_optional_non_negative_number(value) when is_number(value) and value >= 0,
+      do: {:ok, value}
+
+    def validate_optional_non_negative_number(_value),
+      do: {:error, "expected a non-negative number or nil"}
+
     @spec to_map(t()) :: map()
-    def to_map(%__MODULE__{} = config), do: Persistence.encode(config)
+    def to_map(%__MODULE__{} = config) do
+      config
+      |> Map.from_struct()
+      |> Map.put(:sampling_strategy, dump_sampling_strategy(config.sampling_strategy))
+      |> Map.put(:selection_strategy, dump_selection_strategy(config.selection_strategy))
+      |> then(&struct!(__MODULE__, &1))
+      |> Persistence.encode()
+    end
 
     @spec from_map(map()) :: t()
     def from_map(map),
@@ -177,12 +209,79 @@ defmodule Imp.Optimize.Anything.Config do
 
     defp validate_strategies!(config) do
       CandidateSelector.validate!(config.candidate_selection_strategy)
+      validate_sampling_strategy!(config.sampling_strategy)
+      ProposalSelection.validate!(config.selection_strategy || :all_improvements)
+      validate_acceptance_criterion!(config.acceptance_criterion)
 
       unless config.val_evaluation_policy in [:full_eval, :full] or
                is_atom(config.val_evaluation_policy) do
         raise ArgumentError, "val_evaluation_policy must be :full_eval, :full, or a policy module"
       end
     end
+
+    defp validate_sampling_strategy!(nil), do: :ok
+    defp validate_sampling_strategy!(:single), do: :ok
+
+    defp validate_sampling_strategy!({kind, count})
+         when kind in [:same_parent, :independent] and is_integer(count) and count > 0,
+         do: :ok
+
+    defp validate_sampling_strategy!({:pxn, parents, mutations})
+         when is_integer(parents) and parents > 0 and is_integer(mutations) and mutations > 0,
+         do: :ok
+
+    defp validate_sampling_strategy!(strategy) do
+      raise ArgumentError,
+            "sampling_strategy must be nil, :single, {:same_parent, n}, {:independent, n}, or {:pxn, p, n}; custom upstream strategy objects are not supported by the Optimize Anything config, got: #{inspect(strategy)}"
+    end
+
+    defp validate_acceptance_criterion!(criterion)
+         when criterion in [:strict_improvement, :improvement_or_equal, :equal_or_better],
+         do: :ok
+
+    defp validate_acceptance_criterion!({:callback, callback})
+         when is_function(callback, 1),
+         do: :ok
+
+    defp validate_acceptance_criterion!(criterion) do
+      raise ArgumentError,
+            "acceptance_criterion must be :strict_improvement, :improvement_or_equal, or a BEAM-native {:callback, arity_1_function}; custom upstream criterion objects are not supported by the Optimize Anything config, got: #{inspect(criterion)}"
+    end
+
+    defp normalize_persisted_strategies(values) do
+      values
+      |> Keyword.update(:sampling_strategy, nil, &load_sampling_strategy/1)
+      |> Keyword.update(:selection_strategy, nil, &load_selection_strategy/1)
+    end
+
+    defp dump_sampling_strategy({kind, count}) when kind in [:same_parent, :independent],
+      do: %{"type" => Atom.to_string(kind), "count" => count}
+
+    defp dump_sampling_strategy({:pxn, parents, mutations}),
+      do: %{"type" => "pxn", "parents" => parents, "mutations" => mutations}
+
+    defp dump_sampling_strategy(strategy), do: strategy
+
+    defp load_sampling_strategy(%{"type" => type, "count" => count})
+         when type in ["same_parent", "independent"],
+         do: {String.to_existing_atom(type), count}
+
+    defp load_sampling_strategy(%{
+           "type" => "pxn",
+           "parents" => parents,
+           "mutations" => mutations
+         }),
+         do: {:pxn, parents, mutations}
+
+    defp load_sampling_strategy(strategy), do: strategy
+
+    defp dump_selection_strategy({:top_k, count}),
+      do: %{"type" => "top_k", "count" => count}
+
+    defp dump_selection_strategy(strategy), do: strategy
+
+    defp load_selection_strategy(%{"type" => "top_k", "count" => count}), do: {:top_k, count}
+    defp load_selection_strategy(strategy), do: strategy
 
     defp validate_cache!(%{cache_evaluation: true, cache_evaluation_storage: :disk, run_dir: nil}) do
       raise ArgumentError, "cache_evaluation_storage :disk requires run_dir"
@@ -416,10 +515,16 @@ defmodule Imp.Optimize.Anything.Config do
       raise_on_exception: engine.raise_on_exception,
       max_metric_calls: engine.max_metric_calls || :infinity,
       max_full_evaluations: engine.max_full_evaluations || :infinity,
+      max_reflection_cost: engine.max_reflection_cost,
+      reflection_cost_source: reflection.reflection_lm,
       frontier_type: engine.frontier_type,
       cache_evaluation: engine.cache_evaluation,
       cache_evaluation_storage: cache_storage(engine),
       candidate_selection_strategy: engine.candidate_selection_strategy,
+      acceptance_policy: acceptance_policy(engine.acceptance_criterion),
+      sampling_strategy: engine.sampling_strategy,
+      selection_strategy: engine.selection_strategy,
+      proposal_concurrency: proposal_width(engine.sampling_strategy),
       batch_sampler: reflection.batch_sampler,
       module_selector: reflection.module_selector,
       track_best_outputs: engine.track_best_outputs,
@@ -427,7 +532,7 @@ defmodule Imp.Optimize.Anything.Config do
       minibatch_size: reflection.reflection_minibatch_size,
       skip_perfect_score: reflection.skip_perfect_score,
       perfect_score: reflection.perfect_score,
-      max_reflection_calls: engine.max_candidate_proposals || :infinity,
+      max_reflection_calls: :infinity,
       stopper: config.stopper,
       callbacks: config.callbacks
     ]
@@ -542,6 +647,14 @@ defmodule Imp.Optimize.Anything.Config do
 
   defp evaluation_policy(:full_eval), do: :full
   defp evaluation_policy(policy), do: policy
+
+  defp acceptance_policy(:improvement_or_equal), do: :equal_or_better
+  defp acceptance_policy(policy), do: policy
+
+  defp proposal_width(nil), do: nil
+  defp proposal_width(:single), do: 1
+  defp proposal_width({kind, count}) when kind in [:same_parent, :independent], do: count
+  defp proposal_width({:pxn, parents, mutations}), do: parents * mutations
 
   defp cache_storage(engine) do
     case Engine.cache_mode(engine) do

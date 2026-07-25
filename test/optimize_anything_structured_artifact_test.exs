@@ -44,7 +44,7 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
         objective: "Select the typed routing policy",
         config:
           Config.new(
-            engine: [max_candidate_proposals: 4, seed: 17],
+            engine: [max_candidate_proposals: 1, seed: 17],
             reflection: [module_selector: :all]
           ),
         fallback_proposer: proposer

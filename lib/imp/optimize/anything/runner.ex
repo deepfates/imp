@@ -501,6 +501,7 @@ defmodule Imp.Optimize.Anything.Runner do
   defp stopping_condition?(config, opts) do
     not is_nil(config.engine.max_metric_calls) or
       not is_nil(config.engine.max_candidate_proposals) or
+      not is_nil(config.engine.max_reflection_cost) or
       not is_nil(config.stopper) or
       not is_nil(config.engine.run_dir) or
       Keyword.has_key?(opts, :fallback_max_iterations)

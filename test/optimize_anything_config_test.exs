@@ -84,7 +84,7 @@ defmodule Imp.Optimize.Anything.ConfigTest do
     assert opts[:cache_evaluation_storage] == :memory
     assert opts[:candidate_selection_strategy] == :pareto
     assert opts[:module_selector] == :round_robin
-    assert opts[:max_reflection_calls] == 12
+    assert opts[:max_reflection_calls] == :infinity
     assert opts[:track_best_outputs] == false
     assert opts[:skip_perfect_score] == false
     assert opts[:perfect_score] == nil

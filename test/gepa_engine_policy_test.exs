@@ -259,6 +259,7 @@ defmodule Imp.Optimizer.GEPA.EnginePolicyTest do
         fn _, _, _, _ -> "unused" end,
         max_iterations: 2,
         resume_state: checkpoint,
+        acceptance_policy: :equal_or_better,
         cache_evaluation: false
       )
 

@@ -89,6 +89,22 @@ checkpoint, refuses strategy substitution on resume, and never silently falls
 back to `:epoch_shuffled`. As upstream does, a custom sampler cannot be combined
 with `reflection_minibatch_size`.
 
+For multiple proposals in one round, set `engine.sampling_strategy` to
+`{:same_parent, n}`, `{:independent, n}`, or `{:pxn, parents, mutations}` and
+choose `engine.selection_strategy` (`:all_improvements`, `:best_improvement`,
+or `{:top_k, n}`). `engine.acceptance_criterion` controls the preceding
+admission judgement with `:strict_improvement`, `:improvement_or_equal`, or an
+`Imp.Optimizer.GEPA.Acceptance.callback/1`. BEAM-native selection callbacks
+are also supported. The strategy configuration is checkpoint-bound, so resume
+cannot silently switch policies with the same task width. Arbitrary Python
+strategy objects have no native callback contract and are rejected explicitly.
+
+The returned result remains immutable, matching the pinned public result
+boundary. Use `Imp.Optimize.Anything.best_candidate/1` to obtain the native
+selected value, install it into the consumer's actual program/configuration,
+and execute that program. Imp does not advertise an implicit object-mutation
+or application callback.
+
 When `run_dir` is set, Imp writes atomic JSON checkpoints and seed/best
 validation outputs. Evaluation caching defaults to durable, content-addressed
 JSON storage for run directories and fails closed on corrupt or incompatible

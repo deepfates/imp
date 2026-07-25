@@ -58,7 +58,16 @@ defmodule Imp.Optimizer.GEPA.Engine do
               budget_ledger: %BudgetLedger{},
               pending_proposal_batch: nil,
               pending_validation: nil,
-              proposal_policy: %{requested: 1, resolved: 1, timeout: :infinity},
+              proposal_policy: %{
+                requested: 1,
+                resolved: 1,
+                timeout: :infinity,
+                strategy_configuration: %{
+                  sampling_strategy: :single,
+                  selection_strategy: :all_improvements,
+                  acceptance_policy: :strict_improvement
+                }
+              },
               combee_policy: nil,
               combee_reports: [],
               adapter_state: %{},
@@ -3042,7 +3051,12 @@ defmodule Imp.Optimizer.GEPA.Engine do
           value
       end
 
-    %{requested: requested, resolved: resolved, timeout: timeout}
+    %{
+      requested: requested,
+      resolved: resolved,
+      timeout: timeout,
+      strategy_configuration: strategy_configuration(opts)
+    }
   end
 
   defp ensure_proposal_policy!(%State{proposal_policy: policy} = state, requested) do
@@ -3058,18 +3072,26 @@ defmodule Imp.Optimizer.GEPA.Engine do
     %{
       "requested" => if(policy.requested == :auto, do: "auto", else: policy.requested),
       "resolved" => policy.resolved,
-      "timeout" => if(policy.timeout == :infinity, do: "infinity", else: policy.timeout)
+      "timeout" => if(policy.timeout == :infinity, do: "infinity", else: policy.timeout),
+      "strategy_configuration" => Imp.Optimizer.Report.encode_term(policy.strategy_configuration)
     }
   end
 
-  defp load_proposal_policy(dumped, 4, _requested) do
+  defp load_proposal_policy(dumped, 4, requested) do
     stored = Map.fetch!(dumped, "proposal_policy")
 
-    %{
+    loaded = %{
       requested: if(stored["requested"] == "auto", do: :auto, else: stored["requested"]),
       resolved: Map.fetch!(stored, "resolved"),
-      timeout: if(stored["timeout"] == "infinity", do: :infinity, else: stored["timeout"])
+      timeout: if(stored["timeout"] == "infinity", do: :infinity, else: stored["timeout"]),
+      strategy_configuration:
+        case Map.fetch(stored, "strategy_configuration") do
+          {:ok, configuration} -> Imp.Optimizer.Report.decode_term(configuration)
+          :error -> requested.strategy_configuration
+        end
     }
+
+    loaded
   end
 
   defp load_proposal_policy(dumped, 5, requested),
@@ -3080,6 +3102,30 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
   defp load_proposal_policy(dumped, 7, requested),
     do: load_proposal_policy(dumped, 4, requested)
+
+  defp strategy_configuration(opts) do
+    %{
+      sampling_strategy:
+        opts
+        |> Keyword.get(:sampling_strategy, :single)
+        |> strategy_value_identity(),
+      selection_strategy:
+        opts
+        |> Keyword.get(:selection_strategy, :all_improvements)
+        |> strategy_value_identity(),
+      acceptance_policy:
+        opts
+        |> Keyword.get(:acceptance_policy, Acceptance.default(:mutation))
+        |> strategy_value_identity()
+    }
+  end
+
+  defp strategy_value_identity({:callback, callback}) when is_function(callback) do
+    digest = callback |> :erlang.term_to_binary() |> then(&:crypto.hash(:sha256, &1))
+    {:callback, Base.encode16(digest, case: :lower)}
+  end
+
+  defp strategy_value_identity(value), do: value
 
   defp load_combee_policy(dumped, 4, _requested) do
     dumped |> Map.fetch!("combee_policy") |> ComBee.load_policy!()

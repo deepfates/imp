@@ -944,6 +944,27 @@ requires the same strategy identity and restores it before another evaluator
 call. Runtime strategy structs intentionally make the nested config
 non-persistable, while the optimization checkpoint remains JSON-resumable.
 
+Multi-proposal controls are also engine settings on the nested public config.
+`sampling_strategy` accepts `:single`, `{:same_parent, n}`,
+`{:independent, n}`, or `{:pxn, parents, mutations}`. `selection_strategy`
+accepts `:all_improvements`, `:best_improvement`, `{:top_k, n}`, or the
+documented BEAM callback form. `acceptance_criterion` accepts
+`:strict_improvement`, pinned-name `:improvement_or_equal`, native alias
+`:equal_or_better`, or `Imp.Optimizer.GEPA.Acceptance.callback/1`. These values
+control the real proposal batch, filtering, and admission decisions and are
+bound into resumable checkpoints; changing any of them on resume fails before
+evaluation. Unsupported Python strategy objects are rejected by config
+construction rather than accepted and ignored. `max_candidate_proposals`
+counts proposal rounds as it does upstream; it no longer doubles as a
+reflection-call cap when one round contains multiple proposals.
+
+Pinned Optimize Anything returns an immutable result rather than mutating an
+application object, and Imp preserves that boundary. Install
+`best_candidate/1` explicitly into the consumer program/configuration and then
+run that value; there is no accepted-but-ignored application callback. This
+keeps selection auditable and allows the selected native structured artifact
+to cross into a fresh BEAM process without an internal text wrapper.
+
 ## Tools And ReAct
 
 ```elixir
