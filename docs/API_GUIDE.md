@@ -860,12 +860,12 @@ been proven effective, and to what rung, is recorded in [Evidence](EVIDENCE.md).
 
 ## Optimize Arbitrary Artifacts
 
-The primary surface accepts a string, a named map of text components, or `nil`
-for objective-driven seed generation. With no dataset it runs one evaluator
-call per candidate. A `dataset:` supplies proposal/reflection examples; adding
-a non-empty `valset:` supplies separate examples for candidate selection. The
-validation set is not an untouched test set: measure the selected candidate on
-different examples after optimization.
+The primary surface accepts a string, a named map of text components, a
+JSON-safe structured map, or `nil` for objective-driven seed generation. With
+no dataset it runs one evaluator call per candidate. A `dataset:` supplies
+proposal/reflection examples; adding a non-empty `valset:` supplies separate
+examples for candidate selection. The validation set is not an untouched test
+set: measure the selected candidate on different examples after optimization.
 
 ```elixir
 evaluator = fn candidate, _example ->
@@ -913,6 +913,15 @@ the optimizer has seen both `training_examples` and validation scores.
 entry point; `best_candidate/1` reads its selected artifact while execution
 records remain implementation data rather than additional supported module
 APIs.
+
+Pinned GEPA v0.1.4 defines candidates as `str | dict[str, str]`. Imp additionally
+supports typed structured maps with seed-derived exact keys, list lengths, and
+value types. Evaluators and proposers see the native artifact, not its internal
+checkpoint encoding. Invalid JSON, missing fields, type drift, and no-op
+proposals are rejected. Refiner, merge, external tracking, custom callbacks,
+and custom selectors remain text-only and are rejected up front in structured
+mode rather than receiving an encoded substitute. The `__imp_type__` key is
+reserved at every depth for Imp's durable wire tags.
 
 ## Tools And ReAct
 

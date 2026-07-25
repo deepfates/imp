@@ -5,7 +5,8 @@ defmodule Imp.Optimize.Anything.Result do
   The result keeps the complete named candidate population, lineage,
   validation scores, Pareto winners, observed budget, and a JSON-safe engine
   checkpoint. Binary candidates are wrapped internally and unwrapped only by
-  `best_candidate/1`.
+  `best_candidate/1`; structured candidates remain native maps at every
+  public result boundary.
   """
 
   alias Imp.Optimizer.GEPA.{Engine, Frontier}
@@ -50,14 +51,15 @@ defmodule Imp.Optimize.Anything.Result do
   @spec from_state(struct(), keyword()) :: t()
   def from_state(%Engine.State{} = state, opts \\ []) do
     candidate_results = Enum.map(state.candidates, &{&1.id, &1.validation})
+    candidate_decoder = Keyword.get(opts, :candidate_decoder)
 
     %__MODULE__{
-      candidates: Enum.map(state.candidates, & &1.candidate),
+      candidates: Enum.map(state.candidates, &decode_candidate(&1.candidate, candidate_decoder)),
       parents: Enum.map(state.candidates, & &1.parent_ids),
       validation_scores: Enum.map(state.candidates, & &1.validation.aggregate_score),
       validation_subscores: Enum.map(state.candidates, &validation_subscores/1),
       candidate_side_information: Enum.map(state.candidates, & &1.validation.side_information),
-      best_outputs_valset: state.best_outputs_valset,
+      best_outputs_valset: public_term(state.best_outputs_valset, candidate_decoder),
       instance_frontier: frontier(candidate_results, :instance),
       objective_scores: aggregate_objective_scores(state.candidates),
       objective_frontier: optional_frontier(candidate_results, :objective),
@@ -69,8 +71,8 @@ defmodule Imp.Optimize.Anything.Result do
       run_dir: Keyword.get(opts, :run_dir),
       seed: Keyword.get(opts, :seed, 0),
       stop_reason: state.stop_reason,
-      rejected: state.rejected,
-      history: state.history,
+      rejected: public_term(state.rejected, candidate_decoder),
+      history: public_term(state.history, candidate_decoder),
       string_candidate_key: Keyword.get(opts, :string_candidate_key),
       checkpoint: Engine.dump_state(state)
     }
@@ -89,7 +91,7 @@ defmodule Imp.Optimize.Anything.Result do
     |> elem(1)
   end
 
-  @doc "Returns the best named candidate, or a binary for string-candidate runs."
+  @doc "Returns the best named/structured candidate, or a binary for string-candidate runs."
   @spec best_candidate(t()) :: map() | String.t()
   def best_candidate(%__MODULE__{} = result) do
     candidate = Enum.fetch!(result.candidates, best_index(result))
@@ -210,6 +212,25 @@ defmodule Imp.Optimize.Anything.Result do
   end
 
   defp load_frontier(frontier) when is_map(frontier), do: frontier
+
+  defp decode_candidate(candidate, nil), do: candidate
+  defp decode_candidate(candidate, decoder), do: decoder.(candidate)
+
+  defp public_term(term, nil), do: term
+
+  defp public_term(term, decoder) when is_map(term) do
+    decode_candidate(term, decoder)
+  rescue
+    ArgumentError -> Map.new(term, fn {key, value} -> {key, public_term(value, decoder)} end)
+  end
+
+  defp public_term(term, decoder) when is_list(term),
+    do: Enum.map(term, &public_term(&1, decoder))
+
+  defp public_term(term, decoder) when is_tuple(term),
+    do: term |> Tuple.to_list() |> Enum.map(&public_term(&1, decoder)) |> List.to_tuple()
+
+  defp public_term(term, _decoder), do: term
 
   defp indexes(0), do: []
   defp indexes(size), do: Enum.to_list(0..(size - 1))

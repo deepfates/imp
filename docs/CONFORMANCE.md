@@ -597,6 +597,7 @@ Imp modules: `Imp.Optimize.Anything`, `Imp.Optimize.Anything.Config`, `Imp.Optim
 Semantic invariants:
 
 - artifacts are not limited to prompts
+- GEPA v0.1.4 text candidates stay distinct from Imp's strict JSON-safe structured-artifact extension
 - feedback is per-task and per-metric
 - search retains lineage and Pareto trade-offs
 - paper tasks reproduce at meaningful scale
@@ -604,6 +605,7 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/optimize_anything_runner_test.exs`
+- test: `test/optimize_anything_structured_artifact_test.exs`
 - test: `test/optimize_anything_campaign_test.exs`
 - test: `test/optimize_anything_code_artifact_test.exs`
 - test: `test/optimize_anything_agent_config_test.exs`

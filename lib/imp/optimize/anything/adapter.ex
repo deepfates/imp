@@ -4,13 +4,13 @@ defmodule Imp.Optimize.Anything.Adapter do
   @behaviour Imp.Optimizer.GEPA.Adapter
 
   alias Imp.Optimize.Anything
-  alias Imp.Optimize.Anything.{Refiner, StdioCapture}
+  alias Imp.Optimize.Anything.{Refiner, StdioCapture, StructuredCandidate}
   alias Imp.Optimizer.GEPA.{Candidate, Result}
   alias Imp.Optimizer.Trajectory
 
   @modes [:single_task, :multi_task, :generalization]
   @contracts [:standard, :with_optimization_state]
-  @candidate_formats [:named, :string]
+  @candidate_formats [:named, :string, :structured]
   @default_candidate_key :current_candidate
   @default_best_example_evals_k 30
 
@@ -29,6 +29,7 @@ defmodule Imp.Optimize.Anything.Adapter do
     :mode,
     candidate_format: :named,
     candidate_key: @default_candidate_key,
+    structured_codec: nil,
     evaluator_contract: :standard,
     optimization_state: nil,
     optimization_state_store: nil,
@@ -42,12 +43,13 @@ defmodule Imp.Optimize.Anything.Adapter do
 
   @type mode :: :single_task | :multi_task | :generalization
   @type evaluator_contract :: :standard | :with_optimization_state
-  @type candidate_format :: :named | :string
+  @type candidate_format :: :named | :string | :structured
   @type t :: %__MODULE__{
           evaluator: function(),
           mode: mode(),
           candidate_format: candidate_format(),
           candidate_key: atom() | String.t(),
+          structured_codec: StructuredCandidate.t() | nil,
           evaluator_contract: evaluator_contract(),
           optimization_state: OptimizationState.t() | (term() -> OptimizationState.t()),
           optimization_state_store: pid(),
@@ -83,6 +85,7 @@ defmodule Imp.Optimize.Anything.Adapter do
       mode: mode,
       candidate_format: Keyword.get(opts, :candidate_format, :named),
       candidate_key: Keyword.get(opts, :candidate_key, @default_candidate_key),
+      structured_codec: Keyword.get(opts, :structured_codec),
       evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
       optimization_state: Keyword.get(opts, :optimization_state, %OptimizationState{}),
       refiner: Keyword.get(opts, :refiner),
@@ -162,12 +165,20 @@ defmodule Imp.Optimize.Anything.Adapter do
 
   defp evaluate_one(adapter, candidate, example, index, state_source) do
     state = optimization_state(adapter, state_source, example)
+    public_candidate = output_candidate(candidate, adapter)
 
     try do
       case call_evaluator_with_stdio(adapter, candidate, example, state) do
         {:ok, raw, captured_stdout} ->
           evaluation =
-            normalized_evaluation(raw, candidate, example, index, captured_stdout)
+            normalized_evaluation(
+              raw,
+              candidate,
+              public_candidate,
+              example,
+              index,
+              captured_stdout
+            )
 
           unless refined_result?(raw) do
             update_optimization_state(adapter, example, evaluation.score, evaluation.side_info)
@@ -176,12 +187,12 @@ defmodule Imp.Optimize.Anything.Adapter do
           evaluation
 
         {:raised, kind, reason, stacktrace, captured_stdout} ->
-          {:raised, kind, reason, stacktrace, candidate, example, index, captured_stdout}
+          {:raised, kind, reason, stacktrace, public_candidate, example, index, captured_stdout}
       end
     rescue
-      exception -> {:raised, :error, exception, __STACKTRACE__, candidate, example, index}
+      exception -> {:raised, :error, exception, __STACKTRACE__, public_candidate, example, index}
     catch
-      kind, reason -> {:raised, kind, reason, __STACKTRACE__, candidate, example, index}
+      kind, reason -> {:raised, kind, reason, __STACKTRACE__, public_candidate, example, index}
     end
   end
 
@@ -250,14 +261,21 @@ defmodule Imp.Optimize.Anything.Adapter do
        ),
        do: adapter.evaluator.(candidate, example, state)
 
-  defp normalized_evaluation(raw, candidate, example, index, captured_stdout) do
-    {raw, evaluated_candidate} = unwrap_internal_result(raw, candidate)
+  defp normalized_evaluation(
+         raw,
+         engine_candidate,
+         public_candidate,
+         example,
+         index,
+         captured_stdout
+       ) do
+    {raw, evaluated_candidate} = unwrap_internal_result(raw, public_candidate)
     {score, side_info} = normalize_result!(raw)
     validate_score!(score)
     validate_side_info!(side_info)
 
     side_info = side_info |> merge_captured_stdout(captured_stdout) |> Imp.Redaction.redact()
-    objective_scores = objective_scores!(side_info, Map.keys(candidate))
+    objective_scores = objective_scores!(side_info, Map.keys(engine_candidate))
     output = {score, Imp.Redaction.redact(evaluated_candidate), side_info}
 
     %{
@@ -265,7 +283,8 @@ defmodule Imp.Optimize.Anything.Adapter do
       output: output,
       side_info: side_info,
       objective_scores: objective_scores,
-      trajectory: trajectory(index, example, candidate, score, side_info, objective_scores, nil)
+      trajectory:
+        trajectory(index, example, public_candidate, score, side_info, objective_scores, nil)
     }
   end
 
@@ -539,6 +558,12 @@ defmodule Imp.Optimize.Anything.Adapter do
 
   defp evaluator_candidate(candidate, %{candidate_format: :named}), do: candidate
 
+  defp evaluator_candidate(candidate, %{
+         candidate_format: :structured,
+         structured_codec: codec
+       }),
+       do: StructuredCandidate.decode_candidate!(codec, candidate)
+
   defp evaluator_candidate(candidate, %{candidate_format: :string, candidate_key: key}) do
     case fetch_candidate_component(candidate, key) do
       {:ok, value} ->
@@ -559,6 +584,11 @@ defmodule Imp.Optimize.Anything.Adapter do
       :error -> fetch_by_string(candidate, to_string(key))
     end
   end
+
+  defp output_candidate(candidate, %{candidate_format: :structured} = adapter),
+    do: evaluator_candidate(candidate, adapter)
+
+  defp output_candidate(candidate, _adapter), do: candidate
 
   defp fetch_by_string(map, expected) do
     Enum.find_value(map, :error, fn {key, value} ->
@@ -631,6 +661,7 @@ defmodule Imp.Optimize.Anything.Adapter do
     validate_member!(:candidate_format, adapter.candidate_format, @candidate_formats)
     validate_member!(:evaluator_contract, adapter.evaluator_contract, @contracts)
     validate_candidate_key!(adapter.candidate_key)
+    validate_structured_codec!(adapter.candidate_format, adapter.structured_codec)
     validate_state_source!(adapter.optimization_state)
     validate_refiner!(adapter.refiner)
     validate_best_example_evals_k!(adapter.best_example_evals_k)
@@ -678,6 +709,7 @@ defmodule Imp.Optimize.Anything.Adapter do
     allowed = [
       :candidate_format,
       :candidate_key,
+      :structured_codec,
       :evaluator_contract,
       :optimization_state,
       :refiner,
@@ -701,6 +733,19 @@ defmodule Imp.Optimize.Anything.Adapter do
 
   defp validate_candidate_key!(key) do
     raise ArgumentError, ":candidate_key must be an atom or string, got: #{inspect(key)}"
+  end
+
+  defp validate_structured_codec!(:structured, %StructuredCandidate{}), do: :ok
+  defp validate_structured_codec!(format, nil) when format in [:named, :string], do: :ok
+
+  defp validate_structured_codec!(:structured, value) do
+    raise ArgumentError,
+          ":structured candidate format requires a StructuredCandidate codec, got: #{inspect(value)}"
+  end
+
+  defp validate_structured_codec!(format, %StructuredCandidate{}) do
+    raise ArgumentError,
+          "structured candidate codec cannot be combined with #{inspect(format)} candidate format"
   end
 
   defp validate_refiner!(nil), do: :ok

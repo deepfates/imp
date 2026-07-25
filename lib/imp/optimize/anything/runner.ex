@@ -8,6 +8,7 @@ defmodule Imp.Optimize.Anything.Runner do
     Multimodal,
     Progress,
     Result,
+    StructuredCandidate,
     Tracking
   }
 
@@ -56,15 +57,17 @@ defmodule Imp.Optimize.Anything.Runner do
     {mode, trainset, valset} = datasets(opts)
     validate_runtime_support!(config, opts)
 
-    {candidate, candidate_format, string_key} =
+    {candidate, candidate_format, string_key, structured_codec} =
       normalize_seed(seed_candidate, config, opts, trainset)
 
+    validate_candidate_support!(structured_codec, config)
     candidate = inject_refiner_prompt(candidate, config, opts)
 
     adapter_opts =
       [
         candidate_format: candidate_format,
         candidate_key: string_key || @string_candidate_key,
+        structured_codec: structured_codec,
         evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
         raise_on_exception: config.engine.raise_on_exception,
         best_example_evals_k: config.engine.best_example_evals_k,
@@ -77,13 +80,17 @@ defmodule Imp.Optimize.Anything.Runner do
 
     {runtime_callbacks, runtime_resources} = runtime_services(config)
     adapter = open_adapter(evaluator, mode, adapter_opts, runtime_resources)
+    resolved_resume_state = resume_state(config, Keyword.get(opts, :resume_state))
+
+    if structured_codec,
+      do: StructuredCandidate.validate_checkpoint!(structured_codec, resolved_resume_state)
 
     engine_opts =
       config
       |> Config.to_engine_options()
       |> Keyword.update!(:callbacks, &(runtime_callbacks ++ &1))
       |> Keyword.merge(
-        resume_state: resume_state(config, Keyword.get(opts, :resume_state)),
+        resume_state: resolved_resume_state,
         checkpoint_fn: checkpoint_callback(config, Keyword.get(opts, :checkpoint_fn))
       )
       |> normalize_iteration_limit(opts)
@@ -95,7 +102,7 @@ defmodule Imp.Optimize.Anything.Runner do
           Candidate.validate!(candidate),
           trainset,
           valset,
-          proposer(config, opts),
+          proposer(config, opts, structured_codec),
           engine_opts
         )
 
@@ -104,7 +111,8 @@ defmodule Imp.Optimize.Anything.Runner do
           mode: mode,
           run_dir: config.engine.run_dir,
           seed: config.engine.seed,
-          string_candidate_key: string_key
+          string_candidate_key: string_key,
+          candidate_decoder: candidate_decoder(structured_codec)
         )
 
       close_runtime_resources(runtime_resources, :finished)
@@ -175,18 +183,24 @@ defmodule Imp.Optimize.Anything.Runner do
     end
 
     generated = generate_seed!(lm, objective, Keyword.get(opts, :background), trainset)
-    {%{@string_candidate_key => generated}, :string, @string_candidate_key}
+    {%{@string_candidate_key => generated}, :string, @string_candidate_key, nil}
   end
 
   defp normalize_seed(seed, _config, _opts, _trainset) when is_binary(seed),
-    do: {%{@string_candidate_key => seed}, :string, @string_candidate_key}
+    do: {%{@string_candidate_key => seed}, :string, @string_candidate_key, nil}
 
-  defp normalize_seed(seed, _config, _opts, _trainset) when is_map(seed),
-    do: {Candidate.validate!(seed), :named, nil}
+  defp normalize_seed(seed, _config, _opts, _trainset) when is_map(seed) do
+    if Enum.all?(seed, fn {_component, value} -> is_binary(value) end) do
+      {Candidate.validate!(seed), :named, nil, nil}
+    else
+      codec = StructuredCandidate.new!(seed)
+      {StructuredCandidate.encode_candidate!(codec, seed), :structured, nil, codec}
+    end
+  end
 
   defp normalize_seed(seed, _config, _opts, _trainset) do
     raise ArgumentError,
-          "Optimize Anything seed must be a binary, a named text map, or nil; got: #{inspect(seed)}"
+          "Optimize Anything seed must be a binary, a named text map, a JSON-safe structured map, or nil; got: #{inspect(seed)}"
   end
 
   defp generate_seed!(lm, objective, background, trainset) do
@@ -212,16 +226,19 @@ defmodule Imp.Optimize.Anything.Runner do
     |> extract_fenced_text()
   end
 
-  defp proposer(config, opts) do
+  defp proposer(config, opts, structured_codec) do
     cond do
       is_function(config.reflection.custom_candidate_proposer, 4) ->
-        config.reflection.custom_candidate_proposer
+        wrap_structured_proposer(
+          config.reflection.custom_candidate_proposer,
+          structured_codec
+        )
 
       not is_nil(config.reflection.reflection_lm) ->
-        reflection_proposer(config, opts)
+        reflection_proposer(config, opts, structured_codec)
 
       is_function(Keyword.get(opts, :fallback_proposer), 4) ->
-        Keyword.fetch!(opts, :fallback_proposer)
+        wrap_structured_proposer(Keyword.fetch!(opts, :fallback_proposer), structured_codec)
 
       true ->
         raise ArgumentError,
@@ -229,7 +246,7 @@ defmodule Imp.Optimize.Anything.Runner do
     end
   end
 
-  defp reflection_proposer(config, opts) do
+  defp reflection_proposer(config, opts, structured_codec) do
     lm = config.reflection.reflection_lm
     objective = Keyword.get(opts, :objective)
     background = Keyword.get(opts, :background)
@@ -242,22 +259,60 @@ defmodule Imp.Optimize.Anything.Runner do
 
     fn candidate, component, records, iteration ->
       {side_information, images} = Multimodal.render(records)
+      current = Map.fetch!(candidate, component)
+
+      current_parameter =
+        if structured_codec,
+          do: StructuredCandidate.render_component(structured_codec, component, current),
+          else: current
 
       prompt =
         render_reflection_prompt(template, %{
           objective: objective,
           background: background,
           component: component,
-          current_parameter: Map.fetch!(candidate, component),
+          current_parameter: current_parameter,
           side_information: side_information,
-          iteration: iteration
+          iteration: iteration,
+          structured?: not is_nil(structured_codec)
         })
 
-      lm
-      |> Imp.LM.generate([%{role: :user, content: Multimodal.content(prompt, images)}], [])
-      |> lm_text!()
-      |> extract_fenced_text()
+      response =
+        lm
+        |> Imp.LM.generate([%{role: :user, content: Multimodal.content(prompt, images)}], [])
+        |> lm_text!()
+
+      if structured_codec,
+        do:
+          StructuredCandidate.normalize_proposal(structured_codec, component, current, response),
+        else: extract_fenced_text(response)
     end
+  end
+
+  defp render_reflection_prompt(nil, %{structured?: true} = context) do
+    """
+    You are improving one named component in a structured artifact.
+
+    Goal:
+    #{context.objective || "Maximize the evaluator score."}
+
+    Domain context:
+    #{context.background || "No additional context."}
+
+    Component: #{context.component}
+    Iteration: #{context.iteration}
+    Current JSON value:
+    ```json
+    #{context.current_parameter}
+    ```
+
+    Actionable side information:
+    #{context.side_information}
+
+    Return only the complete replacement value for this component as strict JSON.
+    Preserve every required nested field, list position, and value type. Do not return
+    the complete artifact, commentary, or a patch.
+    """
   end
 
   defp render_reflection_prompt(nil, context) do
@@ -333,6 +388,55 @@ defmodule Imp.Optimize.Anything.Runner do
       raise ArgumentError,
             "Optimize Anything requires max_metric_calls, max_candidate_proposals, a stopper, or a run_dir"
     end
+  end
+
+  defp validate_candidate_support!(nil, _config), do: :ok
+
+  defp validate_candidate_support!(%StructuredCandidate{}, config) do
+    unsupported =
+      [
+        {:refiner, config.refiner},
+        {:merge, config.merge},
+        {:custom_module_selector,
+         if(config.reflection.module_selector in [:round_robin, :all],
+           do: nil,
+           else: config.reflection.module_selector
+         )},
+        {:custom_candidate_selector,
+         if(
+           config.engine.candidate_selection_strategy in [
+             :pareto,
+             :current_best,
+             :epsilon_greedy,
+             :top_k_pareto
+           ],
+           do: nil,
+           else: config.engine.candidate_selection_strategy
+         )},
+        {:custom_evaluation_policy,
+         if(config.engine.val_evaluation_policy in [:full_eval, :full],
+           do: nil,
+           else: config.engine.val_evaluation_policy
+         )},
+        {:callbacks, if(config.callbacks == [], do: nil, else: config.callbacks)},
+        {:tracking,
+         if(
+           config.tracking.logger == nil and not config.tracking.use_wandb and
+             not config.tracking.use_mlflow,
+           do: nil,
+           else: config.tracking
+         )}
+      ]
+      |> Enum.reject(fn {_name, value} -> is_nil(value) end)
+      |> Enum.map(&elem(&1, 0))
+
+    if unsupported != [] do
+      raise ArgumentError,
+            "structured Optimize Anything candidates do not yet support #{inspect(unsupported)}; " <>
+              "these extensions consume the GEPA text-engine representation"
+    end
+
+    :ok
   end
 
   defp inject_refiner_prompt(candidate, %{refiner: nil}, _opts), do: candidate
@@ -528,6 +632,16 @@ defmodule Imp.Optimize.Anything.Runner do
   defp optional_section(_title, ""), do: nil
   defp optional_section(title, value), do: "#{title}:\n#{value}"
   defp present?(value), do: is_binary(value) and String.trim(value) != ""
+
+  defp wrap_structured_proposer(proposer, nil), do: proposer
+
+  defp wrap_structured_proposer(proposer, %StructuredCandidate{} = codec),
+    do: StructuredCandidate.wrap_proposer(codec, proposer)
+
+  defp candidate_decoder(nil), do: nil
+
+  defp candidate_decoder(%StructuredCandidate{} = codec),
+    do: &StructuredCandidate.decode_candidate!(codec, &1)
 
   defp maybe_put(keyword, _key, nil), do: keyword
   defp maybe_put(keyword, key, value), do: Keyword.put(keyword, key, value)

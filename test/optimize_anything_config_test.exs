@@ -64,6 +64,7 @@ defmodule Imp.Optimize.Anything.ConfigTest do
           max_metric_calls: 50,
           max_full_evaluations: 8,
           max_candidate_proposals: 12,
+          raise_on_exception: false,
           frontier_type: :cartesian
         ],
         reflection: [reflection_minibatch_size: 2],
@@ -74,6 +75,7 @@ defmodule Imp.Optimize.Anything.ConfigTest do
     opts = Config.to_engine_options(config)
 
     assert opts[:seed] == 9
+    assert opts[:raise_on_exception] == false
     assert opts[:max_metric_calls] == 50
     assert opts[:max_full_evaluations] == 8
     assert opts[:max_iterations] == 12

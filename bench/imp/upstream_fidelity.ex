@@ -676,6 +676,7 @@ defmodule Imp.UpstreamFidelity do
       ],
       invariants: [
         "artifacts are not limited to prompts",
+        "GEPA v0.1.4 text candidates stay distinct from Imp's strict JSON-safe structured-artifact extension",
         "feedback is per-task and per-metric",
         "search retains lineage and Pareto trade-offs",
         "paper tasks reproduce at meaningful scale"
@@ -683,6 +684,7 @@ defmodule Imp.UpstreamFidelity do
       evidence: %{
         tests: [
           "test/optimize_anything_runner_test.exs",
+          "test/optimize_anything_structured_artifact_test.exs",
           "test/optimize_anything_campaign_test.exs",
           "test/optimize_anything_code_artifact_test.exs",
           "test/optimize_anything_agent_config_test.exs",

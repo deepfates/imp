@@ -9,16 +9,24 @@ catalogs, schema constraints, and deterministic regression coverage.
 ```elixir
 result =
   Imp.Optimize.Anything.run(
-    %{config: "mode=slow", policy: "prefer safe changes"},
+    %{
+      enabled: false,
+      retries: 1,
+      policy: %{route: "safe", weights: [1.0, 0.0]}
+    },
     fn candidate ->
-      if candidate.config == "mode=fast", do: 1.0, else: 0.0
+      if candidate.enabled and candidate.policy.route == "fast", do: 1.0, else: 0.0
     end,
     config: [
-      engine: [max_candidate_proposals: 2, run_dir: "tmp/anything-run"],
+      engine: [max_candidate_proposals: 3, run_dir: "tmp/anything-run"],
       reflection: [module_selector: :all]
     ],
-    fallback_proposer: fn candidate, component, _feedback, _iteration ->
-      if component == :config, do: "mode=fast", else: candidate.policy
+    fallback_proposer: fn _candidate, component, _feedback, _iteration ->
+      case component do
+        :enabled -> true
+        :retries -> 3
+        :policy -> %{route: "fast", weights: [0.25, 0.75]}
+      end
     end
   )
 
@@ -32,12 +40,27 @@ mode with an arity-two evaluator, and `dataset:` plus `valset:` evaluates held-
 out generalization. A `nil` seed requires `objective:` and a configured
 `reflection_lm`; a binary seed is exposed to the engine as one named component.
 
+Named text maps follow pinned GEPA v0.1.4's `dict[str, str]` contract. A map
+containing non-text values selects Imp's native structured mode: the evaluator,
+custom proposer, trajectories, and result all receive the native JSON-safe
+artifact, while an internal tagged representation lets the shared GEPA engine
+hash and checkpoint it. The seed fixes exact map keys, list lengths, and value
+types; malformed, partial, type-changing, and no-op proposals are rejected.
+The `__imp_type__` key is reserved at every depth for Imp's durable wire tags.
+
+Structured mode currently rejects refiners, merge, external tracking, custom
+callbacks, and custom candidate/module selectors because those extensions
+consume GEPA's text-component representation. Built-in selection, caching,
+atomic checkpoints, resume, and best-output persistence remain supported.
+
 Evaluators may return a numeric score or `{score, side_information}`. Side
 information can contain component-specific feedback, objective subscores, and
 typed images. Config controls candidate and module selection, refinement,
 perfect-score skipping, merge, stopping, metric/reflection budgets, bounded
 concurrency, and callbacks. Custom selectors implement the documented GEPA
-selector behaviours rather than being special-cased in the runner.
+selector behaviours rather than being special-cased in the runner; the
+structured-mode restriction above prevents an encoded internal candidate from
+being mistaken for the user artifact.
 
 When `run_dir` is set, Imp writes atomic JSON checkpoints and seed/best
 validation outputs. Evaluation caching defaults to durable, content-addressed

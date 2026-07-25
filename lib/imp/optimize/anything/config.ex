@@ -422,6 +422,7 @@ defmodule Imp.Optimize.Anything.Config do
 
     [
       seed: engine.seed,
+      raise_on_exception: engine.raise_on_exception,
       max_metric_calls: engine.max_metric_calls || :infinity,
       max_full_evaluations: engine.max_full_evaluations || :infinity,
       frontier_type: engine.frontier_type,

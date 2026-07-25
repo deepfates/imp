@@ -1,10 +1,13 @@
 defmodule Imp.Optimize.Anything do
   @moduledoc """
-  Optimizes text and named-component systems against evaluator feedback.
+  Optimizes text, named text components, and JSON-safe structured artifacts
+  against evaluator feedback.
 
   The `run/3` surface controls reflection, budgets, selection, caching,
   merging, stopping, and tracking through its options. It returns an immutable
-  result value.
+  result value. Structured artifacts are an Imp-native extension to GEPA
+  v0.1.4's `str | dict[str, str]` candidate contract: their exact shape and
+  value types are derived from the seed and enforced for every proposal.
   """
 
   # These structs remain internal execution values for the independent GEPA
@@ -22,7 +25,7 @@ defmodule Imp.Optimize.Anything do
 
   alias Imp.Optimize.Anything.{Result, Runner}
 
-  @doc "Runs the canonical Optimize Anything engine and returns a Result."
+  @doc "Runs Optimize Anything for a text or JSON-safe structured seed and returns a Result."
   @spec run(String.t() | map() | nil, function(), keyword()) :: struct()
   def run(seed_candidate, evaluator, opts \\ [])
 
@@ -34,7 +37,7 @@ defmodule Imp.Optimize.Anything do
 
   def run(seed_candidate, evaluator, opts) do
     raise ArgumentError,
-          "Imp.Optimize.Anything.run/3 expects a text/named seed, evaluator function, and keyword options; got: " <>
+          "Imp.Optimize.Anything.run/3 expects a text/named/structured seed, evaluator function, and keyword options; got: " <>
             "#{inspect(seed_candidate)}, #{inspect(evaluator)}, #{inspect(opts)}"
   end
 
