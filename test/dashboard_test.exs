@@ -1394,7 +1394,7 @@ defmodule DashboardTest do
     assert Enum.map(live_blockers, & &1["kind"]) == ["live_lane_full_evidence"]
   end
 
-  test "profiles select claim requirements and default keeps telos gaps visible" do
+  test "profiles select claim requirements and default excludes telos targets" do
     root = tmp_dir("dashboard-profile")
     out_dir = Path.join(root, "out")
     File.mkdir_p!(out_dir)
@@ -1424,7 +1424,6 @@ defmodule DashboardTest do
              "live_provider_smoke",
              "livebook_execute",
              "local_mlx_weight_training",
-             "optimize_anything",
              "product_package",
              "protocol_gates",
              "rag_tool_agent"

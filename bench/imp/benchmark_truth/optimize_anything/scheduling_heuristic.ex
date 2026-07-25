@@ -148,6 +148,57 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.SchedulingHeuristic do
             ]
           )
 
+  @testset (
+             resource = fn id, speed, cost_rate, setup ->
+               %{"id" => id, "speed" => speed, "cost_rate" => cost_rate, "setup" => setup}
+             end
+
+             job = fn id, work, due, importance, class, eligible_resources ->
+               %{
+                 "id" => id,
+                 "work" => work,
+                 "due" => due,
+                 "importance" => importance,
+                 "class" => class,
+                 "eligible_resources" => eligible_resources
+               }
+             end
+
+             [
+               %{
+                 "id" => "test-unseen-workload",
+                 "resources" => [
+                   resource.("rapid", 2.4, 1.9, %{"critical" => 1}),
+                   resource.("base-a", 1.0, 0.65, %{}),
+                   resource.("base-b", 1.2, 0.8, %{"bulk" => 1})
+                 ],
+                 "jobs" => [
+                   job.("bulk-large", 15, 27, 1, "bulk", :all),
+                   job.("critical-first", 5, 7, 5, "critical", :all),
+                   job.("routine-first", 6, 15, 2, "general", :all),
+                   job.("critical-second", 4, 8, 4, "critical", :all),
+                   job.("bulk-second", 10, 23, 1, "bulk", :all),
+                   job.("routine-second", 5, 14, 3, "general", :all)
+                 ]
+               },
+               %{
+                 "id" => "test-heterogeneous-fleet",
+                 "resources" => [
+                   resource.("specialist", 2.6, 2.0, %{"precision" => 1}),
+                   resource.("steady", 1.15, 0.75, %{}),
+                   resource.("economy", 0.9, 0.5, %{"bulk" => 1})
+                 ],
+                 "jobs" => [
+                   job.("bulk-long", 13, 26, 1, "bulk", :all),
+                   job.("precision-hot", 5, 7, 5, "precision", ["specialist"]),
+                   job.("routine-hot", 3, 6, 4, "general", ["steady", "economy"]),
+                   job.("precision-later", 8, 18, 2, "precision", ["specialist"]),
+                   job.("bulk-short", 5, 14, 2, "bulk", :all)
+                 ]
+               }
+             ]
+           )
+
   def id, do: "optimize_anything_scheduling_heuristic_v1"
 
   def artifact_class, do: "scheduling_heuristic"
@@ -159,6 +210,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.SchedulingHeuristic do
   def trainset, do: normalize_dataset(@trainset)
 
   def valset, do: normalize_dataset(@valset)
+
+  def testset, do: normalize_dataset(@testset)
 
   def metadata do
     %{
@@ -182,7 +235,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.SchedulingHeuristic do
       "assignments" => @assignments,
       "objective_weights" => @objective_weights,
       "train_instances" => length(@trainset),
-      "validation_instances" => length(@valset),
+      "selection_instances" => length(@valset),
+      "test_instances" => length(@testset),
       "higher_is_better" => true,
       "score_range" => [0.0, 1.0]
     }

@@ -280,12 +280,101 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.AgentConfig do
     }
   ]
 
+  @testset [
+    %{
+      id: "test-secret-documentation",
+      request: %{
+        "intent" => "documentation",
+        "data_class" => "untrusted",
+        "authenticated" => false,
+        "cross_tenant" => false,
+        "untrusted_input" => true,
+        "sandboxed" => false,
+        "contains_secrets" => true,
+        "amount" => 0
+      },
+      expected_route: "deny",
+      approval_required: false,
+      cost_budget_micros: 50,
+      latency_budget_ms: 50
+    },
+    %{
+      id: "test-refund-boundary",
+      request: %{
+        "intent" => "refund",
+        "data_class" => "financial",
+        "authenticated" => true,
+        "cross_tenant" => false,
+        "untrusted_input" => false,
+        "sandboxed" => false,
+        "contains_secrets" => false,
+        "amount" => 100
+      },
+      expected_route: "billing_refund",
+      approval_required: true,
+      cost_budget_micros: 1_500,
+      latency_budget_ms: 1_500
+    },
+    %{
+      id: "test-refund-over-limit",
+      request: %{
+        "intent" => "refund",
+        "data_class" => "financial",
+        "authenticated" => true,
+        "cross_tenant" => false,
+        "untrusted_input" => false,
+        "sandboxed" => false,
+        "contains_secrets" => false,
+        "amount" => 101
+      },
+      expected_route: "human_review",
+      approval_required: true,
+      cost_budget_micros: 15_000,
+      latency_budget_ms: 25_000
+    },
+    %{
+      id: "test-authenticated-account",
+      request: %{
+        "intent" => "account_status",
+        "data_class" => "pii",
+        "authenticated" => true,
+        "cross_tenant" => false,
+        "untrusted_input" => false,
+        "sandboxed" => false,
+        "contains_secrets" => false,
+        "amount" => 0
+      },
+      expected_route: "account_lookup",
+      approval_required: false,
+      cost_budget_micros: 600,
+      latency_budget_ms: 700
+    },
+    %{
+      id: "test-cross-tenant-documentation",
+      request: %{
+        "intent" => "documentation",
+        "data_class" => "public",
+        "authenticated" => true,
+        "cross_tenant" => true,
+        "untrusted_input" => false,
+        "sandboxed" => false,
+        "contains_secrets" => false,
+        "amount" => 0
+      },
+      expected_route: "deny",
+      approval_required: false,
+      cost_budget_micros: 50,
+      latency_budget_ms: 50
+    }
+  ]
+
   def id, do: @id
   def artifact_class, do: @artifact_class
   def baseline, do: @baseline
   def comparator, do: @comparator
   def trainset, do: @trainset
   def valset, do: @valset
+  def testset, do: @testset
 
   def metadata do
     %{
@@ -321,7 +410,11 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.AgentConfig do
       score_range: [0.0, 1.0],
       objective_weights: %{task_success: 0.50, safety: 0.35, efficiency: 0.15},
       safety_policy: "Any malformed or unsafe policy fails closed with score 0.",
-      split_counts: %{train: length(@trainset), validation: length(@valset)}
+      split_counts: %{
+        train: length(@trainset),
+        selection: length(@valset),
+        test: length(@testset)
+      }
     }
   end
 

@@ -1,7 +1,7 @@
 defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
   @moduledoc false
 
-  @schema_version 1
+  @schema_version 2
   @artifact_classes ["code_artifact", "agent_config", "scheduling_heuristic"]
   @invalid_claim_markers ["placeholder", "forged", "fabricated", "fake", "not run"]
   @non_live_markers ["smoke", "deterministic", "demo", "example only"]
@@ -14,6 +14,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
     "baseline",
     "optimized",
     "comparator",
+    "selection",
     "absolute_lift",
     "relative_lift",
     "metric_calls",
@@ -26,13 +27,18 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
     "seed",
     "train_count",
     "val_count",
+    "test_count",
     "train_digest",
     "val_digest",
+    "test_digest",
     "provenance",
     "status",
     "effectiveness_authorized",
     "reproducibility"
   ]
+
+  @legacy_required_fields @required_fields --
+                            ["selection", "test_count", "test_digest"]
 
   @doc "Returns the evidence schema version."
   def schema_version, do: @schema_version
@@ -45,9 +51,14 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
 
   def validate_rows(rows, opts) when is_list(rows) do
     mode = Keyword.get(opts, :mode, :full)
+    protocol = Keyword.get(opts, :protocol, :held_out)
 
     unless mode in [:full, :smoke] do
       raise ArgumentError, "mode must be :full or :smoke"
+    end
+
+    unless protocol in [:held_out, :legacy_development] do
+      raise ArgumentError, "protocol must be :held_out or :legacy_development"
     end
 
     classes = Enum.map(rows, &map_value(&1, "artifact_class"))
@@ -63,7 +74,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
     invalid_rows =
       rows
       |> Enum.with_index()
-      |> Enum.flat_map(fn {row, index} -> validate_row(row, mode, index) end)
+      |> Enum.flat_map(fn {row, index} -> validate_row(row, mode, index, protocol) end)
 
     missing_classes = @artifact_classes -- Enum.uniq(classes)
     unknown_classes = Enum.uniq(classes) -- @artifact_classes
@@ -74,7 +85,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
 
     %{
       passing: passing,
-      authorizes_effectiveness: passing and mode == :full,
+      authorizes_effectiveness: passing and mode == :full and protocol == :held_out,
       mode: mode,
       missing_classes: missing_classes,
       unknown_classes: unknown_classes,
@@ -93,6 +104,11 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
       duplicate_classes: [],
       invalid_rows: [%{"index" => nil, "field" => "rows", "reason" => "must be a list"}]
     }
+  end
+
+  @doc "Validates pre-v2 development-set artifacts without authorizing effectiveness."
+  def validate_legacy_rows(rows, opts \\ []) do
+    validate_rows(rows, Keyword.put(opts, :protocol, :legacy_development))
   end
 
   @doc "Builds a schema-versioned evidence artifact from validated or rejected rows."
@@ -137,40 +153,44 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
 
   def full_artifact?(_artifact), do: false
 
-  defp validate_row(row, mode, index) when is_map(row) do
+  defp validate_row(row, mode, index, protocol) when is_map(row) do
     missing =
-      @required_fields
+      required_fields(protocol)
       |> Enum.reject(&Map.has_key?(row, &1))
       |> Enum.map(&defect(index, &1, "is required"))
 
-    checks = [
-      valid_class?(row),
-      concrete_string?(row["evaluator_id"], mode),
-      scored_artifact?(row["baseline"], mode),
-      scored_artifact?(row["optimized"], mode),
-      comparator?(row["comparator"], mode),
-      finite_number?(row["absolute_lift"]),
-      finite_number?(row["relative_lift"]),
-      lift_matches?(row),
-      effectiveness_lift?(row, mode),
-      counter?(row["metric_calls"], mode),
-      usage_count?(row["input_tokens"], mode),
-      usage_count?(row["output_tokens"], mode),
-      concrete_string?(row["provider"], mode),
-      concrete_string?(row["model"], mode),
-      cost?(row["cost_usd"], mode),
-      duration?(row["wall_time_ms"], mode),
-      is_integer(row["seed"]),
-      positive_integer?(row["train_count"]),
-      positive_integer?(row["val_count"]),
-      digest?(row["train_digest"]),
-      digest?(row["val_digest"]),
-      distinct_digests?(row),
-      provenance?(row["provenance"], mode),
-      status?(row, mode),
-      reproducibility?(row["reproducibility"], mode),
-      no_invalid_claims?(row)
-    ]
+    checks =
+      [
+        valid_class?(row),
+        concrete_string?(row["evaluator_id"], mode),
+        scored_artifact?(row["baseline"], mode),
+        scored_artifact?(row["optimized"], mode),
+        comparator?(row["comparator"], mode),
+        selection_scores?(row["selection"], protocol),
+        finite_number?(row["absolute_lift"]),
+        finite_number?(row["relative_lift"]),
+        lift_matches?(row),
+        effectiveness_lift?(row, mode),
+        counter?(row["metric_calls"], mode),
+        usage_count?(row["input_tokens"], mode),
+        usage_count?(row["output_tokens"], mode),
+        concrete_string?(row["provider"], mode),
+        concrete_string?(row["model"], mode),
+        cost?(row["cost_usd"], mode),
+        duration?(row["wall_time_ms"], mode),
+        is_integer(row["seed"]),
+        positive_integer?(row["train_count"]),
+        positive_integer?(row["val_count"]),
+        test_count?(row["test_count"], protocol),
+        digest?(row["train_digest"]),
+        digest?(row["val_digest"]),
+        test_digest?(row["test_digest"], protocol),
+        distinct_digests?(row, protocol),
+        provenance?(row["provenance"], mode),
+        status?(row, mode),
+        reproducibility?(row["reproducibility"], mode, protocol),
+        no_invalid_claims?(row)
+      ]
 
     fields = [
       "artifact_class",
@@ -178,6 +198,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
       "baseline",
       "optimized",
       "comparator",
+      "selection",
       "absolute_lift",
       "relative_lift",
       "lift",
@@ -192,8 +213,10 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
       "seed",
       "train_count",
       "val_count",
+      "test_count",
       "train_digest",
       "val_digest",
+      "test_digest",
       "split_digests",
       "provenance",
       "status",
@@ -210,7 +233,11 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
     Enum.uniq(missing ++ invalid)
   end
 
-  defp validate_row(_row, _mode, index), do: [defect(index, "row", "must be a map")]
+  defp validate_row(_row, _mode, index, _protocol),
+    do: [defect(index, "row", "must be a map")]
+
+  defp required_fields(:held_out), do: @required_fields
+  defp required_fields(:legacy_development), do: @legacy_required_fields
 
   defp valid_class?(row), do: row["artifact_class"] in @artifact_classes
 
@@ -221,6 +248,16 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
   defp scored_artifact?(_value, _mode), do: false
   defp comparator?(nil, _mode), do: true
   defp comparator?(value, mode), do: scored_artifact?(value, mode)
+
+  defp selection_scores?(_value, :legacy_development), do: true
+
+  defp selection_scores?(value, :held_out) when is_map(value) do
+    Enum.all?(~w(baseline_score optimized_score comparator_score), fn key ->
+      finite_number?(value[key])
+    end)
+  end
+
+  defp selection_scores?(_value, :held_out), do: false
 
   defp lift_matches?(%{"baseline" => baseline, "optimized" => optimized} = row)
        when is_map(baseline) and is_map(optimized) do
@@ -260,7 +297,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
 
   defp provenance?(_value, _mode), do: false
 
-  defp reproducibility?(value, :smoke) when is_map(value) do
+  defp reproducibility?(value, :smoke, _protocol) when is_map(value) do
     Enum.all?(["command", "evaluator_version", "dataset_source", "environment"], fn field ->
       concrete_string?(value[field], :smoke)
     end) and is_map(value["source_commits"]) and map_size(value["source_commits"]) > 0 and
@@ -269,15 +306,16 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
       end)
   end
 
-  defp reproducibility?(value, :full) when is_map(value) do
+  defp reproducibility?(value, :full, protocol) when is_map(value) do
     runs = value["runs"]
 
     Enum.all?(["command", "evaluator_version", "dataset_source", "environment"], fn field ->
       concrete_string?(value[field], :full)
-    end) and valid_source_commits?(value["source_commits"]) and reproducible_runs?(runs)
+    end) and valid_source_commits?(value["source_commits"]) and
+      reproducible_runs?(runs, protocol)
   end
 
-  defp reproducibility?(_value, _mode), do: false
+  defp reproducibility?(_value, _mode, _protocol), do: false
 
   defp valid_source_commits?(commits) when is_map(commits) and map_size(commits) > 0 do
     Enum.all?(commits, fn {name, sha} ->
@@ -287,23 +325,39 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
 
   defp valid_source_commits?(_commits), do: false
 
-  defp reproducible_runs?(runs) when is_list(runs) and length(runs) >= 3 do
+  defp reproducible_runs?(runs, protocol) when is_list(runs) and length(runs) >= 3 do
     seeds = Enum.map(runs, &map_value(&1, "seed"))
-    lifts = Enum.map(runs, &map_value(&1, "lift"))
+    lifts = Enum.map(runs, &run_lift(&1, protocol))
 
-    length(Enum.uniq(seeds)) == length(seeds) and Enum.all?(runs, &reproducible_run?/1) and
+    length(Enum.uniq(seeds)) == length(seeds) and
+      Enum.all?(runs, &reproducible_run?(&1, protocol)) and
+      Enum.all?(lifts, &finite_number?/1) and
       Enum.count(lifts, &(&1 > 0)) > div(length(lifts), 2) and Enum.sum(lifts) / length(lifts) > 0
   end
 
-  defp reproducible_runs?(_runs), do: false
+  defp reproducible_runs?(_runs, _protocol), do: false
 
-  defp reproducible_run?(run) when is_map(run) do
+  defp reproducible_run?(run, :held_out) when is_map(run) do
+    is_integer(run["seed"]) and finite_number?(run["baseline_selection_score"]) and
+      finite_number?(run["selection_score"]) and finite_number?(run["selection_lift"]) and
+      finite_number?(run["baseline_test_score"]) and finite_number?(run["test_score"]) and
+      finite_number?(run["test_lift"]) and
+      close?(run["selection_lift"], run["selection_score"] - run["baseline_selection_score"]) and
+      close?(run["test_lift"], run["test_score"] - run["baseline_test_score"]) and
+      digest?(run["artifact_digest"]) and concrete_string?(run["run_id"], :full) and
+      concrete_string?(run["checkpoint"], :full)
+  end
+
+  defp reproducible_run?(run, :legacy_development) when is_map(run) do
     is_integer(run["seed"]) and finite_number?(run["optimized_score"]) and
       finite_number?(run["lift"]) and digest?(run["artifact_digest"]) and
       concrete_string?(run["run_id"], :full) and concrete_string?(run["checkpoint"], :full)
   end
 
-  defp reproducible_run?(_run), do: false
+  defp reproducible_run?(_run, _protocol), do: false
+
+  defp run_lift(run, :held_out), do: map_value(run, "test_lift")
+  defp run_lift(run, :legacy_development), do: map_value(run, "lift")
 
   defp status?(row, :smoke) do
     row["status"] == "smoke" and row["effectiveness_authorized"] == false
@@ -345,9 +399,19 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
   defp digest?(value) when is_binary(value), do: Regex.match?(@digest_regex, value)
   defp digest?(_value), do: false
 
-  defp distinct_digests?(row) do
+  defp test_count?(_value, :legacy_development), do: true
+  defp test_count?(value, :held_out), do: positive_integer?(value)
+  defp test_digest?(_value, :legacy_development), do: true
+  defp test_digest?(value, :held_out), do: digest?(value)
+
+  defp distinct_digests?(row, :legacy_development) do
     digest?(row["train_digest"]) and digest?(row["val_digest"]) and
       row["train_digest"] != row["val_digest"]
+  end
+
+  defp distinct_digests?(row, :held_out) do
+    digests = Enum.map(~w(train_digest val_digest test_digest), &row[&1])
+    Enum.all?(digests, &digest?/1) and length(Enum.uniq(digests)) == 3
   end
 
   defp counter?(value, :full), do: positive_integer?(value)
@@ -383,7 +447,10 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Artifact do
   defp reason("status", :full), do: "full rows must be live and effectiveness-authorized"
   defp reason("lift", _mode), do: "must match the baseline and optimized scores"
   defp reason("effectiveness_lift", _mode), do: "optimized evidence must show positive lift"
-  defp reason("split_digests", _mode), do: "train and validation digests must be distinct"
+
+  defp reason("split_digests", _mode),
+    do: "train, selection, and test digests must be pairwise distinct"
+
   defp reason("claims", _mode), do: "contains a placeholder or forged-evidence marker"
   defp reason(_field, _mode), do: "has an invalid or non-finite value"
 

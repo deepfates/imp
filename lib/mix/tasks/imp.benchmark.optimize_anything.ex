@@ -103,7 +103,6 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
 
   defp run_live(opts) do
     env_files = Keyword.get_values(opts, :env_file)
-    Imp.BenchmarkEnv.load_files!(if(env_files == [], do: [".env"], else: env_files))
     provider = Keyword.get(opts, :provider) || Mix.raise("--provider is required for --live")
     model = Keyword.get(opts, :model) || Mix.raise("--model is required for --live")
     seeds = opts |> Keyword.get(:seeds, "0,1,2") |> parse_seeds!()
@@ -112,6 +111,8 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
 
     max_output_tokens_per_request =
       required_positive_integer!(opts, :max_output_tokens_per_request)
+
+    Imp.BenchmarkEnv.load_files!(if(env_files == [], do: [".env"], else: env_files))
 
     %{out_path: path} =
       Campaign.run(
@@ -258,6 +259,11 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
       "baseline" => %{"artifact" => "baseline #{artifact_class}", "score" => baseline_score},
       "optimized" => %{"artifact" => "optimized #{artifact_class}", "score" => optimized_score},
       "comparator" => nil,
+      "selection" => %{
+        "baseline_score" => baseline_score,
+        "optimized_score" => optimized_score,
+        "comparator_score" => baseline_score
+      },
       "absolute_lift" => optimized_score - baseline_score,
       "relative_lift" => (optimized_score - baseline_score) / baseline_score,
       "metric_calls" => 2,
@@ -270,8 +276,10 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
       "seed" => index,
       "train_count" => 2,
       "val_count" => 2,
+      "test_count" => 2,
       "train_digest" => digest("#{artifact_class}:train"),
       "val_digest" => digest("#{artifact_class}:validation"),
+      "test_digest" => digest("#{artifact_class}:test"),
       "provenance" => %{
         "run_id" => "smoke-#{artifact_class}-#{index}",
         "checkpoint" => "in-memory-smoke",

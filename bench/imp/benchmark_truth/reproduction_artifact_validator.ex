@@ -189,18 +189,22 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
   end
 
   def validate!("optimize_anything", artifact) do
-    validation = OptimizeAnythingArtifact.validate_rows(artifact["rows"], mode: :full)
-
-    case artifact["runner"] do
-      "imp-optimize-anything-replication" ->
+    case {artifact["runner"], artifact["schema_version"]} do
+      {"imp-optimize-anything-replication", 2} ->
+        validation = OptimizeAnythingArtifact.validate_rows(artifact["rows"], mode: :full)
         validate_current_optimize_anything!(artifact, validation)
 
-      runner ->
-        if runner == "ds" <> "ex-optimize-anything-replication" do
-          validate_historical_optimize_anything!(artifact, validation)
-        else
-          raise ArgumentError, "invalid optimize-anything runner #{inspect(runner)}"
-        end
+      {"imp-optimize-anything-replication", 1} ->
+        validation = OptimizeAnythingArtifact.validate_legacy_rows(artifact["rows"], mode: :full)
+        validate_legacy_current_optimize_anything!(artifact, validation)
+
+      {runner, 1} when runner == "ds" <> "ex-optimize-anything-replication" ->
+        validation = OptimizeAnythingArtifact.validate_legacy_rows(artifact["rows"], mode: :full)
+        validate_historical_optimize_anything!(artifact, validation)
+
+      {runner, schema} ->
+        raise ArgumentError,
+              "invalid optimize-anything runner/schema #{inspect({runner, schema})}"
     end
   end
 
@@ -489,6 +493,40 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
     )
   end
 
+  defp validate_legacy_current_optimize_anything!(artifact, validation) do
+    RunContext.verify!(artifact)
+    source = artifact["source"] || %{}
+    seeds = source["seeds"]
+    gepa_commit = current_gepa_commit!()
+    rows = artifact["rows"] || []
+    campaign_budget = rows |> List.first() |> then(&(&1 && &1["campaign_budget"]))
+
+    require!(
+      credential_safe_artifact?(artifact) and validation.passing and
+        artifact["summary"] == optimize_anything_summary(validation) and
+        valid_current_optimize_anything_source?(source) and
+        get_in(artifact, ["run_context", "inputs"]) == source and
+        get_in(artifact, ["run_context", "source_commits", "gepa"]) ==
+          "gepa-ai/gepa@#{gepa_commit}" and
+        Enum.all?(rows, fn row ->
+          row["provider"] == source["provider"] and row["model"] == source["model"] and
+            valid_optimize_anything_budget?(row["campaign_budget"], source["budget"]) and
+            row["campaign_budget"] == campaign_budget and
+            get_in(row, ["reproducibility", "budget"]) == row["campaign_budget"] and
+            nonempty_string?(get_in(row, ["provenance", "budget_checkpoint"])) and
+            get_in(row, ["provenance", "git_sha"]) == artifact["git_sha"] and
+            get_in(row, ["reproducibility", "source_commits"]) == %{
+              "imp" => artifact["git_sha"],
+              "gepa" => gepa_commit
+            } and run_seeds(row) == Enum.sort(seeds) and
+            valid_legacy_optimize_anything_row_accounting?(row)
+        end) and
+        valid_optimize_anything_campaign_accounting?(rows, campaign_budget) and
+        valid_optimize_anything_checkpoint?(artifact["budget_checkpoint"], campaign_budget),
+      "invalid legacy current optimize-anything artifact"
+    )
+  end
+
   defp validate_historical_optimize_anything!(artifact, validation) do
     require!(
       artifact["schema_version"] == 1 and
@@ -509,7 +547,7 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
           "invalid_rows" => [],
           "missing_classes" => [],
           "unknown_classes" => []
-        } and validation.authorizes_effectiveness,
+        } and validation.passing,
       "invalid optimize-anything artifact"
     )
   end
@@ -601,6 +639,52 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
          cost_usd <- Enum.sum(Enum.map(runs, & &1["cost_usd"])),
          metric_calls <- Enum.sum(Enum.map(runs, & &1["metric_calls"])),
          wall_time_ms <- Enum.sum(Enum.map(runs, & &1["wall_time_ms"])),
+         representative <- Enum.max_by(runs, &{&1["selection_score"], -&1["seed"]}) do
+      row["input_tokens"] == input_tokens and row["output_tokens"] == output_tokens and
+        close_number?(row["cost_usd"], cost_usd) and row["metric_calls"] == metric_calls and
+        row["wall_time_ms"] == wall_time_ms and row["seed"] == representative["seed"] and
+        close_number?(
+          get_in(row, ["selection", "optimized_score"]),
+          representative["selection_score"]
+        ) and
+        close_number?(get_in(row, ["optimized", "score"]), representative["test_score"]) and
+        representative["artifact_digest"] ==
+          CampaignBudget.evidence_digest(get_in(row, ["optimized", "artifact"]))
+    else
+      _ -> false
+    end
+  end
+
+  defp valid_optimize_anything_run?(run, row) when is_map(run) do
+    baseline_selection = get_in(row, ["selection", "baseline_score"])
+    baseline_test = get_in(row, ["baseline", "score"])
+
+    is_integer(run["request_count"]) and run["request_count"] > 0 and
+      is_integer(run["input_tokens"]) and run["input_tokens"] > 0 and
+      is_integer(run["output_tokens"]) and run["output_tokens"] > 0 and
+      finite_positive?(run["cost_usd"]) and is_integer(run["metric_calls"]) and
+      run["metric_calls"] > 0 and is_integer(run["wall_time_ms"]) and
+      run["wall_time_ms"] > 0 and
+      close_number?(run["baseline_selection_score"], baseline_selection) and
+      close_number?(
+        run["selection_lift"],
+        run["selection_score"] - run["baseline_selection_score"]
+      ) and close_number?(run["baseline_test_score"], baseline_test) and
+      close_number?(run["test_lift"], run["test_score"] - run["baseline_test_score"])
+  end
+
+  defp valid_optimize_anything_run?(_run, _row), do: false
+
+  defp valid_legacy_optimize_anything_row_accounting?(row) do
+    runs = get_in(row, ["reproducibility", "runs"])
+
+    with true <- is_list(runs) and runs != [],
+         true <- Enum.all?(runs, &valid_legacy_optimize_anything_run?(&1, row)),
+         input_tokens <- Enum.sum(Enum.map(runs, & &1["input_tokens"])),
+         output_tokens <- Enum.sum(Enum.map(runs, & &1["output_tokens"])),
+         cost_usd <- Enum.sum(Enum.map(runs, & &1["cost_usd"])),
+         metric_calls <- Enum.sum(Enum.map(runs, & &1["metric_calls"])),
+         wall_time_ms <- Enum.sum(Enum.map(runs, & &1["wall_time_ms"])),
          representative <- Enum.max_by(runs, & &1["optimized_score"]) do
       row["input_tokens"] == input_tokens and row["output_tokens"] == output_tokens and
         close_number?(row["cost_usd"], cost_usd) and row["metric_calls"] == metric_calls and
@@ -613,7 +697,7 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
     end
   end
 
-  defp valid_optimize_anything_run?(run, row) when is_map(run) do
+  defp valid_legacy_optimize_anything_run?(run, row) when is_map(run) do
     baseline = get_in(row, ["baseline", "score"])
 
     is_integer(run["request_count"]) and run["request_count"] > 0 and
@@ -625,7 +709,7 @@ defmodule Imp.BenchmarkTruth.ReproductionArtifactValidator do
       close_number?(run["lift"], run["optimized_score"] - baseline)
   end
 
-  defp valid_optimize_anything_run?(_run, _row), do: false
+  defp valid_legacy_optimize_anything_run?(_run, _row), do: false
 
   defp valid_optimize_anything_campaign_accounting?(rows, budget) when is_map(budget) do
     runs = Enum.flat_map(rows, &get_in(&1, ["reproducibility", "runs"]))

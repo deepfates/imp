@@ -457,12 +457,12 @@
     },
     {
       "id": "claim.optimize_anything.non_prompt_effectiveness",
-      "claim_state": "asserted",
+      "claim_state": "target",
       "target_rung": "C3",
-      "release": "v0.1",
+      "release": "telos",
       "scope": "Provider-backed reflective optimization of executable non-prompt text artifacts.",
-      "limitations": ["The admitted result is bounded to three executable artifact classes, seeds 17/23/31, Anthropic Claude Haiku 4.5, and the recorded evaluator, proposal, token, request, and cost budgets.", "This Imp-native effectiveness result does not claim paper-scale performance, general superiority, or matched-internals parity with upstream Optimize Anything."],
-      "statement": "Under the admitted bounded campaign, Imp Optimize Anything improved all three executable non-prompt artifact classes with positive mean held-out lift and a majority of improving runs across three live provider-backed seeds, with exact cost and checkpoint provenance.",
+      "limitations": ["The immutable pre-v2 campaign selected candidates and computed its final scores on the same development set, so it remains bounded T2 execution evidence and does not authorize C3 effectiveness.", "The repaired v2 campaign has distinct train, selection, and untouched test sets, but no provider-backed v2 artifact has been admitted yet.", "The open target does not claim paper-scale performance, general superiority, or matched-internals parity with upstream Optimize Anything."],
+      "statement": "The open C3 target requires all three executable non-prompt artifact classes to show positive mean lift and a majority of improving runs on an untouched test set across at least three live provider-backed seeds. The immutable pre-v2 campaign reported development-set lift only.",
       "category": "optimizer",
       "surface": ["OptimizeAnything", "code_artifact", "agent_config", "scheduling_heuristic"],
       "claim_type": "functional_effectiveness",
@@ -475,7 +475,7 @@
           "kind": "optimizer_effectiveness",
           "lane": "optimize_anything",
           "evidence": "full",
-          "threshold": "all three non-prompt classes show positive mean lift and a majority of improving runs across at least three live provider-backed seeds"
+          "threshold": "all three non-prompt classes show positive mean lift and a majority of improving runs on a test set never passed to candidate selection across at least three live provider-backed seeds"
         }
       ]
     },

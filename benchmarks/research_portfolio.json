@@ -249,6 +249,7 @@
       "id": "arbitrary_artifact_optimization",
       "name": "Arbitrary artifact optimization",
       "claim_ids": [
+        "claim.optimize_anything.non_prompt_effectiveness",
         "claim.optimize_anything.upstream_comparative_effectiveness"
       ],
       "capacity": "The same reflective search interface improves non-prompt textual artifacts with executable domain metrics and explicit acceptance rules.",

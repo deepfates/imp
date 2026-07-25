@@ -66,6 +66,17 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact do
     ]
   end
 
+  def testset do
+    [
+      example("test-server-cap-boundary", 0, true, false, 9_500, 2, 8_000),
+      example("test-urgent-new", 0, true, true, 0, 1, 0),
+      example("test-backoff-one-high-jitter", 1, true, false, 0, 3, 575),
+      example("test-backoff-three-no-jitter", 3, true, false, 0, 0, 2_000),
+      example("test-backoff-late-jitter", 5, true, false, 0, 2, 4_050),
+      example("test-non-retryable-hint", 2, false, false, 600, 3, -1)
+    ]
+  end
+
   def evaluate(candidate_text, example) when is_binary(candidate_text) and is_map(example) do
     with {:ok, source} <- validate_source(candidate_text),
          {:ok, actual} <- execute(source, example) do
@@ -125,7 +136,11 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.CodeArtifact do
         "numeric_proximity" => 0.2,
         "result_type" => 0.1
       },
-      "split" => %{"train_cases" => length(trainset()), "validation_cases" => length(valset())}
+      "split" => %{
+        "train_cases" => length(trainset()),
+        "selection_cases" => length(valset()),
+        "test_cases" => length(testset())
+      }
     }
   end
 

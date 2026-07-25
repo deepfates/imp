@@ -14,6 +14,24 @@ defmodule OptimizeAnythingArtifactTest do
     assert Artifact.full_artifact?(Artifact.build(full_rows(), mode: :full))
   end
 
+  test "the immutable pre-v2 campaign remains T2 evidence but cannot authorize effectiveness" do
+    path =
+      "benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json"
+
+    artifact = path |> File.read!() |> Jason.decode!()
+
+    refute Artifact.full_artifact?(artifact)
+    assert Artifact.validate_legacy_rows(artifact["rows"], mode: :full).passing
+
+    refute Artifact.validate_legacy_rows(artifact["rows"], mode: :full).authorizes_effectiveness
+
+    assert :ok =
+             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
+               "optimize_anything",
+               artifact
+             )
+  end
+
   test "missing classes and required fields are rejected" do
     [row | _] = full_rows()
     validation = Artifact.validate_rows([Map.delete(row, "provider")])
@@ -65,8 +83,14 @@ defmodule OptimizeAnythingArtifactTest do
 
     non_improving_run =
       second
-      |> update_in(["reproducibility", "runs", Access.at(1)], &Map.put(&1, "lift", -0.25))
-      |> update_in(["reproducibility", "runs", Access.at(2)], &Map.put(&1, "lift", -0.25))
+      |> update_in(
+        ["reproducibility", "runs", Access.at(1)],
+        &Map.merge(&1, %{"test_score" => 0.25, "test_lift" => -0.25})
+      )
+      |> update_in(
+        ["reproducibility", "runs", Access.at(2)],
+        &Map.merge(&1, %{"test_score" => 0.25, "test_lift" => -0.25})
+      )
 
     duplicate_seed =
       update_in(third, ["reproducibility", "runs", Access.at(1)], fn run ->
@@ -147,6 +171,11 @@ defmodule OptimizeAnythingArtifactTest do
       "baseline" => %{"artifact" => "baseline #{artifact_class}", "score" => 0.5},
       "optimized" => %{"artifact" => "optimized #{artifact_class}", "score" => 0.75},
       "comparator" => %{"artifact" => "reference #{artifact_class}", "score" => 0.7},
+      "selection" => %{
+        "baseline_score" => 0.4,
+        "optimized_score" => 0.8,
+        "comparator_score" => 0.7
+      },
       "absolute_lift" => 0.25,
       "relative_lift" => 0.5,
       "metric_calls" => 24,
@@ -159,8 +188,10 @@ defmodule OptimizeAnythingArtifactTest do
       "seed" => seed,
       "train_count" => 32,
       "val_count" => 16,
+      "test_count" => 16,
       "train_digest" => digest("#{artifact_class}:train"),
       "val_digest" => digest("#{artifact_class}:val"),
+      "test_digest" => digest("#{artifact_class}:test"),
       "provenance" => %{
         "run_id" => "campaign-20260713-#{artifact_class}",
         "checkpoint" => "checkpoints/#{artifact_class}/iteration-4.json",
@@ -189,8 +220,12 @@ defmodule OptimizeAnythingArtifactTest do
   defp reproducible_run(artifact_class, seed) do
     %{
       "seed" => seed,
-      "optimized_score" => 0.75,
-      "lift" => 0.25,
+      "baseline_selection_score" => 0.4,
+      "selection_score" => 0.8,
+      "selection_lift" => 0.4,
+      "baseline_test_score" => 0.5,
+      "test_score" => 0.75,
+      "test_lift" => 0.25,
       "artifact_digest" => digest("#{artifact_class}:optimized:#{seed}"),
       "run_id" => "campaign-20260713-#{artifact_class}-#{seed}",
       "checkpoint" => "checkpoints/#{artifact_class}/seed-#{seed}.json"

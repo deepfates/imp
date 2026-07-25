@@ -201,8 +201,10 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       budget_config: budget_config
     } = context
 
-    baseline_score = score(evaluator, evaluator.baseline(), evaluator.valset())
-    comparator_score = score(evaluator, evaluator.comparator(), evaluator.valset())
+    baseline_selection_score = score(evaluator, evaluator.baseline(), evaluator.valset())
+    comparator_selection_score = score(evaluator, evaluator.comparator(), evaluator.valset())
+    baseline_test_score = score(evaluator, evaluator.baseline(), evaluator.testset())
+    comparator_test_score = score(evaluator, evaluator.comparator(), evaluator.testset())
 
     runs =
       Enum.map(seeds, fn seed ->
@@ -215,39 +217,45 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
           max_proposals,
           checkpoint_root,
           run_id,
-          baseline_score,
+          baseline_selection_score,
+          baseline_test_score,
           git_sha,
           budget_checkpoint
         )
       end)
 
-    lifts = Enum.map(runs, &(&1.optimized_score - baseline_score))
+    test_lifts = Enum.map(runs, & &1.test_lift)
 
-    unless Enum.count(lifts, &(&1 > 0)) > div(length(lifts), 2) and
-             Enum.sum(lifts) / length(lifts) > 0 do
+    unless Enum.count(test_lifts, &(&1 > 0)) > div(length(test_lifts), 2) and
+             Enum.sum(test_lifts) / length(test_lifts) > 0 do
       raise "#{evaluator.id()} failed the multi-seed held-out effectiveness policy"
     end
 
-    representative = Enum.max_by(runs, & &1.optimized_score)
+    representative = select_representative(runs)
     usage = Enum.reduce(runs, empty_usage(), &sum_usage(&2, &1.usage))
     wall_time_ms = runs |> Enum.map(& &1.wall_time_ms) |> Enum.sum()
     metric_calls = runs |> Enum.map(& &1.metric_calls) |> Enum.sum()
-    absolute_lift = representative.optimized_score - baseline_score
+    absolute_lift = representative.test_score - baseline_test_score
 
     %{
       "artifact_class" => evaluator.artifact_class(),
       "evaluator_id" => evaluator.id(),
-      "baseline" => %{"artifact" => evaluator.baseline(), "score" => baseline_score},
+      "baseline" => %{"artifact" => evaluator.baseline(), "score" => baseline_test_score},
       "optimized" => %{
         "artifact" => representative.artifact,
-        "score" => representative.optimized_score
+        "score" => representative.test_score
       },
       "comparator" => %{
         "artifact" => evaluator.comparator(),
-        "score" => comparator_score
+        "score" => comparator_test_score
+      },
+      "selection" => %{
+        "baseline_score" => baseline_selection_score,
+        "optimized_score" => representative.selection_score,
+        "comparator_score" => comparator_selection_score
       },
       "absolute_lift" => absolute_lift,
-      "relative_lift" => absolute_lift / abs(baseline_score),
+      "relative_lift" => absolute_lift / abs(baseline_test_score),
       "metric_calls" => metric_calls,
       "input_tokens" => usage.input_tokens,
       "output_tokens" => usage.output_tokens,
@@ -258,8 +266,10 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       "seed" => representative.seed,
       "train_count" => length(evaluator.trainset()),
       "val_count" => length(evaluator.valset()),
+      "test_count" => length(evaluator.testset()),
       "train_digest" => digest(evaluator.trainset()),
       "val_digest" => digest(evaluator.valset()),
+      "test_digest" => digest(evaluator.testset()),
       "provenance" => %{
         "run_id" => run_id,
         "checkpoint" => representative.checkpoint,
@@ -272,12 +282,18 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
         "command" =>
           reproducibility_command(provider, model, seeds, max_proposals, budget_config),
         "evaluator_version" => evaluator.id(),
-        "dataset_source" => "embedded Imp benchmark truth corpus with executable evaluators",
+        "dataset_source" =>
+          "embedded Imp benchmark truth corpus with disjoint train, selection, and untouched test splits",
         "environment" => "Elixir #{System.version()} / OTP #{System.otp_release()}",
         "source_commits" => %{"imp" => git_sha, "gepa" => gepa_commit},
         "runs" => Enum.map(runs, &reproducibility_run/1)
       }
     }
+  end
+
+  @doc false
+  def select_representative(runs) when is_list(runs) and runs != [] do
+    Enum.max_by(runs, &{&1.selection_score, -&1.seed})
   end
 
   defp current_gepa_commit! do
@@ -299,7 +315,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
          max_proposals,
          checkpoint_root,
          run_id,
-         baseline_score,
+         baseline_selection_score,
+         baseline_test_score,
          git_sha,
          budget_checkpoint
        ) do
@@ -344,7 +361,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
           valset: evaluator.valset(),
           objective:
             evaluator.metadata()["objective"] || evaluator.metadata()[:objective] ||
-              "Maximize held-out evaluator score while preserving the candidate contract.",
+              "Maximize development evaluator score while preserving the candidate contract.",
           background: Jason.encode!(evaluator.metadata(), pretty: true)
         )
       end)
@@ -358,15 +375,20 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
     validate_seed_usage!(usage, request_count, event_count, after_audit)
 
     artifact = Result.best_candidate(result)
-    optimized_score = score(evaluator, artifact, evaluator.valset())
+    selection_score = score(evaluator, artifact, evaluator.valset())
+    test_score = score(evaluator, artifact, evaluator.testset())
     checkpoint = persist_final_checkpoint(run_dir, result, git_sha)
 
     %{
       seed: seed,
       artifact: artifact,
       artifact_digest: digest(artifact),
-      baseline_score: baseline_score,
-      optimized_score: optimized_score,
+      baseline_selection_score: baseline_selection_score,
+      selection_score: selection_score,
+      selection_lift: selection_score - baseline_selection_score,
+      baseline_test_score: baseline_test_score,
+      test_score: test_score,
+      test_lift: test_score - baseline_test_score,
       metric_calls: result.total_metric_calls,
       wall_time_ms: max(div(elapsed_us, 1_000), 1),
       usage: usage,
@@ -427,9 +449,12 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
   defp reproducibility_run(run) do
     %{
       "seed" => run.seed,
-      "baseline_score" => run.baseline_score,
-      "optimized_score" => run.optimized_score,
-      "lift" => run.optimized_score - run.baseline_score,
+      "baseline_selection_score" => run.baseline_selection_score,
+      "selection_score" => run.selection_score,
+      "selection_lift" => run.selection_lift,
+      "baseline_test_score" => run.baseline_test_score,
+      "test_score" => run.test_score,
+      "test_lift" => run.test_lift,
       "artifact_digest" => run.artifact_digest,
       "metric_calls" => run.metric_calls,
       "wall_time_ms" => run.wall_time_ms,

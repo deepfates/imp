@@ -1585,7 +1585,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
              &valid_optimize_anything_candidate?/1
            ),
          {:ok, artifact} <- read_artifact(path) do
-      full = Imp.BenchmarkTruth.OptimizeAnything.Artifact.full_artifact?(artifact)
+      full =
+        Imp.BenchmarkTruth.OptimizeAnything.Artifact.full_artifact?(artifact) and
+          valid_optimize_anything_admission?(artifact)
+
       rows = if is_list(artifact["rows"]), do: artifact["rows"], else: []
 
       artifact_lane("optimize_anything", path, artifact, max_age_hours,
@@ -2512,6 +2515,15 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
        do: is_boolean(summary["all_passing"])
 
   defp valid_optimize_anything_candidate?(_artifact), do: false
+
+  defp valid_optimize_anything_admission?(artifact) do
+    Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!("optimize_anything", artifact) ==
+      :ok
+  rescue
+    _error -> false
+  catch
+    _kind, _reason -> false
+  end
 
   defp valid_rag_tool_agent_candidate?(%{"summary" => summary, "rows" => rows})
        when is_map(summary) and is_list(rows),

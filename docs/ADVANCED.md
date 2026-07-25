@@ -69,7 +69,7 @@ or finish failures are warnings. Imp reports accurate failed terminal status,
 while the isolated W&B client can reproduce GEPA v0.1.1's success-only finish
 behavior when explicitly configured for compatibility.
 
-The source-checkout effectiveness lane uses executable code, agent
+The source-checkout effectiveness target uses executable code, agent
 configuration, and scheduling artifacts:
 
 ```sh
@@ -85,8 +85,10 @@ mix imp.benchmark.optimize_anything --live --provider openai \
 ```
 
 The smoke command validates wiring only. The source-checkout benchmark guide
-defines the multi-seed, held-out evaluation, cost, and checkpoint requirements
-that authorize the scoped live effectiveness claim. The live command requires
+defines the multi-seed, three-split held-out evaluation, cost, and checkpoint
+requirements for the still-open scoped live effectiveness claim. The immutable
+pre-v2 artifact is T2 execution evidence only because it reused its development
+set for final scoring. The live command requires
 all spend and token ceilings explicitly, reserves worst-case request cost
 before transport, disables cache hits and transport retries, and records a
 checksummed budget checkpoint; missing or zero provider cost telemetry aborts

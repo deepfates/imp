@@ -279,10 +279,12 @@ defmodule ClaimsInventoryTest do
     claims = Map.new(read_claims!(), &{&1["id"], &1})
     oa = claims["claim.optimize_anything.non_prompt_effectiveness"]
 
-    assert oa["claim_state"] == "asserted"
-    assert oa["release"] == "v0.1"
-    assert Enum.any?(oa["limitations"], &String.contains?(&1, "bounded to three"))
-    assert oa["statement"] =~ "improved all three"
+    assert oa["claim_state"] == "target"
+    assert oa["release"] == "telos"
+    assert Enum.any?(oa["limitations"], &String.contains?(&1, "pre-v2"))
+    assert Enum.any?(oa["limitations"], &String.contains?(&1, "development set"))
+    assert oa["statement"] =~ "open C3 target"
+    assert oa["statement"] =~ "untouched test set"
     assert Enum.any?(oa["sources"], &String.contains?(&1, "58ff84ac"))
 
     assert claims["claim.optimize_anything.upstream_comparative_effectiveness"]["claim_state"] ==

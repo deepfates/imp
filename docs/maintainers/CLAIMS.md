@@ -131,11 +131,12 @@ evidence when present, but it is not required by the upstream GEPA artifact.
 Optimize Anything non-prompt effectiveness uses its own `optimize_anything`
 lane. Full evidence requires executable code, agent-configuration, and
 scheduling artifact families; at least three live provider-backed seeds per
-family; positive mean held-out lift; a strict majority of improving runs;
-positive usage and cost; and durable checkpoint provenance. Smoke artifacts
-and authored comparator scores cannot authorize the claim. This lane proves
-the scoped Imp-native effectiveness statement, not paper-scale upstream
-parity.
+family; pairwise-distinct train, selection, and untouched test splits; positive
+mean test lift; a strict majority of improving runs; candidate selection that
+does not consult test outcomes; positive usage and cost; and durable checkpoint
+provenance. Smoke artifacts, development-only pre-v2 artifacts, and authored
+comparator scores cannot authorize the claim. A passing schema-v2 lane proves
+the scoped Imp-native effectiveness statement, not paper-scale upstream parity.
 
 Local MLX weight-training effectiveness uses the `local_mlx_weight_training`
 lane. Full evidence requires a clean, independently validated campaign over the

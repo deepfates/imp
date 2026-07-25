@@ -34,20 +34,20 @@ receipts.
 
 ## Where the ledger stands
 
-As of v0.2.0, the ledger holds **64 claims: 45 asserted, 19 still targets.**
+As of v0.2.0, the ledger holds **64 claims: 44 asserted, 20 still targets.**
 
 | Rung | Claims | Asserted |
 | --- | --- | --- |
 | C0 | 9 | 9 |
 | C1 | 25 | 25 |
 | C2 | 9 | 8 |
-| C3 | 19 | 3 |
+| C3 | 19 | 2 |
 | C4 | 2 | 0 |
 
-**Reconciliation — asserted is not proven.** The 45 asserted rows are
+**Reconciliation — asserted is not proven.** The 44 asserted rows are
 maintainer attestations. In a fresh source checkout, `mix
 benchmark.dashboard --profile v0.1` recomputes claim state from committed
-evidence alone and reports **10 of the 45 proven, 26 blocked, 19
+evidence alone and reports **10 of the 44 proven, 25 blocked, 19
 informational** (profile ready: false): most asserted rows cite lane
 evidence that maintainers generate locally under `tmp/` and that is not
 committed, so a fresh clone cannot replay it. That gap is real and tracked:
@@ -61,10 +61,12 @@ Read the shape honestly: the exists-and-conforms level is asserted with
 differential lanes behind it, but only the committed subset replays from a
 fresh checkout. Most effectiveness claims are still targets — Imp does not
 claim an optimizer helps your task until a held-out score in a committed
-artifact says so. The three asserted C3 rows include the
-[ticket-routing tutorial](TUTORIAL_TICKET_ROUTING.md)'s 25–30% → 85%
-result, whose run artifact is content-addressed in the repository and
-reproducible with one script.
+artifact says so. The two asserted C3 rows are the local MLX weight-training
+campaign and the [ticket-routing tutorial](TUTORIAL_TICKET_ROUTING.md)'s
+25–30% → 85% result; both artifacts are content-addressed in the repository.
+Optimize Anything is not among them: its immutable pre-v2 artifact selected
+and scored on the same development set and is retained only as T2 execution
+evidence pending a three-split rerun.
 
 ## Where the receipts live
 

@@ -99,7 +99,16 @@ defmodule OptimizeAnythingCampaignTest do
       assert_in_delta row["campaign_budget"]["usage"]["usd"], 0.018, 1.0e-12
       assert File.regular?(row["provenance"]["budget_checkpoint"])
       assert length(row["reproducibility"]["runs"]) == 3
-      assert Enum.all?(row["reproducibility"]["runs"], &(&1["lift"] > 0))
+      assert row["test_count"] > 0
+      assert row["test_digest"] not in [row["train_digest"], row["val_digest"]]
+      assert Enum.all?(row["reproducibility"]["runs"], &(&1["test_lift"] > 0))
+
+      assert Enum.all?(row["reproducibility"]["runs"], fn run ->
+               run["baseline_test_score"] == row["baseline"]["score"] and
+                 run["test_score"] > run["baseline_test_score"] and
+                 is_number(run["selection_score"])
+             end)
+
       assert Enum.all?(row["reproducibility"]["runs"], &(&1["request_count"] == 1))
       assert Enum.all?(row["reproducibility"]["runs"], &File.regular?(&1["checkpoint"]))
 
@@ -269,6 +278,15 @@ defmodule OptimizeAnythingCampaignTest do
         max_output_tokens_per_request: 1_000
       )
     end
+  end
+
+  test "representative selection never consults held-out test score" do
+    runs = [
+      %{seed: 17, selection_score: 0.9, test_score: 0.1},
+      %{seed: 23, selection_score: 0.8, test_score: 1.0}
+    ]
+
+    assert Campaign.select_representative(runs).seed == 17
   end
 
   test "cost ceiling stops the next call before cumulative overspend" do

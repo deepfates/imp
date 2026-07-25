@@ -10,6 +10,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Evaluator do
   @callback comparator() :: String.t()
   @callback trainset() :: list()
   @callback valset() :: list()
+  @callback testset() :: list()
   @callback evaluate(artifact :: String.t(), example :: map()) :: {score(), diagnostics()}
   @callback metadata() :: %{optional(String.t()) => term()}
 end

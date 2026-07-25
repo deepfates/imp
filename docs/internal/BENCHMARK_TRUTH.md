@@ -340,12 +340,14 @@ mix imp.benchmark.optimize_anything \
 
 The full lane optimizes three executable artifact classes: an Elixir retry
 controller, a support-routing agent configuration, and a scheduling heuristic.
-Each family has deterministic train and independently recomputed held-out
-evaluators, a baseline, and an authored reference comparator. The comparator
-is a positive control for evaluator headroom; it is not an upstream
-Optimize Anything parity result.
+Each family has deterministic, pairwise-distinct train, selection, and untouched
+test sets, a baseline, and an authored reference comparator. The optimizer sees
+only train and selection data. Final scores and the multi-seed policy use the
+test set, while the displayed representative is chosen by selection score so
+test outcomes cannot choose the candidate. The comparator is a positive control
+for evaluator headroom; it is not an upstream Optimize Anything parity result.
 
-Full evidence requires at least three distinct seeds, positive mean held-out
+Schema-v2 full evidence requires at least three distinct seeds, positive mean held-out
 lift, a strict majority of improving seeds for every family, positive live
 provider token and cost accounting, and per-run checkpoints. All seed
 outcomes remain in the artifact, including ties and regressions. `--smoke`
@@ -399,9 +401,13 @@ secret-shaped values are rejected rather than redacted because the URL is part
 of source identity. Known profiles bind the exact provider, model, rates, and
 authority URL at the CLI, campaign, and pure admission layers.
 
-This campaign establishes Imp-native non-prompt optimization effectiveness at
-the declared scale. It does not establish full paper reproduction or equality
-with an upstream implementation under matched internals.
+The immutable pre-v2 artifact `58ff84ac…` remains valid T2 evidence that a
+live provider-backed campaign executed with recorded costs and checkpoints.
+It does not establish C3 effectiveness because it selected and finally scored
+candidates on the same development set. No provider-backed schema-v2 artifact
+has been admitted, so Imp-native non-prompt effectiveness remains an open
+target. Neither schema establishes full paper reproduction or equality with an
+upstream implementation under matched internals.
 
 ## Run GEPA Paper Replication
 
