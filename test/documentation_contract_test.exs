@@ -344,7 +344,10 @@ defmodule DocumentationContractTest do
     assert advanced =~ "accepts an HTTP transport module or an arity-4 callback"
 
     assert advanced =~
-             "Trainer options accept `nil`, a trainer module, a configured trainer struct, or\nan arity-3 callback"
+             "SFT trainer options accept `nil`, a trainer\nmodule, a configured trainer struct, or an arity-3 callback"
+
+    assert advanced =~
+             "GRPO requires a trainer module or struct because its reinforcement\nlifecycle spans start, status, step, termination, and artifact callbacks"
   end
 
   test "GEPA documentation distinguishes the canonical program and artifact surfaces" do

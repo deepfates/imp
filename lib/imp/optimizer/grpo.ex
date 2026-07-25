@@ -45,7 +45,7 @@ defmodule Imp.Optimizer.GRPO do
   ]
 
   @option_schema [
-    trainer: [type: {:custom, Imp.Clients.Trainer, :validate_provider, []}, default: nil],
+    trainer: [type: {:custom, __MODULE__, :validate_trainer, []}, default: nil],
     validation_fn: [type: {:or, [{:fun, 3}, nil]}, default: nil],
     num_train_steps: [type: :non_neg_integer, default: 100],
     seed: [type: :integer, default: 0],
@@ -107,6 +107,14 @@ defmodule Imp.Optimizer.GRPO do
   def validate_callback_timeout(_timeout),
     do: {:error, "expected :infinity or a positive integer"}
 
+  @doc false
+  def validate_trainer(trainer) when is_function(trainer) do
+    {:error,
+     "expected nil or a trainer module or struct implementing the GRPO reinforcement lifecycle"}
+  end
+
+  def validate_trainer(trainer), do: Trainer.validate_provider(trainer)
+
   @impl true
   def __optimizer__,
     do: %{
@@ -122,17 +130,20 @@ defmodule Imp.Optimizer.GRPO do
       |> Imp.Optimizer.invocation_options()
       |> maybe_put_validation(opts)
 
-    case compile(optimizer, program, Imp.Optimizer.fetch_dataset!(opts, :trainset), compile_opts) do
-      {:ok, compiled} ->
-        {:ok,
-         %Imp.Optimizer.TrainingResult{
-           program: compiled,
-           status: :completed,
-           metadata: %{method: :grpo}
-         }}
-
-      {:error, reason} ->
-        {:error, reason}
+    with :ok <- Imp.Optimizer.reject_options(Keyword.drop(compile_opts, [:valset])),
+         {:ok, compiled} <-
+           compile(
+             optimizer,
+             program,
+             Imp.Optimizer.fetch_dataset!(opts, :trainset),
+             compile_opts
+           ) do
+      {:ok,
+       %Imp.Optimizer.TrainingResult{
+         program: compiled,
+         status: :completed,
+         metadata: %{method: :grpo}
+       }}
     end
   end
 
@@ -143,9 +154,9 @@ defmodule Imp.Optimizer.GRPO do
     do: {:error, :trainer_required}
 
   def compile(%__MODULE__{} = optimizer, program, trainset, opts) when is_list(opts) do
-    valset = Keyword.get(opts, :valset)
-
-    with :ok <- validate_compile_inputs(optimizer, program, trainset, valset),
+    with {:ok, trainset} <- materialize_dataset(trainset, :trainset),
+         {:ok, valset} <- materialize_dataset(Keyword.get(opts, :valset), :valset),
+         :ok <- validate_compile_inputs(optimizer, program, trainset, valset),
          :ok <- Trainer.supports_method(optimizer.trainer, :grpo),
          lm <- program_lm(program),
          identity <- checkpoint_identity(optimizer, lm, trainset, valset),
@@ -176,6 +187,24 @@ defmodule Imp.Optimizer.GRPO do
       do: Keyword.put(compile_opts, :valset, Keyword.fetch!(opts, :validation)),
       else: compile_opts
   end
+
+  defp materialize_dataset(nil, :valset), do: {:ok, nil}
+  defp materialize_dataset(dataset, _name) when is_list(dataset), do: {:ok, dataset}
+
+  defp materialize_dataset(dataset, name) do
+    if Enumerable.impl_for(dataset) do
+      {:ok, Enum.to_list(dataset)}
+    else
+      {:error, invalid_dataset_reason(name)}
+    end
+  rescue
+    _error -> {:error, invalid_dataset_reason(name)}
+  catch
+    _kind, _reason -> {:error, invalid_dataset_reason(name)}
+  end
+
+  defp invalid_dataset_reason(:trainset), do: :invalid_grpo_trainset
+  defp invalid_dataset_reason(:valset), do: :invalid_grpo_valset
 
   defp acquire_session(%{checkpoint_path: path} = optimizer, lm, identity)
        when is_binary(path) do

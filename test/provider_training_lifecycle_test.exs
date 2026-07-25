@@ -1174,7 +1174,7 @@ defmodule ProviderTrainingLifecycleTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.GRPO\.new\/2: invalid value for :trainer option: expected nil, a trainer module, a trainer struct, or an arity-3 trainer callback/,
+                 ~r/Imp\.Optimizer\.GRPO\.new\/2: invalid value for :trainer option: expected nil or a trainer module or struct implementing the GRPO reinforcement lifecycle/,
                  fn ->
                    Imp.Optimizer.GRPO.new(fn _example -> 1.0 end,
                      trainer: fn _lm, _examples -> {:ok, :bad} end

@@ -64,8 +64,12 @@ GRPO reports `status: :completed` after its synchronous trainer workflow returns
 the rebound program. Both require an explicitly configured
 trainer. Imp does not silently fall back to local training when no trainer is
 configured. `Imp.Clients.MLXLMTrainer` is an optional, explicit local SFT
-backend, not a fallback. A training optimizer that declares optional validation
-accepts it as `validation:` in the fourth-argument keyword options.
+backend, not a fallback. The arity-3 trainer callback shorthand implements only
+the single-call SFT boundary; GRPO needs a trainer module or struct implementing
+the reinforcement lifecycle callbacks. Trainsets and GRPO validation sets may
+be any finite `Enumerable`, including streams; Imp materializes each once before
+the multi-step training workflow. A training optimizer that declares optional
+validation accepts it as `validation:` in the fourth-argument keyword options.
 
 Provider training jobs can be refreshed, cancelled when the provider exposes a
 cancellation endpoint, saved without credentials, restored with an explicitly

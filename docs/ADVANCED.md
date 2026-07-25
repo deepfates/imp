@@ -170,10 +170,11 @@ the network.
 
 Provider training is also explicit. `BootstrapFinetune` and `GRPO` build
 training jobs only when a real trainer backend is supplied; they
-do not train models in-process.
-Trainer options accept `nil`, a trainer module, a configured trainer struct, or
-an arity-3 callback so tests and applications can inject the training boundary
-without ambient provider state.
+do not train models in-process. SFT trainer options accept `nil`, a trainer
+module, a configured trainer struct, or an arity-3 callback so tests and
+applications can inject that single-call boundary without ambient provider
+state. GRPO requires a trainer module or struct because its reinforcement
+lifecycle spans start, status, step, termination, and artifact callbacks.
 
 ```elixir
 trainer = Imp.Clients.OpenAITrainer.new(training_file: "file-provider-id")
