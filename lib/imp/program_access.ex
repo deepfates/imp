@@ -37,6 +37,7 @@ defmodule Imp.ProgramAccess do
   def predict(%Refine{program: program}), do: predict(program)
   def predict(%MultiChainComparison{predict: predict}), do: predict(predict)
   def predict(%Imp.Optimizer.KNNFewShot.Program{student: student}), do: predict(student)
+  def predict(%Imp.Playbook.WithContext{program: program}), do: predict(program)
   def predict(_program), do: nil
 
   def task_signature(%Predict{signature: signature}), do: signature
@@ -52,6 +53,8 @@ defmodule Imp.ProgramAccess do
 
   def task_signature(%Imp.Optimizer.KNNFewShot.Program{student: student}),
     do: task_signature(student)
+
+  def task_signature(%Imp.Playbook.WithContext{program: program}), do: task_signature(program)
 
   def task_signature(_program), do: nil
 
@@ -279,6 +282,9 @@ defmodule Imp.ProgramAccess do
   def put_metadata(%Imp.Optimizer.KNNFewShot.Program{student: student} = program, key, value),
     do: %{program | student: put_metadata(student, key, value)}
 
+  def put_metadata(%Imp.Playbook.WithContext{program: inner} = program, key, value),
+    do: %{program | program: put_metadata(inner, key, value)}
+
   def put_metadata(%{__struct__: _module, metadata: metadata} = program, key, value)
       when is_map(metadata),
       do: %{program | metadata: Map.put(metadata, key, value)}
@@ -305,6 +311,18 @@ defmodule Imp.ProgramAccess do
     %{program | program: merge_metadata(inner, metadata)}
   end
 
+  def merge_metadata(%Assertions{program: inner} = program, metadata),
+    do: %{program | program: merge_metadata(inner, metadata)}
+
+  def merge_metadata(%BestOfN{program: inner} = program, metadata),
+    do: %{program | program: merge_metadata(inner, metadata)}
+
+  def merge_metadata(%Refine{program: inner} = program, metadata),
+    do: %{program | program: merge_metadata(inner, metadata)}
+
+  def merge_metadata(%MultiChainComparison{predict: predict} = program, metadata),
+    do: %{program | predict: merge_metadata(predict, metadata)}
+
   def merge_metadata(%ReAct{react: predict} = program, metadata),
     do: %{program | react: merge_metadata(predict, metadata)}
 
@@ -316,6 +334,9 @@ defmodule Imp.ProgramAccess do
 
   def merge_metadata(%Imp.Optimizer.KNNFewShot.Program{student: student} = program, metadata),
     do: %{program | student: merge_metadata(student, metadata)}
+
+  def merge_metadata(%Imp.Playbook.WithContext{program: inner} = program, metadata),
+    do: %{program | program: merge_metadata(inner, metadata)}
 
   def merge_metadata(program, _metadata), do: program
 end

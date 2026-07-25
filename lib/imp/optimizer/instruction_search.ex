@@ -107,10 +107,13 @@ defmodule Imp.Optimizer.InstructionSearch do
   def put_instruction(%module{} = program, instruction) do
     if function_exported?(module, :put_instruction, 2),
       do: module.put_instruction(program, instruction),
-      else: program
+      else: put_single_predictor_instruction!(program, instruction)
   end
 
-  def put_instruction(program, _instruction), do: program
+  def put_instruction(program, _instruction) do
+    raise ArgumentError,
+          "instruction search expects an Imp program struct, got: #{inspect(program)}"
+  end
 
   def current_instruction(%Imp.Predict.Predict{signature: signature}),
     do: signature.instructions
@@ -130,10 +133,13 @@ defmodule Imp.Optimizer.InstructionSearch do
   def current_instruction(%module{} = program) do
     if function_exported?(module, :current_instruction, 1),
       do: module.current_instruction(program),
-      else: nil
+      else: single_predictor_instruction!(program)
   end
 
-  def current_instruction(_program), do: nil
+  def current_instruction(program) do
+    raise ArgumentError,
+          "instruction search expects an Imp program struct, got: #{inspect(program)}"
+  end
 
   def candidate_instructions(program, trainset, opts \\ []) do
     Imp.Optimizer.InstructionProposer.propose(program, trainset, opts)
@@ -194,9 +200,9 @@ defmodule Imp.Optimizer.InstructionSearch do
   defp maybe_put_demos(program, []), do: program
 
   defp maybe_put_demos(program, demos) do
-    case Imp.ProgramAccess.predict(program) do
-      nil -> program
-      _predict -> Imp.with_demos(program, demos)
+    case Imp.ProgramParameters.predictors(program) do
+      [] -> program
+      _predictors -> Imp.with_demos(program, demos)
     end
   end
 
@@ -205,6 +211,34 @@ defmodule Imp.Optimizer.InstructionSearch do
   end
 
   defp unique_candidates(candidates), do: Enum.uniq(candidates)
+
+  defp put_single_predictor_instruction!(program, instruction) do
+    case Imp.ProgramParameters.predictors(program) do
+      [%{name: name}] -> Imp.ProgramParameters.put_instruction(program, name, instruction)
+      [] -> unsupported_program!(program)
+      predictors -> ambiguous_program!(program, predictors)
+    end
+  end
+
+  defp single_predictor_instruction!(program) do
+    case Imp.ProgramParameters.predictors(program) do
+      [%{predictor: predictor}] -> predictor.signature.instructions
+      [] -> unsupported_program!(program)
+      predictors -> ambiguous_program!(program, predictors)
+    end
+  end
+
+  defp unsupported_program!(program) do
+    raise ArgumentError,
+          "instruction search cannot update #{inspect(program.__struct__)} because it exposes no optimizer predictor"
+  end
+
+  defp ambiguous_program!(program, predictors) do
+    names = Enum.map(predictors, & &1.name)
+
+    raise ArgumentError,
+          "instruction search requires one predictor, but #{inspect(program.__struct__)} exposes #{inspect(names)}"
+  end
 
   defp safe_count(enumerable), do: Enum.count(enumerable)
 

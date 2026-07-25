@@ -19,6 +19,13 @@ defmodule OptimizerReportTest do
     def run(%__MODULE__{}, _program, _opts), do: {:error, :optimizer_declined}
   end
 
+  defmodule MultiPredictorProgram do
+    defstruct [:first, :second]
+
+    def optimizer_predictors(program), do: [first: program.first, second: program.second]
+    def update_optimizer_predictor(program, name, update), do: Map.update!(program, name, update)
+  end
+
   defp lm do
     %{
       module: Imp.LM.Static,
@@ -333,6 +340,44 @@ defmodule OptimizerReportTest do
 
     assert Imp.Optimizer.InstructionSearch.current_instruction(rag) == "Use retrieved context."
     assert rag.program.signature.instructions == "Use retrieved context."
+
+    best_of_n =
+      "question -> answer"
+      |> Imp.predict()
+      |> Imp.best_of_n(fn _example, _prediction -> 1.0 end, n: 1)
+      |> Imp.Optimizer.InstructionSearch.put_instruction("Compare one answer exactly.")
+
+    assert best_of_n.program.signature.instructions == "Compare one answer exactly."
+
+    assert Imp.Optimizer.InstructionSearch.current_instruction(best_of_n) ==
+             "Compare one answer exactly."
+
+    with_playbook =
+      "question -> answer"
+      |> Imp.predict()
+      |> Imp.with_playbook(Imp.Playbook.new(id: "instruction-search"))
+      |> Imp.Optimizer.InstructionSearch.put_instruction("Use the active playbook.")
+
+    assert [%{predictor: predictor}] = Imp.ProgramParameters.predictors(with_playbook)
+    assert predictor.signature.instructions == "Use the active playbook."
+
+    assert Imp.ProgramAccess.task_signature(with_playbook).instructions ==
+             "Use the active playbook."
+  end
+
+  test "instruction search rejects unsupported and ambiguous program graphs instead of scoring no-ops" do
+    assert_raise ArgumentError, ~r/exposes no optimizer predictor/, fn ->
+      Imp.Optimizer.InstructionSearch.put_instruction(%URI{scheme: "https"}, "No-op")
+    end
+
+    multi = %MultiPredictorProgram{
+      first: Imp.predict("question -> answer"),
+      second: Imp.predict("question -> answer")
+    }
+
+    assert_raise ArgumentError, ~r/requires one predictor/, fn ->
+      Imp.Optimizer.InstructionSearch.put_instruction(multi, "Ambiguous")
+    end
   end
 
   test "instruction search updates wrapper task signatures as well as LM signatures" do
@@ -684,6 +729,30 @@ defmodule OptimizerReportTest do
     assert report.optimizer == :instruction_search
     assert report.best_score == 1.0
     assert Enum.any?(report.candidates, &(&1.instruction == "Always answer Paris."))
+  end
+
+  test "instruction search evaluates changed programs through callback wrappers" do
+    {_train, dev} = sets()
+
+    metric = fn _example_or_inputs, prediction ->
+      Imp.Prediction.get(prediction, :answer) == "Paris"
+    end
+
+    program =
+      "question -> answer"
+      |> Imp.predict(lm: lm())
+      |> Imp.best_of_n(metric, n: 1)
+
+    compiled =
+      Imp.Optimizer.InstructionSearch.compile(program, metric, [], dev, [
+        "Always answer Paris."
+      ])
+
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) ==
+             "Always answer Paris."
+
+    assert compiled.program.signature.instructions == "Always answer Paris."
+    assert Imp.Optimizer.Report.fetch(compiled).best_score == 1.0
   end
 
   test "instruction search keeps the baseline when candidates regress" do
