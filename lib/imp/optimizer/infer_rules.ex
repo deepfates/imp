@@ -15,9 +15,12 @@ defmodule Imp.Optimizer.InferRules do
   proposal cannot rewrite an already selected candidate through shared Python
   signature-class state. Proposal and evaluation failures are retained in the
   optimizer report instead of aborting the whole compile. Unlike upstream,
-  context-window failures are not yet retried with progressively fewer examples.
-  Those are deliberate native control-flow differences, not claims of exact
-  whole-loop equivalence.
+  Context-window failures retry with progressively fewer examples, matching
+  upstream's user-visible recovery policy. Exhausted retries are retained as
+  proposal errors instead of aborting the whole compile. Those are deliberate
+  native control-flow differences, not claims of exact whole-loop equivalence.
+  Imp also reuses a logical call's sequential rollout ID while its prompt
+  shrinks; DSPy draws a fresh random rollout ID for every retry.
 
   Pass `:rule_lm` (or `:prompt_lm`) to keep rule induction separate from the
   task LM. Without one, the program's bound LM is used. `:candidates` accepts
@@ -133,10 +136,10 @@ defmodule Imp.Optimizer.InferRules do
         teacher: Keyword.get(opts, :teacher)
       )
 
-    bootstrap_report = Imp.Optimizer.Report.fetch(baseline)
+    bootstrap_report = fetch_report!(baseline, :bootstrap_few_shot)
     rule_lm = resolve_rule_lm(optimizer, baseline)
 
-    {candidates, proposal_errors, proposal_calls} =
+    {candidates, proposal_errors, proposal_calls, proposal_attempts} =
       build_candidates(optimizer, baseline, trainset, rule_lm)
 
     evaluation_max_errors = bootstrap_report.metadata.max_errors
@@ -181,6 +184,7 @@ defmodule Imp.Optimizer.InferRules do
           num_candidates: candidate_count(optimizer),
           num_rules: optimizer.num_rules,
           proposal_calls: proposal_calls,
+          proposal_attempts: proposal_attempts,
           evaluation_max_errors: evaluation_max_errors,
           predictor_names: Enum.map(Imp.ProgramParameters.predictors(baseline), & &1.name),
           trainset_size: length(trainset),
@@ -190,7 +194,7 @@ defmodule Imp.Optimizer.InferRules do
         }
       })
 
-    Imp.Optimizer.Report.attach(best, report)
+    attach_report(best, report)
   end
 
   defp format_examples(examples, %Imp.Signature{} = signature) do
@@ -225,7 +229,7 @@ defmodule Imp.Optimizer.InferRules do
         }
       end)
 
-    {rows, [], 0}
+    {rows, [], 0, 0}
   end
 
   defp build_candidates(_optimizer, _baseline, _trainset, nil) do
@@ -234,37 +238,42 @@ defmodule Imp.Optimizer.InferRules do
       error: "no rule LM is configured or bound to the program"
     }
 
-    {[], [error], 0}
+    {[], [error], 0, 0}
   end
 
   defp build_candidates(optimizer, baseline, trainset, rule_lm) do
     predictors = Imp.ProgramParameters.predictors(baseline)
 
     0..(optimizer.num_candidates - 1)
-    |> Enum.reduce({[], [], 0}, fn candidate_index, {rows, errors, calls} ->
+    |> Enum.reduce({[], [], 0, 0}, fn candidate_index, {rows, errors, calls, attempts} ->
       result =
         predictors
         |> Enum.with_index()
-        |> Enum.reduce_while({:ok, %{}, calls}, fn {%{name: name, predictor: predictor},
-                                                    predictor_index},
-                                                   {:ok, rules, calls} ->
-          examples_text = format_examples(trainset, predictor.signature)
+        |> Enum.reduce_while({:ok, %{}, calls, attempts}, fn {%{
+                                                                name: name,
+                                                                predictor: predictor
+                                                              }, predictor_index},
+                                                             {:ok, rules, calls, attempts} ->
           rollout_id = candidate_index * max(length(predictors), 1) + predictor_index
 
           case induce_rules(
                  rule_lm,
-                 examples_text,
+                 trainset,
+                 predictor.signature,
                  optimizer.num_rules,
                  rollout_id,
                  optimizer.bootstrap.teacher_settings
                ) do
-            {:ok, induced} -> {:cont, {:ok, Map.put(rules, name, induced), calls + 1}}
-            {:error, reason} -> {:halt, {:error, name, reason, calls + 1}}
+            {:ok, induced, call_attempts} ->
+              {:cont, {:ok, Map.put(rules, name, induced), calls + 1, attempts + call_attempts}}
+
+            {:error, reason, call_attempts} ->
+              {:halt, {:error, name, reason, calls + 1, attempts + call_attempts}}
           end
         end)
 
       case result do
-        {:ok, rules, calls} ->
+        {:ok, rules, calls, attempts} ->
           row = %{
             program: apply_rules(baseline, rules),
             index: candidate_index,
@@ -272,9 +281,9 @@ defmodule Imp.Optimizer.InferRules do
             baseline: false
           }
 
-          {rows ++ [row], errors, calls}
+          {rows ++ [row], errors, calls, attempts}
 
-        {:error, predictor, reason, calls} ->
+        {:error, predictor, reason, calls, attempts} ->
           error = %{
             stage: :rule_induction,
             candidate: candidate_index,
@@ -282,16 +291,60 @@ defmodule Imp.Optimizer.InferRules do
             error: error_message(reason)
           }
 
-          {rows, errors ++ [error], calls}
+          {rows, errors ++ [error], calls, attempts}
       end
     end)
   end
 
-  defp induce_rules(rule_lm, examples_text, num_rules, rollout_id, teacher_settings) do
+  defp induce_rules(rule_lm, examples, signature, num_rules, rollout_id, teacher_settings) do
+    do_induce_rules(
+      rule_lm,
+      examples,
+      signature,
+      num_rules,
+      rollout_id,
+      teacher_settings,
+      1
+    )
+  end
+
+  defp do_induce_rules(
+         rule_lm,
+         examples,
+         signature,
+         num_rules,
+         rollout_id,
+         teacher_settings,
+         attempt
+       ) do
+    examples_text = format_examples(examples, signature)
+
+    case call_rule_program(rule_lm, examples_text, num_rules, rollout_id, teacher_settings) do
+      {:ok, rules} ->
+        {:ok, rules, attempt}
+
+      {:error, reason} ->
+        if context_window_exceeded?(reason) and length(examples) > 1 do
+          do_induce_rules(
+            rule_lm,
+            Enum.drop(examples, -1),
+            signature,
+            num_rules,
+            rollout_id,
+            teacher_settings,
+            attempt + 1
+          )
+        else
+          {:error, reason, attempt}
+        end
+    end
+  end
+
+  defp call_rule_program(rule_lm, examples_text, num_rules, rollout_id, teacher_settings) do
     signature =
       Imp.signature(
         "examples_text -> natural_language_rules",
-        "Given the examples, extract #{num_rules} concise, non-redundant natural-language rules. Each rule must be actionable for a well-specified scope of similar examples."
+        "Given a set of examples, extract a list of #{num_rules} concise and non-redundant natural language rules that provide clear guidance for performing the task. All rules should be actionable for a well-specified scope of examples of this general kind of task."
       )
 
     program =
@@ -324,6 +377,16 @@ defmodule Imp.Optimizer.InferRules do
     do: rules |> Enum.map(&to_string/1) |> Enum.join("\n") |> normalize_rules()
 
   defp normalize_rules(rules), do: {:error, {:invalid_natural_language_rules, rules}}
+
+  defp context_window_exceeded?(%Imp.ContextWindowExceededError{}), do: true
+  defp context_window_exceeded?({:error, reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?({:lm_failed, _lm, reason}), do: context_window_exceeded?(reason)
+
+  defp context_window_exceeded?(%Imp.LMError{reason: reason}),
+    do: context_window_exceeded?(reason)
+
+  defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?(_reason), do: false
 
   defp apply_rules(program, rules_by_predictor) do
     Enum.reduce(rules_by_predictor, program, fn {name, rules}, current ->
@@ -402,6 +465,38 @@ defmodule Imp.Optimizer.InferRules do
       candidate_count: report.candidate_count,
       error_count: length(report.errors)
     }
+  end
+
+  defp fetch_report!(program, optimizer) do
+    report =
+      [
+        Imp.Optimizer.Report.fetch(program)
+        | Enum.map(Imp.ProgramParameters.predictors(program), fn %{predictor: predictor} ->
+            Imp.Optimizer.Report.fetch(predictor)
+          end)
+      ]
+      |> Enum.find(fn
+        %{optimizer: ^optimizer} -> true
+        _other -> false
+      end)
+
+    report || raise "InferRules expected #{optimizer} to attach an optimizer report"
+  end
+
+  defp attach_report(program, report) do
+    case Imp.ProgramAccess.predict(program) do
+      nil ->
+        Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+          Imp.ProgramParameters.update_predictor(
+            acc,
+            name,
+            &Imp.Optimizer.Report.attach(&1, report)
+          )
+        end)
+
+      _predictor ->
+        Imp.Optimizer.Report.attach(program, report)
+    end
   end
 
   defp ensure_predictors!(program) do

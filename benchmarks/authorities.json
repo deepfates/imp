@@ -318,7 +318,7 @@
       "upstream_tests": {"status": "partial", "references": ["tests/teleprompt/test_copro_optimizer.py#sha256=a9561ce73c056f60ed3ad9fd51c59da27d7acb6d271a16868f94d339eff0db47", "No dedicated upstream tests were found for InferRules or the Imp-native InstructionSearch/SignatureOptimizer surfaces."]},
       "dataset_protocol": {"status": "protocol_defined", "references": ["docs/internal/PARITY_VALIDATION_PROGRAM.md#lane-3-optimizer-lift-parity"], "immutable_digests": []},
       "local_differential": {"status": "partial", "artifacts": ["test/infer_rules_upstream_differential_test.exs", "benchmarks/results/optimizer-lift-parity-*.json"]},
-      "notes": "The provider-free InferRules test executes the exact pinned DSPy 3.2.1 implementation and matches example formatting plus rule-appending semantics. It does not establish full optimizer control-flow parity or effectiveness. InstructionSearch remains an Imp-native deviation where no stable sidecar equivalent exists."
+      "notes": "The provider-free InferRules test executes the exact pinned DSPy 3.2.1 implementation and covers example formatting, rule appending, implicit train/validation splitting, multi-predictor traversal, candidate scoring, the drop-one-example context recovery schedule, and the upstream mutable-signature aliasing defect. Imp deliberately isolates candidates, retains a baseline, records exhausted proposal failures, and reuses its sequential logical-call rollout ID while DSPy draws a new random ID per retry. This is controlled loop evidence rather than whole-optimizer parity or effectiveness. InstructionSearch remains an Imp-native deviation where no stable sidecar equivalent exists."
     },
     {
       "id": "family.optimizer_miprov2",

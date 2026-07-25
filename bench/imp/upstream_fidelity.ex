@@ -495,13 +495,15 @@ defmodule Imp.UpstreamFidelity do
         "public names preserve the upstream optimization mechanism",
         "proposal, bootstrapping, search, and selection stages are independently observable",
         "a source-bound T1 differential matches 33 declared DSPy 3.3.0b1 MIPROv2 and SIMBA structural cases while retaining RNG, sampler, and proposer-call-graph deviations",
+        "a provider-free exact DSPy 3.2.1 InferRules differential exercises formatting, rule updates, implicit train/validation splitting, multi-predictor traversal, candidate scoring, and the drop-one-example context recovery schedule while exposing upstream mutable signature aliasing and retaining rollout-ID differences",
         "the admitted one-seed live AIME preflight is operational T2 evidence only; optimization effectiveness still requires multi-seed held-out lift under matched budgets"
       ],
       evidence: %{
         tests: [
           "test/optimizer_behavioral_corpus_test.exs",
           "test/instruction_optimizer_contract_artifact_test.exs",
-          "test/instruction_optimizer_experiment_test.exs"
+          "test/instruction_optimizer_experiment_test.exs",
+          "test/infer_rules_upstream_differential_test.exs"
         ],
         docs: ["docs/API_GUIDE.md"],
         artifacts: [
@@ -509,7 +511,7 @@ defmodule Imp.UpstreamFidelity do
           "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json"
         ],
         missing: [
-          "matched upstream differential evidence for InferRules and SignatureOptimizer",
+          "whole-optimizer and held-out effectiveness evidence for InferRules, plus any upstream parity authority for the native SignatureOptimizer extension",
           "C3 multi-seed held-out MIPROv2 and SIMBA effectiveness under matched controls",
           "paper-scale lift evidence"
         ]

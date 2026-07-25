@@ -26,6 +26,28 @@ defmodule OptimizerReportTest do
     def update_optimizer_predictor(program, name, update), do: Map.update!(program, name, update)
   end
 
+  defmodule ContextRetryLM do
+    defstruct [:owner, fail_at_one?: false]
+
+    def generate(_messages, _opts), do: {:error, :instance_required}
+
+    def generate(%__MODULE__{owner: owner} = lm, messages, opts) do
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      example_count = length(Regex.scan(~r/Input Fields:/, prompt))
+      send(owner, {:infer_rules_retry, example_count, prompt, opts[:rollout_id]})
+
+      if example_count > 1 or lm.fail_at_one? do
+        {:error, %Imp.ContextWindowExceededError{message: "controlled overflow"}}
+      else
+        {:ok,
+         %{
+           reasoning: "One example fits.",
+           natural_language_rules: "Map France questions to Paris."
+         }}
+      end
+    end
+  end
+
   defp lm do
     %{
       module: Imp.LM.Static,
@@ -364,6 +386,103 @@ defmodule OptimizerReportTest do
     assert Enum.all?(report.candidates, fn candidate ->
              candidate.error =~ "max_errors 1"
            end)
+  end
+
+  test "InferRules retries context overflows with one fewer trailing example" do
+    parent = self()
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "Map France questions to Paris",
+            do: %{answer: "Paris"},
+            else: %{answer: "unknown"}
+        end
+      )
+
+    train =
+      for question <- ["France capital?", "Capital city of France?", "France's seat?"] do
+        Imp.example(question: question, answer: "Paris") |> Imp.with_inputs(:question)
+      end
+
+    dev =
+      [
+        Imp.example(question: "Which city governs France?", answer: "Paris")
+        |> Imp.with_inputs(:question)
+      ]
+
+    compiled =
+      Imp.Optimizer.InferRules.new(Imp.Metrics.exact_match(:answer),
+        rule_lm: %ContextRetryLM{owner: parent},
+        num_candidates: 1,
+        num_rules: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0
+      )
+      |> Imp.Optimizer.InferRules.compile(
+        Imp.predict("question -> answer", lm: task_lm),
+        train,
+        dev
+      )
+
+    attempts =
+      for _ <- 1..3 do
+        assert_receive {:infer_rules_retry, count, prompt, rollout_id}
+        assert prompt =~ "Given a set of examples, extract a list of 1 concise"
+        {count, rollout_id}
+      end
+
+    assert attempts == [{3, 0}, {2, 0}, {1, 0}]
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.best_score == 1.0
+    assert report.metadata.proposal_calls == 1
+    assert report.metadata.proposal_attempts == 3
+    assert report.errors == []
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) =~ "Map France"
+  end
+
+  test "InferRules records an exhausted one-example context retry and retains the baseline" do
+    parent = self()
+
+    train =
+      for question <- ["France capital?", "Capital city of France?"] do
+        Imp.example(question: question, answer: "Paris") |> Imp.with_inputs(:question)
+      end
+
+    dev =
+      [
+        Imp.example(question: "Which city governs France?", answer: "unknown")
+        |> Imp.with_inputs(:question)
+      ]
+
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "unknown"} end)
+      )
+
+    compiled =
+      Imp.Optimizer.InferRules.new(Imp.Metrics.exact_match(:answer),
+        rule_lm: %ContextRetryLM{owner: parent, fail_at_one?: true},
+        num_candidates: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0
+      )
+      |> Imp.Optimizer.InferRules.compile(program, train, dev)
+
+    assert_receive {:infer_rules_retry, 2, _prompt, 0}
+    assert_receive {:infer_rules_retry, 1, _prompt, 0}
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.best_score == 1.0
+    assert report.metadata.proposal_calls == 1
+    assert report.metadata.proposal_attempts == 2
+    assert report.metadata.status == :with_errors
+    assert [%{stage: :rule_induction, error: "controlled overflow"}] = report.errors
+
+    assert Imp.Optimizer.InstructionSearch.current_instruction(compiled) ==
+             program.signature.instructions
   end
 
   test "labeled few-shot reports selected demonstrations without scoring them" do
