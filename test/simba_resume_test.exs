@@ -120,7 +120,7 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
       )
 
     assert_raise ArgumentError,
-                 ~r/does not match the program, datasets, or search configuration/,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
                  fn ->
                    SIMBA.compile(optimizer, program, changed_trainset, final_set,
                      resume_state: checkpoint
@@ -130,12 +130,39 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
     changed_optimizer = %{optimizer | max_demos: 1}
 
     assert_raise ArgumentError,
-                 ~r/does not match the program, datasets, or search configuration/,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
                  fn ->
                    SIMBA.compile(changed_optimizer, program, trainset, final_set,
                      resume_state: checkpoint
                    )
                  end
+  end
+
+  test "resume rejects task call policy drift before more search work" do
+    state = start_supervised!({Agent, fn -> counters() end})
+    {program, optimizer, trainset, final_set} = fixture(state)
+
+    checkpoint =
+      optimizer
+      |> SIMBA.compile(program, trainset, final_set, max_steps: 1)
+      |> Report.fetch()
+      |> then(& &1.metadata.resume_state)
+      |> Jason.encode!()
+      |> Jason.decode!()
+
+    calls_before = Agent.get(state, & &1)
+    changed = %{program | config: [temperature: 0.75], dynamic_adapter?: false}
+
+    assert_raise ArgumentError,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
+                 fn ->
+                   SIMBA.compile(optimizer, changed, trainset, final_set,
+                     resume_state: checkpoint,
+                     max_steps: 0
+                   )
+                 end
+
+    assert Agent.get(state, & &1) == calls_before
   end
 
   test "resume does not replay completed final evaluations" do

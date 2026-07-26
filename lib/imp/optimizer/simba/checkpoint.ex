@@ -57,7 +57,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
 
     unless compatibility == expected_compatibility do
       raise ArgumentError,
-            "SIMBA resume state does not match the program, datasets, or search configuration"
+            "SIMBA resume state does not match the program runtime, datasets, or search configuration"
     end
 
     loaded = %{

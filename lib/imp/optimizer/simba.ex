@@ -981,7 +981,11 @@ defmodule Imp.Optimizer.SIMBA do
             name: name,
             signature: predictor.signature,
             demos: predictor.demos,
-            lm: runtime_identity(predictor.lm)
+            config: predictor.config,
+            lm: runtime_identity(predictor.lm),
+            adapter: runtime_identity(predictor.adapter),
+            dynamic_lm?: predictor.dynamic_lm?,
+            dynamic_adapter?: predictor.dynamic_adapter?
           }
         end),
       program_module: program.__struct__
