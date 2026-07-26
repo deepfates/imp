@@ -47,6 +47,7 @@ defmodule LocalGRPOBanking77.Runner do
   def run do
     cond do
       System.get_env("IMP_GRPO_FRESH") == "1" -> fresh()
+      System.get_env("IMP_GRPO_RESTORE_PREFLIGHT_ONLY") == "1" -> restore_preflight()
       System.get_env("IMP_GRPO_RESUME_PREFLIGHT_ONLY") == "1" -> resume_preflight()
       true -> parent()
     end
@@ -62,6 +63,14 @@ defmodule LocalGRPOBanking77.Runner do
            do: raise("retained base-selection stage drift")
 
     IO.puts("GRPO resume preflight complete")
+  end
+
+  defp restore_preflight do
+    paths = paths!()
+    require_resume_output!(paths)
+    rows = preflight!(paths, :verify)
+    {_job, _manifest, artifacts} = restore_completed_training!(paths, rows)
+    IO.puts("GRPO completed-training restore preflight complete: #{length(artifacts)} steps")
   end
 
   defp parent do
@@ -276,6 +285,7 @@ defmodule LocalGRPOBanking77.Runner do
   defp restore_completed_training!(paths, rows) do
     stage = read_json!(Path.join(paths.output, "02-training.json"))
     state = Map.fetch!(stage, "job")
+    Code.ensure_loaded!(Imp.Optimizer.GRPO)
 
     unless state["provider"] == "trl" and state["status"] == "succeeded" and
              state["model"] == @model,
