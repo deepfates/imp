@@ -1,7 +1,7 @@
 defmodule Imp.TRLProtocolGRPOLifecycleTest do
   use ExUnit.Case
 
-  alias Imp.Clients.{TrainingJob, TRLArtifact, TRLLM, TRLProtocol}
+  alias Imp.Clients.{TrainingJob, TRLArtifact, TRLDeployment, TRLLM, TRLProtocol, TRLTrainer}
   alias Imp.Optimizer.TrainingResult
 
   setup do
@@ -114,6 +114,24 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
     :ok = File.mkdir_p(model_path)
     :ok = File.write(worker_script, fake_deployment_worker())
 
+    base_trainer =
+      TRLTrainer.new(
+        python: System.find_executable("python3"),
+        model_path: model_path,
+        root: deployment_root,
+        worker_script: worker_script,
+        contract_path: Path.expand("../priv/trl_worker/qwen-one-update-contract.json", __DIR__)
+      )
+
+    assert {:ok, %{kind: :base} = base_deployment} = TRLDeployment.start_base(base_trainer)
+    base_program = Imp.ProgramAccess.put_lm(portable, base_deployment.lm)
+
+    assert {:ok, base_prediction} =
+             Imp.call(base_program, %{question: "Does base evaluation work?"})
+
+    assert Imp.get(base_prediction, :answer) == "served exact base"
+    assert :ok = TRLDeployment.stop(base_deployment)
+
     script = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
     program = Imp.load!(#{inspect(base_program_path)})
@@ -198,7 +216,17 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
     while (request := read_frame()) is not None:
         op = request.get("op")
         if op == "initialize":
-            result = {"model": "local/no-model-policy", "model_path": args.model}
+            result = {
+                "model": "local/no-model-policy",
+                "model_path": args.model,
+                "base_model_sha256": "sha256:base",
+            }
+        elif op == "deploy_base":
+            result = {
+                "model": request["model"],
+                "artifact_sha256": request["artifact_sha256"],
+                "adapter_sha256": None,
+            }
         elif op == "deploy_artifact":
             observation = json.loads((pathlib.Path(request["artifact_path"]) / "trl-observation.json").read_text())
             result = {
@@ -207,8 +235,9 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
                 "adapter_sha256": observation["trainable_after_sha256"],
             }
         elif op == "generate":
+            answer = "served exact base" if result["artifact_sha256"] == "sha256:base" else "served verified adapter"
             result = {
-                "completion": "[[ ## answer ## ]]\nserved verified adapter\n\n[[ ## completed ## ]]\n",
+                "completion": "[[ ## answer ## ]]\n" + answer + "\n\n[[ ## completed ## ]]\n",
                 "model": result["model"],
                 "artifact_sha256": result["artifact_sha256"],
                 "adapter_sha256": result["adapter_sha256"],

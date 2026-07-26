@@ -534,6 +534,8 @@ Semantic invariants:
 - provider-backed weight steps complete training and rebind trained model state portably
 - a completed local TRL job restarts only through an explicit trusted runtime,
   loads the verified LoRA tensors, and checks artifact identity on every generation
+- the same trusted runtime can serve the exact pinned base policy explicitly,
+  so consumers can measure base and trained programs through the same Imp adapter path
 
 Executable evidence:
 

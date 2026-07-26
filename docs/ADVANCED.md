@@ -268,6 +268,11 @@ trainer =
     root: "var/trl-sessions"
   )
 
+{:ok, base} = Imp.Clients.TRLDeployment.start_base(trainer)
+baseline_program = Imp.with_lm(program, base.lm)
+{:ok, baseline_prediction} = Imp.call(baseline_program, inputs)
+:ok = Imp.Clients.TRLDeployment.stop(base)
+
 grpo =
   Imp.Optimizer.GRPO.new(reward,
     trainer: trainer,

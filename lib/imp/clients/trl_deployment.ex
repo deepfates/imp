@@ -13,13 +13,14 @@ defmodule Imp.Clients.TRLDeployment do
 
   alias Imp.Clients.{TrainingJob, TRLArtifact, TRLLM, TRLTrainer, TRLWorker}
 
-  @enforce_keys [:artifact_path, :artifact_sha256, :adapter_sha256, :lm, :worker]
-  defstruct [:artifact_path, :artifact_sha256, :adapter_sha256, :lm, :worker]
+  @enforce_keys [:kind, :artifact_path, :artifact_sha256, :lm, :worker]
+  defstruct [:kind, :artifact_path, :artifact_sha256, :adapter_sha256, :lm, :worker]
 
   @type t :: %__MODULE__{
+          kind: :base | :adapter,
           artifact_path: Path.t(),
           artifact_sha256: String.t(),
-          adapter_sha256: String.t(),
+          adapter_sha256: String.t() | nil,
           lm: TRLLM.t(),
           worker: pid()
         }
@@ -41,6 +42,7 @@ defmodule Imp.Clients.TRLDeployment do
          :ok <- validate_loaded(job, expected_adapter_sha256, loaded) do
       {:ok,
        %__MODULE__{
+         kind: :adapter,
          artifact_path: Path.expand(job.result_model),
          artifact_sha256: manifest["payload_sha256"],
          adapter_sha256: expected_adapter_sha256,
@@ -65,6 +67,45 @@ defmodule Imp.Clients.TRLDeployment do
   def start(%TrainingJob{}, _trainer), do: {:error, :trl_deployment_requires_trusted_trainer}
   def start(_job, _trainer), do: {:error, :invalid_trl_deployment}
 
+  @doc "Starts the exact pinned base policy for evaluation before training."
+  @spec start_base(TRLTrainer.t()) :: {:ok, t()} | {:error, term()}
+  def start_base(%TRLTrainer{} = trainer) do
+    key = base_deployment_key(trainer)
+
+    with {:ok, worker} <- start_base_worker(trainer, key),
+         {:ok, identity} <- request(trainer, worker, %{"op" => "initialize"}),
+         :ok <- validate_base_path(trainer, identity),
+         {:ok, loaded} <-
+           request(trainer, worker, %{
+             "op" => "deploy_base",
+             "model" => identity["model"],
+             "artifact_sha256" => identity["base_model_sha256"]
+           }),
+         :ok <- validate_base_loaded(identity, loaded) do
+      {:ok,
+       %__MODULE__{
+         kind: :base,
+         artifact_path: Path.expand(trainer.model_path),
+         artifact_sha256: identity["base_model_sha256"],
+         adapter_sha256: nil,
+         lm: %TRLLM{
+           model: identity["model"],
+           worker_key: key,
+           artifact_sha256: identity["base_model_sha256"]
+         },
+         worker: worker
+       }}
+    else
+      {:error, _reason} = error ->
+        stop_key(key)
+        error
+    end
+  rescue
+    error -> {:error, {:trl_base_deployment_start_failed, Exception.message(error)}}
+  end
+
+  def start_base(_trainer), do: {:error, :trl_base_deployment_requires_trusted_trainer}
+
   @doc "Stops the worker serving a deployment or completed TRL job."
   @spec stop(t() | TrainingJob.t()) :: :ok | {:error, term()}
   def stop(%__MODULE__{worker: worker}) when is_pid(worker), do: stop_worker(worker)
@@ -85,6 +126,18 @@ defmodule Imp.Clients.TRLDeployment do
       python: trainer.python,
       worker_script: trainer.worker_script,
       root: deployment_root(job, trainer),
+      model_path: trainer.model_path,
+      contract_path: trainer.contract_path
+    })
+  end
+
+  defp start_base_worker(trainer, key) do
+    TRLWorker.start(%{
+      session_id: "base-deployment",
+      registry_key: key,
+      python: trainer.python,
+      worker_script: trainer.worker_script,
+      root: Path.join([Path.expand(trainer.root), "deployments", "base-" <> key_digest(key)]),
       model_path: trainer.model_path,
       contract_path: trainer.contract_path
     })
@@ -133,6 +186,21 @@ defmodule Imp.Clients.TRLDeployment do
     end
   end
 
+  defp validate_base_path(trainer, identity) do
+    if is_map(identity) and
+         Path.expand(identity["model_path"] || "") == Path.expand(trainer.model_path) and
+         is_binary(identity["model"]) and is_binary(identity["base_model_sha256"]),
+       do: :ok,
+       else: {:error, :trl_base_deployment_identity_mismatch}
+  end
+
+  defp validate_base_loaded(identity, loaded) do
+    if is_map(loaded) and loaded["model"] == identity["model"] and
+         loaded["artifact_sha256"] == identity["base_model_sha256"],
+       do: :ok,
+       else: {:error, :trl_base_deployment_identity_mismatch}
+  end
+
   defp validate_loaded(job, adapter_sha256, loaded) do
     expected_path = Path.expand(job.result_model)
     expected_artifact = job.metadata[:artifact_sha256] || job.metadata["artifact_sha256"]
@@ -161,12 +229,24 @@ defmodule Imp.Clients.TRLDeployment do
   end
 
   defp deployment_root(job, trainer) do
-    suffix =
-      deployment_key(job)
-      |> :erlang.term_to_binary()
-      |> then(&:crypto.hash(:sha256, &1))
-      |> Base.encode16(case: :lower)
+    Path.join([Path.expand(trainer.root), "deployments", key_digest(deployment_key(job))])
+  end
 
-    Path.join([Path.expand(trainer.root), "deployments", suffix])
+  defp base_deployment_key(trainer),
+    do:
+      {:trl_base_deployment, Path.expand(trainer.model_path), Path.expand(trainer.contract_path)}
+
+  defp key_digest(key) do
+    key
+    |> :erlang.term_to_binary()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
+  defp stop_key(key) do
+    case Registry.lookup(Imp.Clients.TRLWorker.Registry, key) do
+      [{worker, _}] -> stop_worker(worker)
+      [] -> :ok
+    end
   end
 end

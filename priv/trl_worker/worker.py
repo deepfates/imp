@@ -132,6 +132,7 @@ class Worker:
         self.checkpoint: dict[str, Any] | None = None
         self.artifact: dict[str, Any] | None = None
         self.deployed_artifact: dict[str, str] | None = None
+        self.base_identity: dict[str, Any] | None = None
         self.root.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -195,7 +196,7 @@ class Worker:
                 if entry["path"] in {"tokenizer.json", "tokenizer_config.json", "merges.txt", "vocab.json"}
             ]
         )
-        return {
+        self.base_identity = {
             "model": self.contract["model"]["repository"]
             + "@"
             + self.contract["model"]["revision"],
@@ -205,6 +206,7 @@ class Worker:
             "device": "mps",
             "dependencies": actual,
         }
+        return dict(self.base_identity)
 
     def bind_session(self, protocol: dict[str, Any]) -> dict[str, Any]:
         validate_envelope(protocol, "imp_trl_grpo_session")
@@ -378,6 +380,23 @@ class Worker:
             "artifact_sha256": expected_sha256,
             "adapter_sha256": adapter_sha256,
         }
+        return dict(self.deployed_artifact)
+
+    def deploy_base(self, request: dict[str, Any]) -> dict[str, Any]:
+        if self.model is None or self.tokenizer is None or self.base_identity is None:
+            raise WorkerError("worker_not_initialized", "initialize must precede base deployment")
+        if self.protocol is not None or self.trainer is not None or self.deployed_artifact is not None:
+            raise WorkerError("worker_not_deployable", "worker already owns another lifecycle")
+        if request.get("model") != self.base_identity["model"]:
+            raise WorkerError("base_deployment_model_mismatch", "base model identity changed")
+        if request.get("artifact_sha256") != self.base_identity["base_model_sha256"]:
+            raise WorkerError("base_deployment_artifact_mismatch", "base artifact identity changed")
+        self.deployed_artifact = {
+            "model": self.base_identity["model"],
+            "artifact_sha256": self.base_identity["base_model_sha256"],
+            "adapter_sha256": None,
+        }
+        self.model.eval()
         return dict(self.deployed_artifact)
 
     def controlled_completion(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -974,6 +993,8 @@ def dispatch(worker: Worker, request: dict[str, Any]) -> Any:
         return worker.controlled_completion(request)
     if op == "deploy_artifact":
         return worker.deploy_artifact(request)
+    if op == "deploy_base":
+        return worker.deploy_base(request)
     if op == "prepare_update":
         return worker.prepare_update(request)
     if op == "apply_update":
