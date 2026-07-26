@@ -60,6 +60,25 @@ defmodule AvatarDeploymentPersistenceTest do
 
     assert :ok = Imp.save!(compiled, path)
 
+    saved_metadata =
+      path
+      |> File.read!()
+      |> Jason.decode!()
+      |> get_in(["payload", "metadata"])
+
+    assert saved_metadata["__imp_type__"] == "map"
+
+    assert Enum.any?(saved_metadata["entries"], fn
+             [
+               %{"__imp_type__" => "atom", "value" => "optimizer_report"},
+               %{"__imp_type__" => "optimizer_report"}
+             ] ->
+               true
+
+             _entry ->
+               false
+           end)
+
     loaded =
       Task.async(fn -> Imp.load!(path) end)
       |> Task.await()

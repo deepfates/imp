@@ -171,6 +171,23 @@ defmodule Imp.Redaction do
     %{image | url: redact(image.url, keys), metadata: redact(image.metadata, keys)}
   end
 
+  # Optimizer reports have an explicit, lossless JSON wire tag. Preserve the
+  # known struct through this sanitization pass so Report.encode_term/1 can
+  # emit that tag after redaction instead of persisting an indistinguishable
+  # plain map. Report fields are still walked recursively, including candidate
+  # and error payloads that may contain credentials.
+  def redact(%Imp.Optimizer.Report{} = report, keys) do
+    %{
+      report
+      | optimizer: redact(report.optimizer, keys),
+        best_score: redact(report.best_score, keys),
+        candidate_count: redact(report.candidate_count, keys),
+        candidates: redact(report.candidates, keys),
+        errors: redact(report.errors, keys),
+        metadata: redact(report.metadata, keys)
+    }
+  end
+
   def redact(value, keys) when is_struct(value) do
     value
     |> Map.from_struct()
