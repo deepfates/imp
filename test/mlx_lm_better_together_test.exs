@@ -40,6 +40,19 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
     end
   end
 
+  defmodule DeterministicBaseLM do
+    def generate_text(model, messages, _opts) do
+      {:ok,
+       %ReqLLM.Response{
+         id: "deterministic-base",
+         model: model,
+         context: ReqLLM.Context.new(messages),
+         message:
+           ReqLLM.Context.assistant("[[ ## answer ## ]]\nbase-behavior\n\n[[ ## completed ## ]]")
+       }}
+    end
+  end
+
   setup do
     root = Path.join(System.tmp_dir!(), "imp-mlx-better-#{System.unique_integer([:positive])}")
     model_path = Path.join([root, "model", @revision])
@@ -228,6 +241,98 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
 
     report = Imp.Optimizer.Report.fetch(compiled)
     assert report.metadata.selected_strategy == "w -> p"
+    assert :ok = Imp.Clients.MLXLMDeployment.stop(job)
+  end
+
+  test "BetterTogether admits and scores an adopted weight prefix before prompt continuation",
+       context do
+    {job, fixture_program, trainset} =
+      completed_job_fixture(context, &successful_runner/3)
+
+    build_program = fn ->
+      base_path = Path.expand(context.model_path)
+
+      Imp.with_lm(
+        fixture_program,
+        Imp.req_llm(
+          %{
+            provider: :openai,
+            id: base_path,
+            model: base_path,
+            base_url: "http://127.0.0.1:1/v1",
+            extra: %{openai_compatible_backend: :mlx_lm}
+          },
+          req_module: DeterministicBaseLM,
+          cache: false,
+          temperature: 0,
+          max_tokens: 32,
+          max_retries: 0,
+          req_http_options: [retry: false, max_retries: 0]
+        )
+      )
+    end
+
+    program = build_program.()
+
+    adoption = TrainingJobAdoption.new(job, program)
+
+    assert {:ok, %TrainingResult{program: standalone_adopted}} =
+             Imp.train(program, adoption, trainset)
+
+    assert model_id(Imp.ProgramAccess.lm(standalone_adopted)) == Path.expand(job.result_model)
+
+    # Match the real consumer shape: the adoption is bound before a standalone
+    # lifecycle check, then composition receives a freshly reconstructed but
+    # byte-equivalent base program.
+    composition_program = build_program.()
+    assert Imp.Saving.dump(composition_program) == Imp.Saving.dump(program)
+
+    metric = fn example, prediction ->
+      Imp.get(example, :answer) == Imp.get(prediction, :answer)
+    end
+
+    optimizer =
+      BetterTogether.new(metric, %{
+        w: adoption,
+        p: %ObservePromptContinuation{owner: self()}
+      })
+
+    compiled =
+      BetterTogether.compile(optimizer, composition_program, trainset, trainset,
+        strategy: [:w, :p],
+        valset_ratio: 0,
+        shuffle_trainset_between_steps: false,
+        max_concurrency: 1
+      )
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    report_path = Path.join(context.root, "composition-return.json")
+    temporary_report_path = report_path <> ".tmp"
+
+    File.write!(
+      temporary_report_path,
+      Jason.encode!(Imp.Optimizer.Report.dump(report)),
+      [:sync]
+    )
+
+    File.rename!(temporary_report_path, report_path)
+
+    assert_received {:prompt_step_observed, "trained-behavior", fused_path, [_artifact]}
+    assert fused_path == Path.expand(job.result_model)
+
+    persisted_report =
+      report_path |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.load()
+
+    assert persisted_report.metadata.selected_strategy in ["w", "w -> p"]
+
+    assert Enum.map(report.candidates, &{&1.strategy, &1.status, &1.score}) == [
+             {"", :ok, 0.0},
+             {"w", :ok, 1.0},
+             {"w -> p", :ok, 1.0}
+           ]
+
+    assert report.metadata.selected_strategy in ["w", "w -> p"]
+    refute report.metadata.compilation_error_occurred
     assert :ok = Imp.Clients.MLXLMDeployment.stop(job)
   end
 
