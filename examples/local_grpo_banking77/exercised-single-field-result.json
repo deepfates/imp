@@ -1,0 +1,50 @@
+{
+  "status": "complete_negative",
+  "scope": "one pinned Qwen2.5-0.5B two-step, four-group-per-step ordinary free-generation GRPO run on the frozen Banking77 16/8/40 split",
+  "adapter": "Elixir.Imp.Adapter.SingleField",
+  "training_generation_mode": "sample",
+  "evaluation_generation_mode": "greedy",
+  "training": {
+    "steps": 2,
+    "groups_per_step": 4,
+    "rollouts_per_group": 4,
+    "rewards_nonzero": 0,
+    "advantages_nonzero": 0,
+    "training_loss": [0.0, 0.0],
+    "trainable_tensors_changed": false,
+    "artifact_sha256": "sha256:7cd6e8951089fa7050768f1093d3f570d5f255d03da35a6dc1eb3ed7ef163cb8"
+  },
+  "selection": {
+    "base_accuracy": 0.0,
+    "trained_accuracy": 0.0,
+    "base_errors": 8,
+    "trained_errors": 8,
+    "selected_arm": "base"
+  },
+  "untouched_test": {
+    "base_accuracy": 0.0,
+    "trained_accuracy": 0.0,
+    "base_errors": 40,
+    "trained_errors": 40,
+    "fresh_selected_byte_identical": true
+  },
+  "diagnosis": {
+    "step_1": "all sixteen sampled completions used a labelled form such as route (R17), which the exact-value adapter correctly rejected",
+    "step_2": "all sixteen sampled completions were malformed route-prefixed token sequences",
+    "evaluation": "the greedy base and no-op trained policy used the same labelled form, so strict parsing rejected every row"
+  },
+  "establishes": [
+    "ordinary free model generation through four current-step source groups per step",
+    "official two-step TRL lifecycle and truthful uniform-reward no-op",
+    "greedy base/trained selection and untouched evaluation",
+    "fresh-process reproduction of the honestly selected base arm"
+  ],
+  "excludes": [
+    "GRPO weight change",
+    "GRPO learning or usefulness",
+    "general SingleField model adherence",
+    "mmGRPO parity",
+    "production reliability",
+    "BEAM superiority"
+  ]
+}

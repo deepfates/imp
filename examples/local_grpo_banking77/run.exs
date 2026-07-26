@@ -133,6 +133,9 @@ defmodule LocalGRPOBanking77.Runner do
         status: "complete",
         scope: "one task/model #{train_steps()}-step ordinary model-generated local GRPO result",
         model: @model,
+        adapter: "Elixir.Imp.Adapter.JSON",
+        training_generation_mode: "sample",
+        evaluation_generation_mode: "greedy",
         trainable_tensors_changed:
           Enum.any?(step_artifacts, & &1.observation["trainable_tensors_changed"]),
         training_steps:
@@ -317,7 +320,7 @@ defmodule LocalGRPOBanking77.Runner do
         """
       ),
       lm: lm,
-      adapter: Imp.Adapter.Chat,
+      adapter: Imp.Adapter.JSON,
       config: [json_fallback: false]
     )
   end
@@ -445,7 +448,7 @@ defmodule LocalGRPOBanking77.Runner do
     output =
       System.get_env(
         "IMP_GRPO_OUTPUT",
-        "/Users/deepfates/.cache/imp/trl/model-generated-banking77-v1"
+        "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-v1"
       )
 
     %{

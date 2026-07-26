@@ -41,19 +41,20 @@ on the untouched 40 rows. A fresh OS BEAM reproduced the selected base outputs
 byte-for-byte. This is useful evidence that the lifecycle admits a truthful
 no-signal update, not evidence that GRPO is ineffective.
 
-The default remains the retained one-group/one-step run. To exercise the
-bundled durable multi-group/multi-step backend without changing the task,
-select an explicit pinned contract and matching public optimizer width/budget:
+The current default is a lightweight one-group/one-step JSON-adapter run. To
+exercise the durable multi-group/multi-step backend across four frozen source
+rows per step, select the pinned contract and matching public optimizer
+width/budget:
 
 ```sh
 export IMP_TRL_CONTRACT="$PWD/priv/trl_worker/qwen-two-step-contract.json"
 export IMP_GRPO_TRAIN_STEPS=2
-export IMP_GRPO_TRAIN_WIDTH=2
+export IMP_GRPO_TRAIN_WIDTH=4
 export IMP_GRPO_OUTPUT=/tmp/imp-local-grpo-banking77-two-step
 mix run examples/local_grpo_banking77/run.exs
 ```
 
-Each step consumes two ordered source-bound prompt groups with four completions
+Each step consumes four ordered source-bound prompt groups with four completions
 per group. Step two must resume the exact step-one adapter, optimizer,
 scheduler, Trainer state, and MPS RNG; repeated one-step jobs are not accepted
 as an equivalent trajectory.
@@ -64,3 +65,12 @@ state advanced `0 -> 1 -> 2`; the final artifact contains the full chain and
 its trained predictions reproduced byte-for-byte from a fresh OS BEAM. All
 four prompt groups still produced uniform malformed-output rewards, so the
 result remains a no-signal lifecycle proof rather than learned usefulness.
+
+A later free-generation treatment used four prompt groups per step and the
+strict Imp-native `SingleField` adapter. Its immutable negative result is
+`exercised-single-field-result.json`: Qwen consistently emitted labelled text
+such as `route (R17)` rather than the declared exact value, so all rewards were
+zero, both steps were truthful no-ops, and base was retained. The current
+ordinary runner uses the public JSON adapter, which was selected independently
+before that result and keeps free autoregressive training rather than
+substituting a choice-normalized policy for GRPO.
