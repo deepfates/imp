@@ -164,3 +164,20 @@ mix run examples/local_grpo_banking77/run.exs
 Resume verifies the retained data, schedule, model, contract, preflight, and
 base-stage bytes before reconciling the same session. Fresh-process
 reproduction verifies that preflight without rewriting it.
+
+The ten-step condition completed and is retained in
+`exercised-two-padded-epochs-result.json`. Every official step had non-uniform
+semantic rewards, non-zero advantages, and changed LoRA tensors. All trained
+checkpoints tied base at `0.875` validation accuracy, so earliest step one was
+the trained finalist; trained then tied base at `0.725` accuracy / `0.712885`
+macro-F1 / zero errors on the frozen held-out forty rows. The stable outer rule
+retained base and fresh execution was byte-identical. These rows were
+inaccessible to optimization, but their outcomes had been reported by earlier
+treatments, so this is a stronger neutral mechanics/usefulness result—not
+globally untouched evidence or learned lift.
+
+The run also crossed two real restart boundaries. Third-party Python stdout is
+now redirected away from the framed worker channel; the durably accepted tenth
+step reconciled without a repeated update after its original acknowledgement
+timed out. A later caller-shape failure resumed from the verified completed job
+and evaluation stages without reconstructing training.

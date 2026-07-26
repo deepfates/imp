@@ -1,0 +1,49 @@
+{
+  "status": "complete",
+  "treatment_id": "model-generated-banking77-json-two-padded-epochs-v1",
+  "source_commits": {
+    "frozen_treatment": "d51bd7f",
+    "framed_stdout_and_checkpoint_resume": "fdebc5a",
+    "post_training_resume": "f923717",
+    "retained_metadata_decode": "c31dd05"
+  },
+  "result_sha256": "2da06e0cb2c580268d479447444e9d4d722edbf962f5c2ac5e74cbceab663b04",
+  "schedule": {
+    "train_rows": 16,
+    "selection_rows": 8,
+    "frozen_held_out_rows": 40,
+    "steps": 10,
+    "source_groups_per_step": 4,
+    "model_generated_completions_per_group": 4,
+    "padded_schedule_slots": 40
+  },
+  "training": {
+    "all_steps_non_uniform_rewards": true,
+    "all_steps_non_zero_advantages": true,
+    "all_steps_changed_trainable_tensors": true,
+    "reward_sums_by_step": [10, 13, 9, 10, 8, 9, 10, 14, 11, 9]
+  },
+  "selection": {
+    "base": {"accuracy": 0.875, "macro_f1": 0.8666666666666667, "errors": 0},
+    "trained": {"accuracy": 0.875, "macro_f1": 0.8666666666666667, "errors": 0},
+    "all_trained_checkpoint_scores": 0.875,
+    "selected_validation_step": 1,
+    "outer_selected_arm": "base"
+  },
+  "frozen_held_out": {
+    "base": {"accuracy": 0.725, "macro_f1": 0.7128851540616246, "errors": 0},
+    "trained": {"accuracy": 0.725, "macro_f1": 0.7128851540616246, "errors": 0}
+  },
+  "artifact": {
+    "selected_trained_checkpoint": "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-two-padded-epochs-v1/sessions/d75a03918057409f1b43982609db2692ac704ab65a3ad0d8d741ceb780a838f5/artifacts/step-1",
+    "selected_trained_artifact_sha256": "sha256:b21f7ef959e7274d815a251bf53b9eca375166747fcbb6c3fc7220a9200d2278",
+    "fresh_selected_arm": "base",
+    "fresh_byte_identical": true
+  },
+  "recovery": {
+    "accepted_step_10_reconciled_without_repeat": true,
+    "completed_training_restored_without_repeat": true,
+    "base_selection_reused_byte_identically": true
+  },
+  "claim_boundary": "One seed/task/model two-padded-epoch run establishes ordinary model-generated multi-group/multi-step semantic-signal training, optimizer-state continuation, checkpoint selection, content-verified artifacts, interruption recovery, and fresh selected-program use. It is a neutral usefulness result, not learned lift, general GRPO/mmGRPO effectiveness, parity, production reliability, or BEAM superiority. The 40 rows were optimizer-held-out but had been reported in earlier treatments, so they are not globally untouched research evidence."
+}
