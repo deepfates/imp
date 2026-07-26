@@ -89,6 +89,13 @@ same real fused task model, evaluates a genuine demonstration mutation, rejects
 its minibatch overfit on separate validation, and reapplies the selected
 parameter artifact in a fresh OS BEAM.
 
+For natural rule induction, the
+[Banking77 InferRules example](examples/local_infer_rules_banking77/README.md)
+uses a separate local rule model, evaluates the original source, bootstrapped
+baseline, and induced-rule program on validation, and preserves the selected
+program across a fresh OS restart. Its retained run also demonstrates why Imp
+protects the caller's source program when bootstrap or rule induction regresses.
+
 For local weight optimization, the
 [Banking77 GRPO example](examples/local_grpo_banking77/README.md) runs ordinary
 model-generated Qwen rollouts through Imp's public GRPO API, an official pinned
