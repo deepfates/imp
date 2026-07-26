@@ -156,6 +156,16 @@ defmodule GRPOContractTest do
 
     assert Enum.all?(first ++ second, &(length(&1.group) == 2))
 
+    assert Enum.all?(first, fn group ->
+             group.selection_step == 0 and group.source_position == elem(group.group_id, 0) and
+               String.starts_with?(group.source_row_sha256, "sha256:")
+           end)
+
+    assert Enum.all?(second, fn group ->
+             group.selection_step == 1 and group.source_position == elem(group.group_id, 0) and
+               String.starts_with?(group.source_row_sha256, "sha256:")
+           end)
+
     assert Enum.all?(first ++ second, fn batch ->
              length(Enum.uniq(Enum.map(batch.group, & &1.completion.content))) == 2 and
                Enum.all?(batch.group, &(question_from(&1) == question_from(hd(batch.group))))

@@ -288,11 +288,7 @@ defmodule Imp.Clients.TRLProtocol do
     groups
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, MapSet.new()}, fn {group, index}, {:ok, ids} ->
-      with :ok <-
-             exact_keys(
-               group,
-               ~w(batch_id group_id group_position predictor prompt prompt_sha256 samples)
-             ),
+      with :ok <- validate_group_keys(group),
            :ok <- nonempty(group["batch_id"], :batch_id),
            :ok <- unique_value(ids, group["batch_id"], :trl_protocol_duplicate_batch_id),
            true <-
@@ -301,7 +297,8 @@ defmodule Imp.Clients.TRLProtocol do
            :ok <- nonempty(group["predictor"], :predictor),
            :ok <- digest_value(group["prompt_sha256"], :prompt_sha256),
            :ok <- validate_prompt(group["prompt"], group["prompt_sha256"]),
-           :ok <- validate_samples(group["samples"], group["prompt_sha256"]) do
+           :ok <- validate_samples(group["samples"], group["prompt_sha256"]),
+           :ok <- validate_group_source(group) do
         {:cont, {:ok, MapSet.put(ids, group["batch_id"])}}
       else
         {:error, _reason} = error -> {:halt, error}
@@ -314,6 +311,32 @@ defmodule Imp.Clients.TRLProtocol do
   end
 
   defp validate_groups(_groups), do: {:error, :trl_protocol_groups_must_be_nonempty}
+
+  defp validate_group_keys(group) do
+    legacy = ~w(batch_id group_id group_position predictor prompt prompt_sha256 samples)
+    source_bound = legacy ++ ~w(selection_step source_position source_row_sha256)
+    actual = group |> Map.keys() |> Enum.sort()
+
+    cond do
+      actual == Enum.sort(source_bound) -> :ok
+      actual == Enum.sort(legacy) -> :ok
+      true -> {:error, {:trl_protocol_keys_mismatch, Enum.sort(source_bound), actual}}
+    end
+  end
+
+  defp validate_group_source(%{
+         "selection_step" => step,
+         "source_position" => position,
+         "source_row_sha256" => source
+       }) do
+    with :ok <- nonnegative_integer(step, :selection_step),
+         :ok <- nonnegative_integer(position, :source_position),
+         :ok <- digest_value(source, :source_row_sha256) do
+      :ok
+    end
+  end
+
+  defp validate_group_source(_legacy_group), do: :ok
 
   defp validate_samples(samples, prompt_sha256) when is_list(samples) and length(samples) > 1 do
     samples

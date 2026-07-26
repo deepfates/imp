@@ -954,14 +954,22 @@ defmodule Imp.Optimizer.GRPO do
 
     {groups, rng} =
       Enum.reduce(predictors, {[], state.rng}, fn predictor, acc ->
-        Enum.reduce(Enum.with_index(examples), acc, fn {_example, example_index}, {groups, rng} ->
+        Enum.reduce(Enum.with_index(examples), acc, fn {example, example_index}, {groups, rng} ->
           rollouts =
             trajectories
             |> Enum.filter(&(&1.example_index == example_index))
             |> Enum.sort_by(& &1.rollout)
 
           {predictor_groups, rng} =
-            groups_for_predictor(optimizer, predictor, rollouts, example_index, rng)
+            groups_for_predictor(
+              optimizer,
+              predictor,
+              rollouts,
+              example,
+              example_index,
+              step,
+              rng
+            )
 
           {groups ++ predictor_groups, rng}
         end)
@@ -976,7 +984,9 @@ defmodule Imp.Optimizer.GRPO do
          optimizer,
          %{name: name, predictor: predictor},
          rollouts,
+         example,
          example_index,
+         selection_step,
          rng
        ) do
     invocations =
@@ -1005,6 +1015,9 @@ defmodule Imp.Optimizer.GRPO do
           %{
             predictor: name,
             group_id: {example_index, name, invocation_index},
+            source_row_sha256: protocol_digest(Imp.Example.to_map(example)),
+            source_position: example_index,
+            selection_step: selection_step,
             group: group
           }
         end

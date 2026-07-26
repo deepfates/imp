@@ -103,6 +103,35 @@ defmodule Imp.TRLProtocolTest do
              TRLProtocol.update(wrong_idempotency)
   end
 
+  test "updates bind complete source schedule identities without accepting partial shapes" do
+    source_bound =
+      update_attrs()
+      |> put_in(
+        ["groups", Access.at(0)],
+        update_attrs()["groups"]
+        |> hd()
+        |> Map.merge(%{
+          "selection_step" => 2,
+          "source_position" => 1,
+          "source_row_sha256" => digest("source-row")
+        })
+      )
+
+    assert {:ok, update} = TRLProtocol.update(source_bound)
+    assert update["groups"] |> hd() |> Map.fetch!("selection_step") == 2
+
+    partial =
+      update_in(source_bound, ["groups", Access.at(0)], &Map.delete(&1, "source_position"))
+
+    assert {:error, {:trl_protocol_keys_mismatch, _expected, _actual}} =
+             TRLProtocol.update(partial)
+
+    invalid = put_in(source_bound, ["groups", Access.at(0), "selection_step"], -1)
+
+    assert {:error, {:trl_protocol_nonnegative_integer_required, :selection_step}} =
+             TRLProtocol.update(invalid)
+  end
+
   test "receipt, checkpoint, and artifact identities form a closed durable chain" do
     checkpoint = TRLProtocol.checkpoint!(checkpoint_attrs())
 

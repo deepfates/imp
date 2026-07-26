@@ -212,6 +212,9 @@ defmodule Imp.TRLWorkerTest do
         batch_id: "trl-batch-0",
         predictor: :predict,
         group_id: {0, :predict, 0},
+        selection_step: 0,
+        source_position: 0,
+        source_row_sha256: "sha256:" <> String.duplicate("a", 64),
         group: [
           %{
             messages: [%{role: "user", content: "one"}],
@@ -243,6 +246,9 @@ defmodule Imp.TRLWorkerTest do
     assert length(samples) == 4
     assert group["predictor"] == %{"__imp_type__" => "atom", "value" => "predict"}
     assert group["group_id"]["__imp_type__"] == "tuple"
+    assert group["selection_step"] == 0
+    assert group["source_position"] == 0
+    assert group["source_row_sha256"] == "sha256:" <> String.duplicate("a", 64)
     assert Enum.map(samples, & &1["reward"]) == [1.0, 0.0, 0.0, 0.0]
   end
 
@@ -319,6 +325,8 @@ defmodule Imp.TRLWorkerTest do
       })
 
     contract_path = Path.join(context.root, "general-contract.json")
+    source_sha256 = TRLProtocol.digest(%{"row" => "public synthetic arithmetic: 2+2"})
+    second_source_sha256 = TRLProtocol.digest(%{"row" => "public synthetic arithmetic: 3+3"})
     File.mkdir_p!(context.root)
     File.write!(contract_path, Jason.encode!(general_contract))
 
@@ -346,21 +354,49 @@ defmodule Imp.TRLWorkerTest do
         "optimizer": {"config_sha256": "sha256:optimizer"},
         "rng": {"algorithm": "exsss", "state_sha256": "sha256:rng"},
         "behavior_policy": {"model": "pinned-local"},
+        "prompt_schedule": {"steps": [{"step": 0, "ordered_row_sha256s": [#{inspect(source_sha256)}, #{inspect(second_source_sha256)}]}]},
     }
     worker.model = object()
     worker.tokenizer = Tokenizer()
     group = {
-        "batch_id": "batch-0",
+        "batch_id": "trl-step-0-group-0",
         "group_id": [0, "router", 0],
         "predictor": "router",
+        "selection_step": 0,
+        "source_position": 0,
+        "source_row_sha256": #{inspect(source_sha256)},
         "group": [
             {"messages": [{"role": "user", "content": "public synthetic arithmetic: 2+2"}], "completion": {"content": "4"}, "reward": 0.25},
             {"messages": [{"role": "user", "content": "public synthetic arithmetic: 2+2"}], "completion": {"content": "five"}, "reward": 0.25},
         ],
     }
-    prepared = worker.prepare_update({"groups": [group], "step_id": "step-0", "idempotency_key": "update-0"})
+    second = {
+        "batch_id": "trl-step-0-group-1",
+        "group_id": [1, "router", 0],
+        "predictor": "router",
+        "selection_step": 0,
+        "source_position": 1,
+        "source_row_sha256": #{inspect(second_source_sha256)},
+        "group": [
+            {"messages": [{"role": "user", "content": "public synthetic arithmetic: 3+3"}], "completion": {"content": "6"}, "reward": -2.5},
+            {"messages": [{"role": "user", "content": "public synthetic arithmetic: 3+3"}], "completion": {"content": "seven"}, "reward": 8.75},
+        ],
+    }
+    bad = dict(second)
+    bad["source_row_sha256"] = #{inspect(source_sha256)}
+    try:
+        worker.prepare_update({"groups": [group, bad], "step_id": "bad-step", "idempotency_key": "bad-step"})
+        raise AssertionError("substituted source row was accepted")
+    except module.WorkerError as error:
+        assert error.code == "group_source_identity_mismatch"
+    assert not (worker.root / "prepared-controlled-group.json").exists()
+
+    prepared = worker.prepare_update({"groups": [group, second], "step_id": "step-0", "idempotency_key": "update-0"})
     assert [sample["reward"] for sample in prepared["groups"][0]["samples"]] == [0.25, 0.25]
+    assert [sample["reward"] for sample in prepared["groups"][1]["samples"]] == [-2.5, 8.75]
+    assert [item["group_position"] for item in prepared["groups"]] == [0, 1]
     assert prepared["groups"][0]["prompt"][0]["content"].endswith("2+2")
+    assert prepared["groups"][1]["prompt"][0]["content"].endswith("3+3")
     assert (worker.root / "prepared-controlled-group.json").is_file()
     """
 

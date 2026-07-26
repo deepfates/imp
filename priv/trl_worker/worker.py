@@ -131,6 +131,7 @@ class Worker:
         self.receipt: dict[str, Any] | None = None
         self.checkpoint: dict[str, Any] | None = None
         self.artifact: dict[str, Any] | None = None
+        self.accepted_batch_ids: list[str] = []
         self.deployed_artifact: dict[str, str] | None = None
         self.base_identity: dict[str, Any] | None = None
         self.root.mkdir(parents=True, exist_ok=True)
@@ -245,10 +246,18 @@ class Worker:
         if self.step != 0:
             raise WorkerError("one_update_budget_exhausted", "local TRL worker permits exactly one update")
         groups = request.get("groups")
-        if not isinstance(groups, list) or len(groups) != 1:
-            raise WorkerError("group_count_mismatch", "exactly one pending prompt group is required")
+        expected_groups = len(
+            self.protocol["prompt_schedule"]["steps"][self.step]["ordered_row_sha256s"]
+        )
+        if not isinstance(groups, list) or len(groups) != expected_groups:
+            raise WorkerError(
+                "group_count_mismatch",
+                f"expected {expected_groups} ordered prompt groups, got "
+                f"{len(groups) if isinstance(groups, list) else 'invalid'}",
+            )
 
-        encoded_groups = [self._encode_group(groups[0], 0)]
+        encoded_groups = [self._encode_group(group, position) for position, group in enumerate(groups)]
+        self._validate_group_sources(encoded_groups)
         self._persist_prepared_group(encoded_groups)
         self._validate_controlled_groups(encoded_groups)
         self._validate_acceptance_assertions(encoded_groups)
@@ -472,9 +481,9 @@ class Worker:
         from peft import LoraConfig, TaskType
         from trl import GRPOConfig, GRPOTrainer
 
-        group = update["groups"][0]
-        samples = group["samples"]
-        frozen_prompts = [group["prompt"] for _ in samples]
+        groups = update["groups"]
+        samples = [sample for group in groups for sample in group["samples"]]
+        frozen_prompts = [group["prompt"] for group in groups for _ in group["samples"]]
 
         def rollout_func(prompts, _trainer):
             if canonical(prompts) != canonical(frozen_prompts):
@@ -504,9 +513,9 @@ class Worker:
         args = GRPOConfig(
             output_dir=str(output),
             max_steps=1,
-            per_device_train_batch_size=cfg["num_generations"],
+            per_device_train_batch_size=len(groups) * cfg["num_generations"],
             gradient_accumulation_steps=1,
-            generation_batch_size=cfg["num_generations"],
+            generation_batch_size=len(groups) * cfg["num_generations"],
             num_generations=cfg["num_generations"],
             max_completion_length=cfg["max_completion_length"],
             temperature=cfg["temperature"],
@@ -540,7 +549,7 @@ class Worker:
             model=self.model,
             args=args,
             reward_funcs=external_reward,
-            train_dataset=Dataset.from_list([{"prompt": group["prompt"]}]),
+            train_dataset=Dataset.from_list([{"prompt": group["prompt"]} for group in groups]),
             processing_class=self.tokenizer,
             peft_config=peft_config,
             rollout_func=rollout_func,
@@ -560,8 +569,21 @@ class Worker:
         advantages = trainer.imp_advantages
         if not isinstance(advantages, list) or len(advantages) != len(samples):
             raise WorkerError("advantages_missing", "TRL did not expose the grouped advantages", accepted=True)
-        if acceptance["require_non_uniform_advantages"] and len({round(float(value), 8) for value in advantages}) < 2:
-            raise WorkerError("advantages_uniform", "TRL relative advantages are uniform", accepted=True)
+        grouped_advantages = []
+        offset = 0
+        for group in groups:
+            count = len(group["samples"])
+            values = advantages[offset : offset + count]
+            grouped_advantages.append(values)
+            offset += count
+            if acceptance["require_non_uniform_advantages"] and len(
+                {round(float(value), 8) for value in values}
+            ) < 2:
+                raise WorkerError(
+                    "advantages_uniform",
+                    "TRL relative advantages are uniform within a prompt group",
+                    accepted=True,
+                )
 
         staging = self.root / ".artifact.tmp"
         if staging.exists():
@@ -632,7 +654,11 @@ class Worker:
             staging / "trl-observation.json",
             {
                 "advantages": advantages,
+                "group_advantages": grouped_advantages,
                 "rewards": [sample["reward"] for sample in samples],
+                "group_rewards": [
+                    [sample["reward"] for sample in group["samples"]] for group in groups
+                ],
                 "trainable_before_sha256": before_digest,
                 "trainable_after_sha256": after_digest,
                 "global_step_before": 0,
@@ -665,6 +691,7 @@ class Worker:
             os.close(directory)
 
         self.step = 1
+        self.accepted_batch_ids = [group["batch_id"] for group in groups]
         self.receipt = receipt
         self.checkpoint = checkpoint
         self.artifact = artifact
@@ -711,10 +738,43 @@ class Worker:
             "group_id": repr(group["group_id"]),
             "group_position": group_position,
             "predictor": str(group["predictor"]),
+            "selection_step": group.get("selection_step"),
+            "source_position": group.get("source_position"),
+            "source_row_sha256": group.get("source_row_sha256"),
             "prompt": messages,
             "prompt_sha256": prompt_sha,
             "samples": encoded_samples,
         }
+
+    def _validate_group_sources(self, encoded_groups: list[dict[str, Any]]) -> None:
+        assert self.protocol is not None
+        schedule = self.protocol["prompt_schedule"]["steps"]
+
+        for group in encoded_groups:
+            selection_step = group.get("selection_step")
+            source_position = group.get("source_position")
+            source_sha256 = group.get("source_row_sha256")
+            if not isinstance(selection_step, int) or selection_step < 0:
+                raise WorkerError(
+                    "group_source_identity_missing",
+                    "selection step must bind every group to its source schedule",
+                )
+            if selection_step >= len(schedule):
+                raise WorkerError(
+                    "group_selection_step_mismatch",
+                    "group selection step is outside the durable schedule",
+                )
+            ordered = schedule[selection_step]["ordered_row_sha256s"]
+            if not isinstance(source_position, int) or source_position < 0 or source_position >= len(ordered):
+                raise WorkerError(
+                    "group_source_position_mismatch",
+                    "group source position is outside its selected row schedule",
+                )
+            if source_sha256 != ordered[source_position]:
+                raise WorkerError(
+                    "group_source_identity_mismatch",
+                    "group source row differs from the durable selected row schedule",
+                )
 
     def _persist_prepared_group(self, encoded_groups: list[dict[str, Any]]) -> None:
         write_json(
@@ -731,6 +791,11 @@ class Worker:
         controlled = self.contract.get("controlled_rollouts")
         if controlled is None:
             return
+        if len(encoded_groups) != 1:
+            raise WorkerError(
+                "controlled_rollout_group_count_mismatch",
+                "controlled external-rollout contracts support exactly one prompt group",
+            )
         samples = encoded_groups[0]["samples"]
         if not isinstance(controlled, list) or len(controlled) != len(samples):
             raise WorkerError("controlled_rollout_count_mismatch", "controlled rollout count differs from samples")
@@ -773,9 +838,13 @@ class Worker:
             if any(reward not in (0.0, 1.0) for reward in rewards):
                 raise WorkerError("reward_contract_mismatch", "frozen semantic rewards must be binary")
 
-        rewards = [sample["reward"] for sample in encoded_groups[0]["samples"]]
-        if self._acceptance()["require_non_uniform_rewards"] and len(set(rewards)) < 2:
-            raise WorkerError("uniform_rewards", "non-uniform external rewards are required")
+        for group in encoded_groups:
+            rewards = [sample["reward"] for sample in group["samples"]]
+            if self._acceptance()["require_non_uniform_rewards"] and len(set(rewards)) < 2:
+                raise WorkerError(
+                    "uniform_rewards",
+                    "non-uniform external rewards are required within each prompt group",
+                )
 
     def _validate_contract(self) -> None:
         allowed = {
@@ -829,11 +898,11 @@ class Worker:
 
     def _status(self) -> dict[str, Any]:
         total = len(self.protocol["prompt_schedule"]["steps"]) if self.protocol else 0
-        pending = [f"trl-batch-{self.step}"] if self.step < total else []
+        pending = self._pending_batch_ids() if self.step < total else []
         result = {
             "status": "running" if self.step < total else "succeeded",
             "pending_batch_ids": pending,
-            "fulfilled_batch_ids": [f"trl-batch-{index}" for index in range(self.step)],
+            "fulfilled_batch_ids": self.accepted_batch_ids,
             "current_model": str(self.artifact_path) if self.step else (
                 self.protocol["behavior_policy"]["model"] if self.protocol else None
             ),
@@ -869,10 +938,19 @@ class Worker:
         self.artifact = json.loads(manifest_path.read_text())
         self.checkpoint = json.loads((self.artifact_path / "trainer-checkpoint.json").read_text())
         self.receipt = json.loads((self.artifact_path / "receipt-1.json").read_text())
+        accepted_update = json.loads((self.artifact_path / "update-1.json").read_text())
+        self.accepted_batch_ids = [group["batch_id"] for group in accepted_update["groups"]]
         validate_envelope(self.artifact, "imp_trl_grpo_artifact")
         validate_envelope(self.checkpoint, "imp_trl_grpo_checkpoint")
         validate_envelope(self.receipt, "imp_trl_grpo_receipt")
         self.step = 1
+
+    def _pending_batch_ids(self) -> list[str]:
+        assert self.protocol is not None
+        count = len(
+            self.protocol["prompt_schedule"]["steps"][self.step]["ordered_row_sha256s"]
+        )
+        return [f"trl-step-{self.step}-group-{position}" for position in range(count)]
 
     def _verify_environment(self) -> None:
         if sys.version_info[:2] != (3, 12):
