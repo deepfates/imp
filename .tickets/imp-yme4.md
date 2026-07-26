@@ -391,3 +391,25 @@ task with one local model: it does not satisfy the provider-backed three-family
 schema-v2 C3 target, establish general OA effectiveness, upstream comparative
 effectiveness, production reliability, or BEAM superiority. Text-map pinned
 v0.1.4 compatibility remains separate from this Imp-native typed extension.
+
+**2026-07-26T16:20:00Z**
+
+`SignatureOptimizer` is no longer a public name over hand-authored candidates.
+It accepts either explicit candidates or a real task-aware proposer LM, executes
+one grounded proposal call per requested slot, reports proposal failures and
+fallbacks under its own optimizer identity, selects only on validation, and
+keeps the source program on equal-score ties. The selected program and report
+survive package and fresh-OS save/load. Ambiguous manual-plus-LM configuration
+fails before proposal or evaluator work.
+
+The first natural retained-fused-Qwen plus local-Llama Banking77 consumer
+stopped before held-out evaluation. Two proposal transports collapsed to one
+distinct admitted string—`Here is a list of instructions in JSON format:`—so
+the strict consumer refused to treat an explanatory preamble as two trustworthy
+task instructions. That string was genuinely rendered in eight fused-model
+validation calls and happened to score `0.75` versus baseline `0.625`, but the
+score is not promoted because the proposal boundary was malformed. No held-out
+row opened, no selected artifact was written, and the condition was not
+normalized, loosened, substituted, or repeated. This establishes a real public
+proposal runtime plus an honest natural-proposal reliability gap, not
+SignatureOptimizer usefulness, upstream parity, or BEAM superiority.
