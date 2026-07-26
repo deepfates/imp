@@ -160,6 +160,18 @@ defmodule MatchedTRECImp.ObservedLM do
   defstruct [:inner, :observer, :role, :seed, :arm, :max_input_tokens, :expected_model]
 
   def generate(lm, messages, opts) do
+    configured_seed =
+      case lm.inner do
+        %{opts: inner_opts} when is_list(inner_opts) -> Keyword.get(inner_opts, :seed)
+        _other -> nil
+      end
+
+    expected_seed = if lm.role == :task, do: lm.seed
+
+    unless configured_seed == expected_seed do
+      raise "#{lm.role} request seed drift: configured=#{inspect(configured_seed)} expected=#{inspect(expected_seed)}"
+    end
+
     rendered_bytes = (messages |> Jason.encode!() |> byte_size()) + 16 * (length(messages) + 1)
 
     if rendered_bytes > lm.max_input_tokens do
@@ -188,6 +200,9 @@ defmodule MatchedTRECImp.ObservedLM do
              evidence.service_tier in [nil, "default", "standard"] and
              is_number(evidence.input_tokens) and
              evidence.input_tokens <= expected["max_input_tokens"] and
+             is_number(evidence.output_tokens) and
+             evidence.output_tokens <= expected["max_output_tokens"] and
+             is_binary(evidence.finish_reason) and is_binary(evidence.content) and
              is_number(evidence.gateway_reported_cost) and
              is_number(evidence.computed_cost) and
              abs(evidence.gateway_reported_cost - evidence.computed_cost) <= 1.0e-6 do
@@ -870,11 +885,12 @@ defmodule MatchedTRECImp.Runner do
   end
 
   defp model_contract(manifest, role) do
-    Map.put(
-      manifest["models"][role],
+    manifest["models"][role]
+    |> Map.put(
       "max_input_tokens",
       manifest["execution"]["request"][role]["max_input_tokens"]
     )
+    |> Map.put("max_output_tokens", manifest["execution"]["request"][role]["max_tokens"])
   end
 
   defp enforce_call_ceiling!(arm, before, after_snapshot, manifest, reserved_held_out_task) do
@@ -968,7 +984,9 @@ defmodule MatchedTRECImp.Runner do
              evidence.attempts == 1 and evidence.retry == false and
              is_number(evidence.input_tokens) and
              evidence.input_tokens <= expected["max_input_tokens"] and
-             is_number(evidence.output_tokens) and is_binary(evidence.finish_reason) and
+             is_number(evidence.output_tokens) and
+             evidence.output_tokens <= expected["max_output_tokens"] and
+             is_binary(evidence.finish_reason) and
              is_binary(evidence.content) and evidence.gateway == "openrouter" and
              evidence.service_tier in [nil, "default", "standard"] and
              is_number(evidence.gateway_reported_cost) and evidence.gateway_reported_cost >= 0 and

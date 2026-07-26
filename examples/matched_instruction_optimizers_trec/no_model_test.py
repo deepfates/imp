@@ -81,12 +81,13 @@ class NoModelBoundaryTest(unittest.TestCase):
             })
             capture.set_phase(1, "baseline", "selection")
             lm = recording_lm(
-                "model", capture=capture, role="task",
+                "model", capture=capture, role="task", seed=1,
                 expected_model={
                     "logical": "openai/gpt-5.4-mini",
                     "upstream": "openrouter/openai/gpt-5.4-mini",
                     "endpoint_provider": "OpenAI",
                     "max_input_tokens": 4096,
+                    "max_output_tokens": 256,
                 },
             )
             with self.assertRaisesRegex(RuntimeError, "transport evidence"):
@@ -215,6 +216,7 @@ class NoModelBoundaryTest(unittest.TestCase):
                 "upstream": "openrouter/openai/gpt-5.4-mini",
                 "endpoint_provider": "OpenAI",
                 "max_input_tokens": 4096,
+                "max_output_tokens": 256,
             },
         )
 
@@ -233,6 +235,7 @@ class NoModelBoundaryTest(unittest.TestCase):
                     "upstream": "openrouter/openai/gpt-5.4-mini",
                     "endpoint_provider": "OpenAI",
                     "max_input_tokens": 4096,
+                    "max_output_tokens": 256,
                 },
             )
 

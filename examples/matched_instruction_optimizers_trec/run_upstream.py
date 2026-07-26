@@ -441,10 +441,16 @@ def transport_evidence(call: dict[str, Any], expected: dict[str, Any]) -> dict[s
     route_ok = str(evidence["actual_route"]).lower() == expected["endpoint_provider"].lower()
     tokens_ok = isinstance(evidence["input_tokens"], (int, float)) and isinstance(
         evidence["output_tokens"], (int, float)
-    ) and evidence["input_tokens"] <= expected["max_input_tokens"]
+    ) and evidence["input_tokens"] <= expected["max_input_tokens"] and evidence["output_tokens"] <= expected["max_output_tokens"]
+    seed_ok = (
+        evidence["request_seed"] == call["phase"]["seed"]
+        if call["role"] == "task"
+        else evidence["request_seed"] is None
+    )
     if not (
         model_ok
         and route_ok
+        and seed_ok
         and evidence["transport_attempts"] == 1
         and tokens_ok
         and isinstance(evidence["finish_reason"], str)
@@ -468,6 +474,7 @@ def model_contract(manifest: dict[str, Any], role: str) -> dict[str, Any]:
     return {
         **manifest["models"][role],
         "max_input_tokens": manifest["execution"]["request"][role]["max_input_tokens"],
+        "max_output_tokens": manifest["execution"]["request"][role]["max_tokens"],
     }
 
 
