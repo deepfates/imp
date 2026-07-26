@@ -10,6 +10,15 @@ defmodule Imp.Saving do
   alias Imp.Optimizer.Trajectory
 
   @predict_required_keys ["type", "signature", "demos", "config", "metadata"]
+  @portable_predict_metadata_atoms %{
+    "training_artifact" => :training_artifact,
+    "job_id" => :job_id,
+    "provider" => :provider,
+    "base_model" => :base_model,
+    "result_model" => :result_model,
+    "artifact_sha256" => :artifact_sha256,
+    "mlx_lm" => :mlx_lm
+  }
   @rag_required_keys ["type", "program", "retriever", "query_field", "context_field", "k", "hops"]
   @program_of_thought_required_keys ["type", "signature", "predict", "output_field"]
   @artifact_type "imp_program_artifact"
@@ -334,7 +343,7 @@ defmodule Imp.Saving do
     metadata =
       state
       |> require_map!("metadata")
-      |> Imp.Optimizer.Report.decode_term()
+      |> decode_predict_metadata()
 
     opts =
       [
@@ -1320,6 +1329,140 @@ defmodule Imp.Saving do
 
   defp decode_config_value(_key, value), do: value
 
+  defp decode_predict_metadata(metadata) do
+    # These tags are part of the supported TrainingJob.rebind/3 program
+    # artifact. Decode only this explicit Saving-owned vocabulary before the
+    # existing-atom-only generic decoder sees the remaining metadata.
+    metadata
+    |> decode_portable_predict_metadata_atoms()
+    |> Imp.Optimizer.Report.decode_term()
+  end
+
+  defp decode_portable_predict_metadata_atoms(%{"__imp_type__" => "atom", "value" => value} = tag)
+       when map_size(tag) == 2 and is_binary(value) do
+    Map.get(@portable_predict_metadata_atoms, value, tag)
+  end
+
+  defp decode_portable_predict_metadata_atoms(map) when is_map(map) do
+    Map.new(map, fn {key, value} -> {key, decode_portable_predict_metadata_atoms(value)} end)
+  end
+
+  defp decode_portable_predict_metadata_atoms(list) when is_list(list),
+    do: Enum.map(list, &decode_portable_predict_metadata_atoms/1)
+
+  defp decode_portable_predict_metadata_atoms(value), do: value
+
+  @req_llm_option_keys %{
+    "temperature" => :temperature,
+    "max_tokens" => :max_tokens,
+    "top_p" => :top_p,
+    "stop" => :stop,
+    "response_format" => :response_format,
+    "tools" => :tools,
+    "tool_choice" => :tool_choice,
+    "parallel_tool_calls" => :parallel_tool_calls,
+    "openai_parallel_tool_calls" => :openai_parallel_tool_calls,
+    "stream" => :stream,
+    "json_retries" => :json_retries,
+    "json_fallback" => :json_fallback,
+    "timeout" => :timeout,
+    "retries" => :retries,
+    "num_retries" => :num_retries,
+    "retry_backoff_ms" => :retry_backoff_ms,
+    "max_retries" => :max_retries,
+    "max_completion_tokens" => :max_completion_tokens,
+    "receive_timeout" => :receive_timeout,
+    "cache" => :cache,
+    "rollout_id" => :rollout_id,
+    "native_json_schema" => :native_json_schema,
+    "provider_options" => :provider_options,
+    "headers" => :headers,
+    "base_url" => :base_url,
+    "request_id" => :request_id,
+    "req_http_options" => :req_http_options
+  }
+
+  @req_http_option_keys %{
+    "retry" => :retry,
+    "max_retries" => :max_retries
+  }
+
+  defp decode_req_llm_opts(opts) when is_list(opts) do
+    opts
+    |> Imp.Redaction.drop_credentials()
+    |> decode_allowlisted_entries!(@req_llm_option_keys, "saved ReqLLM options", fn key, value ->
+      decode_req_llm_option_value!(key, value)
+    end)
+  end
+
+  defp decode_req_llm_opts(opts) do
+    raise ArgumentError, "saved ReqLLM options must be a list, got: #{inspect(opts)}"
+  end
+
+  defp decode_req_llm_option_value!(:max_retries, value),
+    do: require_non_negative_integer!(value, "ReqLLM max_retries")
+
+  defp decode_req_llm_option_value!(:req_http_options, value),
+    do: decode_req_http_options!(value)
+
+  defp decode_req_llm_option_value!(key, value), do: decode_config_value(key, value)
+
+  defp decode_req_http_options!(options) when is_list(options) do
+    decode_allowlisted_entries!(
+      options,
+      @req_http_option_keys,
+      "saved ReqLLM req_http_options",
+      &decode_req_http_option_value!/2
+    )
+  end
+
+  defp decode_req_http_options!(options) do
+    raise ArgumentError,
+          "saved ReqLLM req_http_options must be a list, got: #{inspect(options)}"
+  end
+
+  defp decode_req_http_option_value!(:retry, value) when is_boolean(value), do: value
+
+  defp decode_req_http_option_value!(:retry, value) do
+    raise ArgumentError,
+          "saved ReqLLM req_http_options retry must be a boolean, got: #{inspect(value)}"
+  end
+
+  defp decode_req_http_option_value!(:max_retries, value),
+    do: require_non_negative_integer!(value, "ReqLLM req_http_options max_retries")
+
+  defp decode_allowlisted_entries!(entries, allowlist, context, decode_value) do
+    {decoded, seen} =
+      Enum.map_reduce(entries, MapSet.new(), fn entry, seen ->
+        {raw_key, value} = decode_saved_pair!(entry, context)
+        key_name = if is_atom(raw_key), do: Atom.to_string(raw_key), else: raw_key
+
+        unless is_binary(key_name) do
+          raise ArgumentError, "#{context} key must be a string or atom, got: #{inspect(raw_key)}"
+        end
+
+        key =
+          Map.get(allowlist, key_name) ||
+            raise(ArgumentError, "unknown #{context} key: #{inspect(key_name)}")
+
+        if MapSet.member?(seen, key) do
+          raise ArgumentError, "duplicate #{context} key: #{inspect(key_name)}"
+        end
+
+        {{key, decode_value.(key, value)}, MapSet.put(seen, key)}
+      end)
+
+    _ = seen
+    decoded
+  end
+
+  defp decode_saved_pair!({key, value}, _context), do: {key, value}
+  defp decode_saved_pair!([key, value], _context), do: {key, value}
+
+  defp decode_saved_pair!(entry, context) do
+    raise ArgumentError, "invalid #{context} entry: #{inspect(entry)}"
+  end
+
   defp decode_adapter(nil), do: Imp.Adapter.Chat
 
   defp decode_adapter(name) when is_binary(name) do
@@ -1380,7 +1523,7 @@ defmodule Imp.Saving do
 
   defp decode_req_llm!(model, opts) do
     model = Imp.Redaction.drop_credentials(model)
-    Imp.Clients.ReqLLM.new(model, opts: decode_config(opts))
+    Imp.Clients.ReqLLM.new(model, opts: decode_req_llm_opts(opts))
   end
 
   defp dump_retriever(%Imp.Retrieve.Memory{} = retriever) do
