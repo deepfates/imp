@@ -1,6 +1,41 @@
 defmodule OptimizerReportTest do
   use ExUnit.Case
 
+  test "public optimizer identity loads in a fresh OS before its module" do
+    root =
+      Path.join(System.tmp_dir!(), "imp-report-atom-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    path = Path.join(root, "report.json")
+    receipt = Path.join(root, "receipt")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    report =
+      Imp.Optimizer.Report.new(%{
+        optimizer: :better_together,
+        best_score: 1.0,
+        candidate_count: 1
+      })
+
+    File.write!(path, Jason.encode!(Imp.Optimizer.Report.dump(report)))
+
+    code = """
+    state = #{inspect(path)} |> File.read!() |> Jason.decode!()
+    report = Imp.Optimizer.Report.load(state)
+    File.write!(#{inspect(receipt)}, Atom.to_string(report.optimizer))
+    """
+
+    {output, 0} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert output == ""
+    assert File.read!(receipt) == "better_together"
+  end
+
   defmodule ErrorOptimizer do
     defstruct []
 

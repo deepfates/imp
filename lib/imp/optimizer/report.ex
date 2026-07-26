@@ -23,6 +23,26 @@ defmodule Imp.Optimizer.Report do
                     "metadata"
                   ])
   @map_tag_keys MapSet.new(["__imp_type__", "entries"])
+  # Public optimizer identities are part of the portable Report contract. A
+  # clean BEAM may not have loaded the owning optimizer module yet, so relying
+  # only on binary_to_existing_atom/2 makes a valid saved report depend on
+  # incidental module load order. Keep this vocabulary explicit; every other
+  # atom still requires a caller/module-owned existing atom and no decoder path
+  # creates atoms dynamically.
+  @portable_optimizer_atoms %{
+    "avatar" => :avatar,
+    "better_together" => :better_together,
+    "bootstrap_few_shot" => :bootstrap_few_shot,
+    "bootstrap_finetune" => :bootstrap_finetune,
+    "copro" => :copro,
+    "gepa" => :gepa,
+    "infer_rules" => :infer_rules,
+    "instruction_search" => :instruction_search,
+    "labeled_few_shot" => :labeled_few_shot,
+    "mipro_v2" => :mipro_v2,
+    "random_search" => :random_search,
+    "simba" => :simba
+  }
 
   defstruct optimizer: nil,
             best_score: nil,
@@ -341,7 +361,9 @@ defmodule Imp.Optimizer.Report do
 
     case state["value"] do
       value when is_binary(value) ->
-        :erlang.binary_to_existing_atom(value, :utf8)
+        Map.get_lazy(@portable_optimizer_atoms, value, fn ->
+          :erlang.binary_to_existing_atom(value, :utf8)
+        end)
 
       _value ->
         raise ArgumentError, "malformed Imp atom JSON tag"
