@@ -12,10 +12,20 @@ defmodule Imp.Clients.TRLLM do
   defstruct [
     :model,
     :worker_key,
+    :artifact_sha256,
     response_field: :route,
     rollout_source: :model_generated,
     timeout: 120_000
   ]
+
+  @type t :: %__MODULE__{
+          model: String.t(),
+          worker_key: term(),
+          artifact_sha256: String.t() | nil,
+          response_field: atom(),
+          rollout_source: :model_generated | :controlled_external,
+          timeout: pos_integer()
+        }
 
   def generate(%__MODULE__{} = lm, messages, opts) do
     with :ok <- validate_rollout_source(lm),
@@ -23,6 +33,7 @@ defmodule Imp.Clients.TRLLM do
            Registry.lookup(Imp.Clients.TRLWorker.Registry, lm.worker_key),
          {:ok, result} <-
            Imp.Clients.TRLWorker.request(worker, rollout_request(lm, messages, opts), lm.timeout),
+         :ok <- validate_artifact_identity(lm, result),
          completion when is_binary(completion) <- result["completion"] do
       {:ok, completion_output(lm, completion)}
     else
@@ -38,6 +49,18 @@ defmodule Imp.Clients.TRLLM do
 
   defp validate_rollout_source(%__MODULE__{rollout_source: source}),
     do: {:error, {:invalid_trl_rollout_source, source}}
+
+  defp validate_artifact_identity(%__MODULE__{artifact_sha256: nil}, _result), do: :ok
+
+  defp validate_artifact_identity(
+         %__MODULE__{model: model, artifact_sha256: expected},
+         %{"model" => model, "artifact_sha256" => expected}
+       )
+       when is_binary(model) and is_binary(expected),
+       do: :ok
+
+  defp validate_artifact_identity(%__MODULE__{}, result),
+    do: {:error, {:trl_deployment_artifact_identity_mismatch, result}}
 
   # Model generation is raw adapter output and must pass through the program's
   # configured parser. A controlled external rollout is explicitly a semantic

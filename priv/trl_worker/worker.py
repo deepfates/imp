@@ -131,6 +131,7 @@ class Worker:
         self.receipt: dict[str, Any] | None = None
         self.checkpoint: dict[str, Any] | None = None
         self.artifact: dict[str, Any] | None = None
+        self.deployed_artifact: dict[str, str] | None = None
         self.root.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -277,8 +278,10 @@ class Worker:
         return attrs
 
     def generate(self, request: dict[str, Any]) -> dict[str, Any]:
-        if self.protocol is None or self.model is None or self.tokenizer is None:
-            raise WorkerError("worker_not_bound", "initialized session is required")
+        if self.model is None or self.tokenizer is None:
+            raise WorkerError("worker_not_initialized", "initialized model is required")
+        if self.protocol is None and self.deployed_artifact is None:
+            raise WorkerError("worker_not_bound", "training session or deployed artifact is required")
         rollout_id = request.get("rollout_id")
         if not isinstance(rollout_id, int) or rollout_id < 0:
             raise WorkerError("invalid_rollout_id", "rollout_id must be a non-negative integer")
@@ -303,14 +306,79 @@ class Worker:
             )
         completion_ids = output[0, inputs["input_ids"].shape[1] :]
         completion = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
-        return {
+        result = {
             "completion": completion,
             "completion_token_ids": completion_ids.detach().cpu().tolist(),
             "rollout_id": rollout_id,
             "seed": seed,
-            "model": self.protocol["behavior_policy"]["model"],
             "rollout_source": "model_generated",
         }
+        if self.deployed_artifact is not None:
+            result.update(self.deployed_artifact)
+        else:
+            result["model"] = self.protocol["behavior_policy"]["model"]
+        return result
+
+    def deploy_artifact(self, request: dict[str, Any]) -> dict[str, Any]:
+        if self.model is None or self.tokenizer is None:
+            raise WorkerError("worker_not_initialized", "initialize must precede artifact deployment")
+        if self.protocol is not None or self.trainer is not None:
+            raise WorkerError("training_worker_not_deployable", "training sessions cannot become deployments")
+
+        raw_path = request.get("artifact_path")
+        expected_sha256 = request.get("artifact_sha256")
+        if not isinstance(raw_path, str) or not pathlib.Path(raw_path).is_absolute():
+            raise WorkerError("invalid_deployment_artifact_path", "artifact path must be absolute")
+        if not isinstance(expected_sha256, str) or not expected_sha256.startswith("sha256:"):
+            raise WorkerError("invalid_deployment_artifact_identity", "artifact identity is required")
+
+        artifact_path = pathlib.Path(raw_path).resolve()
+        manifest_path = artifact_path / "imp-trl-artifact.json"
+        if not artifact_path.is_dir() or not manifest_path.is_file():
+            raise WorkerError("deployment_artifact_missing", "verified TRL artifact is missing")
+        manifest = json.loads(manifest_path.read_text())
+        validate_envelope(manifest, "imp_trl_grpo_artifact")
+        if manifest["payload_sha256"] != expected_sha256:
+            raise WorkerError("deployment_artifact_identity_mismatch", "artifact identity changed")
+        expected_files = sorted(
+            manifest["files"]
+            + [{
+                "path": "imp-trl-artifact.json",
+                "size": manifest_path.stat().st_size,
+                "sha256": file_digest(manifest_path),
+            }],
+            key=lambda entry: entry["path"],
+        )
+        actual_files = sorted(safe_tree_inventory(artifact_path), key=lambda entry: entry["path"])
+        if actual_files != expected_files:
+            raise WorkerError("deployment_artifact_inventory_mismatch", "artifact bytes changed")
+
+        observation_path = artifact_path / "trl-observation.json"
+        observation = json.loads(observation_path.read_text())
+        expected_adapter_sha256 = observation.get("trainable_after_sha256")
+        if not isinstance(expected_adapter_sha256, str):
+            raise WorkerError("deployment_adapter_identity_missing", "trained adapter digest is missing")
+
+        from peft import PeftModel
+
+        self.model = PeftModel.from_pretrained(
+            self.model,
+            str(artifact_path / "adapter"),
+            is_trainable=True,
+        )
+        self.model.to("mps")
+        self.model.eval()
+        self._assert_model_device(self.model, "mps")
+        adapter_sha256 = self._trainable_digest(self.model)
+        if adapter_sha256 != expected_adapter_sha256:
+            raise WorkerError("deployment_adapter_identity_mismatch", "loaded LoRA tensors differ")
+
+        self.deployed_artifact = {
+            "model": str(artifact_path),
+            "artifact_sha256": expected_sha256,
+            "adapter_sha256": adapter_sha256,
+        }
+        return dict(self.deployed_artifact)
 
     def controlled_completion(self, request: dict[str, Any]) -> dict[str, Any]:
         if self.protocol is None or self.model is None or self.tokenizer is None:
@@ -904,6 +972,8 @@ def dispatch(worker: Worker, request: dict[str, Any]) -> Any:
         return worker.generate(request)
     if op == "controlled_completion":
         return worker.controlled_completion(request)
+    if op == "deploy_artifact":
+        return worker.deploy_artifact(request)
     if op == "prepare_update":
         return worker.prepare_update(request)
     if op == "apply_update":

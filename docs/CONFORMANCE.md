@@ -532,6 +532,8 @@ Semantic invariants:
 - BetterTogether evaluates the baseline and every successful prefix, selects the best validated prefix with earlier ties winning, and otherwise returns the latest successful prefix
 - BetterTogether stops at the first failed optimizer step and returns the best candidate found so far
 - provider-backed weight steps complete training and rebind trained model state portably
+- a completed local TRL job restarts only through an explicit trusted runtime,
+  loads the verified LoRA tensors, and checks artifact identity on every generation
 
 Executable evidence:
 
@@ -544,6 +546,7 @@ Executable evidence:
 - test: `test/public_surface_test.exs`
 - test: `test/trl_protocol_test.exs`
 - test: `test/trl_protocol_grpo_lifecycle_test.exs`
+- module: `Imp.Clients.TRLDeployment`
 - docs: `docs/ADVANCED.md`
 - docs: [docs/internal/COVERAGE_MATRIX.md](https://github.com/deepfates/imp/blob/main/docs/internal/COVERAGE_MATRIX.md) (repository only, not shipped in the package)
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)

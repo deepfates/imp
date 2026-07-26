@@ -353,6 +353,7 @@ defmodule Imp.Clients.TrainingJob do
   @doc "Rebinds a program to the provider model artifact and optionally persists it."
   def rebind(%__MODULE__{} = job, program, opts \\ []) do
     with :ok <- validate_rebind_opts(opts),
+         :ok <- validate_provider_rebind_opts(job, opts),
          :ok <- require_artifact(job),
          {:ok, lm} <- deployment_lm(job, program, opts) do
       rebound =
@@ -581,18 +582,18 @@ defmodule Imp.Clients.TrainingJob do
         with {:ok, lm} <- validate_deployment_lm(lm),
              :ok <- validate_provider_deployment_lm(job, lm) do
           if job.provider == :mlx_lm do
-            automatic_deployment_lm(job, Imp.ProgramAccess.put_lm(program, lm))
+            automatic_deployment_lm(job, Imp.ProgramAccess.put_lm(program, lm), opts)
           else
             {:ok, lm}
           end
         end
 
       _missing_or_nil ->
-        automatic_deployment_lm(job, program)
+        automatic_deployment_lm(job, program, opts)
     end
   end
 
-  defp automatic_deployment_lm(%__MODULE__{provider: :mlx_lm} = job, program) do
+  defp automatic_deployment_lm(%__MODULE__{provider: :mlx_lm} = job, program, _opts) do
     source_lm = Imp.ProgramAccess.lm(program)
 
     with {:ok, manifest} <- Imp.Clients.MLXLMTrainer.verify_job(job),
@@ -607,13 +608,19 @@ defmodule Imp.Clients.TrainingJob do
     end
   end
 
-  defp automatic_deployment_lm(%__MODULE__{provider: :trl} = job, program) do
-    with {:ok, _manifest} <- Imp.Clients.TRLArtifact.verify_job(job) do
-      rebound_lm(Imp.ProgramAccess.lm(program), job.provider, job.result_model)
+  defp automatic_deployment_lm(%__MODULE__{provider: :trl} = job, _program, opts) do
+    case Keyword.fetch(opts, :trainer) do
+      {:ok, %Imp.Clients.TRLTrainer{} = trainer} ->
+        with {:ok, deployment} <- Imp.Clients.TRLDeployment.start(job, trainer) do
+          {:ok, deployment.lm}
+        end
+
+      _missing_or_invalid ->
+        {:error, :trl_rebind_requires_trusted_trainer}
     end
   end
 
-  defp automatic_deployment_lm(job, program),
+  defp automatic_deployment_lm(job, program, _opts),
     do: rebound_lm(Imp.ProgramAccess.lm(program), job.provider, job.result_model)
 
   defp validate_deployment_lm(lm) do
@@ -636,12 +643,21 @@ defmodule Imp.Clients.TrainingJob do
 
   defp validate_provider_deployment_lm(%__MODULE__{provider: :trl} = job, lm) do
     with {:ok, _manifest} <- Imp.Clients.TRLArtifact.verify_job(job),
+         %Imp.Clients.TRLLM{artifact_sha256: artifact_sha256, worker_key: worker_key} <- lm,
          {:ok, path} <- trl_model_path(lm),
-         true <- Path.expand(path) == Path.expand(job.result_model) do
+         true <- Path.expand(path) == Path.expand(job.result_model),
+         true <-
+           artifact_sha256 ==
+             (job.metadata[:artifact_sha256] || job.metadata["artifact_sha256"]),
+         [{worker, _}] when is_pid(worker) <-
+           Registry.lookup(Imp.Clients.TRLWorker.Registry, worker_key) do
       :ok
     else
       false -> {:error, :trl_deployment_model_identity_mismatch}
+      [] -> {:error, :trl_deployment_worker_not_running}
+      %{} -> {:error, :trl_deployment_requires_artifact_bound_lm}
       {:error, _reason} = error -> error
+      _other -> {:error, :trl_deployment_requires_artifact_bound_lm}
     end
   end
 
@@ -828,7 +844,7 @@ defmodule Imp.Clients.TrainingJob do
 
   defp validate_rebind_opts(opts) when is_list(opts) do
     if Keyword.keyword?(opts) and
-         Enum.all?(Keyword.keys(opts), &(&1 in [:path, :lm])) and
+         Enum.all?(Keyword.keys(opts), &(&1 in [:path, :lm, :trainer])) and
          (is_nil(opts[:path]) or is_binary(opts[:path])) do
       :ok
     else
@@ -837,6 +853,24 @@ defmodule Imp.Clients.TrainingJob do
   end
 
   defp validate_rebind_opts(_opts), do: {:error, :invalid_training_rebind_options}
+
+  # A live TRL LM is intentionally not serialized: its trusted executable and
+  # worker binding must be reconstructed in the destination process. Persist
+  # the portable source program and TrainingJob separately, then rebind there.
+  defp validate_provider_rebind_opts(%__MODULE__{provider: :trl}, opts) do
+    cond do
+      Keyword.has_key?(opts, :path) ->
+        {:error, :trl_deployment_program_not_portable}
+
+      Keyword.has_key?(opts, :lm) and Keyword.has_key?(opts, :trainer) ->
+        {:error, :trl_deployment_runtime_conflict}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_provider_rebind_opts(%__MODULE__{}, _opts), do: :ok
 
   defp validate_request_policy!(%__MODULE__{} = job) do
     unless is_integer(job.max_attempts) and job.max_attempts > 0 do

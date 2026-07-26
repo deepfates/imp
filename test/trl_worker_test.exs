@@ -18,7 +18,8 @@ defmodule Imp.TRLWorkerTest do
 
     @impl true
     def handle_call({:request, _request}, _from, completion) do
-      {:reply, {:ok, %{"completion" => completion}}, completion}
+      result = if is_map(completion), do: completion, else: %{"completion" => completion}
+      {:reply, {:ok, result}, completion}
     end
   end
 
@@ -180,6 +181,29 @@ defmodule Imp.TRLWorkerTest do
     signature = Imp.Signature.ensure("utterance -> route")
     assert {:ok, prediction} = Imp.Adapter.Chat.parse(signature, completion, [])
     assert Imp.get(prediction, :route) == "R17"
+  end
+
+  test "a deployed rollout refuses response artifact drift" do
+    key = {:trl_deployment_identity_boundary, make_ref()}
+
+    start_supervised!(
+      {CompletionWorker,
+       {key,
+        %{
+          "completion" => "[[ ## route ## ]]\nR17\n",
+          "model" => "/tmp/different-artifact",
+          "artifact_sha256" => "sha256:different"
+        }}}
+    )
+
+    lm = %TRLLM{
+      model: "/tmp/verified-artifact",
+      worker_key: key,
+      artifact_sha256: "sha256:verified"
+    }
+
+    assert {:error, {:trl_deployment_artifact_identity_mismatch, _response}} =
+             Imp.LM.generate(lm, [%{role: "user", content: "route"}])
   end
 
   test "trainer projects atom-keyed Imp groups to the worker's plain JSON shape" do

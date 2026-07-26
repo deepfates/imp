@@ -329,6 +329,12 @@ defmodule Imp.Test.TRLConformanceServer do
     weights_path = Path.join(staging_dir, "adapter.safetensors")
     atomic_write(weights_path, weights)
     weights_sha256 = file_digest(weights_path)
+    observation_path = Path.join(staging_dir, "trl-observation.json")
+
+    atomic_write(
+      observation_path,
+      Jason.encode!(%{"trainable_after_sha256" => weights_sha256}, pretty: true) <> "\n"
+    )
 
     next_optimizer =
       transition_optimizer(optimizer_state(state), update["payload_sha256"], next_step)
@@ -393,6 +399,7 @@ defmodule Imp.Test.TRLConformanceServer do
         "files" =>
           [
             file_entry("adapter.safetensors", weights_path),
+            file_entry("trl-observation.json", observation_path),
             file_entry("trainer-checkpoint.json", checkpoint_path)
           ] ++
             Enum.map(1..next_step, fn update_step ->

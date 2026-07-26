@@ -1,7 +1,7 @@
 defmodule Imp.TRLProtocolGRPOLifecycleTest do
   use ExUnit.Case
 
-  alias Imp.Clients.{TrainingJob, TRLProtocol}
+  alias Imp.Clients.{TrainingJob, TRLArtifact, TRLLM, TRLProtocol}
   alias Imp.Optimizer.TrainingResult
 
   setup do
@@ -14,7 +14,7 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
     %{root: root, server: server}
   end
 
-  test "public GRPO produces an ordered durable artifact and a fresh process rebinds it",
+  test "public GRPO produces an ordered durable artifact and a fresh process executes it",
        context do
     checkpoint = Path.join(context.root, "imp-grpo.json")
 
@@ -104,18 +104,32 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
 
     job_path = Path.join(context.root, "job.json")
     base_program_path = Path.join(context.root, "base-program.json")
-    rebound_path = Path.join(context.root, "fresh-rebound.json")
+    worker_script = Path.join(context.root, "fake-deployment-worker.py")
+    deployment_root = Path.join(context.root, "deployment-runtime")
+    model_path = Path.join(context.root, "base-model")
 
     portable = Imp.predict("question -> answer", lm: Imp.req_llm("openai:portable-base"))
     :ok = Imp.save!(portable, base_program_path)
     :ok = TrainingJob.save!(job, job_path)
+    :ok = File.mkdir_p(model_path)
+    :ok = File.write(worker_script, fake_deployment_worker())
 
     script = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
     program = Imp.load!(#{inspect(base_program_path)})
-    {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, program, path: #{inspect(rebound_path)})
+    trainer = Imp.Clients.TRLTrainer.new(
+      python: #{inspect(System.find_executable("python3"))},
+      model_path: #{inspect(model_path)},
+      root: #{inspect(deployment_root)},
+      worker_script: #{inspect(worker_script)},
+      contract_path: #{inspect(Path.expand("../priv/trl_worker/qwen-one-update-contract.json", __DIR__))}
+    )
+    {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, program, trainer: trainer)
+    {:ok, prediction} = Imp.call(rebound, %{question: "Does the saved adapter answer?"})
     IO.puts("FRESH_MODEL=" <> Imp.ProgramAccess.lm(rebound).model)
     IO.puts("FRESH_SHA=" <> Imp.ProgramAccess.get_metadata(rebound, :training_artifact).artifact_sha256)
+    IO.puts("FRESH_ANSWER=" <> Imp.get(prediction, :answer))
+    :ok = Imp.Clients.TRLDeployment.stop(job)
     """
 
     {output, 0} =
@@ -123,13 +137,31 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
 
     assert output =~ "FRESH_MODEL=#{job.result_model}"
     assert output =~ "FRESH_SHA=#{job.metadata.artifact_sha256}"
-    assert Imp.ProgramAccess.lm(Imp.load!(rebound_path)).model == job.result_model
+    assert output =~ "FRESH_ANSWER=served verified adapter"
+
+    assert {:error, :trl_deployment_program_not_portable} =
+             TrainingJob.rebind(job, portable,
+               trainer: :untrusted,
+               path: Path.join(context.root, "must-not-be-written.json")
+             )
+
+    assert {:error, :trl_deployment_worker_not_running} =
+             TrainingJob.rebind(job, portable,
+               lm: %TRLLM{
+                 model: job.result_model,
+                 worker_key: {:missing_deployment, make_ref()},
+                 artifact_sha256: job.metadata.artifact_sha256
+               }
+             )
+
+    assert {:error, :trl_deployment_runtime_conflict} =
+             TrainingJob.rebind(job, portable, lm: Imp.req_llm("openai:any"), trainer: :any)
 
     extra_path = Path.join(job.result_model, "unlisted.bin")
     File.write!(extra_path, "not in the manifest")
 
     assert {:error, {:trl_artifact_inventory_mismatch, _expected, _actual}} =
-             TrainingJob.rebind(job, portable)
+             TRLArtifact.verify_job(job)
 
     File.rm!(extra_path)
 
@@ -138,7 +170,54 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
     File.write!(weights_path, <<rem(first + 1, 256), rest::binary>>)
 
     assert {:error, {:trl_artifact_file_digest_mismatch, "adapter.safetensors"}} =
-             TrainingJob.rebind(job, portable)
+             TRLArtifact.verify_job(job)
+  end
+
+  defp fake_deployment_worker do
+    ~S'''
+    import argparse, json, pathlib, struct, sys
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", required=True)
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--contract", required=True)
+    args = parser.parse_args()
+
+    def read_frame():
+        header = sys.stdin.buffer.read(4)
+        if not header:
+            return None
+        length = struct.unpack(">I", header)[0]
+        return json.loads(sys.stdin.buffer.read(length))
+
+    def write_frame(value):
+        body = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        sys.stdout.buffer.write(struct.pack(">I", len(body)) + body)
+        sys.stdout.buffer.flush()
+
+    while (request := read_frame()) is not None:
+        op = request.get("op")
+        if op == "initialize":
+            result = {"model": "local/no-model-policy", "model_path": args.model}
+        elif op == "deploy_artifact":
+            observation = json.loads((pathlib.Path(request["artifact_path"]) / "trl-observation.json").read_text())
+            result = {
+                "model": request["artifact_path"],
+                "artifact_sha256": request["artifact_sha256"],
+                "adapter_sha256": observation["trainable_after_sha256"],
+            }
+        elif op == "generate":
+            result = {
+                "completion": "[[ ## answer ## ]]\nserved verified adapter\n\n[[ ## completed ## ]]\n",
+                "model": result["model"],
+                "artifact_sha256": result["artifact_sha256"],
+                "adapter_sha256": result["adapter_sha256"],
+            }
+        else:
+            write_frame({"ok": False, "error": {"accepted": False, "code": "unknown", "message": op}})
+            continue
+        write_frame({"ok": True, "result": result})
+    '''
   end
 
   test "a crash-window response reconciles the durable receipt without repeating the update",

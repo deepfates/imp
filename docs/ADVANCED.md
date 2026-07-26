@@ -278,6 +278,36 @@ grpo =
 {:ok, result} = Imp.train(program, grpo, trainset)
 ```
 
+The training worker is deliberately terminated when the job completes. To use
+the saved LoRA later, load the credential-free job and a portable copy of the
+original program in the new process, reconstruct the trusted local trainer
+configuration, and rebind explicitly:
+
+```elixir
+job = Imp.Clients.TrainingJob.load!("var/trl-job.json")
+program = Imp.load!("var/base-program.json")
+
+trainer =
+  Imp.Clients.TRLTrainer.new(
+    python: "/path/to/pinned-venv/bin/python",
+    model_path: "/path/to/pinned-qwen-snapshot",
+    root: "var/trl-deployments"
+  )
+
+{:ok, trained} =
+  Imp.Clients.TrainingJob.rebind(job, program, trainer: trainer)
+
+{:ok, prediction} = Imp.call(trained, inputs)
+:ok = Imp.Clients.TRLDeployment.stop(job)
+```
+
+Imp does not restore executable paths from the job. Rebind verifies every
+artifact byte, loads the adapter into the pinned base model, and requires the
+loaded LoRA tensor digest to match the training observation. Every generation
+also carries and rechecks the exact artifact identity. A TRL job without the
+explicit trusted `:trainer` therefore fails instead of returning an artifact-
+named LM backed by no running model.
+
 The default worker accepts any Imp-rendered prompt and finite external reward;
 it does not require Banking77, opaque route labels, binary rewards, or a tensor
 change. Uniform group rewards are a valid GRPO no-op and are recorded honestly.
