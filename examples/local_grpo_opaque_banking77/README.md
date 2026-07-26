@@ -187,3 +187,30 @@ export IMP_TRL_CONTRACT="$PWD/priv/trl_worker/qwen-trec-14-step-contract.json"
 export IMP_GRPO_OPAQUE_OUTPUT=/new/empty/output
 mix run examples/local_grpo_opaque_banking77/run.exs
 ```
+
+## Source-guided TREC usefulness treatment
+
+`trec-source-guided-v1-treatment.json` and
+`trec-source-guided-v1-data.json` freeze a later, correctly labeled treatment
+over real TREC questions that excludes every source row used by the SIMBA TREC
+fixture. It uses 64 train rows, 32 validation rows, and 40 official-test rows,
+balanced across `DESC`, `HUM`, `LOC`, and `NUM`. Those meanings never appear in
+the model prompt: the policy sees only the opaque routes `R17/R42/R68/R93`, so
+valid formatting alone cannot earn the externally computed semantic reward.
+
+The immutable result is
+`exercised-trec-source-guided-v1-result.json`. Thirty-three official TRL/MPS
+updates consumed 66 prompt groups with eight ordinary model-generated
+completions per group. All 33 updates changed trainable tensors and 31 had
+non-uniform rewards. Validation selected step five: accuracy improved from
+`0.21875` to `0.3125` and macro-F1 from `0.08974` to `0.21008`. On the held-out
+40 rows, however, the selected artifact regressed from `0.25` to `0.225`
+accuracy and from `0.10204` to `0.09783` macro-F1, with zero parse errors in
+both arms. The predeclared positive rule therefore failed. The trained artifact
+still saved, loaded, served, and reproduced its ordered predictions and errors
+byte-for-byte in a fresh OS BEAM.
+
+This is a real ordinary-usefulness measurement and a negative result for one
+task, model, seed, and budget. It proves the multi-group/multi-step product and
+artifact lifecycle execute; it does not prove useful GRPO learning in general,
+GRPO/mmGRPO parity, production reliability, or BEAM superiority.

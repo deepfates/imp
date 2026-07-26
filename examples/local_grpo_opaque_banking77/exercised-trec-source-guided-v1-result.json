@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "status": "complete_negative",
+  "treatment_id": "imp-grpo-trec-coarse-lora-source-guided-v1",
+  "runtime_base_commit": "403f0b2a5d9219b4b5a4944e11a829f1241445dd",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "training": {
+    "steps": 33,
+    "prompt_groups": 66,
+    "rollouts_per_group": 8,
+    "steps_with_nonuniform_rewards": 31,
+    "steps_with_changed_trainable_tensors": 33,
+    "selected_validation_step": 5,
+    "selected_artifact_sha256": "sha256:b24eb21ef4991cbd8f9541f4a7e4df6966f22ea5e2e37ce6a81af647ac3d4e9c"
+  },
+  "selection": {
+    "selected_arm": "trained",
+    "base": {
+      "accuracy": 0.21875,
+      "macro_f1": 0.08974358974358974,
+      "errors": 0
+    },
+    "trained": {
+      "accuracy": 0.3125,
+      "macro_f1": 0.21008403361344535,
+      "errors": 0
+    }
+  },
+  "held_out_test": {
+    "rows": 40,
+    "base": {
+      "accuracy": 0.25,
+      "macro_f1": 0.10204081632653061,
+      "errors": 0
+    },
+    "trained": {
+      "accuracy": 0.225,
+      "macro_f1": 0.09782608695652174,
+      "errors": 0
+    },
+    "accuracy_delta": -0.025,
+    "macro_f1_delta": -0.004214729370008871,
+    "predeclared_positive_rule_passed": false
+  },
+  "fresh_process": {
+    "selected_arm": "trained",
+    "artifact_identity_matched": true,
+    "ordered_predictions_and_errors_byte_identical": true
+  },
+  "retained_source_hashes": {
+    "result_json_sha256": "afb98a69e12d61c39d73d5e166ff2225f3ecdf8f34bfbdbf449462d0426125db",
+    "training_stage_sha256": "ccd0b470edbac13b5041a1d1efc6d1da169dfc5b0453f30c5f271d94891377cf",
+    "trained_selection_stage_sha256": "f44f96a676f4d0623a3d0c3a07b282020f81d7a767762704e58f9f17bba802f2",
+    "base_test_stage_sha256": "2f464e7557cfc9c64147d92532ebf24eafd910b5b91b2303af493d0135b148ba",
+    "trained_test_stage_sha256": "c59f451204249e5d5b6fb6f0c8066260b52c98c52c40423db878e4d28e95a891",
+    "fresh_test_stage_sha256": "6357f6449b842948819cd34ac8ac418687bf9172e088a21948213d31970a4d1f"
+  },
+  "claim_boundary": "This one source-disjoint TREC treatment proves ordinary model-generated multi-group/multi-step TRL/MPS execution, validation checkpoint selection, a changed deployable LoRA artifact, and byte-identical fresh-process consumption. Validation improved but held-out accuracy and macro-F1 regressed, so it is a negative task/model-specific usefulness result. It does not establish general GRPO or mmGRPO effectiveness, parity, production reliability, or BEAM superiority."
+}

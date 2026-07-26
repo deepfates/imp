@@ -76,6 +76,17 @@ Status values:
 
 ## Evaluation and Optimization
 
+Current GRPO boundary (2026-07-26): the bundled TRL/MPS backend has now
+completed one frozen 33-step, 66-group, ordinary model-generated treatment on
+a source-disjoint TREC slice. Validation selected a changed step-five LoRA
+artifact (`0.21875 -> 0.3125` accuracy), which saved, rebound, and reproduced
+byte-identically in a fresh OS BEAM. Held-out accuracy regressed `0.25 ->
+0.225` and macro-F1 regressed `0.10204 -> 0.09783`, so this closes the prior
+multi-group/multi-step engine and lifecycle gap but is negative evidence for
+that exact task/model treatment, not general usefulness or parity. The
+immutable summary is
+`examples/local_grpo_opaque_banking77/exercised-trec-source-guided-v1-result.json`.
+
 | Concept | Imp status | Imp surface | Deterministic tests | Integration/live proof | Docs | Release decision |
 | --- | --- | --- | --- | --- | --- | --- |
 | Evaluation loop | Implemented | `Imp.Evaluate` with sequential and bounded concurrent row execution | `test/imp_test.exs`, `test/public_surface_test.exs`, `test/metric_contract_test.exs` cover normalized score/feedback rows, trace-aware arity-3 metrics, program/metric errors, `max_errors`, row order, and process-local settings across concurrent tasks | Local integration file-backed dataset proof exercises RAG evaluation and optimization; no paid live proof required for evaluator mechanics | `docs/API_GUIDE.md`, `livebooks/03_evaluate_and_optimize.livemd` | Keep normalized score/feedback rows and explicit concurrency via `max_concurrency:` |

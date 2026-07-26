@@ -558,9 +558,10 @@ Missing evidence or behavior:
 
 - paid-provider weight-training execution evidence
 - BetterTogether paid-provider lifecycle completion
-- ordinary model-sampled GRPO learning and usefulness beyond the supported
-  one-update local TRL boundary; the retained controlled external-rollout run
-  proves MPS loss/gradient execution and changed LoRA tensors only
+- general or consistently useful model-sampled GRPO learning. Imp now has a
+  complete 33-step, 66-group local TRL/MPS treatment with validation-selected
+  deployment and fresh-process reproduction, but its one source-disjoint TREC
+  result regressed on held-out accuracy and macro-F1
 - matched Avatar and AvatarOptimizer effectiveness
 - matched BetterTogether and GRPO effectiveness
 

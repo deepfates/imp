@@ -12,6 +12,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @trec_config "examples/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
   @trec_contract "priv/trl_worker/qwen-trec-14-step-contract.json"
   @trec_stopped_result "examples/local_grpo_opaque_banking77/exercised-trec-semantic-v1-stopped-result.json"
+  @trec_source_guided_result "examples/local_grpo_opaque_banking77/exercised-trec-source-guided-v1-result.json"
 
   setup_all do
     output =
@@ -321,6 +322,30 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     assert result["base_test"]["errors"] == 2
     assert result["fresh_selected_arm"] == "base"
     assert result["fresh_byte_identical"]
+  end
+
+  test "source-guided TREC result preserves the selected artifact and honest held-out regression" do
+    result = @trec_source_guided_result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "complete_negative"
+    assert result["training"]["steps"] == 33
+    assert result["training"]["prompt_groups"] == 66
+    assert result["training"]["rollouts_per_group"] == 8
+    assert result["training"]["steps_with_nonuniform_rewards"] == 31
+    assert result["training"]["steps_with_changed_trainable_tensors"] == 33
+    assert result["training"]["selected_validation_step"] == 5
+
+    assert result["selection"]["selected_arm"] == "trained"
+    assert result["selection"]["trained"]["accuracy"] > result["selection"]["base"]["accuracy"]
+
+    test_result = result["held_out_test"]
+    assert test_result["base"]["accuracy"] == 0.25
+    assert test_result["trained"]["accuracy"] == 0.225
+    assert test_result["accuracy_delta"] == -0.025
+    assert test_result["macro_f1_delta"] < 0
+    refute test_result["predeclared_positive_rule_passed"]
+    assert result["fresh_process"]["artifact_identity_matched"]
+    assert result["fresh_process"]["ordered_predictions_and_errors_byte_identical"]
   end
 
   defp restore_env(name, nil), do: System.delete_env(name)
