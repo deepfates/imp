@@ -2,12 +2,63 @@ Code.require_file("contract.exs", __DIR__)
 Code.require_file("two_phase.exs", __DIR__)
 Code.require_file("source_identity.exs", __DIR__)
 Code.require_file("response_evidence.exs", __DIR__)
+Code.require_file("call_budget.exs", __DIR__)
 
 defmodule MatchedTRECImp.Observer do
   def start_link,
-    do: Agent.start_link(fn -> %{phase: nil, messages: [], responses: [], transports: []} end)
+    do:
+      Agent.start_link(fn ->
+        %{phase: nil, messages: [], responses: [], transports: [], call_budgets: %{}}
+      end)
 
   def phase(pid, value), do: Agent.update(pid, &%{&1 | phase: value})
+
+  def register_budget(pid, seed, arm, ceiling) do
+    Agent.update(pid, fn state ->
+      key = {seed, arm}
+
+      if Map.has_key?(state.call_budgets, key),
+        do: raise("duplicate call-budget registration for #{inspect(key)}")
+
+      budget = %{
+        ceiling: ceiling,
+        counts: MatchedInstructionOptimizersTREC.CallBudget.zero(),
+        refusals: []
+      }
+
+      put_in(state, [:call_budgets, key], budget)
+    end)
+  end
+
+  def reserve_call!(pid, seed, arm, role) when role in [:task, :optimizer] do
+    result =
+      Agent.get_and_update(pid, fn state ->
+        key = {seed, arm}
+        budget = Map.fetch!(state.call_budgets, key)
+
+        try do
+          projected =
+            MatchedInstructionOptimizersTREC.CallBudget.reserve!(
+              budget.counts,
+              budget.ceiling,
+              role
+            )
+
+          updated = put_in(state, [:call_budgets, key, :counts], projected)
+          {:ok, updated}
+        rescue
+          error ->
+            refusal = %{role: role, phase: state.phase, error: Exception.message(error)}
+            updated = update_in(state, [:call_budgets, key, :refusals], &(&1 ++ [refusal]))
+            {{:error, Exception.message(error)}, updated}
+        end
+      end)
+
+    case result do
+      :ok -> :ok
+      {:error, message} -> raise "#{arm} #{message}"
+    end
+  end
 
   def message(pid, role, messages) do
     Agent.update(pid, fn state ->
@@ -39,9 +90,10 @@ defmodule MatchedTRECImp.Observer do
 end
 
 defmodule MatchedTRECImp.ObservedLM do
-  defstruct [:inner, :observer, :role]
+  defstruct [:inner, :observer, :role, :seed, :arm]
 
   def generate(lm, messages, opts) do
+    :ok = MatchedTRECImp.Observer.reserve_call!(lm.observer, lm.seed, lm.arm, lm.role)
     MatchedTRECImp.Observer.message(lm.observer, lm.role, messages)
     result = Imp.LM.generate(lm.inner, messages, opts)
     MatchedTRECImp.Observer.response(lm.observer, lm.role, result)
@@ -75,6 +127,7 @@ defmodule MatchedTRECImp.Runner do
     rows = optimization_rows!(manifest)
     meanings = route_meanings!(manifest)
     {:ok, observer} = Observer.start_link()
+    Process.put(:matched_trec_observer, observer)
     telemetry_id = {__MODULE__, self()}
 
     :ok =
@@ -106,7 +159,7 @@ defmodule MatchedTRECImp.Runner do
       completed = evaluate_held_out(sealed, held_out, observer)
 
       result = %{
-        schema_version: 1,
+        schema_version: 2,
         runtime: "imp",
         status: "complete",
         manifest_sha256: manifest["manifest_sha256"],
@@ -116,8 +169,9 @@ defmodule MatchedTRECImp.Runner do
         rendered_messages: Observer.snapshot(observer).messages,
         lm_results: Report.encode_term(Observer.snapshot(observer).responses),
         transport_events: Report.encode_term(Observer.snapshot(observer).transports),
+        call_budgets: Report.encode_term(Observer.snapshot(observer).call_budgets),
         claim_boundary:
-          "task/model-specific matched local evidence; not general parity or effectiveness"
+          "bounded local diagnostic only; not flagship parity, general effectiveness, or BEAM superiority"
       }
 
       atomic_write!(@output, result)
@@ -128,10 +182,11 @@ defmodule MatchedTRECImp.Runner do
   rescue
     error ->
       atomic_write!(@output, %{
-        schema_version: 1,
+        schema_version: 2,
         runtime: "imp",
         status: "stopped",
         source_commits: source_commits_for_stopped_output(),
+        call_budgets: stopped_call_budgets(),
         error: Exception.format(:error, error, __STACKTRACE__)
       })
 
@@ -139,8 +194,13 @@ defmodule MatchedTRECImp.Runner do
   end
 
   defp compile_and_seal({seed, arm}, manifest, rows, meanings, observer) do
-    task_lm = observed(task_lm(manifest), observer, :task)
-    optimizer_lm = observed(optimizer_lm(manifest), observer, :optimizer)
+    before_arm = Observer.snapshot(observer)
+
+    :ok =
+      Observer.register_budget(observer, seed, arm, manifest["execution"]["call_ceilings"][arm])
+
+    task_lm = observed(task_lm(manifest), observer, :task, seed, arm)
+    optimizer_lm = observed(optimizer_lm(manifest), observer, :optimizer, seed, arm)
     baseline = program(task_lm)
     Observer.phase(observer, %{seed: seed, arm: arm, phase: "compile"})
 
@@ -154,8 +214,12 @@ defmodule MatchedTRECImp.Runner do
         seed,
         arm,
         "selection",
-        manifest["models"]["task"]
+        model_contract(manifest, "task")
       )
+
+    after_selection = Observer.snapshot(observer)
+    preheld_counts = enforce_call_ceiling!(arm, before_arm, after_selection, manifest, 40)
+    validate_response_ledger!(before_arm, after_selection, manifest)
 
     score = aggregate(selection)
     artifact_path = artifact_path(seed, arm)
@@ -196,13 +260,14 @@ defmodule MatchedTRECImp.Runner do
       artifact_path: artifact_path,
       artifact_sha256: sha256_file(artifact_path),
       artifact_payload_sha256: artifact["payload_sha256"],
-      task_model: manifest["models"]["task"]
+      task_model: model_contract(manifest, "task"),
+      preheld_call_counts: preheld_counts
     }
   end
 
   defp selection_receipt(manifest, source_commits, sealed) do
     %{
-      schema_version: 1,
+      schema_version: 2,
       runtime: "imp",
       status: "selection_sealed",
       held_out_loaded: false,
@@ -219,6 +284,8 @@ defmodule MatchedTRECImp.Runner do
     |> Enum.map(fn {seed, entries} ->
       arms =
         Enum.map(entries, fn selected ->
+          before_held_out = Observer.snapshot(observer)
+
           rows =
             evaluate(
               selected.program,
@@ -230,10 +297,38 @@ defmodule MatchedTRECImp.Runner do
               selected.task_model
             )
 
+          after_held_out = Observer.snapshot(observer)
+
+          held_out_counts =
+            enforce_call_ceiling!(
+              selected.arm,
+              before_held_out,
+              after_held_out,
+              put_in(manifest, ["execution", "call_ceilings"], %{
+                selected.arm => %{
+                  "task_logical" => 40,
+                  "optimizer_logical" => 0,
+                  "transports" => 40,
+                  "total_logical" => 40
+                }
+              }),
+              0
+            )
+
+          validate_response_ledger!(before_held_out, after_held_out, manifest)
+
+          enforce_combined_ceiling!(
+            selected.arm,
+            selected.preheld_call_counts,
+            held_out_counts,
+            manifest
+          )
+
           selected
           |> Map.drop([:program, :selection_rows])
           |> Map.put(:rows, %{selection: selected.selection_rows, held_out: rows})
           |> Map.put(:held_out, aggregate(rows))
+          |> Map.put(:held_out_call_counts, held_out_counts)
         end)
 
       %{seed: seed, arms: arms}
@@ -270,9 +365,7 @@ defmodule MatchedTRECImp.Runner do
 
     MIPROv2.new(scalar_metric(),
       auto: nil,
-      num_candidates: config["instruction_candidates"],
-      num_instruct_candidates: config["instruction_candidates"],
-      num_fewshot_candidates: config["fewshot_candidates"],
+      num_candidates: config["num_candidates"],
       num_trials: config["trials"],
       minibatch: false,
       max_bootstrapped_demos: 0,
@@ -462,7 +555,7 @@ defmodule MatchedTRECImp.Runner do
 
     %{
       train: split_rows!(manifest["dataset"]["train_path"], splits["train_ids"]),
-      selection: split_rows!(manifest["dataset"]["selection_path"], splits["validation_ids"])
+      selection: split_rows!(manifest["dataset"]["selection_path"], splits["selection_ids"])
     }
   end
 
@@ -511,12 +604,13 @@ defmodule MatchedTRECImp.Runner do
       max_tokens: request["max_tokens"],
       max_retries: 0,
       timeout: 120_000,
+      provider_options: [num_ctx: request["max_input_tokens"]],
       req_http_options: [retry: false, max_retries: 0]
     )
   end
 
-  defp observed(inner, observer, role),
-    do: %ObservedLM{inner: inner, observer: observer, role: role}
+  defp observed(inner, observer, role, seed, arm),
+    do: %ObservedLM{inner: inner, observer: observer, role: role, seed: seed, arm: arm}
 
   defp verify_models!(manifest) do
     models = Req.get!("http://127.0.0.1:11434/api/tags", retry: false).body["models"]
@@ -537,6 +631,93 @@ defmodule MatchedTRECImp.Runner do
     end
   end
 
+  defp model_contract(manifest, role) do
+    Map.put(
+      manifest["models"][role],
+      "max_input_tokens",
+      manifest["execution"]["request"][role]["max_input_tokens"]
+    )
+  end
+
+  defp enforce_call_ceiling!(arm, before, after_snapshot, manifest, reserved_held_out_task) do
+    ceiling = manifest["execution"]["call_ceilings"][arm]
+
+    effective = %{
+      "task_logical" => ceiling["task_logical"] - reserved_held_out_task,
+      "optimizer_logical" => ceiling["optimizer_logical"],
+      "total_logical" => ceiling["total_logical"] - reserved_held_out_task,
+      "transports" => ceiling["transports"] - reserved_held_out_task
+    }
+
+    counts = call_counts(before, after_snapshot)
+
+    unless Enum.all?(effective, fn {key, limit} -> counts[key] <= limit end) and
+             counts["total_logical"] == counts["transports"] and
+             counts["total_logical"] == counts["responses"] do
+      raise "#{arm} exceeded or mismatched logical/transport call ceiling: counts=#{inspect(counts)} ceiling=#{inspect(effective)}"
+    end
+
+    Map.drop(counts, ["responses"])
+  end
+
+  defp enforce_combined_ceiling!(arm, first, second, manifest) do
+    combined = Map.merge(first, second, fn _key, left, right -> left + right end)
+    ceiling = manifest["execution"]["call_ceilings"][arm]
+
+    unless Enum.all?(ceiling, fn {key, limit} -> combined[key] <= limit end) and
+             combined["total_logical"] == combined["transports"] do
+      raise "#{arm} exceeded its complete diagnostic call ceiling: counts=#{inspect(combined)} ceiling=#{inspect(ceiling)}"
+    end
+
+    combined
+  end
+
+  defp call_counts(before, after_snapshot) do
+    messages = Enum.drop(after_snapshot.messages, length(before.messages))
+    responses = Enum.drop(after_snapshot.responses, length(before.responses))
+    transports = Enum.drop(after_snapshot.transports, length(before.transports))
+
+    task = Enum.count(messages, &(&1.role == :task))
+    optimizer = Enum.count(messages, &(&1.role == :optimizer))
+
+    %{
+      "task_logical" => task,
+      "optimizer_logical" => optimizer,
+      "total_logical" => task + optimizer,
+      "responses" => length(responses),
+      "transports" => length(transports)
+    }
+  end
+
+  defp validate_response_ledger!(before, after_snapshot, manifest) do
+    responses = Enum.drop(after_snapshot.responses, length(before.responses))
+    transports = Enum.drop(after_snapshot.transports, length(before.transports))
+
+    unless Enum.all?(transports, &(map_get(&1.metadata, :retry) == false)),
+      do: raise("diagnostic transport ledger contains a retry-enabled attempt")
+
+    Enum.each(responses, fn entry ->
+      response = MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!(entry.result)
+      role = Atom.to_string(entry.role)
+
+      validate_transport_evidence!(
+        %{
+          model: response.model,
+          route: response.route,
+          attempts: 1,
+          retry: false,
+          input_tokens: response.input_tokens,
+          output_tokens: response.output_tokens,
+          finish_reason: response.finish_reason,
+          content: response.content,
+          provider_cost: response.provider_cost
+        },
+        model_contract(manifest, role),
+        "#{role} optimizer/compile response"
+      )
+    end)
+  end
+
   defp validate_transport_evidence!(evidence, expected, context) do
     configured = expected["imp"]
     local_name = String.replace_prefix(configured, "ollama:", "")
@@ -544,6 +725,7 @@ defmodule MatchedTRECImp.Runner do
     unless evidence.model in [configured, local_name] and evidence.route in ["ollama", :ollama] and
              evidence.attempts == 1 and evidence.retry == false and
              is_number(evidence.input_tokens) and
+             evidence.input_tokens <= expected["max_input_tokens"] and
              is_number(evidence.output_tokens) and is_binary(evidence.finish_reason) and
              is_binary(evidence.content) and
              (is_nil(evidence.provider_cost) or
@@ -573,6 +755,15 @@ defmodule MatchedTRECImp.Runner do
     source_commits!(manifest, false)
   rescue
     _error -> %{"imp" => "unavailable", "dspy" => "unavailable", "gepa" => "unavailable"}
+  end
+
+  defp stopped_call_budgets do
+    case Process.get(:matched_trec_observer) do
+      pid when is_pid(pid) -> Report.encode_term(Observer.snapshot(pid).call_budgets)
+      _ -> %{}
+    end
+  rescue
+    _error -> %{}
   end
 
   defp map_get(value, key) when is_map(value) do

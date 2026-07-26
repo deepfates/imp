@@ -1,12 +1,12 @@
 {
-  "schema_version": 1,
-  "campaign_id": "instruction-optimizer-trec-local-flagship-v1",
+  "schema_version": 2,
+  "campaign_id": "instruction-optimizer-trec-local-diagnostic-v2",
   "authorities": {
     "dspy": {
       "repository": "https://github.com/stanfordnlp/dspy",
-      "version": "3.3.0b1",
-      "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
-      "source_manifest": "../../benchmarks/authority_sources/dspy-3.3.0b1-b2829b7.json"
+      "version": "3.2.1",
+      "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+      "source_manifest": "../../benchmarks/authority_sources/dspy-3.2.1-29448ae.json"
     },
     "gepa": {
       "repository": "https://github.com/gepa-ai/gepa",
@@ -23,12 +23,101 @@
     "train_path": "train.jsonl",
     "train_sha256": "d227d28bd89f448e024b94df01b27a1331446cea460865482eed0c60fb3a5fb6",
     "selection_path": "selection.jsonl",
-    "selection_sha256": "04b391ed687201d23169f7e1042dac461adfa8994fdb9f8313506447ae34262f",
+    "selection_sha256": "805c6ddb9e87693adaca3982aa02f24513eddd6859c68999c3f29ffbddc7a611",
     "held_out_path": "held_out.jsonl",
     "held_out_sha256": "0929be018e0c4a5857b19f5349ea1063c202763e7b65a933cb5d9218b884fa4d",
     "provenance_path": "../../benchmarks/data/confidence-calibration-trec-fine.provenance.json",
     "provenance_sha256": "a9abd542b6a22cf2d0a9753651dd4896225a5c9b48ee658bb1dd4777d67b167c",
-    "revision": "eb1e45c1ba990fecca7cf84b67ce845edbcf49bf"
+    "revision": "eb1e45c1ba990fecca7cf84b67ce845edbcf49bf",
+    "splits": {
+      "train_ids": [
+        "trec-fine:calibration:0041",
+        "trec-fine:calibration:0046",
+        "trec-fine:calibration:0059",
+        "trec-fine:calibration:0130",
+        "trec-fine:calibration:0132",
+        "trec-fine:calibration:0135",
+        "trec-fine:calibration:0142",
+        "trec-fine:calibration:0147",
+        "trec-fine:calibration:0148",
+        "trec-fine:calibration:0151",
+        "trec-fine:calibration:0006",
+        "trec-fine:calibration:0018",
+        "trec-fine:calibration:0019",
+        "trec-fine:calibration:0020",
+        "trec-fine:calibration:0023",
+        "trec-fine:calibration:0024",
+        "trec-fine:calibration:0027",
+        "trec-fine:calibration:0036",
+        "trec-fine:calibration:0045",
+        "trec-fine:calibration:0049"
+      ],
+      "selection_ids": [
+        "trec-fine:calibration:0156",
+        "trec-fine:calibration:0158",
+        "trec-fine:calibration:0183",
+        "trec-fine:calibration:0051",
+        "trec-fine:calibration:0065",
+        "trec-fine:calibration:0067",
+        "trec-fine:calibration:0000",
+        "trec-fine:calibration:0003",
+        "trec-fine:calibration:0007",
+        "trec-fine:calibration:0010",
+        "trec-fine:calibration:0021",
+        "trec-fine:calibration:0026",
+        "trec-fine:calibration:0032",
+        "trec-fine:calibration:0070",
+        "trec-fine:calibration:0071",
+        "trec-fine:calibration:0072",
+        "trec-fine:calibration:0076",
+        "trec-fine:calibration:0080",
+        "trec-fine:calibration:0081",
+        "trec-fine:calibration:0082"
+      ],
+      "held_out_ids": [
+        "trec-fine:heldout:0035",
+        "trec-fine:heldout:0039",
+        "trec-fine:heldout:0046",
+        "trec-fine:heldout:0048",
+        "trec-fine:heldout:0054",
+        "trec-fine:heldout:0056",
+        "trec-fine:heldout:0066",
+        "trec-fine:heldout:0071",
+        "trec-fine:heldout:0073",
+        "trec-fine:heldout:0076",
+        "trec-fine:heldout:0084",
+        "trec-fine:heldout:0091",
+        "trec-fine:heldout:0102",
+        "trec-fine:heldout:0108",
+        "trec-fine:heldout:0110",
+        "trec-fine:heldout:0112",
+        "trec-fine:heldout:0113",
+        "trec-fine:heldout:0119",
+        "trec-fine:heldout:0122",
+        "trec-fine:heldout:0125",
+        "trec-fine:heldout:0004",
+        "trec-fine:heldout:0011",
+        "trec-fine:heldout:0016",
+        "trec-fine:heldout:0018",
+        "trec-fine:heldout:0025",
+        "trec-fine:heldout:0027",
+        "trec-fine:heldout:0029",
+        "trec-fine:heldout:0030",
+        "trec-fine:heldout:0034",
+        "trec-fine:heldout:0038",
+        "trec-fine:heldout:0040",
+        "trec-fine:heldout:0043",
+        "trec-fine:heldout:0047",
+        "trec-fine:heldout:0060",
+        "trec-fine:heldout:0074",
+        "trec-fine:heldout:0075",
+        "trec-fine:heldout:0080",
+        "trec-fine:heldout:0082",
+        "trec-fine:heldout:0088",
+        "trec-fine:heldout:0090"
+      ]
+    },
+    "selection_derivation": "retain_v1_six_then_lexicographic_unused_calibration_ids_per_route_to_10_each_no_heldout"
   },
   "models": {
     "task": {
@@ -46,11 +135,17 @@
       "local_size_bytes": 9053114464
     }
   },
-  "seeds": [2026072602, 2026072603, 2026072604],
-  "arms": ["baseline", "gepa", "mipro_v2"],
+  "seeds": [
+    2026072602
+  ],
+  "arms": [
+    "baseline",
+    "gepa",
+    "mipro_v2"
+  ],
   "optimizer": {
     "gepa": {
-      "iterations": 6,
+      "iterations": 1,
       "minibatch_size": 5,
       "candidate_selection": "pareto",
       "module_selection": "round_robin",
@@ -59,14 +154,12 @@
       "use_merge": false
     },
     "mipro_v2": {
-      "instruction_candidates": 3,
-      "fewshot_candidates": 3,
-      "trials": 6,
+      "num_candidates": 2,
+      "trials": 1,
       "minibatch": false,
       "max_bootstrapped_demos": 0,
       "max_labeled_demos": 0,
-      "startup_trials": 10,
-      "bootstrap_task_call_ceiling": 40
+      "startup_trials": 10
     }
   },
   "execution": {
@@ -80,25 +173,84 @@
     "route_guard": "exact_configured_local_model",
     "cost_guard": "local_non_billable_no_external_spend",
     "request": {
-      "task": {"temperature": 0.0, "max_tokens": 64, "max_input_tokens": 4096},
-      "optimizer": {"temperature": 1.0, "max_tokens": 512, "max_input_tokens": 8192}
+      "task": {
+        "temperature": 0,
+        "max_tokens": 64,
+        "max_input_tokens": 4096
+      },
+      "optimizer": {
+        "temperature": 1,
+        "max_tokens": 512,
+        "max_input_tokens": 8192
+      }
+    },
+    "call_ceilings": {
+      "baseline": {
+        "task_logical": 60,
+        "optimizer_logical": 0,
+        "transports": 60,
+        "total_logical": 60
+      },
+      "gepa": {
+        "task_logical": 110,
+        "optimizer_logical": 1,
+        "transports": 111,
+        "total_logical": 111
+      },
+      "mipro_v2": {
+        "task_logical": 100,
+        "optimizer_logical": 14,
+        "transports": 114,
+        "total_logical": 114
+      }
     }
   },
   "output_contract": {
     "field": "route",
-    "routes": ["K11", "K47"],
+    "routes": [
+      "K11",
+      "K47"
+    ],
     "envelope": "dspy_chat_marker_sections",
     "additional_properties": false,
     "normalization": "none"
   },
   "metrics": {
-    "selection": ["accuracy", "macro_f1"],
-    "held_out": ["accuracy", "macro_f1", "parse_errors"],
-    "uncertainty": "paired_seed_deltas_with_all_seeds"
+    "selection": [
+      "accuracy",
+      "macro_f1"
+    ],
+    "held_out": [
+      "accuracy",
+      "macro_f1",
+      "parse_errors"
+    ],
+    "uncertainty": "paired_seed_delta_with_exact_observed_range_not_confidence_interval"
   },
   "accounting": {
-    "per_row": ["source_id", "expected", "raw_response", "parsed_route", "correct", "input_tokens", "output_tokens", "wall_seconds", "error", "actual_model", "actual_route", "transport_attempts", "cost"],
-    "fail_closed": ["model", "route", "cost", "transport_attempt", "parser", "budget"]
+    "per_row": [
+      "source_id",
+      "expected",
+      "raw_response",
+      "parsed_route",
+      "correct",
+      "input_tokens",
+      "output_tokens",
+      "wall_seconds",
+      "error",
+      "actual_model",
+      "actual_route",
+      "transport_attempts",
+      "cost"
+    ],
+    "fail_closed": [
+      "model",
+      "route",
+      "cost",
+      "transport_attempt",
+      "parser",
+      "budget"
+    ]
   },
   "capture": {
     "rendered_messages": true,
@@ -111,7 +263,8 @@
   },
   "source_commits": {
     "imp": "resolved from clean launch git_sha",
-    "dspy": "https://github.com/stanfordnlp/dspy@b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+    "dspy": "https://github.com/stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
     "gepa": "https://github.com/gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
-  }
+  },
+  "intent": "bounded_local_diagnostic_not_flagship_parity_or_effectiveness"
 }

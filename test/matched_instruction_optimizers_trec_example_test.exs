@@ -21,19 +21,36 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     Path.expand("../examples/matched_instruction_optimizers_trec", __DIR__)
   )
 
+  Code.require_file(
+    "call_budget.exs",
+    Path.expand("../examples/matched_instruction_optimizers_trec", __DIR__)
+  )
+
+  Code.require_file(
+    "aggregate.exs",
+    Path.expand("../examples/matched_instruction_optimizers_trec", __DIR__)
+  )
+
   alias MatchedInstructionOptimizersTREC.Contract
   alias MatchedInstructionOptimizersTREC.TwoPhase
   alias MatchedInstructionOptimizersTREC.SourceIdentity
+  alias MatchedInstructionOptimizersTREC.CallBudget
+  alias MatchedInstructionOptimizersTREC.Aggregator
 
   @manifest "examples/matched_instruction_optimizers_trec/contract.json"
 
   test "freezes exact authorities, dataset IDs, models, and runtime request controls" do
     manifest = Contract.load!(@manifest)
 
-    assert manifest["seeds"] == [2_026_072_602, 2_026_072_603, 2_026_072_604]
+    assert manifest["seeds"] == [2_026_072_602]
+    assert get_in(manifest, ["authorities", "dspy", "version"]) == "3.2.1"
+
+    assert get_in(manifest, ["authorities", "dspy", "commit"]) ==
+             "29448ae12756abdd14bd8796c819247ebb83673c"
+
     assert manifest["arms"] == ~w(baseline gepa mipro_v2)
     assert length(manifest["dataset"]["splits"]["train_ids"]) == 20
-    assert length(manifest["dataset"]["splits"]["validation_ids"]) == 6
+    assert length(manifest["dataset"]["splits"]["selection_ids"]) == 20
     assert length(manifest["dataset"]["splits"]["held_out_ids"]) == 40
 
     assert manifest["models"]["task"]["digest"] ==
@@ -78,17 +95,17 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert plan["downloads"] == 0
 
     assert plan["per_seed_per_runtime"] == %{
-             "baseline" => %{"task_calls" => 46, "optimizer_calls" => 0, "total_calls" => 46},
-             "gepa" => %{"task_calls" => 148, "optimizer_calls" => 6, "total_calls" => 154},
-             "mipro_v2" => %{"task_calls" => 128, "optimizer_calls" => 3, "total_calls" => 131}
+             "baseline" => %{"task_calls" => 60, "optimizer_calls" => 0, "total_calls" => 60},
+             "gepa" => %{"task_calls" => 110, "optimizer_calls" => 1, "total_calls" => 111},
+             "mipro_v2" => %{"task_calls" => 100, "optimizer_calls" => 14, "total_calls" => 114}
            }
 
     assert plan["worst_case"] == %{
-             "task_calls" => 1932,
-             "optimizer_calls" => 54,
-             "total_calls" => 1986,
-             "input_tokens" => 8_355_840,
-             "output_tokens" => 151_296,
+             "task_calls" => 540,
+             "optimizer_calls" => 30,
+             "total_calls" => 570,
+             "input_tokens" => 2_457_600,
+             "output_tokens" => 49_920,
              "usd" => 0.0
            }
 
@@ -99,6 +116,124 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     assert get_in(plan, ["runtime_configs", "imp", "arm_call_ceilings"]) ==
              get_in(plan, ["runtime_configs", "upstream", "arm_call_ceilings"])
+  end
+
+  test "role-aware budget refuses before a dispatch can exceed any ceiling" do
+    ceiling = %{
+      "task_logical" => 1,
+      "optimizer_logical" => 1,
+      "total_logical" => 2,
+      "transports" => 2
+    }
+
+    counts = CallBudget.zero() |> CallBudget.reserve!(ceiling, :task)
+
+    assert counts == %{
+             "task_logical" => 1,
+             "optimizer_logical" => 0,
+             "total_logical" => 1,
+             "transports" => 1
+           }
+
+    assert_raise RuntimeError, ~r/refused task before dispatch/, fn ->
+      CallBudget.reserve!(counts, ceiling, :task)
+    end
+
+    assert CallBudget.reserve!(counts, ceiling, :optimizer)["total_logical"] == 2
+  end
+
+  test "MIPRO uses its source-correct public num_candidates option" do
+    optimizer =
+      Imp.Optimizer.MIPROv2.new(fn _example, _prediction -> 0.0 end,
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 1
+      )
+
+    assert optimizer.config.num_candidates == 2
+
+    assert_raise ArgumentError, ~r/unknown MIPROv2 options/, fn ->
+      Imp.Optimizer.MIPROv2.new(fn _example, _prediction -> 0.0 end,
+        num_instruct_candidates: 2
+      )
+    end
+  end
+
+  test "upstream no-model boundary regressions pass" do
+    script =
+      Path.expand("../examples/matched_instruction_optimizers_trec/no_model_test.py", __DIR__)
+
+    assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
+    assert output =~ "Ran 4 tests"
+  end
+
+  test "shared aggregator recomputes rows and labels the one-seed paired range honestly" do
+    manifest = Contract.load!(@manifest)
+
+    root =
+      Path.join(System.tmp_dir!(), "imp-matched-aggregate-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    selection = perfect_rows("examples/matched_instruction_optimizers_trec/selection.jsonl")
+    held_out = perfect_rows("examples/matched_instruction_optimizers_trec/held_out.jsonl")
+
+    summary = fn rows ->
+      %{"accuracy" => 1.0, "macro_f1" => 1.0, "parse_errors" => 0, "count" => length(rows)}
+    end
+
+    result = fn runtime ->
+      %{
+        "schema_version" => 2,
+        "runtime" => runtime,
+        "status" => "complete",
+        "manifest_sha256" => manifest["manifest_sha256"],
+        "source_commits" => %{"imp" => "i", "dspy" => "d", "gepa" => "g"},
+        "seeds" => [
+          %{
+            "seed" => hd(manifest["seeds"]),
+            "arms" =>
+              Enum.map(~w(baseline gepa mipro_v2), fn arm ->
+                %{
+                  "arm" => arm,
+                  "selection" => summary.(selection),
+                  "held_out" => summary.(held_out),
+                  "rows" => %{"selection" => selection, "held_out" => held_out}
+                }
+              end)
+          }
+        ]
+      }
+    end
+
+    imp_path = Path.join(root, "imp.json")
+    upstream_path = Path.join(root, "upstream.json")
+    File.write!(imp_path, Jason.encode!(result.("imp")))
+    File.write!(upstream_path, Jason.encode!(result.("upstream")))
+
+    aggregate = Aggregator.aggregate!(@manifest, imp_path, upstream_path)
+
+    assert get_in(aggregate, ["within_runtime", "imp", "gepa", "held_out", "accuracy"]) == %{
+             "paired_deltas" => [0.0],
+             "mean" => 0.0,
+             "exact_observed_range" => [0.0, 0.0]
+           }
+
+    refute aggregate["uncertainty"]["is_confidence_interval"]
+
+    tampered =
+      put_in(
+        result.("upstream"),
+        ["seeds", Access.at(0), "arms", Access.at(0), "held_out", "accuracy"],
+        0.5
+      )
+
+    File.write!(upstream_path, Jason.encode!(tampered))
+
+    assert_raise ArgumentError, ~r/held_out summary does not match scored rows/, fn ->
+      Aggregator.aggregate!(@manifest, imp_path, upstream_path)
+    end
   end
 
   test "source, model, and request drift fail closed before a plan exists" do
@@ -232,5 +367,22 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     assert %{finish_reason: "stop", provider_cost: 0} =
              MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
+  end
+
+  defp perfect_rows(path) do
+    path
+    |> File.stream!()
+    |> Enum.map(fn line ->
+      row = Jason.decode!(line)
+      expected = if String.starts_with?(row["label"], "DESC:"), do: "K11", else: "K47"
+
+      %{
+        "source_id" => row["id"],
+        "expected" => expected,
+        "parsed_route" => expected,
+        "correct" => true,
+        "error" => nil
+      }
+    end)
   end
 end

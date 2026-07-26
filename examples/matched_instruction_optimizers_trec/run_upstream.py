@@ -33,6 +33,7 @@ OUTPUT = Path(
 )
 SELECTION_OUTPUT = Path(str(OUTPUT) + ".selection-sealed.json")
 ID_RE = re.compile(rb'"id"\s*:\s*"([^"]+)"')
+ACTIVE_CAPTURE: "Capture | None" = None
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -115,6 +116,25 @@ def resolve(relative: str) -> Path:
 def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
     manifest = json.loads(MANIFEST_PATH.read_text())
     manifest["manifest_sha256"] = sha256_file(MANIFEST_PATH)
+    if manifest.get("schema_version") != 2 or manifest.get("intent") != "bounded_local_diagnostic_not_flagship_parity_or_effectiveness":
+        raise RuntimeError("diagnostic manifest schema/intent drift")
+    if manifest.get("seeds") != [2026072602] or manifest.get("arms") != ["baseline", "gepa", "mipro_v2"]:
+        raise RuntimeError("diagnostic seed/arm contract drift")
+    expected_ceilings = {
+        "baseline": {"task_logical": 60, "optimizer_logical": 0, "transports": 60, "total_logical": 60},
+        "gepa": {"task_logical": 110, "optimizer_logical": 1, "transports": 111, "total_logical": 111},
+        "mipro_v2": {"task_logical": 100, "optimizer_logical": 14, "transports": 114, "total_logical": 114},
+    }
+    if manifest.get("execution", {}).get("call_ceilings") != expected_ceilings:
+        raise RuntimeError("diagnostic call-ceiling contract drift")
+    if manifest.get("optimizer", {}).get("mipro_v2", {}).get("num_candidates") != 2:
+        raise RuntimeError("MIPRO public num_candidates contract drift")
+    splits = manifest.get("dataset", {}).get("splits", {})
+    if [len(splits.get(name, [])) for name in ("train_ids", "selection_ids", "held_out_ids")] != [20, 20, 40]:
+        raise RuntimeError("diagnostic split-size contract drift")
+    all_ids = splits["train_ids"] + splits["selection_ids"] + splits["held_out_ids"]
+    if len(set(all_ids)) != 80:
+        raise RuntimeError("diagnostic splits overlap")
     manifest["dataset"]["data_path"] = str(resolve(manifest["dataset"]["data_path"]))
     manifest["dataset"]["contract_path"] = str(resolve(manifest["dataset"]["contract_path"]))
     manifest["dataset"]["train_path"] = str(resolve(manifest["dataset"]["train_path"]))
@@ -144,7 +164,6 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
     for split in ("train", "selection"):
         if sha256_file(Path(dataset[f"{split}_path"])) != dataset[f"{split}_sha256"]:
             raise RuntimeError(f"TREC {split} split drift")
-    manifest["dataset"]["splits"] = json.loads(Path(dataset["contract_path"]).read_text())["splits"]
     return manifest
 
 
@@ -186,9 +205,49 @@ class Capture:
     def __init__(self) -> None:
         self.phase: dict[str, Any] | None = None
         self.calls: list[dict[str, Any]] = []
+        self.call_budgets: dict[str, dict[str, Any]] = {}
 
     def set_phase(self, seed: int, arm: str, phase: str) -> None:
         self.phase = {"seed": seed, "arm": arm, "phase": phase}
+
+    def register_budget(self, seed: int, arm: str, ceiling: dict[str, int]) -> None:
+        key = f"{seed}:{arm}"
+        if key in self.call_budgets:
+            raise RuntimeError(f"duplicate call-budget registration for {key}")
+        self.call_budgets[key] = {
+            "ceiling": copy.deepcopy(ceiling),
+            "counts": {
+                "task_logical": 0,
+                "optimizer_logical": 0,
+                "total_logical": 0,
+                "transports": 0,
+            },
+            "refusals": [],
+        }
+
+    def reserve(self, role: str) -> None:
+        if self.phase is None:
+            raise RuntimeError("LM dispatch lacks an active phase")
+        key = f"{self.phase['seed']}:{self.phase['arm']}"
+        budget = self.call_budgets[key]
+        projected = dict(budget["counts"])
+        projected[f"{role}_logical"] += 1
+        projected["total_logical"] += 1
+        projected["transports"] += 1
+        for name, count in projected.items():
+            if count > budget["ceiling"][name]:
+                budget["refusals"].append(
+                    {
+                        "role": role,
+                        "phase": copy.deepcopy(self.phase),
+                        "error": f"{name}={count} ceiling={budget['ceiling'][name]}",
+                    }
+                )
+                raise RuntimeError(
+                    f"{self.phase['arm']} call budget refused {role} before dispatch: "
+                    f"{name}={count} ceiling={budget['ceiling'][name]}"
+                )
+        budget["counts"] = projected
 
 
 def install_runtime(args: argparse.Namespace):
@@ -202,39 +261,62 @@ def install_runtime(args: argparse.Namespace):
             self.capture = capture
             self.role = role
 
+        def __deepcopy__(self, memo):
+            # DSPy copies both task programs and rollout LMs. The LM configuration
+            # may be copied, but accounting ownership must remain the one shared
+            # process ledger or optimizer calls would escape the pre-dispatch cap.
+            duplicate = type(self).__new__(type(self))
+            memo[id(self)] = duplicate
+            for name, value in self.__dict__.items():
+                setattr(
+                    duplicate,
+                    name,
+                    value if name == "capture" else copy.deepcopy(value, memo),
+                )
+            return duplicate
+
         def forward(self, prompt=None, messages=None, **kwargs):
+            self.capture.reserve(self.role)
             started = time.monotonic()
-            response = super().forward(prompt=prompt, messages=messages, **kwargs)
-            usage = field(response, "usage")
-            choices = field(response, "choices") or []
-            choice = choices[0] if choices else None
-            message = field(choice, "message")
-            hidden = getattr(response, "_hidden_params", {}) or {}
-            self.capture.calls.append(
-                {
-                    "phase": copy.deepcopy(self.capture.phase),
-                    "role": self.role,
-                    "prompt": prompt,
-                    "messages": copy.deepcopy(messages),
-                    "raw_response": {
-                        "response": json_safe(response),
-                        "provider_metadata": json_safe(hidden),
-                    },
-                    "response_metadata": {
-                        "model": field(response, "model"),
-                        "provider": field(hidden, "custom_llm_provider"),
-                        "input_tokens": field(usage, "prompt_tokens"),
-                        "output_tokens": field(usage, "completion_tokens"),
-                        "finish_reason": field(choice, "finish_reason"),
-                        "content": field(message, "content"),
-                        "provider_cost": field(hidden, "response_cost"),
-                    },
-                    # This is an observed dispatch through this exact adapter boundary.
-                    "adapter_transport_dispatch": 1,
-                    "wall_seconds": time.monotonic() - started,
-                }
-            )
-            return response
+            response = None
+            error = None
+            try:
+                response = super().forward(prompt=prompt, messages=messages, **kwargs)
+                return response
+            except Exception as exc:
+                error = {"type": type(exc).__name__, "message": str(exc)}
+                raise
+            finally:
+                usage = field(response, "usage")
+                choices = field(response, "choices") or []
+                choice = choices[0] if choices else None
+                message = field(choice, "message")
+                hidden = getattr(response, "_hidden_params", {}) or {}
+                self.capture.calls.append(
+                    {
+                        "phase": copy.deepcopy(self.capture.phase),
+                        "role": self.role,
+                        "prompt": prompt,
+                        "messages": copy.deepcopy(messages),
+                        "raw_response": {
+                            "response": json_safe(response),
+                            "provider_metadata": json_safe(hidden),
+                        },
+                        "response_metadata": {
+                            "model": field(response, "model"),
+                            "provider": field(hidden, "custom_llm_provider"),
+                            "input_tokens": field(usage, "prompt_tokens"),
+                            "output_tokens": field(usage, "completion_tokens"),
+                            "finish_reason": field(choice, "finish_reason"),
+                            "content": field(message, "content"),
+                            "provider_cost": field(hidden, "response_cost"),
+                        },
+                        "error": error,
+                        # One forward with num_retries=0 is one adapter transport dispatch.
+                        "adapter_transport_dispatch": 1,
+                        "wall_seconds": time.monotonic() - started,
+                    }
+                )
 
     return dspy, RecordingLM
 
@@ -257,7 +339,7 @@ def transport_evidence(call: dict[str, Any], expected: dict[str, Any]) -> dict[s
     route_ok = evidence["actual_route"] == "ollama"
     tokens_ok = isinstance(evidence["input_tokens"], (int, float)) and isinstance(
         evidence["output_tokens"], (int, float)
-    )
+    ) and evidence["input_tokens"] <= expected["max_input_tokens"]
     if not (
         model_ok
         and route_ok
@@ -275,6 +357,46 @@ def transport_evidence(call: dict[str, Any], expected: dict[str, Any]) -> dict[s
         else {"value": None, "authority": "local_ollama_no_billing", "external_api_spend": 0}
     )
     return evidence
+
+
+def model_contract(manifest: dict[str, Any], role: str) -> dict[str, Any]:
+    return {
+        **manifest["models"][role],
+        "max_input_tokens": manifest["execution"]["request"][role]["max_input_tokens"],
+    }
+
+
+def call_counts(calls: list[dict[str, Any]]) -> dict[str, int]:
+    task = sum(call["role"] == "task" for call in calls)
+    optimizer = sum(call["role"] == "optimizer" for call in calls)
+    return {
+        "task_logical": task,
+        "optimizer_logical": optimizer,
+        "total_logical": task + optimizer,
+        "transports": sum(call["adapter_transport_dispatch"] for call in calls),
+    }
+
+
+def validate_call_slice(calls: list[dict[str, Any]], arm: str, manifest: dict[str, Any],
+                        reserved_held_out_task: int) -> dict[str, int]:
+    ceiling = dict(manifest["execution"]["call_ceilings"][arm])
+    for key in ("task_logical", "total_logical", "transports"):
+        ceiling[key] -= reserved_held_out_task
+    counts = call_counts(calls)
+    if any(counts[key] > limit for key, limit in ceiling.items()) or counts["total_logical"] != counts["transports"]:
+        raise RuntimeError(f"{arm} exceeded or mismatched call ceiling: counts={counts!r} ceiling={ceiling!r}")
+    for call in calls:
+        transport_evidence(call, model_contract(manifest, call["role"]))
+    return counts
+
+
+def validate_combined_ceiling(arm: str, first: dict[str, int], second: dict[str, int],
+                              manifest: dict[str, Any]) -> dict[str, int]:
+    combined = {key: first[key] + second[key] for key in first}
+    ceiling = manifest["execution"]["call_ceilings"][arm]
+    if any(combined[key] > limit for key, limit in ceiling.items()) or combined["total_logical"] != combined["transports"]:
+        raise RuntimeError(f"{arm} exceeded complete call ceiling: counts={combined!r} ceiling={ceiling!r}")
+    return combined
 
 
 def route_meanings(manifest: dict[str, Any]) -> dict[str, str]:
@@ -357,7 +479,7 @@ def compile_arm(dspy: Any, arm: str, program: Any, train: list[Any], selection: 
             prompt_model=optimizer_lm,
             task_model=task_lm,
             auto=None,
-            num_candidates=mipro["instruction_candidates"],
+            num_candidates=mipro["num_candidates"],
             max_bootstrapped_demos=0,
             max_labeled_demos=0,
             num_threads=1,
@@ -395,7 +517,11 @@ def evaluate(program: Any, rows: list[dict[str, str]], task_lm: Any, capture: Ca
             raise RuntimeError(f"{row['id']} used {len(calls)} task adapter transports, expected one")
         evidence = transport_evidence(calls[0], expected_model)
         if actual not in ("K11", "K47"):
-            raise RuntimeError(f"{row['id']} failed strict route parsing: {actual!r}; error={error!r}")
+            error = error or {
+                "type": "typed_parse_failure",
+                "message": f"strict ChatAdapter route was not K11 or K47: {actual!r}",
+            }
+            actual = None
         output.append(
             {
                 "source_id": row["id"],
@@ -438,9 +564,10 @@ def parameter_snapshot(program: Any) -> list[dict[str, Any]]:
     ]
 
 
-def seal(seed: int, arm: str, program: Any, selection_rows: list[dict[str, Any]], manifest: dict[str, Any]) -> dict[str, Any]:
+def seal(seed: int, arm: str, program: Any, selection_rows: list[dict[str, Any]], manifest: dict[str, Any],
+         preheld_call_counts: dict[str, int]) -> dict[str, Any]:
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "runtime": "upstream",
         "seed": seed,
         "arm": arm,
@@ -449,6 +576,7 @@ def seal(seed: int, arm: str, program: Any, selection_rows: list[dict[str, Any]]
         "selection": aggregate(selection_rows),
         "selection_rows": selection_rows,
         "selected_parameters": parameter_snapshot(program),
+        "preheld_call_counts": preheld_call_counts,
     }
     payload["payload_sha256"] = sha256_bytes(
         json.dumps(json_safe(payload), sort_keys=True, separators=(",", ":")).encode()
@@ -459,6 +587,7 @@ def seal(seed: int, arm: str, program: Any, selection_rows: list[dict[str, Any]]
 
 
 def run(args: argparse.Namespace) -> None:
+    global ACTIVE_CAPTURE
     manifest = load_manifest(args)
     commits = source_commits(manifest)
     verify_clean_imp_tree()
@@ -466,11 +595,12 @@ def run(args: argparse.Namespace) -> None:
     dspy, RecordingLM = install_runtime(args)
     dspy.configure(adapter=dspy.ChatAdapter(use_json_adapter_fallback=False))
     capture = Capture()
+    ACTIVE_CAPTURE = capture
     request = manifest["execution"]["request"]
     splits = manifest["dataset"]["splits"]
     train_rows = stream_rows(Path(manifest["dataset"]["train_path"]), splits["train_ids"])
     selection_source = stream_rows(
-        Path(manifest["dataset"]["selection_path"]), splits["validation_ids"]
+        Path(manifest["dataset"]["selection_path"]), splits["selection_ids"]
     )
     meanings = route_meanings(manifest)
     metric = semantic_metric(meanings)
@@ -478,15 +608,19 @@ def run(args: argparse.Namespace) -> None:
 
     for seed in manifest["seeds"]:
         for arm in manifest["arms"]:
+            capture.register_budget(seed, arm, manifest["execution"]["call_ceilings"][arm])
+            before_arm = len(capture.calls)
             task_lm = RecordingLM(
                 manifest["models"]["task"]["upstream"], api_base="http://127.0.0.1:11434",
                 api_key="", cache=False, num_retries=0, capture=capture, role="task",
-                temperature=request["task"]["temperature"], max_tokens=request["task"]["max_tokens"]
+                temperature=request["task"]["temperature"], max_tokens=request["task"]["max_tokens"],
+                num_ctx=request["task"]["max_input_tokens"]
             )
             optimizer_lm = RecordingLM(
                 manifest["models"]["optimizer"]["upstream"], api_base="http://127.0.0.1:11434",
                 api_key="", cache=False, num_retries=0, capture=capture, role="optimizer",
-                temperature=request["optimizer"]["temperature"], max_tokens=request["optimizer"]["max_tokens"]
+                temperature=request["optimizer"]["temperature"], max_tokens=request["optimizer"]["max_tokens"],
+                num_ctx=request["optimizer"]["max_input_tokens"]
             )
             program = build_program(dspy, task_lm)
             capture.set_phase(seed, arm, "compile")
@@ -495,14 +629,21 @@ def run(args: argparse.Namespace) -> None:
                 examples(dspy, selection_source, False), seed, task_lm, optimizer_lm, metric, manifest
             )
             capture.set_phase(seed, arm, "selection")
-            selected_rows = evaluate(selected, selection_source, task_lm, capture, manifest["models"]["task"])
-            sealed.append(seal(seed, arm, selected, selected_rows, manifest))
+            selected_rows = evaluate(
+                selected, selection_source, task_lm, capture, model_contract(manifest, "task")
+            )
+            preheld_call_counts = validate_call_slice(
+                capture.calls[before_arm:], arm, manifest, reserved_held_out_task=40
+            )
+            sealed.append(
+                seal(seed, arm, selected, selected_rows, manifest, preheld_call_counts)
+            )
 
     # Durably record every selected artifact before the held-out loader exists.
     atomic_write(
         SELECTION_OUTPUT,
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "runtime": "upstream",
             "status": "selection_sealed",
             "held_out_loaded": False,
@@ -518,17 +659,39 @@ def run(args: argparse.Namespace) -> None:
     completed = []
     for selected in sealed:
         capture.set_phase(selected["seed"], selected["arm"], "held_out")
-        rows = evaluate(selected["program"], held_out, None, capture, manifest["models"]["task"])
+        before_held = len(capture.calls)
+        rows = evaluate(
+            selected["program"], held_out, None, capture, model_contract(manifest, "task")
+        )
+        held_calls = capture.calls[before_held:]
+        held_counts = call_counts(held_calls)
+        expected_held = {
+            "task_logical": 40,
+            "optimizer_logical": 0,
+            "total_logical": 40,
+            "transports": 40,
+        }
+        if held_counts != expected_held:
+            raise RuntimeError(
+                f"{selected['arm']} held-out call accounting drift: "
+                f"counts={held_counts!r} expected={expected_held!r}"
+            )
+        for call in held_calls:
+            transport_evidence(call, model_contract(manifest, call["role"]))
+        validate_combined_ceiling(
+            selected["arm"], selected["preheld_call_counts"], held_counts, manifest
+        )
         public = {key: value for key, value in selected.items() if key != "program"}
         public["held_out"] = aggregate(rows)
         public["rows"] = {"selection": selected["selection_rows"], "held_out": rows}
+        public["held_out_call_counts"] = held_counts
         completed.append(public)
 
     by_seed = []
     for seed in manifest["seeds"]:
         by_seed.append({"seed": seed, "arms": [row for row in completed if row["seed"] == seed]})
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "runtime": "upstream",
         "status": "complete",
         "manifest_sha256": manifest["manifest_sha256"],
@@ -536,7 +699,8 @@ def run(args: argparse.Namespace) -> None:
         "selection_receipt": str(SELECTION_OUTPUT),
         "seeds": by_seed,
         "calls": capture.calls,
-        "claim_boundary": "task/model-specific matched local evidence; not general parity or effectiveness",
+        "call_budgets": capture.call_budgets,
+        "claim_boundary": "bounded local diagnostic only; not flagship parity, general effectiveness, or BEAM superiority",
     }
     atomic_write(OUTPUT, result)
     print(json.dumps(json_safe(result), indent=2, sort_keys=True))
@@ -557,8 +721,10 @@ def main() -> None:
             commits = {"imp": "unavailable", "dspy": "unavailable", "gepa": "unavailable"}
         atomic_write(
             OUTPUT,
-            {"schema_version": 1, "runtime": "upstream", "status": "stopped",
-             "source_commits": commits, "error": repr(exc)},
+            {"schema_version": 2, "runtime": "upstream", "status": "stopped",
+             "source_commits": commits,
+             "call_budgets": ACTIVE_CAPTURE.call_budgets if ACTIVE_CAPTURE else {},
+             "error": repr(exc)},
         )
         raise
 

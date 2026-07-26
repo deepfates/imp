@@ -1,7 +1,7 @@
 defmodule MatchedInstructionOptimizersTREC.Contract do
   @moduledoc false
 
-  @schema_version 1
+  @schema_version 2
   @runtime_count 2
   @runtimes ~w(imp upstream)
   @arms ~w(baseline gepa mipro_v2)
@@ -20,7 +20,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
       reraise ArgumentError,
               [
                 message:
-                  "invalid instruction-optimizer flagship manifest: #{Exception.message(error)}"
+                  "invalid instruction-optimizer diagnostic manifest: #{Exception.message(error)}"
               ],
               __STACKTRACE__
   end
@@ -44,12 +44,18 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
        when is_map(manifest) and is_binary(path) and held_out_mode in [:all, :defer_held_out] do
     exact_keys!(
       manifest,
-      ~w(schema_version campaign_id authorities dataset models seeds arms optimizer execution output_contract metrics accounting capture source_commits),
+      ~w(schema_version campaign_id intent authorities dataset models seeds arms optimizer execution output_contract metrics accounting capture source_commits),
       "manifest"
     )
 
-    require!(manifest["schema_version"] == @schema_version, "schema_version must be 1")
+    require!(manifest["schema_version"] == @schema_version, "schema_version must be 2")
     require_string!(manifest["campaign_id"], "campaign_id")
+
+    require!(
+      manifest["intent"] == "bounded_local_diagnostic_not_flagship_parity_or_effectiveness",
+      "diagnostic intent drift"
+    )
+
     validate_authorities!(manifest["authorities"], Path.dirname(path))
     dataset = validate_dataset!(manifest["dataset"], Path.dirname(path), held_out_mode)
     validate_models!(manifest["models"])
@@ -72,31 +78,12 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
   def plan!(path) do
     manifest = load!(path)
     counts = split_counts(manifest)
-    optimizer = manifest["optimizer"]
 
-    baseline_task = counts.selection + counts.held_out
-
-    gepa_task =
-      counts.selection +
-        optimizer["gepa"]["iterations"] *
-          (2 * optimizer["gepa"]["minibatch_size"] + counts.selection) +
-        counts.selection + counts.held_out
-
-    gepa_optimizer = optimizer["gepa"]["iterations"]
-
-    mipro_task =
-      optimizer["mipro_v2"]["bootstrap_task_call_ceiling"] +
-        counts.selection +
-        optimizer["mipro_v2"]["trials"] * counts.selection +
-        counts.selection + counts.held_out
-
-    mipro_optimizer = optimizer["mipro_v2"]["instruction_candidates"]
-
-    per_seed_runtime = %{
-      "baseline" => call_row(baseline_task, 0),
-      "gepa" => call_row(gepa_task, gepa_optimizer),
-      "mipro_v2" => call_row(mipro_task, mipro_optimizer)
-    }
+    per_seed_runtime =
+      Map.new(@arms, fn arm ->
+        ceiling = manifest["execution"]["call_ceilings"][arm]
+        {arm, call_row(ceiling["task_logical"], ceiling["optimizer_logical"])}
+      end)
 
     calls_per_seed_runtime =
       per_seed_runtime |> Map.values() |> Enum.map(& &1["total_calls"]) |> Enum.sum()
@@ -116,8 +103,8 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     request = manifest["execution"]["request"]
 
     %{
-      "schema_version" => 1,
-      "kind" => "matched_local_instruction_optimizer_flagship_plan",
+      "schema_version" => 2,
+      "kind" => "matched_local_instruction_optimizer_diagnostic_plan",
       "campaign_id" => manifest["campaign_id"],
       "manifest_sha256" => manifest["manifest_sha256"],
       "network_calls" => 0,
@@ -146,7 +133,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
       },
       "runtime_configs" => runtime_configs(manifest, per_seed_runtime),
       "claim_boundary" =>
-        "matched local multi-seed held-out comparison; adapter renderings are retained and compared but never normalized"
+        "bounded local diagnostic only; not flagship parity, general effectiveness, or BEAM superiority"
     }
   end
 
@@ -181,8 +168,8 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
 
     validate_authority!(
       value["dspy"],
-      "3.3.0b1",
-      "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+      "3.2.1",
+      "29448ae12756abdd14bd8796c819247ebb83673c",
       "authorities.dspy",
       base
     )
@@ -209,7 +196,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
   defp validate_dataset!(value, base, held_out_mode) do
     exact_keys!(
       value,
-      ~w(contract_path contract_sha256 data_path data_sha256 train_path train_sha256 selection_path selection_sha256 held_out_path held_out_sha256 provenance_path provenance_sha256 revision),
+      ~w(contract_path contract_sha256 data_path data_sha256 train_path train_sha256 selection_path selection_sha256 held_out_path held_out_sha256 provenance_path provenance_sha256 revision splits selection_derivation),
       "dataset"
     )
 
@@ -253,13 +240,13 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
 
     contract = contract_path |> File.read!() |> Jason.decode!()
     rows = if held_out_mode == :all, do: load_rows!(data_path), else: %{}
-    ids = contract["splits"]
-    exact_keys!(ids, ~w(train_ids validation_ids held_out_ids), "dataset contract splits")
-    all_ids = ids["train_ids"] ++ ids["validation_ids"] ++ ids["held_out_ids"]
+    ids = value["splits"]
+    exact_keys!(ids, ~w(train_ids selection_ids held_out_ids), "diagnostic dataset splits")
+    all_ids = ids["train_ids"] ++ ids["selection_ids"] ++ ids["held_out_ids"]
 
     require!(
-      length(all_ids) == 66 and length(Enum.uniq(all_ids)) == 66,
-      "dataset split IDs must be 20/6/40 and disjoint"
+      length(all_ids) == 80 and length(Enum.uniq(all_ids)) == 80,
+      "dataset split IDs must be 20/20/40 and disjoint"
     )
 
     if held_out_mode == :all do
@@ -271,10 +258,16 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
 
     require!(contract["source"]["revision"] == value["revision"], "dataset revision drift")
 
+    require!(
+      value["selection_derivation"] ==
+        "retain_v1_six_then_lexicographic_unused_calibration_ids_per_route_to_10_each_no_heldout",
+      "selection derivation drift"
+    )
+
     split_specs =
       [
         {"train", train_path, ids["train_ids"]},
-        {"selection", selection_path, ids["validation_ids"]}
+        {"selection", selection_path, ids["selection_ids"]}
       ] ++
         if(held_out_mode == :all,
           do: [{"held_out", held_out_path, ids["held_out_ids"]}],
@@ -297,6 +290,13 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
           "dataset #{label} file content drift from pinned source"
         )
       end
+    end
+
+    if held_out_mode == :all do
+      validate_route_balance!(rows, ids["train_ids"], 10, "train")
+      validate_route_balance!(rows, ids["selection_ids"], 10, "selection")
+      validate_route_balance!(rows, ids["held_out_ids"], 20, "held_out")
+      validate_selection_derivation!(rows, contract["splits"]["validation_ids"], ids)
     end
 
     Map.merge(value, %{
@@ -325,6 +325,50 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     end)
   end
 
+  defp validate_route_balance!(rows, ids, per_route, label) do
+    counts =
+      ids
+      |> Enum.map(fn id ->
+        rows |> Map.fetch!(id) |> Map.fetch!("label") |> String.split(":") |> hd()
+      end)
+      |> Enum.frequencies()
+
+    require!(
+      counts == %{"DESC" => per_route, "ENTY" => per_route},
+      "#{label} route balance drift"
+    )
+  end
+
+  defp validate_selection_derivation!(rows, original_validation_ids, ids) do
+    train = MapSet.new(ids["train_ids"])
+
+    derived =
+      Enum.reduce(["DESC", "ENTY"], original_validation_ids, fn route, selected ->
+        have =
+          Enum.count(selected, fn id ->
+            rows |> Map.fetch!(id) |> Map.fetch!("label") |> String.starts_with?(route <> ":")
+          end)
+
+        additions =
+          rows
+          |> Map.values()
+          |> Enum.sort_by(& &1["id"])
+          |> Enum.filter(fn row ->
+            row["split"] == "calibration" and String.starts_with?(row["label"], route <> ":") and
+              not MapSet.member?(train, row["id"]) and row["id"] not in selected
+          end)
+          |> Enum.take(10 - have)
+          |> Enum.map(& &1["id"])
+
+        selected ++ additions
+      end)
+
+    require!(
+      derived == ids["selection_ids"],
+      "selection derivation no longer reproduces frozen IDs"
+    )
+  end
+
   defp validate_models!(value) do
     exact_keys!(value, ~w(task optimizer), "models")
     validate_model!(value["task"], "models.task")
@@ -344,9 +388,9 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
 
   defp validate_seeds!(seeds) do
     require!(
-      is_list(seeds) and length(seeds) == 3 and Enum.uniq(seeds) == seeds and
+      is_list(seeds) and length(seeds) == 1 and Enum.uniq(seeds) == seeds and
         Enum.all?(seeds, &(is_integer(&1) and &1 >= 0)),
-      "seeds must contain exactly three unique non-negative integers"
+      "diagnostic seeds must contain exactly one non-negative integer"
     )
   end
 
@@ -359,7 +403,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
       "optimizer.gepa"
     )
 
-    require!(value["gepa"]["iterations"] == 6, "GEPA iterations must be 6")
+    require!(value["gepa"]["iterations"] == 1, "GEPA iterations must be 1")
     require!(value["gepa"]["minibatch_size"] == 5, "GEPA minibatch_size must be 5")
     require!(value["gepa"]["candidate_selection"] == "pareto", "GEPA candidate selection drift")
     require!(value["gepa"]["module_selection"] == "round_robin", "GEPA module selection drift")
@@ -369,17 +413,12 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
 
     exact_keys!(
       value["mipro_v2"],
-      ~w(instruction_candidates fewshot_candidates trials minibatch max_bootstrapped_demos max_labeled_demos startup_trials bootstrap_task_call_ceiling),
+      ~w(num_candidates trials minibatch max_bootstrapped_demos max_labeled_demos startup_trials),
       "optimizer.mipro_v2"
     )
 
-    require!(
-      value["mipro_v2"]["instruction_candidates"] == 3,
-      "MIPRO instruction_candidates must be 3"
-    )
-
-    require!(value["mipro_v2"]["fewshot_candidates"] == 3, "MIPRO fewshot_candidates must be 3")
-    require!(value["mipro_v2"]["trials"] == 6, "MIPRO trials must be 6")
+    require!(value["mipro_v2"]["num_candidates"] == 2, "MIPRO num_candidates must be 2")
+    require!(value["mipro_v2"]["trials"] == 1, "MIPRO trials must be 1")
     require!(value["mipro_v2"]["minibatch"] == false, "MIPRO minibatch must be false")
 
     require!(
@@ -389,17 +428,12 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     )
 
     require!(value["mipro_v2"]["startup_trials"] == 10, "MIPRO startup_trials must be 10")
-
-    require!(
-      value["mipro_v2"]["bootstrap_task_call_ceiling"] == 40,
-      "MIPRO bootstrap ceiling must cover pinned DSPy zero-shot grounding"
-    )
   end
 
   defp validate_execution!(value) do
     exact_keys!(
       value,
-      ~w(concurrency cache retry max_retries json_fallback fallbacks data_collection route_guard cost_guard request),
+      ~w(concurrency cache retry max_retries json_fallback fallbacks data_collection route_guard cost_guard request call_ceilings),
       "execution"
     )
 
@@ -431,6 +465,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     exact_keys!(value["request"], ~w(task optimizer), "execution.request")
     validate_request!(value["request"]["task"], 0.0, 64, "execution.request.task")
     validate_request!(value["request"]["optimizer"], 1.0, 512, "execution.request.optimizer")
+    validate_call_ceilings!(value["call_ceilings"])
   end
 
   defp validate_request!(value, temperature, max_tokens, label) do
@@ -442,6 +477,33 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
       is_integer(value["max_input_tokens"]) and value["max_input_tokens"] > 0,
       "#{label}.max_input_tokens must be positive"
     )
+  end
+
+  defp validate_call_ceilings!(value) do
+    exact_keys!(value, @arms, "execution.call_ceilings")
+
+    expected = %{
+      "baseline" => %{
+        "task_logical" => 60,
+        "optimizer_logical" => 0,
+        "transports" => 60,
+        "total_logical" => 60
+      },
+      "gepa" => %{
+        "task_logical" => 110,
+        "optimizer_logical" => 1,
+        "transports" => 111,
+        "total_logical" => 111
+      },
+      "mipro_v2" => %{
+        "task_logical" => 100,
+        "optimizer_logical" => 14,
+        "transports" => 114,
+        "total_logical" => 114
+      }
+    }
+
+    require!(value == expected, "execution call ceilings drift")
   end
 
   defp validate_output_contract!(value) do
@@ -475,7 +537,8 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     require!(value["held_out"] == ~w(accuracy macro_f1 parse_errors), "held-out metrics drift")
 
     require!(
-      value["uncertainty"] == "paired_seed_deltas_with_all_seeds",
+      value["uncertainty"] ==
+        "paired_seed_delta_with_exact_observed_range_not_confidence_interval",
       "uncertainty contract drift"
     )
   end
@@ -517,7 +580,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     )
 
     require!(
-      String.ends_with?(value["dspy"], "@b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"),
+      String.ends_with?(value["dspy"], "@29448ae12756abdd14bd8796c819247ebb83673c"),
       "DSPy source commit drift"
     )
 
@@ -557,7 +620,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
 
     %{
       train: length(ids["train_ids"]),
-      selection: length(ids["validation_ids"]),
+      selection: length(ids["selection_ids"]),
       held_out: length(ids["held_out_ids"])
     }
   end
