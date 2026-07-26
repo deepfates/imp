@@ -49,17 +49,35 @@ defmodule LocalSIMBABanking77.ObservedLM do
     do: Imp.LM.response_format_capability(inner)
 end
 
+defmodule LocalSIMBABanking77.Audit do
+  def count_mutated_finalists(final_candidates, baseline_instruction) do
+    Enum.count(final_candidates, fn candidate ->
+      candidate.finalist_index > 0 and
+        Enum.any?(candidate.parameters, fn parameter ->
+          parameter.name == :main and
+            (parameter.instruction != baseline_instruction or parameter.demos != [])
+        end)
+    end)
+  end
+end
+
 defmodule LocalSIMBABanking77.Runner do
   alias Imp.Clients.{MLXLMDeployment, TrainingJob}
   alias Imp.Optimizer.{Artifact, Report, SIMBA}
-  alias LocalSIMBABanking77.{Atomic, ObservedLM, Observer}
+  alias LocalSIMBABanking77.{Atomic, Audit, ObservedLM, Observer}
 
   @routes ["R17", "R42", "R68", "R93"]
   @data_sha256 "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18"
   @ollama_model "llama3.2:3b"
   @ollama_digest "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
 
-  def run, do: if(System.get_env("IMP_SIMBA_FRESH") == "1", do: fresh(), else: parent())
+  def run do
+    cond do
+      System.get_env("IMP_SIMBA_FRESH") == "1" -> fresh()
+      System.get_env("IMP_SIMBA_SELECTED_ONLY") == "1" -> selected_only()
+      true -> parent()
+    end
+  end
 
   defp parent do
     paths = paths!()
@@ -183,6 +201,115 @@ defmodule LocalSIMBABanking77.Runner do
     end
   end
 
+  defp selected_only do
+    paths = paths!()
+    unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
+    job = TrainingJob.load!(paths.job)
+    {:ok, _manifest} = Imp.Clients.MLXLMTrainer.verify_job(job)
+    rows = split_rows!(paths.data)
+    observer = observer!()
+
+    try do
+      baseline = program!(job, observer)
+
+      selected =
+        paths.output
+        |> Path.join("selected-parameters.json")
+        |> Artifact.read!()
+        |> Artifact.apply(baseline)
+
+      optimization = audited_optimization!(paths)
+      Atomic.write!(Path.join(paths.output, "01b-optimization-audit.json"), optimization)
+      require_search!(optimization)
+
+      Observer.phase(observer, "baseline_test")
+      baseline_test = evaluate(baseline, rows.test, observer, "baseline_test")
+      Atomic.write!(Path.join(paths.output, "02-baseline-test.json"), baseline_test)
+      require_test!(baseline_test)
+
+      Observer.phase(observer, "selected_test")
+      selected_test = evaluate(selected, rows.test, observer, "selected_test")
+      Atomic.write!(Path.join(paths.output, "03-selected-test.json"), selected_test)
+      require_test!(selected_test)
+
+      :ok = TrainingJob.save!(job, Path.join(paths.output, "training-job.json"))
+      :ok = MLXLMDeployment.stop(job)
+
+      fresh_path = Path.join(paths.output, "04-fresh-test.json")
+      artifact_path = Path.join(paths.output, "selected-parameters.json")
+      {output, status} = fresh_process(paths, artifact_path, fresh_path)
+      if status != 0, do: raise("fresh OS BEAM failed: #{output}")
+      fresh_test = fresh_path |> File.read!() |> Jason.decode!()
+
+      unless fresh_test["reproduction_sha256"] == selected_test.reproduction_sha256,
+        do: raise("fresh selected predictions/errors differ")
+
+      unless fresh_test["artifact_identity"] == job.result_model,
+        do: raise("fresh process served a different artifact")
+
+      result = %{
+        status: "complete",
+        scope: "one local SIMBA Banking77 program lifecycle",
+        split_sizes: %{train: 16, selection: 8, untouched_test: 40},
+        task_artifact: job.result_model,
+        search: %{
+          baseline_score: optimization.baseline_score,
+          selected_score: optimization.selected_score,
+          selected: optimization.selected,
+          candidate_count: optimization.candidate_count,
+          mutated_candidates: optimization.mutated_candidates,
+          rendered_mutation_calls: optimization.rendered_mutation_calls,
+          task_transports: optimization.task_transports,
+          reflection_transports: optimization.reflection_transports
+        },
+        untouched_test: %{
+          baseline: Map.take(baseline_test, [:accuracy, :macro_f1, :errors]),
+          selected: Map.take(selected_test, [:accuracy, :macro_f1, :errors])
+        },
+        fresh_process: %{byte_identical: true, logical_calls: fresh_test["logical_calls"]},
+        claim_boundary:
+          "Operational mutation, validation selection, artifact application, and fresh consumption on one task/model; not general SIMBA effectiveness, DSPy parity, or BEAM superiority."
+      }
+
+      Atomic.write!(Path.join(paths.output, "result.json"), result)
+      IO.puts(Jason.encode!(result, pretty: true))
+    after
+      MLXLMDeployment.stop(job)
+      :telemetry.detach({__MODULE__, self()})
+    end
+  rescue
+    error ->
+      paths = paths!()
+
+      Atomic.write!(Path.join(paths.output, "continuation-failure.json"), %{
+        status: "stopped",
+        error: Exception.format(:error, error, __STACKTRACE__)
+      })
+
+      reraise error, __STACKTRACE__
+  end
+
+  defp audited_optimization!(paths) do
+    stage = paths.output |> Path.join("01-optimization.json") |> File.read!() |> Jason.decode!()
+    report = stage["report"] |> Report.decode_term()
+    baseline_instruction = stage["baseline_instruction"]
+
+    %{
+      status: "complete",
+      artifact_identity: stage["artifact_identity"],
+      baseline_score: stage["baseline_score"],
+      selected_score: stage["selected_score"],
+      selected: stage["selected"],
+      candidate_count: stage["candidate_count"],
+      mutated_candidates:
+        Audit.count_mutated_finalists(report.metadata.final_candidates, baseline_instruction),
+      rendered_mutation_calls: stage["rendered_mutation_calls"],
+      task_transports: stage["task_transports"],
+      reflection_transports: stage["reflection_transports"],
+      predecessor_sha256: sha256_file(Path.join(paths.output, "01-optimization.json"))
+    }
+  end
+
   defp preflight!(paths) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     verify_ollama!()
@@ -252,13 +379,7 @@ defmodule LocalSIMBABanking77.Runner do
     baseline_instruction = baseline.signature.instructions
 
     mutated_candidates =
-      report.metadata.final_candidates
-      |> Enum.count(fn candidate ->
-        candidate.finalist_index > 0 and
-          Enum.any?(candidate.parameters, fn parameter ->
-            parameter.name == :main and parameter.instruction != baseline_instruction
-          end)
-      end)
+      Audit.count_mutated_finalists(report.metadata.final_candidates, baseline_instruction)
 
     task_calls = Enum.filter(snapshot.calls, &(&1.phase == "optimization" and &1.role == :task))
 
