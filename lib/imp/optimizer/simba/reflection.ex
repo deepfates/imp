@@ -31,6 +31,7 @@ defmodule Imp.Optimizer.SIMBA.Reflection do
   def run(prompt_lm, payload) do
     worse_reward_type = reward_type(Map.get(payload, :worse_reward_value))
     better_reward_type = reward_type(Map.get(payload, :better_reward_value))
+    module_names = normalize_module_names!(Map.get(payload, :module_names))
 
     signature =
       ("program_code: string, modules_defn: string, program_inputs: string, oracle_metadata: string, " <>
@@ -41,15 +42,86 @@ defmodule Imp.Optimizer.SIMBA.Reflection do
       |> Imp.Signature.ensure()
       |> Map.put(:instructions, @instructions)
 
-    program = Imp.Predict.Predict.new(signature, lm: prompt_lm, adapter: Imp.Adapter.JSON)
+    program =
+      Imp.Predict.Predict.new(signature,
+        lm: prompt_lm,
+        adapter: Imp.Adapter.JSON,
+        config: [response_format: response_format(module_names)]
+      )
 
     with {:ok, prediction} <-
            Imp.Predict.Predict.call(program, reflection_inputs(payload)),
-         advice when is_map(advice) <- Imp.get(prediction, :module_advice) do
+         advice when is_map(advice) <- Imp.get(prediction, :module_advice),
+         :ok <- validate_advice(advice, module_names) do
       {:ok, advice, Imp.get(prediction, :discussion)}
     else
       {:error, reason} -> {:error, reason}
       other -> {:error, {:invalid_reflection_output, other}}
+    end
+  end
+
+  @doc false
+  def response_format(module_names) when is_list(module_names) do
+    properties = Map.new(module_names, &{&1, %{"type" => "string"}})
+
+    %{
+      type: "json_schema",
+      json_schema: %{
+        name: "SIMBAOfferFeedback",
+        strict: true,
+        schema: %{
+          "type" => "object",
+          "properties" => %{
+            "discussion" => %{"type" => "string"},
+            "module_advice" => %{
+              "type" => "object",
+              "properties" => properties,
+              "required" => module_names,
+              "additionalProperties" => false
+            }
+          },
+          "required" => ["discussion", "module_advice"],
+          "additionalProperties" => false
+        }
+      }
+    }
+  end
+
+  defp normalize_module_names!(names) when is_list(names) and names != [] do
+    names = Enum.map(names, &to_string/1)
+
+    if Enum.any?(names, &(String.trim(&1) == "")) or length(names) != length(Enum.uniq(names)) do
+      raise ArgumentError, "SIMBA reflection requires unique nonblank module names"
+    end
+
+    names
+  end
+
+  defp normalize_module_names!(_names) do
+    raise ArgumentError, "SIMBA reflection requires a nonempty module_names list"
+  end
+
+  defp validate_advice(advice, expected_names) do
+    entries = Enum.map(advice, fn {name, value} -> {to_string(name), value} end)
+    actual_names = entries |> Enum.map(&elem(&1, 0)) |> Enum.sort()
+
+    cond do
+      actual_names != Enum.sort(expected_names) ->
+        {:error,
+         {:invalid_module_advice_keys,
+          %{expected: Enum.sort(expected_names), actual: actual_names}}}
+
+      Enum.any?(entries, fn {_name, value} -> not is_binary(value) end) ->
+        invalid_names =
+          entries
+          |> Enum.reject(fn {_name, value} -> is_binary(value) end)
+          |> Enum.map(&elem(&1, 0))
+          |> Enum.sort()
+
+        {:error, {:invalid_module_advice_values, %{expected: :string, invalid: invalid_names}}}
+
+      true ->
+        :ok
     end
   end
 

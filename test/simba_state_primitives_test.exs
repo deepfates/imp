@@ -96,24 +96,88 @@ defmodule Imp.Optimizer.SIMBA.StatePrimitivesTest do
     assert Enum.all?(first_ids, &(&1 in [0, 1]))
   end
 
-  test "reflection accepts partial module advice and preserves declared typed inputs" do
+  test "reflection binds exact multi-predictor string advice schema and preserves typed inputs" do
     parent = self()
 
     prompt_lm = %{
       module: Imp.LM.Static,
       opts: [
-        handler: fn messages, _opts ->
-          send(parent, {:reflection_messages, messages})
+        handler: fn messages, opts ->
+          send(parent, {:reflection_request, messages, opts[:response_format]})
 
           %{
-            discussion: "Only the first module needs a change.",
-            module_advice: %{first: "Be precise."}
+            discussion: "Both modules receive named advice.",
+            module_advice: %{first: "Be precise.", second: "Check the final answer."}
           }
         end
       ]
     }
 
-    payload = %{
+    payload = reflection_payload()
+
+    log =
+      capture_log(fn ->
+        assert {:ok, %{first: "Be precise.", second: "Check the final answer."},
+                "Both modules receive named advice."} =
+                 Imp.Optimizer.SIMBA.Reflection.run(prompt_lm, payload)
+      end)
+
+    refute log =~ "type mismatch"
+
+    assert_receive {:reflection_request, messages, response_format}
+    prompt = Enum.map_join(messages, "\n", & &1.content)
+    assert prompt =~ "program_code"
+    assert prompt =~ "modules_defn"
+    assert prompt =~ ~s(\"module_name\": \"first\")
+    assert prompt =~ ~s([\"first\", \"second\"])
+
+    assert response_format.type == "json_schema"
+    assert response_format.json_schema.strict
+
+    advice_schema = response_format.json_schema.schema["properties"]["module_advice"]
+
+    assert advice_schema == %{
+             "type" => "object",
+             "properties" => %{
+               "first" => %{"type" => "string"},
+               "second" => %{"type" => "string"}
+             },
+             "required" => ["first", "second"],
+             "additionalProperties" => false
+           }
+  end
+
+  test "reflection rejects missing, extra, and non-string named advice" do
+    run = fn advice ->
+      prompt_lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            %{discussion: "candidate advice", module_advice: advice}
+          end
+        )
+
+      Imp.Optimizer.SIMBA.Reflection.run(prompt_lm, reflection_payload())
+    end
+
+    assert {:error,
+            {:invalid_module_advice_keys, %{expected: ["first", "second"], actual: ["first"]}}} =
+             run.(%{first: "Be precise."})
+
+    assert {:error,
+            {:invalid_module_advice_keys,
+             %{expected: ["first", "second"], actual: ["first", "second", "third"]}}} =
+             run.(%{
+               first: "Be precise.",
+               second: "Check the final answer.",
+               third: "Unmatched advice."
+             })
+
+    assert {:error, {:invalid_module_advice_values, %{expected: :string, invalid: ["second"]}}} =
+             run.(%{first: "Be precise.", second: %{rule: "nested object"}})
+  end
+
+  defp reflection_payload do
+    %{
       program_code: "Program module: Example.Program",
       modules_defn: "Module first\nModule second",
       program_inputs: %{question: "q"},
@@ -130,20 +194,5 @@ defmodule Imp.Optimizer.SIMBA.StatePrimitivesTest do
       better_reward_info: %{},
       module_names: [:first, :second]
     }
-
-    log =
-      capture_log(fn ->
-        assert {:ok, %{first: "Be precise."}, "Only the first module needs a change."} =
-                 Imp.Optimizer.SIMBA.Reflection.run(prompt_lm, payload)
-      end)
-
-    refute log =~ "type mismatch"
-
-    assert_receive {:reflection_messages, messages}
-    prompt = Enum.map_join(messages, "\n", & &1.content)
-    assert prompt =~ "program_code"
-    assert prompt =~ "modules_defn"
-    assert prompt =~ ~s(\"module_name\": \"first\")
-    assert prompt =~ ~s([\"first\", \"second\"])
   end
 end
