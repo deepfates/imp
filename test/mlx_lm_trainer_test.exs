@@ -491,6 +491,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     cache_env = Jason.decode!(File.read!(env_record))
     assert cache_env["HF_HOME"] == isolated_cache
     assert cache_env["HUGGINGFACE_HUB_CACHE"] == Path.join(isolated_cache, "hub")
+    assert File.dir?(cache_env["HUGGINGFACE_HUB_CACHE"])
     assert cache_env["TRANSFORMERS_CACHE"] != poisoned
     assert cache_env["HF_DATASETS_CACHE"] != poisoned
     assert cache_env["UV_CACHE_DIR"] == uv_cache

@@ -322,12 +322,16 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
   end
 
   defp create_cache_children(root) do
-    Enum.reduce_while(~w(huggingface transformers datasets), :ok, fn child, :ok ->
-      case File.mkdir(Path.join(root, child)) do
-        :ok -> {:cont, :ok}
-        {:error, reason} -> {:halt, {:error, reason}}
+    Enum.reduce_while(
+      ["huggingface", "huggingface/hub", "transformers", "datasets"],
+      :ok,
+      fn child, :ok ->
+        case File.mkdir(Path.join(root, child)) do
+          :ok -> {:cont, :ok}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
       end
-    end)
+    )
   end
 
   defp isolated_cache_env(root) do
