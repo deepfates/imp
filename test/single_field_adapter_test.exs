@@ -55,7 +55,18 @@ defmodule Imp.SingleFieldAdapterTest do
     assert {:ok, prediction} = Imp.Adapter.SingleField.parse(signature, "  R42\n", [])
     assert Imp.get(prediction, :route) == "R42"
 
-    for malformed <- ["[R42]", "The answer is R42", ~s("R42"), ""] do
+    assert {:ok, schema_prediction} =
+             Imp.Adapter.SingleField.parse(signature, ~s({"route":"R42"}), [])
+
+    assert Imp.get(schema_prediction, :route) == "R42"
+
+    for malformed <- [
+          "[R42]",
+          "The answer is R42",
+          ~s("R42"),
+          ~s({"route":"R42","extra":"x"}),
+          ""
+        ] do
       assert {:error, _reason} = Imp.Adapter.SingleField.parse(signature, malformed, [])
     end
   end

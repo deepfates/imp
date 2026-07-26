@@ -11,8 +11,9 @@ defmodule Imp.Adapter.SingleField do
 
   The parser is intentionally not a repair heuristic. It trims outer
   whitespace, but does not strip labels, brackets, quotes, code fences, or
-  prose. An enum-constrained output therefore accepts an exact enum member and
-  rejects `[member]` or `The answer is member`.
+  prose. It accepts either the exact scalar value or an exact one-field JSON
+  object emitted by the response-schema transport. An enum-constrained output
+  therefore rejects `[member]`, `"member"`, or `The answer is member`.
 
   Multi-output signatures are rejected before an LM call. Demonstrations must
   contain every input and the output so the adapter never silently drops
@@ -74,7 +75,7 @@ defmodule Imp.Adapter.SingleField do
       text when is_binary(text) ->
         case String.trim(text) do
           "" -> {:error, {:missing_output_fields, [output.name]}}
-          value -> parse_text_value(signature, output, value, opts)
+          value -> parse_text_or_schema_object(signature, output, value, opts)
         end
 
       other ->
@@ -172,6 +173,24 @@ defmodule Imp.Adapter.SingleField do
   # `Literal[...]`-wrapped values. This adapter's contract is stricter: an enum
   # completion is the exact wire value. Keep Chat as the shared type/schema
   # validator only after this adapter-specific boundary is satisfied.
+  defp parse_text_or_schema_object(signature, output, value, opts) do
+    case Jason.decode(value) do
+      {:ok, decoded} when is_map(decoded) ->
+        if Map.keys(decoded) == [to_string(output.name)] do
+          Imp.Adapter.Chat.parse(signature, decoded, opts)
+        else
+          {:error,
+           %Imp.AdapterParseError{
+             message: "expected an exact one-field JSON object",
+             reason: %{expected: [to_string(output.name)], present: Map.keys(decoded)}
+           }}
+        end
+
+      _not_an_object ->
+        parse_text_value(signature, output, value, opts)
+    end
+  end
+
   defp parse_text_value(signature, output, value, opts) do
     case enum_values(output) do
       values when is_list(values) ->
