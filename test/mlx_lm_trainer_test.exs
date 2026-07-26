@@ -474,24 +474,27 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     code = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
-    source = Imp.load!(#{inspect(program_path)})
-    {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, source)
-    {:ok, first} = Imp.call(rebound, %{question: "same frozen probe"})
-    {:ok, second} = Imp.call(rebound, %{question: "same frozen probe"})
-    lm = Imp.ProgramAccess.lm(rebound)
-    opts = %{
-      cache: lm.opts[:cache],
-      max_retries: lm.opts[:max_retries],
-      req_http_options: Map.new(lm.opts[:req_http_options])
-    }
-    File.write!(#{inspect(fresh_path)}, Jason.encode!(%{
-      answers: [Imp.Prediction.get(first, :answer), Imp.Prediction.get(second, :answer)],
-      model: lm.model.id,
-      opts: opts,
-      adapter: rebound.adapter,
-      config: Map.new(rebound.config)
-    }))
-    :ok = Imp.Clients.MLXLMDeployment.stop(job)
+    try do
+      source = Imp.load!(#{inspect(program_path)})
+      {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, source)
+      {:ok, first} = Imp.call(rebound, %{question: "same frozen probe"})
+      {:ok, second} = Imp.call(rebound, %{question: "same frozen probe"})
+      lm = Imp.ProgramAccess.lm(rebound)
+      opts = %{
+        cache: lm.opts[:cache],
+        max_retries: lm.opts[:max_retries],
+        req_http_options: Map.new(lm.opts[:req_http_options])
+      }
+      File.write!(#{inspect(fresh_path)}, Jason.encode!(%{
+        answers: [Imp.Prediction.get(first, :answer), Imp.Prediction.get(second, :answer)],
+        model: lm.model.id,
+        opts: opts,
+        adapter: rebound.adapter,
+        config: Map.new(rebound.config)
+      }))
+    after
+      :ok = Imp.Clients.MLXLMDeployment.stop(job)
+    end
     """
 
     {output, status} =
@@ -575,6 +578,64 @@ defmodule Imp.Clients.MLXLMTrainerTest do
              )
 
     assert :error = Imp.Clients.MLXLMDeployment.lookup(job)
+    assert_port_available!(port)
+  end
+
+  test "fresh-process consumer cleanup survives a downstream recorder failure", context do
+    File.write!(Path.join(context.model_path, "behavior.txt"), "base-behavior\n", [:sync])
+    port = available_port()
+
+    trainer =
+      context
+      |> trainer(&successful_runner/3)
+      |> Map.merge(%{
+        server_executable: System.find_executable("python3"),
+        server_executable_args: [Path.expand("support/fake_mlx_server.py", __DIR__)],
+        server_port: port,
+        server_startup_timeout: 5_000
+      })
+
+    assert {:ok, job} = train(trainer)
+    base_path = Path.expand(context.model_path)
+
+    program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.req_llm(base_path,
+            api_key: "local",
+            cache: false,
+            max_retries: 0,
+            req_http_options: [retry: false, max_retries: 0]
+          ),
+        config: [json_fallback: false]
+      )
+
+    job_path = Path.join(context.root, "failure-cleanup-job.json")
+    program_path = Path.join(context.root, "failure-cleanup-program.json")
+    :ok = TrainingJob.save!(job, job_path)
+    :ok = Imp.save!(program, program_path)
+
+    code = """
+    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    try do
+      program = Imp.load!(#{inspect(program_path)})
+      {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, program)
+      {:ok, _prediction} = Imp.call(rebound, %{question: "cleanup probe"})
+      raise "forced recorder failure"
+    after
+      :ok = Imp.Clients.MLXLMDeployment.stop(job)
+    end
+    """
+
+    {output, status} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert status != 0
+    assert output =~ "forced recorder failure"
     assert_port_available!(port)
   end
 
