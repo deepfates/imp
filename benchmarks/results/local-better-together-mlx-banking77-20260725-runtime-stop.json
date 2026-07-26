@@ -1,0 +1,88 @@
+{
+  "artifact_type": "imp_plain_better_together_banking77_acceptance",
+  "elapsed_ms": 3803,
+  "error": {
+    "exception": "MatchError",
+    "message": "no match of right hand side value:\n\n    {:error,\n     {:training_job_adoption_failed,\n      {:mlx_lm_deployment_start_failed,\n       {:mlx_lm_server_model_identity_mismatch,\n        \"/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused\",\n        [\"jxm/gpt-oss-20b-base\",\n         \"/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused\"]}}}}\n"
+  },
+  "limits": {
+    "interpretation": "one task/model composition result, not general effectiveness",
+    "normalization": {
+      "__imp_type__": "atom",
+      "value": "false"
+    },
+    "proposer_model": "ollama:llama3.2:3b",
+    "provider_calls": {
+      "__imp_type__": "atom",
+      "value": "false"
+    },
+    "retries": {
+      "__imp_type__": "atom",
+      "value": "false"
+    },
+    "scope": "one retained-artifact BetterTogether [:w, :p] run",
+    "task_model": "pinned base then verified fused Qwen2.5-0.5B",
+    "training_or_fusion": {
+      "__imp_type__": "atom",
+      "value": "false"
+    }
+  },
+  "predecessor": {
+    "path": "/Users/deepfates/.cache/imp/mlx_lm/acceptance/better-together-banking77-5962614/result.json",
+    "sha256": "99426adbead36be042c7d8ce197bca0406b3cbac31b47286c6ceb774185eceb6",
+    "status": "stopped_pre_model"
+  },
+  "schema_version": 1,
+  "source_commit": "75a6ed90956accbe119c5e52d396a51b0b53000e",
+  "stages": {
+    "preflight": {
+      "approved_git_identity": {
+        "approved": "75a6ed90956accbe119c5e52d396a51b0b53000e",
+        "canonical": "75a6ed90956accbe119c5e52d396a51b0b53000e",
+        "mode": {
+          "__imp_type__": "atom",
+          "value": "full"
+        }
+      },
+      "base_path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "base_tree_sha256": "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947",
+      "data_file_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+      "deployment": {
+        "args": [
+          "--from",
+          "mlx-lm==0.31.3",
+          "mlx_lm.server"
+        ],
+        "executable": "/Users/deepfates/.local/bin/uvx",
+        "host": "127.0.0.1",
+        "kill_grace_ms": 2000,
+        "max_output_bytes": 32768,
+        "max_tokens": 64,
+        "port": 18822,
+        "startup_timeout": 120000
+      },
+      "fused_path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+      "fused_tree_sha256": "d52aca6b049e9e015b0934bc56e4a120a6d669fb21bc5c7068c527e0f994dc44",
+      "job_id": "mlx-089e3e862c61b67d07bf",
+      "job_status": {
+        "__imp_type__": "atom",
+        "value": "succeeded"
+      },
+      "ports": {
+        "base": 18821,
+        "fused": 18822
+      },
+      "proposer": {
+        "inventory_line": "llama3.2:3b         a80c4f17acd5    2.0 GB    19 months ago    ",
+        "model": "llama3.2:3b"
+      },
+      "source_commit": "75a6ed90956accbe119c5e52d396a51b0b53000e",
+      "source_job_sha256": "8f25d1a86b6ec5423e83a66803e418b6e9fc2f0844332ea48f4f94a6abe7cab5",
+      "worktree_clean": {
+        "__imp_type__": "atom",
+        "value": "true"
+      }
+    }
+  },
+  "status": "stopped"
+}
