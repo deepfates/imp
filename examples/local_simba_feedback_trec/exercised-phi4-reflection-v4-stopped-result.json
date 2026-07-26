@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "status": "stopped_before_mutation_selection_or_heldout",
+  "treatment_id": "local-simba-feedback-trec-phi4-reflection-v4",
+  "runtime_commit": "fa14908",
+  "task_contract_sha256": "1f29446db7aa4ac99683422f3833f313912445ec7c2c9d44776e84f26530d3b8",
+  "treatment_sha256": "2fbb11c2cafba562f38084f68e156ccec4de286524bff6cdd14bfd2858175eb1",
+  "models": {
+    "task": {
+      "id": "ollama:llama3.2:3b",
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    },
+    "reflection": {
+      "id": "ollama:phi4:latest",
+      "digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
+    }
+  },
+  "optimization": {
+    "completed_steps": 4,
+    "baseline_validation_score": 0.5,
+    "selected_validation_score": 0.5,
+    "selected": "baseline",
+    "candidate_count": 0,
+    "mutated_rule_finalists": 0,
+    "rendered_rule_calls": 0,
+    "task_calls": 46,
+    "reflection_calls": 7,
+    "feedback_reflection_calls": 7,
+    "logical_calls": 53,
+    "transport_attempts": 53,
+    "reflection_outputs_with_main_key": 7,
+    "reflection_outputs_with_string_main_advice": 0,
+    "reflection_outputs_with_object_main_advice": 7,
+    "candidate_evaluation_calls": 0,
+    "final_validation_calls": 6
+  },
+  "heldout_opened": false,
+  "fresh_process_attempted": false,
+  "cleanup": {
+    "task_model_unload_status": 200,
+    "reflection_model_unload_status": 200,
+    "resident_models_after_cleanup": []
+  },
+  "stop_reason": "All seven exact Phi-4 reflection responses used the correct named predictor key and discussed the semantic K11/K47 distinction, but every module_advice.main value was a nested object rather than the required string instruction. Imp admitted no mutation, performed no candidate evaluation, persisted the completed optimization stage, and stopped before held-out access or fresh-process execution.",
+  "primary_source_gap": {
+    "authority": "DSPy 3.3.0b1 commit b2829b7, dspy/teleprompt/simba_utils.py OfferFeedback.module_advice and append_a_rule",
+    "upstream_contract": "module_advice is dict[str, str], and append_a_rule appends advice[name] to the named predictor instruction.",
+    "imp_behavior": "Imp's reflection signature declared module_advice only as map, so its generated JSON schema did not constrain each value to a string. SIMBA correctly ignored the resulting non-string advice rather than normalizing or stringifying it.",
+    "interpretation": "This is an Imp reflection-schema boundary failure and an incomplete usefulness measurement, not a SIMBA effectiveness loss or a Phi-4 quality conclusion."
+  },
+  "retained_stage_sha256": {
+    "preflight": "93240587c190a0148ed5b2e7afc0db10becb2a484f6c7b3e1afb89b870554972",
+    "optimization": "5b32bcff983e295e6bf556291edc6ff02e074d18939fc2e5de7b18438babc3ea",
+    "reflection_responses": "c75c9ce40e2685b37003420a5cd3d75d21d215d1fb27ddf45cd794077efa7a69",
+    "selected_parameters": "6960fbb76a1b06670ca97c9bf49a9df2e89b05bf074951f5f6a4bb464dada235",
+    "source_program": "dd35f239819c5e97169ee63bf8d25a291afd55ac11af54e8ce7ffd7e71dfa655",
+    "failure": "4e4b4fdd4702752640ecbe0f2f1f49f4e73eb196a5b5cc3e267e506568ac2009",
+    "cleanup": "97ae429e8eff1bd00257660a5723bc93c657d574cf679757bed711fbb43dbc6d"
+  },
+  "claim_boundary": "This stopped V4 run proves 53 one-attempt local transports, seven semantically relevant exact Phi-4 reflection responses under the correct main key, fail-closed non-string advice handling, completed baseline validation, retained evidence, and full model cleanup. It proves no genuine instruction mutation, candidate validation, held-out behavior, selected-artifact fresh consumption, SIMBA effectiveness or ineffectiveness, full DSPy parity, production reliability, or BEAM superiority."
+}

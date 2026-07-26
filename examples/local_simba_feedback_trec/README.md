@@ -123,3 +123,19 @@ until the selected artifact is written. Positive, neutral, negative, or
 baseline selection are all valid outcomes. Even a positive result would remain
 specific to this task and exact local model pair rather than proving general
 SIMBA effectiveness or DSPy parity.
+
+The immutable V4 execution is retained in
+`exercised-phi4-reflection-v4-stopped-result.json`. It completed four search
+steps and 53 one-attempt local transports: 46 task calls and seven reflection
+calls. Every exact Phi-4 response used the correct `main` key and discussed the
+semantic route distinction, but every `module_advice.main` value was a nested
+object instead of the string instruction required by DSPy's
+`dict[str, str]` contract. Imp did not stringify or otherwise normalize those
+objects, admitted no candidate, persisted the completed optimization stage,
+kept held-out rows closed, and unloaded both models successfully.
+
+This exposes a source-level boundary gap: Imp's reflection signature currently
+describes `module_advice` only as a generic map, so its JSON schema does not
+constrain each advice value to a string. The stopped run is therefore an
+incomplete usefulness measurement, not a SIMBA loss or a conclusion about
+Phi-4. No V4 held-out or fresh-process result exists.

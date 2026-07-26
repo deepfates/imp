@@ -9,6 +9,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
   @stopped_result "examples/local_simba_feedback_trec/exercised-stopped-result.json"
   @structured_stopped_result "examples/local_simba_feedback_trec/exercised-structured-v2-stopped-result.json"
   @schema_decode_stopped_result "examples/local_simba_feedback_trec/exercised-schema-decode-v3-stopped-result.json"
+  @phi4_stopped_result "examples/local_simba_feedback_trec/exercised-phi4-reflection-v4-stopped-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_FEEDBACK_TREC_DEFINE_ONLY")
@@ -246,6 +247,27 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
     assert result["optimization"]["baseline_score"] == 0.5
     refute result["heldout_opened"]
     assert result["claim_boundary"] =~ "does not prove a genuine mutation"
+  end
+
+  test "Phi-4 V4 remains a source-schema stop before mutation and heldout" do
+    result = Jason.decode!(File.read!(@phi4_stopped_result))
+
+    assert result["status"] == "stopped_before_mutation_selection_or_heldout"
+    assert result["runtime_commit"] == "fa14908"
+    assert result["optimization"]["completed_steps"] == 4
+    assert result["optimization"]["logical_calls"] == 53
+    assert result["optimization"]["transport_attempts"] == 53
+    assert result["optimization"]["task_calls"] == 46
+    assert result["optimization"]["reflection_calls"] == 7
+    assert result["optimization"]["reflection_outputs_with_main_key"] == 7
+    assert result["optimization"]["reflection_outputs_with_string_main_advice"] == 0
+    assert result["optimization"]["reflection_outputs_with_object_main_advice"] == 7
+    assert result["optimization"]["candidate_count"] == 0
+    refute result["heldout_opened"]
+    refute result["fresh_process_attempted"]
+    assert result["cleanup"]["resident_models_after_cleanup"] == []
+    assert result["primary_source_gap"]["upstream_contract"] =~ "dict[str, str]"
+    assert result["claim_boundary"] =~ "proves no genuine instruction mutation"
   end
 
   defp split_frequencies(rows) do
