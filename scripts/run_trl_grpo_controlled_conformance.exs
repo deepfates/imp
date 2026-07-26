@@ -1,5 +1,14 @@
 alias Imp.Clients.{TrainingJob, TRLArtifact, TRLLM, TRLProtocol, TRLTrainer}
+alias Imp.Optimizer.GRPO.Callback
 alias Imp.Optimizer.TrainingResult
+
+defmodule Imp.ControlledGRPOConformanceReward do
+  def exact_route(expected, prediction, %{"expected_route" => route}) do
+    if Imp.get(expected, :route) == route and Imp.get(prediction, :route) == route,
+      do: 1.0,
+      else: 0.0
+  end
+end
 
 repo = File.cwd!()
 cache_root = "/Users/deepfates/.cache/imp/trl/controlled-conformance-v1"
@@ -90,9 +99,10 @@ example =
 
 optimizer =
   Imp.Optimizer.GRPO.new(
-    fn expected, prediction ->
-      if Imp.get(prediction, :route) == Imp.get(expected, :route), do: 1.0, else: 0.0
-    end,
+    Callback.reward(Imp.ControlledGRPOConformanceReward, :exact_route,
+      id: "banking77-exact-route-v1",
+      config: %{"expected_route" => "R17"}
+    ),
     trainer: trainer,
     num_train_steps: 1,
     num_dspy_examples_per_grpo_step: 1,

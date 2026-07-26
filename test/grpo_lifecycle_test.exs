@@ -350,7 +350,16 @@ defmodule GRPOLifecycleTest do
       %{first | failure_score: 0.25},
       %{first | format_failure_score: -2.0},
       %{first | reward_fn: reward(0.5)},
-      %{first | validation_fn: fn _program, _dataset, _context -> :ok end},
+      %{
+        first
+        | validation_fn:
+            Imp.Optimizer.GRPO.Callback.validation(
+              Imp.Test.StableGRPOCallbacks,
+              :validate,
+              id: "test-validation-v1",
+              config: %{"result" => "ok"}
+            )
+      },
       %{first | num_steps_for_val: 3},
       %{first | report_train_scores: true, use_train_as_val: true},
       %{first | train_kwargs: [learning_rate: 0.001]},
@@ -382,7 +391,12 @@ defmodule GRPOLifecycleTest do
     )
   end
 
-  defp reward(value), do: fn _example, _prediction -> value end
+  defp reward(value) do
+    Imp.Optimizer.GRPO.Callback.reward(Imp.Test.StableGRPOCallbacks, :reward,
+      id: "test-reward-v1",
+      config: %{"value" => value}
+    )
+  end
 
   defp program do
     lm = %{

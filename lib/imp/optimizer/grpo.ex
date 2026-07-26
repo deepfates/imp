@@ -12,6 +12,13 @@ defmodule Imp.Optimizer.GRPO do
   rely on the caller's process dictionary or mailbox. Independent jobs for
   multiple student LMs are not implemented.
 
+  Durable jobs require `Imp.Optimizer.GRPO.Callback` values for reward and
+  validation logic. They bind a trusted module/function to a consumer-owned
+  versioned id and JSON-safe configuration digest. Bare functions remain
+  available only when `checkpoint_path` is absent; Imp refuses them before
+  trainer activity rather than persisting compiler-local function identity as
+  a false restart contract.
+
   `timeout` bounds each per-example rollout and validation evaluation (default
   5000ms) and is a BEAM-native execution option: pass a larger value or
   `:infinity` when rollouts are slow — agentic or environment-backed programs
@@ -19,7 +26,7 @@ defmodule Imp.Optimizer.GRPO do
   """
 
   alias Imp.Clients.{ReinforcementSession, Trainer, TrainingJob, TRLProtocol}
-  alias Imp.Optimizer.{GRPO.Checkpoint, Sampling, TrajectoryRunner}
+  alias Imp.Optimizer.{GRPO.Callback, GRPO.Checkpoint, Sampling, TrajectoryRunner}
 
   defstruct [
     :reward_fn,
@@ -46,7 +53,10 @@ defmodule Imp.Optimizer.GRPO do
 
   @option_schema [
     trainer: [type: {:custom, __MODULE__, :validate_trainer, []}, default: nil],
-    validation_fn: [type: {:or, [{:fun, 3}, nil]}, default: nil],
+    validation_fn: [
+      type: {:custom, __MODULE__, :validate_validation_callback, []},
+      default: nil
+    ],
     num_train_steps: [type: :non_neg_integer, default: 100],
     seed: [type: :integer, default: 0],
     num_dspy_examples_per_grpo_step: [type: :pos_integer, default: 1],
@@ -108,6 +118,16 @@ defmodule Imp.Optimizer.GRPO do
     do: {:error, "expected :infinity or a positive integer"}
 
   @doc false
+  def validate_validation_callback(nil), do: {:ok, nil}
+  def validate_validation_callback(callback) when is_function(callback, 3), do: {:ok, callback}
+
+  def validate_validation_callback(%Callback{kind: :validation} = callback),
+    do: {:ok, callback}
+
+  def validate_validation_callback(_callback),
+    do: {:error, "expected nil, an arity-three function, or a stable GRPO validation callback"}
+
+  @doc false
   def validate_trainer(trainer) when is_function(trainer) do
     {:error,
      "expected nil or a trainer module or struct implementing the GRPO reinforcement lifecycle"}
@@ -158,6 +178,7 @@ defmodule Imp.Optimizer.GRPO do
     with {:ok, trainset} <- materialize_dataset(trainset, :trainset),
          {:ok, valset} <- materialize_dataset(Keyword.get(opts, :valset), :valset),
          :ok <- validate_compile_inputs(optimizer, program, trainset, valset),
+         :ok <- validate_durable_callbacks(optimizer),
          :ok <- Trainer.supports_method(optimizer.trainer, :grpo),
          lm <- program_lm(program),
          identity <- checkpoint_identity(optimizer, lm, trainset, valset),
@@ -769,6 +790,7 @@ defmodule Imp.Optimizer.GRPO do
   end
 
   defp callback_identity(nil), do: nil
+  defp callback_identity(%Callback{} = callback), do: Callback.identity(callback)
 
   defp callback_identity(callback) when is_function(callback) do
     [:module, :name, :arity, :type, :uniq, :index]
@@ -778,6 +800,8 @@ defmodule Imp.Optimizer.GRPO do
       callback |> :erlang.fun_info(:env) |> elem(1) |> compatibility_identity()
     )
   end
+
+  defp compatibility_identity(%Callback{} = callback), do: Callback.identity(callback)
 
   defp compatibility_identity(%module{} = struct) do
     struct
@@ -1115,8 +1139,14 @@ defmodule Imp.Optimizer.GRPO do
 
           :ok
 
-        fun ->
-          case fun.(program, dataset, context) do
+        callback ->
+          result =
+            case callback do
+              %Callback{} -> Callback.invoke(callback, program, dataset, context)
+              fun -> fun.(program, dataset, context)
+            end
+
+          case result do
             :ok -> :ok
             {:ok, _result} -> :ok
             {:error, _reason} = error -> error
@@ -1404,15 +1434,36 @@ defmodule Imp.Optimizer.GRPO do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
   end
 
+  defp trajectory_metric(%Callback{kind: :reward} = callback),
+    do: fn example, prediction -> Callback.invoke(callback, example, prediction) end
+
   defp trajectory_metric(reward_fn) when is_function(reward_fn, 3), do: reward_fn
   defp trajectory_metric(reward_fn) when is_function(reward_fn, 2), do: reward_fn
   defp trajectory_metric(reward_fn), do: fn example, _prediction -> reward_fn.(example) end
 
   defp validate_reward!(reward_fn) do
-    unless is_function(reward_fn) and
-             Enum.any?([1, 2, 3], &:erlang.is_function(reward_fn, &1)) do
+    unless match?(%Callback{kind: :reward}, reward_fn) or
+             (is_function(reward_fn) and
+                Enum.any?([1, 2, 3], &:erlang.is_function(reward_fn, &1))) do
       raise ArgumentError,
-            "Imp.Optimizer.GRPO.new/2 expects a reward function with arity 1, 2, or 3"
+            "Imp.Optimizer.GRPO.new/2 expects a stable reward callback or a reward function with arity 1, 2, or 3"
     end
   end
+
+  defp validate_durable_callbacks(%{checkpoint_path: nil}), do: :ok
+
+  defp validate_durable_callbacks(%{reward_fn: %Callback{} = reward, validation_fn: nil}),
+    do: Callback.validate(reward, :reward)
+
+  defp validate_durable_callbacks(%{
+         reward_fn: %Callback{} = reward,
+         validation_fn: %Callback{} = validation
+       }) do
+    with :ok <- Callback.validate(reward, :reward),
+         :ok <- Callback.validate(validation, :validation),
+         do: :ok
+  end
+
+  defp validate_durable_callbacks(_optimizer),
+    do: {:error, :stable_grpo_callbacks_required_for_checkpoint}
 end

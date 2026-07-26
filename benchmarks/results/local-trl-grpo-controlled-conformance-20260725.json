@@ -8,9 +8,9 @@
   ],
   "boundary_audit": {
     "adapter_to_worker": "The predecessor retained the exact ordered canonical Imp.Adapter.Chat completions and rewards. The source-to-render validation repair was not reached during this continuation.",
-    "checkpoint_identity": "The saved identity embeds Erlang fun_info module/name/type/uniq/index for the runner-local anonymous reward callback. Recompiling the same runner changes that local function identity, so a fresh OS invocation cannot reconcile the otherwise unchanged checkpoint.",
+    "checkpoint_identity": "The saved identity embeds Erlang fun_info module/name/type/uniq/index for the runner-local anonymous reward callback. The continuation required recorder-only edits to preserve the predecessor result, recompiling the surrounding script module and changing that local function identity despite an unchanged callback body and treatment. This does not prove failure for a byte-identical runner restart.",
     "protocol_to_trl": "Static reduction confirms the sealed protocol supplies the official TRL 1.6.0 rollout_func required prompt_ids, completion_ids, and logprobs fields; external_rewards is forwarded as an extra field to the reward function. This path remains unexecuted because checkpoint reconciliation stopped first.",
-    "safe_reduction": "A resumable public run must bind reward and validation semantics to an explicitly stable callback identity rather than a compiler-local anonymous fun identity. The existing sealed session cannot be rewritten safely without changing its identity."
+    "safe_reduction": "A resumable public run that permits treatment-neutral harness changes needs an explicitly stable reward/validation callback identity rather than compiler-local anonymous-fun identity. The existing sealed session cannot be rewritten safely without changing its identity."
   },
   "checkpoint": {
     "path": "/Users/deepfates/.cache/imp/trl/controlled-conformance-v1/imp-grpo-checkpoint.bin",

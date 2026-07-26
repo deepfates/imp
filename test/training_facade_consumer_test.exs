@@ -60,6 +60,16 @@ defmodule Imp.TrainingFacadeConsumerTest do
     def final_model_artifact(_trainer, _session), do: {:ok, "local/grpo-trained"}
   end
 
+  defmodule StableGRPOCallbacks do
+    def reward(_example, _prediction, %{"value" => value}), do: value
+
+    def validate(_program, rows, context, %{"path" => path}) do
+      record = %{"rows" => Enum.map(rows, &Imp.get(&1, :question)), "context" => context}
+      File.write!(path, Jason.encode!(record) <> "\n", [:append, :sync])
+      :ok
+    end
+  end
+
   defp program do
     Imp.predict("question -> answer", lm: %LocalLM{model: "local/base"})
   end
@@ -159,16 +169,26 @@ defmodule Imp.TrainingFacadeConsumerTest do
 
     on_exit(fn -> File.rm(checkpoint) end)
 
-    validation_fn = fn _program, rows, context ->
-      send(self(), {:grpo_validation, Enum.map(rows, &Imp.get(&1, :question)), context})
-      :ok
-    end
+    validation_path = checkpoint <> ".validation"
+    on_exit(fn -> File.rm(validation_path) end)
+
+    reward =
+      Imp.Optimizer.GRPO.Callback.reward(StableGRPOCallbacks, :reward,
+        id: "consumer-constant-reward-v1",
+        config: %{"value" => 1.0}
+      )
+
+    validation =
+      Imp.Optimizer.GRPO.Callback.validation(StableGRPOCallbacks, :validate,
+        id: "consumer-validation-v1",
+        config: %{"path" => validation_path}
+      )
 
     optimizer =
       Imp.Optimizer.GRPO.new(
-        fn _example, _prediction -> 1.0 end,
+        reward,
         trainer: %LocalGRPOTrainer{owner: self()},
-        validation_fn: validation_fn,
+        validation_fn: validation,
         num_train_steps: 1,
         num_rollouts_per_grpo_step: 2,
         status_poll_interval_ms: 0,
@@ -192,8 +212,11 @@ defmodule Imp.TrainingFacadeConsumerTest do
 
     assert_received {:grpo_groups, [%{group: group}]}
     assert length(group) == 2
-    assert_received {:grpo_validation, ["validation 2+2?"], %{step: -1, final?: false}}
-    assert_received {:grpo_validation, ["validation 2+2?"], %{step: 0, final?: true}}
+
+    assert validation_path |> File.stream!() |> Enum.map(&Jason.decode!/1) == [
+             %{"rows" => ["validation 2+2?"], "context" => %{"step" => -1, "final?" => false}},
+             %{"rows" => ["validation 2+2?"], "context" => %{"step" => 0, "final?" => true}}
+           ]
 
     assert Imp.ProgramAccess.lm(trained).model == "local/grpo-trained"
     assert Imp.ProgramAccess.get_metadata(trained, :training_artifact).method == :grpo

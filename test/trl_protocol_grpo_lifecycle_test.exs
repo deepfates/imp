@@ -25,11 +25,10 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
 
     optimizer =
       Imp.Optimizer.GRPO.new(
-        fn example, prediction ->
-          if String.starts_with?(Imp.get(prediction, :answer), Imp.get(example, :question)),
-            do: 1.0,
-            else: 0.0
-        end,
+        Imp.Optimizer.GRPO.Callback.reward(Imp.Test.StableGRPOCallbacks, :reward,
+          id: "trl-conformance-reward-v1",
+          config: %{"value" => 1.0}
+        ),
         trainer: %Imp.Test.TRLConformanceTrainer{server: context.server},
         num_train_steps: 2,
         num_rollouts_per_grpo_step: 2,
@@ -162,7 +161,11 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
       )
 
     optimizer =
-      Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
+      Imp.Optimizer.GRPO.new(
+        Imp.Optimizer.GRPO.Callback.reward(Imp.Test.StableGRPOCallbacks, :reward,
+          id: "trl-crash-window-reward-v1",
+          config: %{"value" => 1.0}
+        ),
         trainer: %Imp.Test.TRLConformanceTrainer{server: server},
         num_train_steps: 1,
         num_rollouts_per_grpo_step: 2,
