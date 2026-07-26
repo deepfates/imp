@@ -7,10 +7,13 @@ optimizer families and the adapters carry executable differential tests that
 run real DSPy 3.2.1 in a sidecar and compare arm to arm; other surfaces are
 held by behavioral conformance tests or are deliberate Elixir-native
 equivalents, and two surface groups are marked as honest gaps (missing
-exact-reproduction evidence, not divergent algorithms). Where an Imp module
-wears a DSPy name, it carries DSPy's semantics; Imp-only behaviors carry
-Imp-only names (`Imp.Adapter.PlanFirst`, `Imp.Retrievers.KNN`). The
-conformance table below shows which is which, per surface.
+exact-reproduction evidence or declared algorithmic deviations). A shared DSPy
+name means that Imp implements the same user capability and identifies the
+pinned upstream mechanism; it does **not** by itself promise identical Python
+control flow or results. Each family is classified as conformant,
+Elixir-native, or a gap by the conformance table and its linked fidelity page.
+Imp-only behaviors normally carry Imp-only names
+(`Imp.Adapter.PlanFirst`, `Imp.Retrievers.KNN`).
 
 ## The mapping
 
@@ -28,7 +31,7 @@ conformance table below shows which is which, per surface.
 | `LabeledFewShot`, `BootstrapFewShot`, `BootstrapRS` | Same names, `Imp.Optimizer.*` |
 | `KNNFewShot` | Same name, same semantics: per-call embedding retrieval (required `vectorizer:`) plus a metric/teacher-driven BootstrapFewShot over the neighbors, proven against real DSPy by a deterministic-embedder differential |
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
-| `BootstrapFinetune`, `GRPO`, `Ensemble`, `BetterTogether`, `Avatar` | Same names; local MLX SFT belongs to `BootstrapFinetune`, while `GRPO` requires an explicit reinforcement trainer and can use Imp's bundled local TRL/MPS backend |
+| `BootstrapFinetune`, `GRPO`, `Ensemble`, `BetterTogether`, `Avatar` | Same capability families, with explicit BEAM-native contracts: local MLX SFT belongs to `BootstrapFinetune`; `GRPO` requires an explicit reinforcement trainer and can use the bundled local TRL/MPS backend; `Ensemble` returns one normalized `Prediction` and isolates failed children; `Avatar` uses a bounded typed-action runtime and separate finisher |
 | `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
 | `dspy.configure(lm=...)` | `Imp.configure(lm: ...)` sets a supervised node-local default; explicit `lm:` per program is the recommended style |
 | `dspy.context(lm=...)` | `Imp.context([lm: ...], fn -> ... end)` — process-scoped |
@@ -58,6 +61,16 @@ experimental WASM sandbox, with process isolation as the safety boundary.
 **Artifacts are strict.** Saved programs are checksummed and never contain
 credentials; you rebind the live model at load time. This is the same
 save/load story as DSPy with the operational edges sharpened.
+
+**Some shared optimizer names are native adaptations, not compatibility
+modes.** `Avatar` adds explicit policy, timeout, observation, and finisher
+boundaries; `AvatarOptimizer` validates the rewritten candidate before keeping
+it rather than installing a rewrite from its predecessor score;
+`Ensemble` normalizes child output and failure handling into an Imp
+`Prediction`; and weight optimizers use explicit asynchronous trainer artifacts
+instead of mutating a Python LM object. These are intentional public semantics.
+Their source-bound tests cover named shared observations, not whole-loop parity
+or comparative superiority.
 
 ## What is not identical
 
