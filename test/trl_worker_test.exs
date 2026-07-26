@@ -107,6 +107,15 @@ defmodule Imp.TRLWorkerTest do
              :imp |> :code.priv_dir() |> to_string() |> Path.join("trl_worker/worker.py")
 
     assert trainer.model_path == context.model
+
+    default =
+      TRLTrainer.new(
+        python: context.python,
+        model_path: context.model,
+        root: context.root
+      )
+
+    assert Path.basename(default.contract_path) == "qwen-one-update-contract.json"
   end
 
   test "the local rollout LM cannot silently create a second worker" do
@@ -231,5 +240,95 @@ defmodule Imp.TRLWorkerTest do
     """
 
     assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)
+  end
+
+  test "ordinary one-update contracts accept arbitrary prompts and finite reward scales",
+       context do
+    general_contract =
+      context.contract
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.drop(["semantic_group", "controlled_rollouts"])
+      |> put_in(["optimizer", "num_generations"], 2)
+      |> Map.put("acceptance", %{
+        "require_non_uniform_rewards" => false,
+        "require_non_uniform_advantages" => false,
+        "require_weight_change" => false
+      })
+
+    contract_path = Path.join(context.root, "general-contract.json")
+    File.mkdir_p!(context.root)
+    File.write!(contract_path, Jason.encode!(general_contract))
+
+    script = """
+    import importlib.util
+    import pathlib
+    spec = importlib.util.spec_from_file_location("imp_trl_worker", #{inspect(Path.expand("../priv/trl_worker/worker.py", __DIR__))})
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    class Tokenizer:
+        def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=True):
+            return "|".join(message["content"] for message in messages)
+        def __call__(self, text, add_special_tokens=False):
+            return {"input_ids": [len(text), 7]}
+
+    class NoModelWorker(module.Worker):
+        def _completion_logprobs(self, prompt_ids, completion_ids):
+            return [-0.5 for _ in completion_ids]
+
+    worker = NoModelWorker(pathlib.Path(#{inspect(context.root)}) / "general", pathlib.Path(#{inspect(context.model)}), pathlib.Path(#{inspect(contract_path)}))
+    worker.protocol = {
+        "session_id": "general-session",
+        "payload_sha256": "sha256:session",
+        "optimizer": {"config_sha256": "sha256:optimizer"},
+        "rng": {"algorithm": "exsss", "state_sha256": "sha256:rng"},
+        "behavior_policy": {"model": "pinned-local"},
+    }
+    worker.model = object()
+    worker.tokenizer = Tokenizer()
+    group = {
+        "batch_id": "batch-0",
+        "group_id": [0, "router", 0],
+        "predictor": "router",
+        "group": [
+            {"messages": [{"role": "user", "content": "public synthetic arithmetic: 2+2"}], "completion": {"content": "4"}, "reward": 0.25},
+            {"messages": [{"role": "user", "content": "public synthetic arithmetic: 2+2"}], "completion": {"content": "five"}, "reward": 0.25},
+        ],
+    }
+    prepared = worker.prepare_update({"groups": [group], "step_id": "step-0", "idempotency_key": "update-0"})
+    assert [sample["reward"] for sample in prepared["groups"][0]["samples"]] == [0.25, 0.25]
+    assert prepared["groups"][0]["prompt"][0]["content"].endswith("2+2")
+    assert (worker.root / "prepared-controlled-group.json").is_file()
+    """
+
+    assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)
+  end
+
+  test "trainer rejects rollout and step budgets before starting a worker", context do
+    trainer =
+      TRLTrainer.new(
+        python: context.python,
+        model_path: context.model,
+        root: Path.join(context.root, "mismatch"),
+        contract_path: context.contract,
+        worker_key: {:trl_contract_mismatch, make_ref()}
+      )
+
+    protocol_contract = %{
+      "dataset" => %{},
+      "prompt_schedule" => %{"steps" => [%{"step" => 0}, %{"step" => 1}]},
+      "optimizer" => %{},
+      "rng" => %{}
+    }
+
+    assert {:error, :trl_contract_runtime_mismatch} =
+             TRLTrainer.start_reinforcement(trainer, %{model: "unused"},
+               dispatch_id: "no-worker",
+               num_generations: 3,
+               imp_reinforcement_contract: protocol_contract
+             )
+
+    assert Registry.lookup(Imp.Clients.TRLWorker.Registry, trainer.worker_key) == []
   end
 end

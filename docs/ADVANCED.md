@@ -252,6 +252,42 @@ trainer = Imp.Clients.OpenAITrainer.new(training_file: "file-provider-id")
 OpenAI trainer submits a fine-tuning job for an already uploaded provider file;
 it does not upload examples itself.
 
+### Optional local TRL GRPO
+
+`Imp.Clients.TRLTrainer` is a local Apple-Silicon backend for one real LoRA
+GRPO update. Its bundled contract pins Qwen2.5-0.5B-Instruct at revision
+`7ae557604adf67be50417f59c2c2f167def9a775`, CPython 3.12, TRL 1.6.0,
+Transformers 4.57.6, PEFT 0.18.1, and PyTorch 2.10.0 on MPS with CPU fallback
+disabled. Imp does not install those dependencies or download the model.
+
+```elixir
+trainer =
+  Imp.Clients.TRLTrainer.new(
+    python: "/path/to/pinned-venv/bin/python",
+    model_path: "/path/to/pinned-qwen-snapshot",
+    root: "var/trl-sessions"
+  )
+
+grpo =
+  Imp.Optimizer.GRPO.new(reward,
+    trainer: trainer,
+    num_train_steps: 1,
+    num_rollouts_per_grpo_step: 4
+  )
+
+{:ok, result} = Imp.train(program, grpo, trainset)
+```
+
+The default worker accepts any Imp-rendered prompt and finite external reward;
+it does not require Banking77, opaque route labels, binary rewards, or a tensor
+change. Uniform group rewards are a valid GRPO no-op and are recorded honestly.
+The retained controlled-rollout contract separately requires non-uniform
+rewards, advantages, and changed tensors as conformance assertions. Rollout
+count and the exactly-one-step budget are checked before model loading.
+Multi-step crash-safe restoration is still unsupported: use an external
+trainer for longer jobs rather than treating repeated one-step jobs as an
+equivalent optimizer trajectory.
+
 ### Optional local MLX-LM SFT
 
 Apple Silicon hosts can install the separately versioned trainer executable:

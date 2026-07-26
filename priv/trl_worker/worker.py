@@ -120,6 +120,7 @@ class Worker:
         self.model_path = model_path.resolve()
         self.contract_path = contract_path.resolve()
         self.contract = json.loads(self.contract_path.read_text())
+        self._validate_contract()
         self.protocol: dict[str, Any] | None = None
         self.prepared: dict[str, Any] | None = None
         self.model = None
@@ -210,6 +211,11 @@ class Worker:
             raise WorkerError("engine_identity_mismatch", "session engine is not pinned TRL")
         if self.model is None:
             raise WorkerError("worker_not_initialized", "initialize must precede session binding")
+        if len(protocol.get("prompt_schedule", {}).get("steps", [])) != 1:
+            raise WorkerError(
+                "unsupported_step_budget",
+                "the local TRL worker currently supports exactly one durable optimizer update",
+            )
         if self.protocol_path.exists():
             previous = json.loads(self.protocol_path.read_text())
             if previous.get("payload_sha256") != protocol.get("payload_sha256"):
@@ -234,27 +240,15 @@ class Worker:
         if self.protocol is None or self.model is None or self.tokenizer is None:
             raise WorkerError("worker_not_bound", "initialized session is required")
         if self.step != 0:
-            raise WorkerError("one_update_budget_exhausted", "feasibility worker permits exactly one update")
+            raise WorkerError("one_update_budget_exhausted", "local TRL worker permits exactly one update")
         groups = request.get("groups")
         if not isinstance(groups, list) or len(groups) != 1:
-            raise WorkerError("semantic_group_mismatch", "exactly one prompt group is required")
+            raise WorkerError("group_count_mismatch", "exactly one pending prompt group is required")
 
         encoded_groups = [self._encode_group(groups[0], 0)]
         self._persist_prepared_group(encoded_groups)
         self._validate_controlled_groups(encoded_groups)
-        prompt_text = "\n".join(
-            message["content"] for message in encoded_groups[0]["prompt"]
-        )
-        semantic = self.contract["semantic_group"]
-        if semantic["utterance"] not in prompt_text:
-            raise WorkerError("semantic_prompt_mismatch", "frozen Banking77 utterance is absent")
-        if not all(route in prompt_text for route in semantic["allowed_routes"]):
-            raise WorkerError("route_contract_mismatch", "frozen opaque route set is absent")
-        rewards = [sample["reward"] for sample in encoded_groups[0]["samples"]]
-        if any(reward not in (0.0, 1.0) for reward in rewards):
-            raise WorkerError("reward_contract_mismatch", "external rewards must be binary semantic scores")
-        if len(set(rewards)) < 2:
-            raise WorkerError("uniform_rewards", "non-uniform external rewards are required")
+        self._validate_acceptance_assertions(encoded_groups)
 
         optimizer_state = {
             "global_step": 0,
@@ -473,12 +467,13 @@ class Worker:
         after_digest = self._trainable_digest(self.model)
         if trainer.state.global_step != 1:
             raise WorkerError("optimizer_step_mismatch", f"expected step 1, got {trainer.state.global_step}", accepted=True)
-        if before_digest == after_digest:
+        acceptance = self._acceptance()
+        if acceptance["require_weight_change"] and before_digest == after_digest:
             raise WorkerError("trainable_tensor_unchanged", "LoRA tensors did not change", accepted=True)
         advantages = trainer.imp_advantages
         if not isinstance(advantages, list) or len(advantages) != len(samples):
             raise WorkerError("advantages_missing", "TRL did not expose the grouped advantages", accepted=True)
-        if len({round(float(value), 8) for value in advantages}) < 2:
+        if acceptance["require_non_uniform_advantages"] and len({round(float(value), 8) for value in advantages}) < 2:
             raise WorkerError("advantages_uniform", "TRL relative advantages are uniform", accepted=True)
 
         staging = self.root / ".artifact.tmp"
@@ -556,6 +551,7 @@ class Worker:
                 "global_step_before": 0,
                 "global_step_after": trainer.state.global_step,
                 "training_loss": float(train_result.training_loss),
+                "trainable_tensors_changed": before_digest != after_digest,
                 "device": "mps",
             },
         )
@@ -659,6 +655,78 @@ class Worker:
                     "controlled_rollout_order_mismatch",
                     "controlled completion differs from its canonical adapter rendering",
                 )
+
+    def _acceptance(self) -> dict[str, bool]:
+        # Older retained feasibility contracts predate the explicit acceptance
+        # object. Their semantic_group was an experiment assertion, so preserve
+        # its strict behavior without imposing it on ordinary trainer contracts.
+        legacy_strict = "semantic_group" in self.contract
+        configured = self.contract.get("acceptance", {})
+        return {
+            "require_non_uniform_rewards": configured.get(
+                "require_non_uniform_rewards", legacy_strict
+            ),
+            "require_non_uniform_advantages": configured.get(
+                "require_non_uniform_advantages", legacy_strict
+            ),
+            "require_weight_change": configured.get("require_weight_change", legacy_strict),
+        }
+
+    def _validate_acceptance_assertions(self, encoded_groups: list[dict[str, Any]]) -> None:
+        semantic = self.contract.get("semantic_group")
+        if semantic is not None:
+            prompt_text = "\n".join(
+                message["content"] for message in encoded_groups[0]["prompt"]
+            )
+            if semantic["utterance"] not in prompt_text:
+                raise WorkerError("semantic_prompt_mismatch", "frozen semantic utterance is absent")
+            if not all(value in prompt_text for value in semantic["allowed_routes"]):
+                raise WorkerError("route_contract_mismatch", "frozen semantic labels are absent")
+            rewards = [sample["reward"] for sample in encoded_groups[0]["samples"]]
+            if any(reward not in (0.0, 1.0) for reward in rewards):
+                raise WorkerError("reward_contract_mismatch", "frozen semantic rewards must be binary")
+
+        rewards = [sample["reward"] for sample in encoded_groups[0]["samples"]]
+        if self._acceptance()["require_non_uniform_rewards"] and len(set(rewards)) < 2:
+            raise WorkerError("uniform_rewards", "non-uniform external rewards are required")
+
+    def _validate_contract(self) -> None:
+        allowed = {
+            "schema_version", "purpose", "python", "dependencies", "model", "device",
+            "optimizer", "semantic_group", "controlled_rollouts", "acceptance",
+        }
+        unknown = set(self.contract) - allowed
+        if unknown:
+            raise WorkerError("unknown_contract_keys", f"unsupported contract keys: {sorted(unknown)}")
+        if self.contract.get("schema_version") != 1:
+            raise WorkerError("contract_schema_mismatch", "worker requires contract schema v1")
+        if self.contract.get("python") != "3.12":
+            raise WorkerError("contract_python_mismatch", "worker requires CPython 3.12")
+        for key in ("dependencies", "model", "device", "optimizer"):
+            if not isinstance(self.contract.get(key), dict):
+                raise WorkerError("invalid_contract", f"contract {key} must be an object")
+        optimizer = self.contract["optimizer"]
+        required_optimizer = {
+            "seed", "num_generations", "max_steps", "max_completion_length", "temperature",
+            "learning_rate", "loss_type", "scale_rewards", "beta", "lora",
+        }
+        if set(optimizer) != required_optimizer:
+            raise WorkerError("invalid_optimizer_contract", "optimizer contract keys do not match")
+        if optimizer["max_steps"] != 1:
+            raise WorkerError(
+                "unsupported_step_budget",
+                "the local TRL worker currently supports exactly one durable optimizer update",
+            )
+        if not isinstance(optimizer["num_generations"], int) or optimizer["num_generations"] < 2:
+            raise WorkerError("invalid_optimizer_contract", "num_generations must be at least two")
+        acceptance = self.contract.get("acceptance", {})
+        allowed_acceptance = {
+            "require_non_uniform_rewards", "require_non_uniform_advantages", "require_weight_change"
+        }
+        if not isinstance(acceptance, dict) or set(acceptance) - allowed_acceptance:
+            raise WorkerError("invalid_acceptance_contract", "acceptance assertions are invalid")
+        if any(not isinstance(value, bool) for value in acceptance.values()):
+            raise WorkerError("invalid_acceptance_contract", "acceptance assertions must be booleans")
 
     def _completion_logprobs(self, prompt_ids: list[int], completion_ids: list[int]) -> list[float]:
         torch = self.torch

@@ -6,6 +6,14 @@ defmodule Imp.Clients.TRLTrainer do
   `Imp.Clients.TRLProtocol` to the bundled worker and supports only GRPO.
   Constructing the backend does not install Python packages or download a
   model. The configured Python environment and model tree must already exist.
+
+  The bundled default contract pins Qwen2.5-0.5B, TRL 1.6.0, and one durable
+  MPS LoRA update. It accepts arbitrary Imp-rendered prompt groups and finite
+  external rewards. Experiment-specific assertions such as a required tensor
+  change belong in an explicit contract; they are not imposed on ordinary
+  training, where a uniform-reward group may truthfully produce a no-op step.
+  Multi-step optimizer-state restoration is not yet supported and mismatched
+  rollout or step budgets fail before the worker loads the model.
   """
 
   @behaviour Imp.Clients.Trainer
@@ -33,7 +41,11 @@ defmodule Imp.Clients.TRLTrainer do
       model_path: Keyword.fetch!(opts, :model_path),
       root: root,
       contract_path:
-        Keyword.get(opts, :contract_path, Path.join(priv, "trl_worker/feasibility-contract.json")),
+        Keyword.get(
+          opts,
+          :contract_path,
+          Path.join(priv, "trl_worker/qwen-one-update-contract.json")
+        ),
       worker_script: Keyword.get(opts, :worker_script, Path.join(priv, "trl_worker/worker.py")),
       worker_key: Keyword.get(opts, :worker_key, {:trl_worker, Path.expand(root)}),
       timeout: Keyword.get(opts, :timeout, 120_000)
@@ -48,7 +60,8 @@ defmodule Imp.Clients.TRLTrainer do
     dispatch_id = Keyword.fetch!(opts, :dispatch_id)
     contract = Keyword.fetch!(opts, :imp_reinforcement_contract)
 
-    with {:ok, worker} <- start_worker(trainer, dispatch_id),
+    with :ok <- validate_launch_contract(trainer, opts, contract),
+         {:ok, worker} <- start_worker(trainer, dispatch_id),
          {:ok, identity} <- request(trainer, worker, %{"op" => "initialize"}),
          :ok <- exact_model(identity, lm, trainer),
          {:ok, protocol} <- build_session(dispatch_id, identity, contract),
@@ -168,6 +181,26 @@ defmodule Imp.Clients.TRLTrainer do
       model_path: trainer.model_path,
       contract_path: trainer.contract_path
     })
+  end
+
+  defp validate_launch_contract(trainer, opts, protocol_contract) do
+    with {:ok, bytes} <- File.read(trainer.contract_path),
+         {:ok, worker_contract} <- Jason.decode(bytes),
+         %{"optimizer" => optimizer} when is_map(optimizer) <- worker_contract,
+         generations when is_integer(generations) <- Map.get(optimizer, "num_generations"),
+         steps when is_integer(steps) <- Map.get(optimizer, "max_steps"),
+         schedule when is_list(schedule) <-
+           get_in(protocol_contract, ["prompt_schedule", "steps"]),
+         true <- generations == Keyword.fetch!(opts, :num_generations),
+         true <- steps == length(schedule) do
+      :ok
+    else
+      {:error, reason} -> {:error, {:trl_contract_unreadable, reason}}
+      false -> {:error, :trl_contract_runtime_mismatch}
+      _other -> {:error, :invalid_trl_contract}
+    end
+  rescue
+    error -> {:error, {:invalid_trl_contract, Exception.message(error)}}
   end
 
   defp stop_worker(trainer) do

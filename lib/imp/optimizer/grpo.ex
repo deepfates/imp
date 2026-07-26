@@ -271,7 +271,7 @@ defmodule Imp.Optimizer.GRPO do
       optimizer.train_kwargs
       |> Keyword.put(:num_generations, optimizer.num_rollouts_per_grpo_step)
       |> Keyword.put(:imp_reinforcement_contract, reinforcement_contract(identity))
-      |> maybe_put_dispatch_id(optimizer.checkpoint_path, dispatch_id)
+      |> Keyword.put_new(:dispatch_id, dispatch_id)
 
     case bounded_callback(optimizer, :start_reinforcement, fn ->
            Trainer.start_reinforcement(optimizer.trainer, lm, opts)
@@ -290,11 +290,6 @@ defmodule Imp.Optimizer.GRPO do
         {:error, reason}
     end
   end
-
-  defp maybe_put_dispatch_id(opts, path, dispatch_id) when is_binary(path),
-    do: Keyword.put_new(opts, :dispatch_id, dispatch_id)
-
-  defp maybe_put_dispatch_id(opts, _path, _dispatch_id), do: opts
 
   defp run_started_session(
          optimizer,

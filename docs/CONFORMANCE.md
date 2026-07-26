@@ -553,7 +553,9 @@ Missing evidence or behavior:
 
 - paid-provider weight-training execution evidence
 - BetterTogether paid-provider lifecycle completion
-- a real TRL/PyTorch worker, GRPO loss/gradient execution, and changed model weights (the current TRL protocol server is deterministic and no-model)
+- ordinary model-sampled GRPO learning and usefulness beyond the supported
+  one-update local TRL boundary; the retained controlled external-rollout run
+  proves MPS loss/gradient execution and changed LoRA tensors only
 - matched Avatar and AvatarOptimizer effectiveness
 - matched BetterTogether and GRPO effectiveness
 

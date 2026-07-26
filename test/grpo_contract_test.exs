@@ -143,6 +143,10 @@ defmodule GRPOContractTest do
   test "orders pending ids, predictor groups, and repeated rollouts structurally" do
     {compiled, [first, second]} = run(7)
 
+    assert_received {:start, _lm, start_opts}
+    assert is_binary(start_opts[:dispatch_id])
+    assert start_opts[:dispatch_id] != ""
+
     assert Enum.map(first, & &1.batch_id) == [10, 11]
     assert Enum.map(second, & &1.batch_id) == [30, 31]
     assert Enum.map(first, & &1.predictor) == [:main, :main]
