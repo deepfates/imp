@@ -299,6 +299,39 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     refute prompt =~ "%{sample: 4}"
   end
 
+  test "seedless resume reuses the sealed seed without another LM call" do
+    receiver = self()
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          send(receiver, :generated_seed)
+          "```text\ngenerated seed\n```"
+        end
+      ]
+    }
+
+    evaluator = fn _candidate -> 1.0 end
+
+    options = [
+      objective: "Produce a useful artifact",
+      config:
+        Config.new(
+          engine: [max_candidate_proposals: 0],
+          reflection: [reflection_lm: lm]
+        )
+    ]
+
+    first = Anything.run(nil, evaluator, options)
+    assert_receive :generated_seed
+
+    resumed = Anything.run(nil, evaluator, Keyword.put(options, :resume_state, first.checkpoint))
+
+    assert Result.best_candidate(resumed) == "generated seed"
+    refute_receive :generated_seed
+  end
+
   test "structured objective scores populate the public objective frontier" do
     result =
       Anything.run(
@@ -586,6 +619,57 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     refute_receive {:evaluated_v1, _candidate}
     refute_receive {:evaluated_v2, _candidate}
     refute_receive {:evaluated_stateful, _candidate}
+  end
+
+  test "resume binds proposal prompts, implementation, and declared semantic identity" do
+    receiver = self()
+
+    evaluator = fn candidate ->
+      send(receiver, {:evaluated, candidate})
+      0.25
+    end
+
+    proposer = fn candidate, component, _records, _iteration ->
+      send(receiver, :proposed_v1)
+      Map.fetch!(candidate, component)
+    end
+
+    options =
+      runner_options(0,
+        objective: "Prefer concise output",
+        background: "Public task",
+        proposal_identity: %{id: "artifact-proposal", version: 1},
+        fallback_proposer: proposer
+      )
+
+    first = Anything.run("base", evaluator, options)
+    assert_receive {:evaluated, "base"}
+
+    changed_proposer = fn candidate, component, _records, _iteration ->
+      send(receiver, :proposed_v2)
+      Map.fetch!(candidate, component)
+    end
+
+    for changed <- [
+          [objective: "Prefer detailed output"],
+          [background: "Private task"],
+          [proposal_identity: %{id: "artifact-proposal", version: 2}],
+          [fallback_proposer: changed_proposer]
+        ] do
+      assert_raise ArgumentError, ~r/resume run identity mismatch/, fn ->
+        Anything.run(
+          "base",
+          evaluator,
+          options
+          |> Keyword.merge(changed)
+          |> Keyword.put(:resume_state, first.checkpoint)
+        )
+      end
+    end
+
+    refute_receive {:evaluated, _candidate}
+    refute_receive :proposed_v1
+    refute_receive :proposed_v2
   end
 
   test "public runner infers optimization-state evaluators in single-task and dataset modes" do

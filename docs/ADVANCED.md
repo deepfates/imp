@@ -137,10 +137,12 @@ validation outputs. Evaluation caching defaults to durable, content-addressed
 JSON storage for run directories and fails closed on corrupt or incompatible
 entries. Without a run directory, enabled caching is in-memory. Persisted
 config and results use tagged JSON codecs; W&B credentials are never written.
-The checkpoint binds evaluator callback/transport identity and the evaluation
-contract. Supply JSON-safe versioned `evaluator_identity:` data when captured
-configuration changes evaluator meaning, so resume refuses objective drift
-before reusing any prior score.
+The checkpoint binds evaluator callback/transport identity, the evaluation
+contract, and the proposal prompt/model/callback contract. Supply JSON-safe
+versioned `evaluator_identity:` or `proposal_identity:` data when captured
+configuration changes evaluator or proposer meaning. Resume refuses semantic
+drift before evaluator/proposer work, and seedless resume reuses its sealed
+initial candidate without another LM call.
 
 External tracking is optional:
 

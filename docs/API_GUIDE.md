@@ -1168,12 +1168,16 @@ frontiers, measured budgets, rejected proposals, history, and a resumable
 engine checkpoint. `test_scores` is the only untouched outcome in this example;
 the optimizer has seen both `training_examples` and validation scores.
 The checkpoint binds the optimization mode, ordered training and validation
-datasets, scalar/batch evaluator implementation, and evaluator contract. For an
-evaluator whose semantics depend on captured configuration, pass JSON-safe
-versioned `evaluator_identity:` data (for example `%{id: "policy-score", version:
-2}`); that identity is hashed into the checkpoint without serializing executable
-code. Resume rejects dataset, callback, contract, or declared-identity drift
-before evaluator work rather than mixing scores from different objectives.
+datasets, scalar/batch evaluator implementation, evaluator contract, proposal
+objective/background/template, proposal LM, and custom/fallback proposer
+implementation. For evaluator or proposer semantics that depend on captured
+configuration, pass JSON-safe versioned `evaluator_identity:` or
+`proposal_identity:` data (for example `%{id: "policy-score", version: 2}`);
+those identities are hashed into the checkpoint without serializing executable
+code. Resume rejects dataset, callback, contract, prompt, model, or
+declared-identity drift before evaluator/proposer work. Seedless resume reuses
+the sealed initial candidate rather than asking the proposal LM to generate it
+again.
 Checkpoints created before this run-identity binding fail closed instead of
 being guessed compatible.
 `Imp.Optimize.Anything.run/3` is the sole Optimize Anything execution

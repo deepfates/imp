@@ -48,6 +48,7 @@ defmodule Imp.Optimize.Anything.Runner do
     :fallback_proposer,
     :objective,
     :optimization_state,
+    :proposal_identity,
     :resume_state,
     :timeout,
     :valset
@@ -64,9 +65,11 @@ defmodule Imp.Optimize.Anything.Runner do
     validate_runtime_support!(config, opts)
 
     evaluator_identity = validate_evaluator_identity!(Keyword.get(opts, :evaluator_identity))
+    proposal_identity = validate_proposal_identity!(Keyword.get(opts, :proposal_identity))
+    resolved_resume_state = resume_state(config, Keyword.get(opts, :resume_state))
 
     {candidate, candidate_format, string_key, structured_codec} =
-      normalize_seed(seed_candidate, config, opts, trainset)
+      normalize_seed(seed_candidate, config, opts, trainset, resolved_resume_state)
 
     validate_candidate_support!(structured_codec, config)
     candidate = inject_refiner_prompt(candidate, config, opts)
@@ -85,7 +88,9 @@ defmodule Imp.Optimize.Anything.Runner do
             evaluator,
             Keyword.get(opts, :batch_evaluator),
             evaluator_contract,
-            evaluator_identity
+            evaluator_identity,
+            proposal_identity,
+            opts
           ),
         evaluator_contract: evaluator_contract,
         batch_evaluator: Keyword.get(opts, :batch_evaluator),
@@ -98,8 +103,6 @@ defmodule Imp.Optimize.Anything.Runner do
         timeout: Keyword.get(opts, :timeout, 30_000)
       ]
       |> maybe_put(:optimization_state, Keyword.get(opts, :optimization_state))
-
-    resolved_resume_state = resume_state(config, Keyword.get(opts, :resume_state))
 
     if structured_codec,
       do: StructuredCandidate.validate_checkpoint!(structured_codec, resolved_resume_state)
@@ -236,7 +239,7 @@ defmodule Imp.Optimize.Anything.Runner do
 
   defp inferred_evaluator_contract(_evaluator, _mode), do: :standard
 
-  defp normalize_seed(nil, config, opts, trainset) do
+  defp normalize_seed(nil, config, opts, trainset, resume_state) do
     objective = Keyword.get(opts, :objective)
 
     unless is_binary(objective) and String.trim(objective) != "" do
@@ -249,14 +252,20 @@ defmodule Imp.Optimize.Anything.Runner do
       raise ArgumentError, "Optimize Anything seedless mode requires reflection.reflection_lm"
     end
 
-    generated = generate_seed!(lm, objective, Keyword.get(opts, :background), trainset)
+    generated =
+      if is_nil(resume_state) do
+        generate_seed!(lm, objective, Keyword.get(opts, :background), trainset)
+      else
+        resumed_seed!(resume_state)
+      end
+
     {%{@string_candidate_key => generated}, :string, @string_candidate_key, nil}
   end
 
-  defp normalize_seed(seed, _config, _opts, _trainset) when is_binary(seed),
+  defp normalize_seed(seed, _config, _opts, _trainset, _resume_state) when is_binary(seed),
     do: {%{@string_candidate_key => seed}, :string, @string_candidate_key, nil}
 
-  defp normalize_seed(seed, config, _opts, _trainset) when is_map(seed) do
+  defp normalize_seed(seed, config, _opts, _trainset, _resume_state) when is_map(seed) do
     if Enum.all?(seed, fn {_component, value} -> is_binary(value) end) do
       {Candidate.validate!(seed), :named, nil, nil}
     else
@@ -277,7 +286,7 @@ defmodule Imp.Optimize.Anything.Runner do
     end
   end
 
-  defp normalize_seed(seed, _config, _opts, _trainset) do
+  defp normalize_seed(seed, _config, _opts, _trainset, _resume_state) do
     raise ArgumentError,
           "Optimize Anything seed must be a binary, a named text map, a JSON-safe structured map, or nil; got: #{inspect(seed)}"
   end
@@ -303,6 +312,25 @@ defmodule Imp.Optimize.Anything.Runner do
     |> Imp.LM.generate([%{role: :user, content: prompt}], [])
     |> lm_text!()
     |> extract_fenced_text()
+  end
+
+  defp resumed_seed!(%{"candidates" => [%{"candidate" => encoded} | _]}) do
+    case Imp.Optimizer.Report.decode_term(encoded) do
+      %{@string_candidate_key => seed} when is_binary(seed) -> seed
+      _other -> raise ArgumentError, "Optimize Anything seedless resume state has no text seed"
+    end
+  rescue
+    error in [ArgumentError, KeyError] ->
+      reraise ArgumentError,
+              [
+                message:
+                  "Optimize Anything seedless resume state is invalid: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
+  end
+
+  defp resumed_seed!(_state) do
+    raise ArgumentError, "Optimize Anything seedless resume state is invalid"
   end
 
   defp proposer(config, opts, structured_codec) do
@@ -760,11 +788,13 @@ defmodule Imp.Optimize.Anything.Runner do
          evaluator,
          batch_evaluator,
          evaluator_contract,
-         declared_identity
+         declared_identity,
+         proposal_identity,
+         opts
        ) do
     %{
       "type" => "imp_optimize_anything_run_identity",
-      "schema_version" => 3,
+      "schema_version" => 4,
       "mode" => Atom.to_string(mode),
       "trainset_sha256" => dataset_digest!(trainset, :dataset),
       "valset_sha256" => dataset_digest!(valset, :valset),
@@ -776,8 +806,24 @@ defmodule Imp.Optimize.Anything.Runner do
           declared_identity
         ),
       "candidate_selection_sha256" =>
-        candidate_selection_digest!(config.engine.candidate_selection_strategy)
+        candidate_selection_digest!(config.engine.candidate_selection_strategy),
+      "proposal_sha256" => proposal_digest!(config, opts, proposal_identity)
     }
+  end
+
+  defp proposal_digest!(config, opts, declared_identity) do
+    %{
+      objective: Keyword.get(opts, :objective),
+      background: Keyword.get(opts, :background),
+      reflection_prompt_template: config.reflection.reflection_prompt_template,
+      reflection_lm: runtime_identity(config.reflection.reflection_lm),
+      custom_candidate_proposer: callback_identity(config.reflection.custom_candidate_proposer),
+      fallback_proposer: callback_identity(Keyword.get(opts, :fallback_proposer)),
+      declared_identity: declared_identity
+    }
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
   end
 
   defp candidate_selection_digest!(strategy) do
@@ -818,6 +864,22 @@ defmodule Imp.Optimize.Anything.Runner do
     end)
   end
 
+  defp runtime_identity(callback) when is_function(callback), do: callback_identity(callback)
+  defp runtime_identity(%_{} = struct), do: struct |> Map.from_struct() |> runtime_identity()
+
+  defp runtime_identity(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {key, runtime_identity(value)} end)
+
+  defp runtime_identity(list) when is_list(list), do: Enum.map(list, &runtime_identity/1)
+
+  defp runtime_identity(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.map(&runtime_identity/1) |> List.to_tuple()
+
+  defp runtime_identity(pid) when is_pid(pid), do: :runtime_pid
+  defp runtime_identity(reference) when is_reference(reference), do: :runtime_reference
+  defp runtime_identity(port) when is_port(port), do: :runtime_port
+  defp runtime_identity(value), do: value
+
   defp validate_evaluator_identity!(nil), do: nil
 
   defp validate_evaluator_identity!(identity) do
@@ -828,6 +890,20 @@ defmodule Imp.Optimize.Anything.Runner do
               [
                 message:
                   "Optimize Anything :evaluator_identity must be JSON-safe versioned data: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
+  end
+
+  defp validate_proposal_identity!(nil), do: nil
+
+  defp validate_proposal_identity!(identity) do
+    Config.Persistence.json_safe!(identity, [:proposal_identity])
+  rescue
+    error in ArgumentError ->
+      reraise ArgumentError,
+              [
+                message:
+                  "Optimize Anything :proposal_identity must be JSON-safe versioned data: #{Exception.message(error)}"
               ],
               __STACKTRACE__
   end
