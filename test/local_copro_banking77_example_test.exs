@@ -5,6 +5,7 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
   @readme "examples/local_copro_banking77/README.md"
   @stopped "examples/local_copro_banking77/exercised-pre-fenced-json-fix-stopped-result.json"
   @duplicate_stopped "examples/local_copro_banking77/exercised-post-fenced-json-fix-duplicate-stopped-result.json"
+  @structured_stopped "examples/local_copro_banking77/exercised-structured-duplicate-stopped-result.json"
 
   test "front door follows pinned COPRO trainset selection semantics" do
     source = File.read!(@source)
@@ -80,6 +81,23 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
     assert result["search"]["candidate_score_percent"] == 56.25
     refute result["heldout_opened"]
     assert result["claim_boundary"] =~ "falsifying a genuine prompt mutation"
+  end
+
+  test "schema-constrained duplicate remains stopped before heldout" do
+    result = @structured_stopped |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "stopped_before_heldout"
+    assert result["treatment_id"] == "local-copro-banking77-structured-v1"
+    assert result["search"]["proposal_response_format"] == "required"
+    assert result["search"]["valid_schema_proposal"]
+    refute result["search"]["prompt_instruction_changed"]
+    assert result["search"]["baseline_score_percent"] == 56.25
+    assert result["search"]["candidate_score_percent"] == 56.25
+    assert result["search"]["transport_attempts"] == 33
+    refute result["heldout_opened"]
+    refute result["artifact_created"]
+    refute result["fresh_process_attempted"]
+    assert result["claim_boundary"] =~ "does not prove a genuine prompt mutation"
   end
 
   defp byte_offset!(source, needle) do

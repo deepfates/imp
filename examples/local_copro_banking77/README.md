@@ -66,3 +66,13 @@ either stopped response. It keeps the same retained fused task artifact,
 metric, breadth, depth, temperature, call budget, and one-attempt settings. A
 duplicate, neutral, or worse candidate remains a valid negative result and
 cannot be replaced or retried.
+
+That condition is retained in
+`exercised-structured-duplicate-stopped-result.json`. The schema-constrained
+call returned a valid object, but its instruction was again byte-identical to
+the baseline and only the non-rendered prefix changed to `Route:`. Baseline and
+candidate each completed all sixteen fused-model evaluations and tied at
+`56.25%`; the runner then stopped before held-out access or artifact creation.
+This proves the strict proposal transport works. It remains neither a genuine
+prompt mutation nor a COPRO effectiveness result, and it will not be rerun or
+substituted with a different proposer after observing the outcome.
