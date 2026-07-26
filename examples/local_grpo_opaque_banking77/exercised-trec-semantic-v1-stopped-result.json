@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "stopped",
+  "treatment_id": "model-generated-trec-coarse-disclosed-semantics-v1",
+  "runtime_base_commit": "e2e3d24",
+  "stop_stage": "training_step_3_before_selection_or_test",
+  "stop_reason": "The frozen instruction incorrectly said R42 meant entity and R68 meant human. The committed dataset route legend is R17=DESC, R42=HUM, R68=LOC, R93=NUM; entity is not in this four-class slice.",
+  "preflight_sha256": "30cd69e3eb492e3d2ee41cd352c7be56f40d88d4e4637c975973d2fa5bcb74d5",
+  "base_selection_sha256": "c7bd48f3b0384b9f3f45942ad490680d3940edcc1fadef6c3c539a602329847e",
+  "base_selection": {
+    "accuracy": 0.125,
+    "macro_f1": 0.05555555555555555,
+    "errors": 0
+  },
+  "completed_training_steps": 3,
+  "steps_with_changed_trainable_tensors": 3,
+  "steps_with_nonuniform_rewards": 3,
+  "steps_with_nonzero_advantages": 3,
+  "trained_selection": null,
+  "selected_arm": null,
+  "untouched_test_opened": false,
+  "deployable_artifact_selected": false,
+  "fresh_process_reproduction": false,
+  "claim_boundary": "This stopped run preserves three real model-generated TRL/MPS updates only. Its prompt contradicted the frozen route legend, so it is not semantic usefulness evidence and establishes no optimizer win or loss, general GRPO/mmGRPO effectiveness, parity, production reliability, or BEAM superiority."
+}

@@ -11,6 +11,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @semantic_stopped_result "examples/local_grpo_opaque_banking77/exercised-semantic-v1-stopped-result.json"
   @trec_config "examples/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
   @trec_contract "priv/trl_worker/qwen-trec-14-step-contract.json"
+  @trec_stopped_result "examples/local_grpo_opaque_banking77/exercised-trec-semantic-v1-stopped-result.json"
 
   setup_all do
     output =
@@ -261,6 +262,18 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
              MapSet.new(Enum.map(data["train"], & &1["source_id"])),
              MapSet.new(Enum.map(data["held_out"], & &1["source_id"]))
            )
+  end
+
+  test "mislabeled TREC treatment remains stopped before selection and test" do
+    result = @trec_stopped_result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "stopped"
+    assert result["completed_training_steps"] == 3
+    assert result["steps_with_changed_trainable_tensors"] == 3
+    assert result["trained_selection"] == nil
+    assert result["selected_arm"] == nil
+    refute result["untouched_test_opened"]
+    assert result["stop_reason"] =~ "R42=HUM, R68=LOC"
   end
 
   test "retained run preserves a complete neutral usefulness result" do

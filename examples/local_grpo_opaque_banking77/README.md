@@ -153,6 +153,13 @@ export IMP_GRPO_OPAQUE_OUTPUT=/new/empty/output
 mix run examples/local_grpo_opaque_banking77/run.exs
 ```
 
+That exact condition is preserved as
+`exercised-trec-semantic-v1-stopped-result.json` and must not be resumed. It
+stopped after three real updates, before trained selection or test, because the
+instruction incorrectly mapped `R42` to entity and `R68` to human; the frozen
+dataset legend is `R17=DESC`, `R42=HUM`, `R68=LOC`, `R93=NUM`. Entity is not in
+the slice. The partial run is not a usefulness result.
+
 The trained arm is deployed only if it beats base on the eight validation
 rows. A completed positive, neutral, or negative result remains specific to
 this task, model, seed, and budget.
