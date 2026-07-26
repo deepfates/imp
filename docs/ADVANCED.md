@@ -339,10 +339,10 @@ program = Imp.load!("trained-program.json")
 
 The deployment and fusion path is SFT infrastructure. It does not implement a
 GRPO update, and a changed fused-tree digest alone is not evidence of useful
-trained behavior. The real acceptance probe compares the pinned base and fused
-model on one frozen task input, then requires the fresh-process consumer to
-reproduce the fused output; that is lifecycle/trained-behavior evidence, not a
-general held-out-effectiveness claim.
+trained behavior. The completed acceptance compared the pinned base and fused
+model on 40 untouched rows from a frozen four-intent Banking77 subset, then
+required a fresh-process consumer to reproduce the fused ordered predictions
+and errors byte-for-byte.
 
 #### External process dependency decision
 
@@ -383,19 +383,18 @@ Run the source-checkout campaign with:
 mix imp.benchmark.local_mlx
 ```
 
-The campaign owns the complete local effectiveness proof: immutable dataset and model-tree validation, matched
-base/adapter/fused evaluation, adapter replay verification, the trainer-owned
-fusion artifact, deployment-LM rebinding, checksummed save/load, synchronous
-server cleanup, and a verified run envelope. It requires a clean checkout by default and writes a
-new immutable evidence file rather than overwriting prior results. This evidence
-supports a local weight-training effectiveness claim; it does not by itself
-establish BetterTogether parity.
+The source-checkout campaign validates immutable dataset and model-tree inputs,
+matched evaluation, fusion, deployment rebinding, checksummed save/load, and
+server cleanup. A passing artifact supports only its pinned model, task, split,
+and run; it does not establish general SFT or BetterTogether effectiveness.
 
-The canonical post-hardening campaign at commit `922a85e` improved held-out Banking77
-accuracy from `0.15` to `0.85` and macro-F1 from `0.0769` to `0.8430` across 40
-rows. The fused and save/load-rebound programs produced identical row outcomes.
-`LocalMLXCampaign.validate_artifact/1` independently verifies the checked-in
-artifact before the dashboard admits this narrow claim.
+The preserved public-consumer acceptance at commit `dd6f6ad` used one pinned
+Qwen2.5-0.5B MLX SFT artifact and the frozen four-intent Banking77 subset. On
+the 40 untouched rows, accuracy improved from `0.125` to `0.55` and macro-F1
+from `0.0610` to `0.4561`. The saved program loaded and served the exact fused
+artifact in a fresh OS BEAM with byte-identical ordered predictions and errors.
+This is one-model, one-task evidence; it does not establish general Imp or SFT
+effectiveness, GRPO, production reliability, or BEAM superiority.
 
 MLX-LM `0.31.3` does not admit an adapter-served equivalence claim: its server
 remaps `default_model` before consulting the CLI adapter map, so

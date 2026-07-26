@@ -1,0 +1,2968 @@
+{
+  "artifact_type": "imp_public_consumer_acceptance",
+  "base": {
+    "artifact_path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+    "artifact_sha256": "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947",
+    "server": {
+      "advertised_model_ids": [
+        "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+      ],
+      "base_url": "http://127.0.0.1:18821/v1",
+      "os_pid": 53382,
+      "selected_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+    },
+    "test": {
+      "accuracy": 0.125,
+      "duration_ms": 4409,
+      "errors": 7,
+      "macro_f1": 0.06097560975609756,
+      "rows": [
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-800",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "2",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-801",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "3",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-802",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n\n[[ ## completed ## ]]",
+          "request_id": "4",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": null,
+          "correct": false,
+          "error": "{:error, {:missing_output_fields, [:route]}}",
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-803",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[R68]",
+          "request_id": "5",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "error",
+          "transport_attempts": 1
+        },
+        {
+          "actual": null,
+          "correct": false,
+          "error": "{:error, {:missing_output_fields, [:route]}}",
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-804",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[R42]",
+          "request_id": "6",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "error",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-805",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "7",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-806",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "8",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-807",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "9",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-808",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "10",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": null,
+          "correct": false,
+          "error": "{:error, {:missing_output_fields, [:route]}}",
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-809",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[R68]",
+          "request_id": "11",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "error",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1080",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "12",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1081",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "13",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1082",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "14",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1083",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "15",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1084",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "16",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1085",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "17",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1086",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "18",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1087",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "19",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1088",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "20",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1089",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "21",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": null,
+          "correct": false,
+          "error": "{:error, {:missing_output_fields, [:route]}}",
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1600",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[R42]",
+          "request_id": "22",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "error",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1601",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "23",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1602",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "24",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": false,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1603",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R93",
+          "request_id": "25",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": null,
+          "correct": false,
+          "error": "{:error, {:missing_output_fields, [:route]}}",
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1604",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[R68]",
+          "request_id": "26",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "error",
+          "transport_attempts": 1
+        },
+        {
+          "actual": null,
+          "correct": false,
+          "error": "{:error, {:missing_output_fields, [:route]}}",
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1605",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[R68]",
+          "request_id": "27",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "error",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1606",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "28",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1607",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "29",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1608",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "30",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R42",
+          "correct": false,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1609",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R42",
+          "request_id": "31",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2080",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "32",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2081",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "33",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2082",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "34",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2083",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "35",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2084",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "36",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2085",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "37",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2086",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68",
+          "request_id": "38",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2087",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n\n[[ ## completed ## ]]",
+          "request_id": "39",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": null,
+          "correct": false,
+          "error": "{:error, {:missing_output_fields, [:route]}}",
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2088",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[R17]",
+          "request_id": "40",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "error",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2089",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]] R68\n[[ ## completed ## ]]",
+          "request_id": "41",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+          "status": "ok",
+          "transport_attempts": 1
+        }
+      ],
+      "transport_attempts": 40
+    }
+  },
+  "cache_isolation": {
+    "environment": {
+      "HF_HOME": "/Users/deepfates/.cache/imp/mlx_lm/acceptance/banking77-public-dd6f6ad/huggingface",
+      "HF_HUB_CACHE": "/Users/deepfates/.cache/imp/mlx_lm/acceptance/banking77-public-dd6f6ad/huggingface/hub",
+      "HF_HUB_OFFLINE": "1",
+      "HUGGINGFACE_HUB_CACHE": "/Users/deepfates/.cache/imp/mlx_lm/acceptance/banking77-public-dd6f6ad/huggingface/hub",
+      "TRANSFORMERS_CACHE": "/Users/deepfates/.cache/imp/mlx_lm/acceptance/banking77-public-dd6f6ad/transformers",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "model_directories": []
+  },
+  "cleanup": {
+    "base_port_free": true,
+    "base_stop": ":not_started",
+    "fused_port_free": true,
+    "fused_stop": ":not_started"
+  },
+  "comparison": {
+    "accuracy_delta": 0.42500000000000004,
+    "changed_count": 40,
+    "changed_rows": [
+      "banking77-test-800",
+      "banking77-test-801",
+      "banking77-test-802",
+      "banking77-test-803",
+      "banking77-test-804",
+      "banking77-test-805",
+      "banking77-test-806",
+      "banking77-test-807",
+      "banking77-test-808",
+      "banking77-test-809",
+      "banking77-test-1080",
+      "banking77-test-1081",
+      "banking77-test-1082",
+      "banking77-test-1083",
+      "banking77-test-1084",
+      "banking77-test-1085",
+      "banking77-test-1086",
+      "banking77-test-1087",
+      "banking77-test-1088",
+      "banking77-test-1089",
+      "banking77-test-1600",
+      "banking77-test-1601",
+      "banking77-test-1602",
+      "banking77-test-1603",
+      "banking77-test-1604",
+      "banking77-test-1605",
+      "banking77-test-1606",
+      "banking77-test-1607",
+      "banking77-test-1608",
+      "banking77-test-1609",
+      "banking77-test-2080",
+      "banking77-test-2081",
+      "banking77-test-2082",
+      "banking77-test-2083",
+      "banking77-test-2084",
+      "banking77-test-2085",
+      "banking77-test-2086",
+      "banking77-test-2087",
+      "banking77-test-2088",
+      "banking77-test-2089"
+    ],
+    "fresh_byte_identical": true,
+    "fresh_reproduction_sha256": "d7e8d4ae5842e19de00c35c9b3d051b13a4d64e72a41fcf4e58cc01c577f5b8f",
+    "fused_reproduction_sha256": "d7e8d4ae5842e19de00c35c9b3d051b13a4d64e72a41fcf4e58cc01c577f5b8f",
+    "macro_f1_delta": 0.3951255807200929
+  },
+  "data": {
+    "file_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+    "path": "/Users/deepfates/Hacking/github/deepfates/imp/benchmarks/data/provider-training-banking77-v1.json",
+    "row_ids": [
+      "banking77-test-800",
+      "banking77-test-801",
+      "banking77-test-802",
+      "banking77-test-803",
+      "banking77-test-804",
+      "banking77-test-805",
+      "banking77-test-806",
+      "banking77-test-807",
+      "banking77-test-808",
+      "banking77-test-809",
+      "banking77-test-1080",
+      "banking77-test-1081",
+      "banking77-test-1082",
+      "banking77-test-1083",
+      "banking77-test-1084",
+      "banking77-test-1085",
+      "banking77-test-1086",
+      "banking77-test-1087",
+      "banking77-test-1088",
+      "banking77-test-1089",
+      "banking77-test-1600",
+      "banking77-test-1601",
+      "banking77-test-1602",
+      "banking77-test-1603",
+      "banking77-test-1604",
+      "banking77-test-1605",
+      "banking77-test-1606",
+      "banking77-test-1607",
+      "banking77-test-1608",
+      "banking77-test-1609",
+      "banking77-test-2080",
+      "banking77-test-2081",
+      "banking77-test-2082",
+      "banking77-test-2083",
+      "banking77-test-2084",
+      "banking77-test-2085",
+      "banking77-test-2086",
+      "banking77-test-2087",
+      "banking77-test-2088",
+      "banking77-test-2089"
+    ],
+    "rows": 40,
+    "untouched_test_digest": "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1"
+  },
+  "elapsed_ms": 20237,
+  "fresh": {
+    "artifact_path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+    "artifact_sha256": "d52aca6b049e9e015b0934bc56e4a120a6d669fb21bc5c7068c527e0f994dc44",
+    "server": {
+      "advertised_model_ids": [
+        "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+      ],
+      "base_url": "http://127.0.0.1:18822/v1",
+      "selected_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+    },
+    "status": "complete",
+    "test": {
+      "accuracy": 0.55,
+      "duration_ms": 4982,
+      "errors": 0,
+      "macro_f1": 0.45610119047619047,
+      "rows": [
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-800",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "2",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-801",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "3",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-802",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "4",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-803",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "5",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-804",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "6",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-805",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "7",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-806",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "8",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-807",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "9",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-808",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "10",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-809",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "11",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1080",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "12",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1081",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "13",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1082",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "14",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1083",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "15",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1084",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "16",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1085",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "17",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1086",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "18",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1087",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "19",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1088",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "20",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1089",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "21",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1600",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "22",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1601",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "23",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1602",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "24",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1603",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "25",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1604",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "26",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1605",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "27",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1606",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "28",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1607",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "29",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1608",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "30",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1609",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "31",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": true,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2080",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "32",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": true,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2081",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "33",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2082",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "34",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2083",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "35",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2084",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "36",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2085",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "37",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": true,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2086",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "38",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2087",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "39",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2088",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "40",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2089",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "41",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        }
+      ],
+      "transport_attempts": 40
+    }
+  },
+  "fused": {
+    "artifact_path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+    "artifact_sha256": "d52aca6b049e9e015b0934bc56e4a120a6d669fb21bc5c7068c527e0f994dc44",
+    "server": {
+      "advertised_model_ids": [
+        "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+      ],
+      "base_url": "http://127.0.0.1:18822/v1",
+      "selected_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+    },
+    "test": {
+      "accuracy": 0.55,
+      "duration_ms": 5014,
+      "errors": 0,
+      "macro_f1": 0.45610119047619047,
+      "rows": [
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-800",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "42",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-801",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "43",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-802",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "44",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-803",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "45",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-804",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "46",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-805",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "47",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-806",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "48",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-807",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "49",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-808",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "50",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": true,
+          "expected": "R17",
+          "finish_reason": "stop",
+          "id": "banking77-test-809",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "51",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1080",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "52",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1081",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "53",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1082",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "54",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1083",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "55",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1084",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "56",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1085",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "57",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1086",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "58",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1087",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "59",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1088",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "60",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R42",
+          "finish_reason": "stop",
+          "id": "banking77-test-1089",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "61",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1600",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "62",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1601",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "63",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1602",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "64",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1603",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "65",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1604",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "66",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1605",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "67",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1606",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "68",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1607",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "69",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1608",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "70",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": true,
+          "expected": "R68",
+          "finish_reason": "stop",
+          "id": "banking77-test-1609",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "71",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": true,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2080",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "72",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": true,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2081",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "73",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2082",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "74",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2083",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "75",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2084",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "76",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2085",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "77",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R93",
+          "correct": true,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2086",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR93\n\n[[ ## completed ## ]]\n",
+          "request_id": "78",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2087",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "79",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R17",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2088",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n",
+          "request_id": "80",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        },
+        {
+          "actual": "R68",
+          "correct": false,
+          "expected": "R93",
+          "finish_reason": "stop",
+          "id": "banking77-test-2089",
+          "lifecycle": {
+            "finish_reason": "stop",
+            "http_status": 200,
+            "outcome": "stop"
+          },
+          "raw_output": "[[ ## route ## ]]\nR68\n\n[[ ## completed ## ]]\n",
+          "request_id": "81",
+          "request_model": {
+            "id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+            "provider": "openai",
+            "provider_model_id": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused"
+          },
+          "response_model": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+          "status": "ok",
+          "transport_attempts": 1
+        }
+      ],
+      "transport_attempts": 40
+    }
+  },
+  "limits": [
+    "One retained SFT artifact, one base model, one frozen four-intent Banking77 test split.",
+    "This checks trained-artifact behavior and fresh-process lifecycle only; it does not establish general effectiveness, GRPO parity, production reliability, or BEAM superiority."
+  ],
+  "request_policy": {
+    "cache": false,
+    "json_fallback": false,
+    "max_retries": 0,
+    "max_tokens": 32,
+    "retry": false,
+    "temperature": 0
+  },
+  "saved": {
+    "job": "/Users/deepfates/.cache/imp/mlx_lm/acceptance/banking77-public-dd6f6ad/saved-job.json",
+    "job_sha256": "8f25d1a86b6ec5423e83a66803e418b6e9fc2f0844332ea48f4f94a6abe7cab5",
+    "program": "/Users/deepfates/.cache/imp/mlx_lm/acceptance/banking77-public-dd6f6ad/saved-program.json",
+    "program_sha256": "cb0496f8f74509164234fd15bb452b0667b252a97f13b240b3cd4b69da8c9024"
+  },
+  "source_commit": "dd6f6ad9097d7a93149f3fa4a677caf145402e67",
+  "status": "complete"
+}

@@ -107,9 +107,11 @@ and dominance claims remain explicitly unmade where evidence is incomplete.
 Instruction-optimizer matched campaigns are claim-specific gaps rather than
 universal release blockers.
 
-The weight-optimizer row is conformant after the canonical MLX-LM campaign
-proved exact base/adapter identity, real LoRA training, held-out lift from 0.15
-to 0.85 accuracy, official fusion, and save/load-equivalent fused output.
+The weight-optimizer row has one narrow local result: a pinned Qwen2.5-0.5B MLX
+SFT artifact on the frozen four-intent Banking77 subset improved untouched
+40-row accuracy from 0.125 to 0.55 and macro-F1 from 0.0610 to 0.4561, then
+reproduced byte-identical ordered predictions/errors after save/load and
+fresh-process serving of the exact fused artifact.
 Avatar and AvatarOptimizer provide bounded typed-action execution and
 feedback-driven instruction optimization. BetterTogether
 implements arbitrary named and repeated optimizer sequences, evaluates the
@@ -117,9 +119,10 @@ baseline and each successful prefix, selects the best validated prefix with
 stable tie handling, returns the latest successful prefix without validation,
 and stops on the first failed step.
 
-That disposition does not imply paid-provider training, GRPO effectiveness, or
-matched Avatar/AvatarOptimizer/BetterTogether parity. Those remain explicit
-claim-specific gaps until their campaigns pass.
+That result does not imply general Imp or SFT effectiveness, GRPO, production
+reliability, BEAM superiority, paid-provider training, or matched
+Avatar/AvatarOptimizer/BetterTogether parity. Those remain explicit
+claim-specific gaps until their own evidence exists.
 
 The product gate is conformant after the clean-checkout package, persistence,
 deployment, documentation, and production audits passed.

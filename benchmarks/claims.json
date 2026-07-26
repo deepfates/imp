@@ -855,22 +855,22 @@
       "claim_state": "asserted",
       "target_rung": "C3",
       "release": "v0.1",
-      "scope": "Pinned local MLX LoRA training, official fused deployment, and portable-program rebinding on the canonical Banking77 holdout.",
-      "limitations": ["Does not establish paid-provider, BetterTogether, GRPO, or DSPy-matched training parity."],
-      "statement": "Imp can execute a fresh Elixir-owned local MLX training lifecycle whose officially fused model improves the pinned held-out task and whose credential-free saved program reproduces the fused outputs after explicit runtime rebinding.",
+      "scope": "One pinned Qwen2.5-0.5B MLX SFT artifact on a frozen four-intent Banking77 subset with 40 untouched test rows, official fused deployment, and portable-program rebinding.",
+      "limitations": ["This one-model, one-task result does not establish general Imp or SFT effectiveness, GRPO, production reliability, DSPy-matched training parity, or BEAM superiority."],
+      "statement": "On the frozen four-intent Banking77 subset, one pinned Qwen2.5-0.5B MLX SFT artifact improved untouched 40-row accuracy from 0.125 to 0.55 and macro-F1 from 0.0610 to 0.4561; its saved program loaded and served the exact fused artifact in a fresh OS BEAM with byte-identical ordered predictions and errors.",
       "category": "optimizer",
       "surface": ["BootstrapFinetune", "training_protocol", "local_weight_training", "save_load"],
       "claim_type": "functional_effectiveness",
       "comparison": "imp_local_baseline",
       "gate_policy": "blocking",
-      "sources": ["docs/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
+      "sources": ["benchmarks/results/local-mlx-public-consumer-banking77-dd6f6ad.json", "docs/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
         {
           "id": "local_mlx_weight_training.full",
           "kind": "optimizer_effectiveness",
           "lane": "local_mlx_weight_training",
           "evidence": "full",
-          "threshold": "independently validated clean campaign shows positive held-out accuracy and macro-F1 lift plus exact fused/save-load equivalence"
+          "threshold": "the preserved pinned public-consumer result shows the stated 40-row accuracy and macro-F1 lift plus exact fused save/load fresh-process equivalence"
         }
       ]
     },

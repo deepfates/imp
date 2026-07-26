@@ -139,11 +139,12 @@ comparator scores cannot authorize the claim. A passing schema-v2 lane proves
 the scoped Imp-native effectiveness statement, not paper-scale upstream parity.
 
 Local MLX weight-training effectiveness uses the `local_mlx_weight_training`
-lane. Full evidence requires a clean, independently validated campaign over the
-pinned Banking77 split and Qwen MLX snapshot, successful official fusion,
-positive held-out accuracy and macro-F1 lift, and exact fused/save-load row
-equivalence. This proves the local training and deployment substrate only; it
-does not authorize paid-provider, BetterTogether, GRPO, or DSPy-matched parity.
+lane. Its asserted scope is one pinned Qwen2.5-0.5B MLX SFT artifact on the
+frozen four-intent Banking77 subset: untouched 40-row accuracy `0.125 -> 0.55`,
+macro-F1 `0.0610 -> 0.4561`, and byte-identical ordered predictions/errors after
+save/load and fresh-process serving of the exact fused artifact. It does not
+authorize general Imp or SFT effectiveness, GRPO, production reliability,
+DSPy-matched parity, or BEAM superiority.
 
 Weight and composition claims are divided into six authority families: Avatar
 actor, AvatarOptimizer, BootstrapFinetune, DSPy mmGRPO, BetterTogether, and
