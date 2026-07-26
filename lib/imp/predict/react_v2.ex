@@ -229,7 +229,10 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp safe_tool_call(tool, arguments) do
-    {Imp.Tool.call(tool, arguments), false}
+    case Imp.Tool.call(tool, arguments) do
+      {:error, reason} -> {{:error, reason}, true}
+      result -> {result, false}
+    end
   rescue
     error -> {{:error, {:tool_error, tool.name, Exception.message(error)}}, true}
   catch

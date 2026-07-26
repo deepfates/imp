@@ -148,10 +148,15 @@ defmodule Imp.Agent do
       case Map.fetch(agent.tools, name) do
         {:ok, tool} ->
           try do
-            output = Imp.Tool.call(tool, input)
+            case Imp.Tool.call(tool, input) do
+              {:error, reason} ->
+                {:error, reason,
+                 Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
 
-            {:ok, output,
-             Runtime.trace(runtime, %{type: :tool, tool: name, input: input, output: output})}
+              output ->
+                {:ok, output,
+                 Runtime.trace(runtime, %{type: :tool, tool: name, input: input, output: output})}
+            end
           rescue
             exception ->
               reason = {:tool_error, name, Exception.message(exception)}

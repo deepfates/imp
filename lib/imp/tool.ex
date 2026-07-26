@@ -9,7 +9,8 @@ defmodule Imp.Tool do
   model or human reader, the schema is the input contract, and the function is
   ordinary Elixir.
 
-  Tool calls are wrapped in Imp telemetry and runtime traces redact sensitive
+  Tool calls validate JSON-schema-shaped input contracts before invoking the
+  runner, are wrapped in Imp telemetry, and runtime traces redact sensitive
   values before they are stored.
 
   ## Example
@@ -128,11 +129,29 @@ defmodule Imp.Tool do
   Calls a tool with one argument.
 
   This executes the underlying function inside a `[:imp, :tool]` telemetry
-  span. Policy checks, schema checks, and trace redaction happen in the agent or
-  ReAct runtime that calls the tool.
+  span after validating the argument against the supported JSON Schema input
+  contract. Schema validation errors are returned without invoking the runner.
+  Policy checks and trace redaction remain the responsibility of the calling
+  runtime.
   """
   def call(%__MODULE__{run: run} = tool, arg) do
-    Imp.Telemetry.span([:imp, :tool], %{tool: tool.name, arguments: arg}, fn -> run.(arg) end)
+    Imp.Telemetry.span([:imp, :tool], %{tool: tool.name, arguments: arg}, fn ->
+      with :ok <- validate_input(tool, arg), do: run.(arg)
+    end)
+  end
+
+  # Empty schemas preserve the historical untyped-tool behavior. The error
+  # tuples intentionally match the former MCP-only wrapper so every runtime
+  # observes one contract without exposing a second public validation API.
+  defp validate_input(%__MODULE__{schema: schema}, _input) when map_size(schema) == 0,
+    do: :ok
+
+  defp validate_input(%__MODULE__{schema: schema}, input) do
+    with :ok <- validate_root(input, schema),
+         :ok <- validate_required(input, schema),
+         :ok <- validate_properties(input, schema) do
+      :ok
+    end
   end
 
   defp normalize_name(name) when is_atom(name), do: name
@@ -155,5 +174,138 @@ defmodule Imp.Tool do
     String.to_existing_atom(to_string(key))
   rescue
     ArgumentError -> to_string(key)
+  end
+
+  defp validate_root(input, schema) do
+    type = fetch_schema(schema, :type)
+
+    cond do
+      not is_nil(type) and not valid_type?(input, type) ->
+        validation_error(:input, :type, "expected #{type}")
+
+      object_constraints?(schema) and not is_map(input) ->
+        validation_error(:input, :type, "expected object")
+
+      true ->
+        :ok
+    end
+  end
+
+  defp object_constraints?(schema) do
+    fetch_schema(schema, :required, :__missing__) != :__missing__ or
+      fetch_schema(schema, :properties, :__missing__) != :__missing__
+  end
+
+  defp validate_required(input, schema) do
+    missing =
+      schema
+      |> fetch_schema(:required, [])
+      |> Enum.reject(&present?(input, &1))
+
+    case missing do
+      [] -> :ok
+      keys -> {:error, {:missing_required, keys}}
+    end
+  end
+
+  defp validate_properties(input, schema) do
+    errors =
+      schema
+      |> fetch_schema(:properties, %{})
+      |> Enum.flat_map(fn {name, property_schema} ->
+        case fetch_input(input, name) do
+          {:ok, value} -> validate_value(name, value, property_schema)
+          :error -> []
+        end
+      end)
+
+    case errors do
+      [] -> :ok
+      errors -> {:error, {:schema_validation, errors}}
+    end
+  end
+
+  defp validate_value(name, value, schema) do
+    []
+    |> validate_type(name, value, fetch_schema(schema, :type))
+    |> validate_enum(name, value, fetch_schema(schema, :enum))
+    |> validate_minimum(name, value, fetch_schema(schema, :minimum))
+    |> validate_maximum(name, value, fetch_schema(schema, :maximum))
+  end
+
+  defp validate_type(errors, _name, _value, nil), do: errors
+
+  defp validate_type(errors, name, value, type) do
+    if valid_type?(value, type),
+      do: errors,
+      else: errors ++ [%{field: name, rule: :type, message: "expected #{type}"}]
+  end
+
+  defp valid_type?(value, type) do
+    case type do
+      type when type in ["string", :string] -> is_binary(value)
+      type when type in ["integer", :integer] -> is_integer(value)
+      type when type in ["number", :number] -> is_number(value)
+      type when type in ["boolean", :boolean] -> is_boolean(value)
+      type when type in ["array", :array] -> is_list(value)
+      type when type in ["object", :object] -> is_map(value)
+      _ -> true
+    end
+  end
+
+  defp validate_enum(errors, _name, _value, nil), do: errors
+
+  defp validate_enum(errors, name, value, allowed) do
+    if value in allowed,
+      do: errors,
+      else: errors ++ [%{field: name, rule: :enum, message: "must be one of #{inspect(allowed)}"}]
+  end
+
+  defp validate_minimum(errors, _name, _value, nil), do: errors
+
+  defp validate_minimum(errors, name, value, min) when is_number(value) and value < min,
+    do: errors ++ [%{field: name, rule: :minimum, message: "must be >= #{min}"}]
+
+  defp validate_minimum(errors, _name, _value, _min), do: errors
+
+  defp validate_maximum(errors, _name, _value, nil), do: errors
+
+  defp validate_maximum(errors, name, value, max) when is_number(value) and value > max,
+    do: errors ++ [%{field: name, rule: :maximum, message: "must be <= #{max}"}]
+
+  defp validate_maximum(errors, _name, _value, _max), do: errors
+
+  defp validation_error(field, rule, message),
+    do: {:error, {:schema_validation, [%{field: field, rule: rule, message: message}]}}
+
+  defp fetch_schema(map, key, default \\ nil) when is_atom(key),
+    do: Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+
+  defp present?(input, key),
+    do: match?({:ok, value} when not is_nil(value), fetch_input(input, key))
+
+  defp fetch_input(input, key) when is_atom(key),
+    do: Map.fetch(input, key) |> or_fetch(input, Atom.to_string(key))
+
+  defp fetch_input(input, key) when is_binary(key) do
+    case Map.fetch(input, key) do
+      {:ok, value} ->
+        {:ok, value}
+
+      :error ->
+        case existing_atom(key) do
+          {:ok, atom} -> Map.fetch(input, atom)
+          :error -> :error
+        end
+    end
+  end
+
+  defp or_fetch({:ok, value}, _input, _key), do: {:ok, value}
+  defp or_fetch(:error, input, key), do: Map.fetch(input, key)
+
+  defp existing_atom(key) do
+    {:ok, String.to_existing_atom(key)}
+  rescue
+    ArgumentError -> :error
   end
 end
