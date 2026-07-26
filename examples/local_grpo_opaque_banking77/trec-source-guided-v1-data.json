@@ -1,0 +1,1748 @@
+{
+  "schema_version": 1,
+  "artifact_type": "imp_grpo_preregistration_dataset",
+  "treatment_id": "imp-grpo-trec-coarse-lora-source-guided-v1",
+  "source": {
+    "dataset": "CogComp/trec",
+    "revision": "eb1e45c1ba990fecca7cf84b67ce845edbcf49bf",
+    "license": "unknown (as reported by pinned dataset card)",
+    "fixture": "benchmarks/data/confidence-calibration-trec-fine.jsonl",
+    "fixture_sha256": "29cd6eb93a6a4c3b23a2133cf95cc3deca8b95e62c354ded450c663e44c56bd8",
+    "train_source_sha256": "9e4c8bdcaffb96ed61041bd64b564183d52793a8e91d84fc3a8646885f466ec3",
+    "test_source_sha256": "033f22c028c2bbba9ca682f68ffe204dc1aa6e1cf35dd6207f2d4ca67f0d0e8e"
+  },
+  "exclusion": {
+    "fixture": "benchmarks/data/simba-trec-coarse-v1.json",
+    "fixture_sha256": "6643645cc3bcd79a5236b7e3920a5c37526be178df2e02f20652d9a16eef51ad",
+    "identity_field": "source_id",
+    "excluded_source_ids": [
+      "cogcomp-trec:test:033f22c028c2bbba:112",
+      "cogcomp-trec:test:033f22c028c2bbba:137",
+      "cogcomp-trec:test:033f22c028c2bbba:161",
+      "cogcomp-trec:test:033f22c028c2bbba:163",
+      "cogcomp-trec:test:033f22c028c2bbba:167",
+      "cogcomp-trec:test:033f22c028c2bbba:176",
+      "cogcomp-trec:test:033f22c028c2bbba:181",
+      "cogcomp-trec:test:033f22c028c2bbba:193",
+      "cogcomp-trec:test:033f22c028c2bbba:208",
+      "cogcomp-trec:test:033f22c028c2bbba:216",
+      "cogcomp-trec:test:033f22c028c2bbba:221",
+      "cogcomp-trec:test:033f22c028c2bbba:231",
+      "cogcomp-trec:test:033f22c028c2bbba:237",
+      "cogcomp-trec:test:033f22c028c2bbba:255",
+      "cogcomp-trec:test:033f22c028c2bbba:264",
+      "cogcomp-trec:test:033f22c028c2bbba:272",
+      "cogcomp-trec:test:033f22c028c2bbba:286",
+      "cogcomp-trec:test:033f22c028c2bbba:305",
+      "cogcomp-trec:test:033f22c028c2bbba:31",
+      "cogcomp-trec:test:033f22c028c2bbba:316",
+      "cogcomp-trec:test:033f22c028c2bbba:321",
+      "cogcomp-trec:test:033f22c028c2bbba:35",
+      "cogcomp-trec:test:033f22c028c2bbba:351",
+      "cogcomp-trec:test:033f22c028c2bbba:357",
+      "cogcomp-trec:test:033f22c028c2bbba:384",
+      "cogcomp-trec:test:033f22c028c2bbba:385",
+      "cogcomp-trec:test:033f22c028c2bbba:407",
+      "cogcomp-trec:test:033f22c028c2bbba:419",
+      "cogcomp-trec:test:033f22c028c2bbba:421",
+      "cogcomp-trec:test:033f22c028c2bbba:433",
+      "cogcomp-trec:test:033f22c028c2bbba:442",
+      "cogcomp-trec:test:033f22c028c2bbba:447",
+      "cogcomp-trec:test:033f22c028c2bbba:466",
+      "cogcomp-trec:test:033f22c028c2bbba:467",
+      "cogcomp-trec:test:033f22c028c2bbba:479",
+      "cogcomp-trec:test:033f22c028c2bbba:494",
+      "cogcomp-trec:test:033f22c028c2bbba:495",
+      "cogcomp-trec:test:033f22c028c2bbba:51",
+      "cogcomp-trec:test:033f22c028c2bbba:82",
+      "cogcomp-trec:test:033f22c028c2bbba:86",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:1120",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:131",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:1380",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:1416",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:1678",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:2247",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:2482",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:2489",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:2534",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:2568",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:2856",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3098",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3125",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:318",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3226",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3342",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3426",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3488",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3563",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:3753",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:4146",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:4194",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:4403",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:4517",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:4673",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:4754",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:555",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:818",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:872",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:896",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:90",
+      "cogcomp-trec:train:9e4c8bdcaffb96ed:931"
+    ]
+  },
+  "selection_policy": {
+    "algorithm": "within fixture split and coarse label, order by sha256(treatment_id + : + group_id), then id",
+    "coarse_labels": [
+      "DESC",
+      "HUM",
+      "LOC",
+      "NUM"
+    ],
+    "train_per_label": 16,
+    "selection_per_label": 8,
+    "test_per_label": 10,
+    "available_after_exclusion": {
+      "DESC": {
+        "calibration": 37,
+        "held_out": 53
+      },
+      "HUM": {
+        "calibration": 32,
+        "held_out": 18
+      },
+      "LOC": {
+        "calibration": 25,
+        "held_out": 14
+      },
+      "NUM": {
+        "calibration": 27,
+        "held_out": 29
+      }
+    }
+  },
+  "route_codes": [
+    {
+      "coarse": "DESC",
+      "route": "R17"
+    },
+    {
+      "coarse": "HUM",
+      "route": "R42"
+    },
+    {
+      "coarse": "LOC",
+      "route": "R68"
+    },
+    {
+      "coarse": "NUM",
+      "route": "R93"
+    }
+  ],
+  "task": "Four-way opaque-route classification of the answer type requested by a real TREC question.",
+  "training_basis": {
+    "pinned_runtime": {
+      "trl": {
+        "version": "1.6.0",
+        "revision": "0dac440542c2ef9b575f56534f29f6fca1febe4a",
+        "grpo_config_sha256": "5ae40ed6e516a7d3231db77318bb6c2b267c27ea6d54a9a6602c9f5772861965",
+        "facts": {
+          "learning_rate_default": 0.000001,
+          "num_generations_default": 8,
+          "loss_type_default": "dapo",
+          "scale_rewards_default": "group",
+          "beta_default": 0.0
+        }
+      },
+      "transformers": {
+        "version": "4.57.6",
+        "training_args_sha256": "444c4c5617b89e05ae4a31de3c4f7fc1f6311496a9bf7ef357aa69be3aa2afff",
+        "facts": {
+          "lr_scheduler_type_default": "linear",
+          "warmup_ratio_default": 0.0,
+          "warmup_steps_default": 0
+        }
+      },
+      "peft": {
+        "version": "0.18.1",
+        "lora_layer_sha256": "e8a47a49cf69f92ded68bf7ab286aeaf068f0ac809ab3465ad16f78a8f9f8b63",
+        "facts": {
+          "default_scaling": "alpha/r",
+          "default_b_matrix_initialization": "zero"
+        }
+      }
+    },
+    "current_official_guidance": {
+      "repository": "https://github.com/huggingface/trl",
+      "commit": "c9ecd143f0aab0bd0c50f8b137b8f87167045dc5",
+      "qualification": "Current official local source, not proven present at the pinned TRL 1.6.0 runtime revision.",
+      "files": [
+        {
+          "path": "docs/source/peft_integration.md",
+          "sha256": "78968674f528b57d649512cb16382b3be459f3cd4bbc892a724fef6585df71fe"
+        },
+        {
+          "path": "docs/source/lora_without_regret.md",
+          "sha256": "f8f0bcd99cabdd403d38793c184376aaa62abdc7547b437ec731eca2272bf627"
+        }
+      ],
+      "facts": {
+        "grpo_lora_learning_rate": 0.00001,
+        "rl_lora_rank_min": 1,
+        "rl_lora_rank_max": 32,
+        "target_modules": "all-linear",
+        "effective_batch_size": "less_than_32",
+        "num_generations": 8
+      }
+    },
+    "budget_rule": {
+      "basis": "One predeclared Imp padded epoch; not a TRL task-specific step recommendation.",
+      "source_rows": 64,
+      "train_width": 2,
+      "padding_groups": 2,
+      "groups": 66,
+      "optimizer_steps": 33
+    }
+  },
+  "outcome_policy": {
+    "route_semantics_exposed_to_model": false,
+    "selection": {
+      "dataset": "validation",
+      "checkpoint": {
+        "mode": "best_validation",
+        "validation_frequency_steps": 1,
+        "metric": "mean exact-route reward",
+        "higher_is_better": true,
+        "tie": "earliest"
+      },
+      "arm_comparison": {
+        "metrics": [
+          "accuracy",
+          "macro_f1"
+        ],
+        "order": "lexicographic",
+        "trained_requires": "strictly_greater",
+        "tie": "base"
+      }
+    },
+    "test": {
+      "opened_after_selection": true,
+      "positive_min_accuracy_delta": 0.05,
+      "macro_f1_must_not_decrease": true,
+      "errors_must_not_increase": true
+    },
+    "non_claims": [
+      "Weight change alone is not optimization success.",
+      "A decreasing training loss alone is not optimization success.",
+      "Non-uniform rewards or advantages alone are not optimization success.",
+      "Uniform-reward groups remain in the frozen schedule and may legitimately produce no weight change.",
+      "This project-exposed TREC slice is source-disjoint from the SIMBA fixture and optimizer-heldout, not globally untouched."
+    ]
+  },
+  "split_digests": {
+    "train": "sha256:e97d992ad4e53026e3f023208cd73bdc5eccbaf2ab8c24302deb9a3ad8c7f9aa",
+    "validation": "sha256:d3c35b8172c1d4a381405148159522d447e94e542c5dbb678b0cc6936dcc0c61",
+    "held_out": "sha256:d93f1d63de2786066a7a9865da98d6d9974da9342c560a89bc5c3962dca8b862"
+  },
+  "train": [
+    {
+      "id": "trec-fine:calibration:0171",
+      "question": "Why should cigarette smoking be banned ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:reason",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4525",
+      "source_split": "train",
+      "source_row": 4525,
+      "group_id": "trec-question-sha256:b724f5c93c80bd113822587bc36b809d73af0036f48e9d9cda3abaeba0a09cd9"
+    },
+    {
+      "id": "trec-fine:calibration:0037",
+      "question": "What is the song Stairway to Heaven by Led Zeppelin about ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2728",
+      "source_split": "train",
+      "source_row": 2728,
+      "group_id": "trec-question-sha256:fdfdf130fa9be48b08a3eabafff4c1c6898eb1f262948bf1ffc5e240fc29bdc5"
+    },
+    {
+      "id": "trec-fine:calibration:0196",
+      "question": "How did the jack-o '-lantern get it 's name ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2163",
+      "source_split": "train",
+      "source_row": 2163,
+      "group_id": "trec-question-sha256:82b3fce63866be80fd5dd5e5ec6e49dc6b1465ec26197d6d6ef35f79b8008546"
+    },
+    {
+      "id": "trec-fine:calibration:0066",
+      "question": "What is a Devo hat ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1743",
+      "source_split": "train",
+      "source_row": 1743,
+      "group_id": "trec-question-sha256:d8e08bec18fe3070d4e3bfb4e4146fce2de2b065a6eddc9145ed13a0052b4bf8"
+    },
+    {
+      "id": "trec-fine:calibration:0117",
+      "question": "What is the origin of the candy cane at Christmas ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3155",
+      "source_split": "train",
+      "source_row": 3155,
+      "group_id": "trec-question-sha256:2eed5a55f1334c8fe5e41e00eea34c5e12c306dda1c2fb0524c5eb6ca3a496c7"
+    },
+    {
+      "id": "trec-fine:calibration:0157",
+      "question": "What will the weather be today ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4476",
+      "source_split": "train",
+      "source_row": 4476,
+      "group_id": "trec-question-sha256:dc61ce12cd6afbd7218151afef4623ed36912c0fd13897f58c4be3a6edf87c98"
+    },
+    {
+      "id": "trec-fine:calibration:0189",
+      "question": "How can you contact play producers and promoters on-line ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:677",
+      "source_split": "train",
+      "source_row": 677,
+      "group_id": "trec-question-sha256:a37864003572d3013ac809903d337155dfc06ddfa2538f641925ced34bda3b01"
+    },
+    {
+      "id": "trec-fine:calibration:0126",
+      "question": "How do you do a topic outline ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3681",
+      "source_split": "train",
+      "source_row": 3681,
+      "group_id": "trec-question-sha256:b8fc067d2f9f68e338a3dcd4e51b6224d4c94151c6dafaecd93d8e49a6eed1c7"
+    },
+    {
+      "id": "trec-fine:calibration:0058",
+      "question": "What is Candlemas Day ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1031",
+      "source_split": "train",
+      "source_row": 1031,
+      "group_id": "trec-question-sha256:4aa00cf34e70722f085998f158addabfa07625b6b4cc9cc6314bd58b31b33861"
+    },
+    {
+      "id": "trec-fine:calibration:0068",
+      "question": "What was the importance of Magellan ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3546",
+      "source_split": "train",
+      "source_row": 3546,
+      "group_id": "trec-question-sha256:247bf64ee0068069e88ab80d95a1a00bdc0f899e2766a416973cff8958fc99c9"
+    },
+    {
+      "id": "trec-fine:calibration:0084",
+      "question": "Where did the energy for the Big Bang come from ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:5176",
+      "source_split": "train",
+      "source_row": 5176,
+      "group_id": "trec-question-sha256:715f7da6acc54b1e2c73037ea316305c53ab64a6bd4eb7c148ed5f24de821041"
+    },
+    {
+      "id": "trec-fine:calibration:0115",
+      "question": "How come a doughnut has a hole in it ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:reason",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3933",
+      "source_split": "train",
+      "source_row": 3933,
+      "group_id": "trec-question-sha256:c0a2dbb485eac8468ecb2181557c860b6e9927b3d1625e85634c6b2660c5e7cb"
+    },
+    {
+      "id": "trec-fine:calibration:0038",
+      "question": "What 's the Olympic motto ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:23",
+      "source_split": "train",
+      "source_row": 23,
+      "group_id": "trec-question-sha256:7d872465691402d4cfa04b644a014c4f0941a14c5228ecdc61847b54f98347ae"
+    },
+    {
+      "id": "trec-fine:calibration:0043",
+      "question": "How can I get a CCT diagram ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3837",
+      "source_split": "train",
+      "source_row": 3837,
+      "group_id": "trec-question-sha256:c4a70d3ff7b77e0780fbfdd47c186cfc688555f7a798656677f0988d5dc24ed7"
+    },
+    {
+      "id": "trec-fine:calibration:0044",
+      "question": "What is the origin of the word `` amen '' ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3080",
+      "source_split": "train",
+      "source_row": 3080,
+      "group_id": "trec-question-sha256:2ab80c1693395764410cf451a0cbaf17be4a83f86ef73e45f917da08b8ba774f"
+    },
+    {
+      "id": "trec-fine:calibration:0199",
+      "question": "How can a foreigner get a U.S. Social Security card ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3689",
+      "source_split": "train",
+      "source_row": 3689,
+      "group_id": "trec-question-sha256:a0d0a5e9781e1f6ef97bedae66dba6d6b69eb6e224381231a80ae6aedb13a1fc"
+    },
+    {
+      "id": "trec-fine:calibration:0078",
+      "question": "Who is the richest woman in the world ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4808",
+      "source_split": "train",
+      "source_row": 4808,
+      "group_id": "trec-question-sha256:f1c7254408a3b90b6d0f425e1f685048b9287abba44133cc8a33b949edee0fdf"
+    },
+    {
+      "id": "trec-fine:calibration:0138",
+      "question": "Who was the accused in The Trial of the Century , which opened Janurary 1 , 1935 ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4691",
+      "source_split": "train",
+      "source_row": 4691,
+      "group_id": "trec-question-sha256:e9a42baa1e8eab00b45f2d6d282972e618aed21fa51500401d51b958b5cd37ed"
+    },
+    {
+      "id": "trec-fine:calibration:0170",
+      "question": "What English queen had seventeen children ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1351",
+      "source_split": "train",
+      "source_row": 1351,
+      "group_id": "trec-question-sha256:d4350c9e4a169bbdce4d07bbb2440210b1bb46a239b7d195ad2717e5c31158b8"
+    },
+    {
+      "id": "trec-fine:calibration:0097",
+      "question": "Saddam Hussein was compared to whom by President Bush ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2321",
+      "source_split": "train",
+      "source_row": 2321,
+      "group_id": "trec-question-sha256:9b3f747c2eabdc3a73482e8b2d16af5fe3d89dd166c8a5af7ad39e0b50eada1f"
+    },
+    {
+      "id": "trec-fine:calibration:0064",
+      "question": "Who made the most appearances in the center square on Hollywood Squares ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2604",
+      "source_split": "train",
+      "source_row": 2604,
+      "group_id": "trec-question-sha256:1d3ffb0ea5fc8388d8f6a3a94bd9a80617893536d01e9c76192cb647f4260fe6"
+    },
+    {
+      "id": "trec-fine:calibration:0192",
+      "question": "What professional sports league originated the college draft ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4243",
+      "source_split": "train",
+      "source_row": 4243,
+      "group_id": "trec-question-sha256:8f2dfcb659ee674ab56ef85bb6cd4611cddc817fd89aa91baccaa3ce6d412d7c"
+    },
+    {
+      "id": "trec-fine:calibration:0089",
+      "question": "Who invented silly putty ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:829",
+      "source_split": "train",
+      "source_row": 829,
+      "group_id": "trec-question-sha256:15c4c7d85b700623a37bce1b9f23e4f7914b25c043140077e9eb7d4de6359509"
+    },
+    {
+      "id": "trec-fine:calibration:0095",
+      "question": "Who was the first American in space ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:155",
+      "source_split": "train",
+      "source_row": 155,
+      "group_id": "trec-question-sha256:c625a81bf9a50ebbb35c7385c0bdec5416afb92e08959676424512663d2d7089"
+    },
+    {
+      "id": "trec-fine:calibration:0163",
+      "question": "Who was the first Holy Roman Emperor ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:637",
+      "source_split": "train",
+      "source_row": 637,
+      "group_id": "trec-question-sha256:915e63f5ac0b03c88754e7bfcc63dbc5b3f1e1b8b9362e81c033997379ef3b0d"
+    },
+    {
+      "id": "trec-fine:calibration:0195",
+      "question": "Who has won the most Super Bowls ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:306",
+      "source_split": "train",
+      "source_row": 306,
+      "group_id": "trec-question-sha256:8320ce18601a459cfc0c29bdf6029a4bc24b51920c2a6c74cf26080994988a83"
+    },
+    {
+      "id": "trec-fine:calibration:0177",
+      "question": "What daughter of Henry VIII and Anne Boleyn became queen of England ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1288",
+      "source_split": "train",
+      "source_row": 1288,
+      "group_id": "trec-question-sha256:cf7411fe2b11a6dd4574d65ca6dc3d5e1c9a22d025d3147259235b069472fa8f"
+    },
+    {
+      "id": "trec-fine:calibration:0128",
+      "question": "What is the protagonist 's name in Dostoevski 's `` The Idiot '' ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1438",
+      "source_split": "train",
+      "source_row": 1438,
+      "group_id": "trec-question-sha256:5ffcf3bd18937a5efe768e365ee941c3d50bd0d741ccf0e18aa90057b492ea17"
+    },
+    {
+      "id": "trec-fine:calibration:0187",
+      "question": "What organization 's offices were broken into at Watergate in 1972 ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:219",
+      "source_split": "train",
+      "source_row": 219,
+      "group_id": "trec-question-sha256:c02e28ba6239748a3b7dc8325730c1bbdce026bde5915b0028c4129813291b04"
+    },
+    {
+      "id": "trec-fine:calibration:0099",
+      "question": "Which oil company almost picked a word that meant `` stalled car '' in Japanese as its new international name ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:499",
+      "source_split": "train",
+      "source_row": 499,
+      "group_id": "trec-question-sha256:a895e4e731728832df76c832d2fe89cdd539163d90ccfa687467c2129772996a"
+    },
+    {
+      "id": "trec-fine:calibration:0169",
+      "question": "CNN is owned by whom ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2949",
+      "source_split": "train",
+      "source_row": 2949,
+      "group_id": "trec-question-sha256:2fd792cd5cb15dfb2577c381aa9e2d165af9ce1a4008711acb4adffa02bfe035"
+    },
+    {
+      "id": "trec-fine:calibration:0075",
+      "question": "Who is the fastest swimmer in the world ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:434",
+      "source_split": "train",
+      "source_row": 434,
+      "group_id": "trec-question-sha256:f398eb183e7f7b5778de88884050e3bc2857bb640c4ab2234d92764d398b44c7"
+    },
+    {
+      "id": "trec-fine:calibration:0180",
+      "question": "McCarren Airport is located in what city ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:508",
+      "source_split": "train",
+      "source_row": 508,
+      "group_id": "trec-question-sha256:90787a34ea0a3b46445ad8f0e6c267b73257e169c22f403bea3610188e9391de"
+    },
+    {
+      "id": "trec-fine:calibration:0168",
+      "question": "Where was the first zoo in the U.S. ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3301",
+      "source_split": "train",
+      "source_row": 3301,
+      "group_id": "trec-question-sha256:576588200f39325d8786e075b9b9b979bbcdbba586a677169333fb1a951a2b31"
+    },
+    {
+      "id": "trec-fine:calibration:0090",
+      "question": "What 's the most powerful country in the world ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:country",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4748",
+      "source_split": "train",
+      "source_row": 4748,
+      "group_id": "trec-question-sha256:a371bb73d4e693d0ed08ec8976cfef035156b1d58c5a14089aaff25d2e396757"
+    },
+    {
+      "id": "trec-fine:calibration:0107",
+      "question": "Where can I find full written draft of CTBT ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1264",
+      "source_split": "train",
+      "source_row": 1264,
+      "group_id": "trec-question-sha256:b341402283edf6cefb05bd47adb4a273f77b520d30715fe0d99256b1f9350a91"
+    },
+    {
+      "id": "trec-fine:calibration:0111",
+      "question": "Where 's Montenegro ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4826",
+      "source_split": "train",
+      "source_row": 4826,
+      "group_id": "trec-question-sha256:872ad0e23e5998d57942d214091aa2b27303511cc1b991cbedd377e49f38dd65"
+    },
+    {
+      "id": "trec-fine:calibration:0073",
+      "question": "Tell me what city the Kentucky Horse Park is near ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1345",
+      "source_split": "train",
+      "source_row": 1345,
+      "group_id": "trec-question-sha256:a5edd5d2c0fed78fc9a65d8e15b2425dca850e1804ec7d127fbac3d36c34f76d"
+    },
+    {
+      "id": "trec-fine:calibration:0077",
+      "question": "Where can I get mailing lists ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3877",
+      "source_split": "train",
+      "source_row": 3877,
+      "group_id": "trec-question-sha256:f02641c8029df9a605a2170280b9d3da15f3cceb5cca7980700e6cc6f346a05c"
+    },
+    {
+      "id": "trec-fine:calibration:0056",
+      "question": "What country boasts Ismail 's Palace and the Palace of King Farouk ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:country",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3840",
+      "source_split": "train",
+      "source_row": 3840,
+      "group_id": "trec-question-sha256:38112728bb6b1fde4ea26394b771da2955ee7679b7e382654c6e2c0f3be6f03f"
+    },
+    {
+      "id": "trec-fine:calibration:0129",
+      "question": "Where in a tree does photosynthesis occur ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:5199",
+      "source_split": "train",
+      "source_row": 5199,
+      "group_id": "trec-question-sha256:c1c92edf75b1aa207ffb16c62ee0d304c16be9510fb32508e78961896c2759cc"
+    },
+    {
+      "id": "trec-fine:calibration:0055",
+      "question": "Where does the song Anything Goes take place ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3300",
+      "source_split": "train",
+      "source_row": 3300,
+      "group_id": "trec-question-sha256:730613ab131165223869fbf650f21a0d5a06b43f4e5f573e489a7c0cd8663670"
+    },
+    {
+      "id": "trec-fine:calibration:0134",
+      "question": "What river is Pocahontas buried along ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2237",
+      "source_split": "train",
+      "source_row": 2237,
+      "group_id": "trec-question-sha256:a94b3a284fef542d49d7f3a82894b52a7d5e396ed335b93ea6952c40ddbbf83f"
+    },
+    {
+      "id": "trec-fine:calibration:0106",
+      "question": "Where did surfing originate ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3882",
+      "source_split": "train",
+      "source_row": 3882,
+      "group_id": "trec-question-sha256:ca477fb130f3b309bb3f03614c9faacd9b7331565929fea5236d2afc0261ae45"
+    },
+    {
+      "id": "trec-fine:calibration:0166",
+      "question": "What was Einstein 's birthplace ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3565",
+      "source_split": "train",
+      "source_row": 3565,
+      "group_id": "trec-question-sha256:b54dbad125f5ac8aa92f3b78ca029d0a13f5fe8e921fe983ccbc3db7140fa6ce"
+    },
+    {
+      "id": "trec-fine:calibration:0122",
+      "question": "What sea separates Naples and Algiers ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1310",
+      "source_split": "train",
+      "source_row": 1310,
+      "group_id": "trec-question-sha256:8713fc0f2f92e2c99d3c8504b3d8397fde7bf2439d9166d23e97216f4912c770"
+    },
+    {
+      "id": "trec-fine:calibration:0137",
+      "question": "Which country is known as `` Big Bear '' ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:country",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1463",
+      "source_split": "train",
+      "source_row": 1463,
+      "group_id": "trec-question-sha256:ab07653e1f543774f4e8584eebdb62249eb0182e1c0e86e81c764b2905af753f"
+    },
+    {
+      "id": "trec-fine:calibration:0152",
+      "question": "What is California 's capital ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:285",
+      "source_split": "train",
+      "source_row": 285,
+      "group_id": "trec-question-sha256:7d93cf9e33ba37c3f940418493a2a2237ef7e6a857ba0835e8da986ee02531df"
+    },
+    {
+      "id": "trec-fine:calibration:0085",
+      "question": "When was the last major eruption of Mount St. Helens ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4566",
+      "source_split": "train",
+      "source_row": 4566,
+      "group_id": "trec-question-sha256:fc26ab45b4917050a9e102eb66b0c7260508c1f2b8ef911304f9b4655853cdf5"
+    },
+    {
+      "id": "trec-fine:calibration:0121",
+      "question": "What is the current unemployment rate in the U.S. ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:perc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:5284",
+      "source_split": "train",
+      "source_row": 5284,
+      "group_id": "trec-question-sha256:30ebf8b5a1b74fcbbe492660165424f8faad9a99dcbbb028bcd8668f05a8eed8"
+    },
+    {
+      "id": "trec-fine:calibration:0039",
+      "question": "How long did the Paris Commune hold out for against the rest of France ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3957",
+      "source_split": "train",
+      "source_row": 3957,
+      "group_id": "trec-question-sha256:dce5e3c999f6ba370985a2b7801e6390b06c6b543593c0f3e95551ed4d1660e8"
+    },
+    {
+      "id": "trec-fine:calibration:0124",
+      "question": "When did Muhammad live ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:550",
+      "source_split": "train",
+      "source_row": 550,
+      "group_id": "trec-question-sha256:294bcf3847e9bc1f9f22f6728f75cb4437c782029b31766159da85c10cca4e67"
+    },
+    {
+      "id": "trec-fine:calibration:0150",
+      "question": "When is the Thai New Year ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2822",
+      "source_split": "train",
+      "source_row": 2822,
+      "group_id": "trec-question-sha256:52f499324813b84ae5b17f280297ee43b64474a0be1ad19e63b1167dd3d45186"
+    },
+    {
+      "id": "trec-fine:calibration:0198",
+      "question": "How long does a pig 's orgasm last ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:5054",
+      "source_split": "train",
+      "source_row": 5054,
+      "group_id": "trec-question-sha256:6a521d4a544cf531a4929529583ea2e7254c2a7557e80a8cece1b3a5113bbec3"
+    },
+    {
+      "id": "trec-fine:calibration:0054",
+      "question": "What year was the first automobile manufactured ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3322",
+      "source_split": "train",
+      "source_row": 3322,
+      "group_id": "trec-question-sha256:6b1bd9b97e4f26cc431aa7767ec1d137e6bcd3ef844da652a83dba6d225a9b02"
+    },
+    {
+      "id": "trec-fine:calibration:0091",
+      "question": "How long did Shea and Gould practice law in Los Angeles ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2989",
+      "source_split": "train",
+      "source_row": 2989,
+      "group_id": "trec-question-sha256:3bd1430382e588b04cdde73dba97559f44531274c0769b074603712e58b03800"
+    },
+    {
+      "id": "trec-fine:calibration:0031",
+      "question": "When did the American Civil War end ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4106",
+      "source_split": "train",
+      "source_row": 4106,
+      "group_id": "trec-question-sha256:a4143e0693680765acb431db16987a54f6f819726064525c7a74cc47819e6d2a"
+    },
+    {
+      "id": "trec-fine:calibration:0061",
+      "question": "How long did the Charles Manson murder trial last ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2575",
+      "source_split": "train",
+      "source_row": 2575,
+      "group_id": "trec-question-sha256:d7bf43140e67d10a20fdefc4172d4b3672418a6fc89f8cf4e3892503bfda0bc3"
+    },
+    {
+      "id": "trec-fine:calibration:0040",
+      "question": "What is the quantity of American soldiers still unaccounted for from the Vietnam war ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:408",
+      "source_split": "train",
+      "source_row": 408,
+      "group_id": "trec-question-sha256:dc597d5c25242f5244c6ea95ae15793f3a92628196f12d8c1e696b81fb3615a8"
+    },
+    {
+      "id": "trec-fine:calibration:0047",
+      "question": "How long was the TV mission of Star Trek 's Enterprise to be ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1167",
+      "source_split": "train",
+      "source_row": 1167,
+      "group_id": "trec-question-sha256:5718dc37b849a2ee986425cb243b38b1ed426c2fc98ed0402f330cb65db82ca3"
+    },
+    {
+      "id": "trec-fine:calibration:0050",
+      "question": "How many Israeli athletes were killed at the Munich Olympics ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:count",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3110",
+      "source_split": "train",
+      "source_row": 3110,
+      "group_id": "trec-question-sha256:c39f7c81069bd49777355859935c056281e9589467a39ad7344d221881b373f5"
+    },
+    {
+      "id": "trec-fine:calibration:0098",
+      "question": "When does menstruation begin ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:5230",
+      "source_split": "train",
+      "source_row": 5230,
+      "group_id": "trec-question-sha256:217060bf05fcf091db8c81c796c7b1d2be0f01c2c589d4a8dd18dca24ccb8b2d"
+    },
+    {
+      "id": "trec-fine:calibration:0034",
+      "question": "When was Dubai 's first concrete house built ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4875",
+      "source_split": "train",
+      "source_row": 4875,
+      "group_id": "trec-question-sha256:88ee57871bd503de059de60b94b0102b4c127e74263f883d4c29a7c7422a59b6"
+    },
+    {
+      "id": "trec-fine:calibration:0100",
+      "question": "What is the chemical reactivity of neon ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4252",
+      "source_split": "train",
+      "source_row": 4252,
+      "group_id": "trec-question-sha256:5d046894a303976adabd5c04e54c9dbce6f3f5af5bd74caec6925b72d597fc07"
+    }
+  ],
+  "validation": [
+    {
+      "id": "trec-fine:calibration:0105",
+      "question": "What did the only repealed amendment to the U.S. Constitution deal with ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:16",
+      "source_split": "train",
+      "source_row": 16,
+      "group_id": "trec-question-sha256:cc2d282dca25dc403655adc345f86de5b929cd757eab9ee92fddee78f0b07ee8"
+    },
+    {
+      "id": "trec-fine:calibration:0185",
+      "question": "What is a specimen of basidiomycetes ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:5099",
+      "source_split": "train",
+      "source_row": 5099,
+      "group_id": "trec-question-sha256:a33349e651b0c71a08bb3717b639ff19ac1417c94bb6afca6e27b19108387445"
+    },
+    {
+      "id": "trec-fine:calibration:0120",
+      "question": "What is the meaning of caliente , in English , ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:5442",
+      "source_split": "train",
+      "source_row": 5442,
+      "group_id": "trec-question-sha256:95cb381b55e53712d378db13c3bf9da75ff23d9c8c1cf7680681b1dd48ca043f"
+    },
+    {
+      "id": "trec-fine:calibration:0125",
+      "question": "What is the origin of head lice ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:82",
+      "source_split": "train",
+      "source_row": 82,
+      "group_id": "trec-question-sha256:54e5c9d595352750131f5498f98c7b25dd591f1c20711a8576b137a26c99609d"
+    },
+    {
+      "id": "trec-fine:calibration:0159",
+      "question": "What is agent orange ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4418",
+      "source_split": "train",
+      "source_row": 4418,
+      "group_id": "trec-question-sha256:6d577f3cd73c381ee50cc8992275f794047d8e139b2164904805d2148e7dce34"
+    },
+    {
+      "id": "trec-fine:calibration:0167",
+      "question": "How do I contact Answers.com direct ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4995",
+      "source_split": "train",
+      "source_row": 4995,
+      "group_id": "trec-question-sha256:98a8e3ed3ac6e8c441a7d9a1caa35fc1fe11d062f225d8e577feb6dab1354d1a"
+    },
+    {
+      "id": "trec-fine:calibration:0176",
+      "question": "What is witch hazel ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4830",
+      "source_split": "train",
+      "source_row": 4830,
+      "group_id": "trec-question-sha256:3384b456d094d1cfe637018633943f3423763bccdaf6a307f6c17eb667e40cdc"
+    },
+    {
+      "id": "trec-fine:calibration:0112",
+      "question": "What are equity securities ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:137",
+      "source_split": "train",
+      "source_row": 137,
+      "group_id": "trec-question-sha256:9fb40d815ead3438fd36d618d90ba9b1618da2e5c9fa81f9d20f5384f87896fe"
+    },
+    {
+      "id": "trec-fine:calibration:0144",
+      "question": "Who were the Picts ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1613",
+      "source_split": "train",
+      "source_row": 1613,
+      "group_id": "trec-question-sha256:68e1bdd9df6b64eeedbcceacc4cac07b8a25c3e4af2eebc3c2a86df0133a5b34"
+    },
+    {
+      "id": "trec-fine:calibration:0172",
+      "question": "What 4-foot-9 actress in 1984 became the first performer to win an Oscar for playing a character of the opposite sex ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3023",
+      "source_split": "train",
+      "source_row": 3023,
+      "group_id": "trec-question-sha256:81223359abd9aa920b9166185512d7266d4c248d9c7994c494d62acbfc7839c5"
+    },
+    {
+      "id": "trec-fine:calibration:0181",
+      "question": "What is the most common boy 's or girl 's name ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4690",
+      "source_split": "train",
+      "source_row": 4690,
+      "group_id": "trec-question-sha256:1e3725278e3fba0d39a0ff1fe7896ea12f33642febeb1b1ec9ad0b73aef915ec"
+    },
+    {
+      "id": "trec-fine:calibration:0143",
+      "question": "What wrestling star became `` The Incredible Hulk '' ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:570",
+      "source_split": "train",
+      "source_row": 570,
+      "group_id": "trec-question-sha256:294f8bfbfe0b7be73f83de7e727a5879649a839253ad60c31230ac4aa626efae"
+    },
+    {
+      "id": "trec-fine:calibration:0133",
+      "question": "Who starred with Charlie Chaplin in Modern Times and The Great Dictator ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4310",
+      "source_split": "train",
+      "source_row": 4310,
+      "group_id": "trec-question-sha256:69b7174f0730ab9bc748d6d8f7619ea65a0664d6aed21c55aef16fc51e74f476"
+    },
+    {
+      "id": "trec-fine:calibration:0153",
+      "question": "Whom did Friz Freleng add to the Warner Bros. cartoon ranks ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3120",
+      "source_split": "train",
+      "source_row": 3120,
+      "group_id": "trec-question-sha256:06b8bb2a4a056523bdab58d7d087193af098148da38ac0eec320d77679f548c9"
+    },
+    {
+      "id": "trec-fine:calibration:0087",
+      "question": "Which team won the Super Bowl in 1968 ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2946",
+      "source_split": "train",
+      "source_row": 2946,
+      "group_id": "trec-question-sha256:63fe88b7d867c7ddfdbc947f5e97b7aa909658d9c6b5d5776258a1d30671ac6a"
+    },
+    {
+      "id": "trec-fine:calibration:0109",
+      "question": "What comedian was banned from the Ed Sullivan Show for allegedly making an obscene gesture at the show 's host ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1800",
+      "source_split": "train",
+      "source_row": 1800,
+      "group_id": "trec-question-sha256:88c2c4913b86278adf547aa705d12bd8a25b8536004e544c677fd9e5c333ea3c"
+    },
+    {
+      "id": "trec-fine:calibration:0094",
+      "question": "Where is the massive North Korean nuclear complex located ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4287",
+      "source_split": "train",
+      "source_row": 4287,
+      "group_id": "trec-question-sha256:fcdcfb5dd524fd9648f209a91c15a4798ea834fa741798438b8d1a478626f524"
+    },
+    {
+      "id": "trec-fine:calibration:0173",
+      "question": "What Scandinavian capital is built on nine bridge-connected islands ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2338",
+      "source_split": "train",
+      "source_row": 2338,
+      "group_id": "trec-question-sha256:6bfa9f94b004535edafc6add150c04c56fbb1ceb22965fede0d87861bb4c59dd"
+    },
+    {
+      "id": "trec-fine:calibration:0062",
+      "question": "Where is there information on the novel `` El Cid '' ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4956",
+      "source_split": "train",
+      "source_row": 4956,
+      "group_id": "trec-question-sha256:3b9c0c3626b7bcb4333575251dcb9cb5121b8a002151a5e48669ffc1e1607fcd"
+    },
+    {
+      "id": "trec-fine:calibration:0136",
+      "question": "What U.S. state are the Finger Lakes in ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:state",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3530",
+      "source_split": "train",
+      "source_row": 3530,
+      "group_id": "trec-question-sha256:75009c618887021e86ccd0c9154e8cecbb063438868bd320dfe03bffb1e49e8c"
+    },
+    {
+      "id": "trec-fine:calibration:0146",
+      "question": "What country contains the westernmost point in South America ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:country",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4522",
+      "source_split": "train",
+      "source_row": 4522,
+      "group_id": "trec-question-sha256:16f8aaf75d8cde641ee1910b21444b4c1d5f158705f9913770b5105fad82e9b9"
+    },
+    {
+      "id": "trec-fine:calibration:0118",
+      "question": "Where is the Abominable Snowman said to wander ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:585",
+      "source_split": "train",
+      "source_row": 585,
+      "group_id": "trec-question-sha256:a188494c6ad49396967a4aa3257b0f38140f2c369240c573d73c735bffc08ad8"
+    },
+    {
+      "id": "trec-fine:calibration:0186",
+      "question": "What Australian city became the home of the America 's Cup ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1872",
+      "source_split": "train",
+      "source_row": 1872,
+      "group_id": "trec-question-sha256:ee360da0d4c59e597b221a1bc4bb82e5fb01987ab448421ba0cf11d03a05364c"
+    },
+    {
+      "id": "trec-fine:calibration:0179",
+      "question": "What attracts tourists to Reims ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:571",
+      "source_split": "train",
+      "source_row": 571,
+      "group_id": "trec-question-sha256:872302574026813ddabeff63c98617da03e4daa355270d7543213efa56c78c82"
+    },
+    {
+      "id": "trec-fine:calibration:0197",
+      "question": "Of children between the ages of two and eleven , what percentage watch `` The Simpsons '' ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:perc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1357",
+      "source_split": "train",
+      "source_row": 1357,
+      "group_id": "trec-question-sha256:d82d1653b075be2a827c0504168fd6290773405c006ccc46d29bffa992e36b5b"
+    },
+    {
+      "id": "trec-fine:calibration:0160",
+      "question": "What geological time do we live in ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4285",
+      "source_split": "train",
+      "source_row": 4285,
+      "group_id": "trec-question-sha256:932941592b41e32acb3833d4febce7958e828dbde6d53bd0fd40587b21abe142"
+    },
+    {
+      "id": "trec-fine:calibration:0162",
+      "question": "How long does it take the moon to revolve around the Earth ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4108",
+      "source_split": "train",
+      "source_row": 4108,
+      "group_id": "trec-question-sha256:c2fc992a664bdde8539594466f98e8c337a5dcf51295679613c749ec1fe622ff"
+    },
+    {
+      "id": "trec-fine:calibration:0063",
+      "question": "Boxing Day is celebrated on what date ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1221",
+      "source_split": "train",
+      "source_row": 1221,
+      "group_id": "trec-question-sha256:32d526bad7a8fd623ab436e321a88e9eb6a089ae8d37eba3e673fc2451c90bb7"
+    },
+    {
+      "id": "trec-fine:calibration:0088",
+      "question": "How many major Nazi leaders went on trial after the war at Nuremberg ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:count",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3201",
+      "source_split": "train",
+      "source_row": 3201,
+      "group_id": "trec-question-sha256:250c41f827863069e2885a0f45bcfae828e15330f1c362f695535b4ebec6a6f0"
+    },
+    {
+      "id": "trec-fine:calibration:0101",
+      "question": "How many Fig Newtons are there to the pound ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:count",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2775",
+      "source_split": "train",
+      "source_row": 2775,
+      "group_id": "trec-question-sha256:c1392e422d185129038e3fd796a6c649b645e34cd8bb23bb4765116e705be546"
+    },
+    {
+      "id": "trec-fine:calibration:0028",
+      "question": "How many consecutive baseball games did Lou Gehrig play ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:count",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2359",
+      "source_split": "train",
+      "source_row": 2359,
+      "group_id": "trec-question-sha256:48869f87b328981784ae4ea90ca8779f03c250d74a1d19bb68c785efb745f498"
+    },
+    {
+      "id": "trec-fine:calibration:0194",
+      "question": "Hitler came to power in Germany in what year ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3911",
+      "source_split": "train",
+      "source_row": 3911,
+      "group_id": "trec-question-sha256:200fac9f2d6da7344af2bb50bfd845c4d8caf742bc77563a6309493ac14a6f2a"
+    }
+  ],
+  "held_out": [
+    {
+      "id": "trec-fine:heldout:0077",
+      "question": "What is influenza ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:219",
+      "source_split": "test",
+      "source_row": 219,
+      "group_id": "trec-question-sha256:b9747b6c67473a982976422d633f273cc20988b9c079f7a021ed3c641a3ab4b3"
+    },
+    {
+      "id": "trec-fine:heldout:0064",
+      "question": "What is naproxen ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:288",
+      "source_split": "test",
+      "source_row": 288,
+      "group_id": "trec-question-sha256:2bc7b256e2b5cc0b4502e99e286009697515d05e1fa68e6e636e7505351ab1c5"
+    },
+    {
+      "id": "trec-fine:heldout:0123",
+      "question": "What is pilates ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:254",
+      "source_split": "test",
+      "source_row": 254,
+      "group_id": "trec-question-sha256:e25b5ffa622dd356861a1a91bd9eba7ecb9e1dd678a33443e51916e3f1d14ab8"
+    },
+    {
+      "id": "trec-fine:heldout:0124",
+      "question": "What is bio-diversity ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:491",
+      "source_split": "test",
+      "source_row": 491,
+      "group_id": "trec-question-sha256:19515d9da3b9ac4bb04732fb26566345eb02953ff2aa14c907b43c16c0d9034c"
+    },
+    {
+      "id": "trec-fine:heldout:0131",
+      "question": "What is e-coli ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:499",
+      "source_split": "test",
+      "source_row": 499,
+      "group_id": "trec-question-sha256:9d8a4b1806595362524493f2e7c1228cf18c8809663c25081ccf292772c0da00"
+    },
+    {
+      "id": "trec-fine:heldout:0178",
+      "question": "What is myopia ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:396",
+      "source_split": "test",
+      "source_row": 396,
+      "group_id": "trec-question-sha256:52c14127aade5b71fdd7548c9cfe840a47baf5ea9a2aa41af6e27d2a9c5f6fbd"
+    },
+    {
+      "id": "trec-fine:heldout:0053",
+      "question": "What are enzymes ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:428",
+      "source_split": "test",
+      "source_row": 428,
+      "group_id": "trec-question-sha256:8365e5d7e8f9a24ab0a3d4c37cce2316256147b3f8e2ff5c35640cc96971b294"
+    },
+    {
+      "id": "trec-fine:heldout:0069",
+      "question": "What is fibromyalgia ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:53",
+      "source_split": "test",
+      "source_row": 53,
+      "group_id": "trec-question-sha256:a9db66f4b09bd908969c40836eba4cd960116ed81871711c23bfa0dbda9ab944"
+    },
+    {
+      "id": "trec-fine:heldout:0162",
+      "question": "What is sonar ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:235",
+      "source_split": "test",
+      "source_row": 235,
+      "group_id": "trec-question-sha256:6f84745cbb892059399a54d2d1e883ea923b9517692117a1a1ffe546f0cdab86"
+    },
+    {
+      "id": "trec-fine:heldout:0194",
+      "question": "What is poliomyelitis ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:144",
+      "source_split": "test",
+      "source_row": 144,
+      "group_id": "trec-question-sha256:9564529410858a007264c1ae263a8af74a128bde5c20bee6f844f89b6b50a53c"
+    },
+    {
+      "id": "trec-fine:heldout:0161",
+      "question": "George Bush purchased a small interest in which baseball team ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:6",
+      "source_split": "test",
+      "source_row": 6,
+      "group_id": "trec-question-sha256:08a5973fb7a9e1af63d1f9859d72e750e99f2d3af086a6098a5c75323770d780"
+    },
+    {
+      "id": "trec-fine:heldout:0087",
+      "question": "Who was the first man to fly across the Pacific Ocean ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:13",
+      "source_split": "test",
+      "source_row": 13,
+      "group_id": "trec-question-sha256:8b58ee5a3137f2711f30f6ac04b5939fbbdf069e373bb7352a07c1850b2d7a44"
+    },
+    {
+      "id": "trec-fine:heldout:0150",
+      "question": "Who is the congressman from state of Texas on the armed forces committee ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:418",
+      "source_split": "test",
+      "source_row": 418,
+      "group_id": "trec-question-sha256:c02291f9c3ef3346bc5d063101bf069791680b59838730a128744d6ccbbe2f55"
+    },
+    {
+      "id": "trec-fine:heldout:0183",
+      "question": "Who discovered oxygen ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:429",
+      "source_split": "test",
+      "source_row": 429,
+      "group_id": "trec-question-sha256:6116a94c0e1566ddd2372f6011d9fb8bec82371f29f4ba1fcca8441eae52a0a9"
+    },
+    {
+      "id": "trec-fine:heldout:0086",
+      "question": "Who invented the instant Polaroid camera ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:390",
+      "source_split": "test",
+      "source_row": 390,
+      "group_id": "trec-question-sha256:e891d062ea7898965de6bc00f791a278b7b2f1708dfd91b28aebb9a7ba7e915b"
+    },
+    {
+      "id": "trec-fine:heldout:0156",
+      "question": "Who discovered radium ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:151",
+      "source_split": "test",
+      "source_row": 151,
+      "group_id": "trec-question-sha256:f42de572c1b33203f872315f3422b083b2332b76a9e8ffb415f1c79f796afc95"
+    },
+    {
+      "id": "trec-fine:heldout:0126",
+      "question": "Who was the first woman governor in the U.S. ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:273",
+      "source_split": "test",
+      "source_row": 273,
+      "group_id": "trec-question-sha256:721f8100f499c5cd17621b55828c7b548ce6bc1c8959c0ec6df9f0f0daf8d12b"
+    },
+    {
+      "id": "trec-fine:heldout:0159",
+      "question": "Who was the 23rd president of the United States ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:206",
+      "source_split": "test",
+      "source_row": 206,
+      "group_id": "trec-question-sha256:15f032271b3ac2e6a2098854037bc7d9b081f995d3d36e95140bbfac5a8da04c"
+    },
+    {
+      "id": "trec-fine:heldout:0079",
+      "question": "Who is the actress known for her role in the movie `` Gypsy '' ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:444",
+      "source_split": "test",
+      "source_row": 444,
+      "group_id": "trec-question-sha256:5ccbfe6dd4c14d63d0c352d6d47bbab076e59b22cd5118be4531cea5b0e67846"
+    },
+    {
+      "id": "trec-fine:heldout:0193",
+      "question": "Which comedian 's signature line is `` Can we talk '' ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:52",
+      "source_split": "test",
+      "source_row": 52,
+      "group_id": "trec-question-sha256:533557ffc9b83e16dfcfa6e3c224984e00a67cba60e8647e11cdc8a99931115e"
+    },
+    {
+      "id": "trec-fine:heldout:0176",
+      "question": "Where is Milan ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:58",
+      "source_split": "test",
+      "source_row": 58,
+      "group_id": "trec-question-sha256:2e7c4c6c2da59e2a09702ebe2b7cb3e0fc5b2bda5b028a47c2ac5f120d822d61"
+    },
+    {
+      "id": "trec-fine:heldout:0114",
+      "question": "What body of water are the Canary Islands in ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:180",
+      "source_split": "test",
+      "source_row": 180,
+      "group_id": "trec-question-sha256:9189868bb49d5d996f10e9d995866ee9d161ef19e8f979646ab8c995bdb02663"
+    },
+    {
+      "id": "trec-fine:heldout:0105",
+      "question": "What U.S. state 's motto is `` Live free or Die '' ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:state",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:175",
+      "source_split": "test",
+      "source_row": 175,
+      "group_id": "trec-question-sha256:bef52bd25037db74b551ed45f99efb88633a25253f8d2a8eb7b3d0b62e384109"
+    },
+    {
+      "id": "trec-fine:heldout:0083",
+      "question": "What is the oldest city in the United States ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:60",
+      "source_split": "test",
+      "source_row": 60,
+      "group_id": "trec-question-sha256:3bcdf0c0ba4efbeffd61c9f184c6a932c52730bff874044d63b61961a17d7e5d"
+    },
+    {
+      "id": "trec-fine:heldout:0128",
+      "question": "What city had a world fair in 1900 ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:city",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:10",
+      "source_split": "test",
+      "source_row": 10,
+      "group_id": "trec-question-sha256:ff077c976b37ec4e760326ff88ade3d89b1e92f79712ea53ec67c88a9d52f76a"
+    },
+    {
+      "id": "trec-fine:heldout:0166",
+      "question": "What continent is Argentina on ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:424",
+      "source_split": "test",
+      "source_row": 424,
+      "group_id": "trec-question-sha256:b401747c0a4918d26c51e699a66af472560769ce478a192e77b3c45d2b29d8f6"
+    },
+    {
+      "id": "trec-fine:heldout:0196",
+      "question": "Where is the volcano Olympus Mons located ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:205",
+      "source_split": "test",
+      "source_row": 205,
+      "group_id": "trec-question-sha256:e8cb53f8fd79cfa60e325d839f5529d457a62424cb488bdb5a498de798e78075"
+    },
+    {
+      "id": "trec-fine:heldout:0141",
+      "question": "Where are the National Archives ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:142",
+      "source_split": "test",
+      "source_row": 142,
+      "group_id": "trec-question-sha256:e66d8102ced266fe68a32246cfc7c1aaba4b87de1904d3e5d29a7e80770ebe03"
+    },
+    {
+      "id": "trec-fine:heldout:0107",
+      "question": "What river flows between Fargo , North Dakota and Moorhead , Minnesota ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:62",
+      "source_split": "test",
+      "source_row": 62,
+      "group_id": "trec-question-sha256:d5f07dff2502bb05351b755c321c431456fcaf68ea42bd0f13b14a619df2d9c1"
+    },
+    {
+      "id": "trec-fine:heldout:0198",
+      "question": "What river in the US is known as the Big Muddy ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:22",
+      "source_split": "test",
+      "source_row": 22,
+      "group_id": "trec-question-sha256:0628158cf511e67d08f198d53ecdd61e4a538e24ef63b4b35f4611001fe580d7"
+    },
+    {
+      "id": "trec-fine:heldout:0118",
+      "question": "When was Abraham Lincoln born ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:328",
+      "source_split": "test",
+      "source_row": 328,
+      "group_id": "trec-question-sha256:3d9979334d901e7e8779f02aa4f3cf9b31f883e0548098c57e76a1902ce1d31e"
+    },
+    {
+      "id": "trec-fine:heldout:0170",
+      "question": "Mercury , what year was it discovered ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:96",
+      "source_split": "test",
+      "source_row": 96,
+      "group_id": "trec-question-sha256:b3b596b468cfc9845c52a5fc633cddc8ee7dc131fbdd92e7052704c3fa04a84c"
+    },
+    {
+      "id": "trec-fine:heldout:0068",
+      "question": "What is the conversion rate between dollars and pounds ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:money",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:327",
+      "source_split": "test",
+      "source_row": 327,
+      "group_id": "trec-question-sha256:2be92e5dba5be26f8a53ca0d92629eddd82d418a017b70635df417eaf66a3350"
+    },
+    {
+      "id": "trec-fine:heldout:0152",
+      "question": "When did Idaho become a state ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:14",
+      "source_split": "test",
+      "source_row": 14,
+      "group_id": "trec-question-sha256:4b0701ad2d3dfcdd103187821e08baf1f34127e6355b83fe76ce668c22b0f748"
+    },
+    {
+      "id": "trec-fine:heldout:0142",
+      "question": "When did North Carolina enter the union ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:375",
+      "source_split": "test",
+      "source_row": 375,
+      "group_id": "trec-question-sha256:4062ef7758f632c5cac56a85927d65ddd1348a30e55e6111b5c60cf9971142fa"
+    },
+    {
+      "id": "trec-fine:heldout:0137",
+      "question": "What is the diameter of a golf ball ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:dist",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:121",
+      "source_split": "test",
+      "source_row": 121,
+      "group_id": "trec-question-sha256:6411d2af77665977f5e2ded92e91f534e1fc6da991321ef3029322fd850fe140"
+    },
+    {
+      "id": "trec-fine:heldout:0089",
+      "question": "Developing nations comprise what percentage of the world 's population ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:perc",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:398",
+      "source_split": "test",
+      "source_row": 398,
+      "group_id": "trec-question-sha256:34b1fbc5bdec59379d31c8a821577a1f95587b2e42b33c2a731d876b667a8dce"
+    },
+    {
+      "id": "trec-fine:heldout:0154",
+      "question": "What is Susan B. Anthony 's birthday ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:463",
+      "source_split": "test",
+      "source_row": 463,
+      "group_id": "trec-question-sha256:13096f590d2420b2f99fc12b91684ce28cd97ccf9befa39ae47e9438fe1af574"
+    },
+    {
+      "id": "trec-fine:heldout:0067",
+      "question": "What is the average weight of a Yellow Labrador ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:weight",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:12",
+      "source_split": "test",
+      "source_row": 12,
+      "group_id": "trec-question-sha256:077da93b47a917055f438753336a4157519704f8519a24f7380afbfd175880a9"
+    },
+    {
+      "id": "trec-fine:heldout:0121",
+      "question": "How tall is the Sears Building ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:dist",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:5",
+      "source_split": "test",
+      "source_row": 5,
+      "group_id": "trec-question-sha256:78dead8cf6f33453613de39d8fc83cb4b852e6503e3ee5bc19121cf406989b16"
+    }
+  ]
+}

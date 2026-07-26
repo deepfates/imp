@@ -1,0 +1,31 @@
+{
+  "schema_version": 4,
+  "treatment_id": "imp-grpo-trec-coarse-lora-source-guided-v1",
+  "data_sha256": "bef8eb3df2f7fa21eef2a79513bb4b056349794b7339dadc5c2ccb8548afbf9d",
+  "train_sha256": "sha256:e97d992ad4e53026e3f023208cd73bdc5eccbaf2ab8c24302deb9a3ad8c7f9aa",
+  "selection_sha256": "sha256:d3c35b8172c1d4a381405148159522d447e94e542c5dbb678b0cc6936dcc0c61",
+  "test_sha256": "sha256:d93f1d63de2786066a7a9865da98d6d9974da9342c560a89bc5c3962dca8b862",
+  "contract_sha256": "bb847436261ce7f7262985fe3569c49ad80008d529982fee8f4bbba2eaf75ca5",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "seed": 532978328,
+  "routes": ["R17", "R42", "R68", "R93"],
+  "selection_source": "validation",
+  "instruction": "Classify the question into exactly one opaque route code. The only valid route codes are R17, R42, R68, and R93. Return only the route code.",
+  "input_field": "question",
+  "train_steps": 33,
+  "train_width": 2,
+  "num_rollouts": 8,
+  "train_kwargs": {
+    "learning_rate": 0.00001,
+    "beta": 0.0,
+    "loss_type": "dapo",
+    "scale_rewards": "group"
+  },
+  "source_schedule": {
+    "source_rows": 64,
+    "groups": 66,
+    "once": 62,
+    "twice": 2,
+    "thrice": 0
+  }
+}
