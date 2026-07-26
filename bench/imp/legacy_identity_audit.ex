@@ -23,7 +23,11 @@ defmodule Imp.LegacyIdentityAudit do
   }
 
   @allowlisted_files %{
+    ".tickets/imp-yme4.md" =>
+      "canonical ledger preserves the retired adapter identity in historical stopped-run diagnosis",
     "benchmarks/authorities.json" => "benchmark authority provenance",
+    "benchmarks/config/local-mlx-lifecycle-banking77-v2.json" =>
+      "immutable stopped-run contract records the retired renderer and its exact correction",
     "benchmarks/config/failure-recovery-live.json" => "historical live campaign configuration",
     "identity/DECISION.md" => "historical naming decision record",
     "bench/imp/benchmark_truth/local_mlx_campaign.ex" => "benchmark provenance adapter",

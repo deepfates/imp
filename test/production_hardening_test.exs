@@ -659,7 +659,7 @@ defmodule ProductionHardeningTest do
       |> Imp.Saving.load()
     end
 
-    assert_raise ArgumentError, ~r/saved Imp config must be a map or list/, fn ->
+    assert_raise ArgumentError, ~r/saved ReqLLM options must be a list/, fn ->
       base
       |> Map.put("lm", %{"provider" => "req_llm", "model" => "openai:gpt-test", "opts" => 1})
       |> Imp.Saving.load()
