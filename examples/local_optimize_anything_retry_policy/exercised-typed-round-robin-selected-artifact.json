@@ -1,0 +1,8 @@
+{
+  "base_ms": 500,
+  "cap_ms": 8000,
+  "honor_server_hint": true,
+  "jitter_ms": 0,
+  "reject_non_retryable": true,
+  "urgent_attempt_limit": -1
+}

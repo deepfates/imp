@@ -43,4 +43,34 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyResultTest do
     assert result["fresh_process"]["byte_identical"]
     assert result["claim_boundary"] =~ "no admitted mutation"
   end
+
+  test "typed round-robin result preserves the selected mutation and narrow positive outcome" do
+    result =
+      "examples/local_optimize_anything_retry_policy/exercised-typed-round-robin-result.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    selected =
+      "examples/local_optimize_anything_retry_policy/exercised-typed-round-robin-selected-artifact.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert result["status"] == "complete"
+    assert result["selected"] == "mutated"
+    assert result["proposal_calls"] == 6
+
+    assert result["split_sizes"] == %{
+             "train" => 8,
+             "selection" => 6,
+             "untouched_test" => 6
+           }
+
+    assert result["selected_selection_score"] > result["baseline_selection_score"]
+    assert result["untouched_test"]["selected"]["exact"] == 5
+    assert result["untouched_test"]["baseline"]["exact"] == 4
+    assert result["fresh_byte_identical"]
+    assert selected["honor_server_hint"]
+    assert selected["base_ms"] == 500
+    assert result["claim_boundary"] =~ "not general Optimize Anything effectiveness"
+  end
 end

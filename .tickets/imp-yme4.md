@@ -360,3 +360,34 @@ The ordinary GRPO front door completed a ten-step, four-source-group-per-step, f
 The same run exposed and repaired two substantive restart defects. TRL's final-step logging had written to stdout and contaminated the length-framed JSON control channel after the tenth artifact was durably accepted; worker dispatch now redirects all third-party stdout to stderr, with a no-model framing regression. The caller reconciled the accepted tenth update without repeating it. The public example now verifies and reuses retained preflight/base bytes, resumes checksum-bound GRPO checkpoints, restores an already-completed verified job and explicit evaluation-stage shapes, and verifies rather than rewrites preflight during fresh reproduction. Both mid-step and post-training continuations completed the original treatment.
 
 `examples/local_grpo_banking77/exercised-two-padded-epochs-pre-framing-fix-stopped-result.json` preserves the stopped acknowledgement boundary; `exercised-two-padded-epochs-result.json` preserves the completed result and exact full-result digest. This materially strengthens multi-group/multi-step runtime, optimizer-state continuation, artifact, and deployment behavior, but remains a neutral one-seed/task/model usefulness result. It does not establish learned lift, general GRPO/mmGRPO effectiveness or parity, accepted-mutation recovery after loss of the durable worker receipt, multi-student-LM training, production reliability, or BEAM superiority.
+
+**2026-07-26T16:00:00Z**
+
+Optimize Anything's ordinary structured proposer now has an explicit typed
+transport instead of relying on a local model to infer bare scalar JSON. The
+public `structured_response_format` policy is `:off`, `:auto`, or `:required`;
+required mode sends an exact component-specific JSON schema under a single
+`value` transport envelope, strips only that envelope, and then applies the
+existing seed-derived exact shape/type validation. The policy is persisted and
+bound into structured candidate/checkpoint identity, so resume refuses drift.
+A real pinned Phi-4/Ollama call exercised the public transport before the
+frozen consumer run.
+
+The unchanged retry-policy objective, seed artifact, deterministic evaluator,
+six round-robin field schedule, and pairwise-distinct 8/6/6 split then completed
+once with the typed proposal transport. All six non-scripted local-model calls
+were schema-valid. One mutation changed `honor_server_hint` from false to true,
+cleared strict training admission, and improved selection score from
+`0.5636503770` to `0.8625005208`. Only after selection, the native selected map
+improved the six untouched cases from four to five exact and score
+`0.7005874266` to `0.8645835937`, then reproduced byte-identically in a fresh OS
+BEAM. The exact result and selected artifact are retained under
+`examples/local_optimize_anything_retry_policy/`.
+
+This closes one ordinary non-scripted structured-artifact mutation,
+train-admission, validation-selection, real application, positive untouched
+outcome, and fresh-consumer lifecycle. It is one small synthetic operational
+task with one local model: it does not satisfy the provider-backed three-family
+schema-v2 C3 target, establish general OA effectiveness, upstream comparative
+effectiveness, production reliability, or BEAM superiority. Text-map pinned
+v0.1.4 compatibility remains separate from this Imp-native typed extension.

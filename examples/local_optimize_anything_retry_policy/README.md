@@ -97,3 +97,15 @@ six round-robin fields, objective, seed artifact, evaluator, budgets, and 8/6/6
 split remain in force. The schema is part of the durable structured-candidate
 identity, so a checkpoint cannot be resumed under a different proposal
 contract.
+
+Its retained run is `exercised-typed-round-robin-result.json`, with the exact
+selected map in `exercised-typed-round-robin-selected-artifact.json`. All six
+model calls returned schema-valid component values. One non-identity mutation
+(`honor_server_hint: false` to `true`) cleared strict training admission and
+improved separate selection score from `0.56365` to `0.86250`. Only then did
+the runner open the six untouched cases: exact outcomes improved from four to
+five and aggregate score from `0.70059` to `0.86458`. Fresh OS evaluation of
+the selected native map was byte-identical. This is positive evidence for one
+local model and one small retry-policy task, not schema-v2 multi-seed evidence,
+general Optimize Anything effectiveness, upstream comparative effectiveness,
+or BEAM superiority.

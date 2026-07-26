@@ -1,0 +1,28 @@
+{
+  "scope": "one local mixed-type Optimize Anything retry-policy lifecycle",
+  "status": "complete",
+  "selected": "mutated",
+  "model": "phi4:latest",
+  "treatment_id": "local-oa-retry-policy-typed-round-robin-v1",
+  "proposal_calls": 6,
+  "split_sizes": {
+    "train": 8,
+    "selection": 6,
+    "untouched_test": 6
+  },
+  "untouched_test": {
+    "selected": {
+      "exact": 5,
+      "score": 0.8645835937174521
+    },
+    "baseline": {
+      "exact": 4,
+      "score": 0.7005874265716785
+    }
+  },
+  "model_digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
+  "baseline_selection_score": 0.5636503770362039,
+  "selected_selection_score": 0.8625005207682372,
+  "fresh_byte_identical": true,
+  "claim_boundary": "One task/model mixed-type optimization and fresh artifact lifecycle; not general Optimize Anything effectiveness, schema-v2 evidence, parity, or BEAM superiority."
+}
