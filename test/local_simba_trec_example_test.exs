@@ -4,6 +4,7 @@ defmodule Imp.LocalSIMBATRECExampleTest do
   @source "examples/local_simba_trec/run.exs"
   @data "benchmarks/data/simba-trec-coarse-v1.json"
   @result "examples/local_simba_trec/exercised-result.json"
+  @json_result "examples/local_simba_trec/exercised-json-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_TREC_DEFINE_ONLY")
@@ -149,6 +150,24 @@ defmodule Imp.LocalSIMBATRECExampleTest do
              "errors" => 40
            }
 
+    assert result["held_out_test"]["selected"] == result["held_out_test"]["baseline"]
+    assert result["fresh_process"]["byte_identical"]
+  end
+
+  test "retained JSON condition preserves its negative mutation selection" do
+    result = @json_result |> File.read!() |> Jason.decode!()
+
+    assert result["adapter"] == "Imp.Adapter.JSON"
+    assert result["search"]["baseline_score"] == 0.25
+    assert result["search"]["selected_score"] == 0.25
+    assert result["search"]["selected"] == "baseline"
+    assert result["search"]["candidate_count"] == 5
+    assert result["search"]["mutated_finalists"] == 3
+    assert result["search"]["rendered_mutation_calls"] == 111
+    assert result["search"]["logical_calls"] == 146
+    assert result["search"]["transport_attempts"] == 146
+    assert result["held_out_test"]["baseline"]["accuracy"] == 0.35
+    assert_in_delta result["held_out_test"]["baseline"]["macro_f1"], 0.2516469038208169, 1.0e-12
     assert result["held_out_test"]["selected"] == result["held_out_test"]["baseline"]
     assert result["fresh_process"]["byte_identical"]
   end

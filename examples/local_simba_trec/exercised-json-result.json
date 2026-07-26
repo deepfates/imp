@@ -1,0 +1,39 @@
+{
+  "scope": "one local SIMBA opaque-route TREC consumer lifecycle",
+  "status": "complete",
+  "search": {
+    "selected": "baseline",
+    "mutated_finalists": 3,
+    "baseline_score": 0.25,
+    "selected_score": 0.25,
+    "candidate_count": 5,
+    "rendered_mutation_calls": 111,
+    "logical_calls": 146,
+    "transport_attempts": 146
+  },
+  "adapter": "Imp.Adapter.JSON",
+  "model": "ollama:llama3.2:3b",
+  "data_sha256": "6643645cc3bcd79a5236b7e3920a5c37526be178df2e02f20652d9a16eef51ad",
+  "fresh_process": {
+    "byte_identical": true,
+    "model_identity": "ollama:llama3.2:3b"
+  },
+  "split_sizes": {
+    "validation": 8,
+    "train": 24,
+    "held_out_test": 40
+  },
+  "held_out_test": {
+    "selected": {
+      "errors": 4,
+      "accuracy": 0.35,
+      "macro_f1": 0.2516469038208169
+    },
+    "baseline": {
+      "errors": 4,
+      "accuracy": 0.35,
+      "macro_f1": 0.2516469038208169
+    }
+  },
+  "claim_boundary": "One source-disjoint task/model SIMBA mutation, validation selection, artifact, and fresh-process result; not general SIMBA effectiveness, full DSPy parity, production reliability, or BEAM superiority."
+}

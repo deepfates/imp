@@ -58,3 +58,13 @@ mix run run.exs
 
 This condition must still be retained honestly if no mutation wins validation
 or held-out behavior is neutral or worse.
+
+`exercised-json-result.json` preserves that exact negative outcome. The JSON
+adapter made the task measurable: SIMBA built five candidates, three genuine
+mutated finalists were rendered in 111 task calls, and all 146 optimization
+calls used one transport. Every finalist tied baseline at 0.25 validation, so
+baseline remained selected. It scored 0.35 accuracy / 0.25165 macro-F1 with
+four parse errors on the source-disjoint forty and reproduced byte-identically
+after artifact application in a fresh OS BEAM. This establishes a genuine
+natural-model mutation/evaluation/selection/artifact path and an honest
+negative selection result, not a selected mutation or general effectiveness.
