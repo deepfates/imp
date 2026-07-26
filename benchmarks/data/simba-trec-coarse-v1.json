@@ -1,0 +1,830 @@
+{
+  "schema_version": 1,
+  "task": "trec_coarse_opaque_route_v1",
+  "source": {
+    "dataset": "CogComp/trec",
+    "revision": "eb1e45c1ba990fecca7cf84b67ce845edbcf49bf",
+    "license": "unknown (as reported by pinned dataset card)",
+    "fixture": "benchmarks/data/confidence-calibration-trec-fine.jsonl",
+    "fixture_sha256": "29cd6eb93a6a4c3b23a2133cf95cc3deca8b95e62c354ded450c663e44c56bd8",
+    "train_source_sha256": "9e4c8bdcaffb96ed61041bd64b564183d52793a8e91d84fc3a8646885f466ec3",
+    "test_source_sha256": "033f22c028c2bbba9ca682f68ffe204dc1aa6e1cf35dd6207f2d4ca67f0d0e8e"
+  },
+  "route_codes": [
+    {
+      "coarse": "DESC",
+      "route": "R17"
+    },
+    {
+      "coarse": "HUM",
+      "route": "R42"
+    },
+    {
+      "coarse": "LOC",
+      "route": "R68"
+    },
+    {
+      "coarse": "NUM",
+      "route": "R93"
+    }
+  ],
+  "selection": "Preserve the pinned fixture SHA-256 rank; per coarse label take calibration rows 1-6 for train and 7-8 for validation, then official heldout rows 1-10 for test.",
+  "train": [
+    {
+      "id": "trec-fine:calibration:0000",
+      "question": "What is the definition of hazmat ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2489",
+      "source_split": "train",
+      "source_row": 2489,
+      "group_id": "trec-question-sha256:8f8b8f51f6d7a7db060f3e114a99698caaf6fe322859b90558305e6595d4bd0f"
+    },
+    {
+      "id": "trec-fine:calibration:0003",
+      "question": "How can I gain access to a spy satelite ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3753",
+      "source_split": "train",
+      "source_row": 3753,
+      "group_id": "trec-question-sha256:e4e34feb0a8d26cb9e1d275a0f6df133e8d9973213cc63d10178a388461a91d3"
+    },
+    {
+      "id": "trec-fine:calibration:0007",
+      "question": "How close a cousin was Franklin D. to Theodore Roosevelt ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3342",
+      "source_split": "train",
+      "source_row": 3342,
+      "group_id": "trec-question-sha256:9eeb97d9d2b49c9d50916d262657c24493b7589255d67a55fb3deb9d6b41701c"
+    },
+    {
+      "id": "trec-fine:calibration:0010",
+      "question": "What is a transistor ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:131",
+      "source_split": "train",
+      "source_row": 131,
+      "group_id": "trec-question-sha256:8eca2af1061f578b8f2f944fe42439460b1f3cff652b7f4fb82f675bcbf3d086"
+    },
+    {
+      "id": "trec-fine:calibration:0021",
+      "question": "What is ` Last Chance for Animals ' ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4673",
+      "source_split": "train",
+      "source_row": 4673,
+      "group_id": "trec-question-sha256:760a4c11107c6002826e44ff47726d81a5e213a8379cca2d35ac8d82f20a0a31"
+    },
+    {
+      "id": "trec-fine:calibration:0026",
+      "question": "How did former WWF wrestler Rick Rude die ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:manner",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4146",
+      "source_split": "train",
+      "source_row": 4146,
+      "group_id": "trec-question-sha256:963853e22b44b68dfffb11c987df49f1bff633a8c2c4fd30309d6a996c092735"
+    },
+    {
+      "id": "trec-fine:calibration:0001",
+      "question": "What civilization invented the arch ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2482",
+      "source_split": "train",
+      "source_row": 2482,
+      "group_id": "trec-question-sha256:2afb55bcac40856c64b23b3f241dcd3924c5756af2412d35d58fefe784f4ed80"
+    },
+    {
+      "id": "trec-fine:calibration:0005",
+      "question": "Which one of the original seven Mercury program astronauts did not fly on any of the Mercury flights ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1380",
+      "source_split": "train",
+      "source_row": 1380,
+      "group_id": "trec-question-sha256:025407558a84ecd50887f9cfcac078fa591c32263224f2fdf154e57e21d64ccb"
+    },
+    {
+      "id": "trec-fine:calibration:0012",
+      "question": "Who was Shakespeare 's Moorish general ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3125",
+      "source_split": "train",
+      "source_row": 3125,
+      "group_id": "trec-question-sha256:34a825cf4cc4d3b01ac472309da66403a06a2417ab115a6592e5d94de0e0dee2"
+    },
+    {
+      "id": "trec-fine:calibration:0017",
+      "question": "Who is the French literary charcter who is chiefly famous for his enormous nose ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4194",
+      "source_split": "train",
+      "source_row": 4194,
+      "group_id": "trec-question-sha256:60d6c8bf738da2a6b86d143bf04e3807cef3eea63893a1a12a561be7fca92a66"
+    },
+    {
+      "id": "trec-fine:calibration:0048",
+      "question": "What company sells the most greeting cards ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3098",
+      "source_split": "train",
+      "source_row": 3098,
+      "group_id": "trec-question-sha256:b1cfe1571ad41af91ecc095728f1df85881c33b4aa06a775c6c46f3cc6b31372"
+    },
+    {
+      "id": "trec-fine:calibration:0052",
+      "question": "Who invented the stock ticker in 1870 ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3563",
+      "source_split": "train",
+      "source_row": 3563,
+      "group_id": "trec-question-sha256:63ccf2247f47a99bbfabf817808262c32d083f4212be63c4e5f7756218a13156"
+    },
+    {
+      "id": "trec-fine:calibration:0013",
+      "question": "What U.S. state records the least rainfall ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:state",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:931",
+      "source_split": "train",
+      "source_row": 931,
+      "group_id": "trec-question-sha256:524d5c69e210ec4f4497e00eeb8dc1c7202d841b5292ab849366d78df2541609"
+    },
+    {
+      "id": "trec-fine:calibration:0014",
+      "question": "Where did the Battle of the Bulge take place ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1416",
+      "source_split": "train",
+      "source_row": 1416,
+      "group_id": "trec-question-sha256:e44a7859995a1b0dba097384d235fba164190ff812cd7a0903d5fd2b3f2f5053"
+    },
+    {
+      "id": "trec-fine:calibration:0015",
+      "question": "Where 's the Petrified Forest ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:872",
+      "source_split": "train",
+      "source_row": 872,
+      "group_id": "trec-question-sha256:5cf86c90757a87cd66dd7d1d74b81add1f82c6d9198960ba78c8cb2a065876b7"
+    },
+    {
+      "id": "trec-fine:calibration:0029",
+      "question": "What country has problems with hooligans ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:country",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4517",
+      "source_split": "train",
+      "source_row": 4517,
+      "group_id": "trec-question-sha256:2120aae73f15a8ea4aa048b274ebcb65e20c61223793817a9acab6ff0dbac81a"
+    },
+    {
+      "id": "trec-fine:calibration:0030",
+      "question": "What are the largest libraries in the US ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1678",
+      "source_split": "train",
+      "source_row": 1678,
+      "group_id": "trec-question-sha256:d283526d0c0a7288aa421e5a5f1d64bf891810c217212f0f507eb555d7eb0fbf"
+    },
+    {
+      "id": "trec-fine:calibration:0035",
+      "question": "What U.S. state has an element named for it ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:state",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:318",
+      "source_split": "train",
+      "source_row": 318,
+      "group_id": "trec-question-sha256:adf0eb67781ff750aee6cf85231ec13bc76c6af41cd4551f8864e362bb120a73"
+    },
+    {
+      "id": "trec-fine:calibration:0002",
+      "question": "How many people was Randy Craft convicted of murdering ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:count",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2247",
+      "source_split": "train",
+      "source_row": 2247,
+      "group_id": "trec-question-sha256:afd4ca4f167c8716a01aa546fbdb6d06ce9fe72481ca658ce50b97576aaed6c6"
+    },
+    {
+      "id": "trec-fine:calibration:0004",
+      "question": "What year was Janet Jackson 's first album released ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3426",
+      "source_split": "train",
+      "source_row": 3426,
+      "group_id": "trec-question-sha256:921ccd9a9c8669cd8f9c108b43f8abd831792885dd10cb251cd3bcc58353e06d"
+    },
+    {
+      "id": "trec-fine:calibration:0008",
+      "question": "How much will gas be taxed in California by the year 2000 ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:money",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4403",
+      "source_split": "train",
+      "source_row": 4403,
+      "group_id": "trec-question-sha256:caf23d0a60fb1b78d5dffdc07acaf683160dda1c7e92ef19d626fd9bc8270ace"
+    },
+    {
+      "id": "trec-fine:calibration:0009",
+      "question": "How long does a fly live ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3488",
+      "source_split": "train",
+      "source_row": 3488,
+      "group_id": "trec-question-sha256:f981f4f80b485f23f43b1d9838d009680b8573da0dd7863ee6ba38977c38f39f"
+    },
+    {
+      "id": "trec-fine:calibration:0011",
+      "question": "What year did the Vietnam War end ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:896",
+      "source_split": "train",
+      "source_row": 896,
+      "group_id": "trec-question-sha256:eb4caa940bc213da597ece4be183df51a3fc6811b334f054161edb826f51a623"
+    },
+    {
+      "id": "trec-fine:calibration:0016",
+      "question": "How much does it cost , average or whatever is available , to produce and send junk mail catalogues in the US ? , DT CD NN NN ,",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:money",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:1120",
+      "source_split": "train",
+      "source_row": 1120,
+      "group_id": "trec-question-sha256:3bb234031068a636867c751bb01a33439b2a70a1ca7a6c2a19a1a070904dea57"
+    }
+  ],
+  "validation": [
+    {
+      "id": "trec-fine:calibration:0032",
+      "question": "What is the difference between a classical and an acoustic guitar ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:3226",
+      "source_split": "train",
+      "source_row": 3226,
+      "group_id": "trec-question-sha256:2c63a19b90e2b05bd6b951d858d44bffee134444e8e5f6248119ec1dd2743b0e"
+    },
+    {
+      "id": "trec-fine:calibration:0033",
+      "question": "What 's the origin of the word ` news ' ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:818",
+      "source_split": "train",
+      "source_row": 818,
+      "group_id": "trec-question-sha256:da3882e12794104364c44f31abc35ab89b8d664476518fb8bd565e26c8aef3d8"
+    },
+    {
+      "id": "trec-fine:calibration:0057",
+      "question": "What 's the name of the star of the cooking show , `` Galloping Gourmet '' ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:4754",
+      "source_split": "train",
+      "source_row": 4754,
+      "group_id": "trec-question-sha256:d808cd9ac99b66144d90e07988c2d42bbc8250c1381354980a7ee2145132891f"
+    },
+    {
+      "id": "trec-fine:calibration:0060",
+      "question": "What U.S. vice-president said : `` Some newspapers dispose of their garbage by printing it '' ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2856",
+      "source_split": "train",
+      "source_row": 2856,
+      "group_id": "trec-question-sha256:0e0c2f6f90da5977d8625a9df829f67b701384b13fef2e3ea2e3d5e1d6ef8748"
+    },
+    {
+      "id": "trec-fine:calibration:0042",
+      "question": "Which continent has the most roses ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2534",
+      "source_split": "train",
+      "source_row": 2534,
+      "group_id": "trec-question-sha256:9f0d5614da43dc45f811232811d6d711efc249cf690a34975f94b8b7de382bf1"
+    },
+    {
+      "id": "trec-fine:calibration:0053",
+      "question": "Where do people mountain climb in Nepal ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:mount",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:555",
+      "source_split": "train",
+      "source_row": 555,
+      "group_id": "trec-question-sha256:490a191d0b44e5520ad19c40b297d70878a040b35c3dff21174202b90ad2e903"
+    },
+    {
+      "id": "trec-fine:calibration:0022",
+      "question": "When was London 's Docklands Light Railway constructed ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:2568",
+      "source_split": "train",
+      "source_row": 2568,
+      "group_id": "trec-question-sha256:1e778ab23977004e139eac268c2b16ce356fa6196cd5722c5000102259298d0c"
+    },
+    {
+      "id": "trec-fine:calibration:0025",
+      "question": "When did CNN begin broadcasting ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:train:9e4c8bdcaffb96ed:90",
+      "source_split": "train",
+      "source_row": 90,
+      "group_id": "trec-question-sha256:9ac51209bf5d129df6b6c379f6a928537a23eb96662a48344b9a19d236769084"
+    }
+  ],
+  "held_out": [
+    {
+      "id": "trec-fine:heldout:0000",
+      "question": "What does a defibrillator do ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:desc",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:208",
+      "source_split": "test",
+      "source_row": 208,
+      "group_id": "trec-question-sha256:617a29ad9ae80cc750e44adbefe3dd90ed83c6b92cd7030daea772f798ef1759"
+    },
+    {
+      "id": "trec-fine:heldout:0001",
+      "question": "What is phosphorus ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:237",
+      "source_split": "test",
+      "source_row": 237,
+      "group_id": "trec-question-sha256:5321605a57c9bdc404e8b04a5678c916ace8e09e138409d88ec59eb5ce8818f9"
+    },
+    {
+      "id": "trec-fine:heldout:0002",
+      "question": "What is neuropathy ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:181",
+      "source_split": "test",
+      "source_row": 181,
+      "group_id": "trec-question-sha256:99a8dda29f1e61d4bef31ff342bdabf0c512d0d1c5d2f66b08365aae3f83b15e"
+    },
+    {
+      "id": "trec-fine:heldout:0009",
+      "question": "What are polymers ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:161",
+      "source_split": "test",
+      "source_row": 161,
+      "group_id": "trec-question-sha256:c145845ab25399fbe022d903a007d49d243146d87510bb87b1eeb8c317e0b860"
+    },
+    {
+      "id": "trec-fine:heldout:0010",
+      "question": "What is osteoporosis ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:272",
+      "source_split": "test",
+      "source_row": 272,
+      "group_id": "trec-question-sha256:d01b4796f99e396b83e1facc08863aa501860f390d19a932e4687a1a0a51624e"
+    },
+    {
+      "id": "trec-fine:heldout:0015",
+      "question": "What is acetaminophen ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:167",
+      "source_split": "test",
+      "source_row": 167,
+      "group_id": "trec-question-sha256:560e199922603b346d25a77401239dd65793c28c851295ad853da9026310b6f1"
+    },
+    {
+      "id": "trec-fine:heldout:0020",
+      "question": "What is amoxicillin ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:86",
+      "source_split": "test",
+      "source_row": 86,
+      "group_id": "trec-question-sha256:6e0836effedd20eb436e93bf92feacf9113abcad81eb92466e2d95863b011547"
+    },
+    {
+      "id": "trec-fine:heldout:0021",
+      "question": "What is pulmonary fibrosis ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:286",
+      "source_split": "test",
+      "source_row": 286,
+      "group_id": "trec-question-sha256:135e662f4300c6ddcc054c8e40703e74b873af7e34b76217b89311a62a8fbd1e"
+    },
+    {
+      "id": "trec-fine:heldout:0022",
+      "question": "What are pediatricians ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:466",
+      "source_split": "test",
+      "source_row": 466,
+      "group_id": "trec-question-sha256:057fb74c2572ae6385b7f3cf526ca076a91a146fc43615e7bb2c18fd3716882f"
+    },
+    {
+      "id": "trec-fine:heldout:0028",
+      "question": "What is sodium chloride ?",
+      "route": "R17",
+      "coarse": "DESC",
+      "source_label": "DESC:def",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:216",
+      "source_split": "test",
+      "source_row": 216,
+      "group_id": "trec-question-sha256:3fdd422d3a65c9170397564c52cde3f9bfd35018afe259e0357c7668ec250a14"
+    },
+    {
+      "id": "trec-fine:heldout:0008",
+      "question": "What chain store is headquartered in Bentonville , Arkansas ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:gr",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:467",
+      "source_split": "test",
+      "source_row": 467,
+      "group_id": "trec-question-sha256:179a753c3c6e19f27b3f89dae405b220f6be00b4913a2e7c1208783a47b485ff"
+    },
+    {
+      "id": "trec-fine:heldout:0012",
+      "question": "Who wrote the hymn `` Amazing Grace '' ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:137",
+      "source_split": "test",
+      "source_row": 137,
+      "group_id": "trec-question-sha256:98e7a0fd201b454780da4393d0ca2ede485250045457acee1f53401c2c711964"
+    },
+    {
+      "id": "trec-fine:heldout:0017",
+      "question": "Who discovered x-rays ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:51",
+      "source_split": "test",
+      "source_row": 51,
+      "group_id": "trec-question-sha256:286a151e14723fdb1e94929cafb0d965cc14f2bd85229dc667d242dcec6d3070"
+    },
+    {
+      "id": "trec-fine:heldout:0024",
+      "question": "Who was the first African American to win the Nobel Prize in literature ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:447",
+      "source_split": "test",
+      "source_row": 447,
+      "group_id": "trec-question-sha256:9e25b9ce1c31ddfb3555f70aaa765061ac918696c1c709d229cd377588161bf1"
+    },
+    {
+      "id": "trec-fine:heldout:0031",
+      "question": "Who was elected president of South Africa in 1994 ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:82",
+      "source_split": "test",
+      "source_row": 82,
+      "group_id": "trec-question-sha256:5d265f7e95fe2a9a419a1006ce157674aeab164e3033f6f8a0327f3f9c4e003c"
+    },
+    {
+      "id": "trec-fine:heldout:0037",
+      "question": "Who was the first person to reach the North Pole ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:433",
+      "source_split": "test",
+      "source_row": 433,
+      "group_id": "trec-question-sha256:99190801a15fd4a60d11b9ca5958ffae38a90b822e3c3f51d70c16c1a46baec4"
+    },
+    {
+      "id": "trec-fine:heldout:0041",
+      "question": "What is the name of the leader of Ireland ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:231",
+      "source_split": "test",
+      "source_row": 231,
+      "group_id": "trec-question-sha256:7f2c14d8800d1b346594d419b1c0309b5a8465dc5127d1a94a0893f4b235310c"
+    },
+    {
+      "id": "trec-fine:heldout:0045",
+      "question": "Who was president in 1913 ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:419",
+      "source_split": "test",
+      "source_row": 419,
+      "group_id": "trec-question-sha256:db1df83b33b72bed1f1ed0b96db02c58f110af8dc8493f76b614593a17485762"
+    },
+    {
+      "id": "trec-fine:heldout:0050",
+      "question": "Who was the 22nd President of the US ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:495",
+      "source_split": "test",
+      "source_row": 495,
+      "group_id": "trec-question-sha256:bb81ebd5bd1778ba47f5615b2c8a8809ce3d2ce52d8d0482e12675fa2d19cd89"
+    },
+    {
+      "id": "trec-fine:heldout:0051",
+      "question": "Who was the first U.S. president to appear on TV ?",
+      "route": "R42",
+      "coarse": "HUM",
+      "source_label": "HUM:ind",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:316",
+      "source_split": "test",
+      "source_row": 316,
+      "group_id": "trec-question-sha256:5e7fa24fa657a6bf3fdcb408f82e9e719e2d54a019b459fa995e0cfea93a55d2"
+    },
+    {
+      "id": "trec-fine:heldout:0007",
+      "question": "Where are the Rocky Mountains ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:mount",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:31",
+      "source_split": "test",
+      "source_row": 31,
+      "group_id": "trec-question-sha256:516e220c29cb5b2bbaae8836396f94b59d0cce3df64458d415890156f1037f18"
+    },
+    {
+      "id": "trec-fine:heldout:0019",
+      "question": "Which country gave New York the Statue of Liberty ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:country",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:479",
+      "source_split": "test",
+      "source_row": 479,
+      "group_id": "trec-question-sha256:7804ab8ca5d33c7a0d04a25965e15267b143d35822cdf96d6978702968bbcc10"
+    },
+    {
+      "id": "trec-fine:heldout:0032",
+      "question": "Where is the Mason/Dixon line ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:407",
+      "source_split": "test",
+      "source_row": 407,
+      "group_id": "trec-question-sha256:ceb9434d0a7db944f66c6e4cc382f4260325432536430d14d28b9b5618d53135"
+    },
+    {
+      "id": "trec-fine:heldout:0042",
+      "question": "What planet is known as the `` red '' planet ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:255",
+      "source_split": "test",
+      "source_row": 255,
+      "group_id": "trec-question-sha256:aa749d3caf0390bc9e7243cce7340063863306447a4ab4c48feba933269a1b2e"
+    },
+    {
+      "id": "trec-fine:heldout:0057",
+      "question": "Where is the Lourve ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:176",
+      "source_split": "test",
+      "source_row": 176,
+      "group_id": "trec-question-sha256:c1014d07151e3dcc80a8c84ef503cae7eb0d2e881b7c99faf32d63581c834332"
+    },
+    {
+      "id": "trec-fine:heldout:0058",
+      "question": "Which country has the most water pollution ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:country",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:442",
+      "source_split": "test",
+      "source_row": 442,
+      "group_id": "trec-question-sha256:c04749fc54d3d3201762a134db9ab5a4b260bd09a6ccbbe188af986e4fea318b"
+    },
+    {
+      "id": "trec-fine:heldout:0059",
+      "question": "What are Canada 's two territories ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:421",
+      "source_split": "test",
+      "source_row": 421,
+      "group_id": "trec-question-sha256:959f7970b7eb1d4a02d6695e5c6afb7ee5027dbdbbc2b1cca2063061e6f265cb"
+    },
+    {
+      "id": "trec-fine:heldout:0061",
+      "question": "Where is the volcano Mauna Loa ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:163",
+      "source_split": "test",
+      "source_row": 163,
+      "group_id": "trec-question-sha256:af9a1a6bcd5c7180d175c8d5cee1e5da250ae91c3f5e3d96e65152c51dfee6e6"
+    },
+    {
+      "id": "trec-fine:heldout:0063",
+      "question": "What is the location of Lake Champlain ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:351",
+      "source_split": "test",
+      "source_row": 351,
+      "group_id": "trec-question-sha256:2ca644f1a0924a3bd08d3023d72c3e4ad738e01a9efae1e897b6839ae9255e74"
+    },
+    {
+      "id": "trec-fine:heldout:0078",
+      "question": "Where is the Savannah River ?",
+      "route": "R68",
+      "coarse": "LOC",
+      "source_label": "LOC:other",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:305",
+      "source_split": "test",
+      "source_row": 305,
+      "group_id": "trec-question-sha256:63080e5f648b16a2440937f25ab2200ed1d745b27eb26b2bcf92d4a5c9784970"
+    },
+    {
+      "id": "trec-fine:heldout:0003",
+      "question": "When was Ulysses S. Grant born ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:385",
+      "source_split": "test",
+      "source_row": 385,
+      "group_id": "trec-question-sha256:54f5008d5b5320384eb75a21e56b9f42db725ba4f3ba272ec80079abafdcdd58"
+    },
+    {
+      "id": "trec-fine:heldout:0005",
+      "question": "When was President Kennedy shot ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:321",
+      "source_split": "test",
+      "source_row": 321,
+      "group_id": "trec-question-sha256:34999ba39e018c16d25bcca3cf41c134b5abc9af1d3fa96c8dc72001fb71936d"
+    },
+    {
+      "id": "trec-fine:heldout:0006",
+      "question": "How much of an apple is water ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:count",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:494",
+      "source_split": "test",
+      "source_row": 494,
+      "group_id": "trec-question-sha256:0d0ca29a0f38f310d65a4378c1d16872c2b8be73697d8de0877d140aa079491b"
+    },
+    {
+      "id": "trec-fine:heldout:0013",
+      "question": "What year was the Mona Lisa painted ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:221",
+      "source_split": "test",
+      "source_row": 221,
+      "group_id": "trec-question-sha256:4e0b6ebcb08c1da70e06b95fd557fd010e3cf3e03109f35f58ffa09c73ed4c83"
+    },
+    {
+      "id": "trec-fine:heldout:0014",
+      "question": "How old was Joan of Arc when she died ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:264",
+      "source_split": "test",
+      "source_row": 264,
+      "group_id": "trec-question-sha256:42568ef6cb9da6a7e420c8b7b7429bb67b331fb1c7154b20f0ca774eb4c79d8b"
+    },
+    {
+      "id": "trec-fine:heldout:0023",
+      "question": "What is the length of the coastline of the state of Alaska ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:dist",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:112",
+      "source_split": "test",
+      "source_row": 112,
+      "group_id": "trec-question-sha256:8ecc31b05471bbed408ec2e4b9e69ba5472b400bf8ac9e8dbb17baa9a3afce4c"
+    },
+    {
+      "id": "trec-fine:heldout:0026",
+      "question": "What is the width of a football field ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:dist",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:357",
+      "source_split": "test",
+      "source_row": 357,
+      "group_id": "trec-question-sha256:193f82e5f4d8f0a3262af90943aecb0db45734ebfb544106d67cf71bdbaca46c"
+    },
+    {
+      "id": "trec-fine:heldout:0033",
+      "question": "How old was Elvis Presley when he died ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:35",
+      "source_split": "test",
+      "source_row": 35,
+      "group_id": "trec-question-sha256:d7d57d77558540010e08962bcc3b19ed034555b814cf3a6bcb569a4c6cadb1ad"
+    },
+    {
+      "id": "trec-fine:heldout:0036",
+      "question": "How old was the youngest president of the United States ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:period",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:384",
+      "source_split": "test",
+      "source_row": 384,
+      "group_id": "trec-question-sha256:d7c86ad449831aa0d52709bd7b4972863e4949719036768fcf5030548cfb6601"
+    },
+    {
+      "id": "trec-fine:heldout:0044",
+      "question": "When was the first Wal-Mart store opened ?",
+      "route": "R93",
+      "coarse": "NUM",
+      "source_label": "NUM:date",
+      "source_id": "cogcomp-trec:test:033f22c028c2bbba:193",
+      "source_split": "test",
+      "source_row": 193,
+      "group_id": "trec-question-sha256:9126f09c1ae019cc675852f5f7ae4552255c05827b57ee3a6c42b2eae4f8f579"
+    }
+  ]
+}

@@ -189,8 +189,12 @@ defmodule Imp.MixProject do
       Path.wildcard("examples/local_random_search_banking77/**/*") ++
       Path.wildcard("examples/local_signature_optimizer_banking77/**/*") ++
       Path.wildcard("examples/local_simba_banking77/**/*") ++
+      Path.wildcard("examples/local_simba_trec/**/*") ++
       Path.wildcard("examples/provider_free_ticket_router/**/*") ++
-      ["benchmarks/data/grpo-usefulness-banking77-v1.json"] ++
+      [
+        "benchmarks/data/grpo-usefulness-banking77-v1.json",
+        "benchmarks/data/simba-trec-coarse-v1.json"
+      ] ++
       product_docs() ++
       livebooks() ++
       [
