@@ -113,4 +113,68 @@ defmodule Imp.Optimizer.MIPROv2.SearchContractTest do
     assert Imp.Optimizer.Report.fetch(compiled).best_score == 1.0
     assert Imp.ProgramAccess.lm(compiled) == lm
   end
+
+  test "public optimize propagates and reports proposal transport controls" do
+    parent = self()
+
+    task_lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "yes"} end)
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(parent, {:proposal, messages, opts})
+          %{"instructions" => ["Answer yes without explanation."]}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: task_lm)
+    example = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
+
+    compiled =
+      Imp.optimize!(
+        program,
+        Imp.Optimizer.MIPROv2.new(Imp.Metrics.exact_match(:answer),
+          auto: nil,
+          num_candidates: 2,
+          num_trials: 0,
+          max_bootstrapped_demos: 0,
+          max_labeled_demos: 0,
+          minibatch: false,
+          prompt_lm: prompt_lm,
+          init_temperature: 0.25,
+          proposal_response_format: :required
+        ),
+        [example],
+        [example]
+      )
+
+    for proposal_index <- 0..1 do
+      assert_received {:proposal, messages, opts}
+
+      payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
+      assert payload["proposal_index"] == proposal_index
+      assert opts[:rollout_id] == 9 + proposal_index
+      assert opts[:temperature] == 0.25
+      format = opts[:response_format]
+      assert format.json_schema.strict
+      assert format.json_schema.schema["required"] == ["instructions"]
+    end
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.metadata.proposals.main.init_temperature == 0.25
+    assert report.metadata.proposals.main.proposal_response_format == :required
+    assert report.metadata.proposals.main.status == :ok
+  end
+
+  test "rejects invalid proposal transport controls before setup" do
+    metric = Imp.Metrics.exact_match(:answer)
+
+    assert_raise ArgumentError, ~r/init_temperature must be a non-negative number/, fn ->
+      Imp.Optimizer.MIPROv2.new(metric, init_temperature: -0.1)
+    end
+
+    assert_raise ArgumentError, ~r/proposal_response_format must be/, fn ->
+      Imp.Optimizer.MIPROv2.new(metric, proposal_response_format: :sometimes)
+    end
+  end
 end

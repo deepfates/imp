@@ -802,9 +802,19 @@ mipro =
     max_bootstrapped_demos: 2,
     max_labeled_demos: 2,
     minibatch: false,
+    init_temperature: 1.0,
+    proposal_response_format: :auto,
     startup_trials: 2
   )
 ```
+
+`init_temperature` controls grounded instruction-proposal sampling, matching
+the pinned DSPy constructor rather than changing task-model calls. Set
+`proposal_response_format: :auto` to request Imp's strict one-instruction JSON
+schema when the proposal LM advertises schema support, or `:required` when a
+known compatible proposal endpoint must use it. The default `:off` preserves
+text-compatible proposal models. The effective mode and temperature are
+retained per predictor in `report.metadata.proposals`.
 
 `minibatch: false` matters at this scale: minibatched evaluation is the
 default, and its `minibatch_size` must not exceed the validation-set size, so

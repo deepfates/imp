@@ -8,6 +8,10 @@ defmodule Imp.Optimizer.MIPROv2 do
   proposal, and seeded multivariate Bayesian search. Minibatch trials inform
   the surrogate, but only full validation evaluations can select the returned
   program.
+
+  `:init_temperature` is the pinned DSPy proposal-temperature control.
+  `:proposal_response_format` optionally binds each proposal to Imp's strict
+  one-instruction JSON schema (`:off`, `:auto`, or `:required`).
   """
 
   alias Imp.Optimizer.{DemoCandidates, InstructionProposer, Report, Sampling, SearchPolicy}
@@ -21,6 +25,8 @@ defmodule Imp.Optimizer.MIPROv2 do
     :task_lm,
     :teacher,
     :metric_threshold,
+    init_temperature: 1.0,
+    proposal_response_format: :off,
     max_errors: :infinity,
     max_concurrency: 1,
     timeout: :infinity,
@@ -32,6 +38,8 @@ defmodule Imp.Optimizer.MIPROv2 do
     :task_lm,
     :teacher,
     :metric_threshold,
+    :init_temperature,
+    :proposal_response_format,
     :max_errors,
     :max_concurrency,
     :timeout,
@@ -54,6 +62,8 @@ defmodule Imp.Optimizer.MIPROv2 do
       task_lm: runtime_opts[:task_lm],
       teacher: runtime_opts[:teacher],
       metric_threshold: runtime_opts[:metric_threshold],
+      init_temperature: Keyword.get(runtime_opts, :init_temperature, 1.0),
+      proposal_response_format: Keyword.get(runtime_opts, :proposal_response_format, :off),
       max_errors: Keyword.get(runtime_opts, :max_errors, :infinity),
       max_concurrency: Keyword.get(runtime_opts, :max_concurrency, 1),
       timeout: Keyword.get(runtime_opts, :timeout, :infinity),
@@ -286,11 +296,20 @@ defmodule Imp.Optimizer.MIPROv2 do
             tip_aware: config.tip_aware_proposer,
             fewshot_aware: config.fewshot_aware_proposer,
             view_data_batch_size: config.view_data_batch_size,
+            temperature: optimizer.init_temperature,
+            proposal_response_format: optimizer.proposal_response_format,
             seed: config.seed
           )
 
         original = predictor.signature.instructions
         pair = {name, replace_first(proposed, original, config.num_instruct_candidates)}
+
+        report =
+          Map.merge(report, %{
+            init_temperature: optimizer.init_temperature,
+            proposal_response_format: optimizer.proposal_response_format
+          })
+
         {pair, Map.put(metadata, name, report)}
       end)
 
@@ -714,6 +733,16 @@ defmodule Imp.Optimizer.MIPROv2 do
   end
 
   defp validate_runtime!(optimizer) do
+    unless is_number(optimizer.init_temperature) and optimizer.init_temperature >= 0,
+      do: raise(ArgumentError, "init_temperature must be a non-negative number")
+
+    unless optimizer.proposal_response_format in [:off, :auto, :required],
+      do:
+        raise(
+          ArgumentError,
+          "proposal_response_format must be :off, :auto, or :required"
+        )
+
     unless is_integer(optimizer.max_concurrency) and optimizer.max_concurrency > 0,
       do: raise(ArgumentError, "max_concurrency must be a positive integer")
 
