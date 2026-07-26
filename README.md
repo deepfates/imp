@@ -77,6 +77,12 @@ public optimizer with an exact local fused task model and local proposal model,
 keeps the worse proposal out on validation, and reapplies the selected
 parameter artifact in a fresh OS BEAM.
 
+For per-request retrieval and metric-gated bootstrapping, the
+[Banking77 KNNFewShot example](examples/local_knn_few_shot_banking77/README.md)
+retrieves real training neighbors for the fused classifier, renders accepted
+demonstrations, rejects a worse validation result, and reproduces the selected
+saved program after a fresh OS restart.
+
 For introspective minibatch search, the
 [Banking77 SIMBA example](examples/local_simba_banking77/README.md) samples the
 same real fused task model, evaluates a genuine demonstration mutation, rejects

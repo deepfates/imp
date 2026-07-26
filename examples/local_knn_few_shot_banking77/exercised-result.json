@@ -1,0 +1,26 @@
+{
+  "status": "complete",
+  "run_id": "local-knn-few-shot-banking77-v1",
+  "selection": {
+    "baseline": {
+      "errors": 0,
+      "accuracy": 0.625,
+      "macro_f1": 0.5333333333333333
+    },
+    "knn": {
+      "errors": 0,
+      "accuracy": 0.5,
+      "macro_f1": 0.3666666666666667
+    },
+    "selected_arm": "base"
+  },
+  "selected_test": {
+    "errors": 0,
+    "accuracy": 0.475,
+    "macro_f1": 0.33333333333333337
+  },
+  "artifact_identity": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+  "selection_demo_rendered_calls": 4,
+  "fresh_byte_identical": true,
+  "claim_boundary": "One retained-model/task KNNFewShot lifecycle; not general effectiveness, parity, reliability, or BEAM superiority."
+}

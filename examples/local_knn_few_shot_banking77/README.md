@@ -23,3 +23,13 @@ mix run examples/local_knn_few_shot_banking77/run.exs
 A positive, neutral, or negative result applies only to this model/task/split.
 It cannot establish general KNNFewShot or BootstrapFewShot effectiveness,
 upstream parity, production reliability, or BEAM superiority.
+
+The retained result is `exercised-result.json` (SHA-256
+`bef2775231319d8c459210e709c1607a628d17a37d5fd890c9adffe7407691fd`).
+Baseline scored `0.625` on selection. KNN made exactly sixteen transports for
+eight rows, rendered accepted bootstrapped demonstrations on four target calls,
+and regressed to `0.50`, so validation retained base. The selected base then
+scored `0.475` accuracy / `0.33333` macro-F1 / zero errors on untouched test;
+fresh OS load served the exact fused artifact and reproduced all ordered
+predictions/errors with forty single-attempt transports. This is a real
+retrieval/bootstrap/program lifecycle and honest rejection, not positive lift.
