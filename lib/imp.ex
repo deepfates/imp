@@ -333,20 +333,34 @@ defmodule Imp do
 
   Optimizer modules declare their dataset requirements through the
   `Imp.Optimizer` behaviour. Use `Imp.optimize/4` for optimizers that need a
-  validation set and `Imp.optimize/3` for trainset-only optimizers. Invocation
-  options for checkpoint-aware optimizers belong in `Imp.optimize/5`.
+  validation set and `Imp.optimize/3` for trainset-only optimizers. A non-empty
+  keyword list in the fourth position supplies invocation options to a
+  trainset-only optimizer; invocation options alongside a validation set belong
+  in `Imp.optimize/5`.
   """
   def optimize(program, optimizer, trainset),
     do: run_optimizer(program, optimizer, [trainset: trainset], :program)
 
-  def optimize(program, optimizer, trainset, validation),
-    do:
+  def optimize(program, optimizer, trainset, [_ | _] = validation_or_opts) do
+    if Keyword.keyword?(validation_or_opts) do
       run_optimizer(
         program,
         optimizer,
-        [trainset: trainset, validation: validation],
+        Keyword.put(validation_or_opts, :trainset, trainset),
         :program
       )
+    else
+      run_optimizer(
+        program,
+        optimizer,
+        [trainset: trainset, validation: validation_or_opts],
+        :program
+      )
+    end
+  end
+
+  def optimize(program, optimizer, trainset, validation),
+    do: run_optimizer(program, optimizer, [trainset: trainset, validation: validation], :program)
 
   def optimize(program, optimizer, trainset, validation, opts) when is_list(opts) do
     unless Keyword.keyword?(opts),
@@ -372,6 +386,15 @@ defmodule Imp do
   """
   def optimize!(program, optimizer, trainset),
     do: run_optimizer!(program, optimizer, [trainset: trainset], :program, "Imp.optimize!/3")
+
+  def optimize!(program, optimizer, trainset, [_ | _] = validation_or_opts) do
+    opts =
+      if Keyword.keyword?(validation_or_opts),
+        do: Keyword.put(validation_or_opts, :trainset, trainset),
+        else: [trainset: trainset, validation: validation_or_opts]
+
+    run_optimizer!(program, optimizer, opts, :program, "Imp.optimize!/4")
+  end
 
   def optimize!(program, optimizer, trainset, validation),
     do:

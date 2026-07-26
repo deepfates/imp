@@ -49,6 +49,10 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5_000]
   ]
 
+  @compile_option_schema [
+    teacher: [type: :any, default: nil]
+  ]
+
   def new, do: new(nil, [])
   def new(opts) when is_list(opts), do: new(nil, opts)
   def new(metric), do: new(metric, [])
@@ -85,12 +89,27 @@ defmodule Imp.Optimizer.BootstrapFewShot do
 
   @impl true
   def run(%__MODULE__{} = optimizer, program, opts) do
-    with :ok <- Imp.Optimizer.reject_options(Imp.Optimizer.invocation_options(opts)) do
-      {:ok, compile(optimizer, program, Imp.Optimizer.fetch_dataset!(opts, :trainset))}
-    end
+    compile_opts = Imp.Optimizer.invocation_options(opts)
+
+    {:ok,
+     compile(
+       optimizer,
+       program,
+       Imp.Optimizer.fetch_dataset!(opts, :trainset),
+       compile_opts
+     )}
+  end
+
+  @impl true
+  def validate_invocation_options(opts) do
+    _validated = validate_compile_options!(opts)
+    :ok
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
   end
 
   def compile(%__MODULE__{} = optimizer, student, trainset, opts \\ []) when is_list(opts) do
+    opts = validate_compile_options!(opts)
     trainset = Enum.to_list(trainset)
 
     teacher =
@@ -152,6 +171,14 @@ defmodule Imp.Optimizer.BootstrapFewShot do
       })
 
     attach_report(compiled, report)
+  end
+
+  defp validate_compile_options!(opts) do
+    Imp.Options.validate!(
+      opts,
+      @compile_option_schema,
+      "Imp.Optimizer.BootstrapFewShot.compile/4"
+    )
   end
 
   defp prepare_teacher(teacher, _trainset, 0), do: {teacher, :labels_disabled}

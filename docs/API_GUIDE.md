@@ -661,12 +661,14 @@ returns its validated declaration:
 
 Use `Imp.optimize!/3` when a program optimizer does not require validation,
 `Imp.optimize!/4` when supplying validation, and `Imp.optimize!/5` when also
-passing invocation options such as checkpoint controls. This choice follows the
-declared split requirements; Imp does not infer argument meaning from an
-optimizer module's exported function arities. The behaviour layer checks that
-required splits are present and unsupported splits are absent. Each optimizer
-remains responsible for validating split contents and any optimizer-specific
-relationship between them.
+passing invocation options such as checkpoint controls. For a trainset-only
+optimizer, a non-empty keyword list in the fourth position carries invocation
+options; for example, `Imp.optimize!(student, bootstrap, trainset, teacher:
+teacher)`. This choice follows the declared split requirements; Imp does not
+infer argument meaning from an optimizer module's exported function arities.
+The behaviour layer checks that required splits are present and unsupported
+splits are absent. Each optimizer remains responsible for validating split
+contents and any optimizer-specific relationship between them.
 
 Use:
 
@@ -680,6 +682,11 @@ Use:
 | `GEPA` | You want reflective instruction evolution, where the optimizer reads text feedback from your metric and rewrites instructions between candidates. |
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
+
+`BootstrapFewShot` accepts `teacher:` through that trainset-only front door.
+`RandomSearch` accepts the pinned DSPy compile controls `teacher:`, `restrict:`,
+and `labeled_sample:` through `Imp.optimize!/5`. Unknown or malformed controls
+are rejected before teacher or task execution rather than being ignored.
 
 `SignatureOptimizer` is Imp's narrow one-predictor instruction optimizer. Give
 it a proposer LM for task-aware proposals grounded in the program signature and

@@ -47,6 +47,12 @@ defmodule Imp.Optimizer.RandomSearch do
     seed: [type: {:custom, __MODULE__, :validate_optional_integer, []}, default: nil]
   ]
 
+  @compile_option_schema [
+    teacher: [type: :any, default: nil],
+    restrict: [type: {:custom, __MODULE__, :validate_restrict, []}, default: nil],
+    labeled_sample: [type: :boolean, default: true]
+  ]
+
   def new(metric, opts \\ []) do
     Imp.FunctionContract.validate!(metric, [2, 3], "Imp.Optimizer.RandomSearch.new/2", "metric")
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.RandomSearch.new/2")
@@ -94,6 +100,17 @@ defmodule Imp.Optimizer.RandomSearch do
   def validate_optional_max_errors(nil), do: {:ok, nil}
   def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
+  def validate_restrict(nil), do: {:ok, nil}
+
+  def validate_restrict(values) when is_list(values) do
+    if Enum.all?(values, &is_integer/1),
+      do: {:ok, values},
+      else: {:error, "expected nil or a list of integer candidate seeds"}
+  end
+
+  def validate_restrict(_value),
+    do: {:error, "expected nil or a list of integer candidate seeds"}
+
   @impl true
   def __optimizer__,
     do: %{
@@ -104,19 +121,29 @@ defmodule Imp.Optimizer.RandomSearch do
 
   @impl true
   def run(%__MODULE__{} = optimizer, program, opts) do
-    with :ok <- Imp.Optimizer.reject_options(Imp.Optimizer.invocation_options(opts)) do
-      {:ok,
-       compile(
-         optimizer,
-         program,
-         Imp.Optimizer.fetch_dataset!(opts, :trainset),
-         Keyword.get(opts, :validation)
-       )}
-    end
+    compile_opts = Imp.Optimizer.invocation_options(opts)
+
+    {:ok,
+     compile(
+       optimizer,
+       program,
+       Imp.Optimizer.fetch_dataset!(opts, :trainset),
+       Keyword.get(opts, :validation),
+       compile_opts
+     )}
+  end
+
+  @impl true
+  def validate_invocation_options(opts) do
+    _validated = validate_compile_options!(opts)
+    :ok
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
   end
 
   def compile(%__MODULE__{} = optimizer, student, trainset, valset \\ nil, opts \\ [])
       when is_list(opts) do
+    opts = validate_compile_options!(opts)
     trainset = Enum.to_list(trainset)
     valset = materialize_valset(valset, trainset)
     teacher = Keyword.get(opts, :teacher)
@@ -200,6 +227,10 @@ defmodule Imp.Optimizer.RandomSearch do
         }
       })
     )
+  end
+
+  defp validate_compile_options!(opts) do
+    Imp.Options.validate!(opts, @compile_option_schema, "Imp.Optimizer.RandomSearch.compile/5")
   end
 
   defp seeds(count) when count >= 0, do: Enum.to_list(-3..(count - 1))
