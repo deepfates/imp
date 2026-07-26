@@ -246,6 +246,63 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
     assert Enum.any?(payloads, &(&1 =~ "N/A" and &1 =~ "Prediction not available"))
   end
 
+  test "passes normalized metric feedback and metadata into rule reflection" do
+    parent = self()
+
+    task_lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, opts ->
+          if rem(Keyword.get(opts, :rollout_id, 0), 2) == 0,
+            do: %{answer: "correct"},
+            else: %{answer: "wrong"}
+        end
+      ]
+    }
+
+    prompt_lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:reflection_with_reward_info, messages})
+          %{discussion: "use the metric guidance", module_advice: %{main: "Answer correctly."}}
+        end
+      ]
+    }
+
+    metric = fn _example, prediction ->
+      answer = Imp.get(prediction, :answer)
+      score = if answer == "correct", do: 1.0, else: 0.0
+
+      %{
+        score: score,
+        feedback:
+          "The answer #{answer} is #{if(score == 1.0, do: "acceptable", else: "incorrect")}",
+        metadata: %{criterion: "exact semantic answer"}
+      }
+    end
+
+    program = Imp.predict("question -> answer", lm: task_lm)
+    example = Imp.example(question: "q", answer: "correct") |> Imp.with_inputs(:question)
+
+    Imp.Optimizer.SIMBA.new(metric,
+      bsize: 1,
+      num_candidates: 2,
+      max_steps: 1,
+      max_demos: 0,
+      prompt_lm: prompt_lm,
+      max_concurrency: 1,
+      seed: 0
+    )
+    |> Imp.Optimizer.SIMBA.compile(program, [example], [example])
+
+    assert_receive {:reflection_with_reward_info, messages}
+    prompt = Enum.map_join(messages, "\n", & &1.content)
+    assert prompt =~ "The answer correct is acceptable"
+    assert prompt =~ "The answer wrong is incorrect"
+    assert prompt =~ "exact semantic answer"
+  end
+
   test "truncates demo input representations by Unicode characters with the upstream marker" do
     parent = self()
 

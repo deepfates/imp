@@ -645,12 +645,26 @@ defmodule Imp.Optimizer.SIMBA do
       better_program_trajectory: reflection_trajectory(good.trace),
       better_program_outputs: prediction_fields(good.prediction),
       better_reward_value: good.score,
-      better_reward_info: good.metric_metadata || %{},
+      better_reward_info: reward_info(good),
       worse_program_trajectory: reflection_trajectory(bad.trace),
       worse_program_outputs: prediction_fields(bad.prediction),
       worse_reward_value: bad.score,
-      worse_reward_info: bad.metric_metadata || %{}
+      worse_reward_info: reward_info(bad)
     }
+  end
+
+  # DSPy's SIMBA preserves every non-score field returned by a Prediction metric
+  # as reward info for reflection. Imp normalizes the commonly used `feedback`
+  # field separately from metric metadata, so join it back at this boundary.
+  defp reward_info(trajectory) do
+    metadata = trajectory.metric_metadata || %{}
+
+    cond do
+      is_nil(trajectory.feedback) -> metadata
+      Map.has_key?(metadata, :feedback) -> metadata
+      Map.has_key?(metadata, "feedback") -> metadata
+      true -> Map.put(metadata, :feedback, trajectory.feedback)
+    end
   end
 
   defp suppress_trajectory(good, bad, :normal), do: {good, bad}
