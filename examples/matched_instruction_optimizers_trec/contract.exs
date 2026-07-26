@@ -44,7 +44,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
        when is_map(manifest) and is_binary(path) and held_out_mode in [:all, :defer_held_out] do
     exact_keys!(
       manifest,
-      ~w(schema_version campaign_id intent authorities dataset models seeds arms optimizer execution output_contract metrics accounting capture source_commits launch_status),
+      ~w(schema_version campaign_id intent authorities dataset models seeds arms optimizer runtime_dependencies execution output_contract metrics accounting capture source_commits launch_status),
       "manifest"
     )
 
@@ -53,7 +53,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
 
     require!(
       manifest["launch_status"] in [
-        "blocked_pending_public_mipro_bootstrap_rng_call_graph_audit",
+        "blocked_pending_gepa_execution_and_fail_closed_preflight",
         "sealed"
       ],
       "launch_status drift"
@@ -70,6 +70,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     validate_seeds!(manifest["seeds"])
     require!(manifest["arms"] == @arms, "arms must be exactly baseline, gepa, mipro_v2")
     validate_optimizer!(manifest["optimizer"])
+    validate_runtime_dependencies!(manifest["runtime_dependencies"], Path.dirname(path))
     validate_execution!(manifest["execution"])
     validate_output_contract!(manifest["output_contract"])
     validate_metrics!(manifest["metrics"])
@@ -652,9 +653,9 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
       },
       "gepa" => %{
         "task_logical" => 400,
-        "optimizer_logical" => 4,
-        "transports" => 404,
-        "total_logical" => 404
+        "optimizer_logical" => 8,
+        "transports" => 408,
+        "total_logical" => 408
       },
       "mipro_v2" => %{
         "task_logical" => 620,
@@ -665,6 +666,76 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     }
 
     require!(value == expected, "execution call ceilings drift")
+  end
+
+  defp validate_runtime_dependencies!(value, base) do
+    exact_keys!(value, ~w(upstream imp), "runtime_dependencies")
+    upstream = value["upstream"]
+    imp = value["imp"]
+
+    exact_keys!(
+      upstream,
+      ~w(python lock_path lock_sha256 packages),
+      "runtime_dependencies.upstream"
+    )
+
+    exact_keys!(
+      imp,
+      ~w(elixir otp mix_lock_sha256 consumer_mix_lock_sha256 packages),
+      "runtime_dependencies.imp"
+    )
+
+    require!(upstream["python"] == "3.13.2", "upstream Python version drift")
+
+    require!(
+      upstream["lock_path"] == "../../benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock",
+      "upstream dependency lock path drift"
+    )
+
+    require!(
+      upstream["lock_sha256"] ==
+        "c7e29a1f246afd36adcca2306ad3a11e3d3288a99e43fb54618c9a1b48581bb7",
+      "upstream dependency lock digest drift"
+    )
+
+    _lock =
+      verified_path!(
+        upstream["lock_path"],
+        upstream["lock_sha256"],
+        base,
+        "upstream_dependency_lock"
+      )
+
+    require!(
+      upstream["packages"] == %{
+        "dspy" => "3.2.1",
+        "gepa" => "0.0.27",
+        "optuna" => "4.9.0",
+        "numpy" => "2.5.1",
+        "litellm" => "1.93.0",
+        "openai" => "2.48.0",
+        "pydantic" => "2.13.4"
+      },
+      "upstream Python package lock drift"
+    )
+
+    require!(imp["elixir"] == "1.19.5" and imp["otp"] == "28", "Imp runtime version drift")
+    require_sha!(imp["mix_lock_sha256"], "runtime_dependencies.imp.mix_lock_sha256")
+
+    require_sha!(
+      imp["consumer_mix_lock_sha256"],
+      "runtime_dependencies.imp.consumer_mix_lock_sha256"
+    )
+
+    require!(
+      imp["packages"] == %{
+        "req_llm" => "1.17.1",
+        "llm_db" => "2026.7.0",
+        "req" => "0.6.3",
+        "jason" => "1.4.5"
+      },
+      "Imp package lock drift"
+    )
   end
 
   defp validate_output_contract!(value) do

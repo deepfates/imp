@@ -236,6 +236,34 @@
       "view_data_batch_size": 10
     }
   },
+  "runtime_dependencies": {
+    "upstream": {
+      "python": "3.13.2",
+      "lock_path": "../../benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock",
+      "lock_sha256": "c7e29a1f246afd36adcca2306ad3a11e3d3288a99e43fb54618c9a1b48581bb7",
+      "packages": {
+        "dspy": "3.2.1",
+        "gepa": "0.0.27",
+        "optuna": "4.9.0",
+        "numpy": "2.5.1",
+        "litellm": "1.93.0",
+        "openai": "2.48.0",
+        "pydantic": "2.13.4"
+      }
+    },
+    "imp": {
+      "elixir": "1.19.5",
+      "otp": "28",
+      "mix_lock_sha256": "42df3c3a67ef79116c4fbc6f6f8a0dc64c7b28b3226487447e197a016a0fd247",
+      "consumer_mix_lock_sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd",
+      "packages": {
+        "req_llm": "1.17.1",
+        "llm_db": "2026.7.0",
+        "req": "0.6.3",
+        "jason": "1.4.5"
+      }
+    }
+  },
   "execution": {
     "concurrency": 1,
     "cache": false,
@@ -281,9 +309,9 @@
       },
       "gepa": {
         "task_logical": 400,
-        "optimizer_logical": 4,
-        "transports": 404,
-        "total_logical": 404
+        "optimizer_logical": 8,
+        "transports": 408,
+        "total_logical": 408
       },
       "mipro_v2": {
         "task_logical": 620,
@@ -361,6 +389,6 @@
     "dspy": "https://github.com/stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
     "gepa": "https://github.com/gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
   },
-  "launch_status": "blocked_pending_public_mipro_bootstrap_rng_call_graph_audit",
+  "launch_status": "blocked_pending_gepa_execution_and_fail_closed_preflight",
   "intent": "sealed_strong_model_matched_system_comparison"
 }

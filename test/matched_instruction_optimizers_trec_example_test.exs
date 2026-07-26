@@ -56,7 +56,12 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert manifest["models"]["task"]["logical"] == "openai/gpt-5.4-mini"
     assert manifest["models"]["optimizer"]["logical"] == "anthropic/claude-sonnet-4.6"
     assert get_in(manifest, ["execution", "request", "task", "seed"]) == "experiment_seed"
-    assert manifest["launch_status"] =~ "blocked_pending_public_mipro"
+
+    assert manifest["launch_status"] ==
+             "blocked_pending_gepa_execution_and_fail_closed_preflight"
+
+    assert get_in(manifest, ["runtime_dependencies", "upstream", "packages", "optuna"]) ==
+             "4.9.0"
 
     assert manifest["execution"]
            |> Map.take(~w(concurrency cache retry max_retries json_fallback fallbacks)) == %{
@@ -95,17 +100,17 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     assert plan["per_seed_per_runtime"] == %{
              "baseline" => %{"task_calls" => 120, "optimizer_calls" => 0, "total_calls" => 120},
-             "gepa" => %{"task_calls" => 400, "optimizer_calls" => 4, "total_calls" => 404},
+             "gepa" => %{"task_calls" => 400, "optimizer_calls" => 8, "total_calls" => 408},
              "mipro_v2" => %{"task_calls" => 620, "optimizer_calls" => 9, "total_calls" => 629}
            }
 
     assert plan["worst_case"] == %{
              "task_calls" => 6_840,
-             "optimizer_calls" => 78,
-             "total_calls" => 6_918,
-             "input_tokens" => 29_294_592,
-             "output_tokens" => 1_830_912,
-             "usd" => 36.49536
+             "optimizer_calls" => 102,
+             "total_calls" => 6_942,
+             "input_tokens" => 29_687_808,
+             "output_tokens" => 1_855_488,
+             "usd" => 38.43072
            }
 
     assert get_in(plan, ["runtime_configs", "imp", "adapter_rendering"]) ==
@@ -163,7 +168,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
       Path.expand("../examples/matched_instruction_optimizers_trec/no_model_test.py", __DIR__)
 
     assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
-    assert output =~ "Ran 7 tests"
+    assert output =~ "Ran 8 tests"
   end
 
   test "strong runners retain launch, seed, input, USD, endpoint, tier, and dual-cost guards" do
@@ -181,7 +186,13 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     end
 
     assert imp =~ "Keyword.put(opts, :seed, seed)"
+    assert imp =~ "execution_profile: :gepa_v0_1_4"
+    assert imp =~ "search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup"
+    assert imp =~ "Imp.OperationalSafetyError"
+    assert imp =~ "verify_runtime_dependencies!"
     assert upstream =~ "seed=seed"
+    assert upstream =~ "verify_runtime_dependencies(manifest)"
+    assert upstream =~ "materialized upstream environment differs from committed lock"
   end
 
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do

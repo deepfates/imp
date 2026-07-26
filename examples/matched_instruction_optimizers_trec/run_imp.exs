@@ -73,8 +73,11 @@ defmodule MatchedTRECImp.Observer do
       end)
 
     case result do
-      :ok -> :ok
-      {:error, message} -> raise "#{arm} #{message}"
+      :ok ->
+        :ok
+
+      {:error, message} ->
+        operational_error(:budget, :call_reservation_refused, "#{arm} #{message}")
     end
   end
 
@@ -104,8 +107,11 @@ defmodule MatchedTRECImp.Observer do
       end
     end)
     |> case do
-      :ok -> :ok
-      {:error, message} -> raise message
+      :ok ->
+        :ok
+
+      {:error, message} ->
+        operational_error(:cost, :cumulative_cost_drift, message)
     end
   end
 
@@ -122,6 +128,10 @@ defmodule MatchedTRECImp.Observer do
   end
 
   def snapshot(pid), do: Agent.get(pid, & &1)
+
+  defp operational_error(kind, reason, message) do
+    {:error, Imp.OperationalSafetyError.exception(kind: kind, reason: reason, message: message)}
+  end
 
   defp role_usd(manifest) do
     request = manifest["execution"]["request"]
@@ -168,28 +178,74 @@ defmodule MatchedTRECImp.ObservedLM do
 
     expected_seed = if lm.role == :task, do: lm.seed
 
-    unless configured_seed == expected_seed do
-      raise "#{lm.role} request seed drift: configured=#{inspect(configured_seed)} expected=#{inspect(expected_seed)}"
-    end
-
     rendered_bytes = (messages |> Jason.encode!() |> byte_size()) + 16 * (length(messages) + 1)
 
-    if rendered_bytes > lm.max_input_tokens do
-      raise "#{lm.role} rendered request conservative token bound #{rendered_bytes} exceeds #{lm.max_input_tokens}"
-    end
+    with :ok <-
+           ensure(
+             configured_seed == expected_seed,
+             :route,
+             :request_seed_drift,
+             "#{lm.role} request seed drift: configured=#{inspect(configured_seed)} expected=#{inspect(expected_seed)}"
+           ),
+         :ok <-
+           ensure(
+             rendered_bytes <= lm.max_input_tokens,
+             :budget,
+             :input_envelope_exceeded,
+             "#{lm.role} rendered request conservative token bound #{rendered_bytes} exceeds #{lm.max_input_tokens}"
+           ),
+         :ok <-
+           MatchedTRECImp.Observer.reserve_call!(lm.observer, lm.seed, lm.arm, lm.role) do
+      MatchedTRECImp.Observer.message(lm.observer, lm.role, messages)
+      result = dispatch(lm, messages, opts)
+      MatchedTRECImp.Observer.response(lm.observer, lm.role, result)
 
-    :ok = MatchedTRECImp.Observer.reserve_call!(lm.observer, lm.seed, lm.arm, lm.role)
-    MatchedTRECImp.Observer.message(lm.observer, lm.role, messages)
-    result = Imp.LM.generate(lm.inner, messages, opts)
-    MatchedTRECImp.Observer.response(lm.observer, lm.role, result)
-    validate_response!(lm, result)
-    result
+      case result do
+        {:ok, _value} ->
+          with :ok <- validate_response(lm, result), do: result
+
+        {:error, %Imp.OperationalSafetyError{}} = safety ->
+          safety
+
+        {:error, reason} ->
+          operational_error(
+            :transport,
+            :provider_transport_failed,
+            "#{lm.role} transport failed: #{inspect(reason)}"
+          )
+
+        other ->
+          operational_error(
+            :transport,
+            :invalid_transport_envelope,
+            "#{lm.role} returned an invalid transport envelope: #{inspect(other)}"
+          )
+      end
+    end
   end
 
   def response_format_capability(%__MODULE__{inner: inner}),
     do: Imp.LM.response_format_capability(inner)
 
-  defp validate_response!(lm, result) do
+  defp dispatch(lm, messages, opts) do
+    Imp.LM.generate(lm.inner, messages, opts)
+  rescue
+    error ->
+      operational_error(
+        :transport,
+        :provider_transport_raised,
+        "#{lm.role} transport raised: #{Exception.message(error)}"
+      )
+  catch
+    kind, reason ->
+      operational_error(
+        :transport,
+        :provider_transport_threw,
+        "#{lm.role} transport #{kind}: #{inspect(reason)}"
+      )
+  end
+
+  defp validate_response(lm, result) do
     evidence = MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!(result)
     expected = lm.expected_model
 
@@ -206,10 +262,29 @@ defmodule MatchedTRECImp.ObservedLM do
              is_number(evidence.gateway_reported_cost) and
              is_number(evidence.computed_cost) and
              abs(evidence.gateway_reported_cost - evidence.computed_cost) <= 1.0e-6 do
-      raise "first-response route/model/tier/token/cost drift: #{inspect(evidence)}"
+      operational_error(
+        :route,
+        :response_identity_or_usage_drift,
+        "first-response route/model/tier/token/cost drift: #{inspect(evidence)}"
+      )
+    else
+      MatchedTRECImp.Observer.reconcile_cost!(lm.observer, evidence.gateway_reported_cost)
     end
+  rescue
+    error ->
+      operational_error(
+        :transport,
+        :response_evidence_missing,
+        "response evidence validation failed: #{Exception.message(error)}"
+      )
+  end
 
-    MatchedTRECImp.Observer.reconcile_cost!(lm.observer, evidence.gateway_reported_cost)
+  defp ensure(true, _kind, _reason, _message), do: :ok
+
+  defp ensure(false, kind, reason, message), do: operational_error(kind, reason, message)
+
+  defp operational_error(kind, reason, message) do
+    {:error, Imp.OperationalSafetyError.exception(kind: kind, reason: reason, message: message)}
   end
 end
 
@@ -231,6 +306,7 @@ defmodule MatchedTRECImp.Runner do
     manifest = MatchedInstructionOptimizersTREC.Contract.load_optimization!(@manifest)
     require_launch_sealed!(manifest)
     source_commits = source_commits!(manifest, true)
+    verify_runtime_dependencies!(manifest)
     catalog_snapshot = verify_models!(manifest)
     # This first pass never decodes held-out lines. Their values cannot be reached by
     # optimizer, metric, selection, or any sealed program before every arm is sealed.
@@ -496,6 +572,7 @@ defmodule MatchedTRECImp.Runner do
     config = manifest["optimizer"]["gepa"]
 
     GEPA.new(metric(meanings),
+      execution_profile: :gepa_v0_1_4,
       reflection_lm: optimizer_lm,
       generations: config["iterations"],
       minibatch_size: config["minibatch_size"],
@@ -509,7 +586,6 @@ defmodule MatchedTRECImp.Runner do
       max_concurrency: 1,
       timeout: 120_000,
       proposal_timeout: 120_000,
-      max_reflection_calls: config["iterations"],
       raise_on_exception: true
     )
     |> GEPA.compile(program, examples(rows.train, true), examples(rows.selection, false))
@@ -526,6 +602,7 @@ defmodule MatchedTRECImp.Runner do
       max_bootstrapped_demos: 0,
       max_labeled_demos: 0,
       startup_trials: config["startup_trials"],
+      search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup,
       proposer_fidelity: :dspy_3_2_1,
       program_aware_proposer: false,
       data_aware_proposer: true,
@@ -609,6 +686,11 @@ defmodule MatchedTRECImp.Runner do
       messages = Enum.drop(after_call.messages, length(before.messages))
       responses = Enum.drop(after_call.responses, length(before.responses))
       transports = Enum.drop(after_call.transports, length(before.transports))
+
+      case result do
+        {:error, %Imp.OperationalSafetyError{} = safety} -> raise safety
+        _other -> :ok
+      end
 
       {actual, error, metadata} =
         case result do
@@ -853,6 +935,32 @@ defmodule MatchedTRECImp.Runner do
       end)
 
     snapshots
+  end
+
+  defp verify_runtime_dependencies!(manifest) do
+    expected = manifest["runtime_dependencies"]["imp"]
+
+    actual_otp = :erlang.system_info(:otp_release) |> List.to_string()
+
+    unless System.version() == expected["elixir"] and actual_otp == expected["otp"],
+      do: raise("Imp Elixir/OTP runtime dependency drift")
+
+    root_lock = Path.expand("../../mix.lock", __DIR__)
+    consumer_lock = Path.expand("mix.lock", __DIR__)
+
+    unless sha256_file(root_lock) == expected["mix_lock_sha256"] and
+             sha256_file(consumer_lock) == expected["consumer_mix_lock_sha256"],
+           do: raise("Imp Mix lock dependency drift")
+
+    actual =
+      Map.new(expected["packages"], fn {name, _version} ->
+        app = String.to_existing_atom(name)
+        version = Application.spec(app, :vsn) || raise("Imp dependency #{name} is not loaded")
+        {name, to_string(version)}
+      end)
+
+    unless actual == expected["packages"],
+      do: raise("Imp dependency version drift: #{inspect(actual)}")
   end
 
   defp price_lte?(actual, sealed) when is_binary(actual) and is_binary(sealed),

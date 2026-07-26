@@ -10,8 +10,10 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import importlib.metadata
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -34,6 +36,10 @@ OUTPUT = Path(
 SELECTION_OUTPUT = Path(str(OUTPUT) + ".selection-sealed.json")
 ID_RE = re.compile(rb'"id"\s*:\s*"([^"]+)"')
 ACTIVE_CAPTURE: "Capture | None" = None
+
+
+class OperationalSafetyAbort(BaseException):
+    """Bypasses DSPy's ordinary Exception containment for route/cost/budget drift."""
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -145,7 +151,7 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError("strong matched seed/arm contract drift")
     expected_ceilings = {
         "baseline": {"task_logical": 120, "optimizer_logical": 0, "transports": 120, "total_logical": 120},
-        "gepa": {"task_logical": 400, "optimizer_logical": 4, "transports": 404, "total_logical": 404},
+        "gepa": {"task_logical": 400, "optimizer_logical": 8, "transports": 408, "total_logical": 408},
         "mipro_v2": {"task_logical": 620, "optimizer_logical": 9, "transports": 629, "total_logical": 629},
     }
     if manifest.get("execution", {}).get("call_ceilings") != expected_ceilings:
@@ -365,10 +371,13 @@ def install_runtime(args: argparse.Namespace):
             framed_bound = len(rendered) + 16 * ((len(messages) if messages is not None else 1) + 1)
             cap = self.capture.max_input_tokens.get(self.role)
             if cap is not None and framed_bound > cap:
-                raise RuntimeError(
+                raise OperationalSafetyAbort(
                     f"{self.role} rendered request conservative token bound {framed_bound} exceeds {cap}"
                 )
-            self.capture.reserve(self.role)
+            try:
+                self.capture.reserve(self.role)
+            except Exception as exc:
+                raise OperationalSafetyAbort(str(exc)) from exc
             started = time.monotonic()
             response = None
             error = None
@@ -377,7 +386,9 @@ def install_runtime(args: argparse.Namespace):
                 return response
             except Exception as exc:
                 error = {"type": type(exc).__name__, "message": str(exc)}
-                raise
+                raise OperationalSafetyAbort(
+                    f"{self.role} provider transport failed: {type(exc).__name__}: {exc}"
+                ) from exc
             finally:
                 usage = field(response, "usage")
                 choices = field(response, "choices") or []
@@ -414,10 +425,35 @@ def install_runtime(args: argparse.Namespace):
                     }
                 )
                 if response is not None and error is None and self.expected_model is not None:
-                    evidence = transport_evidence(self.capture.calls[-1], self.expected_model)
-                    self.capture.reconcile_cost(evidence["gateway_reported_cost"])
+                    try:
+                        evidence = transport_evidence(self.capture.calls[-1], self.expected_model)
+                        self.capture.reconcile_cost(evidence["gateway_reported_cost"])
+                    except Exception as exc:
+                        raise OperationalSafetyAbort(str(exc)) from exc
 
     return dspy, RecordingLM
+
+
+def verify_runtime_dependencies(manifest: dict[str, Any]) -> None:
+    expected = manifest["runtime_dependencies"]["upstream"]
+    if platform.python_version() != expected["python"]:
+        raise RuntimeError(
+            f"upstream Python drift: {platform.python_version()} != {expected['python']}"
+        )
+    actual = {
+        name: importlib.metadata.version(name) for name in expected["packages"]
+    }
+    if actual != expected["packages"]:
+        raise RuntimeError(f"upstream dependency version drift: {actual!r}")
+    lock = resolve(expected["lock_path"])
+    if sha256_file(lock) != expected["lock_sha256"]:
+        raise RuntimeError("upstream dependency lock digest drift")
+    freeze = subprocess.check_output(
+        [sys.executable, "-m", "pip", "freeze", "--all"], text=True
+    ).splitlines()
+    materialized = "\n".join(sorted(freeze)) + "\n"
+    if materialized.encode("utf-8") != lock.read_bytes():
+        raise RuntimeError("materialized upstream environment differs from committed lock")
 
 
 def transport_evidence(call: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
@@ -725,8 +761,9 @@ def run(args: argparse.Namespace) -> None:
         raise RuntimeError(f"provider launch refused: {manifest.get('launch_status')}")
     commits = source_commits(manifest)
     verify_clean_imp_tree()
-    catalog_snapshot = verify_models(manifest)
     dspy, RecordingLM = install_runtime(args)
+    verify_runtime_dependencies(manifest)
+    catalog_snapshot = verify_models(manifest)
     dspy.configure(adapter=dspy.ChatAdapter(use_json_adapter_fallback=False))
     capture = Capture(manifest)
     ACTIVE_CAPTURE = capture
@@ -853,7 +890,7 @@ def main() -> None:
     args = parser.parse_args()
     try:
         run(args)
-    except Exception as exc:
+    except BaseException as exc:
         try:
             manifest = json.loads(MANIFEST_PATH.read_text())
             commits = source_commits(manifest)

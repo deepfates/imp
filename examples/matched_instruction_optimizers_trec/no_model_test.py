@@ -45,6 +45,16 @@ def successful_call(content: str = "malformed", input_tokens: int = 12):
 
 
 class NoModelBoundaryTest(unittest.TestCase):
+    def test_operational_abort_bypasses_dspy_exception_fallback(self):
+        def dspy_style_fallback():
+            try:
+                raise MODULE.OperationalSafetyAbort("route drift")
+            except Exception:
+                return "silently disabled data-aware proposer"
+
+        with self.assertRaisesRegex(MODULE.OperationalSafetyAbort, "route drift"):
+            dspy_style_fallback()
+
     def test_first_response_drift_stops_before_second_dispatch(self):
         dispatches = []
 
@@ -90,7 +100,7 @@ class NoModelBoundaryTest(unittest.TestCase):
                     "max_output_tokens": 256,
                 },
             )
-            with self.assertRaisesRegex(RuntimeError, "transport evidence"):
+            with self.assertRaisesRegex(MODULE.OperationalSafetyAbort, "transport evidence"):
                 for _ in range(2):
                     lm.forward(messages=[{"role": "user", "content": "question"}])
             self.assertEqual(len(dispatches), 1)
@@ -148,7 +158,7 @@ class NoModelBoundaryTest(unittest.TestCase):
             capture = MODULE.Capture()
             capture.max_input_tokens = {"task": 4}
             lm = recording_lm("model", capture=capture, role="task")
-            with self.assertRaisesRegex(RuntimeError, "conservative token bound"):
+            with self.assertRaisesRegex(MODULE.OperationalSafetyAbort, "conservative token bound"):
                 lm.forward(messages=[{"role": "user", "content": "too large"}])
             self.assertEqual(capture.calls, [])
         finally:

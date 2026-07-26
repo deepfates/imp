@@ -19,10 +19,10 @@ messages, models, splits, budgets, or parsing after results.
 
 ## Current boundary
 
-Launch is deliberately refused while the pinned public MIPRO bootstrap/search
-RNG and call graph receive their final audit. The safe predispatch ceilings are
-currently 6,840 task calls plus 78 optimizer calls across both runtimes. Their
-conservative reservation is $36.49536. The aggregate workshop spend must be
+Launch is deliberately refused while the integrated pinned GEPA execution and
+fail-closed runtime preflight receive independent review. The safe predispatch ceilings are
+currently 6,840 task calls plus 102 optimizer calls across both runtimes. Their
+conservative reservation is $38.43072. The aggregate workshop spend must be
 confirmed immediately before launch against the owner's $50 ceiling.
 
 The runners additionally fail closed on:
@@ -43,15 +43,27 @@ The runners additionally fail closed on:
 Baseline and a frozen injected-instruction no-model probe require byte-identical
 task messages. Live candidate instructions may legitimately diverge; each must
 instead be proven present in its runtime's rendered request. GEPA uses
-`reflection_record_mode: :gepa_v0_1_4`; MIPRO uses
-`proposer_fidelity: :dspy_3_2_1`. Those modes provide pinned semantic
-opportunity, not a blanket claim that independently evolving optimizer
-trajectories emit identical messages.
+`execution_profile: :gepa_v0_1_4`; MIPRO uses
+`proposer_fidelity: :dspy_3_2_1` plus
+`search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup`. The committed Python
+dependency lock is checked byte-for-byte before catalog access. These modes
+provide pinned semantic opportunity for this frozen one-predictor comparison,
+not a blanket claim that independently evolving optimizer trajectories emit
+identical messages.
 
 Inspect the no-network plan from the repository root:
 
 ```sh
 mix run -e 'Code.require_file("examples/matched_instruction_optimizers_trec/contract.exs"); IO.puts(Jason.encode!(MatchedInstructionOptimizersTREC.Contract.plan!("examples/matched_instruction_optimizers_trec/contract.json"), pretty: true))'
+```
+
+Materialize the exact upstream environment from the committed lock rather than
+the repository's rolling parity setup script:
+
+```sh
+uv venv --python 3.13.2 tmp/dspy-parity-venv
+uv pip sync --python tmp/dspy-parity-venv/bin/python \
+  benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock
 ```
 
 When the outstanding audit closes, changing `launch_status` to `sealed` must be
