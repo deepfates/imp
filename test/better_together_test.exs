@@ -601,50 +601,55 @@ defmodule BetterTogetherTest do
   end
 
   test "routes COPRO evaluation options through a composed prompt step" do
-    copro =
-      Imp.Optimizer.COPRO.new(metric(),
-        breadth: 2,
-        depth: 1,
-        proposal_max_concurrency: 1
-      )
+    # This contract exercises COPRO's deterministic native proposer. Pin the
+    # process-local LM so prior application-level configuration cannot silently
+    # turn it into a language-model proposal test.
+    Imp.Settings.context([lm: nil], fn ->
+      copro =
+        Imp.Optimizer.COPRO.new(metric(),
+          breadth: 2,
+          depth: 1,
+          proposal_max_concurrency: 1
+        )
 
-    assert {:ok, direct_copro} =
-             Imp.Optimizer.run(copro, program(),
-               trainset: examples(),
-               validation: examples(),
-               num_threads: 1,
-               max_errors: :infinity
-             )
+      assert {:ok, direct_copro} =
+               Imp.Optimizer.run(copro, program(),
+                 trainset: examples(),
+                 validation: examples(),
+                 num_threads: 1,
+                 max_errors: :infinity
+               )
 
-    direct_report = Imp.Optimizer.Report.fetch(direct_copro)
-    assert direct_report.metadata.max_errors == :infinity
-    assert direct_report.metadata.max_errors_source == :explicit
+      direct_report = Imp.Optimizer.Report.fetch(direct_copro)
+      assert direct_report.metadata.max_errors == :infinity
+      assert direct_report.metadata.max_errors_source == :explicit
 
-    compiled =
-      metric()
-      |> BetterTogether.new(%{
-        p: copro,
-        after_p: %CompileArgsOptimizer{owner: self()}
-      })
-      |> BetterTogether.compile(program(), examples(), examples(),
-        strategy: [:p, :after_p],
-        max_errors: 1,
-        max_concurrency: 1,
-        shuffle_trainset_between_steps: false,
-        optimizer_compile_args: %{
-          p: [num_threads: 1, max_errors: :infinity],
-          after_p: [marker: :after_copro]
-        }
-      )
+      compiled =
+        metric()
+        |> BetterTogether.new(%{
+          p: copro,
+          after_p: %CompileArgsOptimizer{owner: self()}
+        })
+        |> BetterTogether.compile(program(), examples(), examples(),
+          strategy: [:p, :after_p],
+          max_errors: 1,
+          max_concurrency: 1,
+          shuffle_trainset_between_steps: false,
+          optimizer_compile_args: %{
+            p: [num_threads: 1, max_errors: :infinity],
+            after_p: [marker: :after_copro]
+          }
+        )
 
-    assert_received {:compile_args, after_opts}
-    assert after_opts[:marker] == :after_copro
-    refute Keyword.has_key?(after_opts, :num_threads)
-    refute Keyword.has_key?(after_opts, :max_errors)
+      assert_received {:compile_args, after_opts}
+      assert after_opts[:marker] == :after_copro
+      refute Keyword.has_key?(after_opts, :num_threads)
+      refute Keyword.has_key?(after_opts, :max_errors)
 
-    report = Imp.Optimizer.Report.fetch(compiled)
-    assert report.errors == []
-    assert Enum.map(report.candidates, & &1.strategy) == ["", "p", "p -> after_p"]
+      report = Imp.Optimizer.Report.fetch(compiled)
+      assert report.errors == []
+      assert Enum.map(report.candidates, & &1.strategy) == ["", "p", "p -> after_p"]
+    end)
   end
 
   test "rejects unsupported declared child options before baseline evaluation" do
@@ -1158,7 +1163,7 @@ defmodule BetterTogetherTest do
     assert Imp.Optimizer.Report.fetch(compiled).metadata.selected_strategy == "custom"
   end
 
-  test "rejects reportless custom executables before optimizer work" do
+  test "stores custom executable reports on report-capable predictors" do
     student = %ReportlessProgram{predict: program()}
 
     better =
@@ -1166,14 +1171,14 @@ defmodule BetterTogetherTest do
         custom: %SpyOptimizer{owner: self()}
       })
 
-    assert_raise ArgumentError, ~r/cannot store optimizer reports.*map-valued :metadata/s, fn ->
+    compiled =
       BetterTogether.compile(better, student, examples(), nil,
         strategy: :custom,
         valset_ratio: 0
       )
-    end
 
-    refute_received :unexpected_later_step
+    assert_received :unexpected_later_step
+    assert %Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(compiled)
   end
 
   test "routes an explicit teacher into BootstrapFewShot" do

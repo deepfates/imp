@@ -47,7 +47,7 @@ As of v0.2.0, the ledger holds **64 claims: 44 asserted, 20 still targets.**
 **Reconciliation — asserted is not proven.** The 44 asserted rows are
 maintainer attestations. In a fresh source checkout, `mix
 benchmark.dashboard --profile v0.1` recomputes claim state from committed
-evidence alone and reports **10 of the 44 proven, 25 blocked, 19
+evidence alone and reports **0 of the 44 proven, 25 blocked, 19
 informational** (profile ready: false): most asserted rows cite lane
 evidence that maintainers generate locally under `tmp/` and that is not
 committed, so a fresh clone cannot replay it. That gap is real and tracked:

@@ -1182,7 +1182,7 @@ defmodule ProviderTrainingLifecycleTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.GRPO\.new\/2 expects a reward function with arity 1, 2, or 3/,
+                 ~r/Imp\.Optimizer\.GRPO\.new\/2 expects (?:a stable reward callback or )?a reward function with arity 1, 2, or 3/,
                  fn ->
                    Imp.Optimizer.GRPO.new(fn _example, _prediction, _trace, _extra -> 1.0 end)
                  end
