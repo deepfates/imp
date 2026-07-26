@@ -1,0 +1,152 @@
+defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
+  use ExUnit.Case, async: false
+
+  @source "examples/local_grpo_opaque_banking77/run.exs"
+  @contract "priv/trl_worker/qwen-opaque-38-step-contract.json"
+
+  setup_all do
+    output =
+      Path.join(System.tmp_dir!(), "imp-grpo-opaque-define-#{System.unique_integer([:positive])}")
+
+    previous_define = System.get_env("IMP_GRPO_OPAQUE_DEFINE_ONLY")
+    previous_output = System.get_env("IMP_GRPO_OPAQUE_OUTPUT")
+    System.put_env("IMP_GRPO_OPAQUE_DEFINE_ONLY", "1")
+    System.put_env("IMP_GRPO_OPAQUE_OUTPUT", output)
+    Code.require_file(@source, File.cwd!())
+
+    on_exit(fn ->
+      restore_env("IMP_GRPO_OPAQUE_DEFINE_ONLY", previous_define)
+      restore_env("IMP_GRPO_OPAQUE_OUTPUT", previous_output)
+      File.rm_rf!(output)
+    end)
+
+    %{output: output}
+  end
+
+  test "DEFINE_ONLY loads the ordinary front door without output or model activity", %{
+    output: output
+  } do
+    refute File.exists?(output)
+    refute File.exists?("examples/local_grpo_opaque_banking77/exercised-result.json")
+
+    assert apply(LocalGRPOOpaqueBanking77.Definition, :train_steps, []) == 38
+    assert apply(LocalGRPOOpaqueBanking77.Definition, :train_width, []) == 4
+
+    assert apply(LocalGRPOOpaqueBanking77.Definition, :train_kwargs, []) == [
+             learning_rate: 1.0e-6,
+             beta: 0.0,
+             loss_type: :dapo,
+             scale_rewards: :group
+           ]
+  end
+
+  test "the task prompt exposes route identities but no semantic route key" do
+    instruction = apply(LocalGRPOOpaqueBanking77.Definition, :instruction, [])
+
+    for route <- ~w(R17 R42 R68 R93), do: assert(instruction =~ route)
+
+    for leaked_meaning <-
+          ~w(fee charged unrecognized recognised pending reversed reverted payment),
+        do: refute(String.contains?(String.downcase(instruction), leaked_meaning))
+
+    source = File.read!(@source)
+    refute source =~ "R17:"
+    refute source =~ "R42:"
+    refute source =~ "R68:"
+    refute source =~ "R93:"
+  end
+
+  test "pinned worker and public optimizer bind the same 38-step TRL defaults" do
+    contract = @contract |> File.read!() |> Jason.decode!()
+    source = File.read!(@source)
+
+    assert contract["dependencies"] == %{
+             "trl" => "1.6.0",
+             "transformers" => "4.57.6",
+             "peft" => "0.18.1",
+             "torch" => "2.10.0"
+           }
+
+    assert contract["optimizer"]["max_steps"] == 38
+    assert contract["optimizer"]["num_generations"] == 4
+    assert contract["optimizer"]["learning_rate"] == 1.0e-6
+    assert contract["optimizer"]["loss_type"] == "dapo"
+    assert contract["optimizer"]["scale_rewards"] == "group"
+    assert contract["optimizer"]["beta"] == 0.0
+
+    assert contract["device"] == %{
+             "type" => "mps",
+             "dtype" => "float32",
+             "allow_cpu_fallback" => false,
+             "use_vllm" => false
+           }
+
+    contract_sha =
+      @contract |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
+
+    assert source =~ contract_sha
+    assert source =~ "checkpoint_selection: :best_validation"
+    assert source =~ "checkpoint_path: Path.join(paths.output, \"grpo-checkpoint.bin\")"
+  end
+
+  test "frozen 72/8/40 data is split before public GRPO and test stays outside selection" do
+    source = File.read!(@source)
+
+    data =
+      "benchmarks/data/provider-training-banking77-v1.json" |> File.read!() |> Jason.decode!()
+
+    grouped = Enum.group_by(data["train"], & &1["route"])
+    routes = ~w(R17 R42 R68 R93)
+    train = Enum.flat_map(routes, fn route -> Enum.take(grouped[route], 18) end)
+
+    selection =
+      Enum.flat_map(routes, fn route -> grouped[route] |> Enum.drop(18) |> Enum.take(2) end)
+
+    digest = fn rows ->
+      rows
+      |> Enum.map(&Imp.Optimizer.Report.encode_term/1)
+      |> Imp.Clients.TRLProtocol.digest()
+    end
+
+    assert length(train) == 72
+    assert length(selection) == 8
+    assert length(data["held_out"]) == 40
+
+    assert digest.(train) ==
+             "sha256:16d37a946696995fe343b2773e546f54c2d0a1a97adfc0fbce1782e79e281f34"
+
+    assert digest.(selection) ==
+             "sha256:5b34859cb5e6588dcc53360c68e76875c0fba2191b55a7169b4781acef97c6c1"
+
+    assert source =~ "Imp.train(program(training_lm), optimizer, examples(rows.train),"
+    assert source =~ "validation: examples(rows.selection)"
+    refute source =~ "validation: examples(rows.test)"
+    refute source =~ "Imp.train(program(training_lm), optimizer, examples(rows.test)"
+    assert source =~ "source_schedule!(step_artifacts, rows.train)"
+    assert source =~ "length(ids) == 152"
+    assert source =~ "twice == 64 and thrice == 8"
+  end
+
+  test "result retention, stable arm selection, artifact verification and fresh rebind are explicit" do
+    source = File.read!(@source)
+
+    assert source =~
+             "Atomic.write!(Path.join(paths.output, \"03-trained-selection.json\"), stage)"
+
+    assert source =~ "Atomic.write!(Path.join(paths.output, \"04-selection.json\"), selection)"
+    assert source =~ "Atomic.write!(Path.join(paths.output, \"05-base-test.json\"), base_test)"
+
+    assert source =~
+             "Atomic.write!(Path.join(paths.output, \"06-trained-test.json\"), trained_test)"
+
+    assert source =~ "accuracy_then_macro_f1_tie_keeps_base"
+    assert source =~ "TRLArtifact.verify_job(job)"
+    assert source =~ "TrainingJob.rebind(job, portable, trainer: trainer)"
+    assert source =~ "IMP_GRPO_OPAQUE_FRESH"
+    assert source =~ "fresh selected predictions/errors differ"
+    assert source =~ "TRLDeployment.stop(deployment)"
+  end
+
+  defp restore_env(name, nil), do: System.delete_env(name)
+  defp restore_env(name, value), do: System.put_env(name, value)
+end
