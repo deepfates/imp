@@ -12,6 +12,11 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
   )
 
   Code.require_file(
+    "response_evidence.exs",
+    Path.expand("../examples/matched_instruction_optimizers_trec", __DIR__)
+  )
+
+  Code.require_file(
     "source_identity.exs",
     Path.expand("../examples/matched_instruction_optimizers_trec", __DIR__)
   )
@@ -183,5 +188,31 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert_raise RuntimeError, ~r/launch tree is not clean/, fn ->
       SourceIdentity.capture_clean!(root, %{})
     end
+  end
+
+  test "response evidence survives a later typed parse failure" do
+    envelope = %{
+      __imp_lm_output__: "not valid typed output",
+      __imp_lm_metadata__: %{
+        req_llm: %{
+          provider: "ollama",
+          model: "llama3.2:3b",
+          finish_reason: "stop",
+          content: "not valid typed output",
+          usage: %{input_tokens: 12, output_tokens: 4}
+        }
+      }
+    }
+
+    assert %{
+             output: "not valid typed output",
+             route: "ollama",
+             model: "llama3.2:3b",
+             finish_reason: "stop",
+             content: "not valid typed output",
+             input_tokens: 12,
+             output_tokens: 4
+           } =
+             MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
   end
 end

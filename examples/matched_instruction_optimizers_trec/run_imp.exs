@@ -1,15 +1,25 @@
 Code.require_file("contract.exs", __DIR__)
 Code.require_file("two_phase.exs", __DIR__)
 Code.require_file("source_identity.exs", __DIR__)
+Code.require_file("response_evidence.exs", __DIR__)
 
 defmodule MatchedTRECImp.Observer do
-  def start_link, do: Agent.start_link(fn -> %{phase: nil, messages: [], transports: []} end)
+  def start_link,
+    do: Agent.start_link(fn -> %{phase: nil, messages: [], responses: [], transports: []} end)
+
   def phase(pid, value), do: Agent.update(pid, &%{&1 | phase: value})
 
   def message(pid, role, messages) do
     Agent.update(pid, fn state ->
       entry = %{phase: state.phase, role: role, messages: messages}
       %{state | messages: state.messages ++ [entry]}
+    end)
+  end
+
+  def response(pid, role, result) do
+    Agent.update(pid, fn state ->
+      entry = %{phase: state.phase, role: role, result: result}
+      %{state | responses: state.responses ++ [entry]}
     end)
   end
 
@@ -33,7 +43,9 @@ defmodule MatchedTRECImp.ObservedLM do
 
   def generate(lm, messages, opts) do
     MatchedTRECImp.Observer.message(lm.observer, lm.role, messages)
-    Imp.LM.generate(lm.inner, messages, opts)
+    result = Imp.LM.generate(lm.inner, messages, opts)
+    MatchedTRECImp.Observer.response(lm.observer, lm.role, result)
+    result
   end
 
   def response_format_capability(%__MODULE__{inner: inner}),
@@ -102,6 +114,7 @@ defmodule MatchedTRECImp.Runner do
         selection_receipt: @selection_output,
         seeds: completed,
         rendered_messages: Observer.snapshot(observer).messages,
+        lm_results: Report.encode_term(Observer.snapshot(observer).responses),
         transport_events: Report.encode_term(Observer.snapshot(observer).transports),
         claim_boundary:
           "task/model-specific matched local evidence; not general parity or effectiveness"
@@ -252,7 +265,7 @@ defmodule MatchedTRECImp.Runner do
     |> GEPA.compile(program, examples(rows.train, true), examples(rows.selection, false))
   end
 
-  defp compile("mipro_v2", program, rows, seed, optimizer_lm, task_lm, manifest, meanings) do
+  defp compile("mipro_v2", program, rows, seed, optimizer_lm, task_lm, manifest, _meanings) do
     config = manifest["optimizer"]["mipro_v2"]
 
     MIPROv2.new(scalar_metric(),
@@ -340,6 +353,7 @@ defmodule MatchedTRECImp.Runner do
       result = Imp.call(program, %{text: row.text})
       after_call = Observer.snapshot(observer)
       messages = Enum.drop(after_call.messages, length(before.messages))
+      responses = Enum.drop(after_call.responses, length(before.responses))
       transports = Enum.drop(after_call.transports, length(before.transports))
 
       {actual, error, metadata} =
@@ -351,24 +365,22 @@ defmodule MatchedTRECImp.Runner do
             {nil, reason, nil}
         end
 
-      unless length(messages) == 1 and length(transports) == 1,
+      unless length(messages) == 1 and length(responses) == 1 and length(transports) == 1,
         do: raise("#{arm}/#{phase}/#{row.id} did not use exactly one logical/transport call")
 
+      response =
+        MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!(hd(responses).result)
+
       transport = hd(transports)
-      req_llm = metadata && map_get(metadata, :req_llm)
-      usage = req_llm && map_get(req_llm, :usage)
-      actual_model = req_llm && map_get(req_llm, :model)
-      actual_route = req_llm && map_get(req_llm, :provider)
+      actual_model = response.model
+      actual_route = response.route
       attempts = map_get(transport.measurements, :count)
       retry = map_get(transport.metadata, :retry)
-      input_tokens = usage && (map_get(usage, :input_tokens) || map_get(usage, :prompt_tokens))
-
-      output_tokens =
-        usage && (map_get(usage, :output_tokens) || map_get(usage, :completion_tokens))
-
-      finish_reason = req_llm && map_get(req_llm, :finish_reason)
-      raw_response = req_llm && map_get(req_llm, :content)
-      provider_cost = usage && (map_get(usage, :total_cost) || map_get(usage, :cost))
+      input_tokens = response.input_tokens
+      output_tokens = response.output_tokens
+      finish_reason = response.finish_reason
+      raw_response = response.content
+      provider_cost = response.provider_cost
 
       cost =
         if is_number(provider_cost),
