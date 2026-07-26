@@ -413,3 +413,25 @@ row opened, no selected artifact was written, and the condition was not
 normalized, loosened, substituted, or repeated. This establishes a real public
 proposal runtime plus an honest natural-proposal reliability gap, not
 SignatureOptimizer usefulness, upstream parity, or BEAM superiority.
+
+**2026-07-26T16:35:00Z**
+
+The standalone COPRO front door now binds its pinned DSPy 3.2.1 trainset
+selection semantics explicitly: one natural proposal and baseline are evaluated
+on the same sixteen rows, while forty optimizer-held-out rows stay unavailable
+until a genuine prompt mutation is selected. It requires the proposed
+instruction in rendered fused-model calls, preserves a parameter artifact, and
+defines fresh-OS replay. No separate validation set is falsely attributed to
+COPRO.
+
+Its first local-Llama proposal exposed an Imp parser defect: a Markdown-fenced
+JSON response was admitted as instruction `"```"` and evaluated in sixteen
+fused-Qwen calls. COPRO now decodes the enclosed JSON or rejects an invalid
+fence before task evaluation. The unchanged continuation decoded correctly but
+repeated the baseline instruction and changed only COPRO's deprecated,
+non-rendered prefix; both pairs scored `56.25%` on trainset and baseline was
+retained. The consumer stopped before held-out rows or artifact application
+rather than counting inert prefix churn as prompt mutation. Both stops are
+preserved; there was no third model pass. This closes the owning fenced-JSON
+runtime bug and records honest natural-proposer failure, not COPRO held-out
+effectiveness, full parity, or BEAM superiority.
