@@ -1,81 +1,66 @@
-# Matched local instruction optimizers on TREC
+# Strong matched instruction optimizers on TREC
 
-This is a bounded, provider-free integration diagnostic for Imp's instruction
-optimizers. It runs baseline, GEPA, and MIPROv2 through native Imp and pinned
-upstream implementations on the same real two-route TREC task. Its one seed and
-small optimizer budgets are deliberately insufficient for parity or
-effectiveness claims.
+This directory defines the launch-blocked strong-model comparison for Imp and
+pinned DSPy. It supersedes the small local diagnostic at commit `0a6cafe` for
+release decisions; that diagnostic remains historical evidence, not a flagship.
 
-The frozen contract is [`contract.json`](contract.json). It binds stable DSPy
-`3.2.1` at commit `29448ae12756abdd14bd8796c819247ebb83673c`, standalone
-GEPA `0.1.4`, one diagnostic seed, exact 20-train/20-selection/40-held-out
-source IDs, locally installed model digests, strict DSPy ChatAdapter marker
-decoding, one transport attempt, local-only non-billable execution, and maximum
-call ceilings. Both runtimes use matched ChatAdapter rendering with JSON
-fallback disabled, retain exact rendered messages and raw response metadata,
-and perform no output normalization.
+The frozen contract binds DSPy 3.2.1 (`29448ae…`), GEPA 0.1.4 (`8b0ce6…`),
+OpenAI GPT-5.4 Mini for task calls, Anthropic Claude Sonnet 4.6 for optimizer
+calls, three seeds, and disjoint balanced splits of 20 train, 40 selection, and
+80 untouched TREC rows. The opaque labels are K11 and K47. Dedicated selection
+and untouched files are independently hashed, so neither optimizer runtime can
+decode the full 400-row source or test labels during optimization.
 
-The 20-row balanced selection split retains the original six validation IDs,
-then takes the lexicographically earliest unused calibration IDs in each route
-until both routes have ten rows. It never uses the current held-out split. Some
-calibration rows have appeared in earlier, unrelated local work, so this is not
-an independent effectiveness benchmark.
+The scientific headline is falsifiable: on the frozen comparison, at least one
+Imp optimizer must improve its own baseline after Holm correction and remain
+within -0.05 held-out accuracy of its pinned upstream counterpart. A clean
+negative result falsifies that headline; it does not authorize changing seeds,
+messages, models, splits, budgets, or parsing after results.
 
-The runners open only `train.jsonl` and `selection.jsonl` while compiling and
-selection-scoring all three arm programs. They fsync every selected artifact
-and one selection receipt before either runner opens `held_out.jsonl`. GEPA
-train examples receive the same frozen semantic feedback text in both runtimes;
-selection examples return only scalar scores, and held-out rows remain outside
-the optimizer. Upstream typed parse failures become scored row errors instead
-of aborting the diagnostic.
+## Current boundary
 
-Inspect the no-model plan from the repository root:
+Launch is deliberately refused while the pinned public MIPRO bootstrap/search
+RNG and call graph receive their final audit. The safe predispatch ceilings are
+currently 6,840 task calls plus 78 optimizer calls across both runtimes. Their
+conservative reservation is $36.49536. The aggregate workshop spend must be
+confirmed immediately before launch against the owner's $50 ceiling.
 
-```sh
-cd examples/matched_instruction_optimizers_trec
-mix run -e 'Code.require_file("contract.exs"); IO.puts(Jason.encode!(MatchedInstructionOptimizersTREC.Contract.plan!("contract.json"), pretty: true))'
-```
+The runners additionally fail closed on:
 
-The plan starts no model or Python runtime and performs no download. It reserves
-570 total local calls across both runtimes: 540 task calls and 30
-proposal/reflection calls. Every runner owns a role-aware budget which refuses a
-logical/transport call before dispatch; post-stage reconciliation separately
-checks the retained ledger. `max_input_tokens` is passed to Ollama as `num_ctx`
-and checked against returned usage.
+- exact first-party OpenRouter endpoints, endpoint parameters, default service
+  tier, and prices no higher than the sealed catalog prices;
+- fallback disabled, `data_collection: deny`, one transport, cache/retry off,
+  and task request seed equal to the experiment seed;
+- a shared conservative request bound—compact UTF-8 bytes plus 16 bytes for
+  every message and one assistant frame—below the input-token ceiling;
+- per-arm call ceilings and cumulative worst-case USD reservation before each
+  dispatch (unused reservation never creates extra calls);
+- actual upstream provider versus OpenRouter gateway identity, service tier,
+  token counts, and reconciled gateway-reported versus adapter-computed cost;
+- both runtimes durably sealing all nine selections before either can open the
+  untouched file.
 
-MIPROv2's 14 optimizer-call ceiling follows DSPy 3.2.1's public grounded
-proposer estimate (dataset summary, program-aware context, and two instruction
-candidates). Imp normally needs fewer proposal transports because it composes
-those contexts into each candidate request; both paths are bounded before
-dispatch rather than forced to manufacture equal internal call counts.
+Baseline and a frozen injected-instruction no-model probe require byte-identical
+task messages. Live candidate instructions may legitimately diverge; each must
+instead be proven present in its runtime's rendered request. GEPA uses
+`reflection_record_mode: :gepa_v0_1_4`; MIPRO uses
+`proposer_fidelity: :dspy_3_2_1`. Those modes provide pinned semantic
+opportunity, not a blanket claim that independently evolving optimizer
+trajectories emit identical messages.
 
-The execution entry points are intentionally kept next to the example:
-
-```sh
-cd examples/matched_instruction_optimizers_trec
-mix deps.get
-mix run run_imp.exs
-
-../../tmp/dspy-parity-venv/bin/python run_upstream.py \
-  --dspy-root ../../tmp/dspy-3.2.1 \
-  --gepa-root ../../tmp/gepa-v0.1.4
-```
-
-After both complete, one shared aggregator recomputes every score from row
-identity/order and emits paired runtime/arm deltas:
+Inspect the no-network plan from the repository root:
 
 ```sh
-mix run -e 'Code.require_file("contract.exs"); Code.require_file("aggregate.exs"); IO.puts(Jason.encode!(MatchedInstructionOptimizersTREC.Aggregator.aggregate!("contract.json", "../../tmp/matched_instruction_optimizers_trec/imp-result.json", "../../tmp/matched_instruction_optimizers_trec/upstream-result.json"), pretty: true))'
+mix run -e 'Code.require_file("examples/matched_instruction_optimizers_trec/contract.exs"); IO.puts(Jason.encode!(MatchedInstructionOptimizersTREC.Contract.plan!("examples/matched_instruction_optimizers_trec/contract.json"), pretty: true))'
 ```
 
-With one seed, the exact observed paired range is necessarily a point. It is not
-a confidence interval and must not be described as uncertainty evidence. Both
-runners fail closed on source, dataset, model, route, cost, attempt, parser, or
-budget drift. Results are interpreted only as a bounded local diagnostic, not
-flagship evidence, general optimizer parity, effectiveness, or BEAM
-superiority.
+When the outstanding audit closes, changing `launch_status` to `sealed` must be
+a reviewed source-bound change. The Imp and upstream runners must then start
+concurrently so their selection barrier can complete. The shared aggregator
+recomputes all row metrics, performs source-ID-clustered paired bootstrap across
+the three seeds, applies Holm correction to the two Imp improvement tests, and
+checks noninferiority for the winning optimizer.
 
-Default results and sealed artifacts are written under the repository's
-gitignored `tmp/matched_instruction_optimizers_trec/` directory. Both runners
-record the full clean Imp `HEAD` plus the pinned DSPy and GEPA commits before
-the first model catalog request; a dirty source tree is refused.
+No provider calls have been made by this strong comparison. Until a complete
+run exists, it supports no effectiveness, parity, generality, or BEAM-native
+superiority claim.

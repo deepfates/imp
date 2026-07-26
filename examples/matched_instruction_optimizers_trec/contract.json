@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "campaign_id": "instruction-optimizer-trec-local-diagnostic-v2",
+  "schema_version": 3,
+  "campaign_id": "instruction-optimizer-trec-strong-matched-v1",
   "authorities": {
     "dspy": {
       "repository": "https://github.com/stanfordnlp/dspy",
@@ -23,9 +23,9 @@
     "train_path": "train.jsonl",
     "train_sha256": "d227d28bd89f448e024b94df01b27a1331446cea460865482eed0c60fb3a5fb6",
     "selection_path": "selection.jsonl",
-    "selection_sha256": "805c6ddb9e87693adaca3982aa02f24513eddd6859c68999c3f29ffbddc7a611",
+    "selection_sha256": "ccaa1323bf6a8367fce75d453e199920f670ed799f2bf0849959176c2cc8666b",
     "held_out_path": "held_out.jsonl",
-    "held_out_sha256": "0929be018e0c4a5857b19f5349ea1063c202763e7b65a933cb5d9218b884fa4d",
+    "held_out_sha256": "e656e003ae96d2808f720ad120f2e8f2cd5568ccbf6f605ca8e456450af5914a",
     "provenance_path": "../../benchmarks/data/confidence-calibration-trec-fine.provenance.json",
     "provenance_sha256": "a9abd542b6a22cf2d0a9753651dd4896225a5c9b48ee658bb1dd4777d67b167c",
     "revision": "eb1e45c1ba990fecca7cf84b67ce845edbcf49bf",
@@ -72,7 +72,27 @@
         "trec-fine:calibration:0076",
         "trec-fine:calibration:0080",
         "trec-fine:calibration:0081",
-        "trec-fine:calibration:0082"
+        "trec-fine:calibration:0082",
+        "trec-fine:calibration:0033",
+        "trec-fine:calibration:0037",
+        "trec-fine:calibration:0038",
+        "trec-fine:calibration:0043",
+        "trec-fine:calibration:0044",
+        "trec-fine:calibration:0058",
+        "trec-fine:calibration:0066",
+        "trec-fine:calibration:0068",
+        "trec-fine:calibration:0084",
+        "trec-fine:calibration:0105",
+        "trec-fine:calibration:0092",
+        "trec-fine:calibration:0096",
+        "trec-fine:calibration:0102",
+        "trec-fine:calibration:0103",
+        "trec-fine:calibration:0108",
+        "trec-fine:calibration:0110",
+        "trec-fine:calibration:0113",
+        "trec-fine:calibration:0114",
+        "trec-fine:calibration:0119",
+        "trec-fine:calibration:0123"
       ],
       "held_out_ids": [
         "trec-fine:heldout:0035",
@@ -114,29 +134,77 @@
         "trec-fine:heldout:0080",
         "trec-fine:heldout:0082",
         "trec-fine:heldout:0088",
-        "trec-fine:heldout:0090"
+        "trec-fine:heldout:0090",
+        "trec-fine:heldout:0000",
+        "trec-fine:heldout:0001",
+        "trec-fine:heldout:0002",
+        "trec-fine:heldout:0009",
+        "trec-fine:heldout:0010",
+        "trec-fine:heldout:0015",
+        "trec-fine:heldout:0020",
+        "trec-fine:heldout:0021",
+        "trec-fine:heldout:0022",
+        "trec-fine:heldout:0028",
+        "trec-fine:heldout:0053",
+        "trec-fine:heldout:0064",
+        "trec-fine:heldout:0069",
+        "trec-fine:heldout:0077",
+        "trec-fine:heldout:0123",
+        "trec-fine:heldout:0124",
+        "trec-fine:heldout:0131",
+        "trec-fine:heldout:0134",
+        "trec-fine:heldout:0138",
+        "trec-fine:heldout:0139",
+        "trec-fine:heldout:0094",
+        "trec-fine:heldout:0096",
+        "trec-fine:heldout:0097",
+        "trec-fine:heldout:0100",
+        "trec-fine:heldout:0101",
+        "trec-fine:heldout:0104",
+        "trec-fine:heldout:0106",
+        "trec-fine:heldout:0111",
+        "trec-fine:heldout:0115",
+        "trec-fine:heldout:0120",
+        "trec-fine:heldout:0127",
+        "trec-fine:heldout:0129",
+        "trec-fine:heldout:0130",
+        "trec-fine:heldout:0132",
+        "trec-fine:heldout:0143",
+        "trec-fine:heldout:0148",
+        "trec-fine:heldout:0160",
+        "trec-fine:heldout:0168",
+        "trec-fine:heldout:0169",
+        "trec-fine:heldout:0177"
       ]
     },
-    "selection_derivation": "retain_v1_six_then_lexicographic_unused_calibration_ids_per_route_to_10_each_no_heldout"
+    "selection_derivation": "retain_v2_twenty_then_lexicographic_unused_calibration_ids_per_route_to_20_each_no_heldout",
+    "held_out_derivation": "retain_v2_forty_then_lexicographic_unused_heldout_ids_per_route_to_40_each"
   },
   "models": {
     "task": {
-      "logical": "llama3.2:3b@a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
-      "imp": "ollama:llama3.2:3b",
-      "upstream": "ollama/llama3.2:3b",
-      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
-      "local_size_bytes": 2019377376
+      "logical": "openai/gpt-5.4-mini",
+      "imp": "openrouter:openai/gpt-5.4-mini",
+      "upstream": "openrouter/openai/gpt-5.4-mini",
+      "catalog_url": "https://openrouter.ai/api/v1/models",
+      "endpoint_provider": "OpenAI",
+      "catalog_prompt_per_token": "0.00000075",
+      "catalog_completion_per_token": "0.0000045"
     },
     "optimizer": {
-      "logical": "phi4:latest@ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
-      "imp": "ollama:phi4:latest",
-      "upstream": "ollama/phi4:latest",
-      "digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
-      "local_size_bytes": 9053114464
+      "logical": "anthropic/claude-sonnet-4.6",
+      "imp": "openrouter:anthropic/claude-sonnet-4.6",
+      "upstream": "openrouter/anthropic/claude-sonnet-4.6",
+      "catalog_url": "https://openrouter.ai/api/v1/models",
+      "endpoint_provider": "Anthropic",
+      "catalog_prompt_per_token": "0.000003",
+      "catalog_completion_per_token": "0.000015",
+      "catalog_cache_write_per_token": "0.00000375"
     }
   },
   "seeds": [
-    2026072602
+    2026072602,
+    2026072603,
+    2026072604
   ],
   "arms": [
     "baseline",
@@ -145,8 +213,8 @@
   ],
   "optimizer": {
     "gepa": {
-      "iterations": 1,
-      "minibatch_size": 5,
+      "iterations": 4,
+      "minibatch_size": 10,
       "candidate_selection": "pareto",
       "module_selection": "round_robin",
       "acceptance": "strict_improvement",
@@ -154,12 +222,18 @@
       "use_merge": false
     },
     "mipro_v2": {
-      "num_candidates": 2,
-      "trials": 1,
+      "num_candidates": 6,
+      "trials": 9,
       "minibatch": false,
       "max_bootstrapped_demos": 0,
       "max_labeled_demos": 0,
-      "startup_trials": 10
+      "startup_trials": 10,
+      "proposer_fidelity": "dspy_3_2_1",
+      "program_aware_proposer": false,
+      "data_aware_proposer": true,
+      "tip_aware_proposer": true,
+      "fewshot_aware_proposer": false,
+      "view_data_batch_size": 10
     }
   },
   "execution": {
@@ -169,39 +243,53 @@
     "max_retries": 0,
     "json_fallback": false,
     "fallbacks": false,
-    "data_collection": "local_only",
-    "route_guard": "exact_configured_local_model",
-    "cost_guard": "local_non_billable_no_external_spend",
+    "data_collection": "deny",
+    "route_guard": "exact_model_and_first_party_provider_no_fallback",
+    "cost_guard": "pre_dispatch_role_and_global_usd_reservation",
+    "openrouter": {
+      "allow_fallbacks": false,
+      "require_parameters": true,
+      "usage_include": true,
+      "task_only": ["openai"],
+      "task_order": ["openai"],
+      "optimizer_only": ["anthropic"],
+      "optimizer_order": ["anthropic"],
+      "task_max_price_per_million": {"prompt": 0.75, "completion": 4.5, "request": 0},
+      "optimizer_max_price_per_million": {"prompt": 3, "completion": 15, "request": 0}
+    },
     "request": {
       "task": {
-        "temperature": 0,
-        "max_tokens": 64,
-        "max_input_tokens": 4096
+        "temperature": null,
+        "seed": "experiment_seed",
+        "max_tokens": 256,
+        "max_input_tokens": 4096,
+        "reservation_input_tokens": 4352
       },
       "optimizer": {
         "temperature": 1,
-        "max_tokens": 512,
-        "max_input_tokens": 8192
+        "max_tokens": 1024,
+        "max_input_tokens": 16384,
+        "reservation_input_tokens": 17408
       }
     },
     "call_ceilings": {
       "baseline": {
-        "task_logical": 60,
+        "task_logical": 120,
         "optimizer_logical": 0,
-        "transports": 60,
-        "total_logical": 60
+        "transports": 120,
+        "total_logical": 120
       },
       "gepa": {
-        "task_logical": 110,
-        "optimizer_logical": 1,
-        "transports": 111,
-        "total_logical": 111
+        "task_logical": 400,
+        "optimizer_logical": 4,
+        "transports": 404,
+        "total_logical": 404
       },
       "mipro_v2": {
-        "task_logical": 100,
-        "optimizer_logical": 14,
-        "transports": 114,
-        "total_logical": 114
+        "task_logical": 620,
+        "optimizer_logical": 9,
+        "transports": 629,
+        "total_logical": 629
       }
     }
   },
@@ -225,7 +313,10 @@
       "macro_f1",
       "parse_errors"
     ],
-    "uncertainty": "paired_seed_delta_with_exact_observed_range_not_confidence_interval"
+    "uncertainty": "paired_source_id_cluster_bootstrap_with_three_seed_observed_range",
+    "primary": "held_out_accuracy",
+    "improvement_multiplicity": "holm_two_optimizer_tests",
+    "noninferiority_margin": -0.05
   },
   "accounting": {
     "per_row": [
@@ -240,8 +331,12 @@
       "error",
       "actual_model",
       "actual_route",
+      "gateway",
+      "service_tier",
+      "request_seed",
       "transport_attempts",
-      "cost"
+      "gateway_reported_cost",
+      "adapter_computed_cost"
     ],
     "fail_closed": [
       "model",
@@ -266,5 +361,6 @@
     "dspy": "https://github.com/stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
     "gepa": "https://github.com/gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
   },
-  "intent": "bounded_local_diagnostic_not_flagship_parity_or_effectiveness"
+  "launch_status": "blocked_pending_public_mipro_bootstrap_rng_call_graph_audit",
+  "intent": "sealed_strong_model_matched_system_comparison"
 }

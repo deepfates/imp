@@ -61,6 +61,29 @@ def atomic_write(path: Path, value: Any) -> None:
             pass
 
 
+def wait_for_peer_selection(manifest: dict[str, Any]) -> None:
+    peer = Path(os.environ.get(
+        "IMP_MATCHED_TREC_IMP_SELECTION",
+        str(IMP_ROOT / "tmp/matched_instruction_optimizers_trec/imp-result.json.selection-sealed.json"),
+    ))
+    deadline = time.monotonic() + 1800
+    while True:
+        if peer.is_file():
+            receipt = json.loads(peer.read_text())
+            if not (
+                receipt.get("runtime") == "imp"
+                and receipt.get("status") == "selection_sealed"
+                and receipt.get("held_out_loaded") is False
+                and receipt.get("manifest_sha256") == manifest["manifest_sha256"]
+                and len(receipt.get("selections", [])) == 9
+            ):
+                raise RuntimeError("Imp selection barrier receipt drift")
+            return
+        if time.monotonic() >= deadline:
+            raise RuntimeError("timed out before Imp sealed all selections")
+        time.sleep(1)
+
+
 def json_safe(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -116,25 +139,25 @@ def resolve(relative: str) -> Path:
 def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
     manifest = json.loads(MANIFEST_PATH.read_text())
     manifest["manifest_sha256"] = sha256_file(MANIFEST_PATH)
-    if manifest.get("schema_version") != 2 or manifest.get("intent") != "bounded_local_diagnostic_not_flagship_parity_or_effectiveness":
-        raise RuntimeError("diagnostic manifest schema/intent drift")
-    if manifest.get("seeds") != [2026072602] or manifest.get("arms") != ["baseline", "gepa", "mipro_v2"]:
-        raise RuntimeError("diagnostic seed/arm contract drift")
+    if manifest.get("schema_version") != 3 or manifest.get("intent") != "sealed_strong_model_matched_system_comparison":
+        raise RuntimeError("strong matched manifest schema/intent drift")
+    if manifest.get("seeds") != [2026072602, 2026072603, 2026072604] or manifest.get("arms") != ["baseline", "gepa", "mipro_v2"]:
+        raise RuntimeError("strong matched seed/arm contract drift")
     expected_ceilings = {
-        "baseline": {"task_logical": 60, "optimizer_logical": 0, "transports": 60, "total_logical": 60},
-        "gepa": {"task_logical": 110, "optimizer_logical": 1, "transports": 111, "total_logical": 111},
-        "mipro_v2": {"task_logical": 100, "optimizer_logical": 14, "transports": 114, "total_logical": 114},
+        "baseline": {"task_logical": 120, "optimizer_logical": 0, "transports": 120, "total_logical": 120},
+        "gepa": {"task_logical": 400, "optimizer_logical": 4, "transports": 404, "total_logical": 404},
+        "mipro_v2": {"task_logical": 620, "optimizer_logical": 9, "transports": 629, "total_logical": 629},
     }
     if manifest.get("execution", {}).get("call_ceilings") != expected_ceilings:
         raise RuntimeError("diagnostic call-ceiling contract drift")
-    if manifest.get("optimizer", {}).get("mipro_v2", {}).get("num_candidates") != 2:
+    if manifest.get("optimizer", {}).get("mipro_v2", {}).get("num_candidates") != 6:
         raise RuntimeError("MIPRO public num_candidates contract drift")
     splits = manifest.get("dataset", {}).get("splits", {})
-    if [len(splits.get(name, [])) for name in ("train_ids", "selection_ids", "held_out_ids")] != [20, 20, 40]:
-        raise RuntimeError("diagnostic split-size contract drift")
+    if [len(splits.get(name, [])) for name in ("train_ids", "selection_ids", "held_out_ids")] != [20, 40, 80]:
+        raise RuntimeError("strong matched split-size contract drift")
     all_ids = splits["train_ids"] + splits["selection_ids"] + splits["held_out_ids"]
-    if len(set(all_ids)) != 80:
-        raise RuntimeError("diagnostic splits overlap")
+    if len(set(all_ids)) != 140:
+        raise RuntimeError("strong matched splits overlap")
     manifest["dataset"]["data_path"] = str(resolve(manifest["dataset"]["data_path"]))
     manifest["dataset"]["contract_path"] = str(resolve(manifest["dataset"]["contract_path"]))
     manifest["dataset"]["train_path"] = str(resolve(manifest["dataset"]["train_path"]))
@@ -191,21 +214,60 @@ def stream_rows(path: Path, wanted_ids: list[str]) -> list[dict[str, str]]:
     return [found[row_id] for row_id in wanted_ids]
 
 
-def verify_models(manifest: dict[str, Any]) -> None:
-    with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=5) as response:
-        catalog = json.load(response)["models"]
+def verify_models(manifest: dict[str, Any]) -> dict[str, Any]:
+    snapshots = {}
     for role in ("task", "optimizer"):
         expected = manifest["models"][role]
-        name = expected["upstream"].removeprefix("ollama/")
-        if not any(row.get("name") == name and row.get("digest") == expected["digest"] for row in catalog):
-            raise RuntimeError(f"pinned local {role} model is absent or changed")
+        url = f"https://openrouter.ai/api/v1/models/{expected['logical']}/endpoints"
+        with urllib.request.urlopen(url, timeout=30) as response:
+            body = json.load(response)
+        endpoints = body.get("data", {}).get("endpoints", [])
+        required = {"max_tokens", "seed", "response_format"} if role == "task" else {"max_tokens", "temperature"}
+        exact = next((endpoint for endpoint in endpoints if
+            endpoint.get("provider_name") == expected["endpoint_provider"]
+            and endpoint.get("tag") in (None, "default", "standard")
+            and float(endpoint.get("pricing", {}).get("prompt", "inf")) <= float(expected["catalog_prompt_per_token"])
+            and float(endpoint.get("pricing", {}).get("completion", "inf")) <= float(expected["catalog_completion_per_token"])
+            and required.issubset(set(endpoint.get("supported_parameters", [])))), None)
+        if exact is None:
+            raise RuntimeError(f"no exact first-party {role} endpoint satisfies pricing/parameter/default-tier guard")
+        encoded = json.dumps(exact, sort_keys=True, separators=(",", ":")).encode()
+        snapshots[role] = {
+            "endpoint_url": url,
+            "model": expected["logical"],
+            "endpoint": exact,
+            "sha256": hashlib.sha256(encoded).hexdigest(),
+        }
+    return snapshots
 
 
 class Capture:
-    def __init__(self) -> None:
+    def __init__(self, manifest: dict[str, Any] | None = None) -> None:
         self.phase: dict[str, Any] | None = None
         self.calls: list[dict[str, Any]] = []
         self.call_budgets: dict[str, dict[str, Any]] = {}
+        self.usd_reserved = 0.0
+        self.actual_cost = 0.0
+        self.role_usd: dict[str, float] = {}
+        self.usd_limit: float | None = None
+        self.max_input_tokens: dict[str, int] = {}
+        if manifest is not None:
+            request = manifest["execution"]["request"]
+            models = manifest["models"]
+            self.role_usd = {
+                "task": request["task"]["reservation_input_tokens"] * float(models["task"]["catalog_prompt_per_token"])
+                + request["task"]["max_tokens"] * float(models["task"]["catalog_completion_per_token"]),
+                "optimizer": request["optimizer"]["reservation_input_tokens"] * float(models["optimizer"]["catalog_cache_write_per_token"])
+                + request["optimizer"]["max_tokens"] * float(models["optimizer"]["catalog_completion_per_token"]),
+            }
+            self.usd_limit = len(manifest["seeds"]) * sum(
+                ceiling["task_logical"] * self.role_usd["task"]
+                + ceiling["optimizer_logical"] * self.role_usd["optimizer"]
+                for ceiling in manifest["execution"]["call_ceilings"].values()
+            )
+            self.max_input_tokens = {
+                role: request[role]["max_input_tokens"] for role in ("task", "optimizer")
+            }
 
     def set_phase(self, seed: int, arm: str, phase: str) -> None:
         self.phase = {"seed": seed, "arm": arm, "phase": phase}
@@ -230,6 +292,12 @@ class Capture:
             raise RuntimeError("LM dispatch lacks an active phase")
         key = f"{self.phase['seed']}:{self.phase['arm']}"
         budget = self.call_budgets[key]
+        if self.usd_limit is not None:
+            projected_usd = self.usd_reserved + self.role_usd[role]
+            if projected_usd > self.usd_limit + 1e-12:
+                raise RuntimeError(
+                    f"global USD reservation {projected_usd} exceeds {self.usd_limit}"
+                )
         projected = dict(budget["counts"])
         projected[f"{role}_logical"] += 1
         projected["total_logical"] += 1
@@ -248,6 +316,18 @@ class Capture:
                     f"{name}={count} ceiling={budget['ceiling'][name]}"
                 )
         budget["counts"] = projected
+        if self.usd_limit is not None:
+            self.usd_reserved = projected_usd
+
+    def reconcile_cost(self, cost: float) -> None:
+        projected = self.actual_cost + cost
+        if projected > self.usd_reserved + 1e-6 or (
+            self.usd_limit is not None and projected > self.usd_limit + 1e-6
+        ):
+            raise RuntimeError(
+                f"actual cumulative cost {projected} exceeds reserved {self.usd_reserved}"
+            )
+        self.actual_cost = projected
 
 
 def install_runtime(args: argparse.Namespace):
@@ -257,6 +337,7 @@ def install_runtime(args: argparse.Namespace):
 
     class RecordingLM(dspy.LM):
         def __init__(self, *lm_args, capture: Capture, role: str, **lm_kwargs):
+            self.expected_model = lm_kwargs.pop("expected_model", None)
             super().__init__(*lm_args, **lm_kwargs)
             self.capture = capture
             self.role = role
@@ -276,6 +357,17 @@ def install_runtime(args: argparse.Namespace):
             return duplicate
 
         def forward(self, prompt=None, messages=None, **kwargs):
+            rendered = json.dumps(
+                messages if messages is not None else {"prompt": prompt},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            framed_bound = len(rendered) + 16 * ((len(messages) if messages is not None else 1) + 1)
+            cap = self.capture.max_input_tokens.get(self.role)
+            if cap is not None and framed_bound > cap:
+                raise RuntimeError(
+                    f"{self.role} rendered request conservative token bound {framed_bound} exceeds {cap}"
+                )
             self.capture.reserve(self.role)
             started = time.monotonic()
             response = None
@@ -296,6 +388,7 @@ def install_runtime(args: argparse.Namespace):
                     {
                         "phase": copy.deepcopy(self.capture.phase),
                         "role": self.role,
+                        "request_seed": kwargs.get("seed", getattr(self, "kwargs", {}).get("seed")),
                         "prompt": prompt,
                         "messages": copy.deepcopy(messages),
                         "raw_response": {
@@ -304,12 +397,15 @@ def install_runtime(args: argparse.Namespace):
                         },
                         "response_metadata": {
                             "model": field(response, "model"),
-                            "provider": field(hidden, "custom_llm_provider"),
+                            "provider": field(response, "provider") or field(hidden, "provider"),
+                            "gateway": field(hidden, "custom_llm_provider"),
+                            "service_tier": field(response, "service_tier") or field(hidden, "service_tier"),
                             "input_tokens": field(usage, "prompt_tokens"),
                             "output_tokens": field(usage, "completion_tokens"),
                             "finish_reason": field(choice, "finish_reason"),
                             "content": field(message, "content"),
-                            "provider_cost": field(hidden, "response_cost"),
+                            "gateway_reported_cost": field(usage, "cost"),
+                            "computed_cost": field(hidden, "response_cost"),
                         },
                         "error": error,
                         # One forward with num_retries=0 is one adapter transport dispatch.
@@ -317,6 +413,9 @@ def install_runtime(args: argparse.Namespace):
                         "wall_seconds": time.monotonic() - started,
                     }
                 )
+                if response is not None and error is None and self.expected_model is not None:
+                    evidence = transport_evidence(self.capture.calls[-1], self.expected_model)
+                    self.capture.reconcile_cost(evidence["gateway_reported_cost"])
 
     return dspy, RecordingLM
 
@@ -326,17 +425,20 @@ def transport_evidence(call: dict[str, Any], expected: dict[str, Any]) -> dict[s
     evidence = {
         "actual_model": response["model"],
         "actual_route": response["provider"],
+        "gateway": response["gateway"],
+        "service_tier": response["service_tier"],
+        "request_seed": call["request_seed"],
         "transport_attempts": call["adapter_transport_dispatch"],
         "input_tokens": response["input_tokens"],
         "output_tokens": response["output_tokens"],
         "finish_reason": response["finish_reason"],
         "content": response["content"],
-        "provider_cost": response["provider_cost"],
+        "gateway_reported_cost": response["gateway_reported_cost"],
+        "computed_cost": response["computed_cost"],
     }
-    configured = expected["upstream"]
-    local = configured.removeprefix("ollama/")
-    model_ok = evidence["actual_model"] in (configured, local)
-    route_ok = evidence["actual_route"] == "ollama"
+    configured = expected["logical"]
+    model_ok = evidence["actual_model"] in (configured, expected["upstream"])
+    route_ok = str(evidence["actual_route"]).lower() == expected["endpoint_provider"].lower()
     tokens_ok = isinstance(evidence["input_tokens"], (int, float)) and isinstance(
         evidence["output_tokens"], (int, float)
     ) and evidence["input_tokens"] <= expected["max_input_tokens"]
@@ -347,15 +449,18 @@ def transport_evidence(call: dict[str, Any], expected: dict[str, Any]) -> dict[s
         and tokens_ok
         and isinstance(evidence["finish_reason"], str)
         and isinstance(evidence["content"], str)
-        and (evidence["provider_cost"] is None or evidence["provider_cost"] == 0)
+        and evidence["gateway"] == "openrouter"
+        and evidence["service_tier"] in (None, "default", "standard")
+        and isinstance(evidence["gateway_reported_cost"], (int, float)) and evidence["gateway_reported_cost"] >= 0
+        and isinstance(evidence["computed_cost"], (int, float)) and evidence["computed_cost"] >= 0
+        and abs(evidence["gateway_reported_cost"] - evidence["computed_cost"]) <= 1e-6
     ):
         raise RuntimeError(f"missing or drifted upstream transport evidence: {evidence!r}")
-    provider_cost = evidence.pop("provider_cost")
-    evidence["cost"] = (
-        {"value": provider_cost, "authority": "provider_reported"}
-        if provider_cost is not None
-        else {"value": None, "authority": "local_ollama_no_billing", "external_api_spend": 0}
-    )
+    evidence["cost"] = {
+        "gateway_reported": evidence["gateway_reported_cost"],
+        "adapter_computed": evidence["computed_cost"],
+        "tolerance": 1e-6,
+    }
     return evidence
 
 
@@ -363,6 +468,21 @@ def model_contract(manifest: dict[str, Any], role: str) -> dict[str, Any]:
     return {
         **manifest["models"][role],
         "max_input_tokens": manifest["execution"]["request"][role]["max_input_tokens"],
+    }
+
+
+def openrouter_body(manifest: dict[str, Any], role: str) -> dict[str, Any]:
+    routing = manifest["execution"]["openrouter"]
+    return {
+        "provider": {
+            "only": routing[f"{role}_only"],
+            "order": routing[f"{role}_order"],
+            "allow_fallbacks": False,
+            "require_parameters": True,
+            "data_collection": "deny",
+            "max_price": routing[f"{role}_max_price_per_million"],
+        },
+        "usage": {"include": True},
     }
 
 
@@ -494,6 +614,11 @@ def compile_arm(dspy: Any, arm: str, program: Any, train: list[Any], selection: 
             max_labeled_demos=0,
             seed=seed,
             minibatch=False,
+            program_aware_proposer=False,
+            data_aware_proposer=True,
+            tip_aware_proposer=True,
+            fewshot_aware_proposer=False,
+            view_data_batch_size=10,
         )
     raise RuntimeError(f"unknown arm {arm}")
 
@@ -567,7 +692,7 @@ def parameter_snapshot(program: Any) -> list[dict[str, Any]]:
 def seal(seed: int, arm: str, program: Any, selection_rows: list[dict[str, Any]], manifest: dict[str, Any],
          preheld_call_counts: dict[str, int]) -> dict[str, Any]:
     payload = {
-        "schema_version": 2,
+        "schema_version": 3,
         "runtime": "upstream",
         "seed": seed,
         "arm": arm,
@@ -589,12 +714,14 @@ def seal(seed: int, arm: str, program: Any, selection_rows: list[dict[str, Any]]
 def run(args: argparse.Namespace) -> None:
     global ACTIVE_CAPTURE
     manifest = load_manifest(args)
+    if manifest.get("launch_status") != "sealed":
+        raise RuntimeError(f"provider launch refused: {manifest.get('launch_status')}")
     commits = source_commits(manifest)
     verify_clean_imp_tree()
-    verify_models(manifest)
+    catalog_snapshot = verify_models(manifest)
     dspy, RecordingLM = install_runtime(args)
     dspy.configure(adapter=dspy.ChatAdapter(use_json_adapter_fallback=False))
-    capture = Capture()
+    capture = Capture(manifest)
     ACTIVE_CAPTURE = capture
     request = manifest["execution"]["request"]
     splits = manifest["dataset"]["splits"]
@@ -611,16 +738,20 @@ def run(args: argparse.Namespace) -> None:
             capture.register_budget(seed, arm, manifest["execution"]["call_ceilings"][arm])
             before_arm = len(capture.calls)
             task_lm = RecordingLM(
-                manifest["models"]["task"]["upstream"], api_base="http://127.0.0.1:11434",
-                api_key="", cache=False, num_retries=0, capture=capture, role="task",
-                temperature=request["task"]["temperature"], max_tokens=request["task"]["max_tokens"],
-                num_ctx=request["task"]["max_input_tokens"]
+                manifest["models"]["task"]["upstream"], api_base="https://openrouter.ai/api/v1",
+                api_key=os.environ["OPENROUTER_API_KEY"], cache=False, num_retries=0,
+                capture=capture, role="task", seed=seed,
+                expected_model=model_contract(manifest, "task"),
+                max_tokens=request["task"]["max_tokens"],
+                extra_body=openrouter_body(manifest, "task")
             )
             optimizer_lm = RecordingLM(
-                manifest["models"]["optimizer"]["upstream"], api_base="http://127.0.0.1:11434",
-                api_key="", cache=False, num_retries=0, capture=capture, role="optimizer",
-                temperature=request["optimizer"]["temperature"], max_tokens=request["optimizer"]["max_tokens"],
-                num_ctx=request["optimizer"]["max_input_tokens"]
+                manifest["models"]["optimizer"]["upstream"], api_base="https://openrouter.ai/api/v1",
+                api_key=os.environ["OPENROUTER_API_KEY"], cache=False, num_retries=0,
+                capture=capture, role="optimizer", temperature=request["optimizer"]["temperature"],
+                expected_model=model_contract(manifest, "optimizer"),
+                max_tokens=request["optimizer"]["max_tokens"],
+                extra_body=openrouter_body(manifest, "optimizer")
             )
             program = build_program(dspy, task_lm)
             capture.set_phase(seed, arm, "compile")
@@ -633,7 +764,7 @@ def run(args: argparse.Namespace) -> None:
                 selected, selection_source, task_lm, capture, model_contract(manifest, "task")
             )
             preheld_call_counts = validate_call_slice(
-                capture.calls[before_arm:], arm, manifest, reserved_held_out_task=40
+                capture.calls[before_arm:], arm, manifest, reserved_held_out_task=80
             )
             sealed.append(
                 seal(seed, arm, selected, selected_rows, manifest, preheld_call_counts)
@@ -643,7 +774,7 @@ def run(args: argparse.Namespace) -> None:
     atomic_write(
         SELECTION_OUTPUT,
         {
-            "schema_version": 2,
+            "schema_version": 3,
             "runtime": "upstream",
             "status": "selection_sealed",
             "held_out_loaded": False,
@@ -652,6 +783,7 @@ def run(args: argparse.Namespace) -> None:
             "selections": [{key: value for key, value in item.items() if key != "program"} for item in sealed],
         },
     )
+    wait_for_peer_selection(manifest)
     held_out_path = Path(manifest["dataset"]["held_out_path"])
     if sha256_file(held_out_path) != manifest["dataset"]["held_out_sha256"]:
         raise RuntimeError("TREC held-out split drift")
@@ -666,10 +798,10 @@ def run(args: argparse.Namespace) -> None:
         held_calls = capture.calls[before_held:]
         held_counts = call_counts(held_calls)
         expected_held = {
-            "task_logical": 40,
+            "task_logical": 80,
             "optimizer_logical": 0,
-            "total_logical": 40,
-            "transports": 40,
+            "total_logical": 80,
+            "transports": 80,
         }
         if held_counts != expected_held:
             raise RuntimeError(
@@ -691,7 +823,7 @@ def run(args: argparse.Namespace) -> None:
     for seed in manifest["seeds"]:
         by_seed.append({"seed": seed, "arms": [row for row in completed if row["seed"] == seed]})
     result = {
-        "schema_version": 2,
+        "schema_version": 3,
         "runtime": "upstream",
         "status": "complete",
         "manifest_sha256": manifest["manifest_sha256"],
@@ -700,7 +832,8 @@ def run(args: argparse.Namespace) -> None:
         "seeds": by_seed,
         "calls": capture.calls,
         "call_budgets": capture.call_budgets,
-        "claim_boundary": "bounded local diagnostic only; not flagship parity, general effectiveness, or BEAM superiority",
+        "catalog_snapshot": catalog_snapshot,
+        "claim_boundary": "sealed matched system comparison; task messages are matched exactly, optimizer trajectories use pinned fidelity modes",
     }
     atomic_write(OUTPUT, result)
     print(json.dumps(json_safe(result), indent=2, sort_keys=True))
@@ -721,7 +854,7 @@ def main() -> None:
             commits = {"imp": "unavailable", "dspy": "unavailable", "gepa": "unavailable"}
         atomic_write(
             OUTPUT,
-            {"schema_version": 2, "runtime": "upstream", "status": "stopped",
+            {"schema_version": 3, "runtime": "upstream", "status": "stopped",
              "source_commits": commits,
              "call_budgets": ACTIVE_CAPTURE.call_budgets if ACTIVE_CAPTURE else {},
              "error": repr(exc)},

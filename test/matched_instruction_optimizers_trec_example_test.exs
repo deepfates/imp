@@ -42,7 +42,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
   test "freezes exact authorities, dataset IDs, models, and runtime request controls" do
     manifest = Contract.load!(@manifest)
 
-    assert manifest["seeds"] == [2_026_072_602]
+    assert manifest["seeds"] == [2_026_072_602, 2_026_072_603, 2_026_072_604]
     assert get_in(manifest, ["authorities", "dspy", "version"]) == "3.2.1"
 
     assert get_in(manifest, ["authorities", "dspy", "commit"]) ==
@@ -50,14 +50,13 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     assert manifest["arms"] == ~w(baseline gepa mipro_v2)
     assert length(manifest["dataset"]["splits"]["train_ids"]) == 20
-    assert length(manifest["dataset"]["splits"]["selection_ids"]) == 20
-    assert length(manifest["dataset"]["splits"]["held_out_ids"]) == 40
+    assert length(manifest["dataset"]["splits"]["selection_ids"]) == 40
+    assert length(manifest["dataset"]["splits"]["held_out_ids"]) == 80
 
-    assert manifest["models"]["task"]["digest"] ==
-             "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
-
-    assert manifest["models"]["optimizer"]["digest"] ==
-             "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
+    assert manifest["models"]["task"]["logical"] == "openai/gpt-5.4-mini"
+    assert manifest["models"]["optimizer"]["logical"] == "anthropic/claude-sonnet-4.6"
+    assert get_in(manifest, ["execution", "request", "task", "seed"]) == "experiment_seed"
+    assert manifest["launch_status"] =~ "blocked_pending_public_mipro"
 
     assert manifest["execution"]
            |> Map.take(~w(concurrency cache retry max_retries json_fallback fallbacks)) == %{
@@ -95,22 +94,22 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert plan["downloads"] == 0
 
     assert plan["per_seed_per_runtime"] == %{
-             "baseline" => %{"task_calls" => 60, "optimizer_calls" => 0, "total_calls" => 60},
-             "gepa" => %{"task_calls" => 110, "optimizer_calls" => 1, "total_calls" => 111},
-             "mipro_v2" => %{"task_calls" => 100, "optimizer_calls" => 14, "total_calls" => 114}
+             "baseline" => %{"task_calls" => 120, "optimizer_calls" => 0, "total_calls" => 120},
+             "gepa" => %{"task_calls" => 400, "optimizer_calls" => 4, "total_calls" => 404},
+             "mipro_v2" => %{"task_calls" => 620, "optimizer_calls" => 9, "total_calls" => 629}
            }
 
     assert plan["worst_case"] == %{
-             "task_calls" => 540,
-             "optimizer_calls" => 30,
-             "total_calls" => 570,
-             "input_tokens" => 2_457_600,
-             "output_tokens" => 49_920,
-             "usd" => 0.0
+             "task_calls" => 6_840,
+             "optimizer_calls" => 78,
+             "total_calls" => 6_918,
+             "input_tokens" => 29_294_592,
+             "output_tokens" => 1_830_912,
+             "usd" => 36.49536
            }
 
     assert get_in(plan, ["runtime_configs", "imp", "adapter_rendering"]) ==
-             "matched_dspy_chat_adapter_markers_json_fallback_disabled_captured_exactly"
+             "byte_identical_baseline_and_frozen_injected_instruction_probe; live candidate instructions must be rendered; optimizer trajectories may diverge"
 
     assert get_in(plan, ["runtime_configs", "upstream", "capture", "rendered_messages"])
 
@@ -164,10 +163,28 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
       Path.expand("../examples/matched_instruction_optimizers_trec/no_model_test.py", __DIR__)
 
     assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
-    assert output =~ "Ran 4 tests"
+    assert output =~ "Ran 7 tests"
   end
 
-  test "shared aggregator recomputes rows and labels the one-seed paired range honestly" do
+  test "strong runners retain launch, seed, input, USD, endpoint, tier, and dual-cost guards" do
+    imp = File.read!("examples/matched_instruction_optimizers_trec/run_imp.exs")
+    upstream = File.read!("examples/matched_instruction_optimizers_trec/run_upstream.py")
+
+    for source <- [imp, upstream] do
+      assert source =~ "launch_status"
+      assert source =~ "max_input_tokens"
+      assert source =~ "usd_reserved"
+      assert source =~ "/endpoints"
+      assert source =~ "service_tier"
+      assert source =~ "gateway_reported_cost"
+      assert source =~ "computed_cost"
+    end
+
+    assert imp =~ "Keyword.put(opts, :seed, seed)"
+    assert upstream =~ "seed=seed"
+  end
+
+  test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do
     manifest = Contract.load!(@manifest)
 
     root =
@@ -185,25 +202,26 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     result = fn runtime ->
       %{
-        "schema_version" => 2,
+        "schema_version" => 3,
         "runtime" => runtime,
         "status" => "complete",
         "manifest_sha256" => manifest["manifest_sha256"],
         "source_commits" => %{"imp" => "i", "dspy" => "d", "gepa" => "g"},
-        "seeds" => [
-          %{
-            "seed" => hd(manifest["seeds"]),
-            "arms" =>
-              Enum.map(~w(baseline gepa mipro_v2), fn arm ->
-                %{
-                  "arm" => arm,
-                  "selection" => summary.(selection),
-                  "held_out" => summary.(held_out),
-                  "rows" => %{"selection" => selection, "held_out" => held_out}
-                }
-              end)
-          }
-        ]
+        "seeds" =>
+          Enum.map(manifest["seeds"], fn seed ->
+            %{
+              "seed" => seed,
+              "arms" =>
+                Enum.map(~w(baseline gepa mipro_v2), fn arm ->
+                  %{
+                    "arm" => arm,
+                    "selection" => summary.(selection),
+                    "held_out" => summary.(held_out),
+                    "rows" => %{"selection" => selection, "held_out" => held_out}
+                  }
+                end)
+            }
+          end)
       }
     end
 
@@ -215,12 +233,12 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     aggregate = Aggregator.aggregate!(@manifest, imp_path, upstream_path)
 
     assert get_in(aggregate, ["within_runtime", "imp", "gepa", "held_out", "accuracy"]) == %{
-             "paired_deltas" => [0.0],
+             "paired_deltas" => [0.0, 0.0, 0.0],
              "mean" => 0.0,
              "exact_observed_range" => [0.0, 0.0]
            }
 
-    refute aggregate["uncertainty"]["is_confidence_interval"]
+    assert aggregate["uncertainty"]["method"] == "source_id_cluster_bootstrap_all_three_seeds"
 
     tampered =
       put_in(
@@ -334,14 +352,17 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
           model: "llama3.2:3b",
           finish_reason: "stop",
           content: "not valid typed output",
-          usage: %{input_tokens: 12, output_tokens: 4}
+          provider_meta: %{provider: "OpenAI", service_tier: "default"},
+          usage: %{input_tokens: 12, output_tokens: 4, cost: 0.1, total_cost: 0.1}
         }
       }
     }
 
     assert %{
              output: "not valid typed output",
-             route: "ollama",
+             gateway: "ollama",
+             route: "OpenAI",
+             service_tier: "default",
              model: "llama3.2:3b",
              finish_reason: "stop",
              content: "not valid typed output",
@@ -360,12 +381,12 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
           model: "llama3.2:3b",
           finish_reason: :stop,
           content: "",
-          usage: %{input_tokens: 1, output_tokens: 0, cost: 0}
+          usage: %{input_tokens: 1, output_tokens: 0, cost: 0, total_cost: 0}
         }
       }
     }
 
-    assert %{finish_reason: "stop", provider_cost: 0} =
+    assert %{finish_reason: "stop", provider_cost: 0, computed_cost: 0} =
              MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
   end
 

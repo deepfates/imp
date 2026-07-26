@@ -5,17 +5,22 @@ defmodule MatchedInstructionOptimizersTREC.ResponseEvidence do
     with {:ok, output, metadata} <- Imp.LM.Result.split(value),
          req_llm when is_map(req_llm) <- map_get(metadata, :req_llm) do
       usage = map_get(req_llm, :usage) || %{}
+      provider_meta = map_get(req_llm, :provider_meta) || %{}
 
       %{
         output: output,
         metadata: metadata,
         model: map_get(req_llm, :model),
-        route: map_get(req_llm, :provider),
+        route: map_get(provider_meta, :provider),
+        gateway: map_get(req_llm, :provider),
+        service_tier: map_get(provider_meta, :service_tier) || map_get(req_llm, :service_tier),
         input_tokens: map_get(usage, :input_tokens) || map_get(usage, :prompt_tokens),
         output_tokens: map_get(usage, :output_tokens) || map_get(usage, :completion_tokens),
         finish_reason: normalize_finish_reason(map_get(req_llm, :finish_reason)),
         content: map_get(req_llm, :content),
-        provider_cost: map_get(usage, :total_cost) || map_get(usage, :cost)
+        gateway_reported_cost: map_get(usage, :cost),
+        computed_cost: map_get(usage, :total_cost),
+        provider_cost: map_get(usage, :cost)
       }
     else
       {:error, reason} -> raise "invalid LM result envelope: #{inspect(reason)}"

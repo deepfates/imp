@@ -22,17 +22,21 @@ def successful_call(content: str = "malformed", input_tokens: int = 12):
     return {
         "phase": {"seed": 1, "arm": "baseline", "phase": "selection"},
         "role": "task",
+        "request_seed": 1,
         "prompt": None,
         "messages": [{"role": "user", "content": "question"}],
         "raw_response": {"response": content, "provider_metadata": {}},
         "response_metadata": {
-            "model": "llama3.2:3b",
-            "provider": "ollama",
+            "model": "openai/gpt-5.4-mini",
+            "provider": "OpenAI",
+            "gateway": "openrouter",
+            "service_tier": "default",
             "input_tokens": input_tokens,
             "output_tokens": 4,
             "finish_reason": "stop",
             "content": content,
-            "provider_cost": None,
+            "gateway_reported_cost": 0.0001,
+            "computed_cost": 0.0001,
         },
         "error": None,
         "adapter_transport_dispatch": 1,
@@ -41,6 +45,117 @@ def successful_call(content: str = "malformed", input_tokens: int = 12):
 
 
 class NoModelBoundaryTest(unittest.TestCase):
+    def test_first_response_drift_stops_before_second_dispatch(self):
+        dispatches = []
+
+        class FakeLM:
+            def __init__(self, *_args, **kwargs):
+                self.kwargs = kwargs
+
+            def forward(self, **_kwargs):
+                dispatches.append(1)
+                return types.SimpleNamespace(
+                    model="openai/gpt-5.4-mini",
+                    provider="WrongProvider",
+                    service_tier="default",
+                    usage={"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0},
+                    choices=[types.SimpleNamespace(
+                        finish_reason="stop",
+                        message=types.SimpleNamespace(content="ok"),
+                    )],
+                    _hidden_params={"custom_llm_provider": "openrouter", "response_cost": 0.0},
+                )
+
+        prior = sys.modules.get("dspy")
+        sys.modules["dspy"] = types.SimpleNamespace(LM=FakeLM)
+        try:
+            _dspy, recording_lm = MODULE.install_runtime(
+                types.SimpleNamespace(dspy_root=HERE, gepa_root=HERE)
+            )
+            capture = MODULE.Capture()
+            capture.max_input_tokens = {"task": 4096}
+            capture.usd_limit = 1.0
+            capture.role_usd = {"task": 0.1}
+            capture.register_budget(1, "baseline", {
+                "task_logical": 2, "optimizer_logical": 0, "total_logical": 2, "transports": 2
+            })
+            capture.set_phase(1, "baseline", "selection")
+            lm = recording_lm(
+                "model", capture=capture, role="task",
+                expected_model={
+                    "logical": "openai/gpt-5.4-mini",
+                    "upstream": "openrouter/openai/gpt-5.4-mini",
+                    "endpoint_provider": "OpenAI",
+                    "max_input_tokens": 4096,
+                },
+            )
+            with self.assertRaisesRegex(RuntimeError, "transport evidence"):
+                for _ in range(2):
+                    lm.forward(messages=[{"role": "user", "content": "question"}])
+            self.assertEqual(len(dispatches), 1)
+            self.assertEqual(len(capture.calls), 1)
+        finally:
+            if prior is None:
+                sys.modules.pop("dspy", None)
+            else:
+                sys.modules["dspy"] = prior
+
+    def test_usd_reservation_refuses_before_dispatch(self):
+        manifest = {
+            "seeds": [1, 2, 3],
+            "execution": {
+                "request": {
+                    "task": {"reservation_input_tokens": 10, "max_tokens": 2, "max_input_tokens": 100},
+                    "optimizer": {"reservation_input_tokens": 20, "max_tokens": 3, "max_input_tokens": 200},
+                },
+                "call_ceilings": {
+                    "baseline": {"task_logical": 1, "optimizer_logical": 0},
+                    "gepa": {"task_logical": 0, "optimizer_logical": 1},
+                },
+            },
+            "models": {
+                "task": {"catalog_prompt_per_token": "0.001", "catalog_completion_per_token": "0.01"},
+                "optimizer": {"catalog_cache_write_per_token": "0.002", "catalog_completion_per_token": "0.02"},
+            },
+        }
+        capture = MODULE.Capture(manifest)
+        self.assertAlmostEqual(capture.usd_limit, 3 * (0.03 + 0.10))
+        capture.usd_limit = 0.1
+        capture.role_usd = {"task": 0.06}
+        capture.register_budget(
+            1,
+            "baseline",
+            {"task_logical": 2, "optimizer_logical": 0, "total_logical": 2, "transports": 2},
+        )
+        capture.set_phase(1, "baseline", "selection")
+        capture.reserve("task")
+        with self.assertRaisesRegex(RuntimeError, "USD reservation"):
+            capture.reserve("task")
+        self.assertEqual(capture.call_budgets["1:baseline"]["counts"]["transports"], 1)
+
+    def test_rendered_input_bound_refuses_before_budget_or_transport(self):
+        class FakeLM:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+        prior = sys.modules.get("dspy")
+        sys.modules["dspy"] = types.SimpleNamespace(LM=FakeLM)
+        try:
+            _dspy, recording_lm = MODULE.install_runtime(
+                types.SimpleNamespace(dspy_root=HERE, gepa_root=HERE)
+            )
+            capture = MODULE.Capture()
+            capture.max_input_tokens = {"task": 4}
+            lm = recording_lm("model", capture=capture, role="task")
+            with self.assertRaisesRegex(RuntimeError, "conservative token bound"):
+                lm.forward(messages=[{"role": "user", "content": "too large"}])
+            self.assertEqual(capture.calls, [])
+        finally:
+            if prior is None:
+                sys.modules.pop("dspy", None)
+            else:
+                sys.modules["dspy"] = prior
+
     def test_dspy_lm_copies_keep_one_shared_budget_ledger(self):
         class FakeLM:
             def __init__(self, *_args, **kwargs):
@@ -95,7 +210,12 @@ class NoModelBoundaryTest(unittest.TestCase):
             [{"id": "row-1", "text": "question", "route": "K11"}],
             None,
             capture,
-            {"upstream": "ollama/llama3.2:3b", "max_input_tokens": 4096},
+            {
+                "logical": "openai/gpt-5.4-mini",
+                "upstream": "openrouter/openai/gpt-5.4-mini",
+                "endpoint_provider": "OpenAI",
+                "max_input_tokens": 4096,
+            },
         )
 
         self.assertEqual(len(rows), 1)
@@ -108,7 +228,12 @@ class NoModelBoundaryTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "transport evidence"):
             MODULE.transport_evidence(
                 successful_call(input_tokens=4097),
-                {"upstream": "ollama/llama3.2:3b", "max_input_tokens": 4096},
+                {
+                    "logical": "openai/gpt-5.4-mini",
+                    "upstream": "openrouter/openai/gpt-5.4-mini",
+                    "endpoint_provider": "OpenAI",
+                    "max_input_tokens": 4096,
+                },
             )
 
 
