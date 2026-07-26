@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "task_id": "local-simba-feedback-trec-binary-v1",
+  "source": {
+    "dataset": "CogComp/trec",
+    "revision": "eb1e45c1ba990fecca7cf84b67ce845edbcf49bf",
+    "data_path": "benchmarks/data/confidence-calibration-trec-fine.jsonl",
+    "data_sha256": "29cd6eb93a6a4c3b23a2133cf95cc3deca8b95e62c354ded450c663e44c56bd8",
+    "provenance_path": "benchmarks/data/confidence-calibration-trec-fine.provenance.json",
+    "provenance_sha256": "a9abd542b6a22cf2d0a9753651dd4896225a5c9b48ee658bb1dd4777d67b167c"
+  },
+  "source_exclusions": [
+    {
+      "path": "benchmarks/data/simba-trec-coarse-v1.json",
+      "sha256": "6643645cc3bcd79a5236b7e3920a5c37526be178df2e02f20652d9a16eef51ad"
+    },
+    {
+      "path": "examples/local_grpo_opaque_banking77/trec-source-guided-v1-data.json",
+      "sha256": "bef8eb3df2f7fa21eef2a79513bb4b056349794b7339dadc5c2ccb8548afbf9d"
+    }
+  ],
+  "route_mapping": {
+    "DESC": {"route": "K11", "meaning": "question asking for a description, definition, reason, or manner"},
+    "ENTY": {"route": "K47", "meaning": "question asking for an entity such as an animal, product, substance, or other thing"}
+  },
+  "semantic_disclosure": {
+    "source_instruction": "opaque route codes only",
+    "train_feedback": "expected route meaning and predicted route meaning",
+    "validation": "score only; never supplied to reflection",
+    "held_out": "unavailable until selection is persisted"
+  },
+  "splits": {
+    "train_ids": [
+      "trec-fine:calibration:0041", "trec-fine:calibration:0046", "trec-fine:calibration:0059", "trec-fine:calibration:0130",
+      "trec-fine:calibration:0132", "trec-fine:calibration:0135", "trec-fine:calibration:0142", "trec-fine:calibration:0147",
+      "trec-fine:calibration:0148", "trec-fine:calibration:0151",
+      "trec-fine:calibration:0006", "trec-fine:calibration:0018", "trec-fine:calibration:0019", "trec-fine:calibration:0020",
+      "trec-fine:calibration:0023", "trec-fine:calibration:0024", "trec-fine:calibration:0027", "trec-fine:calibration:0036",
+      "trec-fine:calibration:0045", "trec-fine:calibration:0049"
+    ],
+    "validation_ids": [
+      "trec-fine:calibration:0156", "trec-fine:calibration:0158", "trec-fine:calibration:0183",
+      "trec-fine:calibration:0051", "trec-fine:calibration:0065", "trec-fine:calibration:0067"
+    ],
+    "held_out_ids": [
+      "trec-fine:heldout:0035", "trec-fine:heldout:0039", "trec-fine:heldout:0046", "trec-fine:heldout:0048",
+      "trec-fine:heldout:0054", "trec-fine:heldout:0056", "trec-fine:heldout:0066", "trec-fine:heldout:0071",
+      "trec-fine:heldout:0073", "trec-fine:heldout:0076", "trec-fine:heldout:0084", "trec-fine:heldout:0091",
+      "trec-fine:heldout:0102", "trec-fine:heldout:0108", "trec-fine:heldout:0110", "trec-fine:heldout:0112",
+      "trec-fine:heldout:0113", "trec-fine:heldout:0119", "trec-fine:heldout:0122", "trec-fine:heldout:0125",
+      "trec-fine:heldout:0004", "trec-fine:heldout:0011", "trec-fine:heldout:0016", "trec-fine:heldout:0018",
+      "trec-fine:heldout:0025", "trec-fine:heldout:0027", "trec-fine:heldout:0029", "trec-fine:heldout:0030",
+      "trec-fine:heldout:0034", "trec-fine:heldout:0038", "trec-fine:heldout:0040", "trec-fine:heldout:0043",
+      "trec-fine:heldout:0047", "trec-fine:heldout:0060", "trec-fine:heldout:0074", "trec-fine:heldout:0075",
+      "trec-fine:heldout:0080", "trec-fine:heldout:0082", "trec-fine:heldout:0088", "trec-fine:heldout:0090"
+    ]
+  },
+  "model": {
+    "id": "ollama:llama3.2:3b",
+    "inventory_name": "llama3.2:3b",
+    "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "optimizer": {
+    "bsize": 5,
+    "num_candidates": 2,
+    "max_steps": 4,
+    "max_demos": 0,
+    "seed": 2026072602
+  }
+}
