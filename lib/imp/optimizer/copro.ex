@@ -558,11 +558,24 @@ defmodule Imp.Optimizer.COPRO do
     [
       %{
         role: :system,
-        content:
-          "Return exactly #{count} instruction/output-prefix candidate(s) as one JSON array matching the supplied schema."
+        content: proposal_system_message(history, count)
       },
       %{role: :user, content: Jason.encode!(payload)}
     ]
+  end
+
+  defp proposal_system_message([], count) do
+    "You are an instruction optimizer for language models. Propose #{count} improved task " <>
+      "instruction/output-prefix candidate(s) that should make a good language model perform " <>
+      "the supplied signature well. Do not be afraid to be creative. Return exactly one JSON " <>
+      "array matching the supplied schema."
+  end
+
+  defp proposal_system_message(_history, count) do
+    "You are an instruction optimizer for language models. The supplied attempts are ordered " <>
+      "from lower to higher score. Propose #{count} new task instruction/output-prefix " <>
+      "candidate(s) that should perform even better. Do not be afraid to be creative. Return " <>
+      "exactly one JSON array matching the supplied schema."
   end
 
   defp parse_pairs(raw, prefix, count, strict?) do

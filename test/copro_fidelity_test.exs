@@ -280,6 +280,85 @@ defmodule Imp.Optimizer.COPROFidelityTest do
     assert Report.fetch(compiled).metadata.proposal_response_format == :required
   end
 
+  test "initial proposal carries pinned instruction-improvement semantics" do
+    owner = self()
+
+    proposer =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:initial_proposal_messages, messages})
+
+          Jason.encode!([
+            %{
+              "proposed_instruction" => "Answer the location question with one city name.",
+              "proposed_prefix_for_output_field" => "Answer:"
+            }
+          ])
+        end
+      )
+
+    COPRO.new(Imp.Metrics.exact_match(:answer),
+      proposer_lm: proposer,
+      breadth: 2,
+      depth: 1
+    )
+    |> COPRO.compile(constant_program(), trainset(), [])
+
+    assert_received {:initial_proposal_messages, [%{role: :system, content: system}, user]}
+    assert system =~ "instruction optimizer"
+    assert system =~ "improved task instruction"
+    assert system =~ "perform the supplied signature well"
+    assert system =~ "Do not be afraid to be creative"
+
+    payload = user.content |> Jason.decode!()
+
+    assert payload["basic_instruction"] ==
+             "Given the fields `question`, produce the fields `answer`."
+
+    assert payload["attempted_instructions"] == []
+    refute user.content =~ "Paris"
+  end
+
+  test "later proposal explains ordered score history and asks for a better instruction" do
+    owner = self()
+
+    proposer =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
+          send(owner, {:proposal_stage, messages, payload})
+
+          for index <- 1..payload["requested_candidate_count"] do
+            %{
+              "proposed_instruction" => "Candidate #{payload["candidate_index"]}-#{index}",
+              "proposed_prefix_for_output_field" => "Answer:"
+            }
+          end
+          |> Jason.encode!()
+        end
+      )
+
+    COPRO.new(Imp.Metrics.exact_match(:answer),
+      proposer_lm: proposer,
+      breadth: 2,
+      depth: 2
+    )
+    |> COPRO.compile(constant_program(), trainset(), [])
+
+    assert_received {:proposal_stage, [%{content: initial_system}, _user], initial_payload}
+    assert initial_payload["attempted_instructions"] == []
+    assert initial_system =~ "improved task instruction"
+
+    assert_received {:proposal_stage, [%{content: history_system}, _user], history_payload}
+    assert history_system =~ "attempts are ordered from lower to higher score"
+    assert history_system =~ "should perform even better"
+    assert history_payload["attempted_instructions"] != []
+
+    assert Enum.any?(history_payload["attempted_instructions"], fn line ->
+             String.starts_with?(line, "Resulting Score #")
+           end)
+  end
+
   test "required proposal formatting rejects extra fields before task evaluation" do
     owner = self()
 
