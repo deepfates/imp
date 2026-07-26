@@ -3,6 +3,7 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
 
   @source "examples/local_copro_banking77/run.exs"
   @readme "examples/local_copro_banking77/README.md"
+  @stopped "examples/local_copro_banking77/exercised-pre-fenced-json-fix-stopped-result.json"
 
   test "front door follows pinned COPRO trainset selection semantics" do
     source = File.read!(@source)
@@ -53,6 +54,17 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
   test "package includes the cold consumer project" do
     assert File.read!("mix.exs") =~
              ~S|Path.wildcard("examples/local_copro_banking77/**/*")|
+  end
+
+  test "retained pre-fix fence admission does not claim heldout behavior" do
+    result = @stopped |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "stopped_before_heldout"
+    assert result["search"]["admitted_candidate"] == "```"
+    assert result["search"]["task_calls"] == 32
+    refute result["heldout_opened"]
+    refute result["fresh_process_attempted"]
+    assert result["claim_boundary"] =~ "not valid proposal"
   end
 
   defp byte_offset!(source, needle) do
