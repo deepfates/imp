@@ -129,6 +129,48 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
     assert [%{candidate_ids: [], candidate_scores: []}] = report.metadata.trial_logs
   end
 
+  test "does not admit blank reflection advice as an instruction mutation" do
+    task_lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, opts ->
+          if rem(Keyword.get(opts, :rollout_id, 0), 2) == 0,
+            do: %{answer: "correct"},
+            else: %{answer: "wrong"}
+        end
+      ]
+    }
+
+    prompt_lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{discussion: "No actionable advice.", module_advice: %{main: "   \n"}}
+        end
+      ]
+    }
+
+    program = Imp.predict("question -> answer", lm: task_lm)
+    example = Imp.example(question: "q", answer: "correct") |> Imp.with_inputs(:question)
+
+    compiled =
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
+        bsize: 1,
+        num_candidates: 2,
+        max_steps: 1,
+        max_demos: 0,
+        prompt_lm: prompt_lm,
+        max_concurrency: 1,
+        seed: 0
+      )
+      |> Imp.Optimizer.SIMBA.compile(program, [example], [example])
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.candidate_count == 0
+    assert report.metadata.candidate_evaluation_calls == 0
+    assert [%{candidate_ids: [], candidate_scores: []}] = report.metadata.trial_logs
+  end
+
   test "prepares teacher-first rollout models from the baseline rollout id" do
     parent = self()
 

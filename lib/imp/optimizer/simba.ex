@@ -637,8 +637,12 @@ defmodule Imp.Optimizer.SIMBA do
                                                                          program ->
         case Map.get(advice, name) || Map.get(advice, to_string(name)) do
           instruction when is_binary(instruction) ->
-            combined = predictor.signature.instructions <> "\n\n" <> instruction
-            Imp.ProgramParameters.put_instruction(program, name, combined)
+            if String.trim(instruction) == "" do
+              program
+            else
+              combined = predictor.signature.instructions <> "\n\n" <> instruction
+              Imp.ProgramParameters.put_instruction(program, name, combined)
+            end
 
           _ ->
             program
