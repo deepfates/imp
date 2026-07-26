@@ -1104,6 +1104,39 @@ defmodule Imp.Optimizer.GRPO do
   end
 
   defp assign_batches(groups, %ReinforcementSession{} = session, state) do
+    if all_generated_groups?(session) do
+      assign_all_generated_groups(groups, session, state)
+    else
+      assign_pending_batches(groups, session, state)
+    end
+  end
+
+  defp assign_all_generated_groups(groups, session, %{group_queue: []} = state) do
+    batches =
+      groups
+      |> Enum.with_index()
+      |> Enum.map(fn {group, position} ->
+        batch_id =
+          "imp-grpo-group:" <>
+            digest(%{
+              session_id: session.id,
+              selection_step: fetch(group, :selection_step),
+              position: position,
+              group: group
+            })
+
+        Map.put(group, :batch_id, batch_id)
+      end)
+
+    if batches == [],
+      do: {:error, :no_grpo_training_data},
+      else: {:ok, batches, %{state | group_queue: []}}
+  end
+
+  defp assign_all_generated_groups(_groups, _session, _state),
+    do: {:error, :grpo_all_generated_groups_queue_not_empty}
+
+  defp assign_pending_batches(groups, %ReinforcementSession{} = session, state) do
     available =
       Enum.reject(session.pending_batch_ids, &(&1 in session.fulfilled_batch_ids))
 
@@ -1117,6 +1150,10 @@ defmodule Imp.Optimizer.GRPO do
     if batches == [],
       do: {:error, :no_pending_reinforcement_batches},
       else: {:ok, batches, %{state | group_queue: queue, rng: rng}}
+  end
+
+  defp all_generated_groups?(%ReinforcementSession{metadata: metadata}) do
+    fetch(metadata, :batch_assignment) in [:all_generated_groups, "all_generated_groups"]
   end
 
   defp refill_queue(queue, _groups, needed, rng) when length(queue) >= needed,

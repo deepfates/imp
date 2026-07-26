@@ -255,14 +255,10 @@ class Worker:
         if self.step >= self.contract["optimizer"]["max_steps"]:
             raise WorkerError("update_budget_exhausted", "local TRL worker step budget is exhausted")
         groups = request.get("groups")
-        expected_groups = len(
-            self.protocol["prompt_schedule"]["steps"][self.step]["ordered_row_sha256s"]
-        )
-        if not isinstance(groups, list) or len(groups) != expected_groups:
+        if not isinstance(groups, list) or not groups:
             raise WorkerError(
                 "group_count_mismatch",
-                f"expected {expected_groups} ordered prompt groups, got "
-                f"{len(groups) if isinstance(groups, list) else 'invalid'}",
+                "the all-generated-groups batch must contain at least one prompt group",
             )
 
         encoded_groups = [self._encode_group(group, position) for position, group in enumerate(groups)]
@@ -796,6 +792,11 @@ class Worker:
                     "group_source_identity_missing",
                     "selection step must bind every group to its source schedule",
                 )
+            if selection_step != self.step:
+                raise WorkerError(
+                    "group_selection_step_mismatch",
+                    "group belongs to a different optimizer step",
+                )
             if selection_step >= len(schedule):
                 raise WorkerError(
                     "group_selection_step_mismatch",
@@ -944,14 +945,14 @@ class Worker:
                 self.protocol["behavior_policy"]["model"] if self.protocol else None
             ),
             "result_model": str(self.artifact_path) if self.step else None,
-            "metadata": {},
+            "metadata": {"batch_assignment": "all_generated_groups"},
         }
         if self.artifact:
-            result["metadata"] = {
+            result["metadata"].update({
                 "artifact_sha256": self.artifact["payload_sha256"],
                 "checkpoint_sha256": self.checkpoint["payload_sha256"],
                 "protocol_payload_sha256": self.protocol["payload_sha256"],
-            }
+            })
         return result
 
     def _mutation_result(self) -> dict[str, Any]:
@@ -1119,10 +1120,7 @@ class Worker:
 
     def _pending_batch_ids(self) -> list[str]:
         assert self.protocol is not None
-        count = len(
-            self.protocol["prompt_schedule"]["steps"][self.step]["ordered_row_sha256s"]
-        )
-        return [f"trl-step-{self.step}-group-{position}" for position in range(count)]
+        return [f"trl-step-{self.step}-all-generated-groups-ready"]
 
     def _verify_environment(self) -> None:
         if sys.version_info[:2] != (3, 12):

@@ -362,7 +362,8 @@ defmodule Imp.TRLWorkerTest do
     }
     worker.model = object()
     worker.tokenizer = Tokenizer()
-    assert worker._status()["pending_batch_ids"] == ["trl-step-0-group-0", "trl-step-0-group-1"]
+    assert worker._status()["pending_batch_ids"] == ["trl-step-0-all-generated-groups-ready"]
+    assert worker._status()["metadata"]["batch_assignment"] == "all_generated_groups"
     group = {
         "batch_id": "trl-step-0-group-0",
         "group_id": [0, "router", 0],
@@ -396,12 +397,29 @@ defmodule Imp.TRLWorkerTest do
         assert error.code == "group_source_identity_mismatch"
     assert not (worker.root / "prepared-controlled-group.json").exists()
 
-    prepared = worker.prepare_update({"groups": [group, second], "step_id": "step-0", "idempotency_key": "update-0"})
+    future = dict(second)
+    future["selection_step"] = 1
+    future["source_position"] = 0
+    try:
+        worker.prepare_update({"groups": [future], "step_id": "future-step", "idempotency_key": "future-step"})
+        raise AssertionError("future-step group was accepted by the current step")
+    except module.WorkerError as error:
+        assert error.code == "group_selection_step_mismatch"
+    assert not (worker.root / "prepared-controlled-group.json").exists()
+
+    same_source = dict(group)
+    same_source["batch_id"] = "trl-step-0-group-0-second-predictor"
+    same_source["group_id"] = [0, "second-router", 0]
+    same_source["predictor"] = "second-router"
+    prepared = worker.prepare_update({"groups": [group, same_source, second], "step_id": "step-0", "idempotency_key": "update-0"})
     assert [sample["reward"] for sample in prepared["groups"][0]["samples"]] == [0.25, 0.25]
-    assert [sample["reward"] for sample in prepared["groups"][1]["samples"]] == [-2.5, 8.75]
-    assert [item["group_position"] for item in prepared["groups"]] == [0, 1]
+    assert [sample["reward"] for sample in prepared["groups"][1]["samples"]] == [0.25, 0.25]
+    assert [sample["reward"] for sample in prepared["groups"][2]["samples"]] == [-2.5, 8.75]
+    assert [item["group_position"] for item in prepared["groups"]] == [0, 1, 2]
+    assert prepared["groups"][0]["source_row_sha256"] == prepared["groups"][1]["source_row_sha256"]
+    assert prepared["groups"][0]["predictor"] != prepared["groups"][1]["predictor"]
     assert prepared["groups"][0]["prompt"][0]["content"].endswith("2+2")
-    assert prepared["groups"][1]["prompt"][0]["content"].endswith("3+3")
+    assert prepared["groups"][2]["prompt"][0]["content"].endswith("3+3")
     assert (worker.root / "prepared-controlled-group.json").is_file()
     worker.step = 1
     worker.checkpoint = {
@@ -412,7 +430,7 @@ defmodule Imp.TRLWorkerTest do
     worker.artifact = {"payload_sha256": "sha256:artifact-1", "receipt_sha256s": []}
     assert worker._current_training_state() == (worker.checkpoint["optimizer"], worker.checkpoint["rng"])
     assert worker._current_behavior_policy()["artifact_sha256"] == "sha256:artifact-1"
-    assert worker._status()["pending_batch_ids"] == ["trl-step-1-group-0"]
+    assert worker._status()["pending_batch_ids"] == ["trl-step-1-all-generated-groups-ready"]
     prior = worker.root / "artifacts" / "step-1"
     prior.mkdir(parents=True)
     (prior / "update-1.json").write_text("update-one")
@@ -448,6 +466,34 @@ defmodule Imp.TRLWorkerTest do
              TRLTrainer.start_reinforcement(trainer, %{model: "unused"},
                dispatch_id: "no-worker",
                num_generations: 3,
+               imp_reinforcement_contract: protocol_contract
+             )
+
+    assert Registry.lookup(Imp.Clients.TRLWorker.Registry, trainer.worker_key) == []
+  end
+
+  test "trainer rejects unsupported train kwargs before starting a worker", context do
+    trainer =
+      TRLTrainer.new(
+        python: context.python,
+        model_path: context.model,
+        root: Path.join(context.root, "unsupported-kwargs"),
+        contract_path: context.contract,
+        worker_key: {:trl_unsupported_kwargs, make_ref()}
+      )
+
+    protocol_contract = %{
+      "dataset" => %{},
+      "prompt_schedule" => %{"steps" => [%{"step" => 0}]},
+      "optimizer" => %{},
+      "rng" => %{}
+    }
+
+    assert {:error, {:unsupported_trl_train_kwargs, [:learning_rate]}} =
+             TRLTrainer.start_reinforcement(trainer, %{model: "unused"},
+               dispatch_id: "no-worker",
+               num_generations: 4,
+               learning_rate: 1.0e-5,
                imp_reinforcement_contract: protocol_contract
              )
 

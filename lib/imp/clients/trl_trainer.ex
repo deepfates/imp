@@ -195,15 +195,26 @@ defmodule Imp.Clients.TRLTrainer do
          schedule when is_list(schedule) <-
            get_in(protocol_contract, ["prompt_schedule", "steps"]),
          true <- generations == Keyword.fetch!(opts, :num_generations),
-         true <- steps == length(schedule) do
+         true <- steps == length(schedule),
+         :ok <- reject_unsupported_train_kwargs(opts) do
       :ok
     else
+      {:error, {:unsupported_trl_train_kwargs, _keys} = reason} -> {:error, reason}
       {:error, reason} -> {:error, {:trl_contract_unreadable, reason}}
       false -> {:error, :trl_contract_runtime_mismatch}
       _other -> {:error, :invalid_trl_contract}
     end
   rescue
     error -> {:error, {:invalid_trl_contract, Exception.message(error)}}
+  end
+
+  defp reject_unsupported_train_kwargs(opts) do
+    system_keys = [:dispatch_id, :imp_reinforcement_contract, :num_generations]
+
+    case opts |> Keyword.drop(system_keys) |> Keyword.keys() |> Enum.uniq() |> Enum.sort() do
+      [] -> :ok
+      keys -> {:error, {:unsupported_trl_train_kwargs, keys}}
+    end
   end
 
   defp stop_worker(trainer) do

@@ -23,7 +23,12 @@ defmodule GRPOLifecycleTest do
               :zero_steps -> []
               :partial_step_then_hang -> [1, 2]
               _other -> [1]
-            end
+            end,
+          metadata:
+            if(trainer.runtime_mode in [:all_groups_accept_then_hang, :all_groups_ok],
+              do: %{batch_assignment: :all_generated_groups},
+              else: %{}
+            )
         })
 
       Agent.update(trainer.state, &Map.put(&1, dispatch_id, session))
@@ -73,7 +78,9 @@ defmodule GRPOLifecycleTest do
         mode ->
           updated = Imp.Clients.ReinforcementSession.fulfill(session, ids)
           update_session(trainer.state, updated)
-          if mode == :accepted_step_then_hang, do: Process.sleep(1_000)
+
+          if mode in [:accepted_step_then_hang, :all_groups_accept_then_hang],
+            do: Process.sleep(1_000)
       end
 
       case trainer.runtime_mode do
@@ -110,6 +117,31 @@ defmodule GRPOLifecycleTest do
           if existing.id == session.id, do: {dispatch_id, session}, else: {dispatch_id, existing}
         end)
       end)
+    end
+  end
+
+  defmodule TwoPredictorProgram do
+    @behaviour Imp.Module
+
+    defstruct [:first, :second]
+
+    def optimizer_predictors(program), do: [first: program.first, second: program.second]
+
+    def update_optimizer_predictor(program, :first, update),
+      do: %{program | first: update.(program.first)}
+
+    def update_optimizer_predictor(program, :second, update),
+      do: %{program | second: update.(program.second)}
+
+    @impl true
+    def call(program, inputs) do
+      with {:ok, first} <- Imp.Module.call(program.first, inputs),
+           {:ok, second} <- Imp.Module.call(program.second, inputs) do
+        {:ok,
+         Imp.Prediction.new(
+           Map.merge(Imp.Prediction.to_map(first), Imp.Prediction.to_map(second))
+         )}
+      end
     end
   end
 
@@ -372,6 +404,53 @@ defmodule GRPOLifecycleTest do
     end
   end
 
+  test "all-generated-groups mode resumes two predictors by two rows without stale carryover",
+       context do
+    program = two_predictor_program()
+    trainset = two_row_trainset()
+
+    first =
+      optimizer(trainer(context, :all_groups_accept_then_hang), context.path,
+        num_train_steps: 2,
+        num_dspy_examples_per_grpo_step: 2,
+        num_rollouts_per_grpo_step: 2
+      )
+
+    assert {:error, {:grpo_step_outcome_unknown, step_id, _timeout}} =
+             Imp.Optimizer.GRPO.compile(first, program, trainset)
+
+    assert_received {:grpo_step_batches, first_groups}
+    assert length(first_groups) == 4
+    assert Enum.all?(first_groups, &(&1.selection_step == 0))
+    assert MapSet.new(Enum.map(first_groups, & &1.predictor)) == MapSet.new([:first, :second])
+    assert MapSet.size(MapSet.new(Enum.map(first_groups, & &1.batch_id))) == 4
+    assert Enum.all?(first_groups, &String.starts_with?(&1.batch_id, "imp-grpo-group:"))
+
+    assert %{phase: :running, data: %{next_step: 0, step_intent: %{id: ^step_id}}} =
+             Imp.Optimizer.GRPO.Checkpoint.load!(context.path)
+
+    resumed = %{first | trainer: trainer(context, :all_groups_ok)}
+    assert {:ok, compiled} = Imp.Optimizer.GRPO.compile(resumed, program, trainset)
+    assert_received {:grpo_step_batches, second_groups}
+    refute_received {:grpo_step_batches, _third_groups}
+
+    assert length(second_groups) == 4
+    assert Enum.all?(second_groups, &(&1.selection_step == 1))
+    assert MapSet.new(Enum.map(second_groups, & &1.predictor)) == MapSet.new([:first, :second])
+    assert MapSet.size(MapSet.new(Enum.map(second_groups, & &1.batch_id))) == 4
+
+    refute MapSet.disjoint?(
+             MapSet.new(Enum.map(first_groups, & &1.source_row_sha256)),
+             MapSet.new(Enum.map(second_groups, & &1.source_row_sha256))
+           )
+
+    assert Enum.all?(TwoPredictorProgram.optimizer_predictors(compiled), fn {_name, predictor} ->
+             predictor.lm.model == "trained/durable-grpo"
+           end)
+
+    refute File.exists?(context.path)
+  end
+
   defp trainer(context, mode),
     do: %DurableTrainer{owner: self(), state: context.state, runtime_mode: mode}
 
@@ -421,6 +500,26 @@ defmodule GRPOLifecycleTest do
     }
 
     Imp.predict("question -> answer", lm: lm)
+  end
+
+  defp two_predictor_program do
+    lm = %{
+      module: Imp.LM.Static,
+      model: "base-model",
+      opts: [handler: fn _messages, _opts -> %{first_answer: "one", second_answer: "two"} end]
+    }
+
+    %TwoPredictorProgram{
+      first: Imp.predict("question -> first_answer", lm: lm),
+      second: Imp.predict("question -> second_answer", lm: lm)
+    }
+  end
+
+  defp two_row_trainset do
+    for question <- ["alpha", "beta"] do
+      Imp.example(question: question, first_answer: "one", second_answer: "two")
+      |> Imp.with_inputs(:question)
+    end
   end
 
   defp trainset,
