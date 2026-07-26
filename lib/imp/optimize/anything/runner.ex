@@ -60,6 +60,7 @@ defmodule Imp.Optimize.Anything.Runner do
     validate_evaluation_transports!(evaluator, Keyword.get(opts, :batch_evaluator))
     config = resolve_config(Keyword.get(opts, :config))
     {mode, trainset, valset} = datasets(opts)
+    evaluator_contract = resolve_evaluator_contract(evaluator, mode, opts)
     validate_runtime_support!(config, opts)
 
     evaluator_identity = validate_evaluator_identity!(Keyword.get(opts, :evaluator_identity))
@@ -83,10 +84,10 @@ defmodule Imp.Optimize.Anything.Runner do
             valset,
             evaluator,
             Keyword.get(opts, :batch_evaluator),
-            Keyword.get(opts, :evaluator_contract, :standard),
+            evaluator_contract,
             evaluator_identity
           ),
-        evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
+        evaluator_contract: evaluator_contract,
         batch_evaluator: Keyword.get(opts, :batch_evaluator),
         raise_on_exception: config.engine.raise_on_exception,
         best_example_evals_k: config.engine.best_example_evals_k,
@@ -210,6 +211,30 @@ defmodule Imp.Optimize.Anything.Runner do
           "Optimize Anything :dataset and :valset must be non-empty lists or nil, got: " <>
             "#{inspect(dataset)}, #{inspect(valset)}"
   end
+
+  # Python can opt an evaluator into OptimizationState by inspecting the
+  # reserved `opt_state` parameter name. Elixir callback parameters have no
+  # stable runtime names, but the complete public forms are unambiguous by
+  # arity: candidate+state in single-task mode, and
+  # candidate+example+state when a dataset is present. An explicit contract
+  # remains authoritative, including its fail-closed arity validation.
+  defp resolve_evaluator_contract(evaluator, mode, opts) do
+    if Keyword.has_key?(opts, :evaluator_contract) do
+      Keyword.fetch!(opts, :evaluator_contract)
+    else
+      inferred_evaluator_contract(evaluator, mode)
+    end
+  end
+
+  defp inferred_evaluator_contract(evaluator, :single_task)
+       when is_function(evaluator, 2),
+       do: :with_optimization_state
+
+  defp inferred_evaluator_contract(evaluator, mode)
+       when mode in [:multi_task, :generalization] and is_function(evaluator, 3),
+       do: :with_optimization_state
+
+  defp inferred_evaluator_contract(_evaluator, _mode), do: :standard
 
   defp normalize_seed(nil, config, opts, trainset) do
     objective = Keyword.get(opts, :objective)

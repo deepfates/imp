@@ -588,6 +588,52 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     refute_receive {:evaluated_stateful, _candidate}
   end
 
+  test "public runner infers optimization-state evaluators in single-task and dataset modes" do
+    owner = self()
+
+    single_evaluator = fn candidate, state ->
+      send(owner, {:single_state, candidate, state.best_example_evals})
+      if candidate == "better", do: 1.0, else: 0.0
+    end
+
+    single =
+      Anything.run("base", single_evaluator,
+        fallback_max_iterations: 1,
+        fallback_proposer: fn _candidate, _component, _records, _iteration -> "better" end
+      )
+
+    assert Result.best_candidate(single) == "better"
+    assert_receive {:single_state, "base", []}
+
+    assert_receive {:single_state, _candidate,
+                    [%{score: single_score, side_info: side_info} | _rest]}
+
+    assert single_score == 0.0
+    assert is_map(side_info)
+
+    dataset_evaluator = fn candidate, example, state ->
+      send(owner, {:dataset_state, candidate, example.id, state.best_example_evals})
+      if candidate == "better", do: 1.0, else: 0.0
+    end
+
+    dataset =
+      Anything.run("base", dataset_evaluator,
+        dataset: [%{id: :train}],
+        valset: [%{id: :selection}],
+        fallback_max_iterations: 1,
+        fallback_proposer: fn _candidate, _component, _records, _iteration -> "better" end
+      )
+
+    assert Result.best_candidate(dataset) == "better"
+    assert_receive {:dataset_state, "base", :selection, []}
+
+    assert_receive {:dataset_state, _candidate, _example,
+                    [%{score: score, side_info: side_info} | _rest]}
+
+    assert is_number(score)
+    assert is_map(side_info)
+  end
+
   test "evaluator identities reject runtime values before evaluation" do
     receiver = self()
 
