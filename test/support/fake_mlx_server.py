@@ -15,6 +15,7 @@ parser.add_argument("--advertise-model")
 parser.add_argument("--advertise-ambient-cache-model")
 parser.add_argument("--record-cache-root")
 parser.add_argument("--record-cache-env")
+parser.add_argument("--record-requests")
 parser.add_argument("--never-ready", action="store_true")
 args = parser.parse_args()
 
@@ -85,8 +86,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get("content-length", "0"))
-        if length:
-            self.rfile.read(length)
+        body = self.rfile.read(length) if length else b""
+
+        if args.record_requests:
+            with Path(args.record_requests).open("a", encoding="utf-8") as stream:
+                stream.write(
+                    json.dumps(
+                        {
+                            "method": "POST",
+                            "path": self.path,
+                            "model": model,
+                            "body_sha256": __import__("hashlib").sha256(body).hexdigest(),
+                        }
+                    )
+                    + "\n"
+                )
+                stream.flush()
+                os.fsync(stream.fileno())
 
         if self.path == "/v1/chat/completions":
             content = f"[[ ## answer ## ]]\n{behavior}\n\n[[ ## completed ## ]]"

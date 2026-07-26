@@ -111,6 +111,33 @@ defmodule Imp.Clients.TrainingJob do
   @active_statuses [:created, :submitted, :pending, :running]
   @terminal_statuses [:succeeded, :failed, :cancelled, :artifact_missing]
 
+  @mlx_rebind_option_keys [
+    :temperature,
+    :max_tokens,
+    :top_p,
+    :stop,
+    :response_format,
+    :tools,
+    :tool_choice,
+    :parallel_tool_calls,
+    :openai_parallel_tool_calls,
+    :stream,
+    :json_retries,
+    :json_fallback,
+    :timeout,
+    :retries,
+    :num_retries,
+    :retry_backoff_ms,
+    :max_retries,
+    :max_completion_tokens,
+    :receive_timeout,
+    :cache,
+    :rollout_id,
+    :native_json_schema,
+    :request_id,
+    :req_http_options
+  ]
+
   @type t :: %__MODULE__{
           id: String.t(),
           provider: atom(),
@@ -553,7 +580,11 @@ defmodule Imp.Clients.TrainingJob do
       {:ok, lm} when not is_nil(lm) ->
         with {:ok, lm} <- validate_deployment_lm(lm),
              :ok <- validate_provider_deployment_lm(job, lm) do
-          {:ok, lm}
+          if job.provider == :mlx_lm do
+            automatic_deployment_lm(job, Imp.ProgramAccess.put_lm(program, lm))
+          else
+            {:ok, lm}
+          end
         end
 
       _missing_or_nil ->
@@ -561,8 +592,17 @@ defmodule Imp.Clients.TrainingJob do
     end
   end
 
-  defp automatic_deployment_lm(%__MODULE__{provider: :mlx_lm} = job, _program) do
-    with {:ok, deployment} <- Imp.Clients.MLXLMDeployment.start(job) do
+  defp automatic_deployment_lm(%__MODULE__{provider: :mlx_lm} = job, program) do
+    source_lm = Imp.ProgramAccess.lm(program)
+
+    with {:ok, manifest} <- Imp.Clients.MLXLMTrainer.verify_job(job),
+         :ok <- validate_mlx_source_lm(job, source_lm, manifest),
+         {:ok, lm_opts} <- mlx_runtime_options(source_lm),
+         {:ok, deployment} <-
+           Imp.Clients.MLXLMDeployment.start(job,
+             lm_opts: lm_opts,
+             req_module: Elixir.ReqLLM
+           ) do
       {:ok, deployment.lm}
     end
   end
@@ -623,6 +663,154 @@ defmodule Imp.Clients.TrainingJob do
   defp trl_model_path(%Imp.Clients.ReqLLM{model: model}) when is_binary(model), do: {:ok, model}
   defp trl_model_path(%{model: model}) when is_binary(model), do: {:ok, model}
   defp trl_model_path(_lm), do: {:error, :trl_deployment_model_identity_missing}
+
+  defp validate_mlx_source_lm(
+         %__MODULE__{} = job,
+         %Imp.Clients.ReqLLM{model: model},
+         manifest
+       ) do
+    spec = manifest["spec"] || %{}
+
+    allowed =
+      [
+        job.model,
+        job.result_model,
+        spec["model"],
+        model_with_revision(spec["model"], spec["model_revision"]),
+        spec["model_path"]
+      ]
+      |> Enum.filter(&is_binary/1)
+
+    with :ok <- validate_mlx_provider(model),
+         {:ok, identity} <- mlx_lm_model_path(%Imp.Clients.ReqLLM{model: model}),
+         true <- Enum.any?(allowed, &same_model_identity?(identity, &1)) do
+      :ok
+    else
+      false -> {:error, {:mlx_lm_rebind_source_model_mismatch, allowed, model}}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_mlx_source_lm(_job, lm, _manifest) do
+    case Imp.LM.validate_lm(lm) do
+      {:ok, _lm} -> :ok
+      {:error, _message} -> {:error, :mlx_lm_rebind_source_lm_invalid}
+    end
+  end
+
+  defp validate_mlx_provider(%{provider: provider}) when provider in [:openai, "openai"], do: :ok
+
+  defp validate_mlx_provider(%{"provider" => provider}) when provider in [:openai, "openai"],
+    do: :ok
+
+  defp validate_mlx_provider("openai:" <> _model), do: :ok
+
+  defp validate_mlx_provider(model) when is_binary(model) do
+    if Path.type(model) == :absolute,
+      do: :ok,
+      else: {:error, {:mlx_lm_rebind_provider_conflict, model}}
+  end
+
+  defp validate_mlx_provider(model), do: {:error, {:mlx_lm_rebind_provider_conflict, model}}
+
+  defp mlx_runtime_options(%Imp.Clients.ReqLLM{opts: opts}) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      keys = Keyword.keys(opts)
+      unsupported = keys -- (@mlx_rebind_option_keys ++ [:api_key])
+
+      cond do
+        length(keys) != length(Enum.uniq(keys)) ->
+          {:error, :mlx_lm_rebind_duplicate_options}
+
+        unsupported != [] ->
+          {:error, {:mlx_lm_rebind_unsupported_options, unsupported}}
+
+        Keyword.has_key?(opts, :api_key) and opts[:api_key] != "local" ->
+          {:error, :mlx_lm_rebind_credential_conflict}
+
+        true ->
+          with :ok <- validate_mlx_runtime_values(opts) do
+            {:ok, Keyword.take(opts, @mlx_rebind_option_keys)}
+          end
+      end
+    else
+      {:error, :mlx_lm_rebind_options_must_be_keyword_list}
+    end
+  end
+
+  defp mlx_runtime_options(_lm), do: {:ok, []}
+
+  defp validate_mlx_runtime_values(opts) do
+    with :ok <- optional_boolean(opts, :cache),
+         :ok <- optional_non_negative_integer(opts, :max_retries),
+         :ok <- optional_non_negative_integer(opts, :retries),
+         :ok <- optional_non_negative_integer(opts, :num_retries),
+         :ok <- optional_non_negative_integer(opts, :retry_backoff_ms),
+         :ok <- validate_req_http_options(Keyword.get(opts, :req_http_options)) do
+      :ok
+    end
+  end
+
+  defp optional_boolean(opts, key) do
+    case Keyword.fetch(opts, key) do
+      :error -> :ok
+      {:ok, value} when is_boolean(value) -> :ok
+      {:ok, value} -> {:error, {:mlx_lm_rebind_invalid_option, key, value}}
+    end
+  end
+
+  defp optional_non_negative_integer(opts, key) do
+    case Keyword.fetch(opts, key) do
+      :error -> :ok
+      {:ok, value} when is_integer(value) and value >= 0 -> :ok
+      {:ok, value} -> {:error, {:mlx_lm_rebind_invalid_option, key, value}}
+    end
+  end
+
+  defp validate_req_http_options(nil), do: :ok
+
+  defp validate_req_http_options(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      keys = Keyword.keys(opts)
+
+      cond do
+        length(keys) != length(Enum.uniq(keys)) ->
+          {:error, :mlx_lm_rebind_duplicate_req_http_options}
+
+        keys -- [:retry, :max_retries] != [] ->
+          {:error, {:mlx_lm_rebind_unsupported_req_http_options, keys -- [:retry, :max_retries]}}
+
+        Keyword.has_key?(opts, :retry) and not is_boolean(opts[:retry]) ->
+          {:error, {:mlx_lm_rebind_invalid_req_http_option, :retry, opts[:retry]}}
+
+        Keyword.has_key?(opts, :max_retries) and
+            (not is_integer(opts[:max_retries]) or opts[:max_retries] < 0) ->
+          {:error, {:mlx_lm_rebind_invalid_req_http_option, :max_retries, opts[:max_retries]}}
+
+        true ->
+          :ok
+      end
+    else
+      {:error, :mlx_lm_rebind_req_http_options_must_be_keyword_list}
+    end
+  end
+
+  defp validate_req_http_options(value),
+    do: {:error, {:mlx_lm_rebind_invalid_req_http_options, value}}
+
+  defp model_with_revision(model, revision) when is_binary(model) and is_binary(revision),
+    do: model <> "@" <> revision
+
+  defp model_with_revision(_model, _revision), do: nil
+
+  defp same_model_identity?(left, right) when left == right, do: true
+
+  defp same_model_identity?(left, right) when is_binary(left) and is_binary(right) do
+    Path.type(left) == :absolute and Path.type(right) == :absolute and
+      Path.expand(left) == Path.expand(right)
+  end
+
+  defp same_model_identity?(_left, _right), do: false
 
   defp training_artifact_metadata(job) do
     metadata = %{

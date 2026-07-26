@@ -206,8 +206,12 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
 
       true ->
         case verify_live(state) do
-          :ok -> {:reply, {:ok, state.deployment}, state}
-          {:error, reason} -> {:stop, reason, {:error, reason}, state}
+          :ok ->
+            deployment = deployment(config, state.deployment.base_url)
+            {:reply, {:ok, deployment}, state}
+
+          {:error, reason} ->
+            {:stop, reason, {:error, reason}, state}
         end
     end
   end
@@ -250,15 +254,7 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
       {:ok, handle} ->
         case await_exact_model(handle, config, port) do
           {:ok, base_url} ->
-            lm = deployment_lm(config, base_url)
-
-            deployment = %MLXLMDeployment{
-              artifact_path: config.artifact_path,
-              artifact_sha256: config.artifact_sha256,
-              base_url: base_url,
-              lm: lm,
-              pid: self()
-            }
+            deployment = deployment(config, base_url)
 
             {:ok,
              %{
@@ -434,6 +430,16 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
     )
   end
 
+  defp deployment(config, base_url) do
+    %MLXLMDeployment{
+      artifact_path: config.artifact_path,
+      artifact_sha256: config.artifact_sha256,
+      base_url: base_url,
+      lm: deployment_lm(config, base_url),
+      pid: self()
+    }
+  end
+
   defp reserve_port(host, 0) do
     with {:ok, ip} <- parse_host(host),
          {:ok, socket} <-
@@ -481,8 +487,7 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
       :startup_timeout,
       :kill_grace_ms,
       :max_output_bytes,
-      :lm_opts,
-      :req_module
+      :max_output_bytes
     ])
   end
 end

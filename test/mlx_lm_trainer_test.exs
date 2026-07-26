@@ -336,7 +336,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     program =
       Imp.predict("question -> answer",
-        lm: Imp.req_llm("openai:base-placeholder", api_key: "not-used")
+        lm: Imp.req_llm(Path.expand(context.model_path), api_key: "local")
       )
 
     program_path = Path.join(context.root, "trained-program.json")
@@ -393,6 +393,189 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert artifact_path == Path.expand(job.result_model)
     assert served_model == artifact_path
     assert artifact_sha256 == job.metadata.artifact_sha256
+  end
+
+  test "rebind preserves explicit runtime safety options across a fresh counting lifecycle",
+       context do
+    File.write!(Path.join(context.model_path, "behavior.txt"), "base-behavior\n", [:sync])
+    port = available_port()
+    request_log = Path.join(context.root, "requests.jsonl")
+    server = Path.expand("support/fake_mlx_server.py", __DIR__)
+
+    trainer =
+      context
+      |> trainer(&successful_runner/3)
+      |> Map.merge(%{
+        server_executable: System.find_executable("python3"),
+        server_executable_args: [server, "--record-requests", request_log],
+        server_port: port,
+        server_startup_timeout: 5_000
+      })
+
+    assert {:ok, job} = train(trainer)
+    base_path = Path.expand(context.model_path)
+
+    source_lm =
+      Imp.req_llm(
+        %{
+          provider: :openai,
+          id: base_path,
+          model: base_path,
+          base_url: "http://127.0.0.1:1/v1",
+          extra: %{openai_compatible_backend: :mlx_lm}
+        },
+        api_key: "local",
+        cache: false,
+        temperature: 0.25,
+        max_tokens: 32,
+        max_retries: 0,
+        timeout: 10_000,
+        req_http_options: [retry: false, max_retries: 0]
+      )
+
+    source =
+      Imp.predict("question -> answer",
+        lm: source_lm,
+        adapter: Imp.Adapter.Chat,
+        config: [json_fallback: false]
+      )
+
+    assert {:ok, rebound} = TrainingJob.rebind(job, source)
+    rebound_lm = Imp.ProgramAccess.lm(rebound)
+    assert rebound.adapter == Imp.Adapter.Chat
+    assert rebound.config == [json_fallback: false]
+    assert rebound_lm.model.id == Path.expand(job.result_model)
+    assert rebound_lm.model.provider == :openai
+    assert rebound_lm.opts[:cache] == false
+    assert rebound_lm.opts[:temperature] == 0.25
+    assert rebound_lm.opts[:max_tokens] == 32
+    assert rebound_lm.opts[:max_retries] == 0
+    assert rebound_lm.opts[:req_http_options] == [retry: false, max_retries: 0]
+
+    assert {:ok, first} = Imp.call(rebound, %{question: "same frozen probe"})
+    assert {:ok, second} = Imp.call(rebound, %{question: "same frozen probe"})
+    assert Imp.Prediction.get(first, :answer) == "trained-behavior"
+    assert Imp.Prediction.get(second, :answer) == "trained-behavior"
+    assert request_count(request_log) == 2
+
+    differently_tuned =
+      Imp.with_lm(source, %{source_lm | opts: Keyword.put(source_lm.opts, :temperature, 0.75)})
+
+    assert {:ok, second_rebound} = TrainingJob.rebind(job, differently_tuned)
+    assert Imp.ProgramAccess.lm(second_rebound).opts[:temperature] == 0.75
+    assert Imp.ProgramAccess.lm(rebound).opts[:temperature] == 0.25
+
+    job_path = Path.join(context.root, "counting-job.json")
+    program_path = Path.join(context.root, "counting-program.json")
+    fresh_path = Path.join(context.root, "counting-fresh.json")
+    :ok = TrainingJob.save!(job, job_path)
+    :ok = Imp.save!(rebound, program_path)
+    assert :ok = Imp.Clients.MLXLMDeployment.stop(job)
+
+    code = """
+    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    source = Imp.load!(#{inspect(program_path)})
+    {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, source)
+    {:ok, first} = Imp.call(rebound, %{question: "same frozen probe"})
+    {:ok, second} = Imp.call(rebound, %{question: "same frozen probe"})
+    lm = Imp.ProgramAccess.lm(rebound)
+    opts = %{
+      cache: lm.opts[:cache],
+      max_retries: lm.opts[:max_retries],
+      req_http_options: Map.new(lm.opts[:req_http_options])
+    }
+    File.write!(#{inspect(fresh_path)}, Jason.encode!(%{
+      answers: [Imp.Prediction.get(first, :answer), Imp.Prediction.get(second, :answer)],
+      model: lm.model.id,
+      opts: opts,
+      adapter: rebound.adapter,
+      config: Map.new(rebound.config)
+    }))
+    :ok = Imp.Clients.MLXLMDeployment.stop(job)
+    """
+
+    {output, status} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+    assert request_count(request_log) == 4
+
+    fresh = Jason.decode!(File.read!(fresh_path))
+    assert fresh["answers"] == ["trained-behavior", "trained-behavior"]
+    assert fresh["model"] == Path.expand(job.result_model)
+    assert fresh["adapter"] == "Elixir.Imp.Adapter.Chat"
+    assert fresh["config"] == %{"json_fallback" => false}
+    assert fresh["opts"]["cache"] == false
+    assert fresh["opts"]["max_retries"] == 0
+    assert fresh["opts"]["req_http_options"] == %{"retry" => false, "max_retries" => 0}
+
+    assert_port_available!(port)
+  end
+
+  test "rebind refuses MLX provider, model, credential, and option conflicts before launch",
+       context do
+    File.write!(Path.join(context.model_path, "behavior.txt"), "base-behavior\n", [:sync])
+    port = available_port()
+
+    trainer =
+      context
+      |> trainer(&successful_runner/3)
+      |> Map.merge(%{
+        server_executable: System.find_executable("python3"),
+        server_executable_args: [Path.expand("support/fake_mlx_server.py", __DIR__)],
+        server_port: port,
+        server_startup_timeout: 5_000
+      })
+
+    assert {:ok, job} = train(trainer)
+    base_path = Path.expand(context.model_path)
+
+    program_for = fn model, opts ->
+      Imp.predict("question -> answer", lm: Imp.req_llm(model, opts))
+    end
+
+    conflicting_provider =
+      %{provider: :anthropic, id: base_path, model: base_path, base_url: "http://invalid"}
+
+    assert {:error, {:mlx_lm_rebind_provider_conflict, ^conflicting_provider}} =
+             TrainingJob.rebind(job, program_for.(conflicting_provider, []))
+
+    wrong_model = Path.join(context.root, "different-model")
+
+    assert {:error, {:mlx_lm_rebind_source_model_mismatch, _allowed, ^wrong_model}} =
+             TrainingJob.rebind(job, program_for.(wrong_model, []))
+
+    assert {:error, :mlx_lm_rebind_credential_conflict} =
+             TrainingJob.rebind(job, program_for.(base_path, api_key: "external-secret"))
+
+    assert {:error, {:mlx_lm_rebind_unsupported_options, [:base_url]}} =
+             TrainingJob.rebind(job, program_for.(base_path, base_url: "http://invalid"))
+
+    malformed_options = %{Imp.req_llm(base_path) | opts: [:not_a_pair]}
+
+    assert {:error, :mlx_lm_rebind_options_must_be_keyword_list} =
+             TrainingJob.rebind(job, Imp.predict("question -> answer", lm: malformed_options))
+
+    duplicate_options = %{Imp.req_llm(base_path) | opts: [cache: false, cache: true]}
+
+    assert {:error, :mlx_lm_rebind_duplicate_options} =
+             TrainingJob.rebind(job, Imp.predict("question -> answer", lm: duplicate_options))
+
+    assert {:error, :mlx_lm_rebind_req_http_options_must_be_keyword_list} =
+             TrainingJob.rebind(job, program_for.(base_path, req_http_options: [:not_a_pair]))
+
+    assert {:error, {:mlx_lm_rebind_unsupported_req_http_options, [:plugins]}} =
+             TrainingJob.rebind(
+               job,
+               program_for.(base_path, req_http_options: [plugins: [:unexpected]])
+             )
+
+    assert :error = Imp.Clients.MLXLMDeployment.lookup(job)
+    assert_port_available!(port)
   end
 
   test "deployment rejects a server that advertises any other model and cleans it up", context do
@@ -622,6 +805,12 @@ defmodule Imp.Clients.MLXLMTrainerTest do
       :gen_tcp.listen(port, [:binary, ip: {127, 0, 0, 1}, active: false, reuseaddr: true])
 
     :ok = :gen_tcp.close(socket)
+  end
+
+  defp request_count(path) do
+    if File.exists?(path),
+      do: path |> File.read!() |> String.split("\n", trim: true) |> length(),
+      else: 0
   end
 
   defp index_of(argv, flag), do: Enum.find_index(argv, &(&1 == flag))

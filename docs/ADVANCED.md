@@ -327,6 +327,15 @@ Those commands are executable local configuration. A manifest checksum proves
 integrity, not provenance: load and rebind MLX training jobs only from trusted
 runs whose recorded command and artifact paths you control.
 
+Rebinding has an explicit ownership boundary. The verified job owns the trained
+artifact, provider, served model identity, and server endpoint. The trusted
+incoming program retains its adapter and parsing configuration, while its
+allowlisted ReqLLM call controls—including `cache`, `temperature`, token limits,
+timeouts, and explicit retry/`req_http_options` settings—are applied to the new
+artifact-bound client. Provider, model, endpoint, credential, unknown-option,
+and malformed retry-policy conflicts fail before the MLX server starts. Rebind
+never silently restores caching or retries that the source program disabled.
+
 Training jobs and rebound programs remain checksummed, credential-free data:
 
 ```elixir
