@@ -1,6 +1,8 @@
 defmodule MatchedInstructionOptimizersTREC.ResponseEvidence do
   @moduledoc false
 
+  @cost_tolerance 0.000001
+
   def from_result!({:ok, value}) do
     with {:ok, output, metadata} <- Imp.LM.Result.split(value),
          req_llm when is_map(req_llm) <- map_get(metadata, :req_llm) do
@@ -32,6 +34,17 @@ defmodule MatchedInstructionOptimizersTREC.ResponseEvidence do
     do: raise("LM transport failed before a response was available: #{inspect(reason)}")
 
   def from_result!(other), do: raise("invalid observed LM result: #{inspect(other)}")
+
+  @doc false
+  def costs_reconcile?(gateway, computed) when is_number(gateway) and is_number(computed) do
+    gateway
+    |> Kernel.-(computed)
+    |> abs()
+    |> Float.round(12)
+    |> Kernel.<=(@cost_tolerance)
+  end
+
+  def costs_reconcile?(_gateway, _computed), do: false
 
   defp normalize_finish_reason(value) when is_atom(value), do: Atom.to_string(value)
   defp normalize_finish_reason(value), do: value

@@ -20,6 +20,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
@@ -536,7 +537,10 @@ def transport_evidence(call: dict[str, Any], expected: dict[str, Any]) -> dict[s
         and evidence["service_tier"] in (None, "default", "standard")
         and isinstance(evidence["gateway_reported_cost"], (int, float)) and evidence["gateway_reported_cost"] >= 0
         and isinstance(evidence["computed_cost"], (int, float)) and evidence["computed_cost"] >= 0
-        and abs(evidence["gateway_reported_cost"] - evidence["computed_cost"]) <= 1e-6
+        and abs(
+            Decimal(str(evidence["gateway_reported_cost"]))
+            - Decimal(str(evidence["computed_cost"]))
+        ) <= Decimal("0.000001")
     ):
         raise RuntimeError(f"missing or drifted upstream transport evidence: {evidence!r}")
     evidence["cost"] = {

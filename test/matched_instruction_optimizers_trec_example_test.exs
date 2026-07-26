@@ -167,7 +167,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
       Path.expand("../examples/matched_instruction_optimizers_trec/no_model_test.py", __DIR__)
 
     assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
-    assert output =~ "Ran 10 tests"
+    assert output =~ "Ran 11 tests"
   end
 
   test "strong runners retain launch, seed, input, USD, endpoint, tier, and dual-cost guards" do
@@ -427,6 +427,18 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
              provider_cost: 0.00022125,
              computed_cost: 0.000222
            } = MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
+  end
+
+  test "cost reconciliation applies the inclusive decimal microdollar boundary" do
+    assert MatchedInstructionOptimizersTREC.ResponseEvidence.costs_reconcile?(
+             0.000255,
+             0.000254
+           )
+
+    refute MatchedInstructionOptimizersTREC.ResponseEvidence.costs_reconcile?(
+             0.00025501,
+             0.000254
+           )
   end
 
   defp perfect_rows(path) do

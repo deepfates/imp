@@ -297,6 +297,35 @@ class NoModelBoundaryTest(unittest.TestCase):
                 },
             )
 
+    def test_cost_tolerance_is_inclusive_at_one_decimal_microdollar(self):
+        call = successful_call()
+        call["response_metadata"]["gateway_reported_cost"] = 0.000255
+        call["response_metadata"]["computed_cost"] = 0.000254
+        evidence = MODULE.transport_evidence(
+            call,
+            {
+                "logical": "openai/gpt-5.4-mini",
+                "upstream": "openrouter/openai/gpt-5.4-mini",
+                "endpoint_provider": "OpenAI",
+                "max_input_tokens": 4096,
+                "max_output_tokens": 256,
+            },
+        )
+        self.assertEqual(evidence["cost"]["tolerance"], 1e-6)
+
+        call["response_metadata"]["gateway_reported_cost"] = 0.00025501
+        with self.assertRaisesRegex(RuntimeError, "transport evidence"):
+            MODULE.transport_evidence(
+                call,
+                {
+                    "logical": "openai/gpt-5.4-mini",
+                    "upstream": "openrouter/openai/gpt-5.4-mini",
+                    "endpoint_provider": "OpenAI",
+                    "max_input_tokens": 4096,
+                    "max_output_tokens": 256,
+                },
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

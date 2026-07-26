@@ -265,7 +265,10 @@ defmodule MatchedTRECImp.ObservedLM do
              is_binary(evidence.finish_reason) and is_binary(evidence.content) and
              is_number(evidence.gateway_reported_cost) and
              is_number(evidence.computed_cost) and
-             abs(evidence.gateway_reported_cost - evidence.computed_cost) <= 1.0e-6 do
+             MatchedInstructionOptimizersTREC.ResponseEvidence.costs_reconcile?(
+               evidence.gateway_reported_cost,
+               evidence.computed_cost
+             ) do
       operational_error(
         :route,
         :response_identity_or_usage_drift,
@@ -1108,7 +1111,10 @@ defmodule MatchedTRECImp.Runner do
              evidence.service_tier in [nil, "default", "standard"] and
              is_number(evidence.gateway_reported_cost) and evidence.gateway_reported_cost >= 0 and
              is_number(evidence.computed_cost) and evidence.computed_cost >= 0 and
-             abs(evidence.gateway_reported_cost - evidence.computed_cost) <= 1.0e-6 do
+             MatchedInstructionOptimizersTREC.ResponseEvidence.costs_reconcile?(
+               evidence.gateway_reported_cost,
+               evidence.computed_cost
+             ) do
       raise "#{context} lacks exact route/model/attempt/token/finish/content transport evidence: #{inspect(evidence)}"
     end
   end
