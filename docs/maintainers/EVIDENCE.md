@@ -108,6 +108,14 @@ through its pure protocol validator.
    independence.
 7. Require powered paired evidence for superiority.
 8. Generate status; never hand-edit it into a registry or Markdown table.
+9. Provider API keys may be used only with public or explicitly cleared data.
+   Before reporting back to the owner, all workshop projects share a hard
+   aggregate ceiling of **$50 USD** in newly authorized provider spend. Every
+   Imp launch must preregister its maximum contribution, retain provider-reported
+   cost, and report that cost to the workshop coordinator so concurrent projects
+   cannot oversubscribe the ceiling. If the shared remaining amount is unknown,
+   fail closed. Do not transmit bulk private corpora, print or persist key values,
+   or treat the ceiling as permission to publish results.
 
 Use `mix evidence.check` to validate registries and generated projections. Use
 the profile commands in `docs/maintainers/RELEASE.md` to evaluate product or
