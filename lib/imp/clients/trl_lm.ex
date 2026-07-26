@@ -15,6 +15,7 @@ defmodule Imp.Clients.TRLLM do
     :artifact_sha256,
     response_field: :route,
     rollout_source: :model_generated,
+    generation_mode: :sample,
     timeout: 120_000
   ]
 
@@ -24,16 +25,19 @@ defmodule Imp.Clients.TRLLM do
           artifact_sha256: String.t() | nil,
           response_field: atom(),
           rollout_source: :model_generated | :controlled_external,
+          generation_mode: :sample | :greedy,
           timeout: pos_integer()
         }
 
   def generate(%__MODULE__{} = lm, messages, opts) do
     with :ok <- validate_rollout_source(lm),
+         :ok <- validate_generation_mode(lm),
          [{worker, _value}] <-
            Registry.lookup(Imp.Clients.TRLWorker.Registry, lm.worker_key),
          {:ok, result} <-
            Imp.Clients.TRLWorker.request(worker, rollout_request(lm, messages, opts), lm.timeout),
          :ok <- validate_artifact_identity(lm, result),
+         :ok <- validate_generation_identity(lm, result),
          completion when is_binary(completion) <- result["completion"] do
       {:ok, completion_output(lm, completion)}
     else
@@ -49,6 +53,31 @@ defmodule Imp.Clients.TRLLM do
 
   defp validate_rollout_source(%__MODULE__{rollout_source: source}),
     do: {:error, {:invalid_trl_rollout_source, source}}
+
+  defp validate_generation_mode(%__MODULE__{generation_mode: mode})
+       when mode in [:sample, :greedy],
+       do: :ok
+
+  defp validate_generation_mode(%__MODULE__{generation_mode: mode}),
+    do: {:error, {:invalid_trl_generation_mode, mode}}
+
+  defp validate_generation_identity(
+         %__MODULE__{rollout_source: :model_generated, generation_mode: :sample},
+         %{"generation_mode" => "sample"}
+       ),
+       do: :ok
+
+  defp validate_generation_identity(
+         %__MODULE__{rollout_source: :model_generated, generation_mode: :greedy},
+         %{"generation_mode" => "greedy"}
+       ),
+       do: :ok
+
+  defp validate_generation_identity(%__MODULE__{rollout_source: :model_generated}, result),
+    do: {:error, {:trl_generation_mode_mismatch, result}}
+
+  defp validate_generation_identity(%__MODULE__{rollout_source: :controlled_external}, _result),
+    do: :ok
 
   defp validate_artifact_identity(%__MODULE__{artifact_sha256: nil}, _result), do: :ok
 
@@ -83,11 +112,16 @@ defmodule Imp.Clients.TRLLM do
     end
   end
 
-  defp rollout_request(%__MODULE__{rollout_source: :model_generated}, messages, opts) do
+  defp rollout_request(
+         %__MODULE__{rollout_source: :model_generated, generation_mode: mode},
+         messages,
+         opts
+       ) do
     %{
       "op" => "generate",
       "messages" => normalize_messages(messages),
-      "rollout_id" => Keyword.get(opts, :rollout_id, 0)
+      "rollout_id" => Keyword.get(opts, :rollout_id, 0),
+      "generation_mode" => Atom.to_string(mode)
     }
   end
 

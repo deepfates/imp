@@ -124,6 +124,7 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
       )
 
     assert {:ok, %{kind: :base} = base_deployment} = TRLDeployment.start_base(base_trainer)
+    assert base_deployment.lm.generation_mode == :greedy
     base_program = Imp.ProgramAccess.put_lm(portable, base_deployment.lm)
 
     assert {:ok, base_prediction} =
@@ -241,6 +242,7 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
                 "model": result["model"],
                 "artifact_sha256": result["artifact_sha256"],
                 "adapter_sha256": result["adapter_sha256"],
+                "generation_mode": request["generation_mode"],
             }
         else:
             write_frame({"ok": False, "error": {"accepted": False, "code": "unknown", "message": op}})

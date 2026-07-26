@@ -49,7 +49,8 @@ defmodule Imp.Clients.TRLDeployment do
          lm: %TRLLM{
            model: Path.expand(job.result_model),
            worker_key: deployment_key(job),
-           artifact_sha256: manifest["payload_sha256"]
+           artifact_sha256: manifest["payload_sha256"],
+           generation_mode: :greedy
          },
          worker: worker
        }}
@@ -91,7 +92,8 @@ defmodule Imp.Clients.TRLDeployment do
          lm: %TRLLM{
            model: identity["model"],
            worker_key: key,
-           artifact_sha256: identity["base_model_sha256"]
+           artifact_sha256: identity["base_model_sha256"],
+           generation_mode: :greedy
          },
          worker: worker
        }}

@@ -17,8 +17,16 @@ defmodule Imp.TRLWorkerTest do
     end
 
     @impl true
-    def handle_call({:request, _request}, _from, completion) do
+    def handle_call({:request, request}, _from, completion) do
       result = if is_map(completion), do: completion, else: %{"completion" => completion}
+
+      result =
+        if request["op"] == "generate" do
+          Map.put_new(result, "generation_mode", request["generation_mode"])
+        else
+          result
+        end
+
       {:reply, {:ok, result}, completion}
     end
   end
@@ -164,6 +172,17 @@ defmodule Imp.TRLWorkerTest do
              Imp.LM.generate(lm, [], rollout_id: 0)
   end
 
+  test "the rollout LM rejects unknown generation modes before transport" do
+    lm = %TRLLM{
+      model: "Qwen/pinned",
+      worker_key: {:missing, make_ref()},
+      generation_mode: :temperature_sampling
+    }
+
+    assert {:error, {:invalid_trl_generation_mode, :temperature_sampling}} =
+             Imp.LM.generate(lm, [], rollout_id: 0)
+  end
+
   test "model generations remain raw for adapter parsing while controlled values stay typed" do
     completion = "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n"
     key = {:trl_completion_boundary, make_ref()}
@@ -181,6 +200,18 @@ defmodule Imp.TRLWorkerTest do
     signature = Imp.Signature.ensure("utterance -> route")
     assert {:ok, prediction} = Imp.Adapter.Chat.parse(signature, completion, [])
     assert Imp.get(prediction, :route) == "R17"
+  end
+
+  test "deployment generation is explicit greedy while training rollouts sample" do
+    completion = "R17"
+    key = {:trl_generation_mode_boundary, make_ref()}
+    start_supervised!({CompletionWorker, {key, completion}})
+
+    sampled = %TRLLM{model: "Qwen/pinned", worker_key: key}
+    greedy = %{sampled | generation_mode: :greedy}
+
+    assert {:ok, "R17"} = Imp.LM.generate(sampled, [], rollout_id: 3)
+    assert {:ok, "R17"} = Imp.LM.generate(greedy, [], rollout_id: 3)
   end
 
   test "a deployed rollout refuses response artifact drift" do

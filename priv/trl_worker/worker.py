@@ -290,6 +290,12 @@ class Worker:
         rollout_id = request.get("rollout_id")
         if not isinstance(rollout_id, int) or rollout_id < 0:
             raise WorkerError("invalid_rollout_id", "rollout_id must be a non-negative integer")
+        generation_mode = request.get("generation_mode")
+        if generation_mode not in ("sample", "greedy"):
+            raise WorkerError(
+                "invalid_generation_mode",
+                "generation mode must be sample or greedy",
+            )
         messages = self._messages(request.get("messages"))
         cfg = self.contract["optimizer"]
         seed = cfg["seed"] + rollout_id
@@ -299,15 +305,19 @@ class Worker:
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt").to("mps")
+        generation_options = {
+            "do_sample": generation_mode == "sample",
+            "max_new_tokens": cfg["max_completion_length"],
+            "pad_token_id": self.tokenizer.pad_token_id,
+            "eos_token_id": self.tokenizer.eos_token_id,
+            "use_cache": True,
+        }
+        if generation_mode == "sample":
+            generation_options["temperature"] = cfg["temperature"]
         with self.torch.no_grad():
             output = self.model.generate(
                 **inputs,
-                do_sample=True,
-                temperature=cfg["temperature"],
-                max_new_tokens=cfg["max_completion_length"],
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                use_cache=True,
+                **generation_options,
             )
         completion_ids = output[0, inputs["input_ids"].shape[1] :]
         completion = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
@@ -317,6 +327,7 @@ class Worker:
             "rollout_id": rollout_id,
             "seed": seed,
             "rollout_source": "model_generated",
+            "generation_mode": generation_mode,
         }
         if self.deployed_artifact is not None:
             result.update(self.deployed_artifact)
