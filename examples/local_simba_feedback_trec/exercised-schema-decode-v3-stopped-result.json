@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "status": "stopped_before_selection_or_heldout",
+  "treatment_id": "local-simba-feedback-trec-schema-decode-v3",
+  "runtime_commit": "63a31e019eba7a901643389893978ab4f2ab67ee",
+  "contract_sha256": "1f29446db7aa4ac99683422f3833f313912445ec7c2c9d44776e84f26530d3b8",
+  "model": {
+    "id": "ollama:llama3.2:3b",
+    "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "optimization": {
+    "completed_steps": 4,
+    "logical_calls": 52,
+    "transport_attempts": 52,
+    "task_calls": 46,
+    "reflection_calls": 6,
+    "feedback_reflection_calls": 6,
+    "runtime_errors": 0,
+    "baseline_score": 0.5,
+    "candidate_count": 0,
+    "mutated_rule_finalists": 0,
+    "rendered_rule_calls": 0
+  },
+  "heldout_opened": false,
+  "fresh_process_attempted": false,
+  "stop_reason": "Exact one-field schema responses parsed successfully and semantic metric feedback reached all six reflection calls, but no reflection produced a predictor instruction change that SIMBA could admit as a candidate. The retained stage has no runtime errors; exact reflection response text was not retained, so whether advice was empty, irrelevant, or instruction-identical is unknown.",
+  "retained_stage_sha256": {
+    "preflight": "0db1ebf53c42fa4b34f15b7298a4f7ca68e667d98b68484555d1699d32671671",
+    "optimization": "8f0b73f92eac7e462fad5c412a738aedc32000c78f49bc92ee510ea2fd626aaf",
+    "selected_parameters": "2e1806aae37f0d9ef462506c2ff09f698c61d0f9196454e60cb477f625194b74",
+    "source_program": "dd35f239819c5e97169ee63bf8d25a291afd55ac11af54e8ce7ffd7e71dfa655",
+    "failure": "db930f210aa3df02f94ce4934e7536d317cd94a6155093b9a42bbac0aece02e3"
+  },
+  "claim_boundary": "This stopped run proves strict local structured task parsing plus six feedback-informed SIMBA reflection transports on the frozen task. It does not prove a genuine mutation, selection, held-out behavior, artifact consumption, SIMBA effectiveness or ineffectiveness, DSPy parity, production reliability, or BEAM superiority."
+}

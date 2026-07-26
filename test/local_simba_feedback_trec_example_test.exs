@@ -7,6 +7,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
   @old_grpo "examples/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
   @stopped_result "examples/local_simba_feedback_trec/exercised-stopped-result.json"
   @structured_stopped_result "examples/local_simba_feedback_trec/exercised-structured-v2-stopped-result.json"
+  @schema_decode_stopped_result "examples/local_simba_feedback_trec/exercised-schema-decode-v3-stopped-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_FEEDBACK_TREC_DEFINE_ONLY")
@@ -170,6 +171,19 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
     assert result["optimization"]["candidate_count"] == 0
     refute result["heldout_opened"]
     assert result["claim_boundary"] =~ "not a SIMBA win or loss"
+  end
+
+  test "corrected schema run remains a no-mutation result before heldout" do
+    result = Jason.decode!(File.read!(@schema_decode_stopped_result))
+
+    assert result["status"] == "stopped_before_selection_or_heldout"
+    assert result["optimization"]["transport_attempts"] == 52
+    assert result["optimization"]["runtime_errors"] == 0
+    assert result["optimization"]["feedback_reflection_calls"] == 6
+    assert result["optimization"]["candidate_count"] == 0
+    assert result["optimization"]["baseline_score"] == 0.5
+    refute result["heldout_opened"]
+    assert result["claim_boundary"] =~ "does not prove a genuine mutation"
   end
 
   defp split_frequencies(rows) do

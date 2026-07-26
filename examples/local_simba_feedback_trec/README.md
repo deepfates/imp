@@ -93,3 +93,13 @@ source-correct exact-envelope decode repair; task/model/splits/prompts/metric,
 optimizer configuration, seed, budgets, and one-attempt policy remain
 unchanged. V1 and v2 remain stopped and immutable. V3 will execute once and may
 honestly retain baseline or show no held-out lift.
+
+The v3 execution is retained in
+`exercised-schema-decode-v3-stopped-result.json`. All 46 task outputs parsed,
+the baseline scored `0.50`, all four search steps completed without a runtime
+error, and semantic feedback reached each of six reflection calls. No
+reflection yielded a predictor instruction change that SIMBA could admit, so
+the runner stopped before selection and held-out access. The exact reflection
+response text was not retained; empty, irrelevant, and instruction-identical
+advice therefore remain unresolved rather than inferred. This is a real
+reflection/no-mutation result for one task/model, not optimizer ineffectiveness.
