@@ -22,7 +22,19 @@ defmodule Imp.TRLWorkerTest do
 
       result =
         if request["op"] == "generate" do
-          Map.put_new(result, "generation_mode", request["generation_mode"])
+          result
+          |> Map.put_new("generation_mode", request["generation_mode"])
+          |> Map.put_new(
+            "generation_constraint",
+            if(request["allowed_values"], do: "allowed_values", else: "free_text")
+          )
+          |> then(fn result ->
+            if request["allowed_values_sha256"] do
+              Map.put_new(result, "allowed_values_sha256", request["allowed_values_sha256"])
+            else
+              result
+            end
+          end)
         else
           result
         end
@@ -212,6 +224,36 @@ defmodule Imp.TRLWorkerTest do
 
     assert {:ok, "R17"} = Imp.LM.generate(sampled, [], rollout_id: 3)
     assert {:ok, "R17"} = Imp.LM.generate(greedy, [], rollout_id: 3)
+  end
+
+  test "single-field enum choices are content-bound through the rollout transport" do
+    key = {:trl_allowed_values_boundary, make_ref()}
+    start_supervised!({CompletionWorker, {key, "R42"}})
+    sampled = %TRLLM{model: "Qwen/pinned", worker_key: key}
+    lm = %{sampled | generation_mode: :greedy}
+    signature = Imp.signature("utterance -> route: enum[R17,R42,R68,R93]")
+
+    refute Imp.LM.response_format_capability(sampled).choice_values
+    assert Imp.LM.response_format_capability(lm).choice_values
+
+    assert {:error, :trl_sampled_choice_values_unsupported} =
+             Imp.LM.generate(sampled, [],
+               rollout_id: 2,
+               allowed_values: ["R17", "R42", "R68", "R93"]
+             )
+
+    assert [allowed_values: ["R17", "R42", "R68", "R93"]] =
+             Imp.Adapter.SingleField.lm_opts(
+               signature,
+               [],
+               Imp.LM.response_format_capability(lm)
+             )
+
+    assert {:ok, "R42"} =
+             Imp.LM.generate(lm, [],
+               rollout_id: 2,
+               allowed_values: ["R17", "R42", "R68", "R93"]
+             )
   end
 
   test "a deployed rollout refuses response artifact drift" do

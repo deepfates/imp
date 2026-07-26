@@ -23,9 +23,13 @@ defmodule Imp.LM.Capability do
   # intentional and matches DSPy: an LM that does not declare `supported_params`
   # gets no `response_format`.
 
-  @type t :: %__MODULE__{response_format: boolean(), response_schema: boolean()}
+  @type t :: %__MODULE__{
+          response_format: boolean(),
+          response_schema: boolean(),
+          choice_values: boolean()
+        }
 
-  defstruct response_format: false, response_schema: false
+  defstruct response_format: false, response_schema: false, choice_values: false
 
   @doc "DSPy `BaseLM` default: no declared capability (send no response_format)."
   @spec none() :: t()

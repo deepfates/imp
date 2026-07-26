@@ -297,6 +297,24 @@ class Worker:
                 "generation mode must be sample or greedy",
             )
         messages = self._messages(request.get("messages"))
+        allowed_values = request.get("allowed_values")
+        allowed_values_sha256 = request.get("allowed_values_sha256")
+        if allowed_values is not None:
+            if generation_mode != "greedy":
+                raise WorkerError(
+                    "sampled_allowed_values_unsupported",
+                    "allowed-value generation is supported only for greedy deployment",
+                )
+            if (
+                not isinstance(allowed_values, list)
+                or not 1 <= len(allowed_values) <= 128
+                or not all(isinstance(value, str) and 0 < len(value.encode()) <= 256 for value in allowed_values)
+                or len(set(allowed_values)) != len(allowed_values)
+            ):
+                raise WorkerError("invalid_allowed_values", "allowed values are invalid")
+            expected_choices = digest({"allowed_values": allowed_values})
+            if allowed_values_sha256 != expected_choices:
+                raise WorkerError("allowed_values_identity_mismatch", "allowed values digest changed")
         cfg = self.contract["optimizer"]
         seed = cfg["seed"] + rollout_id
         self.torch.manual_seed(seed)
@@ -305,22 +323,24 @@ class Worker:
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt").to("mps")
-        generation_options = {
-            "do_sample": generation_mode == "sample",
-            "max_new_tokens": cfg["max_completion_length"],
-            "pad_token_id": self.tokenizer.pad_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
-            "use_cache": True,
-        }
-        if generation_mode == "sample":
-            generation_options["temperature"] = cfg["temperature"]
         with self.torch.no_grad():
-            output = self.model.generate(
-                **inputs,
-                **generation_options,
-            )
-        completion_ids = output[0, inputs["input_ids"].shape[1] :]
-        completion = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
+            if allowed_values is None:
+                generation_options = {
+                    "do_sample": generation_mode == "sample",
+                    "max_new_tokens": cfg["max_completion_length"],
+                    "pad_token_id": self.tokenizer.pad_token_id,
+                    "eos_token_id": self.tokenizer.eos_token_id,
+                    "use_cache": True,
+                }
+                if generation_mode == "sample":
+                    generation_options["temperature"] = cfg["temperature"]
+                output = self.model.generate(**inputs, **generation_options)
+                completion_ids = output[0, inputs["input_ids"].shape[1] :]
+                completion = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
+            else:
+                completion, completion_ids = self._select_allowed_value(
+                    inputs["input_ids"], allowed_values
+                )
         result = {
             "completion": completion,
             "completion_token_ids": completion_ids.detach().cpu().tolist(),
@@ -328,12 +348,48 @@ class Worker:
             "seed": seed,
             "rollout_source": "model_generated",
             "generation_mode": generation_mode,
+            "generation_constraint": "free_text" if allowed_values is None else "allowed_values",
         }
+        if allowed_values is not None:
+            result["allowed_values_sha256"] = allowed_values_sha256
         if self.deployed_artifact is not None:
             result.update(self.deployed_artifact)
         else:
             result["model"] = self.protocol["behavior_policy"]["model"]
         return result
+
+    def _select_allowed_value(
+        self,
+        prompt_ids,
+        allowed_values: list[str],
+    ):
+        scores = []
+        token_sequences = []
+        prompt_length = prompt_ids.shape[1]
+        if prompt_length < 1:
+            raise WorkerError("empty_choice_prompt", "choice generation requires a prompt token")
+
+        for value in allowed_values:
+            choice_ids = self.tokenizer(value, add_special_tokens=False)["input_ids"]
+            if not choice_ids:
+                raise WorkerError("empty_choice_tokens", "allowed value token sequence is empty")
+            choice_tensor = self.torch.tensor([choice_ids], dtype=self.torch.long, device="mps")
+            combined = self.torch.cat([prompt_ids, choice_tensor], dim=1)
+            logits = self.model(input_ids=combined).logits
+            logprobs = self.torch.log_softmax(logits, dim=-1)
+            start = prompt_length - 1
+            positions = logprobs[:, start : start + len(choice_ids), :]
+            selected = positions.gather(2, choice_tensor.unsqueeze(-1)).squeeze(-1)
+            scores.append(selected.sum())
+            token_sequences.append(choice_ids)
+
+        score_tensor = self.torch.stack(scores)
+        choice_index = int(self.torch.argmax(score_tensor).item())
+
+        selected_ids = self.torch.tensor(
+            token_sequences[choice_index], dtype=self.torch.long, device="mps"
+        )
+        return allowed_values[choice_index], selected_ids
 
     def deploy_artifact(self, request: dict[str, Any]) -> dict[str, Any]:
         if self.model is None or self.tokenizer is None:

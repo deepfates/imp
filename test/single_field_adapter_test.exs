@@ -1,6 +1,22 @@
 defmodule Imp.SingleFieldAdapterTest do
   use ExUnit.Case, async: true
 
+  defmodule ChoiceLM do
+    @behaviour Imp.LM
+    defstruct [:owner]
+
+    def response_format_capability(%__MODULE__{}),
+      do: %Imp.LM.Capability{choice_values: true}
+
+    def generate(%__MODULE__{owner: owner}, messages, opts) do
+      send(owner, {:choice_request, messages, opts})
+      {:ok, opts |> Keyword.fetch!(:allowed_values) |> hd()}
+    end
+
+    @impl true
+    def generate(_messages, _opts), do: {:error, :instance_required}
+  end
+
   test "ordinary enum classifier renders a concise contract and parses only an exact value" do
     signature =
       Imp.signature(
@@ -56,6 +72,34 @@ defmodule Imp.SingleFieldAdapterTest do
     assert_raise ArgumentError, ~r/requires exactly one output field/, fn ->
       Imp.Adapter.SingleField.parse(signature, "a", [])
     end
+  end
+
+  test "choice constraints are requested only from LMs that declare support" do
+    signature = Imp.signature("text -> sentiment: enum[positive,negative]")
+
+    assert Imp.Adapter.SingleField.lm_opts(signature, [], Imp.LM.Capability.none()) == []
+
+    assert Imp.Adapter.SingleField.lm_opts(
+             signature,
+             [],
+             %Imp.LM.Capability{choice_values: true}
+           ) == [allowed_values: ["positive", "negative"]]
+  end
+
+  test "ordinary program calls bind declared enum choices only for capable LMs" do
+    program =
+      Imp.predict(
+        Imp.signature("text -> sentiment: enum[positive,negative]", "Classify sentiment."),
+        lm: %ChoiceLM{owner: self()},
+        adapter: Imp.Adapter.SingleField
+      )
+
+    assert {:ok, prediction} = Imp.call(program, %{text: "excellent"})
+    assert Imp.get(prediction, :sentiment) == "positive"
+
+    assert_received {:choice_request, messages, [allowed_values: ["positive", "negative"]]}
+
+    assert Enum.any?(messages, &String.contains?(&1.content, "positive"))
   end
 
   test "adapter survives the public save/load boundary" do

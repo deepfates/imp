@@ -389,6 +389,14 @@ program =
   )
 ```
 
+When an LM declares native choice support, an enum-constrained single output
+can become an explicit inference action space. Imp's deployed local TRL runtime
+scores the declared token sequences and chooses greedily. Sampled TRL training
+does not advertise or accept this mode: choice-normalized sampling requires a
+different loss and is not ordinary GRPO. Provider clients that do not declare
+the capability receive the same concise prompt and strict parser, with no
+private option forwarded to them.
+
 The JSON adapter validates output fields and returns retry feedback for schema
 violations.
 

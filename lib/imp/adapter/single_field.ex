@@ -17,6 +17,15 @@ defmodule Imp.Adapter.SingleField do
   Multi-output signatures are rejected before an LM call. Demonstrations must
   contain every input and the output so the adapter never silently drops
   partial training context.
+
+  LMs that explicitly advertise `choice_values` support receive the declared
+  enum members as a content-bound generation constraint. For Imp's local TRL
+  runtime's deployed greedy mode, the real causal policy scores every declared
+  token sequence and selects the most likely exact value. Sampled TRL training
+  deliberately does not advertise this capability: choice-normalized sampling
+  needs a different policy objective and must not masquerade as ordinary GRPO.
+  Other LMs receive only the concise prompt and remain subject to the same
+  strict parser.
   """
 
   @behaviour Imp.Adapter
@@ -72,6 +81,18 @@ defmodule Imp.Adapter.SingleField do
     raise ArgumentError,
           "#{inspect(__MODULE__)}.parse/3 expects keyword options, got: #{inspect(opts)}"
   end
+
+  @doc false
+  def lm_opts(signature, _opts, %Imp.LM.Capability{choice_values: true}) do
+    output = single_output!(signature, "lm_opts/3")
+
+    case enum_values(output) do
+      values when is_list(values) and values != [] -> [allowed_values: values]
+      _unconstrained -> []
+    end
+  end
+
+  def lm_opts(_signature, _opts, %Imp.LM.Capability{}), do: []
 
   @doc false
   def validate_demos(demos) do
