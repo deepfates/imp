@@ -29,6 +29,7 @@ defmodule LocalGRPOBanking77.Runner do
   @test_sha256 "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1"
   @model "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775"
   @seed 20_260_725
+  @treatment_id "model-generated-banking77-json-post-eval-mode-v1"
   @routes ["R17", "R42", "R68", "R93"]
   @train_ids ~w(
     banking77-train-2511 banking77-train-2512 banking77-train-2513 banking77-train-2514
@@ -300,6 +301,7 @@ defmodule LocalGRPOBanking77.Runner do
 
     stage = %{
       status: "complete",
+      treatment_id: @treatment_id,
       model: @model,
       data_sha256: @data_sha256,
       train_sha256: @train_sha256,
@@ -469,7 +471,7 @@ defmodule LocalGRPOBanking77.Runner do
     output =
       System.get_env(
         "IMP_GRPO_OUTPUT",
-        "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-defaults-v1"
+        "/Users/deepfates/.cache/imp/trl/#{@treatment_id}"
       )
 
     %{

@@ -112,3 +112,14 @@ The worker now brackets all generation in eval mode and restores prior trainer
 mode afterward. The completed run was not rerun; it is lifecycle/training and
 neutral external-evaluation evidence, not valid checkpoint-selection or GRPO
 effectiveness evidence.
+
+The runner now names a separate post-fix treatment,
+`model-generated-banking77-json-post-eval-mode-v1`. It changes no task,
+model, split, seed, prompt, sampling envelope, reward, step/group width,
+optimizer setting, selection rule, or untouched metric from the documented
+defaults treatment. Its sole treatment boundary is execution after the
+generation-mode repair above, so validation and deployment both observe the
+same inference-mode policy. The prior artifact remains immutable. This new run
+must still be read as one task/model result: even a positive held-out outcome
+would not establish general GRPO effectiveness, mmGRPO parity, production
+reliability, or BEAM superiority.
