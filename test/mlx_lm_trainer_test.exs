@@ -397,6 +397,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
   test "deployment rejects a server that advertises any other model and cleans it up", context do
     port = available_port()
+    cache_record = Path.join(context.root, "rejected-deployment-cache-root.txt")
 
     trainer =
       context
@@ -406,7 +407,9 @@ defmodule Imp.Clients.MLXLMTrainerTest do
         server_executable_args: [
           Path.expand("support/fake_mlx_server.py", __DIR__),
           "--advertise-model",
-          "/wrong/base-model"
+          "/wrong/base-model",
+          "--record-cache-root",
+          cache_record
         ],
         server_port: port,
         server_startup_timeout: 5_000
@@ -420,6 +423,60 @@ defmodule Imp.Clients.MLXLMTrainerTest do
              Imp.Clients.MLXLMDeployment.start(job)
 
     assert expected == job.result_model
+    refute File.exists?(File.read!(cache_record))
+    assert_port_available!(port)
+  end
+
+  test "deployment isolates a poisoned ambient model cache and removes its owned cache",
+       context do
+    File.write!(Path.join(context.model_path, "behavior.txt"), "base-behavior\n", [:sync])
+    port = available_port()
+    poisoned = Path.join(context.root, "poisoned-huggingface")
+    cache_record = Path.join(context.root, "deployment-cache-root.txt")
+    File.mkdir_p!(poisoned)
+    File.write!(Path.join(poisoned, "poisoned-model-id"), "jxm/gpt-oss-20b-base\n", [:sync])
+
+    previous_hf_home = System.get_env("HF_HOME")
+    System.put_env("HF_HOME", poisoned)
+
+    on_exit(fn ->
+      if previous_hf_home,
+        do: System.put_env("HF_HOME", previous_hf_home),
+        else: System.delete_env("HF_HOME")
+    end)
+
+    trainer =
+      context
+      |> trainer(&successful_runner/3)
+      |> Map.merge(%{
+        server_executable: System.find_executable("python3"),
+        server_executable_args: [
+          Path.expand("support/fake_mlx_server.py", __DIR__),
+          "--advertise-ambient-cache-model",
+          "jxm/gpt-oss-20b-base",
+          "--record-cache-root",
+          cache_record
+        ],
+        server_port: port,
+        server_startup_timeout: 5_000
+      })
+
+    assert {:ok, job} = train(trainer)
+    assert {:ok, deployment} = Imp.Clients.MLXLMDeployment.start(job)
+
+    isolated_cache = File.read!(cache_record)
+    refute isolated_cache == poisoned
+    assert File.dir?(isolated_cache)
+    refute File.exists?(Path.join(isolated_cache, "poisoned-model-id"))
+
+    assert {:ok, %{body: %{"data" => [%{"id" => advertised}]}}} =
+             Req.get(deployment.base_url <> "/models", retry: false)
+
+    assert advertised == Path.expand(job.result_model)
+    assert File.exists?(Path.join(poisoned, "poisoned-model-id"))
+
+    assert :ok = Imp.Clients.MLXLMDeployment.stop(job)
+    refute File.exists?(isolated_cache)
     assert_port_available!(port)
   end
 

@@ -311,7 +311,11 @@ partial fused tree, base-identical tree, or manifest mutation fails closed.
 
 `TrainingJob.rebind/3` verifies those contents again, starts the manifest-bound
 `mlx_lm.server` under the Imp supervisor, requires `/v1/models` to advertise the
-exact canonical fused path, and pins the program to the returned ReqLLM. Use
+exact canonical fused path, and pins the program to the returned ReqLLM. Each
+server receives a new empty, deployment-owned Hugging Face/Transformers cache
+environment while the verified artifact is supplied by explicit local path.
+Ambient cached models therefore cannot enter the server catalog, and the owned
+cache is removed with the supervised process group on failure or stop. Use
 `Imp.Clients.MLXLMDeployment.stop(job)` when the local server is no longer
 needed. Application shutdown also tears down its complete external process
 group. Commands are invoked directly with argument vectors, never through a

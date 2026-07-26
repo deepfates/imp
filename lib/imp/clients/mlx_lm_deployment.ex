@@ -7,6 +7,12 @@ defmodule Imp.Clients.MLXLMDeployment do
   `/v1/models` advertises the exact fused path. The returned ReqLLM is therefore
   bound to verified trained bytes rather than a model-name substitution.
 
+  Every launch receives a new empty, deployment-owned Hugging Face,
+  Transformers, and XDG cache environment. The server still receives the
+  verified local artifact path explicitly; ambient model catalogs cannot add a
+  second advertised identity. The owned cache is removed after startup failure,
+  explicit stop, server exit, or application shutdown.
+
   Deployments are shared per fused artifact inside the Imp application and can
   be stopped explicitly with `stop/1`. Application shutdown also terminates the
   supervised external process group.
@@ -208,8 +214,12 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
 
   def handle_call(:stop, _from, state) do
     case Imp.ExternalCommand.stop(state.handle, 10_000) do
-      :ok -> {:stop, :normal, :ok, %{state | handle: nil}}
-      {:error, reason} -> {:reply, {:error, reason}, state}
+      :ok ->
+        :ok = cleanup_cache(state.cache_root)
+        {:stop, :normal, :ok, %{state | handle: nil, cache_root: nil}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
@@ -221,45 +231,57 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
   def handle_info(_message, state), do: {:noreply, state}
 
   @impl true
-  def terminate(_reason, %{handle: handle}) when not is_nil(handle) do
-    _ = Imp.ExternalCommand.stop(handle, 10_000)
+  def terminate(_reason, state) do
+    if state[:handle], do: _ = Imp.ExternalCommand.stop(state.handle, 10_000)
+    _ = cleanup_cache(state[:cache_root])
     :ok
   end
-
-  def terminate(_reason, _state), do: :ok
 
   defp launch(config) do
     with :ok <- MLXLMArtifact.validate(config.artifact_path, config.inventory),
          {:ok, port} <- reserve_port(config.host, config.port),
-         {:ok, handle} <- start_server(config, port) do
-      case await_exact_model(handle, config, port) do
-        {:ok, base_url} ->
-          lm = deployment_lm(config, base_url)
-
-          deployment = %MLXLMDeployment{
-            artifact_path: config.artifact_path,
-            artifact_sha256: config.artifact_sha256,
-            base_url: base_url,
-            lm: lm,
-            pid: self()
-          }
-
-          {:ok,
-           %{
-             config: Map.put(config, :port, port),
-             deployment: deployment,
-             handle: handle,
-             monitor: Process.monitor(handle.owner)
-           }}
-
-        {:error, reason} ->
-          _ = Imp.ExternalCommand.stop(handle, 10_000)
-          {:error, reason}
-      end
+         {:ok, cache_root} <- create_isolated_cache() do
+      launch_server(config, port, cache_root)
     end
   end
 
-  defp start_server(config, port) do
+  defp launch_server(config, port, cache_root) do
+    case start_server(config, port, cache_root) do
+      {:ok, handle} ->
+        case await_exact_model(handle, config, port) do
+          {:ok, base_url} ->
+            lm = deployment_lm(config, base_url)
+
+            deployment = %MLXLMDeployment{
+              artifact_path: config.artifact_path,
+              artifact_sha256: config.artifact_sha256,
+              base_url: base_url,
+              lm: lm,
+              pid: self()
+            }
+
+            {:ok,
+             %{
+               config: Map.put(config, :port, port),
+               deployment: deployment,
+               handle: handle,
+               monitor: Process.monitor(handle.owner),
+               cache_root: cache_root
+             }}
+
+          {:error, reason} ->
+            _ = Imp.ExternalCommand.stop(handle, 10_000)
+            :ok = cleanup_cache(cache_root)
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        :ok = cleanup_cache(cache_root)
+        {:error, reason}
+    end
+  end
+
+  defp start_server(config, port, cache_root) do
     argv =
       config.args ++
         [
@@ -276,8 +298,68 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
     Imp.ExternalCommand.start(config.executable, argv,
       timeout: :infinity,
       kill_grace_ms: config.kill_grace_ms,
-      max_output_bytes: config.max_output_bytes
+      max_output_bytes: config.max_output_bytes,
+      env: isolated_cache_env(cache_root)
     )
+  end
+
+  defp create_isolated_cache do
+    parent = Path.join(System.tmp_dir!(), "imp-mlx-deployments")
+    suffix = Base.url_encode64(:crypto.strong_rand_bytes(18), padding: false)
+    root = Path.join(parent, "deployment-#{suffix}")
+
+    with :ok <- File.mkdir_p(parent),
+         :ok <- File.mkdir(root),
+         :ok <- create_cache_children(root) do
+      {:ok, root}
+    else
+      {:error, reason} ->
+        _ = File.rm_rf(root)
+        {:error, {:mlx_lm_isolated_cache_creation_failed, reason}}
+    end
+  rescue
+    error -> {:error, {:mlx_lm_isolated_cache_creation_failed, Exception.message(error)}}
+  end
+
+  defp create_cache_children(root) do
+    Enum.reduce_while(~w(huggingface transformers xdg datasets), :ok, fn child, :ok ->
+      case File.mkdir(Path.join(root, child)) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp isolated_cache_env(root) do
+    huggingface = Path.join(root, "huggingface")
+
+    [
+      {"HF_HOME", huggingface},
+      {"HF_HUB_CACHE", Path.join(huggingface, "hub")},
+      {"HUGGINGFACE_HUB_CACHE", Path.join(huggingface, "hub")},
+      {"TRANSFORMERS_CACHE", Path.join(root, "transformers")},
+      {"HF_DATASETS_CACHE", Path.join(root, "datasets")},
+      {"XDG_CACHE_HOME", Path.join(root, "xdg")},
+      {"HF_HUB_OFFLINE", "1"},
+      {"TRANSFORMERS_OFFLINE", "1"}
+    ]
+  end
+
+  defp cleanup_cache(nil), do: :ok
+
+  defp cleanup_cache(root) when is_binary(root) do
+    parent = Path.join(System.tmp_dir!(), "imp-mlx-deployments")
+    expanded = Path.expand(root)
+
+    if Path.dirname(expanded) == Path.expand(parent) and
+         String.starts_with?(Path.basename(expanded), "deployment-") do
+      case File.rm_rf(expanded) do
+        {:ok, _entries} -> :ok
+        {:error, reason, path} -> {:error, {:mlx_lm_isolated_cache_cleanup_failed, path, reason}}
+      end
+    else
+      {:error, {:mlx_lm_isolated_cache_cleanup_refused, root}}
+    end
   end
 
   defp await_exact_model(handle, config, port) do
