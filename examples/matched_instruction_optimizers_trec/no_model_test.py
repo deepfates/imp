@@ -69,6 +69,39 @@ class NoModelBoundaryTest(unittest.TestCase):
         capture.set_phase(1, "gepa", "compile")
         MODULE.validate_mipro_optimizer_envelope(capture, "optimizer", "malformed")
 
+    def test_catalog_guard_binds_provider_identity_and_exact_route_tag(self):
+        expected = {
+            "endpoint_provider": "Anthropic",
+            "catalog_prompt_per_token": "0.000003",
+            "catalog_completion_per_token": "0.000015",
+        }
+        eligible = MODULE.eligible_endpoints(
+            [
+                {
+                    "provider_name": "Anthropic",
+                    "tag": "anthropic/2",
+                    "pricing": {"prompt": "0.000003", "completion": "0.000015"},
+                    "supported_parameters": ["max_tokens", "temperature"],
+                },
+                {
+                    "provider_name": "Anthropic",
+                    "tag": "anthropic",
+                    "pricing": {"prompt": "0.000003", "completion": "0.000015"},
+                    "supported_parameters": ["max_tokens", "temperature"],
+                },
+                {
+                    "provider_name": "Other",
+                    "tag": "default",
+                    "pricing": {"prompt": "0", "completion": "0"},
+                    "supported_parameters": ["max_tokens", "temperature"],
+                },
+            ],
+            expected,
+            "optimizer",
+            ["anthropic"],
+        )
+        self.assertEqual([endpoint["tag"] for endpoint in eligible], ["anthropic"])
+
     def test_first_response_drift_stops_before_second_dispatch(self):
         dispatches = []
 

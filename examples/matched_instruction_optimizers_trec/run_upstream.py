@@ -234,23 +234,45 @@ def verify_models(manifest: dict[str, Any]) -> dict[str, Any]:
         with urllib.request.urlopen(url, timeout=30) as response:
             body = json.load(response)
         endpoints = body.get("data", {}).get("endpoints", [])
-        required = {"max_tokens", "seed", "response_format"} if role == "task" else {"max_tokens", "temperature"}
-        exact = next((endpoint for endpoint in endpoints if
-            endpoint.get("provider_name") == expected["endpoint_provider"]
-            and endpoint.get("tag") in (None, "default", "standard")
-            and float(endpoint.get("pricing", {}).get("prompt", "inf")) <= float(expected["catalog_prompt_per_token"])
-            and float(endpoint.get("pricing", {}).get("completion", "inf")) <= float(expected["catalog_completion_per_token"])
-            and required.issubset(set(endpoint.get("supported_parameters", [])))), None)
-        if exact is None:
-            raise RuntimeError(f"no exact first-party {role} endpoint satisfies pricing/parameter/default-tier guard")
-        encoded = json.dumps(exact, sort_keys=True, separators=(",", ":")).encode()
+        tags = manifest["execution"]["openrouter"][f"{role}_order"]
+        eligible = eligible_endpoints(endpoints, expected, role, tags)
+        if not eligible:
+            raise RuntimeError(f"no exact first-party {role} endpoint satisfies pricing/parameter guard")
+        encoded = json.dumps(eligible, sort_keys=True, separators=(",", ":")).encode()
         snapshots[role] = {
             "endpoint_url": url,
             "model": expected["logical"],
-            "endpoint": exact,
+            "eligible_endpoints": eligible,
             "sha256": hashlib.sha256(encoded).hexdigest(),
         }
     return snapshots
+
+
+def eligible_endpoints(
+    endpoints: list[dict[str, Any]],
+    expected: dict[str, Any],
+    role: str,
+    tags: list[str],
+) -> list[dict[str, Any]]:
+    required = (
+        {"max_tokens", "seed", "response_format"}
+        if role == "task"
+        else {"max_tokens", "temperature"}
+    )
+    return sorted(
+        (
+            endpoint
+            for endpoint in endpoints
+            if endpoint.get("provider_name") == expected["endpoint_provider"]
+            and endpoint.get("tag") in tags
+            and float(endpoint.get("pricing", {}).get("prompt", "inf"))
+            <= float(expected["catalog_prompt_per_token"])
+            and float(endpoint.get("pricing", {}).get("completion", "inf"))
+            <= float(expected["catalog_completion_per_token"])
+            and required.issubset(set(endpoint.get("supported_parameters", [])))
+        ),
+        key=lambda endpoint: str(endpoint.get("tag", "")),
+    )
 
 
 class Capture:

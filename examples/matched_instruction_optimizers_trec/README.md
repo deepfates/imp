@@ -27,8 +27,8 @@ confirmed immediately before launch against the owner's $50 ceiling.
 
 The runners additionally fail closed on:
 
-- exact first-party OpenRouter endpoints, endpoint parameters, default service
-  tier, and prices no higher than the sealed catalog prices;
+- exact first-party OpenRouter provider identity, eligible endpoint parameters,
+  response service tier, and prices no higher than the sealed catalog prices;
 - fallback disabled, `data_collection: deny`, one transport, cache/retry off,
   and task request seed equal to the experiment seed;
 - a shared conservative request bound—compact UTF-8 bytes plus 16 bytes for

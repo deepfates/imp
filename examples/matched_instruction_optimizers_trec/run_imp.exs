@@ -905,11 +905,13 @@ defmodule MatchedTRECImp.Runner do
         endpoint_url = "https://openrouter.ai/api/v1/models/#{expected["logical"]}/endpoints"
         body = Req.get!(endpoint_url, retry: false, max_retries: 0).body
         endpoints = get_in(body, ["data", "endpoints"]) || body["data"] || []
+        tags = manifest["execution"]["openrouter"]["#{role}_order"]
 
-        exact =
-          Enum.find(endpoints, fn endpoint ->
+        eligible =
+          endpoints
+          |> Enum.filter(fn endpoint ->
             endpoint["provider_name"] == expected["endpoint_provider"] and
-              endpoint["tag"] in [nil, "default", "standard"] and
+              endpoint["tag"] in tags and
               price_lte?(
                 get_in(endpoint, ["pricing", "prompt"]),
                 expected["catalog_prompt_per_token"]
@@ -919,16 +921,17 @@ defmodule MatchedTRECImp.Runner do
                 expected["catalog_completion_per_token"]
               ) and
               required_parameters?(endpoint, role)
-          end) ||
-            raise(
-              "no exact first-party #{role} endpoint satisfies pricing/parameter/default-tier guard"
-            )
+          end)
+          |> Enum.sort_by(&to_string(&1["tag"]))
+
+        if eligible == [],
+          do: raise("no exact first-party #{role} endpoint satisfies pricing/parameter guard")
 
         bounded = %{
           endpoint_url: endpoint_url,
           model: expected["logical"],
-          endpoint: exact,
-          sha256: :crypto.hash(:sha256, Jason.encode!(exact)) |> Base.encode16(case: :lower)
+          eligible_endpoints: eligible,
+          sha256: :crypto.hash(:sha256, Jason.encode!(eligible)) |> Base.encode16(case: :lower)
         }
 
         {role, bounded}

@@ -168,7 +168,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
       Path.expand("../examples/matched_instruction_optimizers_trec/no_model_test.py", __DIR__)
 
     assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
-    assert output =~ "Ran 9 tests"
+    assert output =~ "Ran 10 tests"
   end
 
   test "strong runners retain launch, seed, input, USD, endpoint, tier, and dual-cost guards" do
