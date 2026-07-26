@@ -79,6 +79,30 @@ defmodule Imp.TRLWorkerTest do
     assert result["sha256"] == TRLProtocol.digest(value)
   end
 
+  test "third-party stdout is redirected away from the framed control channel", context do
+    script = """
+    import contextlib
+    import importlib.util
+    import io
+
+    spec = importlib.util.spec_from_file_location("imp_trl_worker", #{inspect(Path.expand("../priv/trl_worker/worker.py", __DIR__))})
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.dispatch = lambda _worker, _request: (print("library progress"), {"ok": True})[1]
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        result = module.dispatch_quiet(None, {"op": "test"})
+
+    assert result == {"ok": True}
+    assert stdout.getvalue() == ""
+    assert stderr.getvalue() == "library progress\\n"
+    """
+
+    assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)
+  end
+
   test "pinned CPython owns adversarial and retained rollout float bytes", %{worker: worker} do
     adversarial =
       [

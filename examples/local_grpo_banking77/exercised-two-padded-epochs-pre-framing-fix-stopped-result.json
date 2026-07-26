@@ -1,0 +1,32 @@
+{
+  "status": "stopped_after_durable_step_10_before_acknowledgement",
+  "treatment_id": "model-generated-banking77-json-two-padded-epochs-v1",
+  "source_commit": "d51bd7f",
+  "scope": "ten-step ordinary model-generated Qwen/TRL GRPO execution before framed-stdout isolation",
+  "base_selection": {"accuracy": 0.875, "macro_f1": 0.8666666666666667, "errors": 0},
+  "steps": [
+    {"step": 1, "reward_sum": 10, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 2, "reward_sum": 13, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 3, "reward_sum": 9, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 4, "reward_sum": 10, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 5, "reward_sum": 8, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 6, "reward_sum": 9, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 7, "reward_sum": 10, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 8, "reward_sum": 14, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 9, "reward_sum": 11, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true},
+    {"step": 10, "reward_sum": 9, "non_uniform_rewards": true, "non_zero_advantages": true, "trainable_tensors_changed": true}
+  ],
+  "durable_boundary": {
+    "accepted_step_10_artifact_exists": true,
+    "step_10_artifact_sha256": "c30688fb081b39177ff629388581b8a3a876fdd62abc588eea8c5c9b3c97b58f",
+    "caller_checkpoint_phase": "step_intent",
+    "error": "reinforcement_callback_timeout after the Python worker durably accepted step 10 but its final framed acknowledgement did not reach Elixir"
+  },
+  "retained_sha256": {
+    "preflight": "f78afb2984e3781d0e6b3199049cb051870ce3e54b227c9a5891389aea0bee7b",
+    "base_selection": "6f38b09ada8f30e6db207392d8438ea2d4f44180ea2811e0000750901d22bd89",
+    "failure": "1b87a541fc8a9f98245e0494c228671f6bed0b4725e78f8db2ae4dfd7f74efe7",
+    "checkpoint": "7b7c115d8eb7ebd45f140788669e8aa12990237c64e38de860074f2e98651b61"
+  },
+  "claim_boundary": "This proves ten accepted model-generated semantic-signal updates and durable step artifacts, but not completed checkpoint selection, held-out usefulness, or deployment. The stopped execution is not a GRPO win or loss."
+}

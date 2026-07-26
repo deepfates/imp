@@ -30,6 +30,8 @@ defmodule LocalGRPOBanking77.Runner do
   @model "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775"
   @seed 20_260_725
   @treatment_id "model-generated-banking77-json-two-padded-epochs-v1"
+  @pre_framing_fix_runner_sha256 "5b3309e4832e4dc484f36c38db16fc5fbda9dcc41922e392553a4366d9bbb34c"
+  @base_selection_stage_sha256 "6f38b09ada8f30e6db207392d8438ea2d4f44180ea2811e0000750901d22bd89"
   @routes ["R17", "R42", "R68", "R93"]
   @train_ids ~w(
     banking77-train-2511 banking77-train-2512 banking77-train-2513 banking77-train-2514
@@ -43,22 +45,53 @@ defmodule LocalGRPOBanking77.Runner do
   )
 
   def run do
-    if System.get_env("IMP_GRPO_FRESH") == "1", do: fresh(), else: parent()
+    cond do
+      System.get_env("IMP_GRPO_FRESH") == "1" -> fresh()
+      System.get_env("IMP_GRPO_RESUME_PREFLIGHT_ONLY") == "1" -> resume_preflight()
+      true -> parent()
+    end
+  end
+
+  defp resume_preflight do
+    paths = paths!()
+    require_resume_output!(paths)
+    _rows = preflight!(paths, :verify)
+
+    unless sha256_file(Path.join(paths.output, "01-base-selection.json")) ==
+             @base_selection_stage_sha256,
+           do: raise("retained base-selection stage drift")
+
+    IO.puts("GRPO resume preflight complete")
   end
 
   defp parent do
     paths = paths!()
-    require_new_output!(paths.output)
-    run_parent(paths)
+    resume? = System.get_env("IMP_GRPO_RESUME") == "1"
+
+    if resume?,
+      do: require_resume_output!(paths),
+      else: require_new_output!(paths.output)
+
+    run_parent(paths, resume?)
   end
 
-  defp run_parent(paths) do
-    rows = preflight!(paths)
+  defp run_parent(paths, resume?) do
+    rows = preflight!(paths, if(resume?, do: :verify, else: :write))
     trainer = trainer(paths, {:local_grpo_banking77, @seed})
     portable = program(Imp.req_llm("openai:portable-base"))
 
-    base_selection = with_base(trainer, fn lm -> evaluate(program(lm), rows.selection) end)
-    Atomic.write!(Path.join(paths.output, "01-base-selection.json"), base_selection)
+    base_selection =
+      if resume? do
+        unless sha256_file(Path.join(paths.output, "01-base-selection.json")) ==
+                 @base_selection_stage_sha256,
+               do: raise("retained base-selection stage drift")
+
+        read_json!(Path.join(paths.output, "01-base-selection.json"))
+      else
+        stage = with_base(trainer, fn lm -> evaluate(program(lm), rows.selection) end)
+        Atomic.write!(Path.join(paths.output, "01-base-selection.json"), stage)
+        stage
+      end
 
     training_lm = %TRLLM{
       model: @model,
@@ -237,7 +270,7 @@ defmodule LocalGRPOBanking77.Runner do
 
   defp fresh do
     paths = paths!()
-    rows = preflight!(paths)
+    rows = preflight!(paths, :verify)
     job = TrainingJob.load!(paths.job)
     portable = Imp.load!(paths.program)
     trainer = trainer(paths, {:local_grpo_banking77_fresh, @seed})
@@ -284,7 +317,7 @@ defmodule LocalGRPOBanking77.Runner do
     end
   end
 
-  defp preflight!(paths) do
+  defp preflight!(paths, mode) when mode in [:write, :verify] do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     unless File.regular?(paths.python), do: raise("pinned TRL Python is missing")
     unless File.dir?(paths.model), do: raise("pinned Qwen snapshot is missing")
@@ -324,8 +357,27 @@ defmodule LocalGRPOBanking77.Runner do
       test_ids: Enum.map(test, & &1["id"])
     }
 
-    Atomic.write!(Path.join(paths.output, "00-preflight.json"), stage)
+    case mode do
+      :write -> Atomic.write!(Path.join(paths.output, "00-preflight.json"), stage)
+      :verify -> verify_retained_preflight!(paths, stage)
+    end
+
     %{train: train, selection: selection, test: test}
+  end
+
+  defp verify_retained_preflight!(paths, current) do
+    retained = read_json!(Path.join(paths.output, "00-preflight.json"))
+    retained_runner = Map.fetch!(retained, "runner_sha256")
+    current_runner = current.runner_sha256
+
+    unless retained_runner in [current_runner, @pre_framing_fix_runner_sha256],
+      do: raise("retained GRPO runner identity is not an approved predecessor")
+
+    retained_identity = Map.delete(retained, "runner_sha256")
+    current_identity = current |> stringify_keys() |> Map.delete("runner_sha256")
+
+    unless retained_identity == current_identity,
+      do: raise("retained GRPO preflight identity drift")
   end
 
   defp trainer(paths, key) do
@@ -526,6 +578,20 @@ defmodule LocalGRPOBanking77.Runner do
     end
   end
 
+  defp require_resume_output!(paths) do
+    required = [
+      Path.join(paths.output, "00-preflight.json"),
+      Path.join(paths.output, "01-base-selection.json"),
+      Path.join(paths.output, "grpo-checkpoint.bin")
+    ]
+
+    unless Enum.all?(required, &File.regular?/1),
+      do: raise("IMP_GRPO_RESUME requires retained preflight, base selection, and checkpoint")
+
+    if File.regular?(Path.join(paths.output, "result.json")),
+      do: raise("completed GRPO output cannot be resumed")
+  end
+
   defp train_steps, do: positive_env!("IMP_GRPO_TRAIN_STEPS", 10)
   defp train_width, do: positive_env!("IMP_GRPO_TRAIN_WIDTH", 4)
 
@@ -545,6 +611,12 @@ defmodule LocalGRPOBanking77.Runner do
   defp sha256_file(path) do
     path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
   end
+
+  defp stringify_keys(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {to_string(key), stringify_keys(value)} end)
+
+  defp stringify_keys(list) when is_list(list), do: Enum.map(list, &stringify_keys/1)
+  defp stringify_keys(value), do: value
 end
 
 unless System.get_env("IMP_GRPO_DEFINE_ONLY") == "1", do: LocalGRPOBanking77.Runner.run()

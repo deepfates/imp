@@ -9,6 +9,7 @@ Mutation is possible only through a sealed imp_trl_grpo_update envelope.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import math
@@ -1367,6 +1368,12 @@ def dispatch(worker: Worker, request: dict[str, Any]) -> Any:
     raise WorkerError("unknown_operation", "operation is not allowlisted")
 
 
+def dispatch_quiet(worker: Worker, request: dict[str, Any]) -> Any:
+    """Keep third-party logs off the framed stdout control channel."""
+    with contextlib.redirect_stdout(sys.stderr):
+        return dispatch(worker, request)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
@@ -1380,7 +1387,7 @@ def main() -> int:
             request = json.loads(frame)
             if not isinstance(request, dict):
                 raise WorkerError("invalid_request", "request must be an object")
-            write_frame({"ok": True, "result": dispatch(worker, request)})
+            write_frame({"ok": True, "result": dispatch_quiet(worker, request)})
         except WorkerError as error:
             write_frame(
                 {

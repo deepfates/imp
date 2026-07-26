@@ -152,3 +152,15 @@ the earliest trained checkpoint, then the stable outer comparison may still
 retain base. The condition is frozen before execution; neutral or negative
 behavior remains valid and will not trigger prompt, reward, normalization,
 model, or hyperparameter adjustment.
+
+If the caller stops after a durable GRPO checkpoint, resume the same treatment
+without repeating base evaluation or an accepted optimizer update:
+
+```sh
+export IMP_GRPO_RESUME=1
+mix run examples/local_grpo_banking77/run.exs
+```
+
+Resume verifies the retained data, schedule, model, contract, preflight, and
+base-stage bytes before reconciling the same session. Fresh-process
+reproduction verifies that preflight without rewriting it.
