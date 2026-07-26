@@ -93,6 +93,7 @@ defmodule PublicSurfaceTest do
     Imp.Optimize.Anything.Config.Reflection,
     Imp.Optimize.Anything.Config.Tracking,
     Imp.Optimize.Anything.Result,
+    Imp.Optimize.Anything.StructuredStrategy,
     Imp.Optimizer,
     Imp.Optimizer.Artifact,
     Imp.Optimizer.Avatar,

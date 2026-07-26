@@ -11,31 +11,106 @@ defmodule Imp.Optimize.Anything.StructuredCandidate do
   @payload_type "imp_optimize_anything_structured_component"
   @payload_version 1
 
-  @enforce_keys [:schema, :digest, :proposal_contract]
-  defstruct [:schema, :digest, :proposal_contract]
+  @enforce_keys [:schema, :digest, :proposal_contract, :strategy_identity]
+  defstruct [:schema, :digest, :proposal_contract, :strategy_identity]
 
   @type t :: %__MODULE__{
           schema: map(),
           digest: String.t(),
-          proposal_contract: :off | :auto | :required
+          proposal_contract: :off | :auto | :required,
+          strategy_identity: String.t() | nil
         }
 
   @doc false
-  def new!(artifact, proposal_contract \\ :off)
+  def new!(artifact, proposal_contract \\ :off, strategy_identity \\ nil)
 
-  def new!(artifact, proposal_contract)
+  def new!(artifact, proposal_contract, strategy_identity)
       when is_map(artifact) and map_size(artifact) > 0 and
-             proposal_contract in [:off, :auto, :required] do
+             proposal_contract in [:off, :auto, :required] and
+             (is_nil(strategy_identity) or is_binary(strategy_identity)) do
     validate_component_keys!(artifact)
     schema = Map.new(artifact, fn {key, value} -> {key, schema!(value, [key])} end)
-    digest = {schema, proposal_contract} |> :erlang.term_to_binary([:deterministic]) |> sha256()
-    %__MODULE__{schema: schema, digest: digest, proposal_contract: proposal_contract}
+
+    identity_term =
+      if is_nil(strategy_identity),
+        do: {schema, proposal_contract},
+        else: {schema, proposal_contract, strategy_identity}
+
+    digest =
+      identity_term
+      |> :erlang.term_to_binary([:deterministic])
+      |> sha256()
+
+    %__MODULE__{
+      schema: schema,
+      digest: digest,
+      proposal_contract: proposal_contract,
+      strategy_identity: strategy_identity
+    }
   end
 
-  def new!(artifact, proposal_contract) do
+  def new!(artifact, proposal_contract, strategy_identity) do
     raise ArgumentError,
-          "structured Optimize Anything seed must be a non-empty map and proposal contract must be :off, :auto, or :required, got: #{inspect({artifact, proposal_contract})}"
+          "structured Optimize Anything seed must be a non-empty map, proposal contract must be :off, :auto, or :required, and strategy identity must be nil or a string, got: #{inspect({artifact, proposal_contract, strategy_identity})}"
   end
+
+  @doc false
+  def to_map(%__MODULE__{} = codec) do
+    %{
+      "type" => "imp_optimize_anything_structured_candidate_codec",
+      "schema_version" => 1,
+      "schema" => Report.encode_term(codec.schema),
+      "digest" => codec.digest,
+      "proposal_contract" => Atom.to_string(codec.proposal_contract),
+      "strategy_identity" => codec.strategy_identity
+    }
+  end
+
+  @doc false
+  def from_map(
+        %{"type" => "imp_optimize_anything_structured_candidate_codec", "schema_version" => 1} =
+          map
+      ) do
+    proposal_contract = String.to_existing_atom(Map.fetch!(map, "proposal_contract"))
+    schema_payload = Map.fetch!(map, "schema")
+
+    # ReflectionStrategy wraps the complete contextual state in Report's
+    # lossless codec. On that path the nested schema is already decoded before
+    # Bridge.load_state/1 runs; direct Config/JSON persistence still carries
+    # the tagged representation emitted by to_map/1.
+    schema =
+      if is_map(schema_payload) and Map.has_key?(schema_payload, "__imp_type__") do
+        Report.decode_term(schema_payload)
+      else
+        schema_payload
+      end
+
+    codec = %__MODULE__{
+      schema: schema,
+      digest: Map.fetch!(map, "digest"),
+      proposal_contract: proposal_contract,
+      strategy_identity: Map.get(map, "strategy_identity")
+    }
+
+    identity_term =
+      if is_nil(codec.strategy_identity),
+        do: {schema, proposal_contract},
+        else: {schema, proposal_contract, codec.strategy_identity}
+
+    expected =
+      identity_term
+      |> :erlang.term_to_binary([:deterministic])
+      |> sha256()
+
+    unless expected == codec.digest do
+      raise ArgumentError, "structured candidate codec digest mismatch"
+    end
+
+    codec
+  end
+
+  def from_map(value),
+    do: raise(ArgumentError, "invalid structured candidate codec: #{inspect(value)}")
 
   @doc false
   def response_format(%__MODULE__{} = codec, component) do

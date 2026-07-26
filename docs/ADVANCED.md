@@ -57,9 +57,15 @@ validated. The selected mode contributes to checkpoint identity; changing it
 cannot silently resume prior proposal work.
 
 Structured mode currently rejects refiners, merge, external tracking, custom
-callbacks, reflection strategies, and custom candidate/module selectors because those extensions
-consume GEPA's text-component representation. Built-in selection, caching,
-atomic checkpoints, resume, and best-output persistence remain supported.
+callbacks, text reflection strategies, and custom candidate/module selectors
+because those extensions consume GEPA's text-component representation. Native
+artifact mutation is configurable through
+`Imp.Optimize.Anything.StructuredStrategy`: its `propose/4` callback receives
+the complete typed artifact and must return a complete typed artifact. Exact
+shape/type validation and selected-component isolation happen before admission,
+and the consumer-owned strategy id/config are bound into checkpoint identity.
+Built-in selection, caching, atomic checkpoints, resume, and best-output
+persistence remain supported.
 
 Evaluators may return a numeric score or `{score, side_information}`. Side
 information can contain component-specific feedback, objective subscores, and

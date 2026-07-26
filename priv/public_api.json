@@ -3514,6 +3514,79 @@
     {
       "callbacks": [
         {
+          "name": "propose/4",
+          "optional": false
+        }
+      ],
+      "category": "advanced",
+      "functions": [
+        "from_map/1",
+        "identity/1",
+        "new/2",
+        "to_map/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimize.Anything.StructuredStrategy",
+      "signatures": {
+        "callbacks": {
+          "propose/4": []
+        },
+        "functions": {
+          "from_map/1": [
+            "from_map(map)"
+          ],
+          "identity/1": [
+            "identity(structured_strategy)"
+          ],
+          "new/2": [
+            "new(module, opts)"
+          ],
+          "to_map/1": [
+            "to_map(strategy)"
+          ]
+        },
+        "types": {
+          "artifact/0": [],
+          "component/0": [],
+          "proposal/0": [],
+          "reflective_dataset/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimize/anything/structured_strategy.ex",
+      "struct_fields": [
+        "config",
+        "id",
+        "identity",
+        "module"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "artifact/0"
+        },
+        {
+          "kind": "type",
+          "name": "component/0"
+        },
+        {
+          "kind": "type",
+          "name": "proposal/0"
+        },
+        {
+          "kind": "type",
+          "name": "reflective_dataset/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [
+        {
           "name": "__optimizer__/0",
           "optional": false
         },

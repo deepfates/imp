@@ -137,6 +137,7 @@
         "Imp.Datasets.HotPotQA",
         "Imp.Datasets.MATH",
         "Imp.Optimize.Anything",
+        "Imp.Optimize.Anything.StructuredStrategy",
         "Imp.Optimizer.Artifact",
         "Imp.Optimizer.Avatar",
         "Imp.Optimizer.BetterTogether",

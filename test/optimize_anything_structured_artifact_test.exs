@@ -2,7 +2,7 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
   use ExUnit.Case, async: true
 
   alias Imp.Optimize.Anything
-  alias Imp.Optimize.Anything.{Config, Result}
+  alias Imp.Optimize.Anything.{Config, Result, StructuredStrategy}
   alias Imp.Optimizer.Report
 
   defmodule SchemaCapableLM do
@@ -14,6 +14,53 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
     end
 
     def response_format_capability(_lm), do: Imp.LM.Capability.json_schema()
+  end
+
+  defmodule NativeArtifactStrategy do
+    @behaviour StructuredStrategy
+
+    @impl true
+    def propose(candidate, dataset, components, config) do
+      unless is_boolean(candidate.enabled) and is_integer(candidate.retries) and
+               is_map(candidate.policy) and is_list(candidate.policy.weights) and
+               is_map(dataset) and Enum.all?(components, &is_atom/1) do
+        raise "strategy did not receive native artifact values"
+      end
+
+      {:ok,
+       %{
+         enabled: config["enabled"],
+         name: config["name"],
+         policy: %{
+           route: config["route"],
+           weights: config["weights"],
+           note: nil
+         },
+         retries: config["retries"]
+       }, %{native_artifact_strategy: true}}
+    end
+  end
+
+  defmodule ChangesUnselectedStrategy do
+    @behaviour StructuredStrategy
+
+    @impl true
+    def propose(candidate, _dataset, _components, _config) do
+      %{candidate | enabled: true, retries: candidate.retries + 1}
+    end
+  end
+
+  defmodule InvalidArtifactStrategy do
+    @behaviour StructuredStrategy
+
+    @impl true
+    def propose(candidate, _dataset, _components, %{"mode" => "partial"}),
+      do: Map.delete(candidate, :retries)
+
+    def propose(candidate, _dataset, _components, %{"mode" => "type_drift"}),
+      do: Map.put(candidate, :retries, "three")
+
+    def propose(candidate, _dataset, _components, %{"mode" => "no_op"}), do: candidate
   end
 
   test "optimizes a native mixed-type artifact without exposing the text-engine codec" do
@@ -98,6 +145,174 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
 
     assert Result.best_candidate(restored) == target
     assert restored.candidates == result.candidates
+  end
+
+  test "native structured strategy mutates a complete artifact and resumes with stable identity" do
+    seed = %{
+      enabled: false,
+      name: "baseline",
+      policy: %{route: "slow", weights: [1.0, 0.0], note: nil},
+      retries: 1
+    }
+
+    target = %{
+      enabled: true,
+      name: "selected",
+      policy: %{route: "fast", weights: [0.25, 0.75], note: nil},
+      retries: 3
+    }
+
+    strategy =
+      StructuredStrategy.new(NativeArtifactStrategy,
+        id: "mixed-routing/v1",
+        config: %{
+          "enabled" => true,
+          "name" => "selected",
+          "route" => "fast",
+          "weights" => [0.25, 0.75],
+          "retries" => 3
+        }
+      )
+
+    config =
+      Config.new(
+        engine: [max_candidate_proposals: 1, seed: 41],
+        reflection: [module_selector: :all, structured_strategy: strategy]
+      )
+
+    assert config |> Config.to_map() |> Jason.encode!() |> Jason.decode!() |> Config.from_map() ==
+             config
+
+    evaluator = fn artifact, _example -> matching_components(artifact, target) end
+
+    result =
+      Anything.run(seed, evaluator,
+        dataset: [%{split: :train}],
+        valset: [%{split: :selection}],
+        config: config
+      )
+
+    assert seed.enabled == false
+    assert Result.best_candidate(result) == target
+    assert result.validation_scores == [0.0, 1.0]
+    assert get_in(result.history, [Access.all(), :reflection_metadata]) != []
+
+    # Application is the ordinary native object boundary, not a Result-only
+    # text wrapper: a consumer can use the selected typed values directly.
+    consumer = fn artifact, latency_ms ->
+      artifact.enabled and latency_ms <= artifact.retries * 10
+    end
+
+    assert consumer.(Result.best_candidate(result), 20)
+    refute consumer.(seed, 20)
+
+    checkpoint = result.checkpoint |> Jason.encode!() |> Jason.decode!()
+
+    resumed =
+      Anything.run(seed, evaluator,
+        dataset: [%{split: :train}],
+        valset: [%{split: :selection}],
+        config: config,
+        resume_state: checkpoint
+      )
+
+    assert Result.best_candidate(resumed) == target
+    assert resumed.total_metric_calls == result.total_metric_calls
+    assert resumed.candidates == result.candidates
+
+    drifted =
+      StructuredStrategy.new(NativeArtifactStrategy,
+        id: "mixed-routing/v2",
+        config: strategy.config
+      )
+
+    assert_raise ArgumentError, ~r/resume checkpoint is invalid/, fn ->
+      Anything.run(seed, evaluator,
+        dataset: [%{split: :train}],
+        valset: [%{split: :selection}],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1, seed: 41],
+            reflection: [module_selector: :all, structured_strategy: drifted]
+          ),
+        resume_state: checkpoint
+      )
+    end
+  end
+
+  test "native structured strategy cannot mutate outside the selected component" do
+    strategy =
+      StructuredStrategy.new(ChangesUnselectedStrategy,
+        id: "unselected-change/v1"
+      )
+
+    result =
+      Anything.run(
+        %{enabled: false, retries: 1},
+        fn artifact, _example -> if artifact.enabled, do: 1.0, else: 0.0 end,
+        dataset: [:train],
+        valset: [:selection],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1, raise_on_exception: false],
+            reflection: [module_selector: :round_robin, structured_strategy: strategy]
+          )
+      )
+
+    assert result.candidates == [%{enabled: false, retries: 1}]
+    assert inspect(result.rejected) =~ "structured_strategy_changed_unselected_components"
+  end
+
+  test "native structured strategy rejects partial, type-drift, and no-op candidates" do
+    Enum.each(["partial", "type_drift", "no_op"], fn mode ->
+      strategy =
+        StructuredStrategy.new(InvalidArtifactStrategy,
+          id: "invalid-artifact/#{mode}/v1",
+          config: %{"mode" => mode}
+        )
+
+      result =
+        Anything.run(
+          %{enabled: false, retries: 1},
+          fn artifact, _example -> if artifact.enabled, do: 1.0, else: 0.0 end,
+          dataset: [:train],
+          valset: [:selection],
+          config:
+            Config.new(
+              engine: [max_candidate_proposals: 1, raise_on_exception: false],
+              reflection: [module_selector: :all, structured_strategy: strategy]
+            )
+        )
+
+      assert result.candidates == [%{enabled: false, retries: 1}]
+
+      if mode == "no_op" do
+        assert result.reflection_calls == 1
+        assert inspect(result.rejected) =~ "no_op_structured_strategy_candidate"
+      else
+        assert inspect(result.rejected) =~ "invalid_structured_strategy_candidate"
+      end
+    end)
+  end
+
+  test "structured strategy rejects text candidates before evaluator or adapter work" do
+    strategy =
+      StructuredStrategy.new(InvalidArtifactStrategy,
+        id: "structured-only/v1",
+        config: %{"mode" => "no_op"}
+      )
+
+    assert_raise ArgumentError,
+                 ~r/structured_strategy requires a native structured artifact/,
+                 fn ->
+                   Anything.run("text", fn _candidate -> 0.0 end,
+                     config:
+                       Config.new(
+                         engine: [max_candidate_proposals: 0],
+                         reflection: [structured_strategy: strategy]
+                       )
+                   )
+                 end
   end
 
   test "strict reflection decoding rejects malformed, partial, type-drift, and no-op values" do

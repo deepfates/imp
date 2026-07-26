@@ -294,6 +294,7 @@ defmodule Imp.Optimize.Anything.Config do
     @moduledoc "Reflection proposal and minibatch settings."
 
     alias Imp.Optimize.Anything.Config.Persistence
+    alias Imp.Optimize.Anything.StructuredStrategy
     alias Imp.Optimizer.GEPA.ReflectionStrategy
 
     @enum_fields [:batch_sampler, :module_selector, :structured_response_format]
@@ -308,6 +309,7 @@ defmodule Imp.Optimize.Anything.Config do
         default: :off
       ],
       reflection_strategy: [type: :any, default: nil],
+      structured_strategy: [type: :any, default: nil],
       reflection_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
       reflection_prompt_template: [type: {:or, [:string, :map, nil]}, default: nil],
       custom_candidate_proposer: [type: :any, default: nil]
@@ -320,6 +322,7 @@ defmodule Imp.Optimize.Anything.Config do
               module_selector: :round_robin,
               structured_response_format: :off,
               reflection_strategy: nil,
+              structured_strategy: nil,
               reflection_lm: nil,
               reflection_prompt_template: nil,
               custom_candidate_proposer: nil
@@ -336,16 +339,33 @@ defmodule Imp.Optimize.Anything.Config do
       BatchSampler.strategy_minibatch_size(config.batch_sampler, config.reflection_minibatch_size)
       ModuleSelector.validate!(config.module_selector)
       ReflectionStrategy.validate!(config.reflection_strategy)
+      StructuredStrategy.validate!(config.structured_strategy)
       validate_proposer!(config.custom_candidate_proposer)
       config
     end
 
     @spec to_map(t()) :: map()
-    def to_map(%__MODULE__{} = config), do: Persistence.encode(config)
+    def to_map(%__MODULE__{} = config) do
+      config
+      |> Map.from_struct()
+      |> Map.update!(:structured_strategy, fn
+        nil -> nil
+        strategy -> StructuredStrategy.to_map(strategy)
+      end)
+      |> then(&struct!(__MODULE__, &1))
+      |> Persistence.encode()
+    end
 
     @spec from_map(map()) :: t()
-    def from_map(map),
-      do: map |> Persistence.options!("#{inspect(__MODULE__)}.from_map/1", @enum_fields) |> new()
+    def from_map(map) do
+      map
+      |> Persistence.options!("#{inspect(__MODULE__)}.from_map/1", @enum_fields)
+      |> Keyword.update(:structured_strategy, nil, fn
+        nil -> nil
+        strategy -> StructuredStrategy.from_map(strategy)
+      end)
+      |> new()
+    end
 
     defp validate_proposer!(nil), do: :ok
     defp validate_proposer!(proposer) when is_function(proposer, 4), do: :ok

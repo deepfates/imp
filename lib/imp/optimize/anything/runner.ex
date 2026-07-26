@@ -9,6 +9,7 @@ defmodule Imp.Optimize.Anything.Runner do
     Progress,
     Result,
     StructuredCandidate,
+    StructuredStrategy,
     Tracking
   }
 
@@ -112,6 +113,7 @@ defmodule Imp.Optimize.Anything.Runner do
         checkpoint_fn: checkpoint_callback(config, Keyword.get(opts, :checkpoint_fn))
       )
       |> Keyword.put(:reject_identical_candidate, not is_nil(structured_codec))
+      |> put_structured_strategy(config, structured_codec)
       |> normalize_iteration_limit(opts)
 
     try do
@@ -231,7 +233,19 @@ defmodule Imp.Optimize.Anything.Runner do
     if Enum.all?(seed, fn {_component, value} -> is_binary(value) end) do
       {Candidate.validate!(seed), :named, nil, nil}
     else
-      codec = StructuredCandidate.new!(seed, config.reflection.structured_response_format)
+      strategy_identity =
+        case config.reflection.structured_strategy do
+          nil -> nil
+          strategy -> StructuredStrategy.identity(strategy)
+        end
+
+      codec =
+        StructuredCandidate.new!(
+          seed,
+          config.reflection.structured_response_format,
+          strategy_identity
+        )
+
       {StructuredCandidate.encode_candidate!(codec, seed), :structured, nil, codec}
     end
   end
@@ -266,13 +280,14 @@ defmodule Imp.Optimize.Anything.Runner do
 
   defp proposer(config, opts, structured_codec) do
     cond do
-      not is_nil(config.reflection.reflection_strategy) ->
+      not is_nil(config.reflection.reflection_strategy) or
+          not is_nil(config.reflection.structured_strategy) ->
         # The released GEPA strategy API owns reflective mutation. Engine.run/6
         # still accepts a proposer for the non-strategy path, so keep that
         # requirement explicit without accidentally invoking another proposal
         # source or requiring a reflection LM.
         fn _candidate, _component, _records, _iteration ->
-          raise "reflection_strategy owns Optimize Anything proposals"
+          raise "configured strategy owns Optimize Anything proposals"
         end
 
       is_function(config.reflection.custom_candidate_proposer, 4) ->
@@ -468,7 +483,13 @@ defmodule Imp.Optimize.Anything.Runner do
     end
   end
 
-  defp validate_candidate_support!(nil, _config), do: :ok
+  defp validate_candidate_support!(nil, %{reflection: %{structured_strategy: nil}}), do: :ok
+
+  defp validate_candidate_support!(nil, %{reflection: %{structured_strategy: strategy}})
+       when not is_nil(strategy) do
+    raise ArgumentError,
+          "structured_strategy requires a native structured artifact seed; text and named-text candidates must use reflection_strategy"
+  end
 
   defp validate_candidate_support!(%StructuredCandidate{}, config) do
     unsupported =
@@ -516,6 +537,23 @@ defmodule Imp.Optimize.Anything.Runner do
     end
 
     :ok
+  end
+
+  defp put_structured_strategy(opts, %{reflection: %{structured_strategy: nil}}, _codec),
+    do: opts
+
+  defp put_structured_strategy(opts, config, %StructuredCandidate{} = codec) do
+    Keyword.put(
+      opts,
+      :reflection_strategy,
+      StructuredStrategy.bridge(config.reflection.structured_strategy, codec)
+    )
+  end
+
+  defp put_structured_strategy(_opts, %{reflection: %{structured_strategy: strategy}}, nil)
+       when not is_nil(strategy) do
+    raise ArgumentError,
+          "structured_strategy requires a native structured artifact seed; text and named-text candidates must use reflection_strategy"
   end
 
   defp inject_refiner_prompt(candidate, %{refiner: nil}, _opts), do: candidate

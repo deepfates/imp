@@ -1092,10 +1092,18 @@ Pinned GEPA v0.1.4 defines candidates as `str | dict[str, str]`. Imp additionall
 supports typed structured maps with seed-derived exact keys, list lengths, and
 value types. Evaluators and proposers see the native artifact, not its internal
 checkpoint encoding. Invalid JSON, missing fields, type drift, and no-op
-proposals are rejected. Refiner, merge, external tracking, custom callbacks,
-reflection strategies, and custom selectors remain text-only and are rejected up front in structured
-mode rather than receiving an encoded substitute. The `__imp_type__` key is
-reserved at every depth for Imp's durable wire tags.
+proposals are rejected. A configurable native mutation module can be installed
+with `Imp.Optimize.Anything.StructuredStrategy.new/2` and
+`reflection: [structured_strategy: strategy]`. Its `propose/4` callback receives
+the complete native artifact, reflective data, selected top-level components,
+and JSON-native configuration; it returns a complete replacement artifact.
+Imp rejects shape/type drift and changes outside the selected components. The
+stable strategy id, module, and config are persisted and bound into candidate
+checkpoint identity, so resume refuses drift before evaluation. Refiner, merge,
+external tracking, custom callbacks, text reflection strategies, and custom
+selectors remain text-only and are rejected up front in structured mode rather
+than receiving an encoded substitute. The `__imp_type__` key is reserved at
+every depth for Imp's durable wire tags.
 
 For model-backed structured proposals, set
 `reflection: [structured_response_format: :required]` to send a strict,
