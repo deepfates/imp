@@ -42,6 +42,7 @@ defmodule Imp.Optimize.Anything.Runner do
     :config,
     :dataset,
     :evaluator_contract,
+    :evaluator_identity,
     :fallback_max_iterations,
     :fallback_proposer,
     :objective,
@@ -60,6 +61,8 @@ defmodule Imp.Optimize.Anything.Runner do
     {mode, trainset, valset} = datasets(opts)
     validate_runtime_support!(config, opts)
 
+    evaluator_identity = validate_evaluator_identity!(Keyword.get(opts, :evaluator_identity))
+
     {candidate, candidate_format, string_key, structured_codec} =
       normalize_seed(seed_candidate, config, opts, trainset)
 
@@ -71,7 +74,16 @@ defmodule Imp.Optimize.Anything.Runner do
         candidate_format: candidate_format,
         candidate_key: string_key || @string_candidate_key,
         structured_codec: structured_codec,
-        checkpoint_identity: checkpoint_identity(mode, trainset, valset),
+        checkpoint_identity:
+          checkpoint_identity(
+            mode,
+            trainset,
+            valset,
+            evaluator,
+            Keyword.get(opts, :batch_evaluator),
+            Keyword.get(opts, :evaluator_contract, :standard),
+            evaluator_identity
+          ),
         evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
         batch_evaluator: Keyword.get(opts, :batch_evaluator),
         raise_on_exception: config.engine.raise_on_exception,
@@ -675,14 +687,64 @@ defmodule Imp.Optimize.Anything.Runner do
   defp minimum_limit(left, nil), do: left
   defp minimum_limit(left, right), do: min(left, right)
 
-  defp checkpoint_identity(mode, trainset, valset) do
+  defp checkpoint_identity(
+         mode,
+         trainset,
+         valset,
+         evaluator,
+         batch_evaluator,
+         evaluator_contract,
+         declared_identity
+       ) do
     %{
       "type" => "imp_optimize_anything_run_identity",
-      "schema_version" => 1,
+      "schema_version" => 2,
       "mode" => Atom.to_string(mode),
       "trainset_sha256" => dataset_digest!(trainset, :dataset),
-      "valset_sha256" => dataset_digest!(valset, :valset)
+      "valset_sha256" => dataset_digest!(valset, :valset),
+      "evaluation_sha256" =>
+        evaluation_digest!(
+          evaluator,
+          batch_evaluator,
+          evaluator_contract,
+          declared_identity
+        )
     }
+  end
+
+  defp evaluation_digest!(evaluator, batch_evaluator, contract, declared_identity) do
+    %{
+      evaluator: callback_identity(evaluator),
+      batch_evaluator: callback_identity(batch_evaluator),
+      contract: contract,
+      declared_identity: declared_identity
+    }
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
+  defp callback_identity(nil), do: nil
+
+  defp callback_identity(callback) when is_function(callback) do
+    Map.new([:module, :name, :arity, :type, :uniq, :index], fn key ->
+      value = callback |> :erlang.fun_info(key) |> elem(1)
+      {key, if(is_atom(value), do: Atom.to_string(value), else: value)}
+    end)
+  end
+
+  defp validate_evaluator_identity!(nil), do: nil
+
+  defp validate_evaluator_identity!(identity) do
+    Config.Persistence.json_safe!(identity, [:evaluator_identity])
+  rescue
+    error in ArgumentError ->
+      reraise ArgumentError,
+              [
+                message:
+                  "Optimize Anything :evaluator_identity must be JSON-safe versioned data: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   defp dataset_digest!(dataset, name) do

@@ -476,7 +476,7 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     assert first.validation_scores == [0.1]
     assert_receive {:evaluated, "base", :old_selection}
 
-    assert_raise ArgumentError, ~r/resume dataset identity mismatch/, fn ->
+    assert_raise ArgumentError, ~r/resume run identity mismatch/, fn ->
       Anything.run(
         "base",
         evaluator,
@@ -488,6 +488,70 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     end
 
     refute_receive {:evaluated, "base", :new_selection}
+  end
+
+  test "resume binds evaluator implementation, contract, and declared semantic identity" do
+    receiver = self()
+
+    evaluator = fn candidate ->
+      send(receiver, {:evaluated_v1, candidate})
+      0.25
+    end
+
+    options =
+      runner_options(0,
+        evaluator_identity: %{id: "retry-policy-score", version: 1}
+      )
+
+    first = Anything.run("base", evaluator, options)
+    assert_receive {:evaluated_v1, "base"}
+
+    changed_evaluator = fn candidate ->
+      send(receiver, {:evaluated_v2, candidate})
+      1.0
+    end
+
+    stateful_evaluator = fn candidate, _state ->
+      send(receiver, {:evaluated_stateful, candidate})
+      1.0
+    end
+
+    for {evaluator_for_resume, changed} <- [
+          {evaluator, [evaluator_identity: %{id: "retry-policy-score", version: 2}]},
+          {stateful_evaluator, [evaluator_contract: :with_optimization_state]},
+          {changed_evaluator, []}
+        ] do
+      assert_raise ArgumentError, ~r/resume run identity mismatch/, fn ->
+        Anything.run(
+          "base",
+          evaluator_for_resume,
+          options
+          |> Keyword.merge(changed)
+          |> Keyword.put(:resume_state, first.checkpoint)
+        )
+      end
+    end
+
+    refute_receive {:evaluated_v1, _candidate}
+    refute_receive {:evaluated_v2, _candidate}
+    refute_receive {:evaluated_stateful, _candidate}
+  end
+
+  test "evaluator identities reject runtime values before evaluation" do
+    receiver = self()
+
+    assert_raise ArgumentError, ~r/:evaluator_identity must be JSON-safe/, fn ->
+      Anything.run(
+        "base",
+        fn candidate ->
+          send(receiver, {:evaluated, candidate})
+          1.0
+        end,
+        runner_options(0, evaluator_identity: %{version: fn -> 1 end})
+      )
+    end
+
+    refute_receive {:evaluated, _candidate}
   end
 
   test "batch checkpoint resume preserves adapter history and does not duplicate calls" do

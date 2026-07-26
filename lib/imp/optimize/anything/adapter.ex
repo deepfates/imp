@@ -273,7 +273,7 @@ defmodule Imp.Optimize.Anything.Adapter do
 
     unless stored == expected do
       raise ArgumentError,
-            "Optimize Anything resume dataset identity mismatch: stored #{inspect(stored)}, requested #{inspect(expected)}"
+            "Optimize Anything resume run identity mismatch: stored #{inspect(stored)}, requested #{inspect(expected)}"
     end
 
     validate_restored_optimization_state!(state, adapter.best_example_evals_k)
@@ -284,7 +284,7 @@ defmodule Imp.Optimize.Anything.Adapter do
   def set_adapter_state(%__MODULE__{checkpoint_identity: expected}, state)
       when is_map(expected) and is_map(state) do
     raise ArgumentError,
-          "Optimize Anything resume checkpoint predates dataset identity binding and cannot be resumed safely"
+          "Optimize Anything resume checkpoint predates run identity binding and cannot be resumed safely"
   end
 
   defp validate_restored_optimization_state!(states, limit) do
