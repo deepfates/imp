@@ -13,6 +13,8 @@ defmodule Imp.Optimize.Anything.Adapter do
   @candidate_formats [:named, :string, :structured]
   @default_candidate_key :current_candidate
   @default_best_example_evals_k 30
+  @checkpoint_state_type "imp_optimize_anything_adapter_state"
+  @checkpoint_state_version 1
 
   defmodule OptimizationState do
     @moduledoc false
@@ -34,6 +36,7 @@ defmodule Imp.Optimize.Anything.Adapter do
     evaluator_contract: :standard,
     optimization_state: nil,
     optimization_state_store: nil,
+    checkpoint_identity: nil,
     refiner: nil,
     best_example_evals_k: @default_best_example_evals_k,
     capture_stdio: false,
@@ -55,6 +58,7 @@ defmodule Imp.Optimize.Anything.Adapter do
           evaluator_contract: evaluator_contract(),
           optimization_state: OptimizationState.t() | (term() -> OptimizationState.t()),
           optimization_state_store: pid(),
+          checkpoint_identity: map() | nil,
           refiner: keyword() | nil,
           best_example_evals_k: non_neg_integer(),
           capture_stdio: boolean(),
@@ -91,6 +95,7 @@ defmodule Imp.Optimize.Anything.Adapter do
       structured_codec: Keyword.get(opts, :structured_codec),
       evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
       optimization_state: Keyword.get(opts, :optimization_state, %OptimizationState{}),
+      checkpoint_identity: Keyword.get(opts, :checkpoint_identity),
       refiner: Keyword.get(opts, :refiner),
       best_example_evals_k:
         Keyword.get(opts, :best_example_evals_k, @default_best_example_evals_k),
@@ -220,15 +225,66 @@ defmodule Imp.Optimize.Anything.Adapter do
   end
 
   @impl true
-  def get_adapter_state(%__MODULE__{optimization_state_store: store}),
-    do: Agent.get(store, &Map.new/1)
+  def get_adapter_state(%__MODULE__{
+        optimization_state_store: store,
+        checkpoint_identity: nil
+      }),
+      do: Agent.get(store, &Map.new/1)
+
+  def get_adapter_state(%__MODULE__{
+        optimization_state_store: store,
+        checkpoint_identity: identity
+      }) do
+    %{
+      "type" => @checkpoint_state_type,
+      "schema_version" => @checkpoint_state_version,
+      "run_identity" => identity,
+      "optimization_state" => Agent.get(store, &Map.new/1)
+    }
+  end
 
   @impl true
-  def set_adapter_state(%__MODULE__{optimization_state_store: store} = adapter, state)
+  def set_adapter_state(
+        %__MODULE__{optimization_state_store: store, checkpoint_identity: nil} = adapter,
+        state
+      )
       when is_map(state) do
     validate_restored_optimization_state!(state, adapter.best_example_evals_k)
     Agent.update(store, fn _current -> Map.new(state) end)
     adapter
+  end
+
+  def set_adapter_state(
+        %__MODULE__{optimization_state_store: store, checkpoint_identity: expected} = adapter,
+        %{
+          "type" => @checkpoint_state_type,
+          "schema_version" => @checkpoint_state_version,
+          "run_identity" => stored,
+          "optimization_state" => state
+        } = checkpoint
+      )
+      when is_map(state) do
+    expected_keys = ~w(type schema_version run_identity optimization_state)
+
+    unless MapSet.new(Map.keys(checkpoint)) == MapSet.new(expected_keys) do
+      raise ArgumentError,
+            "Optimize Anything adapter checkpoint has unexpected or missing keys"
+    end
+
+    unless stored == expected do
+      raise ArgumentError,
+            "Optimize Anything resume dataset identity mismatch: stored #{inspect(stored)}, requested #{inspect(expected)}"
+    end
+
+    validate_restored_optimization_state!(state, adapter.best_example_evals_k)
+    Agent.update(store, fn _current -> Map.new(state) end)
+    adapter
+  end
+
+  def set_adapter_state(%__MODULE__{checkpoint_identity: expected}, state)
+      when is_map(expected) and is_map(state) do
+    raise ArgumentError,
+          "Optimize Anything resume checkpoint predates dataset identity binding and cannot be resumed safely"
   end
 
   defp validate_restored_optimization_state!(states, limit) do
@@ -1031,6 +1087,7 @@ defmodule Imp.Optimize.Anything.Adapter do
       :structured_codec,
       :evaluator_contract,
       :optimization_state,
+      :checkpoint_identity,
       :refiner,
       :best_example_evals_k,
       :batch_evaluator,

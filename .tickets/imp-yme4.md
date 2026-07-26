@@ -445,3 +445,22 @@ rather than counting inert prefix churn as prompt mutation. Both stops are
 preserved; there was no third model pass. This closes the owning fenced-JSON
 runtime bug and records honest natural-proposer failure, not COPRO held-out
 effectiveness, full parity, or BEAM superiority.
+
+**2026-07-26T17:17:47Z**
+
+Optimize Anything durable resume no longer accepts a different selection set
+while retaining the old candidates and scores. An ordinary no-model run
+reproduced the defect: changing the only validation row from score `0.1` to
+`0.9` returned the checkpoint's stale `0.1` without calling Imp's evaluator.
+An independently executed pinned GEPA v0.1.4 run returned the same stale score;
+it additionally evaluated the new row once before loading the old state and
+discarding that evaluation. This is a narrow upstream runtime observation, not
+optimizer equivalence or effectiveness evidence.
+
+The public runner now checkpoints a versioned run identity over the mode and
+ordered train/validation datasets alongside the optimization-state buffer.
+Explicit and `run_dir` resume reject drift before evaluator work, and older
+identityless checkpoints fail closed instead of being guessed compatible.
+All 149 Optimize Anything tests passed with three expected skips. This repair
+changes resume safety only; it adds no natural mutation, held-out lift,
+provider campaign, whole-port parity, or BEAM-superiority claim.

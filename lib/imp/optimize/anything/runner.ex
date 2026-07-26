@@ -71,6 +71,7 @@ defmodule Imp.Optimize.Anything.Runner do
         candidate_format: candidate_format,
         candidate_key: string_key || @string_candidate_key,
         structured_codec: structured_codec,
+        checkpoint_identity: checkpoint_identity(mode, trainset, valset),
         evaluator_contract: Keyword.get(opts, :evaluator_contract, :standard),
         batch_evaluator: Keyword.get(opts, :batch_evaluator),
         raise_on_exception: config.engine.raise_on_exception,
@@ -673,6 +674,31 @@ defmodule Imp.Optimize.Anything.Runner do
   defp minimum_limit(nil, right), do: right
   defp minimum_limit(left, nil), do: left
   defp minimum_limit(left, right), do: min(left, right)
+
+  defp checkpoint_identity(mode, trainset, valset) do
+    %{
+      "type" => "imp_optimize_anything_run_identity",
+      "schema_version" => 1,
+      "mode" => Atom.to_string(mode),
+      "trainset_sha256" => dataset_digest!(trainset, :dataset),
+      "valset_sha256" => dataset_digest!(valset, :valset)
+    }
+  end
+
+  defp dataset_digest!(dataset, name) do
+    dataset
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  rescue
+    error in ArgumentError ->
+      reraise ArgumentError,
+              [
+                message:
+                  "Optimize Anything #{name} cannot be checkpoint-identified: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
+  end
 
   defp resume_state(_config, state) when not is_nil(state), do: state
   defp resume_state(%{engine: %{run_dir: nil}}, nil), do: nil

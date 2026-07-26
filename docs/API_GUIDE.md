@@ -1069,6 +1069,10 @@ The result retains candidate lineage, per-example validation scores, Pareto
 frontiers, measured budgets, rejected proposals, history, and a resumable
 engine checkpoint. `test_scores` is the only untouched outcome in this example;
 the optimizer has seen both `training_examples` and validation scores.
+The checkpoint binds the optimization mode plus the ordered training and
+validation datasets. Resume rejects dataset drift before evaluator work rather
+than reusing scores from a different selection set; checkpoints created before
+this identity binding fail closed instead of being guessed compatible.
 `Imp.Optimize.Anything.run/3` is the sole Optimize Anything execution
 entry point; `best_candidate/1` reads its selected artifact while execution
 records remain implementation data rather than additional supported module

@@ -457,6 +457,39 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     assert Result.best_candidate(resumed) == "2"
   end
 
+  test "resume rejects validation-set drift before reusing stale selection scores" do
+    receiver = self()
+    trainset = [%{id: :train, score: 0.0}]
+
+    evaluator = fn candidate, example ->
+      send(receiver, {:evaluated, candidate, example.id})
+      example.score
+    end
+
+    options =
+      runner_options(0,
+        dataset: trainset,
+        valset: [%{id: :old_selection, score: 0.1}]
+      )
+
+    first = Anything.run("base", evaluator, options)
+    assert first.validation_scores == [0.1]
+    assert_receive {:evaluated, "base", :old_selection}
+
+    assert_raise ArgumentError, ~r/resume dataset identity mismatch/, fn ->
+      Anything.run(
+        "base",
+        evaluator,
+        Keyword.merge(options,
+          valset: [%{id: :new_selection, score: 0.9}],
+          resume_state: first.checkpoint
+        )
+      )
+    end
+
+    refute_receive {:evaluated, "base", :new_selection}
+  end
+
   test "batch checkpoint resume preserves adapter history and does not duplicate calls" do
     dataset = [%{target: 2}]
     proposer = fn _candidate, _component, _records, iteration -> Integer.to_string(iteration) end
