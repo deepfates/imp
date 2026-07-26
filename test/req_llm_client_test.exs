@@ -1636,4 +1636,111 @@ defmodule ReqLLMClientTest do
     assert Keyword.fetch!(opts, :max_tokens) == 80
     refute Keyword.has_key?(opts, :max_completion_tokens)
   end
+
+  test "explicit no-retry policy is enforced and counted at the Req adapter boundary" do
+    owner = self()
+
+    adapter = fn request ->
+      send(owner, :transport_adapter_called)
+      {request, %Req.TransportError{reason: :closed}}
+    end
+
+    ref = Imp.Test.TelemetryHelpers.attach([[:imp, :lm, :transport, :attempt]])
+
+    lm =
+      Imp.req_llm(%{provider: :openai, id: "counting-model"},
+        api_key: "local-test-key",
+        cache: false,
+        max_retries: 0,
+        req_http_options: [adapter: adapter, retry: false, max_retries: 0]
+      )
+
+    assert {:error, _reason} =
+             Imp.LM.generate(lm, [%{role: :user, content: "one attempt"}], [])
+
+    assert_received :transport_adapter_called
+    refute_received :transport_adapter_called
+
+    assert_received {^ref, [:imp, :lm, :transport, :attempt],
+                     %{count: 1, system_time: system_time}, %{method: :post, retry: false}}
+
+    assert is_integer(system_time)
+    refute_received {^ref, [:imp, :lm, :transport, :attempt], _, _}
+  end
+
+  test "ReqLLM lifecycle starts correspond to real Chat-to-JSON fallback transports" do
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    base_url =
+      Imp.Test.LocalHTTP.start(fn request ->
+        count = Agent.get_and_update(counter, fn value -> {value + 1, value + 1} end)
+        body = Jason.decode!(request.body)
+
+        content =
+          case count do
+            1 -> "this deliberately does not satisfy the chat adapter"
+            2 -> ~s({"route":"R17"})
+          end
+
+        {200,
+         %{
+           "id" => "chatcmpl-count-#{count}",
+           "object" => "chat.completion",
+           "model" => body["model"],
+           "choices" => [
+             %{
+               "index" => 0,
+               "message" => %{"role" => "assistant", "content" => content},
+               "finish_reason" => "stop"
+             }
+           ],
+           "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+         }}
+      end)
+
+    ref =
+      Imp.Test.TelemetryHelpers.attach([
+        [:req_llm, :request, :start],
+        [:imp, :lm, :transport, :attempt],
+        [:imp, :adapter, :parse, :json_fallback]
+      ])
+
+    lm =
+      Imp.req_llm(
+        %{
+          provider: :openai,
+          id: "counting-model",
+          model: "counting-model",
+          base_url: base_url <> "/v1"
+        },
+        api_key: "local-test-key",
+        cache: false,
+        req_http_options: [retry: false, max_retries: 0]
+      )
+
+    signature =
+      Imp.signature(
+        %{
+          inputs: [%{name: :utterance, type: :string}],
+          outputs: [%{name: :route, type: :string, constraints: %{enum: ["R17", "R42"]}}]
+        },
+        "Return exactly one route."
+      )
+
+    program = Imp.predict(signature, lm: lm, adapter: Imp.Adapter.Chat)
+
+    assert {:ok, prediction} = Imp.call(program, %{utterance: "count this request"})
+    assert Imp.get(prediction, :route) == "R17"
+    assert Agent.get(counter, & &1) == 2
+
+    assert_received {^ref, [:req_llm, :request, :start], _, %{request_id: first_id}}
+    assert_received {^ref, [:imp, :lm, :transport, :attempt], %{count: 1}, %{retry: false}}
+    assert_received {^ref, [:imp, :adapter, :parse, :json_fallback], %{count: 1}, _}
+    assert_received {^ref, [:req_llm, :request, :start], _, %{request_id: second_id}}
+    assert_received {^ref, [:imp, :lm, :transport, :attempt], %{count: 1}, %{retry: false}}
+
+    assert first_id != second_id
+    refute_received {^ref, [:req_llm, :request, :start], _, _}
+    refute_received {^ref, [:imp, :lm, :transport, :attempt], _, _}
+  end
 end

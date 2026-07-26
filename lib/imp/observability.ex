@@ -22,6 +22,7 @@ defmodule Imp.Observability do
   @default_trace_events [
     [:imp, :lm, :start],
     [:imp, :lm, :stop],
+    [:imp, :lm, :transport, :attempt],
     [:imp, :lm, :stream, :start],
     [:imp, :lm, :stream, :chunk],
     [:imp, :lm, :stream, :stop],

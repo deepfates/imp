@@ -219,7 +219,7 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp do_generate_uncached(lm, messages, opts) do
-    opts = cap_transport_timeouts(opts)
+    opts = opts |> cap_transport_timeouts() |> enforce_explicit_no_retry()
 
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
@@ -339,7 +339,7 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp safe_stream(lm, messages, opts) do
-    opts = cap_transport_timeouts(opts)
+    opts = opts |> cap_transport_timeouts() |> enforce_explicit_no_retry()
 
     case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
@@ -682,6 +682,65 @@ defmodule Imp.Clients.ReqLLM do
           end
         end)
     end
+  end
+
+  # ReqLLM 1.17.1 attaches its retry step after constructing the Req request and
+  # resets `max_retries` to 3. Re-apply an explicit caller no-retry policy in a
+  # final request step, at the adapter boundary, where it cannot be overwritten.
+  # The attempt event is emitted immediately before the actual Req adapter call,
+  # so it counts transports rather than Imp calls or ReqLLM lifecycle contexts.
+  defp enforce_explicit_no_retry(opts) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+
+    explicit? =
+      Keyword.get(opts, :max_retries) == 0 or
+        (Keyword.keyword?(http_opts) and
+           (Keyword.get(http_opts, :retry) == false or
+              Keyword.get(http_opts, :max_retries) == 0))
+
+    if explicit? do
+      unless Keyword.keyword?(http_opts) do
+        raise ArgumentError, "ReqLLM :req_http_options must be a keyword list"
+      end
+
+      plugins = Keyword.get(http_opts, :plugins, [])
+
+      unless is_list(plugins) do
+        raise ArgumentError, "ReqLLM :req_http_options :plugins must be a list"
+      end
+
+      plugin = &__MODULE__.install_explicit_no_retry/1
+      guarded_http_opts = Keyword.put(http_opts, :plugins, plugins ++ [plugin])
+      Keyword.put(opts, :req_http_options, guarded_http_opts)
+    else
+      opts
+    end
+  end
+
+  @doc false
+  def install_explicit_no_retry(%Req.Request{} = request) do
+    Req.Request.append_request_steps(request,
+      imp_explicit_no_retry: &__MODULE__.enforce_explicit_no_retry_request/1
+    )
+  end
+
+  @doc false
+  def enforce_explicit_no_retry_request(%Req.Request{} = request) do
+    adapter = request.adapter
+
+    guarded_adapter = fn guarded_request ->
+      Imp.Telemetry.execute(
+        [:imp, :lm, :transport, :attempt],
+        %{count: 1, system_time: System.system_time()},
+        %{method: guarded_request.method, retry: false}
+      )
+
+      adapter.(guarded_request)
+    end
+
+    request
+    |> Req.Request.merge_options(retry: false, max_retries: 0)
+    |> Map.put(:adapter, guarded_adapter)
   end
 
   defp cap_timeout(opts, key, remaining) do
