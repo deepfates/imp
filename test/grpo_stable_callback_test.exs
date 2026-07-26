@@ -83,7 +83,10 @@ defmodule Imp.GRPOStableCallbackTest do
     assert File.read!(Path.join(success_root, "artifact/weights.fixture")) ==
              "stable-callback-resume\n"
 
-    assert success_root |> Path.join("rewards.json") |> File.read!() |> Jason.decode!() == [1.0]
+    assert success_root |> Path.join("rewards.json") |> File.read!() |> Jason.decode!() == [
+             1.0,
+             1.0
+           ]
 
     drift_root = Path.join(root, "drift")
 
@@ -121,7 +124,7 @@ defmodule Imp.GRPOStableCallbackTest do
       trainer: trainer,
       checkpoint_path: Path.join(root, "checkpoint.json"),
       num_train_steps: 1,
-      num_rollouts_per_grpo_step: 1,
+      num_rollouts_per_grpo_step: 2,
       callback_timeout_ms: 100,
       status_poll_interval_ms: 0
     )

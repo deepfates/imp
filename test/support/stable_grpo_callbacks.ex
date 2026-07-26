@@ -10,3 +10,16 @@ defmodule Imp.Test.StableGRPOCallbacks do
 
   def validate(_program, _dataset, _context, %{"result" => "ok"}), do: :ok
 end
+
+defmodule Imp.Test.ControlledRouteLM do
+  @moduledoc false
+  @behaviour Imp.LM
+  defstruct [:model]
+
+  @routes ["R17", "R42", "R68", "R93"]
+
+  @impl true
+  def generate(_messages, opts) do
+    {:ok, %{route: Enum.fetch!(@routes, Keyword.fetch!(opts, :rollout_id))}}
+  end
+end

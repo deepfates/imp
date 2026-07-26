@@ -1,0 +1,51 @@
+{
+  "contract_sha256": "sha256:449bde1bebd7f8bd274f8d878daa5fbc55eb7ccb6a1a25d056a7d94569410e7a",
+  "expected_rewards": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "failure_stage": "sealed_update_cross_runtime_digest_validation",
+  "finished_at": "2026-07-26T03:27:48.237683Z",
+  "git_commit": "bc8c92f470dd86e03372e4c52ae647ea0ebe0cf1",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "ordered_completions": [
+    "R17",
+    "R42",
+    "R68",
+    "R93"
+  ],
+  "reason": "{:grpo_execution_and_termination_failed, %{\"accepted\" => false, \"code\" => \"envelope_digest_mismatch\", \"message\" => \"protocol payload digest mismatch\"}, {:trl_worker, %{\"accepted\" => false, \"code\" => \"incomplete_training\", \"message\" => \"the single accepted update did not complete\"}}}",
+  "retained_boundary": {
+    "prepared_controlled_group_sha256": "sha256:3c904832123c9490a311b5acd253323995b19e6b664064b915b341fc97602514",
+    "projected_group_sha256": "sha256:885fa01bf4a0cb0daabaf352a9abb154620837f3003221358e33053e6b1253e5",
+    "checkpoint_sha256": "sha256:0ef32722708a4bcdc93a8115d26524ec87a1e80e632a4c3057d2ca9bca0b7a5b",
+    "session_payload_sha256": "sha256:228310b0c253313afde70e6c21bc59664303a2fe58f2404c19f83dfd42879abc",
+    "ordered_completion_count": 4,
+    "behavior_logprobs_present": true,
+    "semantic_rewards": [1.0, 0.0, 0.0, 0.0]
+  },
+  "cross_runtime_digest_diagnosis": {
+    "elixir_groups_sha256": "sha256:71ed006fd3e87d3696f45055f5bcca2f18d962dc5ccf2eeab61085ee97ba5051",
+    "python_groups_sha256": "sha256:9e5622f6386e610a20d2c0bd33165c506d0f9d461af05825cfba5865822e17ee",
+    "elixir_update_attrs_sha256": "sha256:e1e9bbe52113bfc6cca4da154df76140d7a639d854f55c33b76684e6848d8e88",
+    "python_update_attrs_sha256": "sha256:bb03b1aa84dc15da21b8f9902781977dee8ceaeb07ae743593160b1144b5eb82",
+    "cause": "Elixir Jason and Python json.dumps emit different valid JSON spellings for real finite floats, including decimal-versus-exponent notation and exponent zero-padding. The protocol incorrectly treats independently re-encoded JSON containing behavior log probabilities as cross-runtime canonical bytes."
+  },
+  "protocol_accepted": false,
+  "trl_trainer_constructed": false,
+  "advantages_computed": false,
+  "optimizer_step": false,
+  "trainable_tensor_digest_changed": false,
+  "artifact_created": false,
+  "training_job_rebound": false,
+  "rollout_source": "controlled_external",
+  "row_id": "banking77-train-2511",
+  "row_sha256": "sha256:dd5e7f7ca000bf4c92c81fe93b2b4fb3d05a52989a5cb8f2ab643f25f8242b91",
+  "schema_version": 1,
+  "scope": "one controlled external-rollout MPS/TRL weight-update conformance step; not model sampling, learning, effectiveness, parity, or BEAM superiority",
+  "started_at": "2026-07-26T03:27:45.944505Z",
+  "status": "stopped",
+  "worker_cleaned_up": true
+}

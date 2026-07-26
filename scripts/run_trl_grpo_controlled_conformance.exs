@@ -11,13 +11,22 @@ defmodule Imp.ControlledGRPOConformanceReward do
 end
 
 repo = File.cwd!()
-cache_root = "/Users/deepfates/.cache/imp/trl/controlled-conformance-v1"
+
+cache_root =
+  System.get_env(
+    "IMP_TRL_CONTROLLED_ROOT",
+    "/Users/deepfates/.cache/imp/trl/controlled-conformance-v1"
+  )
+
 python = "/Users/deepfates/.cache/imp/trl/feasibility-v1/.venv/bin/python"
 model_path = "/Users/deepfates/.cache/imp/trl/feasibility-v1/model"
 session_root = Path.join(cache_root, "sessions")
 
 result_path =
-  Path.join(repo, "benchmarks/results/local-trl-grpo-controlled-conformance-20260725.json")
+  System.get_env(
+    "IMP_TRL_CONTROLLED_RESULT",
+    Path.join(repo, "benchmarks/results/local-trl-grpo-controlled-conformance-20260725.json")
+  )
 
 job_path = Path.join(cache_root, "job.json")
 portable_path = Path.join(cache_root, "portable-program.json")

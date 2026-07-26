@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "scope": "exact no-model fresh-OS preflight of the controlled GRPO job through create, checkpoint, resume, sealed group, and worker-preparation boundary",
+  "git_commit": "bc8c92f470dd86e03372e4c52ae647ea0ebe0cf1",
+  "status": "completed",
+  "fresh_os_resume": true,
+  "model_calls": 0,
+  "trainer_constructed": false,
+  "weight_update": false,
+  "events": ["start", "reconcile", "step", "terminate"],
+  "persisted_identity": {
+    "checkpoint_identity_sha256": "sha256:6c3c27bd70b6660310097e7b28f76bb341c23d59d51d48e2f0a3d80abe8715f0",
+    "checkpoint_file_sha256_before_resume": "sha256:84fa1d5835bb1690c8d6fd9d61fc620459d1e899c443865cb9720ea4ed08cc7a",
+    "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+    "trainer": {
+      "module": "Elixir.Imp.Test.FileGRPOTrainer",
+      "root": "/Users/deepfates/.cache/imp/trl/controlled-preflight-bc8c92f",
+      "function_identity_present": false
+    },
+    "train_kwargs": [],
+    "train_kwargs_function_identity_present": false,
+    "reward_callback": {
+      "contract": "imp_grpo_callback_v1",
+      "kind": "reward",
+      "module": "Elixir.Imp.Test.StableGRPOCallbacks",
+      "function": "exact_answer",
+      "id": "banking77-exact-route-v1",
+      "config_sha256": "sha256:97dbce7f3d9b54bd8e11891e873ac5821fec2a14d13fc0474a628ebfbd8cc0b0"
+    },
+    "validation_callback": null,
+    "dataset": {
+      "train_sha256": "sha256:cae3e9ccef071f1fd7bb6e838ee5f1f61fa5d7ff0275a4f00aa4efe52941a0dc",
+      "ordered_train_row_sha256s": ["sha256:ffab916563ee1779b8e73decbb2bbe9a7108f247269c1f479d5fe65a35a93e23"],
+      "validation_sha256": null
+    },
+    "engine": {
+      "name": "trl",
+      "version": "1.6.0",
+      "revision": "0dac440542c2ef9b575f56534f29f6fca1febe4a"
+    },
+    "optimizer": {
+      "name": "grpo",
+      "num_generations": 4,
+      "config_sha256": "sha256:9452319b23dc095d84bbf309835ddcd6d975f58495aebc3038462422109c109b"
+    },
+    "rng": {
+      "algorithm": "exsss",
+      "state_sha256": "sha256:3c01fd7e65847f2e13e1341fdae367683dcc19ac104c4bb0134d5f05e3abff4d"
+    },
+    "session_id": "grpo:6c3c27bd70b6660310097e7b28f76bb341c23d59d51d48e2f0a3d80abe8715f0:5qhNHReEKC46IM4_",
+    "session_payload_sha256": "sha256:9dc5c5736abbb3cf6949329e96906495777f32dc158052dfcfac9998af43972c",
+    "step_id": "grpo-step:76d1d285669e118cf5eb8b5ab629e9e537f944bacc13fd4c45e88ce3cbcd6690",
+    "idempotency_key": "grpo-step:76d1d285669e118cf5eb8b5ab629e9e537f944bacc13fd4c45e88ce3cbcd6690",
+    "sealed_update_payload_sha256": "sha256:63123225db0be3193e97d03d9ad9e20ac23855998a26289316736e168da42b6b"
+  },
+  "retained_files": {
+    "session_protocol_sha256": "sha256:5debe3f90b5cd46e8b39bb556472945713b42c50c0b196980b033103412d1ea3",
+    "sealed_update_sha256": "sha256:e6904fbaf6ec10945dd233bb7b386f78c292d0a3549db3801578f18ffdd58c7f",
+    "events_sha256": "sha256:231a669c2b3342ce2ed1341e8d252706d4af104d4c7ccc4988c69bc46c5394c4"
+  },
+  "limit": "The fake trainer used deterministic byte token IDs and 0.0 behavior log probabilities. It proved persisted identities and lifecycle ordering but did not exercise cross-runtime canonical hashing of real floating-point log probabilities."
+}
