@@ -89,7 +89,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
   test "ordinary compile boundary excludes held-out and requires rendered rule lifecycle" do
     source = File.read!(@source)
 
-    assert source =~ ~s(@treatment_id "local-simba-feedback-trec-structured-v2")
+    assert source =~ ~s(@treatment_id "local-simba-feedback-trec-schema-decode-v3")
 
     assert source =~ "examples(rows.train, rows.contract, true)"
     assert source =~ "examples(rows.validation, rows.contract, false)"

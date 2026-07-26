@@ -86,3 +86,10 @@ parser treated those JSON strings as bare enum values. All 46 task transports
 therefore failed before reflection, selection, or held-out access. Imp now
 decodes only an exact one-field schema object—extra fields, arrays, quoted
 scalars, labels, and prose still fail—without changing the frozen task.
+
+The current condition is separately identified as
+`local-simba-feedback-trec-schema-decode-v3`. Its sole change from v2 is that
+source-correct exact-envelope decode repair; task/model/splits/prompts/metric,
+optimizer configuration, seed, budgets, and one-attempt policy remain
+unchanged. V1 and v2 remain stopped and immutable. V3 will execute once and may
+honestly retain baseline or show no held-out lift.

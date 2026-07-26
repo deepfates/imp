@@ -189,7 +189,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   alias LocalSIMBAFeedbackTREC.{Atomic, Audit, Contract, ObservedLM, Observer}
 
   @contract "task-contract.json"
-  @treatment_id "local-simba-feedback-trec-structured-v2"
+  @treatment_id "local-simba-feedback-trec-schema-decode-v3"
   @routes ~w(K11 K47)
   @max_optimization_transports 130
 
