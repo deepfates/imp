@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "campaign_id": "instruction-optimizer-trec-local-flagship-v1",
+  "authorities": {
+    "dspy": {
+      "repository": "https://github.com/stanfordnlp/dspy",
+      "version": "3.3.0b1",
+      "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+      "source_manifest": "../../benchmarks/authority_sources/dspy-3.3.0b1-b2829b7.json"
+    },
+    "gepa": {
+      "repository": "https://github.com/gepa-ai/gepa",
+      "version": "0.1.4",
+      "commit": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+      "source_manifest": "../../benchmarks/authority_sources/gepa-0.1.4-8b0ce6c.json"
+    }
+  },
+  "dataset": {
+    "contract_path": "../local_simba_feedback_trec/task-contract.json",
+    "contract_sha256": "1f29446db7aa4ac99683422f3833f313912445ec7c2c9d44776e84f26530d3b8",
+    "data_path": "../../benchmarks/data/confidence-calibration-trec-fine.jsonl",
+    "data_sha256": "29cd6eb93a6a4c3b23a2133cf95cc3deca8b95e62c354ded450c663e44c56bd8",
+    "train_path": "train.jsonl",
+    "train_sha256": "d227d28bd89f448e024b94df01b27a1331446cea460865482eed0c60fb3a5fb6",
+    "selection_path": "selection.jsonl",
+    "selection_sha256": "04b391ed687201d23169f7e1042dac461adfa8994fdb9f8313506447ae34262f",
+    "held_out_path": "held_out.jsonl",
+    "held_out_sha256": "0929be018e0c4a5857b19f5349ea1063c202763e7b65a933cb5d9218b884fa4d",
+    "provenance_path": "../../benchmarks/data/confidence-calibration-trec-fine.provenance.json",
+    "provenance_sha256": "a9abd542b6a22cf2d0a9753651dd4896225a5c9b48ee658bb1dd4777d67b167c",
+    "revision": "eb1e45c1ba990fecca7cf84b67ce845edbcf49bf"
+  },
+  "models": {
+    "task": {
+      "logical": "llama3.2:3b@a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "imp": "ollama:llama3.2:3b",
+      "upstream": "ollama/llama3.2:3b",
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "local_size_bytes": 2019377376
+    },
+    "optimizer": {
+      "logical": "phi4:latest@ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
+      "imp": "ollama:phi4:latest",
+      "upstream": "ollama/phi4:latest",
+      "digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
+      "local_size_bytes": 9053114464
+    }
+  },
+  "seeds": [2026072602, 2026072603, 2026072604],
+  "arms": ["baseline", "gepa", "mipro_v2"],
+  "optimizer": {
+    "gepa": {
+      "iterations": 6,
+      "minibatch_size": 5,
+      "candidate_selection": "pareto",
+      "module_selection": "round_robin",
+      "acceptance": "strict_improvement",
+      "selection": "all_improvements",
+      "use_merge": false
+    },
+    "mipro_v2": {
+      "instruction_candidates": 3,
+      "fewshot_candidates": 3,
+      "trials": 6,
+      "minibatch": false,
+      "max_bootstrapped_demos": 0,
+      "max_labeled_demos": 0,
+      "startup_trials": 10,
+      "bootstrap_task_call_ceiling": 40
+    }
+  },
+  "execution": {
+    "concurrency": 1,
+    "cache": false,
+    "retry": false,
+    "max_retries": 0,
+    "json_fallback": false,
+    "fallbacks": false,
+    "data_collection": "local_only",
+    "route_guard": "exact_configured_local_model",
+    "cost_guard": "local_non_billable_no_external_spend",
+    "request": {
+      "task": {"temperature": 0.0, "max_tokens": 64, "max_input_tokens": 4096},
+      "optimizer": {"temperature": 1.0, "max_tokens": 512, "max_input_tokens": 8192}
+    }
+  },
+  "output_contract": {
+    "field": "route",
+    "routes": ["K11", "K47"],
+    "envelope": "dspy_chat_marker_sections",
+    "additional_properties": false,
+    "normalization": "none"
+  },
+  "metrics": {
+    "selection": ["accuracy", "macro_f1"],
+    "held_out": ["accuracy", "macro_f1", "parse_errors"],
+    "uncertainty": "paired_seed_deltas_with_all_seeds"
+  },
+  "accounting": {
+    "per_row": ["source_id", "expected", "raw_response", "parsed_route", "correct", "input_tokens", "output_tokens", "wall_seconds", "error", "actual_model", "actual_route", "transport_attempts", "cost"],
+    "fail_closed": ["model", "route", "cost", "transport_attempt", "parser", "budget"]
+  },
+  "capture": {
+    "rendered_messages": true,
+    "adapter": true,
+    "runtime": true,
+    "arm": true,
+    "seed": true,
+    "phase": true,
+    "candidate_id": true
+  },
+  "source_commits": {
+    "imp": "resolved from clean launch git_sha",
+    "dspy": "https://github.com/stanfordnlp/dspy@b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f",
+    "gepa": "https://github.com/gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
+  }
+}
