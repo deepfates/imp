@@ -192,28 +192,9 @@ class NoModelBoundaryTest(unittest.TestCase):
             capture.reserve("task")
         self.assertEqual(capture.call_budgets["1:baseline"]["counts"]["transports"], 1)
 
-    def test_rendered_input_bound_refuses_before_budget_or_transport(self):
-        class FakeLM:
-            def __init__(self, *_args, **_kwargs):
-                pass
-
-        prior = sys.modules.get("dspy")
-        sys.modules["dspy"] = types.SimpleNamespace(LM=FakeLM)
-        try:
-            _dspy, recording_lm = MODULE.install_runtime(
-                types.SimpleNamespace(dspy_root=HERE, gepa_root=HERE)
-            )
-            capture = MODULE.Capture()
-            capture.max_input_tokens = {"task": 4}
-            lm = recording_lm("model", capture=capture, role="task")
-            with self.assertRaisesRegex(MODULE.OperationalSafetyAbort, "conservative token bound"):
-                lm.forward(messages=[{"role": "user", "content": "too large"}])
-            self.assertEqual(capture.calls, [])
-        finally:
-            if prior is None:
-                sys.modules.pop("dspy", None)
-            else:
-                sys.modules["dspy"] = prior
+    def test_input_ceiling_does_not_substitute_json_bytes_for_provider_tokens(self):
+        source = (HERE / "run_upstream.py").read_text()
+        self.assertNotIn("rendered request conservative token bound", source)
 
     def test_dspy_lm_copies_keep_one_shared_budget_ledger(self):
         class FakeLM:
@@ -285,6 +266,18 @@ class NoModelBoundaryTest(unittest.TestCase):
         self.assertEqual(rows[0]["raw_response"]["response"], "malformed")
 
     def test_reported_input_tokens_cannot_exceed_num_ctx_contract(self):
+        evidence = MODULE.transport_evidence(
+            successful_call(input_tokens=4096),
+            {
+                "logical": "openai/gpt-5.4-mini",
+                "upstream": "openrouter/openai/gpt-5.4-mini",
+                "endpoint_provider": "OpenAI",
+                "max_input_tokens": 4096,
+                "max_output_tokens": 256,
+            },
+        )
+        self.assertEqual(evidence["input_tokens"], 4096)
+
         with self.assertRaisesRegex(RuntimeError, "transport evidence"):
             MODULE.transport_evidence(
                 successful_call(input_tokens=4097),

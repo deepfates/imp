@@ -285,7 +285,6 @@ class Capture:
         self.actual_cost = 0.0
         self.role_usd: dict[str, float] = {}
         self.usd_limit: float | None = None
-        self.max_input_tokens: dict[str, int] = {}
         if manifest is not None:
             request = manifest["execution"]["request"]
             models = manifest["models"]
@@ -300,9 +299,6 @@ class Capture:
                 + ceiling["optimizer_logical"] * self.role_usd["optimizer"]
                 for ceiling in manifest["execution"]["call_ceilings"].values()
             )
-            self.max_input_tokens = {
-                role: request[role]["max_input_tokens"] for role in ("task", "optimizer")
-            }
 
     def set_phase(self, seed: int, arm: str, phase: str) -> None:
         self.phase = {"seed": seed, "arm": arm, "phase": phase}
@@ -392,17 +388,6 @@ def install_runtime(args: argparse.Namespace):
             return duplicate
 
         def forward(self, prompt=None, messages=None, **kwargs):
-            rendered = json.dumps(
-                messages if messages is not None else {"prompt": prompt},
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ).encode("utf-8")
-            framed_bound = len(rendered) + 16 * ((len(messages) if messages is not None else 1) + 1)
-            cap = self.capture.max_input_tokens.get(self.role)
-            if cap is not None and framed_bound > cap:
-                raise OperationalSafetyAbort(
-                    f"{self.role} rendered request conservative token bound {framed_bound} exceeds {cap}"
-                )
             try:
                 self.capture.reserve(self.role)
             except Exception as exc:
