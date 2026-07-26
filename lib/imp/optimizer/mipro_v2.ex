@@ -92,6 +92,26 @@ defmodule Imp.Optimizer.MIPROv2 do
      )}
   end
 
+  @impl true
+  def validate_invocation_options(opts) do
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "MIPROv2 invocation options must be a keyword list")
+
+    unknown = Keyword.keys(opts) -- (Config.option_keys() ++ @compile_runtime_keys)
+
+    if unknown != [],
+      do: raise(ArgumentError, "unknown MIPROv2 invocation options: #{inspect(unknown)}")
+
+    _validated_config = opts |> Keyword.take(Config.option_keys()) |> Config.new()
+
+    _validated_runtime =
+      opts |> Keyword.take(@compile_runtime_keys) |> validate_compile_options!()
+
+    :ok
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
+  end
+
   def compile(%__MODULE__{} = optimizer, program, trainset, valset) do
     compile(optimizer, program, trainset, valset, [])
   end

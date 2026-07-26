@@ -177,4 +177,29 @@ defmodule Imp.Optimizer.MIPROv2.SearchContractTest do
       Imp.Optimizer.MIPROv2.new(metric, proposal_response_format: :sometimes)
     end
   end
+
+  test "validates composition-time config and checkpoint options without running setup" do
+    assert :ok =
+             Imp.Optimizer.MIPROv2.validate_invocation_options(
+               seed: 22,
+               minibatch: false,
+               max_trials: 0
+             )
+
+    assert {:error, unknown} =
+             Imp.Optimizer.MIPROv2.validate_invocation_options(unknown_control: true)
+
+    assert unknown =~ "unknown MIPROv2 invocation options"
+    assert unknown =~ "unknown_control"
+
+    assert {:error, invalid_config} =
+             Imp.Optimizer.MIPROv2.validate_invocation_options(minibatch: :sometimes)
+
+    assert invalid_config =~ "minibatch must be a boolean"
+
+    assert {:error, invalid_runtime} =
+             Imp.Optimizer.MIPROv2.validate_invocation_options(max_trials: -1)
+
+    assert invalid_runtime =~ ":max_trials must be"
+  end
 end

@@ -994,6 +994,9 @@ Imp.Optimizer.BetterTogether.compile(
 
 BetterTogether validates declared child options before evaluating the baseline.
 Unknown COPRO options fail loudly and no child option is silently dropped.
+MIPROv2 likewise validates its constructor-compatible config overrides and
+checkpoint controls (`max_trials`, `checkpoint_fn`, and `resume_state`) at this
+boundary, before BetterTogether spends a baseline call.
 
 `TrainingJobAdoption` declares the training-result protocol only because
 `BetterTogether` uses that protocol for weight-bearing steps. Its result

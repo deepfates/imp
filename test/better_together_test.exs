@@ -683,6 +683,48 @@ defmodule BetterTogetherTest do
     refute_received :unexpected_baseline_call
   end
 
+  test "rejects unsupported MIPROv2 child options before baseline evaluation" do
+    owner = self()
+
+    observed_program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts ->
+              send(owner, :unexpected_mipro_baseline_call)
+              %{answer: "Paris"}
+            end
+          )
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{instructions: ["Answer."]} end)
+
+    mipro =
+      Imp.Optimizer.MIPROv2.new(metric(),
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm
+      )
+
+    optimizer = BetterTogether.new(metric(), %{p: mipro})
+
+    assert_raise ArgumentError,
+                 ~r/invalid optimizer_compile_args.*unknown MIPROv2 invocation options.*unknown_control/s,
+                 fn ->
+                   BetterTogether.compile(optimizer, observed_program, examples(), examples(),
+                     strategy: :p,
+                     optimizer_compile_args: %{p: [unknown_control: true]}
+                   )
+                 end
+
+    refute_received :unexpected_mipro_baseline_call
+  end
+
   test "routes global and per-step teachers through a generic optimizer contract" do
     global_teacher = program()
 
