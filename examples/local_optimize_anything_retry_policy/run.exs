@@ -187,6 +187,11 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
       )
 
     selected = Result.best_candidate(result)
+    selected_path = Path.join(paths.output, "selected-artifact.json")
+    result_path = Path.join(paths.output, "optimizer-result.json")
+    Atomic.write!(result_path, Result.to_map(result))
+    Atomic.write!(selected_path, selected)
+
     proposal_calls = collect_proposal_calls([])
     optimization = optimization_stage(result, selected, proposal_calls)
     Atomic.write!(Path.join(paths.output, "01-optimization.json"), optimization)
@@ -196,11 +201,6 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
     selected_test = evaluate_stage(selected, Task.test())
     test_stage = %{baseline: baseline_test, selected: selected_test}
     Atomic.write!(Path.join(paths.output, "02-untouched-test.json"), test_stage)
-
-    selected_path = Path.join(paths.output, "selected-artifact.json")
-    result_path = Path.join(paths.output, "optimizer-result.json")
-    Atomic.write!(selected_path, selected)
-    Atomic.write!(result_path, Result.to_map(result))
 
     fresh_path = Path.join(paths.output, "03-fresh-test.json")
     {output, status} = fresh_process(paths, selected_path, fresh_path)
@@ -276,7 +276,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
       selected: if(selected == Task.seed(), do: "baseline", else: "mutated"),
       selected_artifact: selected,
       proposal_calls: proposal_calls,
-      rejected: result.rejected,
+      rejected: Imp.Optimizer.Report.json_safe(result.rejected),
       result: Result.to_map(result)
     }
   end
