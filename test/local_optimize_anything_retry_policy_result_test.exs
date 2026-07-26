@@ -28,4 +28,19 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyResultTest do
     refute result["untouched_test_opened"]
     assert result["claim_boundary"] =~ "winner"
   end
+
+  test "completed local condition preserves strict rejection and fresh baseline use" do
+    result =
+      "examples/local_optimize_anything_retry_policy/exercised-result.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert result["status"] == "complete_with_rejected_proposal"
+    assert result["proposal_calls"] == 4
+    assert result["candidate_count"] == 1
+    assert result["selected"] == "baseline"
+    assert result["untouched_test"]["baseline"] == result["untouched_test"]["selected"]
+    assert result["fresh_process"]["byte_identical"]
+    assert result["claim_boundary"] =~ "no admitted mutation"
+  end
 end

@@ -1,0 +1,40 @@
+{
+  "status": "complete_with_rejected_proposal",
+  "scope": "one local mixed-type Optimize Anything retry-policy lifecycle",
+  "source_commits": {
+    "prompt": "6e0c625",
+    "durable_recorder": "c13ede5",
+    "selected_only": "d5c1ba4"
+  },
+  "model": "phi4:latest",
+  "model_digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
+  "split_sizes": {
+    "train": 8,
+    "selection": 6,
+    "untouched_test": 6
+  },
+  "proposal_calls": 4,
+  "candidate_count": 1,
+  "proposal_outcome": "candidate atomically rejected after a type-invalid fourth component; remaining components were not called",
+  "baseline_selection_score": 0.5636503770362039,
+  "selected_selection_score": 0.5636503770362039,
+  "selected": "baseline",
+  "untouched_test": {
+    "baseline": {
+      "exact": 4,
+      "score": 0.7005874265716785
+    },
+    "selected": {
+      "exact": 4,
+      "score": 0.7005874265716785
+    }
+  },
+  "artifact": {
+    "selected_sha256": "4a4962431e2268ed79551c1673fe9d2c737713a4d7fefdd02f89ba9e60dca6e7",
+    "optimizer_result_sha256": "84e82d33019d77a9dcf799b91fd51dfd7fb74a122b03d51a55544df36583dbfe"
+  },
+  "fresh_process": {
+    "byte_identical": true
+  },
+  "claim_boundary": "One task/model strict proposal-rejection and fresh artifact lifecycle; no admitted mutation and not general Optimize Anything effectiveness, schema-v2 evidence, parity, or BEAM superiority."
+}

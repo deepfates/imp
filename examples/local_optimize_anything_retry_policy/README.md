@@ -35,3 +35,10 @@ A subsequent prompt-clarified run is retained separately in
 the example's recorder attempted to JSON-encode a raw rejected-proposal tuple
 before writing the portable result. The in-memory winner is not inferred and
 the untouched test remained unopened.
+
+The repaired recorder allowed that exact bounded condition to finish without
+repeating its proposal round. `exercised-result.json` records four local-model
+component calls, atomic rejection of the malformed candidate, baseline
+selection at `0.56365`, untouched score `0.70059` with four of six exact cases,
+and byte-identical baseline artifact behavior in a fresh OS BEAM. It proves
+strict failure containment and durable consumption, but no mutation or lift.
