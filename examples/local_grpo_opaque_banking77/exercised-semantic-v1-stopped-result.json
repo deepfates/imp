@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "stopped",
+  "treatment_id": "model-generated-banking77-disclosed-route-semantics-v1",
+  "runtime_base_commit": "91585ad",
+  "stop_stage": "training_step_29_before_selection_or_test",
+  "stop_reason": "The frozen instruction said R42 meant obtaining a physical card, while all thirty frozen R42 utterances concern locating, receiving, or setting a card PIN. Continuing would measure learning against a misleading semantic gloss.",
+  "preflight_sha256": "27218776d5ad874b92deea305e7ecdba569908065c564b9670971846b1768ae9",
+  "base_selection_sha256": "095d53f670bbd93bfe787dc7bf1bc5beea4090b294f6412409bd86917e73e909",
+  "base_selection": {
+    "accuracy": 0.75,
+    "macro_f1": 0.65,
+    "errors": 0
+  },
+  "completed_training_steps": 29,
+  "steps_with_changed_trainable_tensors": 29,
+  "steps_with_nonuniform_rewards": 28,
+  "steps_with_nonzero_advantages": 28,
+  "trained_selection": null,
+  "selected_arm": null,
+  "untouched_test_opened": false,
+  "deployable_artifact_selected": false,
+  "fresh_process_reproduction": false,
+  "claim_boundary": "This stopped run preserves real model-generated TRL/MPS training mechanics only. Because its disclosed R42 semantics contradicted the frozen utterances, it is not semantic usefulness evidence and establishes no trained behavior, optimizer win or loss, general GRPO/mmGRPO effectiveness, parity, production reliability, or BEAM superiority."
+}

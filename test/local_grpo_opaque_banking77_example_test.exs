@@ -8,6 +8,9 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @usefulness_config "examples/local_grpo_opaque_banking77/usefulness-v1-treatment.json"
   @usefulness_result "examples/local_grpo_opaque_banking77/exercised-usefulness-v1-result.json"
   @semantic_config "examples/local_grpo_opaque_banking77/semantic-v1-treatment.json"
+  @semantic_stopped_result "examples/local_grpo_opaque_banking77/exercised-semantic-v1-stopped-result.json"
+  @trec_config "examples/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
+  @trec_contract "priv/trl_worker/qwen-trec-14-step-contract.json"
 
   setup_all do
     output =
@@ -127,8 +130,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     refute source =~ "validation: examples(rows.test)"
     refute source =~ "Imp.train(program(training_lm), optimizer, examples(rows.test)"
     assert source =~ "source_schedule!(step_artifacts, rows.train)"
-    assert source =~ "length(ids) == 152"
-    assert source =~ "twice == 64 and thrice == 8"
+    assert source =~ "%{source_rows: 72, groups: 152, twice: 64, thrice: 8}"
   end
 
   test "result retention, stable arm selection, artifact verification and fresh rebind are explicit" do
@@ -213,6 +215,52 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     source = File.read!(@source)
     assert source =~ "instruction_sha256: TRLProtocol.digest(instruction())"
     assert source =~ "Definition.instruction()"
+  end
+
+  test "misleading disclosed-semantics run remains stopped before selection and test" do
+    result = @semantic_stopped_result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "stopped"
+    assert result["completed_training_steps"] == 29
+    assert result["steps_with_changed_trainable_tensors"] == 29
+    assert result["trained_selection"] == nil
+    assert result["selected_arm"] == nil
+    refute result["untouched_test_opened"]
+    refute result["deployable_artifact_selected"]
+    assert result["stop_reason"] =~ "misleading semantic gloss"
+  end
+
+  test "TREC semantic treatment binds a source-disjoint task and official LoRA GRPO settings" do
+    config = @trec_config |> File.read!() |> Jason.decode!()
+    contract = @trec_contract |> File.read!() |> Jason.decode!()
+    data = "benchmarks/data/simba-trec-coarse-v1.json" |> File.read!() |> Jason.decode!()
+
+    assert config["schema_version"] == 3
+    assert config["input_field"] == "question"
+    assert config["train_steps"] == 14
+    assert config["train_kwargs"]["learning_rate"] == 1.0e-5
+
+    assert config["source_schedule"] == %{
+             "source_rows" => 24,
+             "groups" => 56,
+             "twice" => 16,
+             "thrice" => 8
+           }
+
+    assert contract["optimizer"]["seed"] == config["seed"]
+    assert contract["optimizer"]["max_steps"] == config["train_steps"]
+
+    assert contract["optimizer"]["learning_rate"] ==
+             config["train_kwargs"]["learning_rate"]
+
+    assert length(data["train"]) == 24
+    assert length(data["validation"]) == 8
+    assert length(data["held_out"]) == 40
+
+    assert MapSet.disjoint?(
+             MapSet.new(Enum.map(data["train"], & &1["source_id"])),
+             MapSet.new(Enum.map(data["held_out"], & &1["source_id"]))
+           )
   end
 
   test "retained run preserves a complete neutral usefulness result" do

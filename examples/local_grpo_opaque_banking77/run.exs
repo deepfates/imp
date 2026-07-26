@@ -200,12 +200,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
         selected_validation_step: job.metadata.selected_validation_step,
         selected_validation_score: job.metadata.selected_validation_score,
         validation_history: job.metadata.validation_history,
-        trainer_config: %{
-          learning_rate: 1.0e-6,
-          beta: 0.0,
-          loss_type: "dapo",
-          scale_rewards: "group"
-        }
+        trainer_config: Map.new(train_kwargs())
       }
 
       Atomic.write!(Path.join(paths.output, "07-summary-before-fresh.json"), summary)
@@ -274,7 +269,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
         num_dspy_examples_per_grpo_step: train_width(),
         num_rollouts_per_grpo_step: 4,
         seed: seed(),
-        train_kwargs: Definition.train_kwargs(),
+        train_kwargs: train_kwargs(),
         checkpoint_selection: :best_validation,
         num_steps_for_val: 1,
         status_poll_interval_ms: 0,
@@ -418,12 +413,15 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
     contract = read_json!(paths.contract)
 
+    kwargs = Map.new(train_kwargs())
+
     unless get_in(contract, ["optimizer", "max_steps"]) == train_steps() and
              get_in(contract, ["optimizer", "num_generations"]) == 4 and
-             get_in(contract, ["optimizer", "learning_rate"]) == 1.0e-6 and
-             get_in(contract, ["optimizer", "loss_type"]) == "dapo" and
-             get_in(contract, ["optimizer", "scale_rewards"]) == "group" and
-             get_in(contract, ["optimizer", "beta"]) == 0.0,
+             get_in(contract, ["optimizer", "learning_rate"]) == kwargs.learning_rate and
+             get_in(contract, ["optimizer", "loss_type"]) == Atom.to_string(kwargs.loss_type) and
+             get_in(contract, ["optimizer", "scale_rewards"]) ==
+               Atom.to_string(kwargs.scale_rewards) and
+             get_in(contract, ["optimizer", "beta"]) == kwargs.beta,
            do: raise("pinned opaque-route TRL optimizer contract drift")
 
     source = read_json!(paths.data)
@@ -434,7 +432,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
           {ordered_rows!(source["train"], treatment()["train_ids"]),
            ordered_rows!(source[selection_source()], treatment()["selection_ids"])}
 
-        2 ->
+        version when version in [2, 3] ->
           {source["train"], source[selection_source()]}
       end
 
@@ -505,9 +503,11 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   end
 
   defp program(lm) do
+    route_enum = Enum.join(routes(), ",")
+
     Imp.predict(
       Imp.signature(
-        "utterance -> route: enum[R17,R42,R68,R93]",
+        "#{input_field()} -> route: enum[#{route_enum}]",
         instruction()
       ),
       lm: lm,
@@ -518,8 +518,12 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
   defp examples(rows) do
     Enum.map(rows, fn row ->
-      Imp.example(utterance: row["utterance"], route: row["route"], source_id: row["id"])
-      |> Imp.with_inputs(:utterance)
+      Imp.Example.new(%{
+        input_field_atom() => Map.fetch!(row, input_field()),
+        route: row["route"],
+        source_id: row["id"]
+      })
+      |> Imp.with_inputs(input_field_atom())
     end)
   end
 
@@ -536,7 +540,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   defp evaluate(program, rows) do
     results =
       Enum.map(rows, fn row ->
-        case Imp.call(program, %{utterance: row["utterance"]}) do
+        case Imp.call(program, %{input_field_atom() => Map.fetch!(row, input_field())}) do
           {:ok, prediction} ->
             actual = Imp.get(prediction, :route)
             %{id: row["id"], expected: row["route"], actual: actual, error: nil}
@@ -589,7 +593,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     Enum.map(update["groups"], fn group ->
       prompt = group |> Map.fetch!("prompt") |> Enum.map_join("\n", & &1["content"])
 
-      case Enum.filter(rows, &String.contains?(prompt, &1["utterance"])) do
+      case Enum.filter(rows, &String.contains?(prompt, Map.fetch!(&1, input_field()))) do
         [%{"id" => id}] ->
           id
 
@@ -609,23 +613,33 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     ids = Enum.flat_map(step_artifacts, &selected_train_row_ids(&1.update, rows))
     frequencies = Enum.frequencies(ids)
     expected_ids = MapSet.new(Enum.map(rows, & &1["id"]))
+    expectation = source_schedule_expectation()
 
-    unless length(ids) == 152 and MapSet.new(Map.keys(frequencies)) == expected_ids,
-      do: raise("GRPO source schedule does not cover the frozen 72-row train split")
+    unless length(ids) == expectation.groups and
+             length(rows) == expectation.source_rows and
+             MapSet.new(Map.keys(frequencies)) == expected_ids,
+           do: raise("GRPO source schedule does not cover the frozen train split")
 
     twice = Enum.count(frequencies, fn {_id, count} -> count == 2 end)
     thrice = Enum.count(frequencies, fn {_id, count} -> count == 3 end)
 
-    unless twice == 64 and thrice == 8,
-      do: raise("GRPO source schedule does not match two pinned 76-slot schedules")
+    unless twice == expectation.twice and thrice == expectation.thrice,
+      do: raise("GRPO source schedule does not match the pinned padded schedules")
 
     %{
       scheduler: "dspy_pinned_full_batch_padding",
-      source_rows: 72,
-      groups: 152,
+      source_rows: expectation.source_rows,
+      groups: expectation.groups,
       twice: twice,
       thrice: thrice
     }
+  end
+
+  defp source_schedule_expectation do
+    case treatment()["source_schedule"] do
+      nil -> %{source_rows: 72, groups: 152, twice: 64, thrice: 8}
+      schedule -> Map.new(schedule, fn {key, value} -> {String.to_existing_atom(key), value} end)
+    end
   end
 
   defp encode_job(job) do
@@ -650,8 +664,14 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
       {"IMP_TRL_CONTRACT", paths.contract},
       {"IMP_GRPO_OPAQUE_TRAIN_STEPS", Integer.to_string(train_steps())},
       {"IMP_GRPO_OPAQUE_TRAIN_WIDTH", Integer.to_string(train_width())},
-      {"IMP_BANKING77_DATA", paths.data}
+      {"IMP_GRPO_DATA", paths.data}
     ]
+
+    env =
+      case System.get_env("IMP_GRPO_OPAQUE_TREATMENT_CONFIG") do
+        nil -> env
+        path -> [{"IMP_GRPO_OPAQUE_TREATMENT_CONFIG", path} | env]
+      end
 
     System.cmd(
       "mix",
@@ -687,10 +707,11 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
           Path.join(repo, "priv/trl_worker/qwen-opaque-38-step-contract.json")
         ),
       data:
-        System.get_env(
-          "IMP_BANKING77_DATA",
-          Path.join(repo, "benchmarks/data/provider-training-banking77-v1.json")
-        ),
+        System.get_env("IMP_GRPO_DATA") ||
+          System.get_env(
+            "IMP_BANKING77_DATA",
+            Path.join(repo, "benchmarks/data/provider-training-banking77-v1.json")
+          ),
       sessions: Path.join(output, "sessions"),
       job: Path.join(output, "training-job.json"),
       program: Path.join(output, "portable-program.json")
@@ -795,13 +816,14 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
       case config["schema_version"] do
         1 -> identity ++ ~w(train_ids selection_ids)
         2 -> identity ++ ["instruction"]
+        3 -> identity ++ ~w(instruction input_field train_steps train_kwargs source_schedule)
         _other -> []
       end
 
     unless Map.keys(config) |> Enum.sort() == Enum.sort(required),
       do: raise("GRPO opaque treatment config has missing or unsupported fields")
 
-    unless config["schema_version"] in [1, 2] and is_binary(config["treatment_id"]) and
+    unless config["schema_version"] in [1, 2, 3] and is_binary(config["treatment_id"]) and
              is_binary(config["data_sha256"]) and is_binary(config["train_sha256"]) and
              is_binary(config["selection_sha256"]) and is_binary(config["test_sha256"]) and
              is_binary(config["contract_sha256"]) and is_binary(config["model"]) and
@@ -814,9 +836,13 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
       raise("GRPO opaque treatment config has invalid field values")
     end
 
-    if config["schema_version"] == 2 and
+    if config["schema_version"] in [2, 3] and
          (not is_binary(config["instruction"]) or String.trim(config["instruction"]) == "") do
       raise("GRPO opaque treatment config has an invalid instruction")
+    end
+
+    if config["schema_version"] == 3 do
+      validate_v3_treatment!(config)
     end
 
     config
@@ -833,14 +859,54 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   defp routes, do: treatment()["routes"]
   defp selection_source, do: treatment()["selection_source"]
   defp instruction, do: treatment()["instruction"] || Definition.instruction()
+  defp input_field, do: treatment()["input_field"] || "utterance"
+  defp input_field_atom, do: String.to_existing_atom(input_field())
 
   defp test_digest(source, test) do
     get_in(source, ["digests", "held_out"]) ||
       TRLProtocol.digest(Enum.map(test, &Imp.Optimizer.Report.encode_term/1))
   end
 
-  defp train_steps, do: Definition.train_steps()
+  defp train_steps, do: treatment()["train_steps"] || Definition.train_steps()
   defp train_width, do: Definition.train_width()
+
+  defp train_kwargs do
+    case treatment()["train_kwargs"] do
+      nil ->
+        Definition.train_kwargs()
+
+      values ->
+        [
+          learning_rate: values["learning_rate"],
+          beta: values["beta"],
+          loss_type: String.to_existing_atom(values["loss_type"]),
+          scale_rewards: String.to_existing_atom(values["scale_rewards"])
+        ]
+    end
+  end
+
+  defp validate_v3_treatment!(config) do
+    kwargs = config["train_kwargs"]
+    schedule = config["source_schedule"]
+
+    valid_kwargs =
+      is_map(kwargs) and
+        Map.keys(kwargs) |> Enum.sort() == ~w(beta learning_rate loss_type scale_rewards) and
+        is_number(kwargs["learning_rate"]) and kwargs["learning_rate"] > 0 and
+        is_number(kwargs["beta"]) and kwargs["loss_type"] == "dapo" and
+        kwargs["scale_rewards"] == "group"
+
+    valid_schedule =
+      is_map(schedule) and
+        Map.keys(schedule) |> Enum.sort() == ~w(groups source_rows thrice twice) and
+        Enum.all?(Map.values(schedule), &(is_integer(&1) and &1 >= 0))
+
+    unless config["input_field"] in ["utterance", "question"] and
+             is_integer(config["train_steps"]) and config["train_steps"] > 0 and valid_kwargs and
+             valid_schedule do
+      raise("GRPO opaque treatment config has invalid v3 runtime fields")
+    end
+  end
 
   defp sha256_file(path) do
     path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)

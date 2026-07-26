@@ -156,3 +156,27 @@ mix run examples/local_grpo_opaque_banking77/run.exs
 The trained arm is deployed only if it beats base on the eight validation
 rows. A completed positive, neutral, or negative result remains specific to
 this task, model, seed, and budget.
+
+The first execution is preserved in
+`exercised-semantic-v1-stopped-result.json` and must not be resumed or
+reinterpreted. It stopped after 29 real MPS updates, before trained selection or
+test, because the frozen `R42` gloss said “obtain a physical card” while all
+thirty `R42` source utterances ask about locating, receiving, or setting a card
+PIN. The partial run proves no semantic usefulness outcome.
+
+`trec-semantic-v1-treatment.json` is a distinct source-disjoint natural-task
+condition, not a continuation of that stopped run. It uses the already-local
+CogComp/TREC coarse split (24 train, 8 validation, 40 official-test rows),
+discloses the four answer-type meanings, and binds a separate 14-step contract.
+The pinned TRL 1.6 LoRA recipe uses learning rate `1e-5`; four model-generated
+completions and exact coarse-class rewards still drive every group. The same
+validation-only arm rule, artifact verification, fresh-process rebind, and
+frozen-test boundary apply. Run it with:
+
+```sh
+export IMP_GRPO_OPAQUE_TREATMENT_CONFIG="$PWD/examples/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
+export IMP_GRPO_DATA="$PWD/benchmarks/data/simba-trec-coarse-v1.json"
+export IMP_TRL_CONTRACT="$PWD/priv/trl_worker/qwen-trec-14-step-contract.json"
+export IMP_GRPO_OPAQUE_OUTPUT=/new/empty/output
+mix run examples/local_grpo_opaque_banking77/run.exs
+```
