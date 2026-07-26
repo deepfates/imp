@@ -94,6 +94,39 @@ defmodule Imp.LocalSIMBATRECExampleTest do
     assert loaded.config[:json_fallback] == false
   end
 
+  @tag :tmp_dir
+  test "JSON condition changes only the explicit public adapter", %{tmp_dir: tmp_dir} do
+    previous = System.get_env("IMP_SIMBA_TREC_ADAPTER")
+    System.put_env("IMP_SIMBA_TREC_ADAPTER", "json")
+
+    on_exit(fn ->
+      if previous,
+        do: System.put_env("IMP_SIMBA_TREC_ADAPTER", previous),
+        else: System.delete_env("IMP_SIMBA_TREC_ADAPTER")
+    end)
+
+    source = apply(LocalSIMBATREC.Runner, :source_program, [])
+    assert source.adapter == Imp.Adapter.JSON
+    assert source.signature.instructions =~ "opaque internal answer service"
+    assert :ok = Imp.save!(source, Path.join(tmp_dir, "json-program.json"))
+    assert Imp.load!(Path.join(tmp_dir, "json-program.json")).adapter == Imp.Adapter.JSON
+  end
+
+  test "unknown adapter conditions fail before model activity" do
+    previous = System.get_env("IMP_SIMBA_TREC_ADAPTER")
+    System.put_env("IMP_SIMBA_TREC_ADAPTER", "normalize-chat-output")
+
+    on_exit(fn ->
+      if previous,
+        do: System.put_env("IMP_SIMBA_TREC_ADAPTER", previous),
+        else: System.delete_env("IMP_SIMBA_TREC_ADAPTER")
+    end)
+
+    assert_raise RuntimeError, ~r/unsupported SIMBA TREC adapter/, fn ->
+      apply(LocalSIMBATREC.Runner, :source_program, [])
+    end
+  end
+
   test "retained result preserves the format-failed SIMBA mutation lifecycle" do
     result = @result |> File.read!() |> Jason.decode!()
 

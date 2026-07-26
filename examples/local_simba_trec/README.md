@@ -40,3 +40,21 @@ emitted shortened markers such as `[[ R42 ]]` instead of the rendered
 and reproduced all ordered errors byte-for-byte in a fresh OS BEAM. This is a
 complete operational run but an incomplete usefulness measurement; it does not
 establish a selected SIMBA mutation or task quality.
+
+## JSON-adapter condition
+
+The failed Chat condition is not rerun or reinterpreted. A separate synthetic
+question canary, using no TREC row or label, established that the same pinned
+model returns the required typed route through `Imp.Adapter.JSON`. The
+separately named JSON condition changes only that public adapter; it keeps the
+same frozen data, opaque task objective, model, seed, SIMBA settings, split,
+selection rule, and metric:
+
+```sh
+export IMP_SIMBA_TREC_ADAPTER=json
+export IMP_SIMBA_TREC_OUTPUT=/new/empty/output
+mix run run.exs
+```
+
+This condition must still be retained honestly if no mutation wins validation
+or held-out behavior is neutral or worse.

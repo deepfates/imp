@@ -115,7 +115,8 @@ defmodule LocalSIMBATREC.Runner do
         train: length(rows.train),
         validation: length(rows.validation),
         held_out: length(rows.held_out),
-        model: @model_spec
+        model: @model_spec,
+        adapter: inspect(adapter_module!())
       })
     )
   end
@@ -181,6 +182,7 @@ defmodule LocalSIMBATREC.Runner do
         status: "complete",
         scope: "one local SIMBA opaque-route TREC consumer lifecycle",
         model: @model_spec,
+        adapter: inspect(adapter_module!()),
         data_sha256: @data_sha256,
         split_sizes: %{train: 24, validation: 8, held_out_test: 40},
         search:
@@ -270,6 +272,7 @@ defmodule LocalSIMBATREC.Runner do
       data_sha256: @data_sha256,
       model: @model_spec,
       model_digest: @model_digest,
+      adapter: inspect(adapter_module!()),
       train_ids: Enum.map(rows.train, & &1["id"]),
       validation_ids: Enum.map(rows.validation, & &1["id"]),
       held_out_ids: Enum.map(rows.held_out, & &1["id"])
@@ -295,7 +298,7 @@ defmodule LocalSIMBATREC.Runner do
         "Route the question to exactly one opaque internal answer service. Return only its route code."
       ),
       lm: lm,
-      adapter: Imp.Adapter.Chat,
+      adapter: adapter_module!(),
       config: [json_fallback: false]
     )
   end
@@ -449,7 +452,8 @@ defmodule LocalSIMBATREC.Runner do
   defp assert_runtime!(program) do
     lm = Imp.ProgramAccess.lm(program)
 
-    unless lm.model == @model_spec and Keyword.get(lm.opts, :cache) == false and
+    unless program.adapter == adapter_module!() and lm.model == @model_spec and
+             Keyword.get(lm.opts, :cache) == false and
              Keyword.get(lm.opts, :max_retries) == 0 and
              Keyword.get(lm.opts, :req_http_options) == [retry: false, max_retries: 0] do
       raise "saved program changed model, cache, or retry identity"
@@ -460,6 +464,14 @@ defmodule LocalSIMBATREC.Runner do
     case Imp.ProgramAccess.lm(program) do
       %ObservedLM{inner: inner} -> inner.model
       lm -> lm.model
+    end
+  end
+
+  defp adapter_module! do
+    case System.get_env("IMP_SIMBA_TREC_ADAPTER", "chat") do
+      "chat" -> Imp.Adapter.Chat
+      "json" -> Imp.Adapter.JSON
+      other -> raise "unsupported SIMBA TREC adapter: #{inspect(other)}"
     end
   end
 
@@ -492,6 +504,7 @@ defmodule LocalSIMBATREC.Runner do
         {"IMP_PATH", paths.imp},
         {"IMP_SIMBA_TREC_DATA", paths.data},
         {"IMP_SIMBA_TREC_OUTPUT", paths.output},
+        {"IMP_SIMBA_TREC_ADAPTER", System.get_env("IMP_SIMBA_TREC_ADAPTER", "chat")},
         {"IMP_SIMBA_TREC_FRESH", "1"},
         {"IMP_SIMBA_TREC_FRESH_OUTPUT", output_path}
       ],
