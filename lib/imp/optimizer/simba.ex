@@ -477,9 +477,13 @@ defmodule Imp.Optimizer.SIMBA do
 
         case apply_strategy(strategy, source, bucket, analysis, optimizer, prompt_lm) do
           {:ok, candidate} ->
-            {:cont,
-             {candidates ++ [%{program: candidate, source_id: source_id, strategy: strategy}],
-              %{state | population: population, poisson_rng: poisson_rng}}}
+            if optimizer_parameters(candidate) == optimizer_parameters(source) do
+              {:cont, {candidates, %{state | population: population, poisson_rng: poisson_rng}}}
+            else
+              {:cont,
+               {candidates ++ [%{program: candidate, source_id: source_id, strategy: strategy}],
+                %{state | population: population, poisson_rng: poisson_rng}}}
+            end
 
           {:error, reason} ->
             error = %{stage: :strategy, strategy: strategy, reason: reason}
@@ -494,11 +498,7 @@ defmodule Imp.Optimizer.SIMBA do
               }}}
 
           {:skip, _reason} ->
-            skipped = %{program: source, source_id: source_id, strategy: {:skipped, strategy}}
-
-            {:cont,
-             {candidates ++ [skipped],
-              %{state | population: population, poisson_rng: poisson_rng}}}
+            {:cont, {candidates, %{state | population: population, poisson_rng: poisson_rng}}}
         end
       end
     end)
@@ -615,6 +615,15 @@ defmodule Imp.Optimizer.SIMBA do
   end
 
   defp apply_advice(_program, _advice), do: {:error, :invalid_advice}
+
+  # A skipped or irrelevant strategy is not an optimizer candidate. Registering
+  # the unchanged source program inflates population/candidate counts and lets
+  # repeated evaluation variance masquerade as search progress.
+  defp optimizer_parameters(program) do
+    Enum.map(Imp.ProgramParameters.predictors(program), fn %{name: name, predictor: predictor} ->
+      {name, predictor.signature.instructions, predictor.demos}
+    end)
+  end
 
   defp reflection_payload(program, good, bad) do
     %{

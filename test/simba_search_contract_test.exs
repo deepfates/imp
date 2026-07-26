@@ -74,6 +74,36 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
     assert reflection_prompt =~ "better_program_trajectory"
   end
 
+  test "does not register skipped identity programs as optimizer candidates" do
+    lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
+
+    program = Imp.predict("question -> answer", lm: lm)
+
+    trainset = [
+      Imp.example(question: "Capital of France?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+
+    compiled =
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
+        bsize: 1,
+        num_candidates: 2,
+        max_steps: 1,
+        max_demos: 0,
+        prompt_lm: lm,
+        seed: 0
+      )
+      |> Imp.Optimizer.SIMBA.compile(program, trainset, trainset)
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.candidate_count == 0
+    assert report.candidates == []
+    assert report.metadata.population_size == 1
+    assert report.metadata.candidate_evaluation_calls == 0
+    assert [%{candidate_ids: [], candidate_scores: []}] = report.metadata.trial_logs
+  end
+
   test "prepares teacher-first rollout models from the baseline rollout id" do
     parent = self()
 
