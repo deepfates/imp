@@ -15,4 +15,17 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyResultTest do
     refute result["untouched_test_opened"]
     assert result["claim_boundary"] =~ "not Optimize Anything mutation"
   end
+
+  test "retained recorder stop does not infer its lost in-memory winner" do
+    result =
+      "examples/local_optimize_anything_retry_policy/exercised-recorder-stopped-result.json"
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert result["status"] == "stopped_after_optimization_before_durable_result"
+    assert result["optimizer_returned"]
+    refute result["durable_selection_result"]
+    refute result["untouched_test_opened"]
+    assert result["claim_boundary"] =~ "winner"
+  end
 end

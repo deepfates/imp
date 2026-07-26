@@ -29,3 +29,9 @@ The first frozen local-model attempt is retained in
 `exercised-stopped-result.json`. The model returned an object for the integer
 `base_ms` component; Imp rejected the type drift before candidate evaluation,
 selection, or untouched test access. The value was not extracted or normalized.
+
+A subsequent prompt-clarified run is retained separately in
+`exercised-recorder-stopped-result.json`. The bounded optimizer returned, but
+the example's recorder attempted to JSON-encode a raw rejected-proposal tuple
+before writing the portable result. The in-memory winner is not inferred and
+the untouched test remained unopened.

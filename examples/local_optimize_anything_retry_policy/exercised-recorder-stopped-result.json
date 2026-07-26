@@ -1,0 +1,15 @@
+{
+  "status": "stopped_after_optimization_before_durable_result",
+  "source_commit": "6e0c625",
+  "predecessor": "exercised-stopped-result.json",
+  "model": "phi4:latest",
+  "model_digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
+  "failure": {
+    "stage": "optimization_result_recorder",
+    "reason": "raw rejected-proposal tuple was not JSON encodable"
+  },
+  "optimizer_returned": true,
+  "durable_selection_result": false,
+  "untouched_test_opened": false,
+  "claim_boundary": "The optimizer returned after bounded local proposals, but its selected result was not durably retained. No winner or effectiveness outcome is inferred; this is not Optimize Anything usefulness evidence."
+}
