@@ -20,6 +20,11 @@ defmodule PackageContractTest do
     "livebooks/02_programming_not_prompting.livemd"
   ]
 
+  @product_dataset_files [
+    "benchmarks/data/grpo-usefulness-banking77-v1.json",
+    "benchmarks/data/simba-trec-coarse-v1.json"
+  ]
+
   @repository_files [
     "CHANGELOG.md",
     "CONTRIBUTING.md",
@@ -31,7 +36,9 @@ defmodule PackageContractTest do
   ]
 
   @excluded_prefixes [
-    "benchmarks/",
+    "benchmarks/config/",
+    "benchmarks/evidence/",
+    "benchmarks/results/",
     "lib/imp/benchmark_env.ex",
     "lib/mix/tasks/imp.benchmark",
     "lib/mix/tasks/imp.gate_evidence.ex",
@@ -302,6 +309,9 @@ defmodule PackageContractTest do
     for file <- @excluded_files do
       refute file in files
     end
+
+    assert Enum.sort(Enum.filter(files, &String.starts_with?(&1, "benchmarks/"))) ==
+             Enum.sort(@product_dataset_files)
 
     refute Enum.any?(files, &String.starts_with?(&1, "lib/mix/tasks/"))
   end
