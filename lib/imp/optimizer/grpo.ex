@@ -1080,12 +1080,12 @@ defmodule Imp.Optimizer.GRPO do
 
   defp failure_invocations(optimizer, predictor, trajectory) do
     case failure_trace(trajectory.error) do
-      %{messages: messages, raw: raw} ->
+      %{messages: messages, raw: raw} = trace ->
         [
           %{
             messages: normalize_messages(messages),
             completion: %{role: "assistant", content: completion_content(raw)},
-            reward: optimizer.format_failure_score * 1.0
+            reward: format_failure_reward(optimizer, trace)
           }
         ]
 
@@ -1285,6 +1285,26 @@ defmodule Imp.Optimizer.GRPO do
   defp failure_trace(%{trace: trace}) when is_map(trace), do: trace
   defp failure_trace(%{"trace" => trace}) when is_map(trace), do: trace
   defp failure_trace(_error), do: nil
+
+  # DSPy 3.2.1 intends a linear partial-format reward between
+  # format_failure_score and failure_score based on decoded output fields. Its
+  # pinned Python expression divides the two field lists directly; Imp applies
+  # the evident count ratio so the public behavior is usable and finite.
+  defp format_failure_reward(optimizer, trace) do
+    progress = fetch(trace, :format_progress, %{})
+    expected = fetch(progress, :expected, [])
+    present = fetch(progress, :present, [])
+
+    ratio =
+      if is_list(expected) and expected != [] and is_list(present) do
+        min(length(present) / length(expected), 1.0)
+      else
+        0.0
+      end
+
+    optimizer.format_failure_score * 1.0 +
+      (optimizer.failure_score - optimizer.format_failure_score) * ratio
+  end
 
   defp completion_content(content) when is_binary(content), do: content
   defp completion_content(content), do: Jason.encode!(content)

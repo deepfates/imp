@@ -266,6 +266,36 @@ defmodule GRPOContractTest do
     assert Enum.map(execution_group, & &1.reward) == [-2.0, -2.0]
   end
 
+  test "partially decoded multi-output failures receive structural format credit" do
+    partial_failure =
+      Imp.predict("question -> answer, confidence",
+        lm: %{
+          module: Imp.LM.Static,
+          model: "base-model",
+          opts: [handler: fn _messages, _opts -> %{answer: "present"} end]
+        },
+        json_fallback: false
+      )
+
+    optimizer =
+      Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,
+        trainer: trainer(),
+        num_train_steps: 1,
+        num_rollouts_per_grpo_step: 2,
+        failure_score: -1,
+        format_failure_score: -5,
+        status_poll_interval_ms: 0
+      )
+
+    assert {:ok, _compiled} =
+             Imp.Optimizer.GRPO.compile(optimizer, partial_failure, Enum.take(trainset(), 1))
+
+    assert_received {:step, batches}
+    group = batches |> hd() |> Map.fetch!(:group)
+    assert Enum.map(group, & &1.reward) == [-3.0, -3.0]
+    assert Enum.all?(group, &(not Map.has_key?(&1, :outputs)))
+  end
+
   test "terminates a started session when a training step fails" do
     optimizer =
       Imp.Optimizer.GRPO.new(fn _example, _prediction -> 1.0 end,

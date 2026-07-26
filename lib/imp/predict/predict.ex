@@ -599,7 +599,7 @@ defmodule Imp.Predict.Predict do
           )
         else
           emit_parse_error(adapter, signature, error)
-          parse_error(error, messages, raw)
+          parse_error(error, messages, raw, signature)
         end
     end
   end
@@ -636,7 +636,7 @@ defmodule Imp.Predict.Predict do
 
       true ->
         emit_parse_error(adapter, signature, error)
-        parse_error(error, messages, raw)
+        parse_error(error, messages, raw, signature)
     end
   end
 
@@ -708,7 +708,7 @@ defmodule Imp.Predict.Predict do
          {:ok, prediction} <- parse_completions(Imp.Adapter.JSON, signature, retry_raw) do
       {:ok, prediction, retry_messages, retry_raw, %{}}
     else
-      _retry_failure -> parse_error(error, original_messages, original_raw)
+      _retry_failure -> parse_error(error, original_messages, original_raw, signature)
     end
   end
 
@@ -741,11 +741,11 @@ defmodule Imp.Predict.Predict do
          {:ok, retry_raw, retry_lm_metadata} <- Imp.LM.Result.split(retry_raw) do
       case Imp.Adapter.JSON.parse(signature, retry_raw, []) do
         {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
-        _retry_error -> parse_error(error, original_messages, original_raw)
+        _retry_error -> parse_error(error, original_messages, original_raw, signature)
       end
     else
       {:error, _reason} = retry_error ->
-        parse_error(retry_error, original_messages, original_raw)
+        parse_error(retry_error, original_messages, original_raw, signature)
     end
   end
 
@@ -771,7 +771,7 @@ defmodule Imp.Predict.Predict do
          {:ok, retry_raw, retry_lm_metadata} <- Imp.LM.Result.split(retry_raw) do
       case adapter.parse(signature, retry_raw, []) do
         {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
-        retry_error -> parse_error(retry_error, retry_messages, retry_raw)
+        retry_error -> parse_error(retry_error, retry_messages, retry_raw, signature)
       end
     end
   end
@@ -792,13 +792,47 @@ defmodule Imp.Predict.Predict do
 
   defp provider_lm_opts(opts), do: Keyword.drop(opts, [:json_fallback, :json_retries])
 
-  defp parse_error(error, messages, raw) do
+  defp parse_error(error, messages, raw, signature) do
     {:error,
      %{
        reason: error,
-       trace: Imp.Redaction.redact(%{messages: messages, raw: raw})
+       trace:
+         Imp.Redaction.redact(%{
+           messages: messages,
+           raw: raw,
+           format_progress: format_progress(error, signature)
+         })
      }}
   end
+
+  # DSPy's bootstrap trace retains the output fields that were decoded before
+  # a typed adapter failure. GRPO uses that structural progress to distinguish
+  # a wholly malformed completion from one that partially followed a
+  # multi-output signature. Keep only field names here: values remain in the
+  # already-redacted raw trace and typed parsing still fails loudly.
+  defp format_progress(error, signature) do
+    expected = Enum.map(signature.outputs, & &1.name)
+    present = present_output_fields(error, expected)
+    %{expected: expected, present: present}
+  end
+
+  defp present_output_fields({:error, reason}, expected),
+    do: present_output_fields(reason, expected)
+
+  defp present_output_fields({:completion_parse_failed, _index, reason}, expected),
+    do: present_output_fields(reason, expected)
+
+  defp present_output_fields({:missing_output_fields, missing}, expected) when is_list(missing),
+    do: expected -- missing
+
+  defp present_output_fields(%Imp.AdapterParseError{reason: fields}, expected)
+       when is_map(fields) do
+    Enum.filter(expected, fn name ->
+      Map.has_key?(fields, name) or Map.has_key?(fields, to_string(name))
+    end)
+  end
+
+  defp present_output_fields(_reason, _expected), do: []
 
   defp resolve_lm(%__MODULE__{dynamic_lm?: true}), do: Imp.Settings.get().lm
   defp resolve_lm(%__MODULE__{lm: lm}), do: lm

@@ -130,8 +130,9 @@ defmodule Imp.Optimizer.Utils do
   `:example`, `:prediction`, `:trace`, `:example_ind`, and `:score`, in
   dataset order. A failed example keeps its row with `prediction: nil`,
   `score: 0.0`, and the failure under `:error` (upstream substitutes a
-  `FailedPrediction`; Imp has no failed-parse `format_reward` surface — that
-  seam is recorded in docs/internal/UPSTREAM_EXAM.md).
+  `FailedPrediction`; Imp retains equivalent structural format progress on the
+  error trace so GRPO can shape partial multi-output formatting without
+  accepting the invalid prediction).
 
   With `raise_on_error: true` (upstream's default) the first failure raises
   a loud `RuntimeError` instead.
