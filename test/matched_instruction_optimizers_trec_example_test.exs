@@ -242,6 +242,20 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
            ]
   end
 
+  test "paired coordinator refuses authority until both runtime preflights pass" do
+    script = "examples/matched_instruction_optimizers_trec/paired_coordinator_test.py"
+    assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
+    assert output =~ "Ran 4 tests"
+
+    coordinator = File.read!("examples/matched_instruction_optimizers_trec/run_paired.py")
+    assert coordinator =~ ~S|env.pop("OPENROUTER_API_KEY", None)|
+    assert coordinator =~ ~s(cwd=HERE)
+    assert coordinator =~ ~S|PRIOR_SPEND_BOUND = Decimal("1.58349300")|
+    assert coordinator =~ "imp = preflight_imp(manifest_sha)"
+    assert coordinator =~ "upstream = preflight_upstream(manifest)"
+    assert coordinator =~ "return 0 if preflight_only else run_peers()"
+  end
+
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do
     manifest = Contract.load!(@manifest)
 

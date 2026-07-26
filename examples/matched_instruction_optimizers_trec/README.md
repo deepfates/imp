@@ -31,8 +31,7 @@ The runners additionally fail closed on:
   response service tier, and prices no higher than the sealed catalog prices;
 - fallback disabled, `data_collection: deny`, one transport, cache/retry off,
   and task request seed equal to the experiment seed;
-- a shared conservative request bound—compact UTF-8 bytes plus 16 bytes for
-  every message and one assistant frame—below the input-token ceiling;
+- provider-reported input and output token counts below the shared ceilings;
 - per-arm call ceilings and cumulative worst-case USD reservation before each
   dispatch (unused reservation never creates extra calls);
 - actual upstream provider versus OpenRouter gateway identity, service tier,
@@ -68,12 +67,28 @@ uv pip sync --python tmp/dspy-parity-venv/bin/python \
   benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock
 ```
 
-The Imp and upstream runners must start
-concurrently so their selection barrier can complete. The shared aggregator
+The only supported live entry starts the Imp consumer project and upstream
+runtime as one fail-closed pair. From the repository root, load the key without
+printing it and invoke the coordinator:
+
+```sh
+set -a
+. ../.env
+set +a
+python3 examples/matched_instruction_optimizers_trec/run_paired.py
+```
+
+Before giving either child the provider key, the coordinator checks both
+runtime locks and revisions, the exact Imp example cwd, manifest and route
+shape, empty active result/barrier state, the cross-runtime guard-equivalence
+gate, and the sealed cumulative spend bound. Either preflight failure starts
+neither peer; either runtime failure interrupts the other. The shared aggregator
 recomputes all row metrics, performs source-ID-clustered paired bootstrap across
 the three seeds, applies Holm correction to the two Imp improvement tests, and
 checks noninferiority for the winning optimizer.
 
-No provider calls have been made by this strong comparison. Until a complete
-run exists, it supports no effectiveness, parity, generality, or BEAM-native
-superiority claim.
+Several stopped integration attempts made provider calls but never opened the
+untouched barrier and support no optimizer outcome. Their conservative
+cumulative spend bound before the coordinated run is `$1.58349300`. Until a
+complete run exists, this comparison supports no effectiveness, parity,
+generality, or BEAM-native superiority claim.
