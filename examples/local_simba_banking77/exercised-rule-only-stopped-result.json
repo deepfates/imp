@@ -1,0 +1,35 @@
+{
+  "status": "stopped_no_admissible_mutation",
+  "source_commit": "ed386bc",
+  "task": "frozen four-intent Banking77 subset",
+  "task_artifact": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+  "split_sizes": {
+    "train": 16,
+    "selection": 8,
+    "untouched_test": 40
+  },
+  "search": {
+    "bsize": 4,
+    "num_candidates": 2,
+    "max_steps": 1,
+    "max_demos": 0,
+    "seed": 23,
+    "trajectory_calls": 8,
+    "candidate_evaluation_calls": 0,
+    "final_evaluation_calls": 8,
+    "candidate_count": 0,
+    "baseline_batch_score": 0.5,
+    "baseline_selection_score": 0.625,
+    "bucket_ranks": [
+      [0.0, 1.0, 0.0],
+      [0.0, 1.0, 0.0],
+      [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0]
+    ],
+    "task_transports": 16,
+    "reflection_transports": 0
+  },
+  "diagnosis": "The two sampled task rollouts agreed within every example. Rule-only SIMBA therefore had no within-example reward contrast eligible for reflection and correctly produced no candidate. The runner rejected candidate-free completion before untouched evaluation.",
+  "untouched_test_opened": false,
+  "claim_boundary": "This is a retained negative operational result, not SIMBA mutation, usefulness, effectiveness, or parity evidence."
+}

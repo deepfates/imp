@@ -31,3 +31,9 @@ This one task/model run establishes an operational SIMBA mutation, validation,
 artifact, and fresh-consumer lifecycle. A neutral or negative selected outcome
 does not establish general SIMBA effectiveness, DSPy parity, or BEAM
 superiority.
+
+The first frozen rule-only execution is preserved in
+`exercised-rule-only-stopped-result.json`. Both sampled task rollouts agreed
+within every example, so SIMBA had no eligible better/worse contrast and
+correctly produced no reflection candidate. The runner stopped before opening
+the untouched test set. That result is not mutation or effectiveness evidence.
