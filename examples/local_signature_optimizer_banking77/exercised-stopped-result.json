@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "stopped_before_heldout",
+  "runtime_commit": "e48e40c110b746a929f7a416c711f226158c138e",
+  "dataset_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+  "split_sizes": {
+    "train": 16,
+    "selection": 8,
+    "optimizer_heldout_test": 40
+  },
+  "models": {
+    "task_artifact": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+    "proposal_model": "ollama:llama3.2:3b",
+    "proposal_model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "search": {
+    "proposal_calls": 2,
+    "proposal_errors": [],
+    "distinct_admitted_proposals": 1,
+    "admitted_instruction": "Here is a list of instructions in JSON format:",
+    "baseline_validation_score": 0.625,
+    "admitted_proposal_validation_score": 0.75,
+    "task_calls": 16,
+    "logical_calls": 18,
+    "transport_attempts": 18,
+    "rendered_candidate_calls": 8
+  },
+  "heldout_opened": false,
+  "fresh_process_attempted": false,
+  "stop_reason": "The two natural proposal calls collapsed to one distinct instruction, and the admitted text was an explanatory JSON preamble rather than a trustworthy task instruction.",
+  "retained_stage_sha256": {
+    "preflight": "ee4e5211ebb39dd0adde54bf55f6e666768af98706ca7f1c0b1663566b598f24",
+    "optimization": "eb52b107b15104de7e5ce172d430d823c444c89dfeedd55a70eda774830870fb",
+    "failure": "f68dfba207f0f28d894fa43dd8d759bf05ab9160ccd813fa23009f4f8a1b8ee8"
+  },
+  "claim_boundary": "This stopped result proves two non-scripted local proposal transports and rendered validation evaluation, but not valid proposal quality, held-out effectiveness, artifact consumption, upstream parity, or BEAM superiority. The observed 0.75 validation score is not promoted because the proposal boundary was malformed."
+}

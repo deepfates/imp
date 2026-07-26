@@ -30,3 +30,11 @@ One result can establish this public proposal, validation-selection, artifact,
 and fresh-consumer lifecycle on one task/model. It cannot establish general
 SignatureOptimizer effectiveness, upstream parity for this Imp-native
 extension, or BEAM superiority.
+
+The first frozen execution is retained in `exercised-stopped-result.json`. Both
+proposal transports completed, but they collapsed to one distinct admitted
+string: an explanatory JSON preamble rather than a trustworthy task
+instruction. That string was genuinely rendered and evaluated on validation,
+but the runner stopped before exposing held-out rows or writing a selected
+artifact. Its apparent validation gain is therefore not promoted as optimizer
+evidence. The run was not loosened, normalized, or repeated after observation.
