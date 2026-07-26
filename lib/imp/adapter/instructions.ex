@@ -36,6 +36,24 @@ defmodule Imp.Adapter.Instructions do
     |> Enum.join("\n        ")
   end
 
+  @doc false
+  def rendered_objective?(instructions, rendered) when is_binary(rendered) do
+    String.contains?(rendered, objective_text(instructions))
+  end
+
+  def rendered_objective?(instructions, messages) when is_list(messages) do
+    Enum.any?(messages, fn
+      %{content: content} when is_binary(content) ->
+        rendered_objective?(instructions, content)
+
+      %{"content" => content} when is_binary(content) ->
+        rendered_objective?(instructions, content)
+
+      _other ->
+        false
+    end)
+  end
+
   # -- inspect.cleandoc -------------------------------------------------------
 
   # CPython `inspect.cleandoc`:
