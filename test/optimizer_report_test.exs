@@ -70,6 +70,38 @@ defmodule OptimizerReportTest do
     assert File.read!(receipt) == "1"
   end
 
+  test "bootstrap augmented demo marker loads in a fresh OS" do
+    root =
+      Path.join(System.tmp_dir!(), "imp-report-demo-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    path = Path.join(root, "demo.json")
+    receipt = Path.join(root, "receipt")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    encoded =
+      Imp.example(augmented: true)
+      |> Imp.Optimizer.Report.encode_term()
+
+    File.write!(path, Jason.encode!(encoded))
+
+    code = """
+    demo = #{inspect(path)} |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.decode_term()
+    [{key, value}] = Map.to_list(Imp.Example.to_map(demo))
+    File.write!(#{inspect(receipt)}, Atom.to_string(key) <> "=" <> inspect(value))
+    """
+
+    {output, 0} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert output == ""
+    assert File.read!(receipt) == "augmented=true"
+  end
+
   defmodule ErrorOptimizer do
     defstruct []
 

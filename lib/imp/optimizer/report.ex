@@ -32,6 +32,11 @@ defmodule Imp.Optimizer.Report do
   # creates atoms dynamically.
   @portable_optimizer_atoms %{
     "avatar" => :avatar,
+    # BootstrapFewShot marks generated demonstrations with this owned field.
+    # Saved programs decode demos before the optimizer module is necessarily
+    # loaded in a fresh OS process, so this portable marker cannot depend on
+    # incidental module load order.
+    "augmented" => :augmented,
     "better_together" => :better_together,
     "bootstrap_few_shot" => :bootstrap_few_shot,
     "bootstrap_finetune" => :bootstrap_finetune,
