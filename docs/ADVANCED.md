@@ -594,10 +594,13 @@ tests. That coverage includes:
 
 ## Production Boundaries
 
-Advanced Imp APIs are part of the same release contract as the core facade:
-they must pass deterministic tests, compile with warnings as errors, preserve
-JSON-safe persistence where applicable, and keep provider credentials out of
-saved artifacts.
+Advanced Imp APIs are explicitly experimental before 1.0. They remain tested,
+documented, and package-supported, but may change at the next minor release as
+Imp converges on upstream semantics and a smaller stable center. The `Imp`
+facade and modules classified `stable` in the shipped `priv/public_api.json`
+carry the stronger compatibility contract. Experimental APIs must still compile
+with warnings as errors, preserve JSON-safe persistence where applicable, and
+keep provider credentials out of saved artifacts.
 
 MCP support covers catalog import plus JSON-RPC HTTP, stdio, and Streamable HTTP
 clients. The bundled benchmark tests are deterministic regression checks on

@@ -12,10 +12,10 @@
       "types": true,
       "support": "stable"
     },
-    "advanced": {
+    "experimental": {
       "callbacks": true,
       "types": true,
-      "support": "supported"
+      "support": "experimental"
     },
     "spi": {
       "callbacks": true,
@@ -127,7 +127,7 @@
       ]
     },
     {
-      "category": "advanced",
+      "category": "experimental",
       "modules": [
         "Imp.Datasets",
         "Imp.Datasets.Colors",

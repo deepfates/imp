@@ -3,8 +3,8 @@
   "categories": [
     {
       "callbacks": true,
-      "name": "advanced",
-      "support": "supported",
+      "name": "experimental",
+      "support": "experimental",
       "types": true
     },
     {
@@ -2262,7 +2262,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "csv/3",
         "from_records/3",
@@ -2306,7 +2306,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "load/1"
       ],
@@ -2326,7 +2326,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "load/3"
       ],
@@ -2346,7 +2346,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -2371,7 +2371,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "load/1",
         "metric/3"
@@ -2395,7 +2395,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "load/1"
       ],
@@ -2415,7 +2415,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "load/1"
       ],
@@ -3489,7 +3489,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "best_candidate/1",
         "run/3"
@@ -3518,7 +3518,7 @@
           "optional": false
         }
       ],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "from_map/1",
         "identity/1",
@@ -3653,7 +3653,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "apply/4",
         "candidate/3",
@@ -3731,7 +3731,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "new/2"
@@ -3765,7 +3765,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/5",
         "new/2",
@@ -3817,7 +3817,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/4",
         "new/0",
@@ -3866,7 +3866,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/5",
         "new/2"
@@ -3890,7 +3890,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "new/2",
@@ -3932,7 +3932,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/5",
         "new/2"
@@ -3956,7 +3956,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/5",
         "new/2",
@@ -3998,7 +3998,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/2",
         "new/1",
@@ -4031,7 +4031,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/5",
         "compile_with_artifact/5",
@@ -4107,7 +4107,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "accept?/4",
         "callback/1",
@@ -4261,7 +4261,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "compile/4",
@@ -4311,7 +4311,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "identity/1",
         "invoke/3",
@@ -4375,7 +4375,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "compile/4",
@@ -4416,7 +4416,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "propose/3",
         "propose_with_report/3"
@@ -4440,7 +4440,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "candidate_instructions/3",
         "compile/6",
@@ -4472,7 +4472,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "new/3"
@@ -4499,7 +4499,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "new/1"
@@ -4527,7 +4527,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "compile/4",
@@ -4573,7 +4573,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "content_digest/2",
         "dump/1",
@@ -4632,7 +4632,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/6",
         "new/1",
@@ -4692,7 +4692,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/5",
         "new/2",
@@ -4755,7 +4755,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "attach/2",
         "decode_term/1",
@@ -4810,7 +4810,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/3",
         "compile/4",
@@ -4857,7 +4857,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "choose/2",
         "dump/1",
@@ -4921,7 +4921,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compile/4",
         "new/2"
@@ -4955,7 +4955,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -4982,7 +4982,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -5016,7 +5016,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -5048,7 +5048,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "dump/1",
         "load!/1",
@@ -5128,7 +5128,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "run/4"
       ],
@@ -5148,7 +5148,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "bootstrap_trace_data/4",
         "create_minibatch/3",
@@ -5180,7 +5180,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "apply_delta/2",
         "dump/1",
@@ -5245,7 +5245,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -5282,7 +5282,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2",
         "normalize/1"
@@ -5330,7 +5330,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -5366,7 +5366,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/3"
       ],
@@ -5402,7 +5402,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -5433,7 +5433,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/3"
       ],
@@ -5468,7 +5468,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -5501,7 +5501,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/1"
       ],
@@ -5540,7 +5540,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/1"
       ],
@@ -5571,7 +5571,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -5602,7 +5602,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -5633,7 +5633,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "default_normalize/1",
         "majority/2",
@@ -5661,7 +5661,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "new/3"
@@ -5690,7 +5690,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "current_instruction/1",
         "new/3",
@@ -5731,7 +5731,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "new/3",
@@ -5766,7 +5766,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2"
       ],
@@ -5788,7 +5788,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/3"
       ],
@@ -5821,7 +5821,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "new/3"
@@ -5850,7 +5850,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "new/2",
@@ -5882,7 +5882,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "map/3"
       ],
@@ -5902,7 +5902,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "call/3",
@@ -5956,7 +5956,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/2",
         "validate_output_field/1"
@@ -5993,7 +5993,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "new/3"
@@ -6024,7 +6024,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "close/1",
@@ -6082,7 +6082,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/3"
       ],
@@ -6117,7 +6117,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new/3"
       ],
@@ -6151,7 +6151,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "call/2",
         "new/3",
@@ -6186,7 +6186,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "run/3"
       ],
@@ -6275,7 +6275,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "apply_changes/2",
         "apply_changes_with_snapshot/2",
@@ -7117,7 +7117,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "log_artifact/4",
         "log_config/2",
@@ -7171,7 +7171,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "finish/2",
         "log/2",
@@ -7259,7 +7259,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [],
       "kind": "module",
       "macros": [],
@@ -7271,7 +7271,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "finish/2",
         "init/2",
@@ -7357,7 +7357,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "build/4"
       ],
@@ -7385,7 +7385,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "dump/1",
         "new!/6"
@@ -7506,7 +7506,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "charge/3",
         "new!/1",
@@ -7545,7 +7545,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new!/1",
         "validate!/1"
@@ -7589,7 +7589,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "dump/2",
         "encode!/2",
@@ -7625,7 +7625,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "compatibility/1",
         "digest/1",
@@ -7697,7 +7697,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new!/3"
       ],
@@ -7729,7 +7729,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new!/1"
       ],
@@ -7764,7 +7764,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "consume!/1",
         "new!/3",
@@ -7812,7 +7812,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new!/3",
         "reconcile/3",
@@ -7862,7 +7862,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new!/3",
         "validate!/1"
@@ -7904,7 +7904,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "claim/4",
         "new!/3",
@@ -7949,7 +7949,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "claim/2",
         "complete!/5",
@@ -8034,7 +8034,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "batch_digest/1",
         "dump_context!/2",
@@ -8088,7 +8088,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -8114,7 +8114,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "charge_budget/3",
         "claim_cached/4",
@@ -8240,7 +8240,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new!/3"
       ],
@@ -8272,7 +8272,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "new!/3",
         "validate!/1"
@@ -8310,7 +8310,7 @@
     },
     {
       "callbacks": [],
-      "category": "advanced",
+      "category": "experimental",
       "functions": [
         "maybe_record/1",
         "record/2",

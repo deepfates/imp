@@ -29,6 +29,23 @@ defmodule PublicAPIManifestTest do
     refute first_encoded =~ "tmp/"
   end
 
+  test "plain Mix project loading does not depend on dependency modules" do
+    env = [
+      {"MIX_ENV", "test"},
+      {"MIX_PATH", ""},
+      {"ERL_LIBS", ""}
+    ]
+
+    assert {output, 0} =
+             System.cmd("mix", ["help", "test"],
+               cd: File.cwd!(),
+               env: env,
+               stderr_to_stdout: true
+             )
+
+    assert output =~ "mix test"
+  end
+
   test "manifest records category-gated facade, SPI, struct, and type contracts" do
     modules = Map.new(Mix.Tasks.Imp.PublicApi.manifest()["modules"], &{&1["module"], &1})
 
@@ -152,10 +169,30 @@ defmodule PublicAPIManifestTest do
     assert MapSet.member?(generated, "Imp")
   end
 
-  test "new documented modules under advanced namespaces require explicit classification" do
+  test "new documented modules under experimental namespaces require explicit classification" do
     assert_raise Mix.Error, ~r/unclassified: Imp\.Optimizer\.FutureOptimizer/, fn ->
       Mix.Tasks.Imp.PublicApi.classify_module("Imp.Optimizer.FutureOptimizer")
     end
+  end
+
+  test "ExDoc groups derive the stable center and experimental surface from the manifest" do
+    manifest = Mix.Tasks.Imp.PublicApi.manifest()
+    modules = Map.new(manifest["modules"], &{&1["module"], &1["category"]})
+    groups = Map.new(Mix.Project.config()[:docs][:groups_for_modules])
+
+    stable = groups["Stable center"]
+    experimental = groups["Experimental optimizers and advanced workflows"]
+    extension = groups["Extension interfaces"]
+
+    assert "Imp" in stable
+    assert "Imp.Signature" in stable
+    assert "Imp.Optimizer.GEPA" in experimental
+    assert "Imp.Optimize.Anything" in experimental
+    assert "Imp.Optimizer" in extension
+
+    assert Enum.all?(stable, &(modules[&1] in ["facade", "stable"]))
+    assert Enum.all?(experimental, &(modules[&1] == "experimental"))
+    assert Enum.all?(extension, &(modules[&1] == "spi"))
   end
 
   test "policy prefixes are module-boundary aware" do

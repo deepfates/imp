@@ -195,6 +195,12 @@ not claim comparative advantage without powered paired evidence. [Imp for DSPy
 users](docs/IMP_FOR_DSPY_USERS.md) maps every name you already know and states
 exactly what differs.
 
+The package ships one generated API truth in `priv/public_api.json`. HexDocs
+groups the `Imp` facade and stable modules as the compatibility center, marks
+optimizer and advanced modules experimental before 1.0, exposes implementer
+interfaces separately, and omits internal machinery. Experimental means real
+and supported by tests, not frozen against the next minor release.
+
 ## Learn
 
 - [Learning Path](docs/LEARNING_PATH.md): the router above, grown step by

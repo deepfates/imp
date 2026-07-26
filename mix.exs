@@ -16,6 +16,7 @@ defmodule Imp.MixProject do
         api_reference: true,
         extras:
           ["README.md", "CHANGELOG.md", "RELEASE_NOTES.md"] ++ product_docs() ++ livebooks(),
+        groups_for_modules: public_api_doc_groups(),
         filter_modules: &public_doc_module?/2,
         skip_undefined_reference_warnings_on: &skip_filtered_doc_reference?/1,
         skip_code_autolink_to: &skip_filtered_doc_reference?/1
@@ -247,7 +248,7 @@ defmodule Imp.MixProject do
   defp canonical_supported_modules do
     Path.join(__DIR__, "priv/public_api.json")
     |> File.read!()
-    |> Jason.decode!()
+    |> :json.decode()
     |> Map.fetch!("modules")
     |> MapSet.new(& &1["module"])
   end
@@ -255,9 +256,26 @@ defmodule Imp.MixProject do
   defp canonical_internal_modules do
     Path.join(__DIR__, "priv/public_api.json")
     |> File.read!()
-    |> Jason.decode!()
+    |> :json.decode()
     |> Map.fetch!("excluded_modules")
     |> MapSet.new(& &1["module"])
+  end
+
+  defp public_api_doc_groups do
+    modules =
+      Path.join(__DIR__, "priv/public_api.json")
+      |> File.read!()
+      |> :json.decode()
+      |> Map.fetch!("modules")
+
+    by_category = Enum.group_by(modules, & &1["category"], & &1["module"])
+
+    [
+      {"Stable center", Map.get(by_category, "facade", []) ++ Map.get(by_category, "stable", [])},
+      {"Experimental optimizers and advanced workflows",
+       Map.get(by_category, "experimental", [])},
+      {"Extension interfaces", Map.get(by_category, "spi", [])}
+    ]
   end
 
   # ExDoc passes nil for references that name no module (links between extras).
