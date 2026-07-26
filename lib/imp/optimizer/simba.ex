@@ -824,7 +824,7 @@ defmodule Imp.Optimizer.SIMBA do
     rollout_id_plan(start_rollout_id, optimizer.num_candidates, not is_nil(optimizer.teacher_lm))
     |> Enum.map(fn rollout ->
       %{
-        lm: if(rollout.teacher?, do: optimizer.teacher_lm, else: baseline_predictor.lm),
+        lm_override: if(rollout.teacher?, do: optimizer.teacher_lm),
         rollout_id: rollout.rollout_id,
         force_temperature?: rollout.force_temperature?
       }
@@ -843,7 +843,7 @@ defmodule Imp.Optimizer.SIMBA do
 
         %{
           predictor
-          | lm: rollout.lm,
+          | lm: rollout.lm_override || predictor.lm,
             config: config
         }
       end)

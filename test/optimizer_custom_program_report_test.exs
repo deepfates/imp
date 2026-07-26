@@ -118,6 +118,67 @@ defmodule Imp.OptimizerCustomProgramReportTest do
     assert Imp.get(prediction, :route) == "R42"
   end
 
+  test "SIMBA preserves predictor-specific LMs during multi-predictor rollouts" do
+    owner = self()
+
+    analysis_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          if Keyword.has_key?(opts, :rollout_id),
+            do: send(owner, {:analysis_rollout, opts[:rollout_id]})
+
+          %{evidence: "card payment is unrecognized"}
+        end
+      )
+
+    classification_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          if Keyword.has_key?(opts, :rollout_id),
+            do: send(owner, {:classification_rollout, opts[:rollout_id]})
+
+          %{route: "R42"}
+        end
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{discussion: "unused", module_advice: %{}} end
+      )
+
+    program =
+      TwoStageOptimizerProgram.new(analysis_lm)
+      |> Imp.ProgramParameters.update_predictor(:classify_route, fn predictor ->
+        %{predictor | lm: classification_lm}
+      end)
+
+    example =
+      Imp.example(utterance: "I do not recognize this card payment", route: "R42")
+      |> Imp.with_inputs(:utterance)
+
+    compiled =
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:route),
+        bsize: 1,
+        num_candidates: 2,
+        max_steps: 1,
+        max_demos: 0,
+        prompt_lm: prompt_lm,
+        max_concurrency: 1
+      )
+      |> Imp.Optimizer.SIMBA.compile(program, [example], [example])
+
+    assert_received {:analysis_rollout, 0}
+    assert_received {:analysis_rollout, 1}
+    assert_received {:classification_rollout, 0}
+    assert_received {:classification_rollout, 1}
+    refute_received {:analysis_rollout, _other}
+    refute_received {:classification_rollout, _other}
+
+    predictors = Map.new(Imp.ProgramParameters.predictors(compiled), &{&1.name, &1.predictor})
+    assert predictors.analyze_intent.lm == analysis_lm
+    assert predictors.classify_route.lm == classification_lm
+  end
+
   test "shared artifact capture rejects missing reports and unsupported options" do
     program = TwoStageOptimizerProgram.new(Imp.LM.Static.new())
 
