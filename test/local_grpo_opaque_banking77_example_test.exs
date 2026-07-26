@@ -11,6 +11,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @semantic_stopped_result "examples/local_grpo_opaque_banking77/exercised-semantic-v1-stopped-result.json"
   @trec_config "examples/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
   @trec_correct_config "examples/local_grpo_opaque_banking77/trec-correct-semantics-v1-treatment.json"
+  @trec_correct_result "examples/local_grpo_opaque_banking77/exercised-trec-correct-semantics-v1-result.json"
   @trec_contract "priv/trl_worker/qwen-trec-14-step-contract.json"
   @trec_stopped_result "examples/local_grpo_opaque_banking77/exercised-trec-semantic-v1-stopped-result.json"
   @trec_source_guided_result "examples/local_grpo_opaque_banking77/exercised-trec-source-guided-v1-result.json"
@@ -309,6 +310,22 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     assert instruction =~ "R68 means a location"
     assert instruction =~ "R93 means a numeric answer"
     refute instruction =~ "R42 means an entity"
+  end
+
+  test "corrected TREC result preserves the honest held-out regression" do
+    result = @trec_correct_result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "complete_negative"
+    assert result["training"]["steps"] == 14
+    assert result["training"]["steps_with_nonuniform_rewards"] == 14
+    assert result["training"]["steps_with_nonzero_group_relative_advantages"] == 13
+    assert result["training"]["steps_with_changed_trainable_tensors"] == 14
+    assert result["selection"]["selected_arm"] == "base"
+    assert result["selection"]["base"] == result["selection"]["trained"]
+    assert result["held_out_test"]["accuracy_delta"] == -0.05
+    assert result["held_out_test"]["macro_f1_delta"] < 0
+    refute result["held_out_test"]["predeclared_positive_rule_passed"]
+    assert result["fresh_process"]["ordered_predictions_and_errors_byte_identical"]
   end
 
   test "retained run preserves a complete neutral usefulness result" do

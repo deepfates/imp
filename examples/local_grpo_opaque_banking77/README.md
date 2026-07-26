@@ -170,6 +170,17 @@ continuation or reinterpretation of the three stopped updates, and it must be
 reported as a separate one-task/model result whether positive, neutral,
 negative, or stopped.
 
+That corrected condition completed and is retained in
+`exercised-trec-correct-semantics-v1-result.json`. All fourteen official
+TRL/MPS steps changed trainable tensors; all fourteen had non-uniform rewards
+and thirteen had non-zero group-relative advantages. Every competitive trained
+checkpoint tied base at `0.25` validation accuracy, so stable selection retained
+base. On the held-out forty rows the trained arm regressed from `0.375` to
+`0.325` accuracy and from `0.24861` to `0.21044` macro-F1, with zero errors.
+Fresh OS execution reproduced the selected base predictions byte-for-byte.
+This is a negative result for one task, model, seed, and budget—not evidence
+that GRPO is generally ineffective.
+
 The trained arm is deployed only if it beats base on the eight validation
 rows. A completed positive, neutral, or negative result remains specific to
 this task, model, seed, and budget.

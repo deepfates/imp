@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "complete_negative",
+  "treatment_id": "model-generated-trec-coarse-correct-disclosed-semantics-v1",
+  "runtime_base_commit": "de69a91",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "training": {
+    "steps": 14,
+    "prompt_groups": 56,
+    "rollouts_per_group": 4,
+    "steps_with_nonuniform_rewards": 14,
+    "steps_with_nonzero_group_relative_advantages": 13,
+    "steps_with_changed_trainable_tensors": 14,
+    "selected_validation_step": 1,
+    "selected_artifact_sha256": "sha256:b8eede4dacb193430951fad5acdd517740951573dc5d97325a239fb50a76e438"
+  },
+  "selection": {
+    "selected_arm": "base",
+    "base": {"accuracy": 0.25, "macro_f1": 0.1875, "errors": 0},
+    "trained": {"accuracy": 0.25, "macro_f1": 0.1875, "errors": 0}
+  },
+  "held_out_test": {
+    "base": {"accuracy": 0.375, "macro_f1": 0.24860956618464963, "errors": 0},
+    "trained": {"accuracy": 0.325, "macro_f1": 0.21043771043771042, "errors": 0},
+    "accuracy_delta": -0.05,
+    "macro_f1_delta": -0.03817185574693921,
+    "predeclared_positive_rule_passed": false
+  },
+  "fresh_process": {
+    "selected_arm": "base",
+    "artifact_identity_matched": true,
+    "ordered_predictions_and_errors_byte_identical": true
+  },
+  "retained_source_hashes": {
+    "preflight": "01032a9c6b1fdd053bccd0a536d12c7dea464a876515cfa626298ae02c646187",
+    "training": "ef7d173e3a8101cc39bd904d3a7492171e9f6fc7f2c545df62380044d85f0267",
+    "base_test": "d2f4ee8fe71448cdd737f5a7b7269310e51b0f8fca82fe55cc6a2e3cd12f95c5",
+    "trained_test": "50502c4096a9e24909820bbd0e89ba668e30597a675e2c5e0bc06e4874c90db2",
+    "fresh_test": "da87b7d02439709f0bbde0de3b00bf6c9bcb761abd30a23f9ca339cda7c46368",
+    "result": "471fcd33a613475e6561c8dc0e334ae9c08f5e8f5cfb6d6d3993f81a0b505331",
+    "training_job": "d4f74c282c2e5af1afa66884b30b02925883f4a7340b0f9ed09ac32031963b4b",
+    "portable_program": "17bc5ae04d931f1c16269357299260f157190297abcd2c330d24d2d9315c54ac"
+  },
+  "claim_boundary": "This one corrected-semantics TREC task/model treatment proves ordinary model-generated multi-group/multi-step TRL/MPS execution, genuine semantic rewards and group-relative advantages, changed trainable tensors, validation selection, and byte-identical fresh-process consumption of the selected arm. Validation tied and the trained held-out arm regressed, so it is a negative task/model-specific usefulness result. It does not establish general GRPO or mmGRPO effectiveness, parity, production reliability, or BEAM superiority."
+}
