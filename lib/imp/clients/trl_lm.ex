@@ -24,7 +24,7 @@ defmodule Imp.Clients.TRLLM do
          {:ok, result} <-
            Imp.Clients.TRLWorker.request(worker, rollout_request(lm, messages, opts), lm.timeout),
          completion when is_binary(completion) <- result["completion"] do
-      {:ok, %{lm.response_field => String.trim(completion)}}
+      {:ok, completion_output(lm, completion)}
     else
       [] -> {:error, :trl_worker_not_running}
       {:error, _reason} = error -> error
@@ -38,6 +38,19 @@ defmodule Imp.Clients.TRLLM do
 
   defp validate_rollout_source(%__MODULE__{rollout_source: source}),
     do: {:error, {:invalid_trl_rollout_source, source}}
+
+  # Model generation is raw adapter output and must pass through the program's
+  # configured parser. A controlled external rollout is explicitly a semantic
+  # output-field value and remains wrapped for the deterministic conformance
+  # path that supplied it.
+  defp completion_output(%__MODULE__{rollout_source: :model_generated}, completion),
+    do: completion
+
+  defp completion_output(
+         %__MODULE__{rollout_source: :controlled_external, response_field: field},
+         completion
+       ),
+       do: %{field => String.trim(completion)}
 
   @impl true
   def generate(messages, opts) do

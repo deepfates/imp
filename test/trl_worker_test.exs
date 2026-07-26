@@ -3,6 +3,25 @@ defmodule Imp.TRLWorkerTest do
 
   alias Imp.Clients.{TRLLM, TRLProtocol, TRLTrainer, TRLWorker}
 
+  defmodule CompletionWorker do
+    use GenServer
+
+    def start_link({key, completion}) do
+      GenServer.start_link(__MODULE__, {key, completion})
+    end
+
+    @impl true
+    def init({key, completion}) do
+      {:ok, _} = Registry.register(Imp.Clients.TRLWorker.Registry, key, nil)
+      {:ok, completion}
+    end
+
+    @impl true
+    def handle_call({:request, _request}, _from, completion) do
+      {:reply, {:ok, %{"completion" => completion}}, completion}
+    end
+  end
+
   setup do
     root = Path.join(System.tmp_dir!(), "imp-trl-worker-#{System.unique_integer([:positive])}")
     model = Path.join(root, "missing-model")
@@ -142,6 +161,25 @@ defmodule Imp.TRLWorkerTest do
 
     assert {:error, {:invalid_trl_rollout_source, :not_a_rollout_source}} =
              Imp.LM.generate(lm, [], rollout_id: 0)
+  end
+
+  test "model generations remain raw for adapter parsing while controlled values stay typed" do
+    completion = "[[ ## route ## ]]\nR17\n\n[[ ## completed ## ]]\n"
+    key = {:trl_completion_boundary, make_ref()}
+    start_supervised!({CompletionWorker, {key, completion}})
+
+    model_lm = %TRLLM{model: "Qwen/pinned", worker_key: key}
+    controlled_lm = %{model_lm | rollout_source: :controlled_external}
+    trimmed = String.trim(completion)
+
+    assert {:ok, ^completion} = Imp.LM.generate(model_lm, [%{role: "user", content: "route"}])
+
+    assert {:ok, %{route: ^trimmed}} =
+             Imp.LM.generate(controlled_lm, [%{role: "user", content: "route"}])
+
+    signature = Imp.Signature.ensure("utterance -> route")
+    assert {:ok, prediction} = Imp.Adapter.Chat.parse(signature, completion, [])
+    assert Imp.get(prediction, :route) == "R17"
   end
 
   test "trainer projects atom-keyed Imp groups to the worker's plain JSON shape" do
