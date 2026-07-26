@@ -277,12 +277,24 @@ defmodule LocalCOPROBanking77.Runner do
     transports = Enum.filter(snapshot.transports, &(&1.phase == "optimization"))
     baseline_instruction = InstructionSearch.current_instruction(baseline)
     selected_instruction = InstructionSearch.current_instruction(selected)
-
-    baseline_record = Enum.find(report.candidates, &(&1.instruction == baseline_instruction))
-    candidate_record = Enum.find(report.candidates, &(&1.instruction != baseline_instruction))
-    candidate_instruction = candidate_record && candidate_record.instruction
     task_calls = Enum.filter(calls, &(&1.role == :task))
     proposer_responses = responses |> Enum.filter(&(&1.role == :proposal)) |> Enum.map(& &1.value)
+    proposed_pair = proposal_pair(proposer_responses)
+
+    candidate_record =
+      case proposed_pair do
+        {instruction, prefix} ->
+          Enum.find(
+            report.candidates,
+            &(&1.instruction == instruction and &1.prefix == prefix)
+          )
+
+        nil ->
+          nil
+      end
+
+    baseline_record = Enum.find(report.candidates, &(&1 != candidate_record))
+    candidate_instruction = candidate_record && candidate_record.instruction
 
     %{
       status: "complete",
@@ -296,7 +308,8 @@ defmodule LocalCOPROBanking77.Runner do
         if(selected_instruction == baseline_instruction, do: "baseline", else: "candidate"),
       selected_instruction: selected_instruction,
       proposer_calls: Enum.count(calls, &(&1.role == :proposal)),
-      valid_json_proposal: valid_json_proposal?(proposer_responses, candidate_instruction),
+      valid_json_proposal: not is_nil(proposed_pair) and not is_nil(candidate_record),
+      prompt_mutated: candidate_instruction != baseline_instruction,
       candidate_rendered_calls:
         Enum.count(task_calls, fn call ->
           is_binary(candidate_instruction) and
@@ -309,20 +322,28 @@ defmodule LocalCOPROBanking77.Runner do
     }
   end
 
-  defp valid_json_proposal?([raw], candidate_instruction) when is_binary(candidate_instruction) do
+  defp proposal_pair([raw]) do
     case proposal_values(raw) do
-      [value] -> proposal_value?(value, candidate_instruction)
-      _other -> false
+      [value] -> proposal_value(value)
+      _other -> nil
     end
   end
 
-  defp valid_json_proposal?(_responses, _candidate_instruction), do: false
+  defp proposal_pair(_responses), do: nil
 
   defp proposal_values(raw) when is_binary(raw) do
     case Jason.decode(raw) do
-      {:ok, value} when is_list(value) -> value
-      {:ok, value} when is_map(value) -> [value]
-      _error -> []
+      {:ok, value} when is_list(value) ->
+        value
+
+      {:ok, value} when is_map(value) ->
+        [value]
+
+      _error ->
+        case Regex.run(~r/```(?:json)?\s*\n(.*?)```/is, raw, capture: :all_but_first) do
+          [candidate] -> proposal_values(String.trim(candidate))
+          nil -> []
+        end
     end
   end
 
@@ -330,22 +351,23 @@ defmodule LocalCOPROBanking77.Runner do
   defp proposal_values(raw) when is_map(raw), do: [raw]
   defp proposal_values(_raw), do: []
 
-  defp proposal_value?(value, candidate_instruction) when is_map(value) do
+  defp proposal_value(value) when is_map(value) do
     instruction = value["proposed_instruction"] || value[:proposed_instruction]
     prefix = value["proposed_prefix_for_output_field"] || value[:proposed_prefix_for_output_field]
 
-    is_binary(instruction) and String.trim(instruction) == candidate_instruction and
-      is_binary(prefix)
+    if is_binary(instruction) and is_binary(prefix),
+      do: {String.trim(instruction), String.trim(prefix)},
+      else: nil
   end
 
-  defp proposal_value?(_value, _candidate_instruction), do: false
+  defp proposal_value(_value), do: nil
 
   defp require_optimization!(stage) do
     valid =
       stage.evaluation_dataset == :trainset and stage.proposal_mode == :language_model and
         stage.proposer_calls == 1 and stage.valid_json_proposal and
         is_number(stage.baseline_score) and is_number(stage.candidate_score) and
-        stage.candidate_rendered_calls == 16 and stage.task_calls == 32 and
+        stage.prompt_mutated and stage.candidate_rendered_calls == 16 and stage.task_calls == 32 and
         stage.logical_calls == 33 and stage.transport_attempts == 33
 
     unless valid,

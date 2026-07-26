@@ -46,3 +46,12 @@ ran through sixteen fused-model calls and lost to baseline `50.0%` to `56.25%`;
 the runner then stopped before held-out evaluation or artifact creation. COPRO
 now decodes the enclosed JSON or rejects an invalid fence before task work. The
 stopped score is parser-defect evidence, not optimizer effectiveness evidence.
+
+The unchanged continuation after that parser repair is retained separately in
+`exercised-post-fenced-json-fix-duplicate-stopped-result.json`. The enclosed
+JSON decoded correctly, but it repeated the baseline instruction and changed
+only COPRO's deprecated, non-rendered output prefix. Both pairs scored `56.25%`
+on the pinned trainset and source order retained baseline. Because no task
+instruction changed, the consumer again stopped before held-out rows rather
+than presenting inert metadata churn as prompt optimization. No third model
+pass was made.

@@ -4,6 +4,7 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
   @source "examples/local_copro_banking77/run.exs"
   @readme "examples/local_copro_banking77/README.md"
   @stopped "examples/local_copro_banking77/exercised-pre-fenced-json-fix-stopped-result.json"
+  @duplicate_stopped "examples/local_copro_banking77/exercised-post-fenced-json-fix-duplicate-stopped-result.json"
 
   test "front door follows pinned COPRO trainset selection semantics" do
     source = File.read!(@source)
@@ -25,6 +26,7 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
     assert source =~ "stage.proposal_mode == :language_model"
     assert source =~ "stage.proposer_calls == 1 and stage.valid_json_proposal"
     assert source =~ "is_number(stage.baseline_score) and is_number(stage.candidate_score)"
+    assert source =~ "stage.prompt_mutated"
     assert source =~ "stage.candidate_rendered_calls == 16 and stage.task_calls == 32"
     assert source =~ "stage.logical_calls == 33 and stage.transport_attempts == 33"
     assert source =~ "cache: false"
@@ -65,6 +67,17 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
     refute result["heldout_opened"]
     refute result["fresh_process_attempted"]
     assert result["claim_boundary"] =~ "not valid proposal"
+  end
+
+  test "decoded duplicate prefix-only proposal does not count as prompt mutation" do
+    result = @duplicate_stopped |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "stopped_before_heldout"
+    refute result["search"]["prompt_instruction_changed"]
+    assert result["search"]["baseline_score_percent"] == 56.25
+    assert result["search"]["candidate_score_percent"] == 56.25
+    refute result["heldout_opened"]
+    assert result["claim_boundary"] =~ "falsifying a genuine prompt mutation"
   end
 
   defp byte_offset!(source, needle) do

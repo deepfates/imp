@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "stopped_before_heldout",
+  "runtime_commit": "90b6f88",
+  "dataset_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+  "search": {
+    "selection_dataset": "trainset",
+    "proposal_calls": 1,
+    "task_calls": 32,
+    "transport_attempts": 33,
+    "decoded_proposed_instruction": "Choose exactly one opaque route code for the customer utterance.",
+    "decoded_proposed_prefix": "",
+    "baseline_prefix": "Route:",
+    "prompt_instruction_changed": false,
+    "baseline_score_percent": 56.25,
+    "candidate_score_percent": 56.25,
+    "selected": "baseline"
+  },
+  "heldout_opened": false,
+  "fresh_process_attempted": false,
+  "stop_reason": "After the fenced JSON repair, the natural proposal decoded correctly but repeated the baseline instruction and changed only COPRO's deprecated non-rendered prefix. The consumer refused to present inert prefix churn as a prompt mutation.",
+  "retained_stage_sha256": {
+    "preflight": "c2acaa08754d591072dc3918fc40fa09b47720f20ae6500720b830e12a237dec",
+    "optimization": "3b39ffb47fd1e3bc0952cadd61749e695f20860cdaa6761347fb488a0a553199",
+    "failure": "2c2a4543257027bcd647ddf72d6cff3109d3abbd043930a24cedbaf57a218b3f"
+  },
+  "claim_boundary": "This stopped result proves fenced JSON decoding and ordinary candidate/baseline evaluation, while falsifying a genuine prompt mutation for this proposer call. It is not held-out effectiveness, artifact, parity, or BEAM-superiority evidence."
+}
