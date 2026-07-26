@@ -139,10 +139,49 @@ defmodule Imp.Optimizer.Report do
   @doc false
   def json_projection(value), do: value |> dump_projection() |> Imp.Redaction.redact()
 
-  def attach(program, %__MODULE__{} = report),
-    do: Imp.ProgramAccess.put_metadata(program, :optimizer_report, report)
+  def attach(program, %__MODULE__{} = report) do
+    attached = Imp.ProgramAccess.put_metadata(program, :optimizer_report, report)
 
-  def fetch(program), do: Imp.ProgramAccess.get_metadata(program, :optimizer_report)
+    if Imp.ProgramAccess.get_metadata(attached, :optimizer_report) == report do
+      attached
+    else
+      Enum.reduce(Imp.ProgramParameters.predictors(attached), attached, fn %{name: name}, acc ->
+        Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
+          Imp.ProgramAccess.put_metadata(predictor, :optimizer_report, report)
+        end)
+      end)
+    end
+  end
+
+  def fetch(%_{} = program) do
+    case Imp.ProgramAccess.get_metadata(program, :optimizer_report) do
+      %__MODULE__{} = report ->
+        report
+
+      nil ->
+        program
+        |> Imp.ProgramParameters.predictors()
+        |> Enum.map(&Imp.ProgramAccess.get_metadata(&1.predictor, :optimizer_report))
+        |> Enum.reject(&is_nil/1)
+        |> consistent_predictor_report!()
+    end
+  end
+
+  def fetch(_program), do: nil
+
+  defp consistent_predictor_report!([]), do: nil
+
+  defp consistent_predictor_report!([%__MODULE__{} = report | rest]) do
+    if Enum.all?(rest, &(&1 == report)) do
+      report
+    else
+      raise ArgumentError, "program predictors carry conflicting optimizer reports"
+    end
+  end
+
+  defp consistent_predictor_report!(_reports) do
+    raise ArgumentError, "program predictors carry malformed optimizer reports"
+  end
 
   defp dump_value(%Imp.Example{} = example) do
     %{
