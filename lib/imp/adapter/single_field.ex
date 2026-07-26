@@ -24,8 +24,13 @@ defmodule Imp.Adapter.SingleField do
   token sequence and selects the most likely exact value. Sampled TRL training
   deliberately does not advertise this capability: choice-normalized sampling
   needs a different policy objective and must not masquerade as ordinary GRPO.
-  Other LMs receive only the concise prompt and remain subject to the same
-  strict parser.
+
+  When choice scoring is unavailable but the LM advertises exact response
+  schemas, `SingleField` sends the same one-field schema as `Imp.Adapter.JSON`.
+  The provider may then return a map, which this adapter validates through the
+  ordinary typed parser. This is transport constraint, not text repair: an LM
+  with neither capability still receives only the concise prompt and remains
+  subject to the exact-value parser.
   """
 
   @behaviour Imp.Adapter
@@ -90,6 +95,10 @@ defmodule Imp.Adapter.SingleField do
       values when is_list(values) and values != [] -> [allowed_values: values]
       _unconstrained -> []
     end
+  end
+
+  def lm_opts(signature, opts, %Imp.LM.Capability{response_schema: true} = capability) do
+    Imp.Adapter.JSON.lm_opts(signature, opts, capability)
   end
 
   def lm_opts(_signature, _opts, %Imp.LM.Capability{}), do: []
