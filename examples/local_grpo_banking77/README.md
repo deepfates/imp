@@ -85,3 +85,16 @@ and a fresh OS BEAM reproduced it byte-for-byte. This establishes ordinary
 model-generated semantic signal and weight-changing lifecycle mechanics, but
 the neutral held-out result is neither a GRPO win nor a general optimizer loss.
 The run did not retrospectively select its step-one checkpoint.
+
+The current runner defines a separate, prospective defaults treatment rather
+than altering either retained result. With the two-step contract and width four
+environment shown above, it keeps the same model revision, JSON adapter,
+16/8/40 rows, seed, four rollouts per group, prompt, token envelope, and task
+metric, while using pinned TRL 1.6.0's documented `learning_rate: 1.0e-6` and
+`loss_type: :dapo` defaults (`beta: 0.0`, group reward scaling). It predeclares
+earliest-on-tie selection among trained checkpoints using only the eight
+selection rows, then performs the existing base-versus-selected comparison
+before opening the untouched 40 rows. The default output directory is
+`model-generated-banking77-json-defaults-v1`. This treatment must be interpreted
+independently whether positive, neutral, negative, or stopped; it is not a
+retry or reinterpretation of `exercised-json-multistep-result.json`.

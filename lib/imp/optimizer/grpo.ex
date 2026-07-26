@@ -735,6 +735,15 @@ defmodule Imp.Optimizer.GRPO do
        when next_step > 0,
        do: :ok
 
+  defp maybe_initial_validation(
+         %{checkpoint_selection: :best_validation},
+         _program,
+         _trainset,
+         _valset,
+         0
+       ),
+       do: :ok
+
   defp maybe_initial_validation(optimizer, program, trainset, valset, 0) do
     case maybe_validate(optimizer, program, trainset, valset, -1) do
       {:ok, _score} -> :ok

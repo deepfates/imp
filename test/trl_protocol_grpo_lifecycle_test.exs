@@ -20,7 +20,7 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
         lm: %Imp.Test.TRLConformanceLM{model: "local/no-model-policy"}
       )
 
-    scores = %{-1 => 0.0, 0 => 1.0, 1 => 0.5}
+    scores = %{0 => 1.0, 1 => 0.5}
 
     optimizer =
       Imp.Optimizer.GRPO.new(

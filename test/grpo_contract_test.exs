@@ -228,7 +228,7 @@ defmodule GRPOContractTest do
   end
 
   test "predeclared validation selects and rebinds the earliest best trained checkpoint" do
-    scores = %{-1 => 0.25, 0 => 1.0, 1 => 0.5}
+    scores = %{0 => 1.0, 1 => 0.5}
 
     optimizer =
       Imp.Optimizer.GRPO.new(

@@ -72,13 +72,25 @@ defmodule LocalGRPOBanking77.Runner do
         num_dspy_examples_per_grpo_step: train_width(),
         num_rollouts_per_grpo_step: 4,
         seed: @seed,
+        train_kwargs: [
+          learning_rate: 1.0e-6,
+          beta: 0.0,
+          loss_type: :dapo,
+          scale_rewards: :group
+        ],
+        checkpoint_selection: :best_validation,
+        num_steps_for_val: 1,
         status_poll_interval_ms: 0,
         callback_timeout_ms: 900_000,
         timeout: 120_000,
         checkpoint_path: Path.join(paths.output, "grpo-checkpoint.bin")
       )
 
-    {:ok, result} = Imp.train(program(training_lm), optimizer, examples(rows.train))
+    {:ok, result} =
+      Imp.train(program(training_lm), optimizer, examples(rows.train),
+        validation: examples(rows.selection)
+      )
+
     job = result.job
     {:ok, manifest} = TRLArtifact.verify_job(job)
 
@@ -157,7 +169,16 @@ defmodule LocalGRPOBanking77.Runner do
         base_test: metrics(base_test),
         trained_test: metrics(trained_test),
         artifact_path: job.result_model,
-        artifact_sha256: manifest["payload_sha256"]
+        artifact_sha256: manifest["payload_sha256"],
+        selected_validation_step: job.metadata.selected_validation_step,
+        selected_validation_score: job.metadata.selected_validation_score,
+        validation_history: job.metadata.validation_history,
+        trainer_config: %{
+          learning_rate: 1.0e-6,
+          beta: 0.0,
+          loss_type: "dapo",
+          scale_rewards: "group"
+        }
       }
 
       Atomic.write!(Path.join(paths.output, "07-summary-before-fresh.json"), summary)
@@ -448,7 +469,7 @@ defmodule LocalGRPOBanking77.Runner do
     output =
       System.get_env(
         "IMP_GRPO_OUTPUT",
-        "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-v1"
+        "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-defaults-v1"
       )
 
     %{
