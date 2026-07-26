@@ -1401,6 +1401,168 @@
       ]
     },
     {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "verify/2",
+        "verify_job/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Clients.TRLArtifact",
+      "signatures": {
+        "functions": {
+          "verify/2": [
+            "verify(path, expected_sha256)"
+          ],
+          "verify_job/1": [
+            "verify_job(job)"
+          ]
+        }
+      },
+      "source": "lib/imp/clients/trl_artifact.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "generate/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.TRLLM",
+      "signatures": {
+        "functions": {
+          "generate/3": [
+            "generate(lm, messages, opts)"
+          ]
+        }
+      },
+      "source": "lib/imp/clients/trl_lm.ex",
+      "struct_fields": [
+        "model",
+        "response_field",
+        "rollout_source",
+        "timeout",
+        "worker_key"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "artifact!/1",
+        "artifact/1",
+        "canonical_json/1",
+        "checkpoint!/1",
+        "checkpoint/1",
+        "digest/1",
+        "engine_identity/0",
+        "receipt!/1",
+        "receipt/1",
+        "schema_version/0",
+        "session!/1",
+        "session/1",
+        "update!/1",
+        "update/1",
+        "validate/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Clients.TRLProtocol",
+      "signatures": {
+        "functions": {
+          "artifact!/1": [
+            "artifact!(attrs)"
+          ],
+          "artifact/1": [
+            "artifact(attrs)"
+          ],
+          "canonical_json/1": [
+            "canonical_json(value)"
+          ],
+          "checkpoint!/1": [
+            "checkpoint!(attrs)"
+          ],
+          "checkpoint/1": [
+            "checkpoint(attrs)"
+          ],
+          "digest/1": [
+            "digest(value)"
+          ],
+          "engine_identity/0": [
+            "engine_identity()"
+          ],
+          "receipt!/1": [
+            "receipt!(attrs)"
+          ],
+          "receipt/1": [
+            "receipt(attrs)"
+          ],
+          "schema_version/0": [
+            "schema_version()"
+          ],
+          "session!/1": [
+            "session!(attrs)"
+          ],
+          "session/1": [
+            "session(attrs)"
+          ],
+          "update!/1": [
+            "update!(attrs)"
+          ],
+          "update/1": [
+            "update(attrs)"
+          ],
+          "validate/1": [
+            "validate(value)"
+          ]
+        },
+        "types": {
+          "envelope/0": []
+        }
+      },
+      "source": "lib/imp/clients/trl_protocol.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "envelope/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.TRLTrainer",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(opts)"
+          ]
+        }
+      },
+      "source": "lib/imp/clients/trl_trainer.ex",
+      "struct_fields": [
+        "contract_path",
+        "model_path",
+        "python",
+        "root",
+        "timeout",
+        "worker_key",
+        "worker_script"
+      ],
+      "types": []
+    },
+    {
       "callbacks": [
         {
           "name": "final_model_artifact/1",
@@ -3341,6 +3503,7 @@
         "compare/4",
         "inspect/1",
         "new/3",
+        "parameter_candidate/3",
         "promote/2",
         "read!/1",
         "rollback/1",
@@ -3365,6 +3528,9 @@
           ],
           "new/3": [
             "new(champion, challengers \\\\ [], opts \\\\ [])"
+          ],
+          "parameter_candidate/3": [
+            "parameter_candidate(id, program, opts \\\\ [])"
           ],
           "promote/2": [
             "promote(artifact, candidate_id)"
@@ -3975,6 +4141,70 @@
       "callbacks": [],
       "category": "advanced",
       "functions": [
+        "identity/1",
+        "invoke/3",
+        "invoke/4",
+        "new/4",
+        "reward/3",
+        "validate/2",
+        "validation/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.GRPO.Callback",
+      "signatures": {
+        "functions": {
+          "identity/1": [
+            "identity(callback)"
+          ],
+          "invoke/3": [
+            "invoke(callback, example, prediction)"
+          ],
+          "invoke/4": [
+            "invoke(callback, program, dataset, context)"
+          ],
+          "new/4": [
+            "new(kind, module, function, opts)"
+          ],
+          "reward/3": [
+            "reward(module, function, opts \\\\ [])"
+          ],
+          "validate/2": [
+            "validate(callback, expected_kind)"
+          ],
+          "validation/3": [
+            "validation(module, function, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "kind/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/grpo/callback.ex",
+      "struct_fields": [
+        "config",
+        "config_sha256",
+        "function",
+        "id",
+        "kind",
+        "module"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "kind/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
         "compile/3",
         "compile/4",
         "compile/5",
@@ -4553,6 +4783,40 @@
         "program",
         "reason",
         "status"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "advanced",
+      "functions": [
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.TrainingJobAdoption",
+      "signatures": {
+        "functions": {
+          "new/2": [
+            "new(job, program)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/training_job_adoption.ex",
+      "struct_fields": [
+        "artifact_sha256",
+        "base_model_identity",
+        "job",
+        "job_sha256",
+        "program_sha256"
       ],
       "types": [
         {

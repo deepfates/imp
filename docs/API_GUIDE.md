@@ -840,6 +840,39 @@ small-dataset prefix selection real instead of silently becoming the
 no-validation/latest-prefix path. A single example remains a training row; pass
 an explicit validation set when selection is required at that size.
 
+To continue a `BetterTogether` workflow from an already-completed weight job,
+use the explicit adoption optimizer. Adoption verifies and binds the exact job,
+artifact contents, incoming program, and base-model identity; it performs no
+trainer dispatch, fusion, or weight update.
+
+```elixir
+job = Imp.Clients.TrainingJob.load!("training-job.json")
+
+weight_step =
+  Imp.Optimizer.TrainingJobAdoption.new(job, base_program)
+
+optimizer =
+  Imp.Optimizer.BetterTogether.new(metric, %{
+    w: weight_step,
+    p: Imp.Optimizer.COPRO.new(metric, proposer_lm: proposer_lm)
+  })
+
+program =
+  Imp.Optimizer.BetterTogether.compile(
+    optimizer,
+    base_program,
+    trainset,
+    validation_set,
+    strategy: [:w, :p]
+  )
+```
+
+`TrainingJobAdoption` declares the training-result protocol only because
+`BetterTogether` uses that protocol for weight-bearing steps. Its result
+metadata records `training_performed: false`; it accepts only supported,
+content-verified completed artifacts and fails closed on job, artifact, base,
+or program drift.
+
 Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
 and GEPA-style artifact optimization, use the same explicit LM shapes as
 programs. `proposer_lm:`, `prompt_lm:`, and `reflection_lm:` reject malformed
