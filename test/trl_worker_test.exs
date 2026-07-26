@@ -383,6 +383,77 @@ defmodule Imp.TRLWorkerTest do
     assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)
   end
 
+  test "generation temporarily enters eval mode and restores the trainer mode", context do
+    script = """
+    import contextlib
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("imp_trl_worker", #{inspect(Path.expand("../priv/trl_worker/worker.py", __DIR__))})
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    class CompletionIDs:
+        def detach(self): return self
+        def cpu(self): return self
+        def tolist(self): return [7]
+
+    class Output:
+        def __getitem__(self, key):
+            assert key == (0, slice(2, None, None))
+            return CompletionIDs()
+
+    class InputIDs:
+        shape = (1, 2)
+
+    class Inputs(dict):
+        def to(self, device):
+            assert device == "mps"
+            return self
+
+    class Tokenizer:
+        pad_token_id = 0
+        eos_token_id = 1
+        def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=True):
+            return "prompt"
+        def __call__(self, prompt, add_special_tokens=False, return_tensors=None):
+            return Inputs(input_ids=InputIDs())
+        def decode(self, ids, skip_special_tokens=True):
+            return "{\\\"route\\\":\\\"R17\\\"}"
+
+    class MPS:
+        def manual_seed(self, seed): pass
+
+    class Torch:
+        mps = MPS()
+        def manual_seed(self, seed): pass
+        def no_grad(self): return contextlib.nullcontext()
+
+    class Model:
+        training = True
+        def eval(self): self.training = False
+        def train(self): self.training = True
+        def generate(self, **kwargs):
+            assert self.training is False
+            return Output()
+
+    worker = object.__new__(module.Worker)
+    worker.model = Model()
+    worker.tokenizer = Tokenizer()
+    worker.torch = Torch()
+    worker.protocol = {"behavior_policy": {"model": "base"}}
+    worker.deployed_artifact = None
+    worker.contract = {"optimizer": {"seed": 7, "max_completion_length": 16, "temperature": 1.0}}
+    result = worker.generate({
+        "messages": [{"role": "user", "content": "route"}],
+        "rollout_id": 0,
+        "generation_mode": "greedy",
+    })
+    assert result["completion"] == '{"route":"R17"}'
+    assert worker.model.training is True
+    """
+
+    assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)
+  end
+
   test "ordinary one-update contracts accept arbitrary prompts and finite reward scales",
        context do
     general_contract =

@@ -329,24 +329,30 @@ class Worker:
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt").to("mps")
-        with self.torch.no_grad():
-            if allowed_values is None:
-                generation_options = {
-                    "do_sample": generation_mode == "sample",
-                    "max_new_tokens": cfg["max_completion_length"],
-                    "pad_token_id": self.tokenizer.pad_token_id,
-                    "eos_token_id": self.tokenizer.eos_token_id,
-                    "use_cache": True,
-                }
-                if generation_mode == "sample":
-                    generation_options["temperature"] = cfg["temperature"]
-                output = self.model.generate(**inputs, **generation_options)
-                completion_ids = output[0, inputs["input_ids"].shape[1] :]
-                completion = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
-            else:
-                completion, completion_ids = self._select_allowed_value(
-                    inputs["input_ids"], allowed_values
-                )
+        was_training = self.model.training
+        self.model.eval()
+        try:
+            with self.torch.no_grad():
+                if allowed_values is None:
+                    generation_options = {
+                        "do_sample": generation_mode == "sample",
+                        "max_new_tokens": cfg["max_completion_length"],
+                        "pad_token_id": self.tokenizer.pad_token_id,
+                        "eos_token_id": self.tokenizer.eos_token_id,
+                        "use_cache": True,
+                    }
+                    if generation_mode == "sample":
+                        generation_options["temperature"] = cfg["temperature"]
+                    output = self.model.generate(**inputs, **generation_options)
+                    completion_ids = output[0, inputs["input_ids"].shape[1] :]
+                    completion = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
+                else:
+                    completion, completion_ids = self._select_allowed_value(
+                        inputs["input_ids"], allowed_values
+                    )
+        finally:
+            if was_training:
+                self.model.train()
         result = {
             "completion": completion,
             "completion_token_ids": completion_ids.detach().cpu().tolist(),

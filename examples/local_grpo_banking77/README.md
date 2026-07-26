@@ -98,3 +98,17 @@ before opening the untouched 40 rows. The default output directory is
 `model-generated-banking77-json-defaults-v1`. This treatment must be interpreted
 independently whether positive, neutral, negative, or stopped; it is not a
 retry or reinterpretation of `exercised-json-multistep-result.json`.
+
+That treatment completed and is preserved in
+`exercised-json-defaults-result.json`, but its internal checkpoint comparison is
+invalid. Step one again produced real semantic signal and changed tensors; step
+two again collapsed to malformed samples. The worker had remained in training
+mode after `GRPOTrainer.train()`, so its immediate validation calls did not
+match the later inference-mode deployment of the saved step-one artifact. The
+internal scores were both `0.0`, while ordinary deployment scored base and the
+selected step-one artifact identically at `0.875` on selection and `0.725` on
+untouched test, with zero parse errors. Base was retained and reproduced fresh.
+The worker now brackets all generation in eval mode and restores prior trainer
+mode afterward. The completed run was not rerun; it is lifecycle/training and
+neutral external-evaluation evidence, not valid checkpoint-selection or GRPO
+effectiveness evidence.

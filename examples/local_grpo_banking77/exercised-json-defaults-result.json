@@ -1,0 +1,57 @@
+{
+  "status": "complete_with_invalid_internal_validation",
+  "scope": "one pinned Qwen2.5-0.5B two-step, four-group-per-step ordinary model-generated GRPO run on the frozen Banking77 16/8/40 split using documented TRL 1.6.0 training defaults",
+  "adapter": "Elixir.Imp.Adapter.JSON",
+  "trainer_config": {
+    "learning_rate": 0.000001,
+    "beta": 0.0,
+    "loss_type": "dapo",
+    "scale_rewards": "group"
+  },
+  "training": {
+    "steps": 2,
+    "groups_per_step": 4,
+    "rollouts_per_group": 4,
+    "step_1_rewards": [1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0],
+    "step_1_advantages": [0.8658754229545593, -0.8658754229545593, -0.8658754229545593, 0.8658754229545593, 0.0, 0.0, 0.0, 0.0, -0.8658754229545593, 0.8658754229545593, 0.8658754229545593, -0.8658754229545593, -0.8658754229545593, 0.8658754229545593, 0.8658754229545593, -0.8658754229545593],
+    "step_2_rewards": [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0],
+    "step_2_advantages": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "trainable_tensors_changed": true
+  },
+  "internal_checkpoint_validation": {
+    "recorded_scores": [{"step": 1, "score": 0.0}, {"step": 2, "score": 0.0}],
+    "selected_step": 1,
+    "valid_for_checkpoint_comparison": false,
+    "reason": "the live worker generated after training while the policy remained in training mode; the saved step-one artifact later scored normally after inference-mode reload"
+  },
+  "ordinary_deployment_selection": {
+    "base_accuracy": 0.875,
+    "trained_step_1_accuracy": 0.875,
+    "base_macro_f1": 0.8666666666666667,
+    "trained_step_1_macro_f1": 0.8666666666666667,
+    "errors": 0,
+    "selected_arm": "base"
+  },
+  "untouched_test": {
+    "base_accuracy": 0.725,
+    "trained_step_1_accuracy": 0.725,
+    "base_macro_f1": 0.7128851540616246,
+    "trained_step_1_macro_f1": 0.7128851540616246,
+    "errors": 0,
+    "fresh_selected_base_byte_identical": true
+  },
+  "establishes": [
+    "the public allowlisted trainer configuration was applied to the official two-step TRL worker",
+    "ordinary step-one semantic rewards and advantages changed LoRA tensors",
+    "the retained selected trained artifact was content-verified and deployable",
+    "external base-versus-selected and untouched evaluation were neutral"
+  ],
+  "excludes": [
+    "valid in-session checkpoint score comparison",
+    "GRPO usefulness or improvement on this task",
+    "general GRPO learning or effectiveness",
+    "mmGRPO parity",
+    "production reliability",
+    "BEAM superiority"
+  ]
+}
