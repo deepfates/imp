@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "scope": "two-group/two-step local TRL lifecycle acceptance; not effectiveness",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "dataset_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+  "train_steps": 2,
+  "groups_per_step": 2,
+  "generations_per_group": 4,
+  "selected_train_row_ids": [
+    "banking77-train-3483",
+    "banking77-train-5094",
+    "banking77-train-2512",
+    "banking77-train-5093"
+  ],
+  "global_steps": [[0, 1], [1, 2]],
+  "group_rewards": [
+    [-1.0, -1.0, -1.0, -1.0],
+    [-1.0, -1.0, -1.0, -1.0],
+    [-1.0, -1.0, -1.0, -1.0],
+    [-1.0, -1.0, -1.0, -1.0]
+  ],
+  "group_advantages": [
+    [0.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 0.0]
+  ],
+  "trainable_tensors_changed": false,
+  "selected_arm": "base",
+  "base_test": {"accuracy": 0.025, "macro_f1": 0.045454545454545456, "errors": 39},
+  "trained_test": {"accuracy": 0.025, "macro_f1": 0.045454545454545456, "errors": 39},
+  "artifact_sha256": "sha256:dbba0a90e842fcf3d671fd1601519b4c7d01f0342a5f1daf5e0b454dde00c2f1",
+  "fresh_selected_base_byte_identical": true,
+  "fresh_trained_artifact_byte_identical": true,
+  "training_stage_sha256": "8cea96f0d02ba3a5ec4e1f42498404795646f9cb7721c063e7129ba6dae32b83",
+  "fresh_trained_reproduction_sha256": "sha256:e1dba687e84416d595bdbfa0b800af38d0ebd8f2a4e5dd6cd977eb16f2c52e07",
+  "exclusions": [
+    "useful learned behavior",
+    "ordinary model-generated weight change",
+    "GRPO or mmGRPO effectiveness",
+    "full upstream parity",
+    "production reliability",
+    "BEAM superiority"
+  ]
+}

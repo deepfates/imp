@@ -57,3 +57,10 @@ Each step consumes two ordered source-bound prompt groups with four completions
 per group. Step two must resume the exact step-one adapter, optimizer,
 scheduler, Trainer state, and MPS RNG; repeated one-step jobs are not accepted
 as an equivalent trajectory.
+
+The retained two-group/two-step acceptance is summarized in
+`exercised-multistep-result.json`. Both official steps completed and global
+state advanced `0 -> 1 -> 2`; the final artifact contains the full chain and
+its trained predictions reproduced byte-for-byte from a fresh OS BEAM. All
+four prompt groups still produced uniform malformed-output rewards, so the
+result remains a no-signal lifecycle proof rather than learned usefulness.

@@ -8,12 +8,15 @@ defmodule Imp.Clients.TRLTrainer do
   model. The configured Python environment and model tree must already exist.
 
   The bundled default contract pins Qwen2.5-0.5B, TRL 1.6.0, and one durable
-  MPS LoRA update. It accepts arbitrary Imp-rendered prompt groups and finite
-  external rewards. Experiment-specific assertions such as a required tensor
-  change belong in an explicit contract; they are not imposed on ordinary
-  training, where a uniform-reward group may truthfully produce a no-op step.
-  Multi-step optimizer-state restoration is not yet supported and mismatched
-  rollout or step budgets fail before the worker loads the model.
+  MPS LoRA update; the bundled two-step contract exercises durable continuation.
+  Both accept arbitrary Imp-rendered prompt groups and finite external rewards.
+  Ordered groups are source-bound and batched through official TRL. Later steps
+  restore the prior adapter, optimizer, scheduler, Trainer state, and explicit
+  MPS RNG before continuing. Experiment-specific assertions such as a required
+  tensor change belong in an explicit contract; they are not imposed on
+  ordinary training, where uniform-reward groups may truthfully produce no-op
+  steps. Mismatched rollout or step budgets fail before the worker loads the
+  model.
   """
 
   @behaviour Imp.Clients.Trainer

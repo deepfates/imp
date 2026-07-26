@@ -131,7 +131,7 @@ defmodule LocalGRPOBanking77.Runner do
 
       summary = %{
         status: "complete",
-        scope: "one task/model one-update ordinary model-generated local GRPO result",
+        scope: "one task/model #{train_steps()}-step ordinary model-generated local GRPO result",
         model: @model,
         trainable_tensors_changed:
           Enum.any?(step_artifacts, & &1.observation["trainable_tensors_changed"]),
@@ -210,9 +210,10 @@ defmodule LocalGRPOBanking77.Runner do
     portable = Imp.load!(paths.program)
     trainer = trainer(paths, {:local_grpo_banking77_fresh, @seed})
     selection = read_json!(Path.join(paths.output, "04-selection.json"))
+    selected_arm = System.get_env("IMP_GRPO_FRESH_ARM", selection["selected_arm"])
 
     {:ok, deployment, selected} =
-      case selection["selected_arm"] do
+      case selected_arm do
         "trained" ->
           {:ok, trained} = TrainingJob.rebind(job, portable, trainer: trainer)
           {:ok, job, trained}
@@ -237,7 +238,7 @@ defmodule LocalGRPOBanking77.Runner do
 
       Atomic.write!(System.fetch_env!("IMP_GRPO_FRESH_OUTPUT"), %{
         status: "complete",
-        selected_arm: selection["selected_arm"],
+        selected_arm: selected_arm,
         rows: stage.rows,
         accuracy: stage.accuracy,
         macro_f1: stage.macro_f1,

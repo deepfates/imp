@@ -273,8 +273,8 @@ it does not upload examples itself.
 
 ### Optional local TRL GRPO
 
-`Imp.Clients.TRLTrainer` is a local Apple-Silicon backend for one real LoRA
-GRPO update. Its bundled contract pins Qwen2.5-0.5B-Instruct at revision
+`Imp.Clients.TRLTrainer` is a local Apple-Silicon backend for real LoRA GRPO
+updates. Its default one-step contract pins Qwen2.5-0.5B-Instruct at revision
 `7ae557604adf67be50417f59c2c2f167def9a775`, CPython 3.12, TRL 1.6.0,
 Transformers 4.57.6, PEFT 0.18.1, and PyTorch 2.10.0 on MPS with CPU fallback
 disabled. Imp does not install those dependencies or download the model.
@@ -338,9 +338,15 @@ change. Uniform group rewards are a valid GRPO no-op and are recorded honestly.
 The retained controlled-rollout contract separately requires non-uniform
 rewards, advantages, and changed tensors as conformance assertions. Rollout
 count and the exactly-one-step budget are checked before model loading.
-Multi-step crash-safe restoration is still unsupported: use an external
-trainer for longer jobs rather than treating repeated one-step jobs as an
-equivalent optimizer trajectory.
+Prompt groups carry their selected source-row identity and are ordered
+group-major through official TRL, so group-relative advantages remain separate.
+`qwen-two-step-contract.json` demonstrates a longer durable session: step two
+loads the step-one adapter and resumes the exact official optimizer, scheduler,
+Trainer state, and separately retained MPS RNG. Every step is immutable and the
+final standalone artifact includes the complete update/receipt chain. A fresh
+worker verifies that chain and reloads the latest adapter before it advertises
+the next step. Repeating independent one-step jobs is not equivalent and is not
+used as a continuation path.
 
 ### Optional local MLX-LM SFT
 
