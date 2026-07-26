@@ -86,87 +86,34 @@ defmodule LocalGRPOBanking77.Runner do
                  @base_selection_stage_sha256,
                do: raise("retained base-selection stage drift")
 
-        read_json!(Path.join(paths.output, "01-base-selection.json"))
+        load_evaluation_stage!(Path.join(paths.output, "01-base-selection.json"))
       else
         stage = with_base(trainer, fn lm -> evaluate(program(lm), rows.selection) end)
         Atomic.write!(Path.join(paths.output, "01-base-selection.json"), stage)
         stage
       end
 
-    training_lm = %TRLLM{
-      model: @model,
-      worker_key: trainer.worker_key,
-      response_field: :route,
-      timeout: 120_000
-    }
-
-    optimizer =
-      Imp.Optimizer.GRPO.new(
-        Callback.reward(LocalGRPOBanking77.Reward, :exact_route,
-          id: "banking77-exact-route-v1",
-          config: %{}
-        ),
-        trainer: trainer,
-        num_train_steps: train_steps(),
-        num_dspy_examples_per_grpo_step: train_width(),
-        num_rollouts_per_grpo_step: 4,
-        seed: @seed,
-        train_kwargs: [
-          learning_rate: 1.0e-6,
-          beta: 0.0,
-          loss_type: :dapo,
-          scale_rewards: :group
-        ],
-        checkpoint_selection: :best_validation,
-        num_steps_for_val: 1,
-        status_poll_interval_ms: 0,
-        callback_timeout_ms: 900_000,
-        timeout: 120_000,
-        checkpoint_path: Path.join(paths.output, "grpo-checkpoint.bin")
-      )
-
-    {:ok, result} =
-      Imp.train(program(training_lm), optimizer, examples(rows.train),
-        validation: examples(rows.selection)
-      )
-
-    job = result.job
-    {:ok, manifest} = TRLArtifact.verify_job(job)
-
-    step_artifacts =
-      Enum.map(1..train_steps(), fn step ->
-        path = job.result_model |> Path.dirname() |> Path.join("step-#{step}")
-
-        %{
-          step: step,
-          path: path,
-          observation: path |> Path.join("trl-observation.json") |> read_json!(),
-          update: path |> Path.join("update-#{step}.json") |> read_json!()
-        }
-      end)
+    {job, manifest, step_artifacts} =
+      if resume? and not File.regular?(Path.join(paths.output, "grpo-checkpoint.bin")) do
+        restore_completed_training!(paths, rows)
+      else
+        train!(paths, rows, trainer)
+      end
 
     final_step = List.last(step_artifacts)
     observation = final_step.observation
-    update = final_step.update
-
-    training_stage = %{
-      status: "complete",
-      job: encode_job(job),
-      artifact_payload_sha256: manifest["payload_sha256"],
-      observation: observation,
-      steps: step_artifacts,
-      group: update["groups"],
-      selected_train_row_ids:
-        Enum.flat_map(step_artifacts, &selected_train_row_ids(&1.update, rows.train))
-    }
-
-    Atomic.write!(Path.join(paths.output, "02-training.json"), training_stage)
 
     {:ok, trained_program} = TrainingJob.rebind(job, portable, trainer: trainer)
 
     try do
-      trained_selection = evaluate(trained_program, rows.selection)
-      Atomic.write!(Path.join(paths.output, "03-trained-selection.json"), trained_selection)
+      trained_selection =
+        if resume? and File.regular?(Path.join(paths.output, "03-trained-selection.json")) do
+          load_evaluation_stage!(Path.join(paths.output, "03-trained-selection.json"))
+        else
+          stage = evaluate(trained_program, rows.selection)
+          Atomic.write!(Path.join(paths.output, "03-trained-selection.json"), stage)
+          stage
+        end
 
       selection = choose(base_selection, trained_selection)
       Atomic.write!(Path.join(paths.output, "04-selection.json"), selection)
@@ -266,6 +213,111 @@ defmodule LocalGRPOBanking77.Runner do
       })
 
       reraise error, __STACKTRACE__
+  end
+
+  defp train!(paths, rows, trainer) do
+    training_lm = %TRLLM{
+      model: @model,
+      worker_key: trainer.worker_key,
+      response_field: :route,
+      timeout: 120_000
+    }
+
+    optimizer =
+      Imp.Optimizer.GRPO.new(
+        Callback.reward(LocalGRPOBanking77.Reward, :exact_route,
+          id: "banking77-exact-route-v1",
+          config: %{}
+        ),
+        trainer: trainer,
+        num_train_steps: train_steps(),
+        num_dspy_examples_per_grpo_step: train_width(),
+        num_rollouts_per_grpo_step: 4,
+        seed: @seed,
+        train_kwargs: [
+          learning_rate: 1.0e-6,
+          beta: 0.0,
+          loss_type: :dapo,
+          scale_rewards: :group
+        ],
+        checkpoint_selection: :best_validation,
+        num_steps_for_val: 1,
+        status_poll_interval_ms: 0,
+        callback_timeout_ms: 900_000,
+        timeout: 120_000,
+        checkpoint_path: Path.join(paths.output, "grpo-checkpoint.bin")
+      )
+
+    {:ok, result} =
+      Imp.train(program(training_lm), optimizer, examples(rows.train),
+        validation: examples(rows.selection)
+      )
+
+    job = result.job
+    {:ok, manifest} = TRLArtifact.verify_job(job)
+    step_artifacts = step_artifacts(job)
+    final_step = List.last(step_artifacts)
+
+    training_stage = %{
+      status: "complete",
+      job: encode_job(job),
+      artifact_payload_sha256: manifest["payload_sha256"],
+      observation: final_step.observation,
+      steps: step_artifacts,
+      group: final_step.update["groups"],
+      selected_train_row_ids:
+        Enum.flat_map(step_artifacts, &selected_train_row_ids(&1.update, rows.train))
+    }
+
+    Atomic.write!(Path.join(paths.output, "02-training.json"), training_stage)
+    {job, manifest, step_artifacts}
+  end
+
+  defp restore_completed_training!(paths, rows) do
+    stage = read_json!(Path.join(paths.output, "02-training.json"))
+    state = Map.fetch!(stage, "job")
+
+    unless state["provider"] == "trl" and state["status"] == "succeeded" and
+             state["model"] == @model,
+           do: raise("retained completed GRPO job identity drift")
+
+    job =
+      TrainingJob.new(%{
+        id: Map.fetch!(state, "id"),
+        provider: :trl,
+        model: @model,
+        status: :succeeded,
+        result_model: Map.fetch!(state, "result_model"),
+        metadata: state["metadata"] |> Imp.Optimizer.Report.decode_term()
+      })
+
+    {:ok, manifest} = TRLArtifact.verify_job(job)
+
+    unless manifest["payload_sha256"] == stage["artifact_payload_sha256"],
+      do: raise("retained completed GRPO artifact drift")
+
+    step_artifacts = step_artifacts(job)
+
+    selected_ids =
+      Enum.flat_map(step_artifacts, &selected_train_row_ids(&1.update, rows.train))
+
+    unless selected_ids == stage["selected_train_row_ids"],
+      do: raise("retained GRPO source schedule drift")
+
+    {job, manifest, step_artifacts}
+  end
+
+  defp step_artifacts(job) do
+    Enum.map(1..train_steps(), fn step ->
+      path = job.result_model |> Path.dirname() |> Path.join("step-#{step}")
+
+      %{
+        step: step,
+        path: path,
+        observation: path |> Path.join("trl-observation.json") |> read_json!(),
+        update: path |> Path.join("update-#{step}.json") |> read_json!()
+      }
+    end)
   end
 
   defp fresh do
@@ -569,6 +621,27 @@ defmodule LocalGRPOBanking77.Runner do
 
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()
 
+  defp load_evaluation_stage!(path) do
+    stage = read_json!(path)
+
+    %{
+      status: Map.fetch!(stage, "status"),
+      rows:
+        Enum.map(Map.fetch!(stage, "rows"), fn row ->
+          %{
+            id: Map.fetch!(row, "id"),
+            expected: Map.fetch!(row, "expected"),
+            actual: Map.get(row, "actual"),
+            error: Map.get(row, "error")
+          }
+        end),
+      accuracy: Map.fetch!(stage, "accuracy"),
+      macro_f1: Map.fetch!(stage, "macro_f1"),
+      errors: Map.fetch!(stage, "errors"),
+      reproduction_sha256: Map.fetch!(stage, "reproduction_sha256")
+    }
+  end
+
   defp require_new_output!(path) do
     case File.ls(path) do
       {:error, :enoent} -> :ok
@@ -585,8 +658,16 @@ defmodule LocalGRPOBanking77.Runner do
       Path.join(paths.output, "grpo-checkpoint.bin")
     ]
 
-    unless Enum.all?(required, &File.regular?/1),
-      do: raise("IMP_GRPO_RESUME requires retained preflight, base selection, and checkpoint")
+    training_complete? =
+      File.regular?(Path.join(paths.output, "02-training.json")) and
+        File.regular?(Path.join(paths.output, "03-trained-selection.json"))
+
+    unless Enum.all?(Enum.take(required, 2), &File.regular?/1) and
+             (File.regular?(List.last(required)) or training_complete?),
+           do:
+             raise(
+               "IMP_GRPO_RESUME requires retained preflight/base plus a checkpoint or completed training stages"
+             )
 
     if File.regular?(Path.join(paths.output, "result.json")),
       do: raise("completed GRPO output cannot be resumed")
