@@ -17,6 +17,12 @@ defmodule Imp.Optimizer.InstructionProposer do
   def propose_with_report(program, trainset, opts \\ []) do
     count = Keyword.get(opts, :count, 5)
     fallback = fallback_candidates(program, trainset, opts)
+    proposal_response_format = Keyword.get(opts, :proposal_response_format, :off)
+
+    unless proposal_response_format in [:off, :auto, :required] do
+      raise ArgumentError,
+            "instruction proposal response format must be :off, :auto, or :required"
+    end
 
     case Keyword.get(opts, :lm) || Keyword.get(opts, :proposer_lm) do
       nil ->
@@ -36,13 +42,18 @@ defmodule Imp.Optimizer.InstructionProposer do
             Imp.LM.generate(
               lm,
               messages(program, trainset, proposal_opts),
-              rollout_id: Keyword.get(proposal_opts, :seed, index),
-              temperature: Keyword.get(opts, :temperature, 1.0)
+              proposal_lm_opts(lm, proposal_response_format,
+                rollout_id: Keyword.get(proposal_opts, :seed, index),
+                temperature: Keyword.get(opts, :temperature, 1.0)
+              )
             )
 
           case Imp.LM.Result.unwrap(result) do
             {:ok, raw} ->
-              case parse(raw, 1, []) do
+              case parse_proposal(
+                     raw,
+                     proposal_response_format_enabled?(lm, proposal_response_format)
+                   ) do
                 [instruction | _] ->
                   {instruction, %{metadata | calls: metadata.calls + 1}}
 
@@ -133,7 +144,7 @@ defmodule Imp.Optimizer.InstructionProposer do
       %{
         role: :system,
         content:
-          "Propose Imp instruction candidates. Return JSON list of strings or newline-separated instructions."
+          "Propose one complete Imp task instruction. Return exactly one JSON object with an `instructions` array containing exactly one string."
       },
       %{
         role: :user,
@@ -274,6 +285,62 @@ defmodule Imp.Optimizer.InstructionProposer do
 
   defp proposal_indices(count) when count > 0, do: 0..(count - 1)
   defp proposal_indices(_count), do: []
+
+  defp proposal_lm_opts(lm, response_format, opts) do
+    if proposal_response_format_enabled?(lm, response_format) do
+      Keyword.put(opts, :response_format, proposal_response_format())
+    else
+      opts
+    end
+  end
+
+  defp proposal_response_format_enabled?(_lm, :required), do: true
+  defp proposal_response_format_enabled?(_lm, :off), do: false
+
+  defp proposal_response_format_enabled?(lm, :auto),
+    do: Imp.LM.response_format_capability(lm).response_schema
+
+  defp proposal_response_format do
+    %{
+      type: "json_schema",
+      json_schema: %{
+        name: "imp_instruction_proposal",
+        strict: true,
+        schema: %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "properties" => %{
+            "instructions" => %{
+              "type" => "array",
+              "minItems" => 1,
+              "maxItems" => 1,
+              "items" => %{"type" => "string"}
+            }
+          },
+          "required" => ["instructions"]
+        }
+      }
+    }
+  end
+
+  defp parse_proposal(raw, false), do: parse(raw, 1, [])
+
+  defp parse_proposal(raw, true) when is_binary(raw) do
+    case Jason.decode(raw) do
+      {:ok, decoded} -> parse_proposal(decoded, true)
+      {:error, _reason} -> []
+    end
+  end
+
+  defp parse_proposal(%{"instructions" => [instruction]} = payload, true)
+       when map_size(payload) == 1 and is_binary(instruction),
+       do: clean([instruction], 1, [])
+
+  defp parse_proposal(%{instructions: [instruction]} = payload, true)
+       when map_size(payload) == 1 and is_binary(instruction),
+       do: clean([instruction], 1, [])
+
+  defp parse_proposal(_raw, true), do: []
 
   defp fallback_at([], _index), do: "Complete the task."
   defp fallback_at(fallback, index), do: Enum.at(fallback, rem(index, length(fallback)))

@@ -149,4 +149,80 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
     assert_received {:proposal_demos, 11, [%{"answer" => "b", "question" => "b"} | _]}
     assert_received {:proposal_demos, 12, [%{"answer" => "c", "question" => "c"} | _]}
   end
+
+  test "required typed transport sends an exact schema and rejects narrative substitutes" do
+    parent = self()
+
+    typed =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          send(parent, {:proposal_response_format, opts[:response_format]})
+          %{"instructions" => ["Classify by the demonstrated route mapping."]}
+        end
+      )
+
+    program = Imp.predict("question -> route")
+    example = Imp.example(question: "q", route: "R17") |> Imp.with_inputs(:question)
+
+    assert {[
+              "Classify by the demonstrated route mapping."
+            ], %{status: :ok, calls: 1, errors: []}} =
+             InstructionProposer.propose_with_report(program, [example],
+               lm: typed,
+               count: 1,
+               proposal_response_format: :required
+             )
+
+    assert_received {:proposal_response_format,
+                     %{
+                       type: "json_schema",
+                       json_schema: %{
+                         name: "imp_instruction_proposal",
+                         strict: true,
+                         schema: %{
+                           "additionalProperties" => false,
+                           "required" => ["instructions"]
+                         }
+                       }
+                     }}
+
+    narrative =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{"comment" => "Here is a list of instructions in JSON format:"}
+        end
+      )
+
+    {fallbacks, report} =
+      InstructionProposer.propose_with_report(program, [example],
+        lm: narrative,
+        count: 1,
+        proposal_response_format: :required
+      )
+
+    assert length(fallbacks) == 1
+    assert report.status == :with_fallbacks
+    assert report.errors == [{:invalid_proposal, 0}]
+  end
+
+  test "required typed transport rejects partial and extra proposal fields" do
+    program = Imp.predict("question -> answer")
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
+
+    for response <- [
+          %{"instructions" => []},
+          %{"instructions" => ["one", "two"]},
+          %{"instructions" => ["one"], "comment" => "extra"},
+          %{"instruction" => "one"}
+        ] do
+      {_fallbacks, report} =
+        InstructionProposer.propose_with_report(program, [example],
+          lm: Imp.LM.Static.new(handler: fn _messages, _opts -> response end),
+          count: 1,
+          proposal_response_format: :required
+        )
+
+      assert report.errors == [{:invalid_proposal, 0}]
+    end
+  end
 end

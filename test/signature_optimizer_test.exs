@@ -70,6 +70,36 @@ defmodule Imp.Optimizer.SignatureOptimizerTest do
     end
   end
 
+  test "required proposal response format is honored and recorded" do
+    owner = self()
+
+    proposer =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          send(owner, {:typed_proposal_opts, opts})
+          %{"instructions" => ["Always answer Paris."]}
+        end
+      )
+
+    compiled =
+      SignatureOptimizer.new(Imp.Metrics.exact_match(:answer),
+        proposer_lm: proposer,
+        num_candidates: 1,
+        proposal_response_format: :required
+      )
+      |> SignatureOptimizer.compile(
+        Imp.predict("question -> answer", lm: instruction_sensitive_lm()),
+        [example()],
+        [example()]
+      )
+
+    assert_receive {:typed_proposal_opts, opts}
+    assert opts[:response_format].json_schema.strict
+    assert opts[:response_format].json_schema.schema["additionalProperties"] == false
+    assert InstructionSearch.current_instruction(compiled) == "Always answer Paris."
+    assert Report.fetch(compiled).metadata.proposal_response_format == :required
+  end
+
   test "proposal failure is explicit while native fallbacks and baseline remain usable" do
     proposer =
       Imp.LM.Static.new(handler: fn _messages, _opts -> raise "proposal backend unavailable" end)

@@ -11,6 +11,12 @@ defmodule Imp.Optimizer.SignatureOptimizer do
 
   Candidate selection is performed only on the required validation set. The
   original program is always evaluated and wins equal-score ties.
+
+  `proposal_response_format: :required` binds each proposer call to an exact
+  one-instruction JSON Schema envelope. `:auto` uses that envelope when the LM
+  advertises schema support; `:off` retains the pinned text-compatible parser.
+  Invalid structured responses become explicit proposal fallbacks rather than
+  executable explanatory prose.
   """
 
   defstruct [
@@ -21,6 +27,7 @@ defmodule Imp.Optimizer.SignatureOptimizer do
     seed: 0,
     temperature: 1.0,
     view_data_batch_size: 10,
+    proposal_response_format: :off,
     extra_instructions: []
   ]
 
@@ -34,6 +41,10 @@ defmodule Imp.Optimizer.SignatureOptimizer do
       default: 1.0
     ],
     view_data_batch_size: [type: :non_neg_integer, default: 10],
+    proposal_response_format: [
+      type: {:in, [:off, :auto, :required]},
+      default: :off
+    ],
     extra_instructions: [type: {:list, :string}, default: []]
   ]
 
@@ -109,6 +120,7 @@ defmodule Imp.Optimizer.SignatureOptimizer do
           proposal_status: proposal.status,
           proposal_calls: proposal.calls,
           proposal_errors: proposal.errors,
+          proposal_response_format: optimizer.proposal_response_format,
           requested_candidates: length(candidates),
           baseline_score: search.metadata[:baseline_score],
           selected_instruction: Imp.Optimizer.InstructionSearch.current_instruction(compiled),
@@ -134,6 +146,7 @@ defmodule Imp.Optimizer.SignatureOptimizer do
       seed: optimizer.seed,
       temperature: optimizer.temperature,
       view_data_batch_size: optimizer.view_data_batch_size,
+      proposal_response_format: optimizer.proposal_response_format,
       extra_instructions: optimizer.extra_instructions,
       preserve_slots: true
     ]
