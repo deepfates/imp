@@ -231,6 +231,95 @@ defmodule Imp.Optimizer.COPROFidelityTest do
     assert Report.fetch(compiled).metadata.evaluation_dataset == :trainset
   end
 
+  test "required proposal formatting reaches the LM as an exact batch schema" do
+    owner = self()
+
+    proposer =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          send(owner, {:proposal_response_format, opts[:response_format]})
+
+          Jason.encode!([
+            %{
+              "proposed_instruction" => "Answer Paris.",
+              "proposed_prefix_for_output_field" => "Answer:"
+            }
+          ])
+        end
+      )
+
+    compiled =
+      COPRO.new(Imp.Metrics.exact_match(:answer),
+        proposer_lm: proposer,
+        breadth: 2,
+        depth: 1,
+        proposal_response_format: :required
+      )
+      |> COPRO.compile(constant_program(), trainset(), [])
+
+    assert_received {:proposal_response_format,
+                     %{
+                       type: "json_schema",
+                       json_schema: %{
+                         strict: true,
+                         schema: %{
+                           "type" => "array",
+                           "minItems" => 1,
+                           "maxItems" => 1,
+                           "items" => %{
+                             "additionalProperties" => false,
+                             "required" => [
+                               "proposed_instruction",
+                               "proposed_prefix_for_output_field"
+                             ]
+                           }
+                         }
+                       }
+                     }}
+
+    assert Report.fetch(compiled).metadata.proposal_response_format == :required
+  end
+
+  test "required proposal formatting rejects extra fields before task evaluation" do
+    owner = self()
+
+    proposer =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Jason.encode!([
+            %{
+              "proposed_instruction" => "Answer Paris.",
+              "proposed_prefix_for_output_field" => "Answer:",
+              "explanation" => "This must not cross the executable boundary."
+            }
+          ])
+        end
+      )
+
+    program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts ->
+              send(owner, :task_called)
+              %{answer: "Paris"}
+            end
+          )
+      )
+
+    assert_raise RuntimeError, ~r/returned no instruction\/prefix candidate/, fn ->
+      COPRO.new(Imp.Metrics.exact_match(:answer),
+        proposer_lm: proposer,
+        breadth: 2,
+        depth: 1,
+        proposal_response_format: :required
+      )
+      |> COPRO.compile(program, trainset(), [])
+    end
+
+    refute_received :task_called
+  end
+
   test "decodes a JSON candidate inside a markdown fence instead of optimizing the delimiter" do
     proposer =
       Imp.LM.Static.new(

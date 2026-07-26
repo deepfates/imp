@@ -1000,6 +1000,10 @@ Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
 and GEPA-style artifact optimization, use the same explicit LM shapes as
 programs. `proposer_lm:`, `prompt_lm:`, and `reflection_lm:` reject malformed
 values when the optimizer is built or run, before a search loop starts.
+COPRO, MIPROv2, and SignatureOptimizer accept
+`proposal_response_format: :required` to send and locally enforce their exact
+proposal JSON Schema. `:auto` enables it only for LMs that advertise schema
+support, while `:off` keeps the pinned tolerant text parser.
 
 Optimizer-specific `compile` functions remain public for advanced workflows
 that need their native return values or split/options layout. The MIPROv2 and

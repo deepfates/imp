@@ -14,6 +14,11 @@ defmodule Imp.Optimizer.COPRO do
   in the optimizer or Imp settings, deterministic native fallback proposals keep
   the optimizer executable.
 
+  `proposal_response_format: :required` sends an exact JSON Schema and validates
+  the returned batch before any candidate evaluation. `:auto` does so when the
+  configured LM advertises schema support; `:off` preserves DSPy's tolerant text
+  compatibility path.
+
   For statistics fidelity, `results_latest` preserves 3.2.1's cumulative
   `latest_scores` behavior across predictors within each depth.
   """
@@ -26,7 +31,8 @@ defmodule Imp.Optimizer.COPRO do
     init_temperature: 1.4,
     track_stats: false,
     extra_instructions: [],
-    proposal_max_concurrency: 4
+    proposal_max_concurrency: 4,
+    proposal_response_format: :off
   ]
 
   @option_schema [
@@ -36,7 +42,8 @@ defmodule Imp.Optimizer.COPRO do
     track_stats: [type: :boolean, default: false],
     proposer_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
     extra_instructions: [type: {:list, :string}, default: []],
-    proposal_max_concurrency: [type: :pos_integer, default: 4]
+    proposal_max_concurrency: [type: :pos_integer, default: 4],
+    proposal_response_format: [type: {:in, [:off, :auto, :required]}, default: :off]
   ]
 
   @eval_option_schema [
@@ -279,6 +286,7 @@ defmodule Imp.Optimizer.COPRO do
           score_scale: :percentage,
           prefix_behavior: :stored_compared_but_not_rendered,
           proposal_mode: proposal_mode(optimizer),
+          proposal_response_format: optimizer.proposal_response_format,
           proposal_batching: :whole_batch_or_ordered_bounded_fanout,
           latest_score_scope: :cumulative_across_predictors_per_depth,
           max_errors: max_errors,
@@ -352,7 +360,13 @@ defmodule Imp.Optimizer.COPRO do
         candidate_index: 1
       )
 
-    first_pairs = parse_pairs(first_raw, prefix, count)
+    first_pairs =
+      parse_pairs(
+        first_raw,
+        prefix,
+        count,
+        proposal_response_format_enabled?(lm, optimizer.proposal_response_format)
+      )
 
     if first_pairs == [] do
       raise RuntimeError, "COPRO proposal LM returned no instruction/prefix candidate"
@@ -385,7 +399,12 @@ defmodule Imp.Optimizer.COPRO do
                candidate_index: completed + rollout_id
              ) do
           {:ok, raw} ->
-            case parse_pairs(raw, prefix, 1) do
+            case parse_pairs(
+                   raw,
+                   prefix,
+                   1,
+                   proposal_response_format_enabled?(lm, optimizer.proposal_response_format)
+                 ) do
               [pair] -> {:ok, pair}
               [] -> {:error, :missing_candidate}
             end
@@ -420,11 +439,53 @@ defmodule Imp.Optimizer.COPRO do
   defp request_proposals(lm, predictor, history, optimizer, count, opts) do
     messages = proposal_messages(predictor, history, count, opts[:candidate_index])
 
-    Imp.LM.generate(lm, messages,
-      temperature: optimizer.init_temperature,
-      rollout_id: opts[:rollout_id]
-    )
+    generate_opts =
+      [temperature: optimizer.init_temperature, rollout_id: opts[:rollout_id]]
+      |> maybe_put_proposal_response_format(lm, optimizer.proposal_response_format, count)
+
+    Imp.LM.generate(lm, messages, generate_opts)
     |> Imp.LM.Result.unwrap()
+  end
+
+  defp maybe_put_proposal_response_format(opts, _lm, :off, _count), do: opts
+
+  defp maybe_put_proposal_response_format(opts, lm, :auto, count) do
+    if Imp.LM.response_format_capability(lm).response_schema,
+      do: Keyword.put(opts, :response_format, proposal_response_format(count)),
+      else: opts
+  end
+
+  defp maybe_put_proposal_response_format(opts, _lm, :required, count),
+    do: Keyword.put(opts, :response_format, proposal_response_format(count))
+
+  defp proposal_response_format_enabled?(_lm, :off), do: false
+  defp proposal_response_format_enabled?(_lm, :required), do: true
+
+  defp proposal_response_format_enabled?(lm, :auto),
+    do: Imp.LM.response_format_capability(lm).response_schema
+
+  defp proposal_response_format(count) do
+    %{
+      type: "json_schema",
+      json_schema: %{
+        name: "imp_copro_proposals",
+        strict: true,
+        schema: %{
+          "type" => "array",
+          "minItems" => count,
+          "maxItems" => count,
+          "items" => %{
+            "type" => "object",
+            "additionalProperties" => false,
+            "required" => ["proposed_instruction", "proposed_prefix_for_output_field"],
+            "properties" => %{
+              "proposed_instruction" => %{"type" => "string"},
+              "proposed_prefix_for_output_field" => %{"type" => "string"}
+            }
+          }
+        }
+      }
+    }
   end
 
   defp fallback_pairs(predictor, optimizer, count) do
@@ -504,9 +565,9 @@ defmodule Imp.Optimizer.COPRO do
     ]
   end
 
-  defp parse_pairs(raw, prefix, count) do
+  defp parse_pairs(raw, prefix, count, strict?) do
     raw
-    |> decode_raw()
+    |> decode_proposals(strict?, count)
     |> Enum.flat_map(fn
       %{
         "proposed_instruction" => instruction,
@@ -526,6 +587,33 @@ defmodule Imp.Optimizer.COPRO do
     |> Enum.reject(fn {instruction, _prefix} -> instruction == "" end)
     |> Enum.take(count)
   end
+
+  defp decode_proposals(raw, false, _count), do: decode_raw(raw)
+
+  defp decode_proposals(raw, true, count) when is_binary(raw) do
+    case Jason.decode(raw) do
+      {:ok, decoded} -> decode_proposals(decoded, true, count)
+      {:error, _reason} -> []
+    end
+  end
+
+  defp decode_proposals(values, true, count) when is_list(values) and length(values) == count do
+    if Enum.all?(values, &strict_proposal?/1), do: values, else: []
+  end
+
+  defp decode_proposals(_raw, true, _count), do: []
+
+  defp strict_proposal?(proposal) when is_map(proposal) and map_size(proposal) == 2 do
+    instruction = proposal["proposed_instruction"] || proposal[:proposed_instruction]
+
+    prefix =
+      proposal["proposed_prefix_for_output_field"] ||
+        proposal[:proposed_prefix_for_output_field]
+
+    is_binary(instruction) and String.trim(instruction) != "" and is_binary(prefix)
+  end
+
+  defp strict_proposal?(_proposal), do: false
 
   defp decode_raw(raw) when is_list(raw), do: raw
   defp decode_raw(%{} = raw), do: [raw]
