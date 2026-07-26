@@ -215,4 +215,22 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
            } =
              MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
   end
+
+  test "response evidence preserves false-valued metadata" do
+    envelope = %{
+      __imp_lm_output__: %{"route" => "K11"},
+      __imp_lm_metadata__: %{
+        req_llm: %{
+          provider: "ollama",
+          model: "llama3.2:3b",
+          finish_reason: false,
+          content: "",
+          usage: %{input_tokens: 1, output_tokens: 0, cost: 0}
+        }
+      }
+    }
+
+    assert %{finish_reason: false, provider_cost: 0} =
+             MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
+  end
 end

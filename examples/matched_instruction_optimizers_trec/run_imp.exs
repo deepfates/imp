@@ -575,8 +575,12 @@ defmodule MatchedTRECImp.Runner do
     _error -> %{"imp" => "unavailable", "dspy" => "unavailable", "gepa" => "unavailable"}
   end
 
-  defp map_get(value, key) when is_map(value),
-    do: Map.get(value, key) || Map.get(value, Atom.to_string(key))
+  defp map_get(value, key) when is_map(value) do
+    case Map.fetch(value, key) do
+      {:ok, found} -> found
+      :error -> Map.get(value, Atom.to_string(key))
+    end
+  end
 
   defp map_get(_value, _key), do: nil
 
