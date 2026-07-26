@@ -111,7 +111,9 @@ The implementation performs:
 5. stochastic demo eviction;
 6. successful trajectory demo extraction or better/worse trajectory reflection;
 7. predictor-specific rule appending;
-8. unconditional registration of generated candidates, including worse ones;
+8. registration of every genuinely mutated generated candidate, including
+   worse ones; unlike pinned DSPy, an unchanged source returned by a skipped or
+   irrelevant strategy is not registered as fake search progress;
 9. winning-history subsampling; and
 10. final full-dataset validation of the selected history.
 

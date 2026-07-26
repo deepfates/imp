@@ -157,7 +157,11 @@ defmodule Imp.Optimizer.InferRulesUpstreamDifferentialTest do
     assert report.metadata.validation_size == 2
     assert report.metadata.proposal_calls == 4
     assert report.metadata.proposal_attempts == 4
-    assert Enum.map(report.candidates, & &1.score) == [0.0, 1.0, 0.0]
+    # Imp deliberately evaluates the source and bootstrapped baseline before
+    # the two upstream-shaped rule candidates. Upstream evaluates only the two
+    # generated candidates; the extra leading 0.0 is the documented baseline
+    # protection, not another induced-rule proposal.
+    assert Enum.map(report.candidates, & &1.score) == [0.0, 0.0, 1.0, 0.0]
     assert Enum.at(instructions, 0) =~ "rule-0"
     assert Enum.at(instructions, 1) =~ "rule-1"
     assert Agent.get(responses, & &1) == []

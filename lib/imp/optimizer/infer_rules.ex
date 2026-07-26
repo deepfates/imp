@@ -14,11 +14,10 @@ defmodule Imp.Optimizer.InferRules do
 
   Candidate programs and signatures remain immutable and isolated, so a later
   proposal cannot rewrite an already selected candidate through shared Python
-  signature-class state. Proposal and evaluation failures are retained in the
-  optimizer report instead of aborting the whole compile. Unlike upstream,
-  Context-window failures retry with progressively fewer examples, matching
-  upstream's user-visible recovery policy. Exhausted retries are retained as
-  proposal errors instead of aborting the whole compile. Those are deliberate
+  signature-class state. Context-window failures retry with progressively fewer
+  examples, matching upstream's user-visible recovery policy. Proposal and
+  evaluation failures, including exhausted context retries, are retained in the
+  optimizer report instead of aborting the whole compile. Those are deliberate
   native control-flow differences, not claims of exact whole-loop equivalence.
   Imp also reuses a logical call's sequential rollout ID while its prompt
   shrinks; DSPy draws a fresh random rollout ID for every retry.
@@ -718,6 +717,28 @@ defmodule Imp.Optimizer.InferRules do
     do: context_window_exceeded?(reason)
 
   defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
+
+  # Pinned DSPy 3.2.1 also recognizes provider exceptions whose rendered
+  # class name contains `ContextWindowExceededError`. Provider adapters do not
+  # all preserve a native exception type across their transport boundary, so
+  # keep this deliberately narrow instead of retrying every arbitrary error as
+  # upstream's broad `ValueError` branch does.
+  defp context_window_exceeded?(reason) when is_binary(reason) do
+    normalized = String.downcase(reason)
+
+    Enum.any?(
+      [
+        "contextwindowexceedederror",
+        "context window exceeded",
+        "context length exceeded",
+        "context_length_exceeded",
+        "maximum context length",
+        "context overflow"
+      ],
+      &String.contains?(normalized, &1)
+    )
+  end
+
   defp context_window_exceeded?(_reason), do: false
 
   defp apply_rules(program, rules_by_predictor) do

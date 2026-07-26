@@ -854,9 +854,11 @@ and retains it when every induced candidate regresses. For deterministic replay,
 pass already-induced rule strings with `candidates: [...]`; this bypasses rule-LM
 calls but still performs validation selection.
 
-When the rule LM returns a structured `Imp.ContextWindowExceededError`,
-InferRules retries after dropping one trailing training example at a time, as
-DSPy 3.2.1 does. The report distinguishes logical `proposal_calls` from actual
+When the rule LM returns a structured `Imp.ContextWindowExceededError` or a
+provider error carrying a recognized context-window error marker, InferRules
+retries after dropping one trailing training example at a time, as DSPy 3.2.1
+does. It does not copy upstream's broader retry of every arbitrary Python
+`ValueError`. The report distinguishes logical `proposal_calls` from actual
 `proposal_attempts`. If even one example does not fit, Imp records that proposal
 error and keeps searching—or returns the evaluated baseline—instead of aborting
 the entire compile as upstream does. Retry attempts reuse the logical proposal's
