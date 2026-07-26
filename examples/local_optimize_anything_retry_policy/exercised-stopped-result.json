@@ -1,0 +1,21 @@
+{
+  "status": "stopped_invalid_structured_proposal",
+  "source_commit": "a2772c8",
+  "model": "phi4:latest",
+  "model_digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba",
+  "split_sizes": {
+    "train": 8,
+    "selection": 6,
+    "untouched_test": 6
+  },
+  "failure": {
+    "component": "base_ms",
+    "expected_type": "integer",
+    "returned_shape": "object",
+    "reason": "invalid_structured_proposal"
+  },
+  "candidate_evaluated": false,
+  "selection_opened": false,
+  "untouched_test_opened": false,
+  "claim_boundary": "The strict structured decoder rejected type drift before candidate evaluation. This is a retained model-format failure, not Optimize Anything mutation, usefulness, effectiveness, parity, or BEAM-superiority evidence."
+}

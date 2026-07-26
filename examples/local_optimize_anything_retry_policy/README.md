@@ -24,3 +24,8 @@ One result can establish an ordinary arbitrary-artifact lifecycle and a narrow
 task/model outcome. It cannot establish general Optimize Anything
 effectiveness, schema-v2 multi-seed evidence, upstream parity, or BEAM
 superiority.
+
+The first frozen local-model attempt is retained in
+`exercised-stopped-result.json`. The model returned an object for the integer
+`base_ms` component; Imp rejected the type drift before candidate evaluation,
+selection, or untouched test access. The value was not extracted or normalized.
