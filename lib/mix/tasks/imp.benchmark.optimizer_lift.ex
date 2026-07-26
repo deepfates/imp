@@ -431,8 +431,11 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       "metric" => metric,
       "program" => program,
       "calls" => calls,
-      "compile" => fn _metric, program, trainset, _devset ->
-        Imp.Optimizer.KNNFewShot.new(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
+      "compile" => fn metric, program, trainset, _devset ->
+        Imp.Optimizer.KNNFewShot.new(1, trainset,
+          vectorizer: Imp.Embeddings.BagOfWords,
+          few_shot_bootstrap_args: [metric: metric]
+        )
         |> Imp.Optimizer.KNNFewShot.compile(program)
       end
     })
@@ -507,7 +510,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       "train_examples" => length(trainset),
       "dev_examples" => length(devset),
       "selected" => selected_summary(report, compiled, optimized_result),
-      "trace" => optimizer_trace(report, compiled),
+      "trace" => optimizer_trace(report, compiled, optimized_result),
       "deviation" =>
         "Natural-data lane is Imp release evidence over local benchmark-shaped samples. Direct Imp-vs-DSPy optimizer parity remains in the top-level optimizer rows when the sidecar exposes the matching optimizer."
     }
@@ -700,6 +703,17 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       "errors" => normalize(report.errors)
     }
   end
+
+  defp optimizer_trace(nil, compiled, optimized_result) do
+    %{
+      "demos" =>
+        compiled
+        |> selected_demos(optimized_result)
+        |> Enum.map(&Imp.Example.to_map/1)
+    }
+  end
+
+  defp optimizer_trace(report, compiled, _optimized_result), do: optimizer_trace(report, compiled)
 
   defp demos(%Imp.Predict.Predict{demos: demos}), do: demos
   defp demos(%Imp.Predict.ChainOfThought{predict: predict}), do: demos(predict)

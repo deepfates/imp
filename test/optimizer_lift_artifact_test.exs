@@ -42,6 +42,10 @@ defmodule OptimizerLiftArtifactTest do
     assert length(lanes["classification_colors"]["selected"]["demos"]) == 2
     assert length(lanes["qa_paraphrase"]["selected"]["demos"]) == 1
     assert length(lanes["retrieval_knn_few_shot"]["selected"]["demos"]) == 1
+
+    assert lanes["retrieval_knn_few_shot"]["trace"]["demos"] ==
+             lanes["retrieval_knn_few_shot"]["selected"]["demos"]
+
     assert lanes["instruction_following_exact"]["selected"]["instructions"] != []
 
     copro = Enum.find(artifact["rows"], &(&1["optimizer"] == "COPRO"))
