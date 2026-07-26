@@ -155,9 +155,9 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
   alias Imp.Optimize.Anything.{Config, Result}
   alias LocalOptimizeAnythingRetryPolicy.{Atomic, ObservedLM, Task}
 
-  @model "llama3.3:latest"
-  @digest "a6eb4748fd2990ad2952b2335a95a7f952d1a06119a0aa6a2df6cd052a93a3fa"
-  @treatment_id "local-oa-retry-policy-llama3.3-post-noop-fix-v1"
+  @model "phi4:latest"
+  @digest "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
+  @treatment_id "local-oa-retry-policy-round-robin-v1"
 
   def run do
     cond do
@@ -187,14 +187,15 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
         config:
           Config.new(
             engine: [
-              max_candidate_proposals: 1,
+              max_candidate_proposals: 6,
               seed: 29,
               raise_on_exception: false,
               parallel: false,
               max_workers: 1,
-              cache_evaluation: false
+              cache_evaluation: false,
+              acceptance_criterion: :strict_improvement
             ],
-            reflection: [reflection_lm: proposal_lm(), module_selector: :all]
+            reflection: [reflection_lm: proposal_lm(), module_selector: :round_robin]
           )
       )
 

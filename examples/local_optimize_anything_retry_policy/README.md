@@ -62,3 +62,18 @@ objective, proposal count, component-wise strict decoder, evaluator, rows,
 splits, and metrics above; it performs no extraction or result-driven
 normalization. New executions require an empty owned output directory. A valid
 mutation may still lose to baseline on selection, and either outcome is valid.
+
+That post-repair all-component condition is preserved in
+`exercised-llama3.3-post-noop-fix-result.json`. Five fields reached the strict
+decoder before the model returned an object for the boolean
+`reject_non_retryable`; atomic all-component construction rejected it. No value
+was extracted and baseline remained selected.
+
+The current `local-oa-retry-policy-round-robin-v1` condition uses the public
+round-robin component strategy with the original pinned `phi4:latest` digest
+and six proposal rounds, one for each deterministically ordered field. It keeps
+strict-improvement admission. A valid field mutation is therefore evaluated as
+an artifact in its own right, while a later malformed/no-op/worse proposal is
+retained as a rejection instead of erasing earlier work. The task, seed,
+objective, evaluator, train/selection/untouched rows, decoding, transport
+limits, and metrics remain unchanged.
