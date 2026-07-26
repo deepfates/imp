@@ -267,7 +267,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
         trainer: trainer,
         num_train_steps: train_steps(),
         num_dspy_examples_per_grpo_step: train_width(),
-        num_rollouts_per_grpo_step: 4,
+        num_rollouts_per_grpo_step: num_rollouts(),
         seed: seed(),
         train_kwargs: train_kwargs(),
         checkpoint_selection: :best_validation,
@@ -416,7 +416,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     kwargs = Map.new(train_kwargs())
 
     unless get_in(contract, ["optimizer", "max_steps"]) == train_steps() and
-             get_in(contract, ["optimizer", "num_generations"]) == 4 and
+             get_in(contract, ["optimizer", "num_generations"]) == num_rollouts() and
              get_in(contract, ["optimizer", "learning_rate"]) == kwargs.learning_rate and
              get_in(contract, ["optimizer", "loss_type"]) == Atom.to_string(kwargs.loss_type) and
              get_in(contract, ["optimizer", "scale_rewards"]) ==
@@ -432,7 +432,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
           {ordered_rows!(source["train"], treatment()["train_ids"]),
            ordered_rows!(source[selection_source()], treatment()["selection_ids"])}
 
-        version when version in [2, 3] ->
+        version when version in [2, 3, 4] ->
           {source["train"], source[selection_source()]}
       end
 
@@ -462,6 +462,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
       instruction_sha256: TRLProtocol.digest(instruction()),
       train_steps: train_steps(),
       train_width: train_width(),
+      num_rollouts: num_rollouts(),
       contract_path: paths.contract,
       train_ids: Enum.map(train, & &1["id"]),
       selection_ids: Enum.map(selection, & &1["id"]),
@@ -620,16 +621,19 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
              MapSet.new(Map.keys(frequencies)) == expected_ids,
            do: raise("GRPO source schedule does not cover the frozen train split")
 
+    once = Enum.count(frequencies, fn {_id, count} -> count == 1 end)
     twice = Enum.count(frequencies, fn {_id, count} -> count == 2 end)
     thrice = Enum.count(frequencies, fn {_id, count} -> count == 3 end)
 
-    unless twice == expectation.twice and thrice == expectation.thrice,
-      do: raise("GRPO source schedule does not match the pinned padded schedules")
+    unless once == Map.get(expectation, :once, 0) and twice == expectation.twice and
+             thrice == expectation.thrice,
+           do: raise("GRPO source schedule does not match the pinned padded schedules")
 
     %{
       scheduler: "dspy_pinned_full_batch_padding",
       source_rows: expectation.source_rows,
       groups: expectation.groups,
+      once: once,
       twice: twice,
       thrice: thrice
     }
@@ -814,16 +818,28 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
     required =
       case config["schema_version"] do
-        1 -> identity ++ ~w(train_ids selection_ids)
-        2 -> identity ++ ["instruction"]
-        3 -> identity ++ ~w(instruction input_field train_steps train_kwargs source_schedule)
-        _other -> []
+        1 ->
+          identity ++ ~w(train_ids selection_ids)
+
+        2 ->
+          identity ++ ["instruction"]
+
+        3 ->
+          identity ++ ~w(instruction input_field train_steps train_kwargs source_schedule)
+
+        4 ->
+          identity ++
+            ~w(instruction input_field train_steps train_width num_rollouts train_kwargs source_schedule)
+
+        _other ->
+          []
       end
 
     unless Map.keys(config) |> Enum.sort() == Enum.sort(required),
       do: raise("GRPO opaque treatment config has missing or unsupported fields")
 
-    unless config["schema_version"] in [1, 2, 3] and is_binary(config["treatment_id"]) and
+    unless config["schema_version"] in [1, 2, 3, 4] and
+             is_binary(config["treatment_id"]) and
              is_binary(config["data_sha256"]) and is_binary(config["train_sha256"]) and
              is_binary(config["selection_sha256"]) and is_binary(config["test_sha256"]) and
              is_binary(config["contract_sha256"]) and is_binary(config["model"]) and
@@ -836,12 +852,12 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
       raise("GRPO opaque treatment config has invalid field values")
     end
 
-    if config["schema_version"] in [2, 3] and
+    if config["schema_version"] in [2, 3, 4] and
          (not is_binary(config["instruction"]) or String.trim(config["instruction"]) == "") do
       raise("GRPO opaque treatment config has an invalid instruction")
     end
 
-    if config["schema_version"] == 3 do
+    if config["schema_version"] in [3, 4] do
       validate_v3_treatment!(config)
     end
 
@@ -868,7 +884,8 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   end
 
   defp train_steps, do: treatment()["train_steps"] || Definition.train_steps()
-  defp train_width, do: Definition.train_width()
+  defp train_width, do: treatment()["train_width"] || Definition.train_width()
+  defp num_rollouts, do: treatment()["num_rollouts"] || 4
 
   defp train_kwargs do
     case treatment()["train_kwargs"] do
@@ -898,12 +915,20 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
     valid_schedule =
       is_map(schedule) and
-        Map.keys(schedule) |> Enum.sort() == ~w(groups source_rows thrice twice) and
+        (Map.keys(schedule) |> Enum.sort()) in [
+          ~w(groups source_rows thrice twice),
+          ~w(groups once source_rows thrice twice)
+        ] and
         Enum.all?(Map.values(schedule), &(is_integer(&1) and &1 >= 0))
+
+    valid_batch =
+      config["schema_version"] != 4 or
+        (is_integer(config["train_width"]) and config["train_width"] > 0 and
+           is_integer(config["num_rollouts"]) and config["num_rollouts"] > 1)
 
     unless config["input_field"] in ["utterance", "question"] and
              is_integer(config["train_steps"]) and config["train_steps"] > 0 and valid_kwargs and
-             valid_schedule do
+             valid_schedule and valid_batch do
       raise("GRPO opaque treatment config has invalid v3 runtime fields")
     end
   end
