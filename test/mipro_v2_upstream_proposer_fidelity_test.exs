@@ -9,6 +9,17 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   @public_runner "test/support/dspy_3_2_1_mipro_public_compile_tape.py"
   @commit "29448ae12756abdd14bd8796c819247ebb83673c"
 
+  defmodule SequenceLM do
+    defstruct [:agent]
+
+    def generate(%__MODULE__{agent: agent}, _messages, _opts) do
+      Agent.get_and_update(agent, fn
+        [{:ok, value} | rest] -> {{:ok, value}, rest}
+        [{:error, reason} | rest] -> {{:error, reason}, rest}
+      end)
+    end
+  end
+
   def metric(expected, prediction),
     do: Imp.get(expected, :route) == Imp.get(prediction, :route)
 
@@ -183,6 +194,58 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     final_user = calls |> List.last() |> List.last() |> Map.fetch!(:content)
     assert final_user =~ "[[ ## observations ## ]]\nfirstlater"
+  end
+
+  test "dataset summary contains an ordinary continuation failure but not an operational guard" do
+    signature = Imp.signature("text -> route")
+
+    trainset =
+      Enum.map(0..19, fn index ->
+        Imp.example(text: "request-#{index}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    ordinary_agent =
+      start_supervised!(
+        {Agent,
+         fn ->
+           [
+             {:ok, %{observations: "retained observations"}},
+             {:error, :malformed_continuation},
+             {:ok, %{summary: "retained summary"}}
+           ]
+         end},
+        id: :ordinary_continuation_agent
+      )
+
+    assert UpstreamProposer.summarize!(
+             %SequenceLM{agent: ordinary_agent},
+             trainset,
+             signature,
+             10
+           ) == "retained summary"
+
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        reason: :provider_drift,
+        message: "provider route drift"
+      )
+
+    safety_agent =
+      start_supervised!(
+        {Agent,
+         fn ->
+           [
+             {:ok, %{observations: "retained observations"}},
+             {:error, safety}
+           ]
+         end},
+        id: :safety_continuation_agent
+      )
+
+    assert_raise Imp.OperationalSafetyError, "provider route drift", fn ->
+      UpstreamProposer.summarize!(%SequenceLM{agent: safety_agent}, trainset, signature, 10)
+    end
   end
 
   @tag :evidence_infrastructure

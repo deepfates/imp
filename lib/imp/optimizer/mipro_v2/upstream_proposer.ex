@@ -1,6 +1,7 @@
 defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   @moduledoc false
 
+  alias Imp.OperationalSafetyError
   alias Imp.Optimizer.MIPROv2.PythonRandom
 
   @tips [
@@ -37,20 +38,28 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
 
     {observations, _skips} =
       Enum.reduce_while(rest, {observations, 0}, fn batch, {accumulated, skips} ->
-        next =
-          call!(
-            lm,
-            dataset_descriptor_with_prior_signature(),
-            %{examples: examples_repr(batch, signature), prior_observations: accumulated},
-            temperature: 1.0
-          )
-          |> Imp.get(:observations)
+        try do
+          next =
+            call!(
+              lm,
+              dataset_descriptor_with_prior_signature(),
+              %{examples: examples_repr(batch, signature), prior_observations: accumulated},
+              temperature: 1.0
+            )
+            |> Imp.get(:observations)
 
-        if String.starts_with?(String.upcase(next), "COMPLETE") do
-          skips = skips + 1
-          if skips >= 5, do: {:halt, {accumulated, skips}}, else: {:cont, {accumulated, skips}}
-        else
-          {:cont, {accumulated <> next, skips}}
+          if String.starts_with?(String.upcase(next), "COMPLETE") do
+            skips = skips + 1
+
+            if skips >= 5,
+              do: {:halt, {accumulated, skips}},
+              else: {:cont, {accumulated, skips}}
+          else
+            {:cont, {accumulated <> next, skips}}
+          end
+        rescue
+          safety in OperationalSafetyError -> reraise safety, __STACKTRACE__
+          _ordinary_continuation_failure -> {:halt, {accumulated, skips}}
         end
       end)
 
@@ -117,6 +126,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
     raw =
       case Imp.LM.generate(lm, messages, opts) |> Imp.LM.Result.unwrap() do
         {:ok, raw} -> raw
+        {:error, %OperationalSafetyError{} = safety} -> raise safety
         {:error, reason} -> raise "DSPy 3.2.1 MIPRO proposer LM call failed: #{inspect(reason)}"
       end
 
