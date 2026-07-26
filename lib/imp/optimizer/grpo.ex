@@ -9,8 +9,19 @@ defmodule Imp.Optimizer.GRPO do
   session checkpoints reconcile accepted dispatches after caller crashes and
   resume completed optimizer steps. Provider callbacks execute under explicit
   deadlines in isolated unlinked tasks, so callback implementations must not
-  rely on the caller's process dictionary or mailbox. Independent jobs for
-  multiple student LMs are not implemented.
+  rely on the caller's process dictionary or mailbox.
+
+  Pinned DSPy 3.2.1 rejects distinct student LMs even though its unfinished job
+  routing is keyed by LM. Imp makes that lifecycle explicit: programs with
+  distinct student LMs use one independent trainer session and
+  artifact per LM. Predictor groups are routed only to the session that owns
+  those predictors, and only those predictors are rebound to that session's
+  current or final artifact. Student groups run in stable predictor order; a
+  later group therefore observes earlier completed groups in the program. This
+  deliberately avoids pretending that one trained artifact represents every
+  predictor. A durable multi-student checkpoint records completed artifacts
+  plus the active child-session checkpoint, so resume never retrains a
+  completed student or guesses an unknown mutating outcome.
 
   Durable jobs require `Imp.Optimizer.GRPO.Callback` values for reward and
   validation logic. They bind a trusted module/function to a consumer-owned
@@ -167,12 +178,15 @@ defmodule Imp.Optimizer.GRPO do
              Imp.Optimizer.fetch_dataset!(opts, :trainset),
              compile_opts
            ) do
+      jobs = completed_training_jobs(compiled)
+
       {:ok,
        %Imp.Optimizer.TrainingResult{
          program: compiled,
-         job: completed_training_job(compiled),
+         job: if(length(jobs) == 1, do: hd(jobs), else: nil),
+         jobs: jobs,
          status: :completed,
-         metadata: %{method: :grpo}
+         metadata: %{method: :grpo, student_lms: length(jobs)}
        }}
     end
   end
@@ -188,21 +202,13 @@ defmodule Imp.Optimizer.GRPO do
          {:ok, valset} <- materialize_dataset(Keyword.get(opts, :valset), :valset),
          :ok <- validate_compile_inputs(optimizer, program, trainset, valset),
          :ok <- validate_durable_callbacks(optimizer),
-         :ok <- Trainer.supports_method(optimizer.trainer, :grpo),
-         lm <- program_lm(program),
-         identity <- checkpoint_identity(optimizer, lm, trainset, valset),
-         {:ok, session, resume_data, resumed?, dispatch_id} <-
-           acquire_session(optimizer, lm, identity) do
-      run_started_session(
-        optimizer,
-        program,
-        trainset,
-        valset,
-        session,
-        Map.put(identity, :dispatch_id, dispatch_id),
-        resume_data,
-        resumed?
-      )
+         :ok <- Trainer.supports_method(optimizer.trainer, :grpo) do
+      students = student_lms(program)
+
+      case students do
+        [student] -> compile_student(optimizer, program, trainset, valset, student, true)
+        students -> compile_students(optimizer, program, trainset, valset, students)
+      end
     end
   end
 
@@ -236,6 +242,119 @@ defmodule Imp.Optimizer.GRPO do
 
   defp invalid_dataset_reason(:trainset), do: :invalid_grpo_trainset
   defp invalid_dataset_reason(:valset), do: :invalid_grpo_valset
+
+  defp compile_student(optimizer, program, trainset, valset, student, remove_checkpoint?) do
+    lm = Map.fetch!(student, :lm)
+    identity = checkpoint_identity(optimizer, lm, trainset, valset, student)
+
+    with {:ok, session, resume_data, resumed?, dispatch_id} <-
+           acquire_session(optimizer, lm, identity) do
+      run_started_session(
+        optimizer,
+        program,
+        trainset,
+        valset,
+        session,
+        Map.put(identity, :dispatch_id, dispatch_id),
+        resume_data,
+        resumed?,
+        student,
+        remove_checkpoint?
+      )
+    end
+  end
+
+  defp compile_students(optimizer, program, trainset, valset, students) do
+    identity = multi_student_identity(optimizer, students, trainset, valset)
+
+    with {:ok, completed} <- load_multi_student_checkpoint(optimizer, identity),
+         {:ok, program} <- rebind_completed_students(program, completed) do
+      next_student = length(completed)
+
+      students
+      |> Enum.with_index()
+      |> Enum.drop(next_student)
+      |> Enum.reduce_while({:ok, program, completed}, fn {student, index},
+                                                         {:ok, current, completed} ->
+        student_optimizer = %{
+          optimizer
+          | checkpoint_path: student_checkpoint_path(optimizer.checkpoint_path, student, index)
+        }
+
+        case compile_student(
+               student_optimizer,
+               current,
+               trainset,
+               valset,
+               student,
+               false
+             ) do
+          {:ok, rebound} ->
+            artifact = student_artifact!(rebound, student)
+            completed = completed ++ [artifact]
+
+            with :ok <- save_multi_student_checkpoint(optimizer, identity, completed),
+                 :ok <- Checkpoint.remove(student_optimizer.checkpoint_path) do
+              {:cont, {:ok, rebound, completed}}
+            else
+              {:error, reason} ->
+                {:halt, {:error, {:grpo_multi_checkpoint_failed, reason}}}
+            end
+
+          {:error, reason} ->
+            {:halt, {:error, reason}}
+        end
+      end)
+      |> case do
+        {:ok, rebound, _completed} ->
+          Checkpoint.remove(optimizer.checkpoint_path)
+          {:ok, rebound}
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+  rescue
+    error -> {:error, {:grpo_multi_checkpoint_failed, Exception.message(error)}}
+  end
+
+  defp load_multi_student_checkpoint(%{checkpoint_path: nil}, _identity), do: {:ok, []}
+
+  defp load_multi_student_checkpoint(%{checkpoint_path: path}, identity) do
+    if File.regular?(path) do
+      checkpoint = Checkpoint.load!(path)
+      saved = Map.fetch!(checkpoint.data, :multi_student_identity)
+
+      if Map.fetch!(saved, :digest) == Map.fetch!(identity, :digest) do
+        {:ok, Map.fetch!(checkpoint.data, :completed_students)}
+      else
+        {:error, :grpo_multi_student_checkpoint_identity_mismatch}
+      end
+    else
+      :ok = Checkpoint.save!(path, :running, multi_student_checkpoint_data(identity, []))
+      {:ok, []}
+    end
+  end
+
+  defp save_multi_student_checkpoint(%{checkpoint_path: nil}, _identity, _completed), do: :ok
+
+  defp save_multi_student_checkpoint(%{checkpoint_path: path}, identity, completed) do
+    Checkpoint.save!(path, :running, multi_student_checkpoint_data(identity, completed))
+  end
+
+  defp multi_student_checkpoint_data(identity, completed) do
+    %{
+      multi_student_identity: identity,
+      completed_students: completed,
+      next_student: length(completed)
+    }
+  end
+
+  defp student_checkpoint_path(nil, _student, _index), do: nil
+
+  defp student_checkpoint_path(path, student, index) do
+    path <> ".student-#{index}-" <> String.slice(Map.fetch!(student, :id), 0, 12)
+  end
 
   defp acquire_session(%{checkpoint_path: path} = optimizer, lm, identity)
        when is_binary(path) do
@@ -308,12 +427,14 @@ defmodule Imp.Optimizer.GRPO do
          session,
          identity,
          resume_data,
-         resumed?
+         resumed?,
+         student,
+         remove_checkpoint?
        ) do
     trainset = repeat_short_trainset(trainset, optimizer.num_dspy_examples_per_grpo_step)
 
     {initial_state, next_step} =
-      restore_or_initialize_state(program, session, optimizer.seed, resume_data)
+      restore_or_initialize_state(program, session, optimizer.seed, resume_data, student)
 
     result =
       cond do
@@ -389,9 +510,10 @@ defmodule Imp.Optimizer.GRPO do
                      state.program,
                      selected_artifact,
                      selected_session,
-                     resumed?
+                     resumed?,
+                     student
                    ) do
-              Checkpoint.remove(optimizer.checkpoint_path)
+              if remove_checkpoint?, do: Checkpoint.remove(optimizer.checkpoint_path)
               {:ok, rebound}
             end
 
@@ -464,13 +586,23 @@ defmodule Imp.Optimizer.GRPO do
          {:ok, session} <- await_pending(optimizer, state.session, optimizer.max_status_polls) do
       state = %{state | session: session}
 
-      with {:ok, groups, state} <- build_groups(optimizer, state.program, selected, step, state),
+      with {:ok, groups, state} <-
+             build_groups(
+               optimizer,
+               state.program,
+               selected,
+               step,
+               state,
+               state.student.predictors
+             ),
            {:ok, batches, state} <- assign_batches(groups, session, state),
            step_intent <- step_intent(identity, step, batches),
            :ok <- checkpoint_step_intent(optimizer, state, identity, step, step_intent),
            {:ok, stepped} <-
              submit_step(optimizer, session, Map.fetch!(step_intent, :batches), step_intent) do
-        program = rebind_current_model(state.program, stepped.current_model)
+        program =
+          rebind_current_model(state.program, stepped.current_model, state.student.predictors)
+
         state = %{state | session: stepped, program: program}
         checkpoint_pending_validation(optimizer, state, identity, step)
 
@@ -621,7 +753,10 @@ defmodule Imp.Optimizer.GRPO do
 
   defp complete_recovered_step(optimizer, trainset, valset, state, intent, identity) do
     step = Map.fetch!(intent, :step)
-    program = rebind_current_model(state.program, state.session.current_model)
+
+    program =
+      rebind_current_model(state.program, state.session.current_model, state.student.predictors)
+
     state = %{state | program: program}
     checkpoint_pending_validation(optimizer, state, identity, step)
 
@@ -696,10 +831,11 @@ defmodule Imp.Optimizer.GRPO do
     end
   end
 
-  defp restore_or_initialize_state(program, session, seed, nil) do
+  defp restore_or_initialize_state(program, session, seed, nil, student) do
     {%{
        session: session,
-       program: rebind_current_model(program, session.current_model),
+       program: rebind_current_model(program, session.current_model, student.predictors),
+       student: student,
        rng: seed_state(seed),
        shuffled_ids: [],
        frequencies: %{},
@@ -711,15 +847,16 @@ defmodule Imp.Optimizer.GRPO do
      }, 0}
   end
 
-  defp restore_or_initialize_state(program, session, seed, data)
+  defp restore_or_initialize_state(program, session, seed, data, student)
        when not is_map_key(data, :rng) do
-    restore_or_initialize_state(program, session, seed, nil)
+    restore_or_initialize_state(program, session, seed, nil, student)
   end
 
-  defp restore_or_initialize_state(program, session, _seed, data) do
+  defp restore_or_initialize_state(program, session, _seed, data, student) do
     {%{
        session: session,
-       program: rebind_current_model(program, session.current_model),
+       program: rebind_current_model(program, session.current_model, student.predictors),
+       student: student,
        rng: data |> Map.fetch!(:rng) |> Sampling.load!(),
        shuffled_ids: Map.fetch!(data, :shuffled_ids),
        frequencies: Map.fetch!(data, :frequencies),
@@ -887,12 +1024,17 @@ defmodule Imp.Optimizer.GRPO do
 
   defp maybe_checkpoint(_optimizer, _phase, _data), do: :ok
 
-  defp checkpoint_identity(optimizer, lm, trainset, valset) do
+  defp checkpoint_identity(optimizer, lm, trainset, valset, student) do
     effective_trainset =
       repeat_short_trainset(trainset, optimizer.num_dspy_examples_per_grpo_step)
 
     identity = %{
       model: if(is_map(lm), do: Map.get(lm, :model, Map.get(lm, "model")), else: inspect(lm)),
+      student: %{
+        id: student.id,
+        predictors: student.predictors,
+        lm: compatibility_identity(lm)
+      },
       provider: compatibility_identity(optimizer.trainer),
       seed: optimizer.seed,
       num_train_steps: optimizer.num_train_steps,
@@ -920,6 +1062,18 @@ defmodule Imp.Optimizer.GRPO do
       trainset: Enum.map(trainset, &Imp.Example.to_map/1),
       valset: if(is_list(valset), do: Enum.map(valset, &Imp.Example.to_map/1), else: nil),
       prompt_schedule: prompt_schedule(optimizer, effective_trainset)
+    }
+
+    Map.put(identity, :digest, digest(identity))
+  end
+
+  defp multi_student_identity(optimizer, students, trainset, valset) do
+    identity = %{
+      schema_version: 1,
+      students:
+        Enum.map(students, fn student ->
+          checkpoint_identity(optimizer, student.lm, trainset, valset, student)
+        end)
     }
 
     Map.put(identity, :digest, digest(identity))
@@ -1088,8 +1242,13 @@ defmodule Imp.Optimizer.GRPO do
     end)
   end
 
-  defp build_groups(optimizer, program, examples, step, state) do
-    predictors = Imp.ProgramParameters.predictors(program)
+  defp build_groups(optimizer, program, examples, step, state, predictor_names) do
+    predictor_names = MapSet.new(predictor_names)
+
+    predictors =
+      program
+      |> Imp.ProgramParameters.predictors()
+      |> Enum.filter(&MapSet.member?(predictor_names, &1.name))
 
     trajectories =
       for rollout <- 0..(optimizer.num_rollouts_per_grpo_step - 1),
@@ -1441,15 +1600,12 @@ defmodule Imp.Optimizer.GRPO do
       Enum.any?(Imp.ProgramParameters.predictors(program), &is_nil(&1.predictor.lm)) ->
         {:error, :grpo_predictor_lm_required}
 
-      unique_lms(program) != 1 ->
-        {:error, :grpo_single_student_lm_required}
-
       true ->
         :ok
     end
   end
 
-  defp rebind_program(program, artifact, session, resumed?) do
+  defp rebind_program(program, artifact, session, resumed?, student) do
     training_artifact =
       %{
         provider: session.provider,
@@ -1457,7 +1613,9 @@ defmodule Imp.Optimizer.GRPO do
         base_model: lm_model(session.model),
         result_model: artifact,
         method: :grpo,
-        resumed: resumed?
+        resumed: resumed?,
+        student_id: student.id,
+        predictors: student.predictors
       }
       |> maybe_put_session_metadata(session.metadata, :artifact_sha256)
       |> maybe_put_session_metadata(session.metadata, :checkpoint_sha256)
@@ -1467,17 +1625,70 @@ defmodule Imp.Optimizer.GRPO do
       |> maybe_put_session_metadata(session.metadata, :selected_validation_score)
       |> maybe_put_session_metadata(session.metadata, :validation_history)
 
+    predictor_names = MapSet.new(student.predictors)
+
     rebound =
       Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
-        Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
-          %{predictor | lm: rebind_lm(predictor.lm, artifact), dynamic_lm?: false}
-        end)
+        if MapSet.member?(predictor_names, name) do
+          Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
+            predictor
+            |> Map.put(:lm, rebind_lm(predictor.lm, artifact))
+            |> Map.put(:dynamic_lm?, false)
+            |> Imp.ProgramAccess.put_metadata(:training_artifact, training_artifact)
+          end)
+        else
+          acc
+        end
       end)
-      |> Imp.ProgramAccess.put_metadata(:training_artifact, training_artifact)
+
+    rebound =
+      if MapSet.size(predictor_names) == length(Imp.ProgramParameters.predictors(program)) do
+        Imp.ProgramAccess.put_metadata(rebound, :training_artifact, training_artifact)
+      else
+        rebound
+      end
 
     {:ok, rebound}
   rescue
     error -> {:error, {:grpo_rebind_failed, Exception.message(error)}}
+  end
+
+  defp rebind_completed_students(program, completed) do
+    Enum.reduce_while(completed, {:ok, program}, fn artifact, {:ok, acc} ->
+      predictor_names = Map.fetch!(artifact, :predictors)
+
+      try do
+        rebound =
+          Enum.reduce(predictor_names, acc, fn name, current ->
+            Imp.ProgramParameters.update_predictor(current, name, fn predictor ->
+              predictor
+              |> Map.put(:lm, rebind_lm(predictor.lm, Map.fetch!(artifact, :result_model)))
+              |> Map.put(:dynamic_lm?, false)
+              |> Imp.ProgramAccess.put_metadata(:training_artifact, artifact)
+            end)
+          end)
+
+        {:cont, {:ok, rebound}}
+      rescue
+        error -> {:halt, {:error, {:grpo_rebind_failed, Exception.message(error)}}}
+      end
+    end)
+  end
+
+  defp student_artifact!(program, student) do
+    student.predictors
+    |> hd()
+    |> then(fn name ->
+      program
+      |> Imp.ProgramParameters.predictors()
+      |> Enum.find(&(&1.name == name))
+      |> Map.fetch!(:predictor)
+      |> Imp.ProgramAccess.get_metadata(:training_artifact)
+    end)
+    |> case do
+      %{student_id: id} = artifact when id == student.id -> artifact
+      _missing -> raise ArgumentError, "GRPO student artifact metadata is missing"
+    end
   end
 
   defp rebind_lm(%Imp.Clients.ReqLLM{} = lm, artifact), do: %{lm | model: artifact}
@@ -1485,13 +1696,20 @@ defmodule Imp.Optimizer.GRPO do
   defp rebind_lm(lm, artifact) when is_map(lm), do: Map.put(lm, :model, artifact)
   defp rebind_lm(_lm, _artifact), do: raise(ArgumentError, "student LM is not rebindable")
 
-  defp rebind_current_model(program, nil), do: program
+  defp rebind_current_model(program, nil, _predictor_names), do: program
 
-  defp rebind_current_model(program, model) when is_binary(model) and model != "" do
+  defp rebind_current_model(program, model, predictor_names)
+       when is_binary(model) and model != "" do
+    predictor_names = MapSet.new(predictor_names)
+
     Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
-      Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
-        %{predictor | lm: rebind_lm(predictor.lm, model), dynamic_lm?: false}
-      end)
+      if MapSet.member?(predictor_names, name) do
+        Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
+          %{predictor | lm: rebind_lm(predictor.lm, model), dynamic_lm?: false}
+        end)
+      else
+        acc
+      end
     end)
   end
 
@@ -1564,21 +1782,34 @@ defmodule Imp.Optimizer.GRPO do
   defp fill_to(list, count, _item) when length(list) >= count, do: list
   defp fill_to(list, count, item), do: fill_to(list ++ [item], count, item)
 
-  defp unique_lms(program) do
+  defp student_lms(program) do
     program
     |> Imp.ProgramParameters.predictors()
-    |> Enum.map(&:erlang.term_to_binary(&1.predictor.lm, [:deterministic]))
-    |> MapSet.new()
-    |> MapSet.size()
-  end
+    |> Enum.reduce([], fn %{name: name, predictor: predictor}, students ->
+      key = :erlang.term_to_binary(predictor.lm, [:deterministic])
 
-  defp program_lm(program),
-    do:
-      program
-      |> Imp.ProgramParameters.predictors()
-      |> hd()
-      |> Map.fetch!(:predictor)
-      |> Map.fetch!(:lm)
+      case Enum.find_index(students, &(&1.key == key)) do
+        nil ->
+          identity = %{lm: compatibility_identity(predictor.lm), predictors: [name]}
+
+          students ++
+            [
+              %{
+                id: "grpo-student:" <> digest(identity),
+                key: key,
+                lm: predictor.lm,
+                predictors: [name]
+              }
+            ]
+
+        index ->
+          List.update_at(students, index, fn student ->
+            %{student | predictors: student.predictors ++ [name]}
+          end)
+      end
+    end)
+    |> Enum.map(&Map.delete(&1, :key))
+  end
 
   defp repeat_short_trainset(trainset, width) when length(trainset) < width do
     multiplier = div(width + length(trainset) - 1, length(trainset))
@@ -1670,14 +1901,22 @@ defmodule Imp.Optimizer.GRPO do
     end
   end
 
-  defp completed_training_job(program) do
-    artifact = Imp.ProgramAccess.get_metadata(program, :training_artifact) || %{}
-    lm = Imp.ProgramAccess.lm(program)
+  defp completed_training_jobs(program) do
+    program
+    |> Imp.ProgramParameters.predictors()
+    |> Enum.map(fn %{predictor: predictor} ->
+      Imp.ProgramAccess.get_metadata(predictor, :training_artifact)
+    end)
+    |> Enum.filter(&is_map/1)
+    |> Enum.uniq_by(&{Map.get(&1, :student_id), Map.get(&1, :session_id)})
+    |> Enum.map(&training_job_from_artifact/1)
+  end
 
+  defp training_job_from_artifact(artifact) do
     TrainingJob.new(%{
       id: Map.get(artifact, :session_id, "grpo-completed"),
       provider: Map.get(artifact, :provider, :local),
-      model: Map.get(artifact, :base_model, lm_model(lm)),
+      model: Map.get(artifact, :base_model),
       status: :succeeded,
       result_model: Map.get(artifact, :result_model),
       metadata:
@@ -1689,7 +1928,9 @@ defmodule Imp.Optimizer.GRPO do
           :final_trained_model,
           :selected_validation_step,
           :selected_validation_score,
-          :validation_history
+          :validation_history,
+          :student_id,
+          :predictors
         ])
         |> Map.put(:method, :grpo)
     })

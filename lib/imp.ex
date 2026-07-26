@@ -427,7 +427,9 @@ defmodule Imp do
 
   The result is tagged and contains a `Imp.Optimizer.TrainingResult`. SFT
   returns `status: :job_created`; synchronous reinforcement training
-  returns `status: :completed` with the rebound program.
+  returns `status: :completed` with the rebound program. When a training
+  optimizer owns multiple independent provider jobs, `TrainingResult.jobs` is
+  exhaustive and the singular `TrainingResult.job` is `nil`.
   """
   def train(program, optimizer, trainset, opts \\ [])
 

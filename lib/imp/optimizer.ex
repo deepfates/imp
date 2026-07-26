@@ -1,13 +1,21 @@
 defmodule Imp.Optimizer.TrainingResult do
-  @moduledoc "Result of a training optimizer executed through `Imp.train/4`."
+  @moduledoc """
+  Result of a training optimizer executed through `Imp.train/4`.
+
+  `job` is the singular provider job when exactly one job represents the
+  result. `jobs` is the exhaustive list for optimizers that may train multiple
+  independent student models; in that case `job` is `nil` rather than an
+  arbitrary representative.
+  """
 
   @enforce_keys [:program, :status]
-  defstruct [:program, :job, :status, metadata: %{}]
+  defstruct [:program, :job, :status, jobs: [], metadata: %{}]
 
   @type status :: :job_created | :completed
   @type t :: %__MODULE__{
           program: struct(),
           job: term() | nil,
+          jobs: [term()],
           status: status(),
           metadata: map()
         }
@@ -266,7 +274,14 @@ defmodule Imp.Optimizer do
 
   defp validate_result(
          %{result: :training_result},
-         {:ok, %TrainingResult{program: program, status: status, job: job, metadata: metadata}}
+         {:ok,
+          %TrainingResult{
+            program: program,
+            status: status,
+            job: job,
+            jobs: jobs,
+            metadata: metadata
+          }}
        ) do
     cond do
       not executable_program?(program) ->
@@ -277,6 +292,9 @@ defmodule Imp.Optimizer do
 
       not is_map(metadata) ->
         {:error, {:invalid_training_metadata, metadata}}
+
+      not is_list(jobs) ->
+        {:error, {:invalid_training_jobs, jobs}}
 
       status == :job_created and is_nil(job) ->
         {:error, :training_job_required}
