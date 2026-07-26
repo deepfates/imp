@@ -64,6 +64,12 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
 
     final_scores = Enum.map(report.metadata.final_candidates, & &1.score)
     assert final_scores == Enum.sort(final_scores, :desc)
+
+    assert Enum.all?(report.metadata.final_candidates, fn finalist ->
+             [%{name: :main, instruction: instruction, demos: demos}] = finalist.parameters
+             is_binary(instruction) and is_list(demos)
+           end)
+
     assert Enum.all?(report.metadata.trial_logs, &Map.has_key?(&1, :train_score))
 
     assert_received {:simba_reflection, reflection_messages}

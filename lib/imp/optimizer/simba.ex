@@ -278,7 +278,11 @@ defmodule Imp.Optimizer.SIMBA do
     final_candidates =
       scored_finalists
       |> Enum.sort_by(& &1.score, :desc)
-      |> Enum.map(&Map.drop(&1, [:program]))
+      |> Enum.map(fn finalist ->
+        finalist
+        |> Map.drop([:program])
+        |> Map.put(:parameters, parameter_snapshot(finalist.program))
+      end)
 
     Report.attach(
       attached_program,
@@ -622,6 +626,12 @@ defmodule Imp.Optimizer.SIMBA do
   defp optimizer_parameters(program) do
     Enum.map(Imp.ProgramParameters.predictors(program), fn %{name: name, predictor: predictor} ->
       {name, predictor.signature.instructions, predictor.demos}
+    end)
+  end
+
+  defp parameter_snapshot(program) do
+    Enum.map(Imp.ProgramParameters.predictors(program), fn %{name: name, predictor: predictor} ->
+      %{name: name, instruction: predictor.signature.instructions, demos: predictor.demos}
     end)
   end
 
