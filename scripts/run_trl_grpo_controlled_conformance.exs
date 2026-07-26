@@ -41,6 +41,9 @@ unless TRLProtocol.digest(Imp.Optimizer.Report.encode_term(row)) == expected_row
 contract = contract_path |> File.read!() |> Jason.decode!()
 controlled = ["R17", "R42", "R68", "R93"]
 
+controlled_rendered =
+  Enum.map(controlled, &"[[ ## route ## ]]\n#{&1}\n\n[[ ## completed ## ]]\n")
+
 unless contract["controlled_rollouts"] == controlled,
   do: raise("controlled completion contract mismatch")
 
@@ -136,7 +139,7 @@ result =
         observation = observation_path |> File.read!() |> Jason.decode!()
         samples = update["groups"] |> hd() |> Map.fetch!("samples")
 
-        unless Enum.map(samples, & &1["completion"]) == controlled,
+        unless Enum.map(samples, & &1["completion"]) == controlled_rendered,
           do: raise("sealed controlled completion order mismatch")
 
         unless Enum.map(samples, & &1["reward"]) == [1.0, 0.0, 0.0, 0.0],
