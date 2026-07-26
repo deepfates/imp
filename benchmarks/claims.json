@@ -298,11 +298,11 @@
     {
       "id": "claim.optimizer.better_together.api",
       "claim_state": "asserted", "target_rung": "C0", "release": "v0.1",
-      "scope": "The packaged Imp.Optimizer.BetterTogether API composes named prompt and weight optimizer stages.",
-      "limitations": ["API and lifecycle availability do not establish composition quality or DSPy conformance."],
-      "statement": "Imp exposes a callable BEAM-native BetterTogether composition API.",
+      "scope": "The packaged Imp.Optimizer.BetterTogether API composes named prompt and weight optimizer stages; one retained-artifact lifecycle exercises prompt candidates through the adopted fused task LM, validation prefix selection, untouched evaluation, and fresh-process save/load.",
+      "limitations": ["The retained one-model, one-task lifecycle selected weight-only when the prompt continuation tied it; it does not establish general BetterTogether or prompt-optimizer effectiveness, DSPy-matched effectiveness, or BEAM superiority."],
+      "statement": "Imp exposes a callable BEAM-native BetterTogether composition API; on one frozen Banking77/Qwen MLX lifecycle, the prompt stage used the fused task LM, validation selected weight-only on a tie, and the selected program reproduced byte-identically after fresh-process save/load.",
       "category": "optimizer", "surface": ["BetterTogether"], "claim_type": "feature_completeness", "comparison": "imp_api_contract", "gate_policy": "blocking",
-      "sources": ["lib/imp/optimizer/better_together.ex", "test/better_together_test.exs"],
+      "sources": ["lib/imp/optimizer/better_together.ex", "test/better_together_test.exs", "test/better_together_ledger_observer_test.exs", "benchmarks/results/local-better-together-mlx-banking77-20260725.json"],
       "requirements": [{"id": "optimizer.better_together.api", "kind": "api_surface", "lane": "product_package", "evidence": "full", "threshold": "clean package proof and public-surface tests include Imp.Optimizer.BetterTogether"}]
     },
     {
@@ -405,7 +405,7 @@
       "target_rung": "C3",
       "release": "telos",
       "scope": "Held-out BetterTogether composition effectiveness for declared prompt/weight stage sequences.",
-      "limitations": ["Lifecycle and prefix-selection tests do not prove provider completion or matched effectiveness."],
+      "limitations": ["The retained Banking77/Qwen lifecycle proves real fused-task execution, honest prefix selection, and portable selected-program behavior only; because the prompt continuation tied weight-only, it does not establish general BetterTogether or prompt-optimizer effectiveness."],
       "statement": "The open target is family-specific BetterTogether effectiveness; the local MLX result is not generalized into this claim.",
       "category": "optimizer",
       "surface": ["BetterTogether"],

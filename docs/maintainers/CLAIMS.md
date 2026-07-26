@@ -146,6 +146,17 @@ save/load and fresh-process serving of the exact fused artifact. It does not
 authorize general Imp or SFT effectiveness, GRPO, production reliability,
 DSPy-matched parity, or BEAM superiority.
 
+BetterTogether has one narrower retained-artifact lifecycle result on that same
+model and task. Its prompt stage evaluated two rendered instructions through
+the fused task LM; validation scored weight-only and weight-then-prompt equally
+at `0.50`, so stable prefix selection retained weight-only. That selected
+program scored `0.55` accuracy, `0.4561` macro-F1, and zero parse errors on the
+40 untouched rows, then reproduced ordered predictions and errors byte-for-byte
+after save/load and fresh-OS rebinding. This proves real composition mechanics,
+honest weight-only fallback, and portable selected-program behavior. It does
+not satisfy the separate general BetterTogether or prompt-optimizer
+effectiveness target.
+
 Weight and composition claims are divided into six authority families: Avatar
 actor, AvatarOptimizer, BootstrapFinetune, DSPy mmGRPO, BetterTogether, and
 Ensemble. Each has its own C0 API claim, C1 source-conformance target, and C3
