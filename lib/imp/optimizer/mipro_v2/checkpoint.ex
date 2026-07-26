@@ -2,6 +2,8 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
   @moduledoc false
 
   alias Imp.Optimizer.{Report, Sampling, SearchPolicy}
+  alias Imp.Optimizer.MIPROv2.OptunaStartupPolicy
+  alias Imp.Optimizer.SearchPolicy.CategoricalTPE
 
   @type_name "imp_mipro_v2_run"
   @schema_version 1
@@ -59,7 +61,10 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
     end
 
     loaded = %{
-      policy: state |> Map.fetch!("policy") |> SearchPolicy.load!(),
+      policy:
+        state
+        |> Map.fetch!("policy")
+        |> SearchPolicy.load!([CategoricalTPE, OptunaStartupPolicy]),
       rng: state |> Map.fetch!("rng") |> Sampling.load!(),
       trials: state |> Map.fetch!("trials") |> load_records!("trials"),
       combo_scores: fetch_score_map!(state, "combo_scores"),
@@ -148,6 +153,20 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
 
     unless is_list(state.errors) do
       raise ArgumentError, "MIPROv2 checkpoint errors must be a list"
+    end
+
+    case state.policy do
+      %SearchPolicy{
+        module: OptunaStartupPolicy,
+        state: %{completed_trials: completed_trials}
+      } ->
+        unless completed_trials == length(state.trials) + 1 do
+          raise ArgumentError,
+                "MIPROv2 Optuna startup checkpoint completed-trial count does not match its trials"
+        end
+
+      _other ->
+        :ok
     end
 
     state

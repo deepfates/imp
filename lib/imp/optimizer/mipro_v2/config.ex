@@ -24,6 +24,7 @@ defmodule Imp.Optimizer.MIPROv2.Config do
             tip_aware_proposer: true,
             fewshot_aware_proposer: true,
             proposer_fidelity: :beam_native,
+            search_fidelity: :beam_native,
             trainset: nil,
             valset: nil,
             zeroshot: nil,
@@ -48,7 +49,8 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     :view_data_batch_size,
     :tip_aware_proposer,
     :fewshot_aware_proposer,
-    :proposer_fidelity
+    :proposer_fidelity,
+    :search_fidelity
   ]
 
   @doc false
@@ -242,6 +244,11 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     unless config.proposer_fidelity in [:beam_native, :dspy_3_2_1],
       do: raise(ArgumentError, "proposer_fidelity must be :beam_native or :dspy_3_2_1")
 
+    unless config.search_fidelity in [:beam_native, :dspy_3_2_1_optuna_4_9_0_startup] do
+      raise ArgumentError,
+            "search_fidelity must be :beam_native or :dspy_3_2_1_optuna_4_9_0_startup"
+    end
+
     if config.proposer_fidelity == :dspy_3_2_1 and
          (config.program_aware_proposer or config.fewshot_aware_proposer or
             not config.data_aware_proposer or not config.tip_aware_proposer or
@@ -249,6 +256,15 @@ defmodule Imp.Optimizer.MIPROv2.Config do
       raise ArgumentError,
             ":dspy_3_2_1 proposer fidelity currently requires program_aware_proposer: false, " <>
               "fewshot_aware_proposer: false, data_aware_proposer: true, tip_aware_proposer: true, " <>
+              "max_bootstrapped_demos: 0, and max_labeled_demos: 0"
+    end
+
+    if config.search_fidelity == :dspy_3_2_1_optuna_4_9_0_startup and
+         (config.proposer_fidelity != :dspy_3_2_1 or config.minibatch or
+            config.max_bootstrapped_demos != 0 or config.max_labeled_demos != 0) do
+      raise ArgumentError,
+            ":dspy_3_2_1_optuna_4_9_0_startup search fidelity requires " <>
+              "proposer_fidelity: :dspy_3_2_1, minibatch: false, " <>
               "max_bootstrapped_demos: 0, and max_labeled_demos: 0"
     end
 

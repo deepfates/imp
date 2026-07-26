@@ -117,12 +117,30 @@ Imp does not silently reduce the sealed proposer's information after a failed
 call; matched runs stop and retain the transport/parser failure instead. This
 is an operational safety deviation, not prompt-construction parity.
 
-DSPy delegates this stage to Optuna's multivariate `TPESampler`; Imp uses a
-native joint categorical Parzen implementation with explicit immutable random
-state. The engines are expected to share the search-space, observation, and
-promotion contracts, not identical trial sequences from the same integer seed.
-Any claim that the native search is equivalent or better therefore requires a
-recorded decision-tape differential plus T3 effectiveness evidence.
+DSPy delegates this stage to Optuna's multivariate `TPESampler`; Imp's default
+uses a native joint categorical Parzen implementation with explicit immutable
+random state. The engines share search-space, observation, and promotion
+contracts, not identical trial sequences from the same integer seed. That
+default remains an algorithm-native comparison and any equivalence or
+superiority claim requires a decision-tape differential plus T3 effectiveness
+evidence.
+
+The pinned DSPy 3.2.1 matched path is narrower and explicit. With the default
+Optuna startup count of ten, an inserted baseline, and nine objective trials,
+Optuna never enters modeled TPE: every suggestion comes from its NumPy
+`RandomState` categorical startup sampler. Imp's
+`:dspy_3_2_1_optuna_4_9_0_startup` search fidelity reproduces that one-hot
+uniform/argmax stream, parameter order, and completed-trial count exactly,
+persists the full MT19937 state, and refuses a tenth objective trial rather
+than substituting Imp's Parzen model. Source-bound tests independently execute
+Optuna 4.9.0 for all three sealed comparison seeds. This startup-only result is
+not general Optuna TPE parity.
+
+Pinned DSPy turns an evaluation exception into score zero and continues the
+study. The matched Imp mode does the same for ordinary task/adapter failures.
+Operational budget, route, cost, transport, or cancellation guards use
+`MIPROv2.OperationalSafetyError` and remain fail-closed instead of being
+silently admitted as a poor candidate.
 
 DSPy's bootstrap utility hashes repeated calls and deterministically chooses an
 earlier or final call. Imp retains the eligible calls for each predictor and

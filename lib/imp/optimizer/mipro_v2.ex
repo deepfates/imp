@@ -18,6 +18,12 @@ defmodule Imp.Optimizer.MIPROv2 do
   `program_aware_proposer: false`, `fewshot_aware_proposer: false`, and data/tip
   awareness enabled in zero-shot mode; unsupported combinations fail before
   any LM call.
+
+  `:search_fidelity` separately controls parameter search. The narrow
+  `:dspy_3_2_1_optuna_4_9_0_startup` mode reproduces Optuna 4.9.0's NumPy
+  RandomState startup sequence exactly and rejects configurations that would
+  enter modeled TPE. Imp's default categorical Parzen search remains a
+  BEAM-native algorithm and does not claim Optuna trial-sequence parity.
   """
 
   alias Imp.Optimizer.{
@@ -30,6 +36,8 @@ defmodule Imp.Optimizer.MIPROv2 do
   }
 
   alias Imp.Optimizer.MIPROv2.{Checkpoint, Config}
+  alias Imp.Optimizer.MIPROv2.OperationalSafetyError
+  alias Imp.Optimizer.MIPROv2.OptunaStartupPolicy
   alias Imp.Optimizer.MIPROv2.PythonRandom
   alias Imp.Optimizer.MIPROv2.UpstreamBootstrap
   alias Imp.Optimizer.MIPROv2.UpstreamProposer
@@ -91,6 +99,34 @@ defmodule Imp.Optimizer.MIPROv2 do
       startup_trials: Keyword.get(runtime_opts, :startup_trials, 10)
     }
     |> validate_runtime!()
+  end
+
+  @doc """
+  Returns a typed fail-closed error for an operational guard inside an LM or
+  program callback.
+
+  Generic Imp call boundaries intentionally normalize raised exceptions. A
+  route, cost, transport, budget, or cancellation guard that runs inside those
+  boundaries must therefore return this tuple so pinned MIPRO search can
+  distinguish it from an ordinary task/adapter failure:
+
+      MIPROv2.operational_error(:cost, :nonzero_provider_cost,
+        message: "provider cost guard drift"
+      )
+
+  Use `operational_error!/3` only outside a normalized LM/program callback.
+  """
+  def operational_error(kind, reason, opts \\ []) when is_list(opts) do
+    {:error,
+     OperationalSafetyError.exception(
+       [kind: kind, reason: reason] ++ Keyword.take(opts, [:message])
+     )}
+  end
+
+  @doc "Raises the typed operational guard error outside normalized call boundaries."
+  def operational_error!(kind, reason, opts \\ []) when is_list(opts) do
+    {_tag, error} = operational_error(kind, reason, opts)
+    raise error
   end
 
   @impl true
@@ -216,6 +252,8 @@ defmodule Imp.Optimizer.MIPROv2 do
   end
 
   defp run(optimizer, config, program, predictors, run_opts) do
+    validate_search_fidelity!(optimizer, config)
+
     prompt_lm =
       optimizer.prompt_lm || predictors |> hd() |> Map.fetch!(:predictor) |> Map.get(:lm)
 
@@ -295,11 +333,13 @@ defmodule Imp.Optimizer.MIPROv2 do
         errors: state.errors,
         metadata: %{
           algorithm: :mipro_v2,
-          sampler: :joint_categorical_parzen,
+          sampler: sampler_metadata(config),
           upstream_sampler: :optuna_multivariate_tpe,
-          exact_sampler_sequence_parity: false,
-          upstream_release: "DSPy 3.3.0b1",
-          upstream_commit: "b2829b7",
+          exact_sampler_sequence_parity: exact_search_fidelity?(config),
+          exact_sampler_sequence_scope: sampler_sequence_scope(config),
+          optuna_release: optuna_release(config),
+          upstream_release: upstream_release(config),
+          upstream_commit: upstream_commit(config),
           seed: config.seed,
           effective_config: config_metadata(config),
           bootstrap: artifacts.bootstrap_metadata,
@@ -439,16 +479,19 @@ defmodule Imp.Optimizer.MIPROv2 do
       Imp.Telemetry.span(
         [:imp, :optimizer, :trial],
         %{optimizer: :mipro_v2, trial: 0, kind: :baseline},
-        fn -> evaluate(program, config.valset, optimizer) end
+        fn -> evaluate(program, config.valset, optimizer, config) end
       )
 
     policy =
-      CategoricalPolicy
-      |> SearchPolicy.new(
-        space: space,
-        seed: config.seed,
-        startup_trials: optimizer.startup_trials
-      )
+      config
+      |> search_policy(predictors)
+      |> then(fn {module, extra_opts} ->
+        SearchPolicy.new(
+          module,
+          [space: space, seed: config.seed, startup_trials: optimizer.startup_trials] ++
+            extra_opts
+        )
+      end)
       |> SearchPolicy.observe(%{params: default_params, score: baseline.score})
 
     state = %{
@@ -518,7 +561,7 @@ defmodule Imp.Optimizer.MIPROv2 do
           trial: trial,
           kind: if(config.minibatch, do: :minibatch, else: :full)
         },
-        fn -> evaluate(candidate, examples, optimizer) end
+        fn -> evaluate(candidate, examples, optimizer, config) end
       )
 
     policy = SearchPolicy.observe(policy, %{params: params, score: result.score})
@@ -585,7 +628,7 @@ defmodule Imp.Optimizer.MIPROv2 do
           Imp.Telemetry.span(
             [:imp, :optimizer, :trial],
             %{optimizer: :mipro_v2, trial: upstream_trial_num + 1, kind: :full_evaluation},
-            fn -> evaluate(representative.program, config.valset, optimizer) end
+            fn -> evaluate(representative.program, config.valset, optimizer, config) end
           )
 
         policy =
@@ -634,7 +677,7 @@ defmodule Imp.Optimizer.MIPROv2 do
     num_trials + div(num_trials, full_eval_steps) + 1 + additional
   end
 
-  defp evaluate(program, examples, optimizer) do
+  defp evaluate(program, examples, optimizer, config) do
     evaluator =
       Imp.Evaluate.new(examples, optimizer.metric,
         max_concurrency: optimizer.max_concurrency,
@@ -650,13 +693,31 @@ defmodule Imp.Optimizer.MIPROv2 do
         Imp.Evaluate.run(evaluator, program)
       rescue
         cancelled in Imp.EvaluationCancelledError ->
-          reraise RuntimeError,
-                  "MIPROv2 error budget exhausted: #{length(cancelled.errors)} errors " <>
-                    "(maximum #{optimizer.max_errors})",
-                  __STACKTRACE__
+          if exact_search_fidelity?(config) do
+            case operational_safety_error(cancelled.errors) do
+              nil ->
+                %Imp.Evaluate.Result{score: 0.0, rows: [], errors: cancelled.errors}
+
+              %OperationalSafetyError{} = safety ->
+                raise safety
+            end
+          else
+            reraise RuntimeError,
+                    "MIPROv2 error budget exhausted: #{length(cancelled.errors)} errors " <>
+                      "(maximum #{optimizer.max_errors})",
+                    __STACKTRACE__
+          end
       end
 
-    enforce_error_budget!(result.errors, optimizer.max_errors)
+    if exact_search_fidelity?(config) do
+      case operational_safety_error(result.errors) do
+        nil -> :ok
+        %OperationalSafetyError{} = safety -> raise safety
+      end
+    else
+      enforce_error_budget!(result.errors, optimizer.max_errors)
+    end
+
     result
   end
 
@@ -736,6 +797,10 @@ defmodule Imp.Optimizer.MIPROv2 do
         max_errors: optimizer.max_errors,
         timeout: optimizer.timeout
       },
+      search: %{
+        fidelity: config.search_fidelity,
+        startup_trials: optimizer.startup_trials
+      },
       predictors:
         Enum.map(predictors, fn %{name: name, predictor: predictor} ->
           %{
@@ -814,6 +879,93 @@ defmodule Imp.Optimizer.MIPROv2 do
     |> Map.put(:trainset_size, length(config.trainset))
     |> Map.put(:valset_size, length(config.valset))
   end
+
+  defp validate_search_fidelity!(optimizer, config) do
+    if exact_search_fidelity?(config) do
+      cond do
+        optimizer.startup_trials != 10 ->
+          raise ArgumentError,
+                "pinned DSPy 3.2.1/Optuna 4.9.0 search requires startup_trials: 10"
+
+        config.num_trials > optimizer.startup_trials - 1 ->
+          raise ArgumentError,
+                "pinned DSPy 3.2.1/Optuna 4.9.0 startup fidelity supports at most " <>
+                  "#{optimizer.startup_trials - 1} objective trials after the baseline; " <>
+                  "modeled TPE is not implemented"
+
+        optimizer.max_concurrency != 1 ->
+          raise ArgumentError,
+                "pinned DSPy 3.2.1/Optuna 4.9.0 search requires max_concurrency: 1"
+
+        config.seed > 0xFFFFFFFF ->
+          raise ArgumentError,
+                "pinned NumPy RandomState search seed must be at most 4294967295"
+
+        true ->
+          :ok
+      end
+    end
+  end
+
+  defp search_policy(%{search_fidelity: :beam_native}, _predictors),
+    do: {CategoricalPolicy, []}
+
+  defp search_policy(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup}, predictors) do
+    parameter_order =
+      Enum.flat_map(predictors, fn %{name: name} -> [param_key(name, :instruction)] end)
+
+    {OptunaStartupPolicy, [parameter_order: parameter_order]}
+  end
+
+  defp exact_search_fidelity?(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup}),
+    do: true
+
+  defp exact_search_fidelity?(_config), do: false
+
+  defp sampler_metadata(config) do
+    if exact_search_fidelity?(config),
+      do: :optuna_4_9_0_startup_random,
+      else: :joint_categorical_parzen
+  end
+
+  defp sampler_sequence_scope(config) do
+    if exact_search_fidelity?(config),
+      do: :startup_only_before_modeled_tpe,
+      else: :none
+  end
+
+  defp optuna_release(config), do: if(exact_search_fidelity?(config), do: "4.9.0")
+
+  defp upstream_release(config),
+    do: if(exact_search_fidelity?(config), do: "DSPy 3.2.1", else: "DSPy 3.3.0b1")
+
+  defp upstream_commit(config),
+    do:
+      if(exact_search_fidelity?(config),
+        do: "29448ae12756abdd14bd8796c819247ebb83673c",
+        else: "b2829b7"
+      )
+
+  defp operational_safety_error(errors) do
+    Enum.find_value(errors, fn error -> find_operational_safety(error) end)
+  end
+
+  defp find_operational_safety(%OperationalSafetyError{} = error), do: error
+
+  defp find_operational_safety(%_{} = struct),
+    do: struct |> Map.from_struct() |> find_operational_safety()
+
+  defp find_operational_safety(map) when is_map(map) do
+    Enum.find_value(map, fn {_key, value} -> find_operational_safety(value) end)
+  end
+
+  defp find_operational_safety(list) when is_list(list),
+    do: Enum.find_value(list, &find_operational_safety/1)
+
+  defp find_operational_safety(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.find_value(&find_operational_safety/1)
+
+  defp find_operational_safety(_value), do: nil
 
   defp maybe_rebind_task_lm(program, _predictors, nil), do: program
 
