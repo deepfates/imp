@@ -178,6 +178,7 @@ defmodule Imp.MixProject do
     # top-level dev/test checkout.
     runtime_source_files() ++
       Path.wildcard("examples/deployment/**/*") ++
+      Path.wildcard("examples/local_copro_banking77/**/*") ++
       Path.wildcard("examples/local_gepa_banking77/**/*") ++
       Path.wildcard("examples/local_grpo_banking77/**/*") ++
       Path.wildcard("examples/local_grpo_opaque_banking77/**/*") ++
