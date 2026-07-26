@@ -68,3 +68,13 @@ candidate was admitted, and the runner failed closed. The immutable summary is
 This is a model/typed-format measurement failure, not a SIMBA loss. Held-out
 labels remained unopened, and no selected artifact or fresh-process behavior
 was claimed.
+
+The current separately named condition is
+`local-simba-feedback-trec-structured-v2`. Imp now exposes ReqLLM's native
+Ollama JSON-schema capability and `SingleField` uses an exact one-field schema
+when choice scoring is unavailable. This changes only the provider transport
+constraint: the same task contract and digest, local model and digest, split
+rows, opaque route meanings, prompts, metric feedback, validation boundary,
+SIMBA seed/configuration, budgets, and strict typed parser remain frozen. It
+does not strip or normalize any predecessor output. The v1 stopped result
+remains immutable, and v2 may still produce no mutation or no held-out lift.

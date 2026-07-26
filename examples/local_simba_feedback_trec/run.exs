@@ -189,6 +189,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   alias LocalSIMBAFeedbackTREC.{Atomic, Audit, Contract, ObservedLM, Observer}
 
   @contract "task-contract.json"
+  @treatment_id "local-simba-feedback-trec-structured-v2"
   @routes ~w(K11 K47)
   @max_optimization_transports 130
 
@@ -207,6 +208,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
     IO.puts(
       Jason.encode!(%{
         status: "preflight_complete",
+        treatment_id: @treatment_id,
         contract_sha256: Contract.contract_sha256(),
         split_sizes: %{
           train: length(rows.train),
@@ -277,6 +279,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
 
       result = %{
         status: "complete",
+        treatment_id: @treatment_id,
         task_id: rows.contract["task_id"],
         contract_sha256: Contract.contract_sha256(),
         model: rows.contract["model"]["id"],
@@ -404,6 +407,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
 
     Atomic.write!(Path.join(paths.output, "00-preflight.json"), %{
       status: "complete",
+      treatment_id: @treatment_id,
       contract_sha256: Contract.contract_sha256(),
       model: rows.contract["model"],
       train_ids: Enum.map(rows.train, & &1["id"]),
