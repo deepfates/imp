@@ -26,10 +26,20 @@ defmodule Imp.Optimizer.InferRules do
   Pass `:rule_lm` (or `:prompt_lm`) to keep rule induction separate from the
   task LM. Without one, the program's bound LM is used. `:candidates` accepts
   already-induced rule strings and is useful for deterministic replay.
+
+  Durable runs accept `:max_operations`, `:checkpoint_fn`, and `:resume_state`
+  at compile time. Operations seal the bootstrap, each predictor's rule
+  proposal, and each whole candidate evaluation. Anonymous or captured metrics
+  require a stable JSON-safe `:metric_identity`; complete in-process runs remain
+  available without one and explicitly produce no resume state.
   """
+
+  alias Imp.Optimizer.{DurableCallbackIdentity, Report}
+  alias Imp.Optimizer.InferRules.Checkpoint
 
   defstruct [
     :metric,
+    :metric_identity,
     :rule_lm,
     :bootstrap,
     candidates: [],
@@ -45,6 +55,7 @@ defmodule Imp.Optimizer.InferRules do
     num_threads: [type: {:or, [:pos_integer, nil]}, default: nil],
     rule_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
     prompt_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
+    metric_identity: [type: :any, default: nil],
     metric_threshold: [
       type: {:custom, Imp.Optimizer.BootstrapFewShot, :validate_optional_number, []},
       default: nil
@@ -71,7 +82,16 @@ defmodule Imp.Optimizer.InferRules do
   ]
 
   @compile_option_schema [
-    teacher: [type: :any, default: nil]
+    teacher: [type: :any, default: nil],
+    resume_state: [
+      type: {:custom, Imp.Optimize.Anything, :validate_resume_state, []},
+      default: nil
+    ],
+    checkpoint_fn: [
+      type: {:custom, Imp.Optimize.Anything, :validate_checkpoint_fn, []},
+      default: nil
+    ],
+    max_operations: [type: {:or, [:non_neg_integer, {:in, [:infinity]}]}, default: :infinity]
   ]
 
   def new(metric, opts \\ []) do
@@ -88,6 +108,8 @@ defmodule Imp.Optimizer.InferRules do
 
     %__MODULE__{
       metric: metric,
+      metric_identity:
+        DurableCallbackIdentity.normalize!(opts[:metric_identity], :metric_identity),
       rule_lm: rule_lm,
       bootstrap: Imp.Optimizer.BootstrapFewShot.new(metric, bootstrap_opts),
       candidates: opts[:candidates],
@@ -141,36 +163,60 @@ defmodule Imp.Optimizer.InferRules do
     opts = validate_compile_options!(opts)
     {trainset, devset} = datasets(trainset, devset)
     ensure_predictors!(program)
+    :ok = DurableCallbackIdentity.validate_normalized!(optimizer.metric_identity, "InferRules")
 
-    baseline =
-      Imp.Optimizer.BootstrapFewShot.compile(
-        optimizer.bootstrap,
-        program,
-        trainset,
-        teacher: Keyword.get(opts, :teacher)
+    durable? =
+      DurableCallbackIdentity.durable?(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable_controls?(opts)
       )
 
-    bootstrap_report = fetch_report!(baseline, :bootstrap_few_shot)
-    rule_lm = resolve_rule_lm(optimizer, baseline)
+    metric_identity =
+      DurableCallbackIdentity.resolve!(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable?,
+        "InferRules",
+        :metric_identity
+      )
 
-    {candidates, proposal_errors, proposal_calls, proposal_attempts} =
-      build_candidates(optimizer, baseline, trainset, rule_lm)
+    compatibility =
+      resume_compatibility(program, trainset, devset, optimizer, opts, metric_identity)
 
-    evaluation_max_errors = bootstrap_report.metadata.max_errors
-    evaluator = evaluator(devset, optimizer, evaluation_max_errors)
+    {state, resumed?} =
+      case opts[:resume_state] do
+        nil ->
+          state = initial_state()
+          emit_checkpoint(opts[:checkpoint_fn], durable?, compatibility, state)
+          {state, false}
 
-    evaluated =
-      [
-        %{program: program, index: :source, rules: %{}, source: true, baseline: false},
-        %{program: baseline, index: :baseline, rules: %{}, source: false, baseline: true}
-        | candidates
-      ]
-      |> Enum.map(&evaluate_candidate(evaluator, &1))
+        checkpoint ->
+          {Checkpoint.load!(checkpoint, compatibility, program), true}
+      end
 
-    {best, best_score} = select_best(evaluated, baseline)
+    operation_limit =
+      invocation_operation_limit(state.completed_operations, opts[:max_operations])
+
+    state =
+      run_until_boundary(
+        state,
+        optimizer,
+        program,
+        trainset,
+        devset,
+        opts,
+        operation_limit,
+        durable?,
+        compatibility
+      )
+
+    complete? = run_complete?(state)
+    fallback = state.baseline || program
+    {best, best_score} = select_best(state.evaluated, fallback)
 
     evaluation_errors =
-      Enum.flat_map(evaluated, fn
+      Enum.flat_map(state.evaluated, fn
         %{status: :error} = row ->
           [Map.drop(row, [:program])]
 
@@ -182,34 +228,45 @@ defmodule Imp.Optimizer.InferRules do
       end)
 
     report_candidates =
-      Enum.map(evaluated, fn row ->
+      Enum.map(state.evaluated, fn row ->
         Map.take(row, [:index, :rules, :source, :baseline, :score, :status, :error, :errors])
       end)
 
+    checkpoint = if durable?, do: Checkpoint.dump(compatibility, state)
+
     report =
-      Imp.Optimizer.Report.new(%{
+      Report.new(%{
         optimizer: :infer_rules,
         best_score: best_score,
         candidate_count: length(report_candidates),
         candidates: report_candidates,
-        errors: proposal_errors ++ evaluation_errors,
+        errors: state.proposal_errors ++ evaluation_errors,
         metadata: %{
           implementation: :native_rule_induction,
           upstream: "DSPy 3.2.1 InferRules",
           source_protected: true,
           baseline_protected: true,
-          bootstrap: report_summary(bootstrap_report),
+          bootstrap: state.bootstrap_summary,
           explicit_candidates: optimizer.candidates != [],
           num_candidates: candidate_count(optimizer),
           num_rules: optimizer.num_rules,
-          proposal_calls: proposal_calls,
-          proposal_attempts: proposal_attempts,
-          evaluation_max_errors: evaluation_max_errors,
-          predictor_names: Enum.map(Imp.ProgramParameters.predictors(baseline), & &1.name),
+          proposal_calls: state.proposal_calls,
+          proposal_attempts: state.proposal_attempts,
+          evaluation_max_errors: state.evaluation_max_errors,
+          predictor_names: Enum.map(Imp.ProgramParameters.predictors(fallback), & &1.name),
           trainset_size: length(trainset),
           validation_size: length(devset),
+          durable: durable?,
+          metric_identity: metric_identity,
+          resumed: resumed?,
+          completed_operations: state.completed_operations,
+          run_status: if(complete?, do: :complete, else: :paused),
+          resume_state: checkpoint,
           status:
-            if(proposal_errors == [] and evaluation_errors == [], do: :ok, else: :with_errors)
+            if(state.proposal_errors == [] and evaluation_errors == [],
+              do: :ok,
+              else: :with_errors
+            )
         }
       })
 
@@ -244,89 +301,332 @@ defmodule Imp.Optimizer.InferRules do
     )
   end
 
-  defp build_candidates(%{candidates: candidates}, baseline, _trainset, _rule_lm)
-       when candidates != [] do
-    rows =
-      candidates
-      |> Enum.with_index()
-      |> Enum.map(fn {rules, index} ->
-        rules_by_predictor =
-          Map.new(Imp.ProgramParameters.predictors(baseline), &{&1.name, rules})
-
-        %{
-          program: apply_rules(baseline, rules_by_predictor),
-          index: index,
-          rules: rules_by_predictor,
-          baseline: false
-        }
-      end)
-
-    {rows, [], 0, 0}
+  defp initial_state do
+    %{
+      baseline: nil,
+      bootstrap_summary: nil,
+      evaluation_max_errors: nil,
+      proposals_complete: false,
+      next_candidate_index: 0,
+      proposal_cursor: nil,
+      candidates: [],
+      proposal_errors: [],
+      proposal_calls: 0,
+      proposal_attempts: 0,
+      evaluated: [],
+      completed_operations: 0
+    }
   end
 
-  defp build_candidates(_optimizer, _baseline, _trainset, nil) do
-    error = %{
-      stage: :rule_induction,
-      error: "no rule LM is configured or bound to the program"
+  defp run_until_boundary(
+         state,
+         optimizer,
+         program,
+         trainset,
+         devset,
+         opts,
+         operation_limit,
+         durable?,
+         compatibility
+       ) do
+    cond do
+      run_complete?(state) ->
+        state
+
+      operation_budget_exhausted?(state.completed_operations, operation_limit) ->
+        state
+
+      true ->
+        state = advance_once(state, optimizer, program, trainset, devset, opts)
+        emit_checkpoint(opts[:checkpoint_fn], durable?, compatibility, state)
+
+        run_until_boundary(
+          state,
+          optimizer,
+          program,
+          trainset,
+          devset,
+          opts,
+          operation_limit,
+          durable?,
+          compatibility
+        )
+    end
+  end
+
+  defp advance_once(%{baseline: nil} = state, optimizer, program, trainset, _devset, opts) do
+    baseline =
+      Imp.Optimizer.BootstrapFewShot.compile(
+        optimizer.bootstrap,
+        program,
+        trainset,
+        teacher: opts[:teacher]
+      )
+
+    report = fetch_report!(baseline, :bootstrap_few_shot)
+
+    %{
+      state
+      | baseline: baseline,
+        bootstrap_summary: report_summary(report),
+        evaluation_max_errors: report.metadata.max_errors,
+        completed_operations: state.completed_operations + 1
+    }
+  end
+
+  defp advance_once(
+         %{proposals_complete: false} = state,
+         optimizer,
+         _program,
+         trainset,
+         _devset,
+         _opts
+       ) do
+    advance_proposal(state, optimizer, trainset)
+  end
+
+  defp advance_once(state, optimizer, program, _trainset, devset, _opts) do
+    plan = evaluation_plan(program, state)
+    candidate = Enum.fetch!(plan, length(state.evaluated))
+    evaluator = evaluator(devset, optimizer, state.evaluation_max_errors)
+    evaluated = evaluate_candidate(evaluator, candidate)
+
+    %{
+      state
+      | evaluated: state.evaluated ++ [evaluated],
+        completed_operations: state.completed_operations + 1
+    }
+  end
+
+  defp advance_proposal(state, %{candidates: candidates}, _trainset)
+       when candidates != [] do
+    index = state.next_candidate_index
+    rules = Enum.fetch!(candidates, index)
+
+    rules_by_predictor =
+      Map.new(Imp.ProgramParameters.predictors(state.baseline), &{&1.name, rules})
+
+    row = %{
+      program: apply_rules(state.baseline, rules_by_predictor),
+      index: index,
+      rules: rules_by_predictor,
+      source: false,
+      baseline: false
     }
 
-    {[], [error], 0, 0}
+    next = index + 1
+
+    %{
+      state
+      | candidates: state.candidates ++ [row],
+        next_candidate_index: next,
+        proposals_complete: next == length(candidates),
+        completed_operations: state.completed_operations + 1
+    }
   end
 
-  defp build_candidates(optimizer, baseline, trainset, rule_lm) do
-    predictors = Imp.ProgramParameters.predictors(baseline)
+  defp advance_proposal(state, optimizer, trainset) do
+    rule_lm = resolve_rule_lm(optimizer, state.baseline)
 
-    0..(optimizer.num_candidates - 1)
-    |> Enum.reduce({[], [], 0, 0}, fn candidate_index, {rows, errors, calls, attempts} ->
-      result =
-        predictors
-        |> Enum.with_index()
-        |> Enum.reduce_while({:ok, %{}, calls, attempts}, fn {%{
-                                                                name: name,
-                                                                predictor: predictor
-                                                              }, predictor_index},
-                                                             {:ok, rules, calls, attempts} ->
-          rollout_id = candidate_index * max(length(predictors), 1) + predictor_index
+    if is_nil(rule_lm) do
+      error = %{
+        stage: :rule_induction,
+        error: "no rule LM is configured or bound to the program"
+      }
 
-          case induce_rules(
-                 rule_lm,
-                 trainset,
-                 predictor.signature,
-                 optimizer.num_rules,
-                 rollout_id,
-                 optimizer.bootstrap.teacher_settings
-               ) do
-            {:ok, induced, call_attempts} ->
-              {:cont, {:ok, Map.put(rules, name, induced), calls + 1, attempts + call_attempts}}
+      %{
+        state
+        | proposals_complete: true,
+          proposal_errors: state.proposal_errors ++ [error],
+          completed_operations: state.completed_operations + 1
+      }
+    else
+      advance_generated_proposal(state, optimizer, trainset, rule_lm)
+    end
+  end
 
-            {:error, reason, call_attempts} ->
-              {:halt, {:error, name, reason, calls + 1, attempts + call_attempts}}
-          end
-        end)
+  defp advance_generated_proposal(state, optimizer, trainset, rule_lm) do
+    predictors = Imp.ProgramParameters.predictors(state.baseline)
 
-      case result do
-        {:ok, rules, calls, attempts} ->
+    cursor =
+      state.proposal_cursor ||
+        %{
+          candidate_index: state.next_candidate_index,
+          predictor_index: 0,
+          rules: %{}
+        }
+
+    %{name: name, predictor: predictor} = Enum.fetch!(predictors, cursor.predictor_index)
+
+    rollout_id =
+      cursor.candidate_index * max(length(predictors), 1) + cursor.predictor_index
+
+    result =
+      induce_rules(
+        rule_lm,
+        trainset,
+        predictor.signature,
+        optimizer.num_rules,
+        rollout_id,
+        optimizer.bootstrap.teacher_settings
+      )
+
+    state = %{
+      state
+      | proposal_calls: state.proposal_calls + 1,
+        completed_operations: state.completed_operations + 1
+    }
+
+    case result do
+      {:ok, induced, attempts} ->
+        rules = Map.put(cursor.rules, name, induced)
+        next_predictor = cursor.predictor_index + 1
+        state = %{state | proposal_attempts: state.proposal_attempts + attempts}
+
+        if next_predictor == length(predictors) do
           row = %{
-            program: apply_rules(baseline, rules),
-            index: candidate_index,
+            program: apply_rules(state.baseline, rules),
+            index: cursor.candidate_index,
             rules: rules,
+            source: false,
             baseline: false
           }
 
-          {rows ++ [row], errors, calls, attempts}
+          finish_proposal(state, cursor.candidate_index, row, optimizer.num_candidates)
+        else
+          %{state | proposal_cursor: %{cursor | predictor_index: next_predictor, rules: rules}}
+        end
 
-        {:error, predictor, reason, calls, attempts} ->
-          error = %{
-            stage: :rule_induction,
-            candidate: candidate_index,
-            predictor: predictor,
-            error: error_message(reason)
+      {:error, reason, attempts} ->
+        error = %{
+          stage: :rule_induction,
+          candidate: cursor.candidate_index,
+          predictor: name,
+          error: error_message(reason)
+        }
+
+        state = %{
+          state
+          | proposal_attempts: state.proposal_attempts + attempts,
+            proposal_errors: state.proposal_errors ++ [error]
+        }
+
+        finish_proposal(state, cursor.candidate_index, nil, optimizer.num_candidates)
+    end
+  end
+
+  defp finish_proposal(state, candidate_index, row, num_candidates) do
+    next = candidate_index + 1
+    candidates = if is_nil(row), do: state.candidates, else: state.candidates ++ [row]
+
+    %{
+      state
+      | candidates: candidates,
+        next_candidate_index: next,
+        proposal_cursor: nil,
+        proposals_complete: next == num_candidates
+    }
+  end
+
+  defp evaluation_plan(program, state) do
+    [
+      %{program: program, index: :source, rules: %{}, source: true, baseline: false},
+      %{
+        program: state.baseline,
+        index: :baseline,
+        rules: %{},
+        source: false,
+        baseline: true
+      }
+      | state.candidates
+    ]
+  end
+
+  defp run_complete?(state) do
+    not is_nil(state.baseline) and state.proposals_complete and
+      length(state.evaluated) == length(state.candidates) + 2
+  end
+
+  defp invocation_operation_limit(_completed, :infinity), do: :infinity
+  defp invocation_operation_limit(completed, maximum), do: completed + maximum
+
+  defp operation_budget_exhausted?(_completed, :infinity), do: false
+  defp operation_budget_exhausted?(completed, limit), do: completed >= limit
+
+  defp durable_controls?(opts) do
+    not is_nil(opts[:resume_state]) or not is_nil(opts[:checkpoint_fn]) or
+      opts[:max_operations] != :infinity
+  end
+
+  defp emit_checkpoint(_callback, false, _compatibility, _state), do: :ok
+  defp emit_checkpoint(nil, true, _compatibility, _state), do: :ok
+
+  defp emit_checkpoint(callback, true, compatibility, state) do
+    callback.(Checkpoint.dump(compatibility, state))
+    :ok
+  end
+
+  defp resume_compatibility(program, trainset, devset, optimizer, opts, metric_identity) do
+    bootstrap = optimizer.bootstrap |> Map.from_struct() |> Map.drop([:metric])
+
+    payload = %{
+      datasets: %{trainset: trainset, devset: devset},
+      metric: metric_identity,
+      optimizer: %{
+        candidates: optimizer.candidates,
+        num_candidates: optimizer.num_candidates,
+        num_rules: optimizer.num_rules,
+        num_threads: optimizer.num_threads,
+        bootstrap: runtime_identity(bootstrap),
+        rule_lm: runtime_identity(resolve_rule_lm(optimizer, program))
+      },
+      teacher: runtime_identity(opts[:teacher]),
+      program_module: program.__struct__,
+      predictors:
+        Enum.map(Imp.ProgramParameters.predictors(program), fn %{name: name, predictor: predictor} ->
+          %{
+            name: name,
+            signature: predictor.signature,
+            demos: predictor.demos,
+            config: predictor.config,
+            lm: runtime_identity(predictor.lm),
+            adapter: runtime_identity(predictor.adapter),
+            dynamic_lm?: predictor.dynamic_lm?,
+            dynamic_adapter?: predictor.dynamic_adapter?
           }
+        end)
+    }
 
-          {rows, errors ++ [error], calls, attempts}
-      end
+    digest =
+      payload
+      |> Report.encode_term()
+      |> :erlang.term_to_binary([:deterministic])
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    %{"sha256" => digest}
+  end
+
+  defp runtime_identity(callback) when is_function(callback) do
+    Map.new([:module, :name, :arity, :type, :uniq, :index], fn key ->
+      {key, callback |> :erlang.fun_info(key) |> elem(1)}
     end)
   end
+
+  defp runtime_identity(%_{} = struct), do: struct |> Map.from_struct() |> runtime_identity()
+
+  defp runtime_identity(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {key, runtime_identity(value)} end)
+
+  defp runtime_identity(list) when is_list(list), do: Enum.map(list, &runtime_identity/1)
+
+  defp runtime_identity(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.map(&runtime_identity/1) |> List.to_tuple()
+
+  defp runtime_identity(pid) when is_pid(pid), do: :runtime_pid
+  defp runtime_identity(reference) when is_reference(reference), do: :runtime_reference
+  defp runtime_identity(port) when is_port(port), do: :runtime_port
+  defp runtime_identity(value), do: value
 
   defp induce_rules(rule_lm, examples, signature, num_rules, rollout_id, teacher_settings) do
     do_induce_rules(
