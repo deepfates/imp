@@ -278,6 +278,20 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
         fallback_proposer: &same_component/4
       )
     end
+
+    reflection_strategy = fn _candidate, _dataset, _components ->
+      %{new_texts: %{enabled: true}}
+    end
+
+    assert_raise ArgumentError, ~r/reflection_strategy/, fn ->
+      Anything.run(seed, fn _artifact -> 0.0 end,
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 0],
+            reflection: [reflection_strategy: reflection_strategy]
+          )
+      )
+    end
   end
 
   test "reserved persistence tag keys fail before evaluator execution" do

@@ -1013,9 +1013,16 @@ supports typed structured maps with seed-derived exact keys, list lengths, and
 value types. Evaluators and proposers see the native artifact, not its internal
 checkpoint encoding. Invalid JSON, missing fields, type drift, and no-op
 proposals are rejected. Refiner, merge, external tracking, custom callbacks,
-and custom selectors remain text-only and are rejected up front in structured
+reflection strategies, and custom selectors remain text-only and are rejected up front in structured
 mode rather than receiving an encoded substitute. The `__imp_type__` key is
 reserved at every depth for Imp's durable wire tags.
+
+Pinned text-map workflows may instead set
+`reflection: [reflection_strategy: MyStrategy]`, where `MyStrategy` exports
+`reflect/3`. This released GEPA surface owns proposal generation and works
+without a reflection LM. Contextual state is stored in the engine checkpoint
+and verified on JSON resume; the strategy remains a trusted runtime binding and
+is not serialized inside `Config.to_map/1`.
 
 Pinned GEPA v0.1.4's grouped evaluator surface is available through the same
 entry point: pass `nil` as the scalar evaluator and an arity-one

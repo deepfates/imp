@@ -5,6 +5,53 @@ defmodule Imp.Optimize.Anything.StrategyConfigTest do
   alias Imp.Optimize.Anything.{Config, Result}
   alias Imp.Optimizer.GEPA.Acceptance
 
+  defmodule ReleasedReflectionStrategy do
+    def reflect(_candidate, _dataset, [component]) do
+      %{new_texts: %{component => "1.0"}}
+    end
+  end
+
+  test "released reflection strategy executes through the public API and resumes from JSON" do
+    calls = start_supervised!({Agent, fn -> 0 end})
+
+    evaluator = fn candidate, _example ->
+      Agent.update(calls, &(&1 + 1))
+      String.to_float(candidate)
+    end
+
+    config =
+      Config.new(
+        reflection: [
+          reflection_strategy: ReleasedReflectionStrategy,
+          reflection_minibatch_size: 1
+        ],
+        engine: [max_candidate_proposals: 1]
+      )
+
+    result =
+      Anything.run("0.0", evaluator,
+        dataset: [%{id: :train}],
+        valset: [%{id: :selection}],
+        config: config
+      )
+
+    assert Result.best_candidate(result) == "1.0"
+    calls_before_resume = Agent.get(calls, & &1)
+    checkpoint = result.checkpoint |> Jason.encode!() |> Jason.decode!()
+
+    resumed =
+      Anything.run("0.0", evaluator,
+        dataset: [%{id: :train}],
+        valset: [%{id: :selection}],
+        config: config,
+        resume_state: checkpoint
+      )
+
+    assert Result.best_candidate(resumed) == "1.0"
+    assert resumed.candidates == result.candidates
+    assert Agent.get(calls, & &1) == calls_before_resume
+  end
+
   test "public sampling, selection, and acceptance strategies execute and return an applicable artifact" do
     receiver = self()
     proposals = start_supervised!({Agent, fn -> ["0.25", "0.75", "0.50"] end})

@@ -252,6 +252,15 @@ defmodule Imp.Optimize.Anything.Runner do
 
   defp proposer(config, opts, structured_codec) do
     cond do
+      not is_nil(config.reflection.reflection_strategy) ->
+        # The released GEPA strategy API owns reflective mutation. Engine.run/6
+        # still accepts a proposer for the non-strategy path, so keep that
+        # requirement explicit without accidentally invoking another proposal
+        # source or requiring a reflection LM.
+        fn _candidate, _component, _records, _iteration ->
+          raise "reflection_strategy owns Optimize Anything proposals"
+        end
+
       is_function(config.reflection.custom_candidate_proposer, 4) ->
         wrap_structured_proposer(
           config.reflection.custom_candidate_proposer,
@@ -421,6 +430,7 @@ defmodule Imp.Optimize.Anything.Runner do
       [
         {:refiner, config.refiner},
         {:merge, config.merge},
+        {:reflection_strategy, config.reflection.reflection_strategy},
         {:custom_module_selector,
          if(config.reflection.module_selector in [:round_robin, :all],
            do: nil,

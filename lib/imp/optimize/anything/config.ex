@@ -294,6 +294,7 @@ defmodule Imp.Optimize.Anything.Config do
     @moduledoc "Reflection proposal and minibatch settings."
 
     alias Imp.Optimize.Anything.Config.Persistence
+    alias Imp.Optimizer.GEPA.ReflectionStrategy
 
     @enum_fields [:batch_sampler, :module_selector]
     @schema [
@@ -302,6 +303,7 @@ defmodule Imp.Optimize.Anything.Config do
       batch_sampler: [type: :any, default: :epoch_shuffled],
       reflection_minibatch_size: [type: {:or, [:pos_integer, nil]}, default: nil],
       module_selector: [type: :any, default: :round_robin],
+      reflection_strategy: [type: :any, default: nil],
       reflection_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
       reflection_prompt_template: [type: {:or, [:string, :map, nil]}, default: nil],
       custom_candidate_proposer: [type: :any, default: nil]
@@ -312,6 +314,7 @@ defmodule Imp.Optimize.Anything.Config do
               batch_sampler: :epoch_shuffled,
               reflection_minibatch_size: nil,
               module_selector: :round_robin,
+              reflection_strategy: nil,
               reflection_lm: nil,
               reflection_prompt_template: nil,
               custom_candidate_proposer: nil
@@ -327,6 +330,7 @@ defmodule Imp.Optimize.Anything.Config do
       BatchSampler.validate_strategy!(config.batch_sampler)
       BatchSampler.strategy_minibatch_size(config.batch_sampler, config.reflection_minibatch_size)
       ModuleSelector.validate!(config.module_selector)
+      ReflectionStrategy.validate!(config.reflection_strategy)
       validate_proposer!(config.custom_candidate_proposer)
       config
     end
@@ -517,6 +521,7 @@ defmodule Imp.Optimize.Anything.Config do
       max_full_evaluations: engine.max_full_evaluations || :infinity,
       max_reflection_cost: engine.max_reflection_cost,
       reflection_cost_source: reflection.reflection_lm,
+      reflection_strategy: reflection.reflection_strategy,
       frontier_type: engine.frontier_type,
       cache_evaluation: engine.cache_evaluation,
       cache_evaluation_storage: cache_storage(engine),
@@ -628,6 +633,11 @@ defmodule Imp.Optimize.Anything.Config do
   end
 
   defp ensure_persistable_runtime!(%{stopper: nil, callbacks: []} = config) do
+    if not is_nil(config.reflection.reflection_strategy) do
+      raise ArgumentError,
+            "Optimize Anything reflection_strategy is runtime-only and cannot be persisted"
+    end
+
     Persistence.json_safe!(config.reflection.reflection_lm, [:reflection, :reflection_lm])
 
     Persistence.json_safe!(config.reflection.custom_candidate_proposer, [

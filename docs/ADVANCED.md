@@ -49,7 +49,7 @@ types; malformed, partial, type-changing, and no-op proposals are rejected.
 The `__imp_type__` key is reserved at every depth for Imp's durable wire tags.
 
 Structured mode currently rejects refiners, merge, external tracking, custom
-callbacks, and custom candidate/module selectors because those extensions
+callbacks, reflection strategies, and custom candidate/module selectors because those extensions
 consume GEPA's text-component representation. Built-in selection, caching,
 atomic checkpoints, resume, and best-output persistence remain supported.
 
@@ -61,6 +61,15 @@ concurrency, and callbacks. Custom selectors implement the documented GEPA
 selector behaviours rather than being special-cased in the runner; the
 structured-mode restriction above prevents an encoded internal candidate from
 being mistaken for the user artifact.
+
+For pinned GEPA v0.1.4 text candidates, `reflection.reflection_strategy` accepts
+a module exporting `reflect/3`, an arity-three function, or a contextual
+`Imp.Optimizer.GEPA.ReflectionStrategy`. The strategy owns proposal generation
+and therefore does not require `reflection_lm`. Its stable identity and
+contextual state are bound into the engine checkpoint, so JSON resume refuses
+strategy drift before evaluation. Executable strategy references remain trusted
+runtime bindings: persist the result checkpoint and supply the same strategy on
+resume rather than serializing it inside the nested config.
 
 For an external batch backend, pass `nil` as the scalar evaluator and provide
 `batch_evaluator:`. The callback receives every pending `{candidate, example}`

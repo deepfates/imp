@@ -5,6 +5,12 @@ defmodule Imp.Optimize.Anything.ConfigTest do
   alias Imp.Optimize.Anything.Config.{Engine, Merge, Refiner, Reflection, Tracking}
   alias Imp.Optimizer.GEPA.Stopper
 
+  defmodule ReflectionStrategy do
+    def reflect(_candidate, _dataset, [component]) do
+      %{new_texts: %{component => "improved"}}
+    end
+  end
+
   test "defaults mirror released settings without choosing an external model" do
     config = Config.new()
 
@@ -109,6 +115,13 @@ defmodule Imp.Optimize.Anything.ConfigTest do
     assert opts[:module_selector] == :all
   end
 
+  test "engine bridge accepts and forwards the released reflection strategy" do
+    config = Config.new(reflection: [reflection_strategy: ReflectionStrategy])
+
+    assert config.reflection.reflection_strategy == ReflectionStrategy
+    assert Config.to_engine_options(config)[:reflection_strategy] == ReflectionStrategy
+  end
+
   test "constructors reject invalid released settings and unknown options" do
     assert_raise ArgumentError, ~r/unknown options.*wat/, fn -> Engine.new(wat: true) end
 
@@ -164,11 +177,15 @@ defmodule Imp.Optimize.Anything.ConfigTest do
     assert Config.from_map(persisted).tracking.wandb_api_key == nil
   end
 
-  test "persistence rejects runtime-only model, proposer, stopper, and callback values" do
+  test "persistence rejects runtime-only model, strategy, proposer, stopper, and callback values" do
     reflection_lm = fn _messages, _opts -> {:ok, "proposal"} end
 
     assert_raise ArgumentError, ~r/runtime-only value/, fn ->
       Config.new(reflection: [reflection_lm: reflection_lm]) |> Config.to_map()
+    end
+
+    assert_raise ArgumentError, ~r/reflection_strategy is runtime-only/, fn ->
+      Config.new(reflection: [reflection_strategy: ReflectionStrategy]) |> Config.to_map()
     end
 
     assert_raise ArgumentError, ~r/stopper and callbacks are runtime-only/, fn ->
