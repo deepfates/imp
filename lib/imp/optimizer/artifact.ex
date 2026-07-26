@@ -270,11 +270,11 @@ defmodule Imp.Optimizer.Artifact do
     }
   end
 
-  @doc "Applies one candidate's portable parameters to a compatible live program."
+  @doc "Applies one candidate's portable parameters and canonical report to a compatible live program."
   @spec apply(artifact(), struct(), selection(), keyword()) :: struct()
   def apply(artifact, program, selection \\ :champion, opts \\ []) do
-    candidate_program =
-      artifact |> validate!() |> fetch_candidate!(selection) |> restore_program(opts)
+    candidate = artifact |> validate!() |> fetch_candidate!(selection)
+    candidate_program = restore_program(candidate, opts)
 
     source = index_predictors(candidate_program)
     target = index_predictors(program)
@@ -284,8 +284,9 @@ defmodule Imp.Optimizer.Artifact do
             "optimizer artifact predictor set is incompatible with the target program"
     end
 
-    Enum.reduce(target, program, fn {identity, %{name: target_name, predictor: target_predictor}},
-                                    acc ->
+    target
+    |> Enum.reduce(program, fn {identity, %{name: target_name, predictor: target_predictor}},
+                               acc ->
       source_predictor = source |> Map.fetch!(identity) |> Map.fetch!(:predictor)
 
       validate_signature_compatibility!(
@@ -301,6 +302,7 @@ defmodule Imp.Optimizer.Artifact do
         |> Map.put(:config, source_predictor.config)
       end)
     end)
+    |> attach_candidate_report(candidate)
   end
 
   @doc "Promotes a challenger and records the prior champion for rollback."
@@ -506,6 +508,18 @@ defmodule Imp.Optimizer.Artifact do
     validate_keyword!(opts, [:registry], "artifact operation")
     Saving.load(candidate["program"], saving_opts(opts))
   end
+
+  defp attach_candidate_report(program, %{"report" => report}) when is_map(report) do
+    expected = MapSet.new(~w(optimizer best_score candidate_count candidates errors metadata))
+
+    if MapSet.equal?(MapSet.new(Map.keys(report)), expected) do
+      Report.attach(program, Report.load(report))
+    else
+      program
+    end
+  end
+
+  defp attach_candidate_report(program, _candidate), do: program
 
   defp index_predictors(program) do
     program

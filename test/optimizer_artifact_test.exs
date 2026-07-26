@@ -56,6 +56,7 @@ defmodule Imp.Optimizer.ArtifactTest do
     assert [%Imp.Example{}] = predictor.predictor.demos
     assert predictor.predictor.lm == live.predict.lm
     assert predictor.predictor.adapter == live.predict.adapter
+    assert Report.fetch(applied) == report
 
     assert applied.predict.lm == live.predict.lm
     assert applied.predict.lm.opts[:api_key] == "sk-live-credential-123456"

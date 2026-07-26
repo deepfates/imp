@@ -696,9 +696,7 @@ defmodule PackageContractTest do
       raise "BootstrapFewShot package lifecycle did not attach its accepted trace"
     end
 
-    verify_program_optimizer.(
-      :random_search,
-      :random_search,
+    random_search =
       Imp.optimize!(
         program,
         Imp.Optimizer.RandomSearch.new(metric,
@@ -709,7 +707,26 @@ defmodule PackageContractTest do
         fixture_trainset,
         fixture_selection_set
       )
+
+    verify_program_optimizer.(
+      :random_search,
+      :random_search,
+      random_search
     )
+
+    random_deployed =
+      random_search
+      |> Imp.Optimizer.Artifact.from_optimized_program()
+      |> Imp.Optimizer.Artifact.apply(program)
+
+    unless match?(
+             %Imp.Optimizer.Report{optimizer: :random_search},
+             Imp.Optimizer.Report.fetch(random_deployed)
+           ) do
+      raise "RandomSearch package artifact lost its optimizer report on application"
+    end
+
+    verify_program_optimizer.(:random_search_artifact, :random_search, random_deployed)
 
     knn_few_shot =
       Imp.Optimizer.KNNFewShot.new(1, fixture_trainset,

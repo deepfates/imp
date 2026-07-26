@@ -1,5 +1,5 @@
 defmodule Imp.ClassicalOptimizerFrontDoorTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Imp.Optimizer.{Artifact, BootstrapFewShot, RandomSearch, Report}
 
@@ -136,6 +136,43 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
              Enum.map(optimized.demos, &Imp.Example.to_map/1)
 
     assert applied.lm == fresh.lm
+    assert Report.fetch(applied) == Report.fetch(optimized)
+    assert_fresh_os_artifact(path, Report.fetch(optimized))
+  end
+
+  defp assert_fresh_os_artifact(path, expected_report) do
+    expression = """
+    {:ok, _} = Application.ensure_all_started(:imp)
+
+    fresh =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "fresh"} end)
+      )
+
+    applied =
+      System.argv()
+      |> hd()
+      |> Imp.Optimizer.Artifact.read!()
+      |> Imp.Optimizer.Artifact.apply(fresh)
+
+    report = Imp.Optimizer.Report.fetch(applied)
+
+    unless report && report.optimizer == #{inspect(expected_report.optimizer)} and
+             report.best_score == #{inspect(expected_report.best_score)} and
+             report.candidate_count == #{inspect(expected_report.candidate_count)} and
+             length(applied.demos) == 1 and applied.lm == fresh.lm do
+      raise "fresh artifact lost its report, parameters, or runtime binding: \#{inspect({report, applied})}"
+    end
+    """
+
+    args =
+      "_build/test/lib/*/ebin"
+      |> Path.wildcard()
+      |> Enum.flat_map(&["-pa", &1])
+      |> Kernel.++(["-e", expression, path])
+
+    {output, status} = System.cmd("elixir", args, stderr_to_stdout: true)
+    assert status == 0, output
   end
 
   defp program(answer) do
