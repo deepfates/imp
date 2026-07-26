@@ -44,6 +44,20 @@ defmodule Imp.Optimizer.Report do
     "random_search" => :random_search,
     "simba" => :simba
   }
+  @optimizer_modules %{
+    avatar: Imp.Optimizer.Avatar,
+    better_together: Imp.Optimizer.BetterTogether,
+    bootstrap_few_shot: Imp.Optimizer.BootstrapFewShot,
+    bootstrap_finetune: Imp.Optimizer.BootstrapFinetune,
+    copro: Imp.Optimizer.COPRO,
+    gepa: Imp.Optimizer.GEPA,
+    infer_rules: Imp.Optimizer.InferRules,
+    instruction_search: Imp.Optimizer.InstructionSearch,
+    labeled_few_shot: Imp.Optimizer.LabeledFewShot,
+    mipro_v2: Imp.Optimizer.MIPROv2,
+    random_search: Imp.Optimizer.RandomSearch,
+    simba: Imp.Optimizer.SIMBA
+  }
 
   defstruct optimizer: nil,
             best_score: nil,
@@ -123,6 +137,7 @@ defmodule Imp.Optimizer.Report do
     end
 
     optimizer = state |> fetch_required!(:optimizer) |> load_value()
+    ensure_optimizer_runtime_loaded!(optimizer)
     best_score = state |> fetch_required!(:best_score) |> load_value()
     candidate_count = state |> fetch_required!(:candidate_count) |> load_value()
     metadata = state |> fetch_required!(:metadata) |> load_value()
@@ -202,6 +217,27 @@ defmodule Imp.Optimizer.Report do
 
   defp consistent_predictor_report!(_reports) do
     raise ArgumentError, "program predictors carry malformed optimizer reports"
+  end
+
+  # Metadata atom keys are owned by the optimizer that emitted the report. A
+  # fresh BEAM may not have loaded that module's literal vocabulary yet. Load
+  # only the explicit public allowlist; never derive a module or create an atom
+  # from report data.
+  defp ensure_optimizer_runtime_loaded!(optimizer) do
+    case Map.fetch(@optimizer_modules, optimizer) do
+      {:ok, module} ->
+        case Code.ensure_loaded(module) do
+          {:module, ^module} ->
+            :ok
+
+          {:error, reason} ->
+            raise ArgumentError,
+                  "cannot load #{inspect(optimizer)} report owner: #{inspect(reason)}"
+        end
+
+      :error ->
+        :ok
+    end
   end
 
   defp dump_value(%Imp.Example{} = example) do

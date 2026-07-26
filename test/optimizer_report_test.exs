@@ -36,6 +36,40 @@ defmodule OptimizerReportTest do
     assert File.read!(receipt) == "better_together"
   end
 
+  test "public optimizer metadata loads in a fresh OS before its module" do
+    root =
+      Path.join(System.tmp_dir!(), "imp-report-metadata-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    path = Path.join(root, "report.json")
+    receipt = Path.join(root, "receipt")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    encoded =
+      %Imp.Optimizer.Report{
+        optimizer: :simba,
+        metadata: %{budgets: %{max_steps: 1}, run_status: :complete}
+      }
+      |> Imp.Optimizer.Report.json_safe()
+
+    File.write!(path, Jason.encode!(encoded))
+
+    code = """
+    report = #{inspect(path)} |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.decode_term()
+    File.write!(#{inspect(receipt)}, Integer.to_string(report.metadata.budgets.max_steps))
+    """
+
+    {output, 0} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert output == ""
+    assert File.read!(receipt) == "1"
+  end
+
   defmodule ErrorOptimizer do
     defstruct []
 
