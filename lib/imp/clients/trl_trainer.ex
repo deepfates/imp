@@ -17,6 +17,11 @@ defmodule Imp.Clients.TRLTrainer do
   ordinary training, where uniform-reward groups may truthfully produce no-op
   steps. Mismatched rollout or step budgets fail before the worker loads the
   model.
+
+  Public `GRPO.train_kwargs` may override the narrow data-only training keys
+  `learning_rate`, `beta`, `loss_type`, and `scale_rewards`. They are validated
+  before worker startup, sealed into the session identity, and written to a
+  session-owned runtime contract. Arbitrary Python kwargs are never forwarded.
   """
 
   @behaviour Imp.Clients.Trainer
@@ -63,8 +68,9 @@ defmodule Imp.Clients.TRLTrainer do
     dispatch_id = Keyword.fetch!(opts, :dispatch_id)
     contract = Keyword.fetch!(opts, :imp_reinforcement_contract)
 
-    with :ok <- validate_launch_contract(trainer, opts, contract),
-         {:ok, worker} <- start_worker(trainer, dispatch_id),
+    with {:ok, runtime_contract_path} <-
+           validate_launch_contract(trainer, dispatch_id, opts, contract),
+         {:ok, worker} <- start_worker(trainer, dispatch_id, runtime_contract_path),
          {:ok, identity} <- request(trainer, worker, %{"op" => "initialize"}),
          :ok <- exact_model(identity, lm, trainer),
          {:ok, protocol} <- build_session(dispatch_id, identity, contract),
@@ -80,7 +86,8 @@ defmodule Imp.Clients.TRLTrainer do
 
   @impl true
   def reconcile_reinforcement(%__MODULE__{} = trainer, dispatch_id) do
-    with {:ok, worker} <- start_worker(trainer, dispatch_id),
+    with {:ok, worker} <-
+           start_worker(trainer, dispatch_id, persisted_contract(trainer, dispatch_id)),
          {:ok, result} <- request(trainer, worker, %{"op" => "reconcile"}),
          %{"protocol" => protocol, "model" => model} <- result,
          :ok <- TRLProtocol.validate(protocol) do
@@ -174,7 +181,7 @@ defmodule Imp.Clients.TRLTrainer do
   def final_model_artifact(%__MODULE__{}, %ReinforcementSession{}),
     do: {:error, :reinforcement_artifact_missing}
 
-  defp start_worker(trainer, dispatch_id) do
+  defp start_worker(trainer, dispatch_id, contract_path) do
     TRLWorker.start(%{
       session_id: dispatch_id,
       registry_key: trainer.worker_key,
@@ -182,11 +189,11 @@ defmodule Imp.Clients.TRLTrainer do
       worker_script: trainer.worker_script,
       root: Path.join(Path.expand(trainer.root), safe_session_name(dispatch_id)),
       model_path: trainer.model_path,
-      contract_path: trainer.contract_path
+      contract_path: contract_path
     })
   end
 
-  defp validate_launch_contract(trainer, opts, protocol_contract) do
+  defp validate_launch_contract(trainer, dispatch_id, opts, protocol_contract) do
     with {:ok, bytes} <- File.read(trainer.contract_path),
          {:ok, worker_contract} <- Jason.decode(bytes),
          %{"optimizer" => optimizer} when is_map(optimizer) <- worker_contract,
@@ -196,10 +203,16 @@ defmodule Imp.Clients.TRLTrainer do
            get_in(protocol_contract, ["prompt_schedule", "steps"]),
          true <- generations == Keyword.fetch!(opts, :num_generations),
          true <- steps == length(schedule),
-         :ok <- reject_unsupported_train_kwargs(opts) do
-      :ok
+         {:ok, train_kwargs} <- normalize_train_kwargs(opts),
+         true <-
+           get_in(protocol_contract, ["optimizer", "config_sha256"]) ==
+             TRLProtocol.digest(train_kwargs),
+         {:ok, path} <-
+           persist_runtime_contract(trainer, dispatch_id, worker_contract, train_kwargs) do
+      {:ok, path}
     else
       {:error, {:unsupported_trl_train_kwargs, _keys} = reason} -> {:error, reason}
+      {:error, {:invalid_trl_train_kwarg, _key, _value} = reason} -> {:error, reason}
       {:error, reason} -> {:error, {:trl_contract_unreadable, reason}}
       false -> {:error, :trl_contract_runtime_mismatch}
       _other -> {:error, :invalid_trl_contract}
@@ -208,19 +221,103 @@ defmodule Imp.Clients.TRLTrainer do
     error -> {:error, {:invalid_trl_contract, Exception.message(error)}}
   end
 
-  defp reject_unsupported_train_kwargs(opts) do
+  @doc false
+  def normalize_train_kwargs(opts) when is_list(opts) do
     system_keys = [:dispatch_id, :imp_reinforcement_contract, :num_generations]
+    values = Keyword.drop(opts, system_keys)
+    allowed = [:beta, :learning_rate, :loss_type, :scale_rewards]
 
-    case opts |> Keyword.drop(system_keys) |> Keyword.keys() |> Enum.uniq() |> Enum.sort() do
-      [] -> :ok
-      keys -> {:error, {:unsupported_trl_train_kwargs, keys}}
+    unsupported =
+      values |> Keyword.keys() |> Enum.uniq() |> Enum.reject(&(&1 in allowed)) |> Enum.sort()
+
+    if unsupported != [] do
+      {:error, {:unsupported_trl_train_kwargs, unsupported}}
+    else
+      Enum.reduce_while(values, {:ok, %{}}, fn {key, value}, {:ok, acc} ->
+        case normalize_train_kwarg(key, value) do
+          {:ok, normalized} -> {:cont, {:ok, Map.put(acc, Atom.to_string(key), normalized)}}
+          {:error, _reason} = error -> {:halt, error}
+        end
+      end)
     end
+  end
+
+  defp normalize_train_kwarg(:learning_rate, value)
+       when is_number(value) and value > 0 and value < 1,
+       do: finite_kwarg(:learning_rate, value)
+
+  defp normalize_train_kwarg(:beta, value) when is_number(value) and value >= 0,
+    do: finite_kwarg(:beta, value)
+
+  defp normalize_train_kwarg(:loss_type, value)
+       when value in [:grpo, :dr_grpo, :dapo, :bnpo, "grpo", "dr_grpo", "dapo", "bnpo"],
+       do: {:ok, to_string(value)}
+
+  defp normalize_train_kwarg(:scale_rewards, value)
+       when value in [:group, :batch, :none, "group", "batch", "none", true, false],
+       do: {:ok, if(is_atom(value) and not is_boolean(value), do: to_string(value), else: value)}
+
+  defp normalize_train_kwarg(key, value), do: {:error, {:invalid_trl_train_kwarg, key, value}}
+
+  defp finite_kwarg(key, value) do
+    value = value * 1.0
+
+    if value == value and abs(value) <= 1.7976931348623157e308,
+      do: {:ok, value},
+      else: {:error, {:invalid_trl_train_kwarg, key, value}}
+  end
+
+  defp persist_runtime_contract(trainer, dispatch_id, contract, train_kwargs) do
+    runtime = build_runtime_contract(contract, train_kwargs)
+
+    path = runtime_contract_path(trainer, dispatch_id)
+    temporary = path <> ".tmp-#{System.unique_integer([:positive])}"
+
+    try do
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(temporary, Jason.encode!(runtime, pretty: true) <> "\n", [:sync])
+      File.rename!(temporary, path)
+      {:ok, path}
+    rescue
+      error -> {:error, {:trl_runtime_contract_persistence_failed, Exception.message(error)}}
+    after
+      File.rm(temporary)
+    end
+  end
+
+  @doc false
+  def build_runtime_contract(contract, train_kwargs)
+      when is_map(contract) and is_map(train_kwargs) do
+    optimizer = Map.merge(Map.fetch!(contract, "optimizer"), train_kwargs)
+
+    contract
+    |> Map.put("optimizer", optimizer)
+    |> Map.put("imp_runtime", %{"train_kwargs" => train_kwargs})
+  end
+
+  defp persisted_contract(trainer, dispatch_id) do
+    path = runtime_contract_path(trainer, dispatch_id)
+    if File.regular?(path), do: path, else: trainer.contract_path
+  end
+
+  defp runtime_contract_path(trainer, dispatch_id) do
+    trainer.root
+    |> Path.expand()
+    |> Path.join(safe_session_name(dispatch_id))
+    |> Path.join("imp-runtime-contract.json")
   end
 
   defp stop_worker(trainer) do
     case Registry.lookup(Imp.Clients.TRLWorker.Registry, trainer.worker_key) do
-      [{pid, _}] -> TRLWorker.stop(pid)
-      [] -> :ok
+      [{pid, _}] ->
+        case DynamicSupervisor.terminate_child(Imp.Clients.TRLWorker.Supervisor, pid) do
+          :ok -> :ok
+          {:error, :not_found} -> :ok
+          {:error, reason} -> {:error, {:trl_worker_stop_failed, reason}}
+        end
+
+      [] ->
+        :ok
     end
   catch
     :exit, _reason -> :ok

@@ -1420,10 +1420,7 @@ defmodule Imp.Optimizer.GRPO do
       "optimizer" => %{
         "name" => "grpo",
         "num_generations" => identity.rollouts_per_step,
-        "config_sha256" =>
-          identity
-          |> Map.drop([:trainset, :valset, :prompt_schedule, :digest])
-          |> protocol_digest()
+        "config_sha256" => protocol_digest(protocol_train_config(identity.train_kwargs))
       },
       "rng" => %{
         "algorithm" => "exsss",
@@ -1437,6 +1434,22 @@ defmodule Imp.Optimizer.GRPO do
     |> Imp.Optimizer.Report.encode_term()
     |> TRLProtocol.digest()
   end
+
+  defp protocol_train_config(keyword) when is_list(keyword) do
+    Map.new(keyword, fn {key, value} -> {to_string(key), protocol_train_value(value)} end)
+  end
+
+  defp protocol_train_value(value) when is_boolean(value) or is_nil(value), do: value
+  defp protocol_train_value(value) when is_atom(value), do: Atom.to_string(value)
+
+  defp protocol_train_value(value) when is_list(value),
+    do: Enum.map(value, &protocol_train_value/1)
+
+  defp protocol_train_value(value) when is_map(value) do
+    Map.new(value, fn {key, nested} -> {to_string(key), protocol_train_value(nested)} end)
+  end
+
+  defp protocol_train_value(value), do: value
 
   defp maybe_put_session_metadata(metadata, session_metadata, key) do
     case Map.get(session_metadata, key, Map.get(session_metadata, Atom.to_string(key))) do

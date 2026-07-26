@@ -542,7 +542,74 @@ defmodule Imp.TRLWorkerTest do
                imp_reinforcement_contract: protocol_contract
              )
 
-    assert Registry.lookup(Imp.Clients.TRLWorker.Registry, trainer.worker_key) == []
+    assert eventually(fn ->
+             Registry.lookup(Imp.Clients.TRLWorker.Registry, trainer.worker_key) == []
+           end)
+  end
+
+  test "trainer normalizes only allowlisted official TRL kwargs" do
+    assert {:ok,
+            %{
+              "beta" => 0.25,
+              "learning_rate" => 1.0e-6,
+              "loss_type" => "dapo",
+              "scale_rewards" => "none"
+            }} =
+             TRLTrainer.normalize_train_kwargs(
+               beta: 0.25,
+               learning_rate: 1.0e-6,
+               loss_type: :dapo,
+               scale_rewards: :none
+             )
+
+    assert {:error, {:unsupported_trl_train_kwargs, [:gradient_accumulation_steps]}} =
+             TRLTrainer.normalize_train_kwargs(gradient_accumulation_steps: 8)
+
+    assert {:error, {:invalid_trl_train_kwarg, :learning_rate, 0}} =
+             TRLTrainer.normalize_train_kwargs(learning_rate: 0)
+
+    assert {:error, {:invalid_trl_train_kwarg, :loss_type, :cispo}} =
+             TRLTrainer.normalize_train_kwargs(loss_type: :cispo)
+  end
+
+  test "trainer persists a session-owned allowlisted runtime contract before model startup",
+       context do
+    trainer =
+      TRLTrainer.new(
+        python: context.python,
+        model_path: context.model,
+        root: Path.join(context.root, "runtime-kwargs"),
+        contract_path: context.contract,
+        worker_key: {:trl_runtime_kwargs, make_ref()}
+      )
+
+    train_kwargs = %{"learning_rate" => 1.0e-6, "loss_type" => "dapo"}
+
+    protocol_contract = %{
+      "dataset" => %{},
+      "prompt_schedule" => %{"steps" => [%{"step" => 0}]},
+      "optimizer" => %{"config_sha256" => TRLProtocol.digest(train_kwargs)},
+      "rng" => %{}
+    }
+
+    assert {:error, {:trl_worker, %{"code" => "model_missing"}}} =
+             TRLTrainer.start_reinforcement(trainer, %{model: "unused"},
+               dispatch_id: "no-worker",
+               num_generations: 4,
+               learning_rate: 1.0e-6,
+               loss_type: :dapo,
+               imp_reinforcement_contract: protocol_contract
+             )
+
+    assert eventually(fn ->
+             Registry.lookup(Imp.Clients.TRLWorker.Registry, trainer.worker_key) == []
+           end)
+
+    assert [path] = Path.wildcard(Path.join([trainer.root, "*", "imp-runtime-contract.json"]))
+    persisted = path |> File.read!() |> Jason.decode!()
+    assert persisted["imp_runtime"] == %{"train_kwargs" => train_kwargs}
+    assert persisted["optimizer"]["learning_rate"] == 1.0e-6
+    assert persisted["optimizer"]["loss_type"] == "dapo"
   end
 
   test "trainer rejects unsupported train kwargs before starting a worker", context do
@@ -562,14 +629,26 @@ defmodule Imp.TRLWorkerTest do
       "rng" => %{}
     }
 
-    assert {:error, {:unsupported_trl_train_kwargs, [:learning_rate]}} =
+    assert {:error, {:unsupported_trl_train_kwargs, [:gradient_accumulation_steps]}} =
              TRLTrainer.start_reinforcement(trainer, %{model: "unused"},
                dispatch_id: "no-worker",
                num_generations: 4,
-               learning_rate: 1.0e-5,
+               gradient_accumulation_steps: 8,
                imp_reinforcement_contract: protocol_contract
              )
 
     assert Registry.lookup(Imp.Clients.TRLWorker.Registry, trainer.worker_key) == []
+  end
+
+  defp eventually(fun, attempts \\ 50)
+  defp eventually(_fun, 0), do: false
+
+  defp eventually(fun, attempts) do
+    if fun.() do
+      true
+    else
+      Process.sleep(2)
+      eventually(fun, attempts - 1)
+    end
   end
 end

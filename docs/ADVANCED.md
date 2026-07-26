@@ -296,7 +296,8 @@ grpo =
   Imp.Optimizer.GRPO.new(reward,
     trainer: trainer,
     num_train_steps: 1,
-    num_rollouts_per_grpo_step: 4
+    num_rollouts_per_grpo_step: 4,
+    train_kwargs: [learning_rate: 1.0e-6, loss_type: :dapo]
   )
 
 {:ok, result} = Imp.train(program, grpo, trainset)
@@ -347,6 +348,16 @@ final standalone artifact includes the complete update/receipt chain. A fresh
 worker verifies that chain and reloads the latest adapter before it advertises
 the next step. Repeating independent one-step jobs is not equivalent and is not
 used as a continuation path.
+
+`train_kwargs` is not an arbitrary Python escape hatch. The local backend
+accepts only `learning_rate`, `beta`, `loss_type` (`:grpo`, `:dr_grpo`, `:dapo`,
+or `:bnpo`), and `scale_rewards` (`:group`, `:batch`, `:none`, `true`, or
+`false`). It validates them before model startup, writes an owned session
+contract, and binds their normalized content into both protocol and durable
+resume identity. Unknown or changed settings fail closed; device, model, LoRA,
+step/generation budgets, filesystem paths, and executable behavior remain
+contract-owned. In particular, Imp does not expose TRL's CISPO loss as native
+CISPO product support through this option.
 
 ### Optional local MLX-LM SFT
 

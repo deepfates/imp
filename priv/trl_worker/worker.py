@@ -220,6 +220,12 @@ class Worker:
             raise WorkerError("engine_identity_mismatch", "session engine is not pinned TRL")
         if self.model is None:
             raise WorkerError("worker_not_initialized", "initialize must precede session binding")
+        runtime_kwargs = self.contract.get("imp_runtime", {}).get("train_kwargs", {})
+        if protocol.get("optimizer", {}).get("config_sha256") != digest(runtime_kwargs):
+            raise WorkerError(
+                "optimizer_config_identity_mismatch",
+                "session optimizer identity differs from the runtime contract",
+            )
         steps = protocol.get("prompt_schedule", {}).get("steps", [])
         if len(steps) != self.contract["optimizer"]["max_steps"]:
             raise WorkerError(
@@ -954,7 +960,7 @@ class Worker:
     def _validate_contract(self) -> None:
         allowed = {
             "schema_version", "purpose", "python", "dependencies", "model", "device",
-            "optimizer", "semantic_group", "controlled_rollouts", "acceptance",
+            "optimizer", "semantic_group", "controlled_rollouts", "acceptance", "imp_runtime",
         }
         unknown = set(self.contract) - allowed
         if unknown:
@@ -988,6 +994,39 @@ class Worker:
             raise WorkerError("invalid_acceptance_contract", "acceptance assertions are invalid")
         if any(not isinstance(value, bool) for value in acceptance.values()):
             raise WorkerError("invalid_acceptance_contract", "acceptance assertions must be booleans")
+        runtime = self.contract.get("imp_runtime", {"train_kwargs": {}})
+        if not isinstance(runtime, dict) or set(runtime) != {"train_kwargs"}:
+            raise WorkerError("invalid_runtime_contract", "runtime contract keys do not match")
+        train_kwargs = runtime["train_kwargs"]
+        if not isinstance(train_kwargs, dict) or set(train_kwargs) - {
+            "learning_rate", "beta", "loss_type", "scale_rewards"
+        }:
+            raise WorkerError("invalid_runtime_contract", "runtime train kwargs are not allowlisted")
+        for key, value in train_kwargs.items():
+            if optimizer.get(key) != value:
+                raise WorkerError("runtime_contract_mismatch", f"runtime override {key} was not applied")
+        learning_rate = train_kwargs.get("learning_rate")
+        if learning_rate is not None and (
+            isinstance(learning_rate, bool)
+            or not isinstance(learning_rate, (int, float))
+            or not math.isfinite(learning_rate)
+            or not 0 < learning_rate < 1
+        ):
+            raise WorkerError("invalid_runtime_contract", "learning_rate must be finite in (0, 1)")
+        beta = train_kwargs.get("beta")
+        if beta is not None and (
+            isinstance(beta, bool)
+            or not isinstance(beta, (int, float))
+            or not math.isfinite(beta)
+            or beta < 0
+        ):
+            raise WorkerError("invalid_runtime_contract", "beta must be finite and non-negative")
+        if train_kwargs.get("loss_type", "grpo") not in {"grpo", "dr_grpo", "dapo", "bnpo"}:
+            raise WorkerError("invalid_runtime_contract", "loss_type is not allowlisted")
+        if train_kwargs.get("scale_rewards", "group") not in {
+            "group", "batch", "none", True, False
+        }:
+            raise WorkerError("invalid_runtime_contract", "scale_rewards is not allowlisted")
 
     def _completion_logprobs(self, prompt_ids: list[int], completion_ids: list[int]) -> list[float]:
         torch = self.torch

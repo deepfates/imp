@@ -177,6 +177,38 @@ defmodule GRPOContractTest do
     assert_received {:artifact, :succeeded}
   end
 
+  test "forwards and seals normalized public trainer configuration" do
+    {_compiled, _steps} =
+      run(7,
+        train_kwargs: [
+          learning_rate: 1.0e-6,
+          beta: 0.0,
+          loss_type: :dapo,
+          scale_rewards: :none
+        ]
+      )
+
+    assert_received {:start, _lm, start_opts}
+
+    assert Keyword.take(start_opts, [:learning_rate, :beta, :loss_type, :scale_rewards]) ==
+             [
+               learning_rate: 1.0e-6,
+               beta: 0.0,
+               loss_type: :dapo,
+               scale_rewards: :none
+             ]
+
+    expected = %{
+      "learning_rate" => 1.0e-6,
+      "beta" => 0.0,
+      "loss_type" => "dapo",
+      "scale_rewards" => "none"
+    }
+
+    assert get_in(start_opts, [:imp_reinforcement_contract, "optimizer", "config_sha256"]) ==
+             Imp.Clients.TRLProtocol.digest(expected)
+  end
+
   test "keeps predictor identity and predictor-major source ordering" do
     lm = %{
       module: Imp.LM.Static,
