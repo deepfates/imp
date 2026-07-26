@@ -214,6 +214,34 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert {:ok, _ast} = Code.string_to_quoted(canary)
   end
 
+  test "production runner guards remain cross-runtime equivalent" do
+    script = "examples/matched_instruction_optimizers_trec/guard_equivalence.py"
+    assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
+    report = Jason.decode!(output)
+    assert report["status"] == "pass"
+    assert report["count"] == 14
+    assert Enum.count(report["guards"], &(&1["comparison"] == "identical")) == 10
+    assert Enum.count(report["guards"], &(&1["comparison"] == "intentional_difference")) == 4
+    assert Enum.all?(report["guards"], &(is_binary(&1["rationale"]) and &1["rationale"] != ""))
+
+    assert Enum.map(report["guards"], & &1["guard"]) == [
+             "launch",
+             "predispatch_reservation",
+             "model_identity",
+             "route_identity",
+             "request_seed",
+             "token_limits",
+             "cost",
+             "finish_content_envelope",
+             "task_parser",
+             "optimizer_parser",
+             "retry_fallback",
+             "call_ceiling",
+             "heldout_barrier",
+             "stop_persistence"
+           ]
+  end
+
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do
     manifest = Contract.load!(@manifest)
 
