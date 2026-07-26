@@ -140,3 +140,15 @@ This is a valid neutral held-out result, not useful learned behavior.
 New executions fail before preflight if their output directory is non-empty,
 bind the exact runner and contract digests, and derive the fresh-process arm
 only from the persisted selection stage.
+
+The current prospective ordinary-usefulness condition is
+`model-generated-banking77-json-two-padded-epochs-v1`. It keeps the corrected
+adapter, inference-mode generation, model revision, 16/8/40 rows, seed, prompt,
+four completions per semantic group, exact-route reward, TRL defaults, and
+validation/untouched metrics from the neutral post-fix run. Its only research
+change is a ten-step budget at four source groups per step: two complete
+twenty-slot schedules under the pinned mmGRPO padding rule. Validation chooses
+the earliest trained checkpoint, then the stable outer comparison may still
+retain base. The condition is frozen before execution; neutral or negative
+behavior remains valid and will not trigger prompt, reward, normalization,
+model, or hyperparameter adjustment.

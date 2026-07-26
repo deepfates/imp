@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "purpose": "general ten-step local MPS LoRA GRPO backend for Imp-owned prompts and finite external rewards",
+  "python": "3.12",
+  "dependencies": {
+    "trl": "1.6.0",
+    "transformers": "4.57.6",
+    "peft": "0.18.1",
+    "torch": "2.10.0"
+  },
+  "model": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "license": "Apache-2.0",
+    "runtime_bytes": 999586347,
+    "files": [
+      {"path": "config.json", "size": 659},
+      {"path": "generation_config.json", "size": 242},
+      {"path": "merges.txt", "size": 1671839},
+      {
+        "path": "model.safetensors",
+        "size": 988097824,
+        "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+      },
+      {"path": "tokenizer.json", "size": 7031645},
+      {"path": "tokenizer_config.json", "size": 7305},
+      {"path": "vocab.json", "size": 2776833}
+    ]
+  },
+  "device": {
+    "type": "mps",
+    "dtype": "float32",
+    "allow_cpu_fallback": false,
+    "use_vllm": false
+  },
+  "optimizer": {
+    "seed": 20260725,
+    "num_generations": 4,
+    "max_steps": 10,
+    "max_completion_length": 16,
+    "temperature": 1.0,
+    "learning_rate": 0.00001,
+    "loss_type": "grpo",
+    "scale_rewards": "group",
+    "beta": 0.0,
+    "lora": {
+      "rank": 8,
+      "alpha": 16,
+      "dropout": 0.0,
+      "target_modules": ["q_proj", "v_proj"]
+    }
+  },
+  "acceptance": {
+    "require_non_uniform_rewards": false,
+    "require_non_uniform_advantages": false,
+    "require_weight_change": false
+  }
+}
