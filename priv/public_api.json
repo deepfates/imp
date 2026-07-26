@@ -4073,6 +4073,7 @@
       "struct_fields": [
         "acceptance_policy",
         "callbacks",
+        "candidate_selection_strategy",
         "combee",
         "component_feedback",
         "evaluation_policy",
@@ -4405,6 +4406,7 @@
         "bootstrap",
         "candidates",
         "metric",
+        "metric_identity",
         "num_candidates",
         "num_rules",
         "num_threads",
@@ -4558,6 +4560,7 @@
         "max_concurrency",
         "max_errors",
         "metric",
+        "metric_identity",
         "metric_threshold",
         "prompt_lm",
         "proposal_response_format",
@@ -4740,6 +4743,7 @@
         "max_labeled_demos",
         "max_rounds",
         "metric",
+        "metric_identity",
         "metric_threshold",
         "num_candidate_programs",
         "num_threads",
@@ -4841,6 +4845,7 @@
         "max_demos",
         "max_steps",
         "metric",
+        "metric_identity",
         "num_candidates",
         "prompt_lm",
         "sampling_temperature",
@@ -5025,6 +5030,7 @@
       "source": "lib/imp/optimizer.ex",
       "struct_fields": [
         "job",
+        "jobs",
         "metadata",
         "program",
         "status"

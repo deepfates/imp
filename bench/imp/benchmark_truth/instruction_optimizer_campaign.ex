@@ -282,13 +282,30 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
     opts =
       config
       |> keywordize()
-      |> Keyword.merge(seed: context.seed, prompt_lm: lm, max_concurrency: 1)
+      |> Keyword.merge(
+        seed: context.seed,
+        prompt_lm: lm,
+        max_concurrency: 1,
+        metric_identity: simba_metric_identity(context)
+      )
 
     SIMBA.new(metric, opts)
     |> SIMBA.compile(program, context.trainset, context.trainset,
       resume_state: resume,
       checkpoint_fn: checkpoint
     )
+  end
+
+  defp simba_metric_identity(context) do
+    %{
+      "id" => "imp.benchmark_truth.gepa_metrics",
+      "version" => 1,
+      "config" => %{
+        "family" => context.family,
+        "output_key" => context.spec["output_key"],
+        "upstream_metric" => context.spec["upstream_metric"]
+      }
+    }
   end
 
   defp evaluate_split(program, examples, metric, split, progress, persist, budget) do

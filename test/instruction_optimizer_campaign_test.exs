@@ -168,13 +168,13 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
       |> campaign_opts(dataset, static_lm(), arms: [:simba])
       |> InstructionOptimizerCampaign.run()
 
-    assert get_in(result.artifact, [
-             "results",
-             "simba",
-             "optimizer_report",
-             "metadata",
-             "final_evaluation_calls"
-           ]) == 1
+    metadata = get_in(result.artifact, ["results", "simba", "optimizer_report", "metadata"])
+
+    assert metadata["final_evaluation_calls"] == 1
+    assert metadata["metric_identity"]["kind"] == "declared"
+    assert metadata["metric_identity"]["id"] == "imp.benchmark_truth.gepa_metrics"
+    assert metadata["metric_identity"]["version"] == 1
+    assert metadata["metric_identity"]["config_sha256"] =~ "sha256:"
   end
 
   test "checkpoint tampering and dataset drift fail closed" do

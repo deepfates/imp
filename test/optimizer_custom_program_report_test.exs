@@ -113,7 +113,7 @@ defmodule Imp.OptimizerCustomProgramReportTest do
 
     fresh = TwoStageOptimizerProgram.new(lm)
     applied = Artifact.apply(artifact, fresh)
-    assert Report.fetch(applied) == nil
+    assert %Report{optimizer: :simba, best_score: 1.0} = Report.fetch(applied)
     assert {:ok, prediction} = Imp.call(applied, %{utterance: "unknown payment"})
     assert Imp.get(prediction, :route) == "R42"
   end
