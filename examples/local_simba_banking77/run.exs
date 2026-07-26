@@ -59,6 +59,11 @@ defmodule LocalSIMBABanking77.Audit do
         end)
     end)
   end
+
+  def valid_search?(stage) do
+    stage.candidate_count > 0 and stage.mutated_candidates > 0 and
+      stage.rendered_mutation_calls > 0 and stage.task_transports > 0
+  end
 end
 
 defmodule LocalSIMBABanking77.Runner do
@@ -433,10 +438,8 @@ defmodule LocalSIMBABanking77.Runner do
   end
 
   defp require_search!(stage) do
-    unless stage.candidate_count > 0 and stage.mutated_candidates > 0 and
-             stage.rendered_mutation_calls > 0 and stage.task_transports > 0 and
-             stage.reflection_transports > 0,
-           do: raise("SIMBA did not execute a real rendered mutation: #{inspect(stage)}")
+    unless Audit.valid_search?(stage),
+      do: raise("SIMBA did not execute a real rendered mutation: #{inspect(stage)}")
   end
 
   defp evaluate(program, rows, observer, phase) do

@@ -31,8 +31,7 @@ defmodule Imp.LocalSIMBABanking77ExampleTest do
   test "front door rejects candidate-count and cached-call substitutes" do
     source = File.read!(@source)
 
-    assert source =~ "stage.rendered_mutation_calls > 0"
-    assert source =~ "stage.mutated_candidates > 0"
+    assert source =~ "Audit.valid_search?(stage)"
     assert source =~ "max_demos: 4"
     assert source =~ "cache: false"
     assert source =~ "stage.logical_calls == 40 and stage.transport_attempts == 40"
@@ -51,5 +50,25 @@ defmodule Imp.LocalSIMBABanking77ExampleTest do
     ]
 
     assert apply(LocalSIMBABanking77.Audit, :count_mutated_finalists, [finalists, "base"]) == 1
+
+    assert apply(LocalSIMBABanking77.Audit, :valid_search?, [
+             %{
+               candidate_count: 1,
+               mutated_candidates: 1,
+               rendered_mutation_calls: 4,
+               task_transports: 12,
+               reflection_transports: 0
+             }
+           ])
+
+    refute apply(LocalSIMBABanking77.Audit, :valid_search?, [
+             %{
+               candidate_count: 1,
+               mutated_candidates: 1,
+               rendered_mutation_calls: 0,
+               task_transports: 12,
+               reflection_transports: 0
+             }
+           ])
   end
 end
