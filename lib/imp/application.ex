@@ -15,6 +15,8 @@ defmodule Imp.Application do
       {Task.Supervisor, name: Imp.UnlinkedTaskSupervisor},
       {Registry, keys: :unique, name: Imp.Clients.MLXLMDeployment.Registry},
       {DynamicSupervisor, name: Imp.Clients.MLXLMDeployment.Supervisor, strategy: :one_for_one},
+      {Registry, keys: :unique, name: Imp.Clients.TRLWorker.Registry},
+      {DynamicSupervisor, name: Imp.Clients.TRLWorker.Supervisor, strategy: :one_for_one},
       {DynamicSupervisor,
        name: Imp.Optimize.Anything.StateStoreSupervisor, strategy: :one_for_one}
     ]

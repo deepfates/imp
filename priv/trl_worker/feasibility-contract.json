@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "purpose": "one-update local MPS LoRA GRPO feasibility; not effectiveness or parity evidence",
+  "python": "3.12",
+  "dependencies": {
+    "trl": "1.6.0",
+    "transformers": "4.57.6",
+    "peft": "0.18.1",
+    "torch": "2.10.0"
+  },
+  "model": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "license": "Apache-2.0",
+    "runtime_bytes": 999586347,
+    "files": [
+      {"path": "config.json", "size": 659},
+      {"path": "generation_config.json", "size": 242},
+      {"path": "merges.txt", "size": 1671839},
+      {
+        "path": "model.safetensors",
+        "size": 988097824,
+        "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+      },
+      {"path": "tokenizer.json", "size": 7031645},
+      {"path": "tokenizer_config.json", "size": 7305},
+      {"path": "vocab.json", "size": 2776833}
+    ]
+  },
+  "device": {
+    "type": "mps",
+    "dtype": "float32",
+    "allow_cpu_fallback": false,
+    "use_vllm": false
+  },
+  "optimizer": {
+    "seed": 20260725,
+    "num_generations": 4,
+    "max_steps": 1,
+    "max_completion_length": 16,
+    "temperature": 1.0,
+    "learning_rate": 0.00001,
+    "loss_type": "grpo",
+    "scale_rewards": "group",
+    "beta": 0.0,
+    "lora": {
+      "rank": 8,
+      "alpha": 16,
+      "dropout": 0.0,
+      "target_modules": ["q_proj", "v_proj"]
+    }
+  },
+  "semantic_group": {
+    "dataset": "PolyAI/banking77",
+    "dataset_revision": "90d4e2ee5521c04fc1488f065b8b083658768c57",
+    "dataset_license": "CC-BY-4.0",
+    "row_id": "banking77-train-2511",
+    "row_sha256": "sha256:dd5e7f7ca000bf4c92c81fe93b2b4fb3d05a52989a5cb8f2ab643f25f8242b91",
+    "utterance": "There was a fee charged when I paid with my card.",
+    "expected_route": "R17",
+    "allowed_routes": ["R17", "R42", "R68", "R93"]
+  }
+}
