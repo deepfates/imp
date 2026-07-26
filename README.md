@@ -68,6 +68,13 @@ different local model runtimes, evaluates a GEPA proposal using train/selection
 only, applies the selected named parameters, and reproduces the untouched result
 after restarting the exact trained artifact in a fresh OS BEAM.
 
+For local weight optimization, the
+[Banking77 GRPO example](examples/local_grpo_banking77/README.md) runs ordinary
+model-generated Qwen rollouts through Imp's public GRPO API, an official pinned
+TRL LoRA update on MPS, train/selection/untouched-test separation, exact
+artifact verification, and selected-program reproduction in a fresh OS BEAM.
+Its retained run is an honest no-signal result rather than a claimed win.
+
 ## Because the program is a value, the rest is ordinary engineering
 
 Each stage below is one stop on the [Learning Path](docs/LEARNING_PATH.md),

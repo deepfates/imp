@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "scope": "one task/model one-update ordinary model-generated local GRPO result",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "dataset_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+  "train_selection_test_counts": [16, 8, 40],
+  "selected_train_row_id": "banking77-train-3483",
+  "rollout_source": "model_generated",
+  "rewards": [-1.0, -1.0, -1.0, -1.0],
+  "advantages": [0.0, 0.0, 0.0, 0.0],
+  "training_loss": 0.0,
+  "trainable_tensors_changed": false,
+  "selected_arm": "base",
+  "base_selection": {"accuracy": 0.0, "macro_f1": 0.0, "errors": 8},
+  "trained_selection": {"accuracy": 0.0, "macro_f1": 0.0, "errors": 8},
+  "base_test": {"accuracy": 0.025, "macro_f1": 0.045454545454545456, "errors": 39},
+  "trained_test": {"accuracy": 0.025, "macro_f1": 0.045454545454545456, "errors": 39},
+  "artifact_sha256": "sha256:fe7baf50356d1a9b2fa3d1a81fefcb6113bffe34d27bc451409e088faaab9272",
+  "fresh_selected_arm": "base",
+  "fresh_byte_identical": true,
+  "full_result_sha256": "7cb56006d2f438384e4122952892febf72ad239bba35b498a051aa9268736899",
+  "exclusions": [
+    "GRPO effectiveness",
+    "ordinary model-generated weight change",
+    "multi-group or multi-step training",
+    "mmGRPO parity",
+    "production reliability",
+    "BEAM superiority"
+  ]
+}
