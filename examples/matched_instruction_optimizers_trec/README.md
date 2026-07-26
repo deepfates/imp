@@ -19,9 +19,9 @@ messages, models, splits, budgets, or parsing after results.
 
 ## Current boundary
 
-Launch is deliberately refused while the integrated pinned GEPA execution and
-fail-closed runtime preflight receive independent review. The safe predispatch ceilings are
-currently 6,840 task calls plus 102 optimizer calls across both runtimes. Their
+The exact treatment is sealed after the integrated pinned GEPA execution,
+MIPRO information-flow, dependency, route, and fail-closed preflights passed.
+The safe predispatch ceilings are 6,840 task calls plus 102 optimizer calls across both runtimes. Their
 conservative reservation is $38.43072. The aggregate workshop spend must be
 confirmed immediately before launch against the owner's $50 ceiling.
 
@@ -68,8 +68,7 @@ uv pip sync --python tmp/dspy-parity-venv/bin/python \
   benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock
 ```
 
-When the outstanding audit closes, changing `launch_status` to `sealed` must be
-a reviewed source-bound change. The Imp and upstream runners must then start
+The Imp and upstream runners must start
 concurrently so their selection barrier can complete. The shared aggregator
 recomputes all row metrics, performs source-ID-clustered paired bootstrap across
 the three seeds, applies Holm correction to the two Imp improvement tests, and

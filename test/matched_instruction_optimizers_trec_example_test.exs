@@ -57,8 +57,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert manifest["models"]["optimizer"]["logical"] == "anthropic/claude-sonnet-4.6"
     assert get_in(manifest, ["execution", "request", "task", "seed"]) == "experiment_seed"
 
-    assert manifest["launch_status"] ==
-             "blocked_pending_gepa_execution_and_fail_closed_preflight"
+    assert manifest["launch_status"] == "sealed"
 
     assert get_in(manifest, ["runtime_dependencies", "upstream", "packages", "optuna"]) ==
              "4.9.0"
