@@ -96,6 +96,14 @@ same real fused task model, evaluates a genuine demonstration mutation, rejects
 its minibatch overfit on separate validation, and reapplies the selected
 parameter artifact in a fresh OS BEAM.
 
+GEPA, MIPROv2, and SIMBA share one deployment handoff. After validation selects
+a program, `Imp.Optimizer.Artifact.from_optimized_program/2` captures only its
+named signatures, demonstrations, configs, and optimizer report. A restarted
+application reconstructs its trusted program and live model clients, then uses
+`Imp.Optimizer.Artifact.read!/1` and `apply/4` to install those selected
+parameters. The [Learning Path](docs/LEARNING_PATH.md#8-persist-programs-or-selected-parameters-not-secrets)
+shows the complete shape without benchmark or training infrastructure.
+
 For natural rule induction, the
 [Banking77 InferRules example](examples/local_infer_rules_banking77/README.md)
 uses a separate local rule model, evaluates the original source, bootstrapped
@@ -166,7 +174,7 @@ a worked example for every row.
 | **Measure** | `evaluate` (score plus every row), `exact_match`, `extractive_qa`, `classification`, `classification_report`, `majority` voting |
 | **Improve** | `optimize`, `train` (weights are deliberately separate), `with_demos`, `with_playbook`, `with_lm`, `optimizer_capabilities`; optimizers: `LabeledFewShot`, `BootstrapFewShot`, `RandomSearch`, `KNNFewShot`, `COPRO`, `SIMBA`, `MIPROv2`, `GEPA`, `InferRules`, `SignatureOptimizer`, `Ensemble`, `BetterTogether`, `BootstrapFinetune` (including local MLX SFT), `TrainingJobAdoption` (verified completed-artifact adoption, never training), `GRPO` (an explicit reinforcement trainer is required; bundled local TRL/MPS is available), and Optimize-Anything for text plus JSON-safe structured artifacts |
 | **Extend** | program shapes: `predict`, `chain_of_thought`, `react` and `react_v2`, `avatar`, `code_act`, `program_of_thought`, `rlm` with `rlm_serializable` handles; composition: `best_of_n`, `refine`, `assert` / `assertion`, `multi_chain_comparison`, `parallel`; tools and context: `tool`, `Imp.MCP.import_tools`, `memory`, `retrieve`, `rag`, `knn` / `nearest`, `Imp.Datasets` loaders, `Imp.Embeddings` |
-| **Operate** | `save!` / `load!` (checksummed artifacts) and `dump` / `load` (state as data), `trace`, `inspect_history`, `subscribe_optimizer_progress`, `enable_logging` / `disable_logging` |
+| **Operate** | `save!` / `load!` (portable programs), `Imp.Optimizer.Artifact` write/read/apply (selected parameters for reconstructed trusted programs), `dump` / `load` (state as data), `trace`, `inspect_history`, `subscribe_optimizer_progress`, `enable_logging` / `disable_logging` |
 
 You will use one or two rows at first; the rest are there when a task
 earns them.

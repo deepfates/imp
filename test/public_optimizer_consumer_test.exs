@@ -97,7 +97,10 @@ defmodule Imp.PublicOptimizerConsumerTest do
     ]
   end
 
-  test "advertised instruction optimizers compile and remain callable through public Imp APIs" do
+  @tag :tmp_dir
+  test "advertised instruction optimizers compile and remain callable through public Imp APIs", %{
+    tmp_dir: tmp_dir
+  } do
     trainset = rows("train")
     selection_set = rows("selection")
     testset = rows("test")
@@ -117,6 +120,26 @@ defmodule Imp.PublicOptimizerConsumerTest do
 
       assert Imp.evaluate(compiled, testset, metric()).score == 1.0,
              "#{family} did not remain executable on distinct test rows"
+
+      if family in [:mipro_v2, :simba, :gepa] do
+        artifact_path = Path.join(tmp_dir, "#{family}.json")
+
+        compiled
+        |> Imp.Optimizer.Artifact.from_optimized_program(artifact_id: "public-#{family}-selected")
+        |> Imp.Optimizer.Artifact.write!(artifact_path)
+
+        deployed =
+          artifact_path
+          |> Imp.Optimizer.Artifact.read!()
+          |> Imp.Optimizer.Artifact.apply(program())
+
+        assert %Imp.Optimizer.Report{optimizer: ^family} =
+                 Imp.Optimizer.Report.fetch(deployed)
+
+        assert {:ok, prediction} = Imp.call(deployed, %{question: "fresh consumer call"})
+        assert Imp.get(prediction, :answer) == "yes"
+        assert Imp.evaluate(deployed, testset, metric()).score == 1.0
+      end
     end
   end
 end

@@ -368,6 +368,28 @@ defmodule DocumentationContractTest do
     assert parity =~ "GEPA-style optimizer rows"
   end
 
+  test "cold learning path distinguishes portable programs from selected parameter artifacts" do
+    readme = File.read!("README.md")
+    learning = File.read!("docs/LEARNING_PATH.md")
+
+    assert readme =~ "GEPA, MIPROv2, and SIMBA share one deployment handoff"
+    assert readme =~ "Imp.Optimizer.Artifact.from_optimized_program/2"
+    assert readme =~ "Imp.Optimizer.Artifact.read!/1"
+
+    assert learning =~ "## 8. Persist Programs Or Selected Parameters, Not Secrets"
+    assert learning =~ "There are two restart paths."
+    assert learning =~ "Imp.Optimizer.Artifact.from_optimized_program(selected"
+    assert learning =~ "Imp.Optimizer.Artifact.write!(artifact"
+    assert learning =~ "Imp.Optimizer.Artifact.read!()"
+    assert learning =~ "Imp.Optimizer.Artifact.apply(fresh_router)"
+    assert learning =~ "%Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(deployed)"
+    assert learning =~ "Imp.Optimizer.GEPA.compile_with_artifact/5"
+    assert learning =~ "It does not carry your module,\nLMs, adapters, callbacks, credentials"
+
+    assert learning =~
+             "Artifact\nreproduction proves deployment behavior, not held-out improvement"
+  end
+
   test "instruction optimizer docs define durable run-level resume boundaries" do
     ops = File.read!("docs/OPERATIONS_REFERENCE.md")
     fidelity = File.read!("docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md")

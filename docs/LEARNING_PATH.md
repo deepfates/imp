@@ -233,13 +233,14 @@ synonym for retrieval. [Livebook 04](../livebooks/04_tools_agents_mcp_rlm.livemd
 runs it live; set budgets before exposing production data and read the
 redacted trace before raising them.
 
-## 8. Persist Programs, Not Secrets
+## 8. Persist Programs Or Selected Parameters, Not Secrets
 
-A program — including one an optimizer compiled — is a value. `Imp.save!/2`
-and `Imp.load!/1` round-trip it through a checksummed JSON artifact.
-Credentials are never persisted: rebind the live model at load time with
-`Imp.with_lm/2` or a scoped `Imp.context/2`. Saving a program pinned to a
-non-portable runtime LM fails loudly instead of silently dropping the pin.
+There are two restart paths. A portable program — including one a few-shot
+optimizer compiled — round-trips through `Imp.save!/2` and `Imp.load!/1` as a
+checksummed JSON artifact. Credentials are never persisted: rebind the live
+model at load time with `Imp.with_lm/2` or a scoped `Imp.context/2`. Saving a
+program pinned to a non-portable runtime LM fails loudly instead of silently
+dropping the pin.
 
 ```elixir
 lm = %{
@@ -266,8 +267,49 @@ end
 #=> "security"
 ```
 
-Treat the artifact as deployable program state: review and version it
-alongside the metric and evaluation data that justified promoting it.
+GEPA, MIPROv2, and SIMBA also support consumer-defined program graphs and live
+runtime clients that should not be serialized. For those programs, persist only
+the parameters selected on validation:
+
+```elixir
+# `selected` is the program returned by Imp.optimize!/4 with GEPA, MIPROv2,
+# or SIMBA after separate train and validation evaluation.
+artifact =
+  Imp.Optimizer.Artifact.from_optimized_program(selected,
+    artifact_id: "ticket-router-v1"
+  )
+
+:ok = Imp.Optimizer.Artifact.write!(artifact, "ticket-router-parameters.json")
+
+# In a restarted application, rebuild trusted code and runtime clients first.
+fresh_router = MyApp.TicketRouter.new(runtime_lm)
+
+deployed =
+  "ticket-router-parameters.json"
+  |> Imp.Optimizer.Artifact.read!()
+  |> Imp.Optimizer.Artifact.apply(fresh_router)
+
+%Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(deployed)
+```
+
+The parameter artifact carries named predictor signatures, demonstrations,
+configs, and the canonical optimizer report. It does not carry your module,
+LMs, adapters, callbacks, credentials, or arbitrary runtime state. Applying it
+requires the fresh program to expose the same compatible named predictors; a
+mismatch fails instead of partially installing state. GEPA can produce the
+selected program, report, and artifact together with
+`Imp.Optimizer.GEPA.compile_with_artifact/5`; MIPROv2 and SIMBA use the shared
+`from_optimized_program/2` path above. The [API Guide](API_GUIDE.md#optimize-a-program)
+shows both forms, while the local
+[GEPA](../examples/local_gepa_banking77/README.md),
+[MIPROv2](../examples/local_mipro_banking77/README.md), and
+[SIMBA](../examples/local_simba_banking77/README.md) programs exercise the
+save/apply/restart lifecycle with real model runtimes.
+
+Treat either artifact as deployable program state: review and version it
+alongside the metric and evaluation data that justified promoting it. Artifact
+reproduction proves deployment behavior, not held-out improvement; measure the
+selected program on data unavailable to optimization before making that claim.
 
 ## 9. Inspect Runtime Behavior
 
