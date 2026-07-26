@@ -77,6 +77,7 @@ defmodule LocalCOPROBanking77.Runner do
   alias LocalCOPROBanking77.{Atomic, ObservedLM, Observer}
 
   @routes ["R17", "R42", "R68", "R93"]
+  @treatment_id "local-copro-banking77-structured-v1"
   @data_sha256 "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18"
   @ollama_model "llama3.2:3b"
   @ollama_digest "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
@@ -99,7 +100,8 @@ defmodule LocalCOPROBanking77.Runner do
           depth: 1,
           init_temperature: 0,
           proposer_lm: proposer,
-          proposal_max_concurrency: 1
+          proposal_max_concurrency: 1,
+          proposal_response_format: :required
         )
         |> COPRO.compile(baseline, examples(rows.train), [],
           num_threads: 1,
@@ -139,6 +141,7 @@ defmodule LocalCOPROBanking77.Runner do
 
       result = %{
         status: "complete",
+        treatment_id: @treatment_id,
         split_sizes: %{train_and_selection: 16, optimizer_heldout_test: 40},
         selection_dataset: "trainset",
         task_artifact: job.result_model,
@@ -216,6 +219,7 @@ defmodule LocalCOPROBanking77.Runner do
 
     Atomic.write!(Path.join(paths.output, "00-preflight.json"), %{
       status: "complete",
+      treatment_id: @treatment_id,
       data_sha256: @data_sha256,
       train_ids: Enum.map(rows.train, & &1["id"]),
       test_ids: Enum.map(rows.test, & &1["id"]),

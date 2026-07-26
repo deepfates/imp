@@ -55,3 +55,14 @@ on the pinned trainset and source order retained baseline. Because no task
 instruction changed, the consumer again stopped before held-out rows rather
 than presenting inert metadata churn as prompt optimization. No third model
 pass was made.
+
+The current separately named condition is
+`local-copro-banking77-structured-v1`. It uses COPRO's public
+`proposal_response_format: :required` option, which sends the exact one-item
+instruction/prefix schema and validates it before task evaluation. This is a
+source-correct proposal transport contract, not extraction or normalization of
+either stopped response. It keeps the same retained fused task artifact,
+`llama3.2:3b` proposer and digest, sixteen training rows, forty held-out rows,
+metric, breadth, depth, temperature, call budget, and one-attempt settings. A
+duplicate, neutral, or worse candidate remains a valid negative result and
+cannot be replaced or retried.
