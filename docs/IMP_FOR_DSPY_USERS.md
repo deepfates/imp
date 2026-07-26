@@ -28,7 +28,7 @@ conformance table below shows which is which, per surface.
 | `LabeledFewShot`, `BootstrapFewShot`, `BootstrapRS` | Same names, `Imp.Optimizer.*` |
 | `KNNFewShot` | Same name, same semantics: per-call embedding retrieval (required `vectorizer:`) plus a metric/teacher-driven BootstrapFewShot over the neighbors, proven against real DSPy by a deterministic-embedder differential |
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
-| `BootstrapFinetune`, `GRPO`, `Ensemble`, `BetterTogether`, `Avatar` | Same names; local MLX SFT belongs to `BootstrapFinetune`, while `GRPO` still requires an external reinforcement trainer |
+| `BootstrapFinetune`, `GRPO`, `Ensemble`, `BetterTogether`, `Avatar` | Same names; local MLX SFT belongs to `BootstrapFinetune`, while `GRPO` requires an explicit reinforcement trainer and can use Imp's bundled local TRL/MPS backend |
 | `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
 | `dspy.configure(lm=...)` | `Imp.configure(lm: ...)` sets a supervised node-local default; explicit `lm:` per program is the recommended style |
 | `dspy.context(lm=...)` | `Imp.context([lm: ...], fn -> ... end)` — process-scoped |
