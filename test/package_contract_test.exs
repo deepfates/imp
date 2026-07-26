@@ -493,6 +493,120 @@ defmodule PackageContractTest do
       raise "saved and loaded program did not remain executable"
     end
 
+    defmodule ImpConsumer.NativeArtifactStrategy do
+      @behaviour Imp.Optimize.Anything.StructuredStrategy
+
+      @impl true
+      def propose(candidate, dataset, components, config) do
+        unless is_boolean(candidate["enabled"]) and is_integer(candidate["retries"]) and
+                 is_map(candidate["policy"]) and is_list(candidate["policy"]["weights"]) and
+                 is_map(dataset) and Enum.sort(components) == ["enabled", "policy", "retries"] do
+          raise "packaged strategy did not receive the native structured artifact"
+        end
+
+        {:ok, config["target"], %{"source" => "cold-consumer"}}
+      end
+    end
+
+    defmodule ImpConsumer.MalformedArtifactStrategy do
+      @behaviour Imp.Optimize.Anything.StructuredStrategy
+
+      @impl true
+      def propose(candidate, _dataset, _components, _config),
+        do: Map.delete(candidate, "retries")
+    end
+
+    seed_artifact = %{
+      "enabled" => false,
+      "policy" => %{"route" => "slow", "weights" => [1.0, 0.0]},
+      "retries" => 1
+    }
+
+    selected_artifact = %{
+      "enabled" => true,
+      "policy" => %{"route" => "fast", "weights" => [0.25, 0.75]},
+      "retries" => 3
+    }
+
+    strategy =
+      Imp.Optimize.Anything.StructuredStrategy.new(
+        ImpConsumer.NativeArtifactStrategy,
+        id: "package-routing/v1",
+        config: %{"target" => selected_artifact}
+      )
+
+    {:ok, oa_calls} = Agent.start_link(fn -> 0 end)
+
+    artifact_evaluator = fn artifact, _example ->
+      Agent.update(oa_calls, &(&1 + 1))
+      matches = Enum.count(selected_artifact, fn {key, value} -> artifact[key] == value end)
+      matches / map_size(selected_artifact)
+    end
+
+    oa_config = [
+      engine: [max_candidate_proposals: 1, seed: 29],
+      reflection: [module_selector: :all, structured_strategy: strategy]
+    ]
+
+    oa_result =
+      Imp.Optimize.Anything.run(seed_artifact, artifact_evaluator,
+        dataset: [%{"split" => "train"}],
+        valset: [%{"split" => "selection"}],
+        config: oa_config
+      )
+
+    unless seed_artifact["enabled"] == false and
+             Imp.Optimize.Anything.best_candidate(oa_result) == selected_artifact do
+      raise "packaged structured strategy did not select an immutable native artifact"
+    end
+
+    applied = Imp.Optimize.Anything.best_candidate(oa_result)
+
+    unless applied["enabled"] and applied["retries"] == 3 and
+             applied["policy"]["route"] == "fast" do
+      raise "selected native artifact was not directly applicable by the consumer"
+    end
+
+    persisted_selected = applied |> Jason.encode!() |> Jason.decode!()
+    persisted_checkpoint = oa_result.checkpoint |> Jason.encode!() |> Jason.decode!()
+    calls_before_resume = Agent.get(oa_calls, & &1)
+
+    resumed =
+      Imp.Optimize.Anything.run(seed_artifact, artifact_evaluator,
+        dataset: [%{"split" => "train"}],
+        valset: [%{"split" => "selection"}],
+        config: oa_config,
+        resume_state: persisted_checkpoint
+      )
+
+    unless Imp.Optimize.Anything.best_candidate(resumed) == persisted_selected and
+             Agent.get(oa_calls, & &1) == calls_before_resume do
+      raise "packaged structured strategy did not resume exactly from saved state"
+    end
+
+    malformed =
+      Imp.Optimize.Anything.StructuredStrategy.new(
+        ImpConsumer.MalformedArtifactStrategy,
+        id: "package-malformed/v1"
+      )
+
+    rejected =
+      Imp.Optimize.Anything.run(seed_artifact, fn _artifact -> 0.0 end,
+        config: [
+          engine: [max_candidate_proposals: 1, raise_on_exception: false],
+          reflection: [module_selector: :all, structured_strategy: malformed]
+        ]
+      )
+
+    unless Imp.Optimize.Anything.best_candidate(rejected) == seed_artifact and
+             inspect(rejected.rejected) =~ "invalid_structured_strategy_candidate" do
+      raise "packaged structured proposal validation admitted a partial artifact"
+    end
+
+    # This deterministic package contract proves public construction,
+    # validation, selection, application, and resume—not artifact-strategy
+    # effectiveness on an untouched task.
+
     # Package lifecycle fixture only: these planted Static LMs prove that the
     # unpacked artifact can construct the named core optimizer families, attach
     # their reports where applicable, and execute the returned programs. The
