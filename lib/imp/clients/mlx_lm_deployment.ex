@@ -270,7 +270,7 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
              }}
 
           {:error, reason} ->
-            _ = Imp.ExternalCommand.stop(handle, 10_000)
+            reason = stop_with_readiness_capture(handle, reason)
             :ok = cleanup_cache(cache_root)
             {:error, reason}
         end
@@ -322,7 +322,7 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
   end
 
   defp create_cache_children(root) do
-    Enum.reduce_while(~w(huggingface transformers xdg datasets), :ok, fn child, :ok ->
+    Enum.reduce_while(~w(huggingface transformers datasets), :ok, fn child, :ok ->
       case File.mkdir(Path.join(root, child)) do
         :ok -> {:cont, :ok}
         {:error, reason} -> {:halt, {:error, reason}}
@@ -339,7 +339,6 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
       {"HUGGINGFACE_HUB_CACHE", Path.join(huggingface, "hub")},
       {"TRANSFORMERS_CACHE", Path.join(root, "transformers")},
       {"HF_DATASETS_CACHE", Path.join(root, "datasets")},
-      {"XDG_CACHE_HOME", Path.join(root, "xdg")},
       {"HF_HUB_OFFLINE", "1"},
       {"TRANSFORMERS_OFFLINE", "1"}
     ]
@@ -360,6 +359,22 @@ defmodule Imp.Clients.MLXLMDeployment.Worker do
     else
       {:error, {:mlx_lm_isolated_cache_cleanup_refused, root}}
     end
+  end
+
+  defp stop_with_readiness_capture(handle, {:mlx_lm_server_readiness_timeout, artifact_path}) do
+    case Imp.ExternalCommand.stop_with_capture(handle, 10_000) do
+      {:ok, capture} ->
+        {:mlx_lm_server_readiness_timeout, %{artifact_path: artifact_path, process: capture}}
+
+      {:error, stop_reason} ->
+        {:mlx_lm_server_readiness_timeout,
+         %{artifact_path: artifact_path, capture_error: stop_reason}}
+    end
+  end
+
+  defp stop_with_readiness_capture(handle, reason) do
+    _ = Imp.ExternalCommand.stop(handle, 10_000)
+    reason
   end
 
   defp await_exact_model(handle, config, port) do

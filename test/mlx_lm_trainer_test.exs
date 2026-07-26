@@ -433,16 +433,33 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     port = available_port()
     poisoned = Path.join(context.root, "poisoned-huggingface")
     cache_record = Path.join(context.root, "deployment-cache-root.txt")
+    env_record = Path.join(context.root, "deployment-cache-env.json")
+    uv_cache = Path.join(context.root, "verified-uv-cache")
+    xdg_cache = Path.join(context.root, "ambient-xdg-cache")
     File.mkdir_p!(poisoned)
+    File.mkdir_p!(uv_cache)
+    File.mkdir_p!(xdg_cache)
     File.write!(Path.join(poisoned, "poisoned-model-id"), "jxm/gpt-oss-20b-base\n", [:sync])
 
     previous_hf_home = System.get_env("HF_HOME")
+    previous_uv_cache = System.get_env("UV_CACHE_DIR")
+    previous_xdg_cache = System.get_env("XDG_CACHE_HOME")
     System.put_env("HF_HOME", poisoned)
+    System.put_env("UV_CACHE_DIR", uv_cache)
+    System.put_env("XDG_CACHE_HOME", xdg_cache)
 
     on_exit(fn ->
       if previous_hf_home,
         do: System.put_env("HF_HOME", previous_hf_home),
         else: System.delete_env("HF_HOME")
+
+      if previous_uv_cache,
+        do: System.put_env("UV_CACHE_DIR", previous_uv_cache),
+        else: System.delete_env("UV_CACHE_DIR")
+
+      if previous_xdg_cache,
+        do: System.put_env("XDG_CACHE_HOME", previous_xdg_cache),
+        else: System.delete_env("XDG_CACHE_HOME")
     end)
 
     trainer =
@@ -455,7 +472,9 @@ defmodule Imp.Clients.MLXLMTrainerTest do
           "--advertise-ambient-cache-model",
           "jxm/gpt-oss-20b-base",
           "--record-cache-root",
-          cache_record
+          cache_record,
+          "--record-cache-env",
+          env_record
         ],
         server_port: port,
         server_startup_timeout: 5_000
@@ -469,6 +488,14 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert File.dir?(isolated_cache)
     refute File.exists?(Path.join(isolated_cache, "poisoned-model-id"))
 
+    cache_env = Jason.decode!(File.read!(env_record))
+    assert cache_env["HF_HOME"] == isolated_cache
+    assert cache_env["HUGGINGFACE_HUB_CACHE"] == Path.join(isolated_cache, "hub")
+    assert cache_env["TRANSFORMERS_CACHE"] != poisoned
+    assert cache_env["HF_DATASETS_CACHE"] != poisoned
+    assert cache_env["UV_CACHE_DIR"] == uv_cache
+    assert cache_env["XDG_CACHE_HOME"] == xdg_cache
+
     assert {:ok, %{body: %{"data" => [%{"id" => advertised}]}}} =
              Req.get(deployment.base_url <> "/models", retry: false)
 
@@ -477,6 +504,42 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     assert :ok = Imp.Clients.MLXLMDeployment.stop(job)
     refute File.exists?(isolated_cache)
+    assert_port_available!(port)
+  end
+
+  test "deployment readiness timeout retains bounded server output and cleans up", context do
+    File.write!(Path.join(context.model_path, "behavior.txt"), "base-behavior\n", [:sync])
+    port = available_port()
+    cache_record = Path.join(context.root, "timeout-deployment-cache-root.txt")
+
+    trainer =
+      context
+      |> trainer(&successful_runner/3)
+      |> Map.merge(%{
+        server_executable: System.find_executable("python3"),
+        server_executable_args: [
+          Path.expand("support/fake_mlx_server.py", __DIR__),
+          "--never-ready",
+          "--record-cache-root",
+          cache_record
+        ],
+        server_port: port,
+        server_startup_timeout: 100,
+        max_output_bytes: 128
+      })
+
+    assert {:ok, job} = train(trainer)
+
+    assert {:error,
+            {:mlx_lm_deployment_start_failed,
+             {:mlx_lm_server_readiness_timeout, %{artifact_path: artifact_path, process: process}}}} =
+             Imp.Clients.MLXLMDeployment.start(job)
+
+    assert artifact_path == Path.expand(job.result_model)
+    assert process.exit_status == :stopped
+    assert process.output =~ "intentionally withheld readiness"
+    assert byte_size(process.output) <= 128
+    refute File.exists?(File.read!(cache_record))
     assert_port_available!(port)
   end
 

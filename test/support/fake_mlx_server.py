@@ -14,12 +14,35 @@ parser.add_argument("--max-tokens")
 parser.add_argument("--advertise-model")
 parser.add_argument("--advertise-ambient-cache-model")
 parser.add_argument("--record-cache-root")
+parser.add_argument("--record-cache-env")
+parser.add_argument("--never-ready", action="store_true")
 args = parser.parse_args()
 
 model = str(Path(args.model).resolve())
 cache_root = os.environ.get("HF_HOME", "")
 if args.record_cache_root:
     Path(args.record_cache_root).write_text(cache_root, encoding="utf-8")
+if args.record_cache_env:
+    Path(args.record_cache_env).write_text(
+        json.dumps(
+            {
+                key: os.environ.get(key)
+                for key in [
+                    "HF_HOME",
+                    "HF_HUB_CACHE",
+                    "HUGGINGFACE_HUB_CACHE",
+                    "TRANSFORMERS_CACHE",
+                    "HF_DATASETS_CACHE",
+                    "UV_CACHE_DIR",
+                    "XDG_CACHE_HOME",
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+if args.never_ready:
+    print("fake mlx server intentionally withheld readiness", flush=True)
 
 ambient_marker = Path(cache_root) / "poisoned-model-id" if cache_root else None
 ambient_model = None
@@ -47,6 +70,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/v1/models":
+            if args.never_ready:
+                self._json(503, {"error": "not ready"})
+                return
             self._json(
                 200,
                 {

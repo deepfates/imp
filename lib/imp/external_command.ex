@@ -79,6 +79,34 @@ defmodule Imp.ExternalCommand.Lifecycle do
     end
   end
 
+  @spec stop_with_capture(Imp.ExternalCommand.Handle.t(), timeout()) ::
+          {:ok, Capture.t()} | {:error, term()}
+  def stop_with_capture(%Imp.ExternalCommand.Handle{} = handle, timeout \\ 10_000) do
+    if Process.alive?(handle.owner) do
+      stop_ref = make_ref()
+      monitor_ref = Process.monitor(handle.owner)
+      send(handle.owner, {:stop_with_capture, self(), stop_ref})
+
+      receive do
+        {^stop_ref, {:stopped, %Capture{} = capture}} ->
+          receive do
+            {:DOWN, ^monitor_ref, :process, _, _} -> {:ok, capture}
+          after
+            timeout -> {:error, :command_stop_timeout}
+          end
+
+        {:DOWN, ^monitor_ref, :process, _, _} ->
+          {:error, :command_owner_exited_before_capture}
+      after
+        timeout ->
+          Process.demonitor(monitor_ref, [:flush])
+          {:error, :command_stop_timeout}
+      end
+    else
+      {:error, :command_owner_not_running}
+    end
+  end
+
   @doc """
   Tears down a raw port's OS process group with the shared TERM -> grace -> KILL
   escalation, then closes the port.
@@ -227,6 +255,14 @@ defmodule Imp.ExternalCommand.Lifecycle do
         Process.demonitor(caller_ref, [:flush])
         _capture = terminate_group(port, os_pid, capture, config.kill_grace_ms, false)
         send(reply_to, {stop_ref, :stopped})
+        :ok
+
+      {:stop_with_capture, reply_to, stop_ref} ->
+        cancel_timer(timer)
+        Process.demonitor(caller_ref, [:flush])
+        capture = terminate_group(port, os_pid, capture, config.kill_grace_ms, false)
+        capture = captured_output(capture, config.secrets, started_at)
+        send(reply_to, {stop_ref, {:stopped, capture}})
         :ok
 
       {:DOWN, ^caller_ref, :process, ^caller, _reason} ->
@@ -595,6 +631,16 @@ defmodule Imp.ExternalCommand do
   @spec stop(Imp.ExternalCommand.Handle.t(), timeout()) :: :ok | {:error, term()}
   def stop(%Imp.ExternalCommand.Handle{} = handle, timeout \\ 10_000),
     do: Lifecycle.stop(handle, timeout)
+
+  @doc false
+  @spec stop_with_capture(Imp.ExternalCommand.Handle.t(), timeout()) ::
+          {:ok, result()} | {:error, term()}
+  def stop_with_capture(%Imp.ExternalCommand.Handle{} = handle, timeout \\ 10_000) do
+    case Lifecycle.stop_with_capture(handle, timeout) do
+      {:ok, %Capture{} = capture} -> {:ok, normalize(capture, :stopped)}
+      {:error, _reason} = error -> error
+    end
+  end
 
   @spec run(String.t(), [String.t()], keyword()) :: {:ok, result()} | {:error, term()}
   def run(executable, argv, opts \\ []) do

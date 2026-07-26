@@ -100,6 +100,24 @@ defmodule Imp.ExternalCommandTest do
     refute process_alive?(child_pid)
   end
 
+  test "managed stop can retain the bounded process capture" do
+    assert {:ok, handle} =
+             Imp.ExternalCommand.start(
+               "python3",
+               ["-c", "import time; print('readiness detail', flush=True); time.sleep(30)"],
+               timeout: :infinity,
+               max_output_bytes: 64
+             )
+
+    Process.sleep(50)
+
+    assert {:ok, %{exit_status: :stopped, output: output}} =
+             Imp.ExternalCommand.stop_with_capture(handle, 2_000)
+
+    assert output =~ "readiness detail"
+    assert byte_size(output) <= 64
+  end
+
   @tag timeout: 5_000
   test "normal leader exit cleans descendants before run returns" do
     root = Path.join(System.tmp_dir!(), "imp-exit-command-#{System.unique_integer([:positive])}")
