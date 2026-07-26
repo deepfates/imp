@@ -102,6 +102,38 @@ defmodule OptimizerReportTest do
     assert File.read!(receipt) == "augmented=true"
   end
 
+  test "Optimize Anything side-info envelope loads before the adapter module" do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-report-oa-side-info-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(root)
+    path = Path.join(root, "result-fragment.json")
+    receipt = Path.join(root, "receipt")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    encoded = Imp.Optimizer.Report.encode_term(%{side_info: %{"feedback" => "bounded"}})
+    File.write!(path, Jason.encode!(encoded))
+
+    code = """
+    decoded = #{inspect(path)} |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.decode_term()
+    [{key, value}] = Map.to_list(decoded)
+    File.write!(#{inspect(receipt)}, Atom.to_string(key) <> "=" <> value["feedback"])
+    """
+
+    {output, 0} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert output == ""
+    assert File.read!(receipt) == "side_info=bounded"
+  end
+
   defmodule ErrorOptimizer do
     defstruct []
 
