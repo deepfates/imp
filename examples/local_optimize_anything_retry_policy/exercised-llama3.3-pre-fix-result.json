@@ -1,0 +1,28 @@
+{
+  "scope": "one local mixed-type Optimize Anything retry-policy lifecycle",
+  "status": "complete",
+  "selected": "baseline",
+  "model": "llama3.3:latest",
+  "treatment_id": "local-oa-retry-policy-llama3.3-v1",
+  "proposal_calls": 2,
+  "split_sizes": {
+    "train": 8,
+    "selection": 6,
+    "untouched_test": 6
+  },
+  "untouched_test": {
+    "selected": {
+      "exact": 4,
+      "score": 0.7005874265716785
+    },
+    "baseline": {
+      "exact": 4,
+      "score": 0.7005874265716785
+    }
+  },
+  "model_digest": "a6eb4748fd2990ad2952b2335a95a7f952d1a06119a0aa6a2df6cd052a93a3fa",
+  "baseline_selection_score": 0.5636503770362039,
+  "selected_selection_score": 0.5636503770362039,
+  "fresh_byte_identical": true,
+  "claim_boundary": "One task/model mixed-type optimization and fresh artifact lifecycle; not general Optimize Anything effectiveness, schema-v2 evidence, parity, or BEAM superiority."
+}

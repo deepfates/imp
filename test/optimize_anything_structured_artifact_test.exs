@@ -139,6 +139,31 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
     end)
   end
 
+  test "unchanged structured components carry forward when another component mutates" do
+    seed = %{cap_ms: 8_000, honor_hint: false}
+    target = %{cap_ms: 8_000, honor_hint: true}
+
+    result =
+      Anything.run(
+        seed,
+        fn artifact, _example -> if artifact == target, do: 1.0, else: 0.0 end,
+        dataset: [:train],
+        valset: [:selection],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1],
+            reflection: [module_selector: :all]
+          ),
+        fallback_proposer: fn _artifact, component, _records, _iteration ->
+          Map.fetch!(target, component)
+        end
+      )
+
+    assert result.candidates == [seed, target]
+    assert result.validation_scores == [0.0, 1.0]
+    assert Result.best_candidate(result) == target
+  end
+
   test "strict reflection decoding applies a complete typed JSON component" do
     seed = %{policy: %{route: "slow", retries: 1}}
     target = %{policy: %{route: "fast", retries: 3}}

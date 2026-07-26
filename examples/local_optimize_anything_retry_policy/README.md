@@ -43,8 +43,18 @@ selection at `0.56365`, untouched score `0.70059` with four of six exact cases,
 and byte-identical baseline artifact behavior in a fresh OS BEAM. It proves
 strict failure containment and durable consumption, but no mutation or lift.
 
-The current runner names a separate `local-oa-retry-policy-llama3.3-v1`
-condition. Before any task call, it selected the already-installed
+The first stronger-model condition, `local-oa-retry-policy-llama3.3-v1`, is
+preserved in `exercised-llama3.3-pre-fix-result.json`. It exposed a product
+defect after two valid scalar proposals: leaving the already-correct `cap_ms`
+component unchanged aborted the entire six-component artifact before the
+remaining fields could be proposed. The result therefore records baseline
+selection and untouched behavior, not a valid test of mutation usefulness.
+
+Imp now carries an unchanged component forward while other fields are proposed
+and rejects only a wholly identical structured artifact before evaluation.
+The current runner names the post-repair condition
+`local-oa-retry-policy-llama3.3-post-noop-fix-v1`. Before any task call, it
+selected the already-installed
 `llama3.3:latest` artifact with digest
 `a6eb4748fd2990ad2952b2335a95a7f952d1a06119a0aa6a2df6cd052a93a3fa`
 for its general instruction-following capacity. It preserves the exact seed,

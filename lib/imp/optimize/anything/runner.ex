@@ -98,6 +98,7 @@ defmodule Imp.Optimize.Anything.Runner do
         resume_state: resolved_resume_state,
         checkpoint_fn: checkpoint_callback(config, Keyword.get(opts, :checkpoint_fn))
       )
+      |> Keyword.put(:reject_identical_candidate, not is_nil(structured_codec))
       |> normalize_iteration_limit(opts)
 
     try do

@@ -106,7 +106,7 @@ defmodule Imp.Optimize.Anything.StructuredCandidate do
          {:ok, normalized} <- normalize(fetch_schema!(codec, component), decoded, [component]) do
       encoded = encode_component!(codec, component, normalized)
 
-      if encoded == current,
+      if encoded == current and map_size(codec.schema) == 1,
         do: {:error, {:no_op_structured_proposal, component}},
         else: {:ok, encoded}
     else
@@ -171,7 +171,9 @@ defmodule Imp.Optimize.Anything.StructuredCandidate do
   defp encode_proposed_value(codec, component, current, value) do
     case normalize(fetch_schema!(codec, component), value, [component]) do
       {:ok, ^current} ->
-        {:error, {:no_op_structured_proposal, component}}
+        if map_size(codec.schema) == 1,
+          do: {:error, {:no_op_structured_proposal, component}},
+          else: {:ok, encode_component!(codec, component, current)}
 
       {:ok, normalized} ->
         {:ok, encode_component!(codec, component, normalized)}

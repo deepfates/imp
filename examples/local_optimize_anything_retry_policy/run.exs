@@ -157,7 +157,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
 
   @model "llama3.3:latest"
   @digest "a6eb4748fd2990ad2952b2335a95a7f952d1a06119a0aa6a2df6cd052a93a3fa"
-  @treatment_id "local-oa-retry-policy-llama3.3-v1"
+  @treatment_id "local-oa-retry-policy-llama3.3-post-noop-fix-v1"
 
   def run do
     cond do

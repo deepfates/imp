@@ -3562,12 +3562,22 @@ defmodule Imp.Optimizer.GEPA.Engine do
            }),
          proposed_candidate = Map.merge(parent.candidate, replacements),
          {:ok, proposed_result, state} <-
-           evaluate(adapter, batch, proposed_candidate, false, :minibatch, state, opts, %{
-             iteration: iteration,
-             candidate_idx: nil,
-             parent_ids: [parent.id],
-             is_seed_candidate: false
-           }) do
+           evaluate_changed_candidate(
+             adapter,
+             batch,
+             parent.candidate,
+             proposed_candidate,
+             components,
+             parent_result,
+             state,
+             opts,
+             %{
+               iteration: iteration,
+               candidate_idx: nil,
+               parent_ids: [parent.id],
+               is_seed_candidate: false
+             }
+           ) do
       policy = Keyword.get(opts, :acceptance_policy, Acceptance.default(:mutation))
 
       case decide_acceptance(policy, parent_result, proposed_result, %{
@@ -3624,11 +3634,50 @@ defmodule Imp.Optimizer.GEPA.Engine do
       {:error, {:component_proposal_error, reason, components}, state} ->
         reject_or_raise_proposal_error(state, parent, components, reason, iteration, opts)
 
+      {:error, {:no_op_candidate, components, parent_result}, state} ->
+        notify(opts, :on_candidate_rejected, %{
+          iteration: iteration,
+          old_score: parent_result.aggregate_score,
+          new_score: parent_result.aggregate_score,
+          reason: :no_op_candidate,
+          components: components
+        })
+
+        {:ok,
+         reject(
+           state,
+           iteration,
+           parent,
+           components,
+           :no_op_candidate,
+           parent_result,
+           parent_result,
+           parent.candidate
+         )}
+
       {:error, reason, state} ->
         reject_or_raise_proposal_error(state, parent, [], reason, iteration, opts)
 
       {:error, reason} ->
         reject_or_raise_proposal_error(state, parent, [], reason, iteration, opts)
+    end
+  end
+
+  defp evaluate_changed_candidate(
+         adapter,
+         batch,
+         candidate,
+         proposed_candidate,
+         components,
+         parent_result,
+         state,
+         opts,
+         metadata
+       ) do
+    if candidate == proposed_candidate and Keyword.get(opts, :reject_identical_candidate, false) do
+      {:error, {:no_op_candidate, components, parent_result}, state}
+    else
+      evaluate(adapter, batch, proposed_candidate, false, :minibatch, state, opts, metadata)
     end
   end
 
