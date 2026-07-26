@@ -730,7 +730,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     require!(
       imp["packages"] == %{
         "req_llm" => "1.17.1",
-        "llm_db" => "2026.7.0",
+        "llm_db" => "2026.7.3",
         "req" => "0.6.3",
         "jason" => "1.4.5"
       },

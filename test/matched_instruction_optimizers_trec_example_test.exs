@@ -192,6 +192,10 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert upstream =~ "seed=seed"
     assert upstream =~ "verify_runtime_dependencies(manifest)"
     assert upstream =~ "materialized upstream environment differs from committed lock"
+
+    {verify_offset, _} = :binary.match(upstream, "verify_runtime_dependencies(manifest)")
+    {install_offset, _} = :binary.match(upstream, "dspy, RecordingLM = install_runtime(args)")
+    assert verify_offset < install_offset
   end
 
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do

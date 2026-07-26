@@ -258,7 +258,7 @@
       "consumer_mix_lock_sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd",
       "packages": {
         "req_llm": "1.17.1",
-        "llm_db": "2026.7.0",
+        "llm_db": "2026.7.3",
         "req": "0.6.3",
         "jason": "1.4.5"
       }
