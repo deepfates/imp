@@ -38,6 +38,7 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyExampleTest do
     assert source =~ "Atomic.write!(result_path, Result.to_map(result))"
     assert source =~ "Report.json_safe(result.rejected)"
     assert source =~ "IMP_OA_FRESH"
+    assert source =~ "IMP_OA_SELECTED_ONLY"
     assert source =~ "cache: false"
   end
 end

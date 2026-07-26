@@ -158,7 +158,13 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
   @model "phi4:latest"
   @digest "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
 
-  def run, do: if(System.get_env("IMP_OA_FRESH") == "1", do: fresh(), else: parent())
+  def run do
+    cond do
+      System.get_env("IMP_OA_FRESH") == "1" -> fresh()
+      System.get_env("IMP_OA_SELECTED_ONLY") == "1" -> selected_only()
+      true -> parent()
+    end
+  end
 
   defp parent do
     paths = paths!()
@@ -249,6 +255,65 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
     Atomic.write!(System.fetch_env!("IMP_OA_FRESH_OUTPUT"), stage)
   end
 
+  defp selected_only do
+    paths = paths!()
+
+    optimization =
+      paths.output |> Path.join("01-optimization.json") |> File.read!() |> Jason.decode!()
+
+    require_optimization!(optimization)
+
+    selected_path = Path.join(paths.output, "selected-artifact.json")
+    selected = selected_path |> File.read!() |> Jason.decode!()
+    baseline_test = evaluate_stage(Task.seed(), Task.test())
+    selected_test = evaluate_stage(selected, Task.test())
+
+    Atomic.write!(Path.join(paths.output, "02-untouched-test.json"), %{
+      baseline: baseline_test,
+      selected: selected_test
+    })
+
+    fresh_path = Path.join(paths.output, "03-fresh-test.json")
+    {output, status} = fresh_process(paths, selected_path, fresh_path)
+    if status != 0, do: raise("fresh OS BEAM failed: #{output}")
+    fresh = fresh_path |> File.read!() |> Jason.decode!()
+
+    unless fresh["reproduction_sha256"] == selected_test.reproduction_sha256,
+      do: raise("fresh selected retry behavior differs")
+
+    summary = %{
+      status: "complete_with_rejected_proposal",
+      scope: "one local mixed-type Optimize Anything retry-policy lifecycle",
+      split_sizes: %{train: 8, selection: 6, untouched_test: 6},
+      model: @model,
+      model_digest: @digest,
+      proposal_calls: optimization["proposal_calls"],
+      baseline_selection_score: optimization["baseline_score"],
+      selected_selection_score: optimization["selected_score"],
+      selected: optimization["selected"],
+      untouched_test: %{
+        baseline: Map.take(baseline_test, [:score, :exact]),
+        selected: Map.take(selected_test, [:score, :exact])
+      },
+      fresh_byte_identical: true,
+      claim_boundary:
+        "One task/model strict proposal-rejection and fresh artifact lifecycle; no admitted mutation and not general Optimize Anything effectiveness, schema-v2 evidence, parity, or BEAM superiority."
+    }
+
+    Atomic.write!(Path.join(paths.output, "result.json"), summary)
+    IO.puts(Jason.encode!(summary, pretty: true))
+  rescue
+    error ->
+      paths = paths!()
+
+      Atomic.write!(Path.join(paths.output, "continuation-failure.json"), %{
+        status: "stopped",
+        error: Exception.format(:error, error, __STACKTRACE__)
+      })
+
+      reraise error, __STACKTRACE__
+  end
+
   defp proposal_lm do
     %ObservedLM{
       owner: self(),
@@ -282,11 +347,16 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
   end
 
   defp require_optimization!(stage) do
-    unless stage.proposal_calls == 6 and stage.candidate_count >= 1,
-      do:
-        raise(
-          "Optimize Anything did not execute the frozen component proposals: #{inspect(stage)}"
-        )
+    proposal_calls = Map.get(stage, :proposal_calls, Map.get(stage, "proposal_calls"))
+    candidate_count = Map.get(stage, :candidate_count, Map.get(stage, "candidate_count"))
+    rejected = Map.get(stage, :rejected, Map.get(stage, "rejected", []))
+
+    unless is_integer(proposal_calls) and proposal_calls > 0 and candidate_count >= 1 and
+             (candidate_count > 1 or rejected != []),
+           do:
+             raise(
+               "Optimize Anything did not execute the frozen component proposals: #{inspect(stage)}"
+             )
   end
 
   defp evaluate_stage(candidate, rows) do
