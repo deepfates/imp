@@ -26,7 +26,7 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
 
     assert source =~ "stage.proposal_mode == :language_model"
     assert source =~ "proposal_response_format: :required"
-    assert source =~ ~s(@treatment_id "local-copro-banking77-structured-v1")
+    assert source =~ ~s(@treatment_id "local-copro-banking77-objective-correct-v2")
     assert source =~ "stage.proposer_calls == 1 and stage.valid_json_proposal"
     assert source =~ "is_number(stage.baseline_score) and is_number(stage.candidate_score)"
     assert source =~ "stage.prompt_mutated"

@@ -76,3 +76,14 @@ candidate each completed all sixteen fused-model evaluations and tied at
 This proves the strict proposal transport works. It remains neither a genuine
 prompt mutation nor a COPRO effectiveness result, and it will not be rerun or
 substituted with a different proposer after observing the outcome.
+
+The current separately identified condition is
+`local-copro-banking77-objective-correct-v2`. Source review after v1 found that
+Imp's proposal envelope omitted pinned DSPy COPRO's semantic instruction to
+produce an improved, creative task instruction and, for later depths, to use
+ordered score history to propose something better. Commit `2cc83b7` restored
+those source-owned objectives without exposing train answers or forcing
+uniqueness. V2 changes only that repaired proposal prompt: task/proposer models
+and digests, 16/40 rows, schema, metric, breadth/depth/temperature, call budget,
+and one-attempt policy remain unchanged. It executes once and may still retain
+baseline or stop without held-out access.

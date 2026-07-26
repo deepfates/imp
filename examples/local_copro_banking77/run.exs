@@ -77,7 +77,7 @@ defmodule LocalCOPROBanking77.Runner do
   alias LocalCOPROBanking77.{Atomic, ObservedLM, Observer}
 
   @routes ["R17", "R42", "R68", "R93"]
-  @treatment_id "local-copro-banking77-structured-v1"
+  @treatment_id "local-copro-banking77-objective-correct-v2"
   @data_sha256 "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18"
   @ollama_model "llama3.2:3b"
   @ollama_digest "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
