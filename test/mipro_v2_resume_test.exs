@@ -3,8 +3,13 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
 
   alias Imp.Optimizer.{MIPROv2, Report}
 
+  def exact_metric(example, prediction),
+    do: Imp.Metrics.exact_match(:answer).(example, prediction)
+
   setup do
-    state = start_supervised!({Agent, fn -> %{proposal_calls: 0, checkpoints: []} end})
+    state =
+      start_supervised!({Agent, fn -> %{proposal_calls: 0, task_calls: 0, checkpoints: []} end})
+
     %{state: state}
   end
 
@@ -18,7 +23,7 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
       |> MIPROv2.compile(program, trainset, valset)
       |> Report.fetch()
 
-    Agent.update(state, fn _ -> %{proposal_calls: 0, checkpoints: []} end)
+    Agent.update(state, fn _ -> %{proposal_calls: 0, task_calls: 0, checkpoints: []} end)
 
     checkpoint_fn = fn checkpoint ->
       Agent.update(state, fn snapshot ->
@@ -144,9 +149,11 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     end
   end
 
-  test "run configuration matching excludes runtime callback captures", %{state: state} do
-    {program, optimizer, trainset, valset} = fixture(state)
-    optimizer = %{optimizer | metric: captured_metric(state)}
+  test "declared metric identity permits a fresh capture but refuses config drift", %{
+    state: state
+  } do
+    identity = metric_identity(%{"field" => "answer", "mode" => "exact"})
+    {program, optimizer, trainset, valset} = fixture(state, captured_metric(state), identity)
 
     checkpoint =
       optimizer
@@ -159,13 +166,32 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     replacement_state =
       start_supervised!(
         Supervisor.child_spec(
-          {Agent, fn -> %{proposal_calls: 0, checkpoints: []} end},
+          {Agent, fn -> %{proposal_calls: 0, task_calls: 0, checkpoints: []} end},
           id: :replacement_callback_state
         )
       )
 
-    {_program, rebound_optimizer, _trainset, _valset} = fixture(replacement_state)
-    rebound_optimizer = %{rebound_optimizer | metric: captured_metric(replacement_state)}
+    {_program, drifted_optimizer, _trainset, _valset} =
+      fixture(
+        replacement_state,
+        captured_metric(replacement_state),
+        metric_identity(%{"field" => "answer", "mode" => "case_insensitive"})
+      )
+
+    assert_raise ArgumentError,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
+                 fn ->
+                   MIPROv2.compile(drifted_optimizer, program, trainset, valset,
+                     resume_state: checkpoint,
+                     max_trials: 0
+                   )
+                 end
+
+    assert Agent.get(replacement_state, & &1.proposal_calls) == 0
+    assert Agent.get(replacement_state, & &1.task_calls) == 0
+
+    {_program, rebound_optimizer, _trainset, _valset} =
+      fixture(replacement_state, captured_metric(replacement_state), identity)
 
     report =
       rebound_optimizer
@@ -174,6 +200,84 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
 
     assert report.metadata.resumed
     assert report.metadata.completed_trials == 1
+    assert report.metadata.metric_identity["kind"] == "declared"
+    assert report.metadata.metric_identity["id"] == "exact-answer"
+    assert report.metadata.metric_identity["version"] == 1
+    assert report.metadata.metric_identity["config_sha256"] =~ "sha256:"
+    refute Map.has_key?(report.metadata.metric_identity, "config")
+  end
+
+  test "durable anonymous metric without declared identity fails before setup", %{state: state} do
+    owner = self()
+
+    metric = fn example, prediction ->
+      send(owner, :metric_called)
+      exact_metric(example, prediction)
+    end
+
+    {program, optimizer, trainset, valset} = fixture(state, metric, nil)
+
+    assert_raise ArgumentError, ~r/requires :metric_identity/, fn ->
+      MIPROv2.compile(optimizer, program, trainset, valset, max_trials: 1)
+    end
+
+    assert Agent.get(state, & &1.proposal_calls) == 0
+    assert Agent.get(state, & &1.task_calls) == 0
+    refute_received :metric_called
+  end
+
+  test "anonymous metric may run explicitly without durable controls", %{state: state} do
+    {program, optimizer, trainset, valset} =
+      fixture(state, Imp.Metrics.exact_match(:answer), nil)
+
+    report = optimizer |> MIPROv2.compile(program, trainset, valset) |> Report.fetch()
+
+    refute report.metadata.durable
+    assert is_nil(report.metadata.metric_identity)
+    assert is_nil(report.metadata.resume_state)
+    assert report.metadata.run_status == :complete
+  end
+
+  test "external named metric derives a durable identity", %{state: state} do
+    {program, optimizer, trainset, valset} = fixture(state, &__MODULE__.exact_metric/2, nil)
+
+    report = optimizer |> MIPROv2.compile(program, trainset, valset) |> Report.fetch()
+
+    assert report.metadata.durable
+
+    assert report.metadata.metric_identity == %{
+             "arity" => 2,
+             "kind" => "external_function",
+             "module" => Atom.to_string(__MODULE__),
+             "name" => "exact_metric"
+           }
+
+    assert is_map(report.metadata.resume_state)
+  end
+
+  test "metric identity must be explicit JSON-safe data" do
+    assert_raise ArgumentError, ~r/already JSON-safe config/, fn ->
+      MIPROv2.new(&__MODULE__.exact_metric/2,
+        metric_identity: metric_identity(%{"field" => :answer})
+      )
+    end
+
+    assert_raise ArgumentError, ~r/use string keys/, fn ->
+      MIPROv2.new(&__MODULE__.exact_metric/2,
+        metric_identity: %{id: "exact-answer", version: 1, config: %{}}
+      )
+    end
+
+    assert_raise ArgumentError, ~r/contain exactly/, fn ->
+      MIPROv2.new(&__MODULE__.exact_metric/2,
+        metric_identity: %{
+          "id" => "exact-answer",
+          "version" => 1,
+          "config" => %{},
+          "extra" => true
+        }
+      )
+    end
   end
 
   defp captured_metric(state) do
@@ -183,10 +287,19 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     end
   end
 
-  defp fixture(state) do
+  defp fixture(
+         state,
+         metric \\ Imp.Metrics.exact_match(:answer),
+         identity \\ metric_identity()
+       ) do
     task_lm = %{
       module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "yes"} end]
+      opts: [
+        handler: fn _messages, _opts ->
+          Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
+          %{answer: "yes"}
+        end
+      ]
     }
 
     prompt_lm = %{
@@ -216,7 +329,7 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
       end
 
     optimizer =
-      MIPROv2.new(Imp.Metrics.exact_match(:answer),
+      MIPROv2.new(metric,
         auto: nil,
         num_candidates: 3,
         num_trials: 6,
@@ -226,10 +339,15 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
         minibatch_size: 1,
         minibatch_full_eval_steps: 2,
         prompt_lm: prompt_lm,
+        metric_identity: identity,
         startup_trials: 1,
         seed: 31
       )
 
     {program, optimizer, trainset, valset}
+  end
+
+  defp metric_identity(config \\ %{"field" => "answer"}) do
+    %{"id" => "exact-answer", "version" => 1, "config" => config}
   end
 end

@@ -35,12 +35,20 @@ interrupted in-flight work is retried.
 Checkpoints do not serialize executable callbacks or live LM clients. Resume
 with the original program shape, datasets, and search configuration, while
 supplying the current metric and LM callbacks through the runtime optimizer and
-program. This deliberately allows callback captures such as process handles or
-credentials to be rebound. Run-configuration hashes and payload checksums reject
-accidental mismatch or mutation, but they are not signatures, authentication,
-encryption, or a sandbox. Checkpoints can contain instructions, demos, outputs,
-and error details: store them as sensitive data, accept them only from a trusted
-run, and make `checkpoint_fn` persistence atomic when crash durability matters.
+program. For MIPROv2, an anonymous or captured metric must also declare a stable
+`metric_identity` with string-keyed JSON-safe `id`, `version`, and finite-valued `config`.
+Imp persists the id/version/config digest rather than the config and refuses
+identity or config drift before evaluation. A public `&Module.function/2`
+metric can derive that identity; an anonymous metric without one is explicitly
+non-durable and cannot use checkpoint, resume, or partial-run controls. This
+allows fresh-process runtime handles to change only when the consumer declares
+that the metric semantics did not. Run-configuration hashes and payload
+checksums reject accidental mismatch or mutation, but they are
+not signatures, authentication,
+encryption, or a sandbox. Checkpoints can contain instructions,
+demos, outputs, and error details: store them as sensitive data, accept them only
+from a trusted run, and make `checkpoint_fn` persistence atomic when crash
+durability matters.
 
 ## Provider Training
 
