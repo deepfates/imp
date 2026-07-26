@@ -77,3 +77,13 @@ an artifact in its own right, while a later malformed/no-op/worse proposal is
 retained as a rejection instead of erasing earlier work. The task, seed,
 objective, evaluator, train/selection/untouched rows, decoding, transport
 limits, and metrics remain unchanged.
+
+`exercised-round-robin-result.json` preserves that completed condition. All six
+field rounds executed. Three proposals were strict type failures; the other
+three produced candidate artifacts that were behaviorally evaluated and
+rejected for no strict training improvement. No candidate entered validation,
+so baseline remained selected at `0.56365`; it scored `0.70059` with four of
+six exact untouched cases and reproduced byte-for-byte after fresh load. This
+proves that ordinary round-robin search contains malformed fields and executes
+valid mutations independently, but it still does not provide an admitted OA
+mutation or usefulness lift.
