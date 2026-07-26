@@ -77,6 +77,12 @@ public optimizer with an exact local fused task model and local proposal model,
 keeps the worse proposal out on validation, and reapplies the selected
 parameter artifact in a fresh OS BEAM.
 
+For introspective minibatch search, the
+[Banking77 SIMBA example](examples/local_simba_banking77/README.md) samples the
+same real fused task model, evaluates a genuine demonstration mutation, rejects
+its minibatch overfit on separate validation, and reapplies the selected
+parameter artifact in a fresh OS BEAM.
+
 For local weight optimization, the
 [Banking77 GRPO example](examples/local_grpo_banking77/README.md) runs ordinary
 model-generated Qwen rollouts through Imp's public GRPO API, an official pinned

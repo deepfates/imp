@@ -1,0 +1,50 @@
+{
+  "status": "complete",
+  "scope": "one local SIMBA Banking77 program lifecycle",
+  "source_commits": {
+    "optimization": "52df337",
+    "demo_mutation_audit": "d604037",
+    "fresh_report_loading": "d831097"
+  },
+  "split_sizes": {
+    "train": 16,
+    "selection": 8,
+    "untouched_test": 40
+  },
+  "task_artifact": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+  "search": {
+    "baseline_batch_score": 0.5,
+    "candidate_batch_score": 0.75,
+    "baseline_selection_score": 0.625,
+    "candidate_selection_score": 0.375,
+    "selected": "baseline",
+    "candidate_count": 1,
+    "mutated_candidates": 1,
+    "mutation": "one appended successful-trajectory demonstration",
+    "rendered_mutation_calls": 12,
+    "task_transports": 28,
+    "reflection_transports": 0
+  },
+  "untouched_test": {
+    "baseline": {
+      "accuracy": 0.475,
+      "macro_f1": 0.33333333333333337,
+      "errors": 0
+    },
+    "selected": {
+      "accuracy": 0.475,
+      "macro_f1": 0.33333333333333337,
+      "errors": 0
+    }
+  },
+  "artifact": {
+    "selected_parameters_sha256": "cfc05a09bdc20574e667917c70190a7cc33390d8afacce7df0e6e6d4231e6395",
+    "optimization_stage_sha256": "8a7f0812c75856486c60ae88eeb81b72ceeeb728f82f79a81279d61a9a36b809"
+  },
+  "fresh_process": {
+    "byte_identical": true,
+    "logical_calls": 40,
+    "artifact_identity_matched": true
+  },
+  "claim_boundary": "One real demonstration mutation improved its training minibatch but regressed on validation, so SIMBA retained baseline before the untouched test. This proves an operational mutation, validation selection, artifact application, and fresh-consumer lifecycle on one task/model; not general SIMBA effectiveness, DSPy parity, or BEAM superiority."
+}

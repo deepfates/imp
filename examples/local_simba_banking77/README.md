@@ -41,3 +41,12 @@ correctly produced no reflection candidate. The runner stopped before opening
 the untouched test set. The ordinary workflow now enables SIMBA's full public
 demonstration-plus-rule strategy set; the stopped predecessor remains unchanged.
 That predecessor result is not mutation or effectiveness evidence.
+
+The completed full-strategy result is preserved in `exercised-result.json`.
+One real appended demonstration improved the search minibatch from `0.50` to
+`0.75` but regressed on validation from the baseline's `0.625` to `0.375`, so
+SIMBA correctly retained baseline. Baseline and selected then both scored
+`0.475` accuracy and `0.3333` macro-F1 with zero errors on the untouched forty
+rows, and the selected artifact reproduced byte-identically in a fresh OS
+BEAM. This is operational lifecycle evidence and an honest overfit rejection,
+not a general effectiveness result.
