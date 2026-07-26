@@ -35,9 +35,21 @@ defmodule GRPOContractTest do
     def reinforcement_step(_trainer, session, groups, _opts) do
       send(session.backend_state.owner, {:step, groups})
 
+      step = div(length(session.fulfilled_batch_ids), 2) + 1
+
       if session.backend_state.mode == :step_error,
         do: {:error, {:reinforcement_step_not_accepted, :step_failed}},
-        else: {:ok, session}
+        else:
+          {:ok,
+           %{
+             session
+             | current_model: "trained/step-#{step}",
+               result_model: "trained/step-#{step}",
+               metadata: %{
+                 artifact_sha256: "artifact-step-#{step}",
+                 checkpoint_sha256: "checkpoint-step-#{step}"
+               }
+           }}
     end
 
     @impl true
@@ -50,6 +62,12 @@ defmodule GRPOContractTest do
     def final_model_artifact(trainer, session) do
       send(trainer.owner, {:artifact, session.status})
       {:ok, trainer.artifact}
+    end
+
+    @impl true
+    def reinforcement_artifact(trainer, _session, selection) do
+      send(trainer.owner, {:selected_artifact, selection})
+      {:ok, selection}
     end
   end
 
@@ -207,6 +225,71 @@ defmodule GRPOContractTest do
 
     assert get_in(start_opts, [:imp_reinforcement_contract, "optimizer", "config_sha256"]) ==
              Imp.Clients.TRLProtocol.digest(expected)
+  end
+
+  test "predeclared validation selects and rebinds the earliest best trained checkpoint" do
+    scores = %{-1 => 0.25, 0 => 1.0, 1 => 0.5}
+
+    optimizer =
+      Imp.Optimizer.GRPO.new(
+        fn _example, _prediction -> 1.0 end,
+        trainer: trainer(),
+        validation_fn: fn _program, _dataset, %{step: step} -> {:ok, Map.fetch!(scores, step)} end,
+        checkpoint_selection: :best_validation,
+        num_train_steps: 2,
+        num_steps_for_val: 1,
+        num_dspy_examples_per_grpo_step: 2,
+        num_rollouts_per_grpo_step: 2,
+        status_poll_interval_ms: 0
+      )
+
+    static = fn _messages, _opts -> %{answer: "ok"} end
+
+    assert {:ok, compiled} =
+             Imp.Optimizer.GRPO.compile(
+               optimizer,
+               program(static),
+               trainset(),
+               valset: Enum.take(trainset(), 2)
+             )
+
+    assert Imp.ProgramAccess.lm(compiled).model == "trained/step-1"
+    artifact = Imp.ProgramAccess.get_metadata(compiled, :training_artifact)
+    assert artifact.result_model == "trained/step-1"
+    assert artifact.selected_validation_step == 1
+    assert artifact.selected_validation_score == 1.0
+    assert artifact.final_trained_model == "trained/grpo-model"
+    assert Enum.map(artifact.validation_history, &{&1.step, &1.score}) == [{1, 1.0}, {2, 0.5}]
+
+    assert_received {:selected_artifact,
+                     %{
+                       step: 1,
+                       score: 1.0,
+                       path: "trained/step-1",
+                       artifact_sha256: "artifact-step-1",
+                       checkpoint_sha256: "checkpoint-step-1"
+                     }}
+  end
+
+  test "best checkpoint selection rejects report-only validation results" do
+    optimizer =
+      Imp.Optimizer.GRPO.new(
+        fn _example, _prediction -> 1.0 end,
+        trainer: trainer(),
+        validation_fn: fn _program, _dataset, _context -> :ok end,
+        checkpoint_selection: :best_validation,
+        num_train_steps: 1,
+        num_rollouts_per_grpo_step: 2,
+        status_poll_interval_ms: 0
+      )
+
+    assert {:error, {:invalid_grpo_validation_result, :ok}} =
+             Imp.Optimizer.GRPO.compile(
+               optimizer,
+               program(fn _messages, _opts -> %{answer: "ok"} end),
+               trainset(),
+               valset: Enum.take(trainset(), 1)
+             )
   end
 
   test "keeps predictor identity and predictor-major source ordering" do

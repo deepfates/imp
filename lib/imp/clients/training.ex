@@ -1145,6 +1145,10 @@ defmodule Imp.Clients.Trainer do
               {:ok, String.t()} | {:error, term()}
   @callback final_model_artifact(term(), Imp.Clients.ReinforcementSession.t()) ::
               {:ok, String.t()} | {:error, term()}
+  @callback reinforcement_artifact(Imp.Clients.ReinforcementSession.t(), map()) ::
+              {:ok, map()} | {:error, term()}
+  @callback reinforcement_artifact(term(), Imp.Clients.ReinforcementSession.t(), map()) ::
+              {:ok, map()} | {:error, term()}
 
   @optional_callbacks finetune: 3,
                       finetune: 4,
@@ -1163,7 +1167,9 @@ defmodule Imp.Clients.Trainer do
                       terminate_reinforcement: 1,
                       terminate_reinforcement: 2,
                       final_model_artifact: 1,
-                      final_model_artifact: 2
+                      final_model_artifact: 2,
+                      reinforcement_artifact: 2,
+                      reinforcement_artifact: 3
 
   def finetune(provider, lm, examples, opts \\ [])
 
@@ -1271,6 +1277,31 @@ defmodule Imp.Clients.Trainer do
       other -> {:error, {:invalid_reinforcement_artifact, other}}
     end
   end
+
+  @doc "Resolves and verifies a retained reinforcement checkpoint for deployment."
+  def reinforcement_artifact(provider, %Imp.Clients.ReinforcementSession{} = session, selection)
+      when is_map(selection) do
+    with {:ok, artifact} <- dispatch(provider, :reinforcement_artifact, [session, selection]),
+         %{path: path, artifact_sha256: sha256} <- artifact,
+         true <- is_binary(path) and path != "" and is_binary(sha256) do
+      {:ok, artifact}
+    else
+      false -> {:error, :reinforcement_artifact_invalid}
+      {:error, _reason} = error -> error
+      other -> {:error, {:invalid_reinforcement_artifact, other}}
+    end
+  end
+
+  @doc false
+  def supports_reinforcement_artifact?(%module{}) do
+    Code.ensure_loaded?(module) and function_exported?(module, :reinforcement_artifact, 3)
+  end
+
+  def supports_reinforcement_artifact?(module) when is_atom(module) do
+    Code.ensure_loaded?(module) and function_exported?(module, :reinforcement_artifact, 2)
+  end
+
+  def supports_reinforcement_artifact?(_provider), do: false
 
   def validate_provider(nil), do: {:ok, nil}
   def validate_provider(provider) when is_atom(provider), do: {:ok, provider}

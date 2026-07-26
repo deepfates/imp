@@ -26,7 +26,7 @@ defmodule Imp.Clients.TRLTrainer do
 
   @behaviour Imp.Clients.Trainer
 
-  alias Imp.Clients.{ReinforcementSession, TRLProtocol, TRLWorker}
+  alias Imp.Clients.{ReinforcementSession, TRLArtifact, TRLProtocol, TRLWorker}
 
   @enforce_keys [:python, :model_path, :root, :contract_path]
   defstruct [
@@ -180,6 +180,29 @@ defmodule Imp.Clients.TRLTrainer do
 
   def final_model_artifact(%__MODULE__{}, %ReinforcementSession{}),
     do: {:error, :reinforcement_artifact_missing}
+
+  @impl true
+  def reinforcement_artifact(
+        %__MODULE__{},
+        %ReinforcementSession{id: session_id, model: base_model},
+        %{path: path, artifact_sha256: sha256, step: step} = selection
+      )
+      when is_binary(path) and is_binary(sha256) and is_integer(step) and step > 0 do
+    with {:ok, manifest} <- TRLArtifact.verify(path, sha256),
+         true <- manifest["session_id"] == session_id || {:error, :trl_artifact_session_mismatch},
+         true <- manifest["trainer_step"] == step || {:error, :trl_artifact_step_mismatch},
+         true <-
+           manifest["base_model"] == lm_model(base_model) ||
+             {:error, :trl_artifact_base_model_mismatch} do
+      {:ok,
+       selection
+       |> Map.put(:path, Path.expand(path))
+       |> Map.put(:checkpoint_sha256, manifest["checkpoint_sha256"])}
+    end
+  end
+
+  def reinforcement_artifact(%__MODULE__{}, %ReinforcementSession{}, _selection),
+    do: {:error, :invalid_trl_reinforcement_selection}
 
   defp start_worker(trainer, dispatch_id, contract_path) do
     TRLWorker.start(%{
@@ -417,6 +440,11 @@ defmodule Imp.Clients.TRLTrainer do
     |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
   end
+
+  defp lm_model(%{model: model}), do: model
+  defp lm_model(%{"model" => model}), do: model
+  defp lm_model(model) when is_binary(model), do: model
+  defp lm_model(other), do: inspect(other)
 
   @doc false
   def encode_groups(groups), do: Imp.Optimizer.Report.json_projection(groups)

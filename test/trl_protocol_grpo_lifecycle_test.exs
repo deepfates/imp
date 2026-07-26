@@ -14,6 +14,50 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
     %{root: root, server: server}
   end
 
+  test "validation selects an earlier content-verified trained artifact", context do
+    program =
+      Imp.predict("question -> answer",
+        lm: %Imp.Test.TRLConformanceLM{model: "local/no-model-policy"}
+      )
+
+    scores = %{-1 => 0.0, 0 => 1.0, 1 => 0.5}
+
+    optimizer =
+      Imp.Optimizer.GRPO.new(
+        fn _example, _prediction -> 1.0 end,
+        trainer: %Imp.Test.TRLConformanceTrainer{server: context.server},
+        validation_fn: fn _program, _dataset, %{step: step} -> {:ok, Map.fetch!(scores, step)} end,
+        checkpoint_selection: :best_validation,
+        num_train_steps: 2,
+        num_steps_for_val: 1,
+        num_rollouts_per_grpo_step: 2,
+        status_poll_interval_ms: 0
+      )
+
+    rows = [Imp.example(question: "alpha", answer: "alpha") |> Imp.with_inputs(:question)]
+
+    assert {:ok, result} = Imp.train(program, optimizer, rows, validation: rows)
+    assert result.job.result_model == Path.join(context.root, "artifacts/step-1")
+    assert result.job.metadata.selected_validation_step == 1
+    assert result.job.metadata.selected_validation_score == 1.0
+    assert result.job.metadata.final_trained_model == Path.join(context.root, "artifacts/step-2")
+
+    assert Enum.map(result.job.metadata.validation_history, &{&1.step, &1.score}) ==
+             [{1, 1.0}, {2, 0.5}]
+
+    assert Imp.ProgramAccess.lm(result.program).model == result.job.result_model
+    assert {:ok, manifest} = TRLArtifact.verify_job(result.job)
+    assert manifest["trainer_step"] == 1
+
+    job_path = Path.join(context.root, "selected-job.json")
+    assert :ok = TrainingJob.save!(result.job, job_path)
+    loaded = TrainingJob.load!(job_path)
+    assert loaded.result_model == result.job.result_model
+
+    assert Enum.map(loaded.metadata["validation_history"], &{&1["step"], &1["score"]}) ==
+             [{1, 1.0}, {2, 0.5}]
+  end
+
   test "public GRPO produces an ordered durable artifact and a fresh process executes it",
        context do
     checkpoint = Path.join(context.root, "imp-grpo.json")

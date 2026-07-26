@@ -48,6 +48,19 @@ defmodule Imp.Test.TRLConformanceTrainer do
   def final_model_artifact(%__MODULE__{server: server}, session) do
     Imp.Test.TRLConformanceServer.artifact(server, session)
   end
+
+  @impl true
+  def reinforcement_artifact(_trainer, session, selection) do
+    with {:ok, manifest} <-
+           Imp.Clients.TRLArtifact.verify(selection.path, selection.artifact_sha256),
+         true <- manifest["session_id"] == session.id,
+         true <- manifest["trainer_step"] == selection.step do
+      {:ok, Map.put(selection, :checkpoint_sha256, manifest["checkpoint_sha256"])}
+    else
+      false -> {:error, :trl_conformance_selected_artifact_mismatch}
+      {:error, _reason} = error -> error
+    end
+  end
 end
 
 defmodule Imp.Test.TRLConformanceServer do

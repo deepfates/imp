@@ -23,6 +23,13 @@ defmodule Imp.Optimizer.GRPO do
   5000ms) and is a BEAM-native execution option: pass a larger value or
   `:infinity` when rollouts are slow — agentic or environment-backed programs
   routinely run for minutes and would otherwise be killed at the 5s default.
+
+  `checkpoint_selection: :best_validation` predeclares validation-only
+  selection across trained checkpoints. Validation is greedy for the bundled
+  TRL LM, scores are finite scalars, higher is better, and the earliest
+  checkpoint wins ties. The final trainer state remains retained for trajectory
+  integrity even when an earlier content-verified artifact is deployed. The
+  base model and untouched test data are never candidates in this selector.
   """
 
   alias Imp.Clients.{ReinforcementSession, Trainer, TrainingJob, TRLProtocol}
@@ -47,6 +54,7 @@ defmodule Imp.Optimizer.GRPO do
     max_status_polls: 300,
     callback_timeout_ms: 30_000,
     checkpoint_path: nil,
+    checkpoint_selection: :latest,
     train_kwargs: [],
     timeout: 5_000
   ]
@@ -81,6 +89,7 @@ defmodule Imp.Optimizer.GRPO do
       default: 30_000
     ],
     checkpoint_path: [type: {:or, [:string, nil]}, default: nil],
+    checkpoint_selection: [type: {:in, [:latest, :best_validation]}, default: :latest],
     train_kwargs: [type: :keyword_list, default: []],
     timeout: [type: {:or, [:timeout, :pos_integer]}, default: 5_000]
   ]
@@ -311,6 +320,16 @@ defmodule Imp.Optimizer.GRPO do
         resume_data && resume_data[:checkpoint_phase] in [:terminating, :termination_failed] ->
           {:ok, initial_state}
 
+        resume_data && is_integer(resume_data[:pending_validation_step]) ->
+          safely_resume_pending_validation(
+            optimizer,
+            trainset,
+            valset,
+            initial_state,
+            resume_data[:pending_validation_step],
+            identity
+          )
+
         resume_data && is_map(resume_data[:step_intent]) ->
           safely_resume_step_intent(
             optimizer,
@@ -363,8 +382,15 @@ defmodule Imp.Optimizer.GRPO do
                    bounded_callback(optimizer, :final_model_artifact, fn ->
                      Trainer.final_model_artifact(optimizer.trainer, terminated)
                    end),
+                 {:ok, selected_artifact, selected_session} <-
+                   resolve_selected_artifact(optimizer, state, terminated, artifact),
                  {:ok, rebound} <-
-                   rebind_program(state.program, artifact, terminated, resumed?) do
+                   rebind_program(
+                     state.program,
+                     selected_artifact,
+                     selected_session,
+                     resumed?
+                   ) do
               Checkpoint.remove(optimizer.checkpoint_path)
               {:ok, rebound}
             end
@@ -389,6 +415,27 @@ defmodule Imp.Optimizer.GRPO do
       {:error, reason} ->
         terminate_after_failure(optimizer, initial_state, identity, reason)
     end
+  end
+
+  defp safely_resume_pending_validation(optimizer, trainset, valset, state, step, identity) do
+    case maybe_validate(optimizer, state.program, trainset, valset, step) do
+      {:ok, score} ->
+        case record_validation(optimizer, state, step, score) do
+          {:ok, state} ->
+            maybe_checkpoint(optimizer, :running, checkpoint_data(state, identity, step + 1))
+            run_steps(optimizer, trainset, valset, state, step + 1, identity)
+
+          {:error, reason} ->
+            {:error, reason, state}
+        end
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  rescue
+    error -> {:error, {:grpo_execution_failed, Exception.message(error)}, state}
+  catch
+    kind, reason -> {:error, {:grpo_execution_failed, {kind, reason}}, state}
   end
 
   defp run_steps(%{num_train_steps: count}, _trainset, _valset, state, next_step, _identity)
@@ -425,10 +472,17 @@ defmodule Imp.Optimizer.GRPO do
              submit_step(optimizer, session, Map.fetch!(step_intent, :batches), step_intent) do
         program = rebind_current_model(state.program, stepped.current_model)
         state = %{state | session: stepped, program: program}
+        checkpoint_pending_validation(optimizer, state, identity, step)
 
         case maybe_validate(optimizer, program, trainset, valset, step) do
-          :ok -> {:ok, state}
-          {:error, reason} -> {:error, reason, state}
+          {:ok, score} ->
+            case record_validation(optimizer, state, step, score) do
+              {:ok, state} -> {:ok, state}
+              {:error, reason} -> {:error, reason, state}
+            end
+
+          {:error, reason} ->
+            {:error, reason, state}
         end
       else
         {:step_outcome_unknown, reason} -> {:step_outcome_unknown, reason}
@@ -569,14 +623,56 @@ defmodule Imp.Optimizer.GRPO do
     step = Map.fetch!(intent, :step)
     program = rebind_current_model(state.program, state.session.current_model)
     state = %{state | program: program}
+    checkpoint_pending_validation(optimizer, state, identity, step)
 
     case maybe_validate(optimizer, program, trainset, valset, step) do
-      :ok ->
-        maybe_checkpoint(optimizer, :running, checkpoint_data(state, identity, step + 1))
-        run_steps(optimizer, trainset, valset, state, step + 1, identity)
+      {:ok, score} ->
+        case record_validation(optimizer, state, step, score) do
+          {:ok, state} ->
+            maybe_checkpoint(optimizer, :running, checkpoint_data(state, identity, step + 1))
+            run_steps(optimizer, trainset, valset, state, step + 1, identity)
+
+          {:error, reason} ->
+            {:error, reason, state}
+        end
 
       {:error, reason} ->
         {:error, reason, state}
+    end
+  end
+
+  defp checkpoint_pending_validation(optimizer, state, identity, step) do
+    maybe_checkpoint(
+      optimizer,
+      :running,
+      checkpoint_data(state, identity, step + 1) |> Map.put(:pending_validation_step, step)
+    )
+  end
+
+  defp record_validation(_optimizer, state, _step, nil), do: {:ok, state}
+  defp record_validation(%{checkpoint_selection: :latest}, state, _step, _score), do: {:ok, state}
+
+  defp record_validation(%{checkpoint_selection: :best_validation}, state, step, score) do
+    entry = %{
+      step: step + 1,
+      score: score,
+      path: state.session.current_model,
+      artifact_sha256: fetch(state.session.metadata, :artifact_sha256),
+      checkpoint_sha256: fetch(state.session.metadata, :checkpoint_sha256)
+    }
+
+    selected =
+      case state.selected_validation do
+        nil -> entry
+        %{score: best} when score > best -> entry
+        current -> current
+      end
+
+    if is_binary(entry.path) and entry.path != "" and is_binary(entry.artifact_sha256) and
+         is_binary(entry.checkpoint_sha256) do
+      {:ok, %{state | validations: state.validations ++ [entry], selected_validation: selected}}
+    else
+      {:error, :grpo_validation_artifact_identity_missing}
     end
   end
 
@@ -609,7 +705,9 @@ defmodule Imp.Optimizer.GRPO do
        frequencies: %{},
        frequency_order: [],
        epoch: -1,
-       group_queue: []
+       group_queue: [],
+       validations: [],
+       selected_validation: nil
      }, 0}
   end
 
@@ -627,7 +725,9 @@ defmodule Imp.Optimizer.GRPO do
        frequencies: Map.fetch!(data, :frequencies),
        frequency_order: Map.fetch!(data, :frequency_order),
        epoch: Map.fetch!(data, :epoch),
-       group_queue: Map.fetch!(data, :group_queue)
+       group_queue: Map.fetch!(data, :group_queue),
+       validations: Map.get(data, :validations, []),
+       selected_validation: Map.get(data, :selected_validation)
      }, Map.fetch!(data, :next_step)}
   end
 
@@ -635,8 +735,12 @@ defmodule Imp.Optimizer.GRPO do
        when next_step > 0,
        do: :ok
 
-  defp maybe_initial_validation(optimizer, program, trainset, valset, 0),
-    do: maybe_validate(optimizer, program, trainset, valset, -1)
+  defp maybe_initial_validation(optimizer, program, trainset, valset, 0) do
+    case maybe_validate(optimizer, program, trainset, valset, -1) do
+      {:ok, _score} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
 
   defp checkpoint_data(state, identity, next_step) do
     %{
@@ -649,7 +753,9 @@ defmodule Imp.Optimizer.GRPO do
       frequencies: state.frequencies,
       frequency_order: state.frequency_order,
       epoch: state.epoch,
-      group_queue: state.group_queue
+      group_queue: state.group_queue,
+      validations: state.validations,
+      selected_validation: state.selected_validation
     }
   end
 
@@ -690,6 +796,50 @@ defmodule Imp.Optimizer.GRPO do
       Trainer.terminate_reinforcement(optimizer.trainer, session)
     end)
   end
+
+  defp resolve_selected_artifact(%{checkpoint_selection: :latest}, _state, session, artifact),
+    do: {:ok, artifact, session}
+
+  defp resolve_selected_artifact(
+         %{checkpoint_selection: :best_validation} = optimizer,
+         %{selected_validation: selection} = state,
+         session,
+         final_artifact
+       )
+       when is_map(selection) do
+    case bounded_callback(optimizer, :reinforcement_artifact, fn ->
+           Trainer.reinforcement_artifact(optimizer.trainer, session, selection)
+         end) do
+      {:ok, selected} ->
+        metadata =
+          session.metadata
+          |> Map.put(:artifact_sha256, Map.fetch!(selected, :artifact_sha256))
+          |> Map.put(:checkpoint_sha256, Map.fetch!(selected, :checkpoint_sha256))
+          |> Map.put(:selected_validation_step, Map.fetch!(selected, :step))
+          |> Map.put(:selected_validation_score, Map.fetch!(selected, :score))
+          |> Map.put(:validation_history, state.validations)
+          |> Map.put(:final_trained_model, final_artifact)
+
+        selected_session = %{
+          session
+          | result_model: Map.fetch!(selected, :path),
+            metadata: metadata
+        }
+
+        {:ok, Map.fetch!(selected, :path), selected_session}
+
+      {:error, reason} ->
+        {:error, {:grpo_selected_artifact_failed, reason}}
+    end
+  end
+
+  defp resolve_selected_artifact(
+         %{checkpoint_selection: :best_validation},
+         _state,
+         _session,
+         _artifact
+       ),
+       do: {:error, :grpo_validation_checkpoint_missing}
 
   defp bounded_callback(%{callback_timeout_ms: :infinity}, callback, fun) do
     normalize_callback_result(callback, fun.())
@@ -752,7 +902,10 @@ defmodule Imp.Optimizer.GRPO do
         validation_fn: callback_identity(optimizer.validation_fn),
         use_train_as_val: optimizer.use_train_as_val,
         num_steps_for_val: optimizer.num_steps_for_val,
-        report_train_scores: optimizer.report_train_scores
+        report_train_scores: optimizer.report_train_scores,
+        checkpoint_selection: optimizer.checkpoint_selection,
+        direction: :maximize,
+        tie_break: :earliest
       },
       train_kwargs: compatibility_identity(optimizer.train_kwargs),
       trainset: Enum.map(trainset, &Imp.Example.to_map/1),
@@ -1176,32 +1329,64 @@ defmodule Imp.Optimizer.GRPO do
 
       case optimizer.validation_fn do
         nil ->
-          _ =
-            TrajectoryRunner.run(program, dataset, trajectory_metric(optimizer.reward_fn),
+          trajectories =
+            TrajectoryRunner.run(
+              validation_program(program),
+              dataset,
+              trajectory_metric(optimizer.reward_fn),
               max_concurrency: 1,
               timeout: optimizer.timeout
             )
 
-          :ok
+          {:ok, average_validation_score(trajectories)}
 
         callback ->
           result =
             case callback do
-              %Callback{} -> Callback.invoke(callback, program, dataset, context)
-              fun -> fun.(program, dataset, context)
+              %Callback{} ->
+                Callback.invoke(callback, validation_program(program), dataset, context)
+
+              fun ->
+                fun.(validation_program(program), dataset, context)
             end
 
           case result do
-            :ok -> :ok
-            {:ok, _result} -> :ok
+            :ok when optimizer.checkpoint_selection == :latest -> {:ok, nil}
+            {:ok, score} when is_number(score) -> finite_validation_score(score)
+            {:ok, _result} when optimizer.checkpoint_selection == :latest -> {:ok, nil}
             {:error, _reason} = error -> error
             other -> {:error, {:invalid_grpo_validation_result, other}}
           end
       end
     else
-      :ok
+      {:ok, nil}
     end
   end
+
+  defp average_validation_score([]), do: 0.0
+
+  defp average_validation_score(trajectories) do
+    Enum.sum(Enum.map(trajectories, & &1.score)) / length(trajectories)
+  end
+
+  defp finite_validation_score(score) do
+    score = score * 1.0
+
+    if score == score and abs(score) <= 1.7976931348623157e308,
+      do: {:ok, score},
+      else: {:error, {:invalid_grpo_validation_score, score}}
+  end
+
+  defp validation_program(program) do
+    Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
+      Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
+        %{predictor | lm: validation_lm(predictor.lm)}
+      end)
+    end)
+  end
+
+  defp validation_lm(%Imp.Clients.TRLLM{} = lm), do: %{lm | generation_mode: :greedy}
+  defp validation_lm(lm), do: lm
 
   defp validation_dataset(%{report_train_scores: true}, trainset, valset) when is_list(valset),
     do: valset ++ trainset
@@ -1230,6 +1415,17 @@ defmodule Imp.Optimizer.GRPO do
       optimizer.report_train_scores and is_nil(valset) and not optimizer.use_train_as_val ->
         {:error, :grpo_train_scores_require_validation}
 
+      optimizer.checkpoint_selection == :best_validation and optimizer.num_train_steps == 0 ->
+        {:error, :grpo_best_validation_requires_training_steps}
+
+      optimizer.checkpoint_selection == :best_validation and
+          validation_dataset(optimizer, trainset, valset) == [] ->
+        {:error, :grpo_best_validation_requires_validation_data}
+
+      optimizer.checkpoint_selection == :best_validation and
+          not Trainer.supports_reinforcement_artifact?(optimizer.trainer) ->
+        {:error, :grpo_trainer_does_not_support_checkpoint_selection}
+
       Imp.ProgramParameters.predictors(program) == [] ->
         {:error, :grpo_predictor_required}
 
@@ -1257,6 +1453,10 @@ defmodule Imp.Optimizer.GRPO do
       |> maybe_put_session_metadata(session.metadata, :artifact_sha256)
       |> maybe_put_session_metadata(session.metadata, :checkpoint_sha256)
       |> maybe_put_session_metadata(session.metadata, :protocol_payload_sha256)
+      |> maybe_put_session_metadata(session.metadata, :final_trained_model)
+      |> maybe_put_session_metadata(session.metadata, :selected_validation_step)
+      |> maybe_put_session_metadata(session.metadata, :selected_validation_score)
+      |> maybe_put_session_metadata(session.metadata, :validation_history)
 
     rebound =
       Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
@@ -1453,8 +1653,11 @@ defmodule Imp.Optimizer.GRPO do
 
   defp maybe_put_session_metadata(metadata, session_metadata, key) do
     case Map.get(session_metadata, key, Map.get(session_metadata, Atom.to_string(key))) do
-      value when is_binary(value) -> Map.put(metadata, key, value)
-      _missing -> metadata
+      value when is_binary(value) or is_number(value) or is_list(value) ->
+        Map.put(metadata, key, value)
+
+      _missing ->
+        metadata
     end
   end
 
@@ -1470,7 +1673,15 @@ defmodule Imp.Optimizer.GRPO do
       result_model: Map.get(artifact, :result_model),
       metadata:
         artifact
-        |> Map.take([:artifact_sha256, :checkpoint_sha256, :protocol_payload_sha256])
+        |> Map.take([
+          :artifact_sha256,
+          :checkpoint_sha256,
+          :protocol_payload_sha256,
+          :final_trained_model,
+          :selected_validation_step,
+          :selected_validation_score,
+          :validation_history
+        ])
         |> Map.put(:method, :grpo)
     })
   end

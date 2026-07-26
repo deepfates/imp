@@ -297,10 +297,11 @@ grpo =
     trainer: trainer,
     num_train_steps: 1,
     num_rollouts_per_grpo_step: 4,
-    train_kwargs: [learning_rate: 1.0e-6, loss_type: :dapo]
+    train_kwargs: [learning_rate: 1.0e-6, loss_type: :dapo],
+    checkpoint_selection: :best_validation
   )
 
-{:ok, result} = Imp.train(program, grpo, trainset)
+{:ok, result} = Imp.train(program, grpo, trainset, validation: selection_set)
 ```
 
 The training worker is deliberately terminated when the job completes. To use
@@ -358,6 +359,18 @@ resume identity. Unknown or changed settings fail closed; device, model, LoRA,
 step/generation budgets, filesystem paths, and executable behavior remain
 contract-owned. In particular, Imp does not expose TRL's CISPO loss as native
 CISPO product support through this option.
+
+The default checkpoint selection is `:latest`. With
+`checkpoint_selection: :best_validation`, Imp evaluates each due trained
+checkpoint on the declared validation set, maximizes the finite scalar score,
+and keeps the earliest checkpoint on ties. The bundled TRL LM evaluates
+greedily even though training rollouts remain sampled. Every validation and the
+selected artifact identity survive durable resume; selection resolves and
+content-verifies the retained artifact before program rebind. The final trainer
+state is preserved separately so an earlier deployable winner does not rewrite
+training history. This selector intentionally excludes the base program and
+untouched test data—compare base as a separate selection arm if the product
+must be able to decline training altogether.
 
 ### Optional local MLX-LM SFT
 
