@@ -397,6 +397,24 @@ different loss and is not ordinary GRPO. Provider clients that do not declare
 the capability receive the same concise prompt and strict parser, with no
 private option forwarded to them.
 
+For strict local Ollama classification, prefer the ordinary JSON adapter. The
+native ReqLLM Ollama provider declares JSON-schema generation even when a local
+model name is not present in LLMDB, so Imp sends the enum constraint to Ollama
+rather than relying on prompt adherence or result-repair heuristics:
+
+```elixir
+program =
+  Imp.predict(
+    Imp.signature("question -> route: enum[K11,K47]", "Route the question."),
+    lm: Imp.req_llm("ollama:llama3.2:3b", cache: false),
+    adapter: Imp.Adapter.JSON,
+    config: [json_fallback: false]
+  )
+```
+
+`json_fallback: false` makes a malformed response one explicit error and one
+generation. It does not normalize labels, brackets, or out-of-enum values.
+
 The JSON adapter validates output fields and returns retry feedback for schema
 violations.
 

@@ -77,28 +77,17 @@ defmodule Imp.Clients.ReqLLM do
   #     json-schema mode implies the param is accepted).
   #
   # When the registry has no `json` capability for a model (unknown / sparse
-  # entry), this returns `Imp.LM.Capability.none/0` — no `response_format` is
-  # sent. That is loud-by-omission and faithful to DSPy: an LM whose registry
-  # does not advertise the param gets nothing rather than a guessed-wrong
-  # envelope. The two registries (litellm vs LLMDB) are independent, so a
-  # *decision* divergence here reflects a registry-data difference, not a logic
-  # difference — the gating logic itself is byte-identical to DSPy's.
+  # entry), this normally returns `Imp.LM.Capability.none/0` — no
+  # `response_format` is sent. The exception is a native provider whose pinned
+  # public contract owns structured generation independently of model metadata:
+  # ReqLLM's Ollama provider unconditionally exposes JSON-schema
+  # `generate_object/4`. This keeps unknown providers loud-by-omission while
+  # avoiding a false downgrade for ordinary local Ollama model names.
   @spec response_format_capability(t()) :: Imp.LM.Capability.t()
   def response_format_capability(%__MODULE__{model: model_spec}) do
     case resolve_model(model_spec) do
       {:ok, model} ->
-        case json_capability(model) do
-          %{} = json ->
-            schema? = truthy?(Map.get(json, :schema))
-            native? = truthy?(Map.get(json, :native))
-            %Imp.LM.Capability{response_format: native? or schema?, response_schema: schema?}
-
-          _no_json_entry ->
-            # Documented loud-by-omission: the registry resolved the model but
-            # does not advertise a `json` capability, so no response_format is
-            # sent. Not a failure — see the moduledoc note above.
-            Imp.LM.Capability.none()
-        end
+        response_format_capability(model, model_spec)
 
       {:error, reason} ->
         Logger.warning(
@@ -107,6 +96,33 @@ defmodule Imp.Clients.ReqLLM do
             "(Capability.none) — no response_format will be sent"
         )
 
+        Imp.LM.Capability.none()
+    end
+  end
+
+  # ReqLLM's native Ollama provider owns JSON-schema constrained generation at
+  # the provider layer, independently of LLMDB's per-model catalog. Its pinned
+  # public `generate_object/4` path unconditionally constructs a json_schema
+  # response format for Ollama's OpenAI-compatible endpoint. Local model names
+  # are commonly absent from LLMDB, so consulting only `model.capabilities`
+  # incorrectly downgraded this supported provider path to Capability.none and
+  # left small local models to follow a prompt-only JSON/value contract.
+  defp response_format_capability(%{provider: provider}, _model_spec)
+       when provider in [:ollama, "ollama"],
+       do: Imp.LM.Capability.json_schema()
+
+  defp response_format_capability(model, _model_spec) do
+    case json_capability(model) do
+      %{} = json ->
+        schema? = truthy?(Map.get(json, :schema))
+        native? = truthy?(Map.get(json, :native))
+        %Imp.LM.Capability{response_format: native? or schema?, response_schema: schema?}
+
+      _no_json_entry ->
+        # Documented loud-by-omission: the registry resolved the model but
+        # does not advertise a `json` capability, so no response_format is
+        # sent. Provider-owned guarantees (currently native Ollama) are handled
+        # above; all other unknown providers remain fail-closed.
         Imp.LM.Capability.none()
     end
   end

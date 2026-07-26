@@ -83,6 +83,21 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule RouteObjectStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_ollama_route",
+         model: "llama3.2:3b",
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(~s({"route":"K47"})),
+         object: %{"route" => "K47"}
+       }}
+    end
+  end
+
   defmodule ProviderMetadataStub do
     def generate_text(model, messages, _opts) do
       {:ok,
@@ -408,6 +423,45 @@ defmodule ReqLLMClientTest do
     assert Keyword.fetch!(opts, :temperature) == 0.0
     refute Keyword.has_key?(opts, :native_json_schema)
     assert get_in(opts, [:provider_options, :response_format, :type]) == "json_schema"
+  end
+
+  test "native Ollama model uses the provider-owned JSON-schema path without an override" do
+    model = %{provider: :ollama, id: "llama3.2:3b"}
+    lm = Imp.req_llm(model, test_pid: self(), req_module: RouteObjectStub, cache: false)
+
+    assert Imp.Clients.ReqLLM.response_format_capability(lm) ==
+             Imp.LM.Capability.json_schema()
+
+    program =
+      Imp.predict(
+        Imp.signature("question -> route: enum[K11,K47]", "Route the question."),
+        lm: lm,
+        adapter: Imp.Adapter.JSON,
+        config: [json_fallback: false]
+      )
+
+    assert {:ok, prediction} = Imp.call(program, %{question: "What is a quasar?"})
+    assert Imp.get(prediction, :route) == "K47"
+
+    assert_received {:req_llm_generate, ^model, _messages, opts}
+    response_format = get_in(opts, [:provider_options, :response_format])
+
+    assert response_format.type == "json_schema"
+    assert response_format.json_schema.strict
+
+    assert get_in(response_format, [:json_schema, :schema, "properties", "route", "enum"]) ==
+             ["K11", "K47"]
+
+    assert get_in(response_format, [:json_schema, :schema, "required"]) == ["route"]
+  end
+
+  test "ordinary ollama-prefixed local model retains the provider capability off-catalog" do
+    lm = Imp.req_llm("ollama:imp-no-catalog-model")
+
+    ExUnit.CaptureLog.capture_log(fn ->
+      assert Imp.Clients.ReqLLM.response_format_capability(lm) ==
+               Imp.LM.Capability.json_schema()
+    end)
   end
 
   test "provider metadata preserves semantic schema descriptors while redacting credentials" do

@@ -12,7 +12,9 @@ defmodule Imp.LM.Capability do
   #     `lm.supports_response_schema` (`litellm.supports_response_schema(...)`).
   #
   # DSPy reads these from litellm's model registry; Imp reads them from the
-  # ReqLLM/LLMDB registry (`Imp.Clients.ReqLLM.response_format_capability/1`).
+  # ReqLLM/LLMDB registry (`Imp.Clients.ReqLLM.response_format_capability/1`),
+  # except where a native ReqLLM provider itself owns a stronger documented
+  # transport guarantee (currently Ollama JSON-schema generation).
   # The *decision logic* over the two booleans is reproduced byte-faithfully in
   # `Imp.Adapter.JSON`; the *source* is each ecosystem's own registry, exactly
   # as DSPy delegates to litellm rather than hardcoding a model list.
