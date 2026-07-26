@@ -1274,7 +1274,9 @@ defmodule ProviderTrainingLifecycleTest do
              |> Imp.Optimizer.GRPO.compile(program, trainset)
 
     assert Imp.ProgramAccess.lm(compiled).model == "grpo-model"
-    assert_received {:grpo_started, ^lm, [num_generations: 1]}
+    assert_received {:grpo_started, ^lm, start_opts}
+    assert start_opts[:num_generations] == 1
+    assert start_opts[:imp_reinforcement_contract]["optimizer"]["name"] == "grpo"
     assert_received {:grpo_step, [%{batch_id: 1, group: [%{reward: 0.75}]}]}
     assert_received :grpo_terminated
   end

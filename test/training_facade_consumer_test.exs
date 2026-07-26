@@ -185,8 +185,10 @@ defmodule Imp.TrainingFacadeConsumerTest do
               metadata: %{method: :grpo}
             }} = Imp.train(program(), optimizer, trainset, validation: validation)
 
-    assert_received {:grpo_started, %LocalLM{model: "local/base"},
-                     [dispatch_id: _, num_generations: 2]}
+    assert_received {:grpo_started, %LocalLM{model: "local/base"}, start_opts}
+    assert is_binary(start_opts[:dispatch_id])
+    assert start_opts[:num_generations] == 2
+    assert start_opts[:imp_reinforcement_contract]["optimizer"]["name"] == "grpo"
 
     assert_received {:grpo_groups, [%{group: group}]}
     assert length(group) == 2

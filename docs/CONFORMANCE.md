@@ -542,6 +542,8 @@ Executable evidence:
 - test: `test/provider_training_lifecycle_test.exs`
 - test: `test/protocol_training/provider_training_lifecycle_test.exs`
 - test: `test/public_surface_test.exs`
+- test: `test/trl_protocol_test.exs`
+- test: `test/trl_protocol_grpo_lifecycle_test.exs`
 - docs: `docs/ADVANCED.md`
 - docs: [docs/internal/COVERAGE_MATRIX.md](https://github.com/deepfates/imp/blob/main/docs/internal/COVERAGE_MATRIX.md) (repository only, not shipped in the package)
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
@@ -551,6 +553,7 @@ Missing evidence or behavior:
 
 - paid-provider weight-training execution evidence
 - BetterTogether paid-provider lifecycle completion
+- a real TRL/PyTorch worker, GRPO loss/gradient execution, and changed model weights (the current TRL protocol server is deterministic and no-model)
 - matched Avatar and AvatarOptimizer effectiveness
 - matched BetterTogether and GRPO effectiveness
 

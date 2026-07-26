@@ -59,6 +59,7 @@ defmodule Imp.UpstreamFidelityTest do
              MapSet.new([
                "paid-provider weight-training execution evidence",
                "BetterTogether paid-provider lifecycle completion",
+               "a real TRL/PyTorch worker, GRPO loss/gradient execution, and changed model weights (the current TRL protocol server is deterministic and no-model)",
                "matched Avatar and AvatarOptimizer effectiveness",
                "matched BetterTogether and GRPO effectiveness"
              ])

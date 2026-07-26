@@ -18,7 +18,7 @@ defmodule Imp.Optimizer.GRPO do
   routinely run for minutes and would otherwise be killed at the 5s default.
   """
 
-  alias Imp.Clients.{ReinforcementSession, Trainer}
+  alias Imp.Clients.{ReinforcementSession, Trainer, TrainingJob, TRLProtocol}
   alias Imp.Optimizer.{GRPO.Checkpoint, Sampling, TrajectoryRunner}
 
   defstruct [
@@ -141,6 +141,7 @@ defmodule Imp.Optimizer.GRPO do
       {:ok,
        %Imp.Optimizer.TrainingResult{
          program: compiled,
+         job: completed_training_job(compiled),
          status: :completed,
          metadata: %{method: :grpo}
        }}
@@ -248,6 +249,7 @@ defmodule Imp.Optimizer.GRPO do
     opts =
       optimizer.train_kwargs
       |> Keyword.put(:num_generations, optimizer.num_rollouts_per_grpo_step)
+      |> Keyword.put(:imp_reinforcement_contract, reinforcement_contract(identity))
       |> maybe_put_dispatch_id(optimizer.checkpoint_path, dispatch_id)
 
     case bounded_callback(optimizer, :start_reinforcement, fn ->
@@ -711,6 +713,9 @@ defmodule Imp.Optimizer.GRPO do
   defp maybe_checkpoint(_optimizer, _phase, _data), do: :ok
 
   defp checkpoint_identity(optimizer, lm, trainset, valset) do
+    effective_trainset =
+      repeat_short_trainset(trainset, optimizer.num_dspy_examples_per_grpo_step)
+
     identity = %{
       model: if(is_map(lm), do: Map.get(lm, :model, Map.get(lm, "model")), else: inspect(lm)),
       provider: compatibility_identity(optimizer.trainer),
@@ -735,7 +740,8 @@ defmodule Imp.Optimizer.GRPO do
       },
       train_kwargs: compatibility_identity(optimizer.train_kwargs),
       trainset: Enum.map(trainset, &Imp.Example.to_map/1),
-      valset: if(is_list(valset), do: Enum.map(valset, &Imp.Example.to_map/1), else: nil)
+      valset: if(is_list(valset), do: Enum.map(valset, &Imp.Example.to_map/1), else: nil),
+      prompt_schedule: prompt_schedule(optimizer, effective_trainset)
     }
 
     Map.put(identity, :digest, digest(identity))
@@ -1164,19 +1170,26 @@ defmodule Imp.Optimizer.GRPO do
   end
 
   defp rebind_program(program, artifact, session, resumed?) do
+    training_artifact =
+      %{
+        provider: session.provider,
+        session_id: session.id,
+        base_model: lm_model(session.model),
+        result_model: artifact,
+        method: :grpo,
+        resumed: resumed?
+      }
+      |> maybe_put_session_metadata(session.metadata, :artifact_sha256)
+      |> maybe_put_session_metadata(session.metadata, :checkpoint_sha256)
+      |> maybe_put_session_metadata(session.metadata, :protocol_payload_sha256)
+
     rebound =
       Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
         Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
           %{predictor | lm: rebind_lm(predictor.lm, artifact), dynamic_lm?: false}
         end)
       end)
-      |> Imp.ProgramAccess.put_metadata(:training_artifact, %{
-        provider: session.provider,
-        session_id: session.id,
-        result_model: artifact,
-        method: :grpo,
-        resumed: resumed?
-      })
+      |> Imp.ProgramAccess.put_metadata(:training_artifact, training_artifact)
 
     {:ok, rebound}
   rescue
@@ -1269,6 +1282,94 @@ defmodule Imp.Optimizer.GRPO do
   end
 
   defp repeat_short_trainset(trainset, _width), do: trainset
+
+  defp prompt_schedule(%{num_train_steps: 0}, _trainset), do: []
+
+  defp prompt_schedule(optimizer, trainset) do
+    initial = %{
+      rng: seed_state(optimizer.seed),
+      shuffled_ids: [],
+      frequencies: %{},
+      frequency_order: [],
+      epoch: -1
+    }
+
+    0..(optimizer.num_train_steps - 1)
+    |> Enum.map_reduce(initial, fn step, state ->
+      {:ok, examples, state} = select_examples(optimizer, trainset, step, state)
+
+      {%{
+         "step" => step,
+         "ordered_row_sha256s" => Enum.map(examples, &protocol_digest(Imp.Example.to_map(&1)))
+       }, state}
+    end)
+    |> elem(0)
+  end
+
+  defp reinforcement_contract(identity) do
+    train_rows = Enum.map(identity.trainset, &protocol_digest/1)
+
+    val_rows =
+      if is_list(identity.valset), do: Enum.map(identity.valset, &protocol_digest/1), else: []
+
+    %{
+      "dataset" => %{
+        "train_sha256" => protocol_digest(train_rows),
+        "validation_sha256" => if(val_rows == [], do: nil, else: protocol_digest(val_rows)),
+        "ordered_train_row_sha256s" => train_rows
+      },
+      "prompt_schedule" => %{
+        "selector" => "imp_grpo_v1",
+        "steps" => identity.prompt_schedule
+      },
+      "optimizer" => %{
+        "name" => "grpo",
+        "num_generations" => identity.rollouts_per_step,
+        "config_sha256" =>
+          identity
+          |> Map.drop([:trainset, :valset, :prompt_schedule, :digest])
+          |> protocol_digest()
+      },
+      "rng" => %{
+        "algorithm" => "exsss",
+        "state_sha256" => protocol_digest(Sampling.dump(seed_state(identity.seed)))
+      }
+    }
+  end
+
+  defp protocol_digest(value) do
+    value
+    |> Imp.Optimizer.Report.encode_term()
+    |> TRLProtocol.digest()
+  end
+
+  defp maybe_put_session_metadata(metadata, session_metadata, key) do
+    case Map.get(session_metadata, key, Map.get(session_metadata, Atom.to_string(key))) do
+      value when is_binary(value) -> Map.put(metadata, key, value)
+      _missing -> metadata
+    end
+  end
+
+  defp completed_training_job(program) do
+    artifact = Imp.ProgramAccess.get_metadata(program, :training_artifact) || %{}
+    lm = Imp.ProgramAccess.lm(program)
+
+    TrainingJob.new(%{
+      id: Map.get(artifact, :session_id, "grpo-completed"),
+      provider: Map.get(artifact, :provider, :local),
+      model: Map.get(artifact, :base_model, lm_model(lm)),
+      status: :succeeded,
+      result_model: Map.get(artifact, :result_model),
+      metadata:
+        artifact
+        |> Map.take([:artifact_sha256, :checkpoint_sha256, :protocol_payload_sha256])
+        |> Map.put(:method, :grpo)
+    })
+  end
+
+  defp lm_model(%{model: model}), do: model
+  defp lm_model(%{"model" => model}), do: model
+  defp lm_model(lm), do: inspect(lm)
 
   defp seed_state(seed) do
     value = abs(seed) + 1

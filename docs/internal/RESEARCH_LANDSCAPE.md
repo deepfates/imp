@@ -167,17 +167,26 @@ again for metrics. A scorer with effects or cost would therefore be duplicated
 unless a controlled shim used content-bound idempotent caching; that workaround
 would not substitute for correcting or pinning the engine behavior.
 
-The later Imp-to-trainer scoring contract should be a narrow data protocol, not
-an arbitrary Python callback. Imp should send an immutable batch containing a
-schema version, session/update/batch identifiers, prompt identity, completion
-text and token IDs, group position, optional reference, and a payload hash. The
-scorer should return ordered finite numeric rewards or typed row errors plus the
-same hash. A content-bound idempotency key must make a replay return the same
-receipt without evaluating twice. Imp must reject count, order, identity, hash,
-non-finite-score, or duplicate-receipt mismatches; persist the scoring receipt
-before accepting a gradient update; and keep training, selection, and untouched
-test records disjoint. Provider credentials and arbitrary executable callbacks
-must not cross this boundary.
+Imp now defines the first version of that narrow data protocol rather than an
+arbitrary Python callback. A pinned-TRL session binds the ordered dataset and
+prompt schedule, base-model and tokenizer identities, optimizer configuration,
+and initial RNG. Each immutable update binds session/update/batch identifiers,
+ordered groups, rendered prompts, completion text, prompt/completion token IDs
+and masks, behavior log probabilities, finite external rewards, trainer step,
+optimizer/RNG identities, and a canonical payload hash. Exact replay returns
+the existing receipt; missing, reordered, or same-id/different-content updates
+fail closed. Checkpoint, receipt, update, and final artifact manifests form a
+content-verified chain that `TrainingJob.rebind/3` rechecks before installing a
+TRL artifact in another program.
+
+A deterministic no-model conformance server exercises this contract through
+the ordinary public GRPO lifecycle, including accepted-then-disconnected
+reconciliation and fresh-process job/program load and rebind. It changes only a
+synthetic content-addressed artifact. No Python worker, TRL/PyTorch runtime,
+tokenizer, causal model, GRPO loss, gradient, or real weight change exists yet.
+Those remain the next engine slice; this protocol cannot establish GRPO or
+mmGRPO parity, training effectiveness, Apple/MPS feasibility, or deployable
+model behavior.
 
 This inspection recommends TRL as the first production integration target and
 `mlx-lm-lora` only as a separately audited Apple-local experiment. It does not

@@ -567,6 +567,12 @@ defmodule Imp.Clients.TrainingJob do
     end
   end
 
+  defp automatic_deployment_lm(%__MODULE__{provider: :trl} = job, program) do
+    with {:ok, _manifest} <- Imp.Clients.TRLArtifact.verify_job(job) do
+      rebound_lm(Imp.ProgramAccess.lm(program), job.provider, job.result_model)
+    end
+  end
+
   defp automatic_deployment_lm(job, program),
     do: rebound_lm(Imp.ProgramAccess.lm(program), job.provider, job.result_model)
 
@@ -588,6 +594,17 @@ defmodule Imp.Clients.TrainingJob do
     end
   end
 
+  defp validate_provider_deployment_lm(%__MODULE__{provider: :trl} = job, lm) do
+    with {:ok, _manifest} <- Imp.Clients.TRLArtifact.verify_job(job),
+         {:ok, path} <- trl_model_path(lm),
+         true <- Path.expand(path) == Path.expand(job.result_model) do
+      :ok
+    else
+      false -> {:error, :trl_deployment_model_identity_mismatch}
+      {:error, _reason} = error -> error
+    end
+  end
+
   defp validate_provider_deployment_lm(_job, _lm), do: :ok
 
   defp mlx_lm_model_path(%Imp.Clients.ReqLLM{model: model}) when is_binary(model),
@@ -602,6 +619,10 @@ defmodule Imp.Clients.TrainingJob do
   end
 
   defp mlx_lm_model_path(_lm), do: {:error, :mlx_lm_deployment_requires_req_llm}
+
+  defp trl_model_path(%Imp.Clients.ReqLLM{model: model}) when is_binary(model), do: {:ok, model}
+  defp trl_model_path(%{model: model}) when is_binary(model), do: {:ok, model}
+  defp trl_model_path(_lm), do: {:error, :trl_deployment_model_identity_missing}
 
   defp training_artifact_metadata(job) do
     metadata = %{
@@ -677,6 +698,7 @@ defmodule Imp.Clients.TrainingJob do
   defp load_provider("openai"), do: :openai
   defp load_provider("databricks"), do: :databricks
   defp load_provider("mlx_lm"), do: :mlx_lm
+  defp load_provider("trl"), do: :trl
   defp load_provider("local"), do: :local
   defp load_provider(provider), do: provider
 
@@ -816,7 +838,7 @@ defmodule Imp.Clients.ReinforcementSession do
   def fulfill(%__MODULE__{} = session, batch_ids) when is_list(batch_ids) do
     %{
       session
-      | fulfilled_batch_ids: session.fulfilled_batch_ids ++ batch_ids,
+      | fulfilled_batch_ids: Enum.uniq(session.fulfilled_batch_ids ++ batch_ids),
         pending_batch_ids: Enum.reject(session.pending_batch_ids, &(&1 in batch_ids))
     }
   end

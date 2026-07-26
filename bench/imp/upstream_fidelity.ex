@@ -603,7 +603,9 @@ defmodule Imp.UpstreamFidelity do
           "test/optimizer_contract_test.exs",
           "test/provider_training_lifecycle_test.exs",
           "test/protocol_training/provider_training_lifecycle_test.exs",
-          "test/public_surface_test.exs"
+          "test/public_surface_test.exs",
+          "test/trl_protocol_test.exs",
+          "test/trl_protocol_grpo_lifecycle_test.exs"
         ],
         docs: [
           "docs/ADVANCED.md",
@@ -616,6 +618,7 @@ defmodule Imp.UpstreamFidelity do
         missing: [
           "paid-provider weight-training execution evidence",
           "BetterTogether paid-provider lifecycle completion",
+          "a real TRL/PyTorch worker, GRPO loss/gradient execution, and changed model weights (the current TRL protocol server is deterministic and no-model)",
           "matched Avatar and AvatarOptimizer effectiveness",
           "matched BetterTogether and GRPO effectiveness"
         ]
