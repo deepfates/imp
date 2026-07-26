@@ -1502,6 +1502,7 @@ defmodule Imp.Saving do
       "Elixir.Imp.Adapter.XML" -> Imp.Adapter.XML
       "Elixir.Imp.Adapter.TwoStep" -> Imp.Adapter.TwoStep
       "Elixir.Imp.Adapter.PlanFirst" -> Imp.Adapter.PlanFirst
+      "Elixir.Imp.Adapter.SingleField" -> Imp.Adapter.SingleField
       other -> raise ArgumentError, "unsupported saved Imp adapter: #{inspect(other)}"
     end
   end

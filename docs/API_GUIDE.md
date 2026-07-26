@@ -377,6 +377,18 @@ signature =
 program = Imp.predict(signature, adapter: Imp.Adapter.JSON)
 ```
 
+For concise local classifiers and other programs with exactly one output, use
+the strict value-only adapter. It validates the returned value against the
+signature but does not guess through labels, brackets, code fences, or prose:
+
+```elixir
+program =
+  Imp.predict(
+    Imp.signature("text -> sentiment: enum[positive,negative]", "Classify sentiment."),
+    adapter: Imp.Adapter.SingleField
+  )
+```
+
 The JSON adapter validates output fields and returns retry feedback for schema
 violations.
 

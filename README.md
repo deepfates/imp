@@ -31,6 +31,9 @@ Imp.get(prediction, :team)
 #=> "security"
 ```
 
+For an exact one-output classifier or scalar program, `Imp.Adapter.SingleField`
+uses a concise value-only wire contract while retaining signature validation.
+
 The model read the situation: an invoice complaint that is really a
 security incident. The types held the contract: the answer is always one of
 your four teams, and a generation that breaks the declaration is rejected

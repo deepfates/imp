@@ -13,7 +13,10 @@ An adapter turns a signature, inputs, and demos into model messages, then turns
 raw model output back into a `Imp.Prediction`.
 
 Use `Imp.Adapter.Chat` for readable field-labelled text. Use
-`Imp.Adapter.JSON` when output shape matters.
+`Imp.Adapter.JSON` when output shape matters. Use `Imp.Adapter.SingleField`
+for a strict one-output classifier or scalar program whose model should return
+only the value; it rejects multi-output signatures and does not repair labelled
+or bracketed prose into an answer.
 
 ## Artifact
 
