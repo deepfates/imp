@@ -4,6 +4,8 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @source "examples/local_grpo_opaque_banking77/run.exs"
   @contract "priv/trl_worker/qwen-opaque-38-step-contract.json"
   @result "examples/local_grpo_opaque_banking77/exercised-result.json"
+  @usefulness_data "benchmarks/data/grpo-usefulness-banking77-v1.json"
+  @usefulness_config "examples/local_grpo_opaque_banking77/usefulness-v1-treatment.json"
 
   setup_all do
     output =
@@ -145,6 +147,45 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     assert source =~ "IMP_GRPO_OPAQUE_FRESH"
     assert source =~ "fresh selected predictions/errors differ"
     assert source =~ "TRLDeployment.stop(deployment)"
+  end
+
+  test "fresh-label usefulness treatment is source-pinned and split-disjoint" do
+    data = @usefulness_data |> File.read!() |> Jason.decode!()
+    config = @usefulness_config |> File.read!() |> Jason.decode!()
+
+    assert data["source"] == %{
+             "repository" => "PolyAI/banking77",
+             "revision" => "796a4623935746f71378f0ebd435635a8ce08e50",
+             "license" => "CC-BY-4.0",
+             "train_file" => "data/train-00000-of-00001.parquet",
+             "train_file_sha256" =>
+               "4526edfa60622ff9b39e238657ab6d712f6aba1ba91c9d7ed7897b0715ee0390",
+             "test_file" => "data/test-00000-of-00001.parquet",
+             "test_file_sha256" =>
+               "535fc96c4c2b4c2dbdeb0d4b31f24a4859620cf663d6c19c1bd1f97450c410be"
+           }
+
+    assert Enum.map(data["route_codes"], & &1["source_label_id"]) == [27, 38, 70, 32]
+    assert Enum.map(data["route_codes"], & &1["route"]) == ~w(R17 R42 R68 R93)
+    assert length(data["train"]) == 72
+    assert length(data["validation"]) == 8
+    assert length(data["held_out"]) == 40
+
+    ids = Enum.map(data["train"] ++ data["validation"] ++ data["held_out"], & &1["id"])
+    assert length(ids) == length(Enum.uniq(ids))
+    assert config["train_ids"] == Enum.map(data["train"], & &1["id"])
+    assert config["selection_ids"] == Enum.map(data["validation"], & &1["id"])
+    assert config["selection_source"] == "validation"
+
+    digest = fn rows ->
+      rows
+      |> Enum.map(&Imp.Optimizer.Report.encode_term/1)
+      |> Imp.Clients.TRLProtocol.digest()
+    end
+
+    assert digest.(data["train"]) == config["train_sha256"]
+    assert digest.(data["validation"]) == config["selection_sha256"]
+    assert digest.(data["held_out"]) == config["test_sha256"]
   end
 
   test "retained run preserves a complete neutral usefulness result" do

@@ -79,3 +79,41 @@ macro-F1 / zero errors on the frozen forty rows. Stable selection retained
 base, and fresh OS execution reproduced its exact artifact identity and ordered
 outputs byte-for-byte. This establishes that the full ordinary usefulness path
 can return an honest non-win; it does not establish learned improvement.
+
+## Fresh-label usefulness treatment
+
+`usefulness-v1-treatment.json` binds the same public runner, exact Qwen
+revision, TRL 1.6/MPS/LoRA backend, 38-step two-padded-schedule budget, opaque
+route prompt, exact semantic reward, validation-only selection, and fresh-OS
+artifact lifecycle to a new source-frozen Banking77 slice. It changes no model
+or trainer setting.
+
+The data snapshot is `benchmarks/data/grpo-usefulness-banking77-v1.json`. It is
+derived from `PolyAI/banking77` revision
+`796a4623935746f71378f0ebd435635a8ce08e50` (CC-BY-4.0; original parquet files
+388,204 bytes combined). Before any base or trained prediction, four label ids
+were selected by a declared SHA-256 ordering after excluding the predecessor's
+four labels: declined transfer, getting a physical card, verifying source of
+funds, and exchange rate. Their semantic names remain audit metadata and never
+enter the model prompt; they map to the same opaque `R17/R42/R68/R93` outputs.
+Within each source label, a second declared SHA-256 ordering freezes 18 train,
+2 validation, and 10 held-out rows, for disjoint 72/8/40 splits.
+
+Run the no-model preflight or the complete treatment with the already-installed
+pinned local worker/model:
+
+```sh
+export IMP_GRPO_OPAQUE_TREATMENT_CONFIG="$PWD/examples/local_grpo_opaque_banking77/usefulness-v1-treatment.json"
+export IMP_BANKING77_DATA="$PWD/benchmarks/data/grpo-usefulness-banking77-v1.json"
+export IMP_GRPO_OPAQUE_OUTPUT=/new/empty/output
+
+IMP_GRPO_OPAQUE_PREFLIGHT_ONLY=1 mix run examples/local_grpo_opaque_banking77/run.exs
+# or, from a different new output path:
+mix run examples/local_grpo_opaque_banking77/run.exs
+```
+
+This is a one-task/one-model usefulness measurement. A positive result cannot
+establish general GRPO effectiveness or parity; a neutral or negative result
+cannot establish GRPO ineffectiveness. No source label, row, reward, prompt,
+seed, optimizer setting, selection rule, or test metric may change after base
+evaluation begins.

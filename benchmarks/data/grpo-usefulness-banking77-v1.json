@@ -1,0 +1,896 @@
+{
+  "schema_version": 1,
+  "artifact_type": "imp_grpo_usefulness_dataset",
+  "source": {
+    "repository": "PolyAI/banking77",
+    "revision": "796a4623935746f71378f0ebd435635a8ce08e50",
+    "license": "CC-BY-4.0",
+    "train_file": "data/train-00000-of-00001.parquet",
+    "train_file_sha256": "4526edfa60622ff9b39e238657ab6d712f6aba1ba91c9d7ed7897b0715ee0390",
+    "test_file": "data/test-00000-of-00001.parquet",
+    "test_file_sha256": "535fc96c4c2b4c2dbdeb0d4b31f24a4859620cf663d6c19c1bd1f97450c410be"
+  },
+  "selection_policy": {
+    "label_policy": "first four non-predecessor labels ordered by sha256(imp-grpo-usefulness-banking77-v1: + canonical label name)",
+    "row_policy": "within source split and label, order by sha256(imp-grpo-usefulness-banking77-v1:split:label_id:source_index:text)",
+    "train_per_label": 18,
+    "selection_per_label": 2,
+    "test_per_label": 10,
+    "excluded_predecessor_label_ids": [
+      15,
+      16,
+      45,
+      53
+    ]
+  },
+  "route_codes": [
+    {
+      "source_label_id": 27,
+      "source_label": "declined_transfer",
+      "route": "R17"
+    },
+    {
+      "source_label_id": 38,
+      "source_label": "get_physical_card",
+      "route": "R42"
+    },
+    {
+      "source_label_id": 70,
+      "source_label": "verify_source_of_funds",
+      "route": "R68"
+    },
+    {
+      "source_label_id": 32,
+      "source_label": "exchange_rate",
+      "route": "R93"
+    }
+  ],
+  "task": "Four-way opaque-route intent classification over a fresh deterministic Banking77 label slice.",
+  "train": [
+    {
+      "id": "banking77-796a-train-5656",
+      "utterance": "I have been trying to make a transfer and it won't go through. I have checked all the receipts and its all correct but still won't let me do it.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5637",
+      "utterance": "I received a \"declined\" message when doing a transfer",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5572",
+      "utterance": "Why was one of my transfers declined?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5612",
+      "utterance": "Help me figure out why my transfer was declined",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5589",
+      "utterance": "Why are my transfers getting declined?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5556",
+      "utterance": "Why has my transfer been declined?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5546",
+      "utterance": "the bank transfer was declined",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5545",
+      "utterance": "I am having trouble doing a transfer. A \"Decline \" message appears after making the transfer.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5606",
+      "utterance": "Why do transfers get declined?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5645",
+      "utterance": "unsupported transfer declined",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5610",
+      "utterance": "I tried to transfer but it was declined",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5626",
+      "utterance": "Could not complete transfer, states 'declined'",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5615",
+      "utterance": "I got a message that my transfer was declined.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5617",
+      "utterance": "I tried to do a transfer but I got a message that it was declined.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5571",
+      "utterance": "Why would I get a decline message in a transfer?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5665",
+      "utterance": "My transfers keep on getting declined. My card was working fine up until now, however it has suddenly stopped working. Why is this?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5638",
+      "utterance": "Why did I get declined during a transfer?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5574",
+      "utterance": "I have been trying to make transfers to another account but I keep getting a declined notice. I have checked all of my information more than once and my information is accurate.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-4024",
+      "utterance": "Where should I look for my PIN number at?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4077",
+      "utterance": "can i go into my app to find my pin",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4010",
+      "utterance": "I am not able to see the card PIN anywhere?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4050",
+      "utterance": "When do I set up my card PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4052",
+      "utterance": "Do i have to wait to get the pin or can i set up a pin",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-3996",
+      "utterance": "Where can I get my card PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4029",
+      "utterance": "Where is my PIN located?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4013",
+      "utterance": "How do I find my PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4030",
+      "utterance": "I can't find the PIN.",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-3995",
+      "utterance": "Is my PIN sent separably?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4038",
+      "utterance": "How do I request the PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4016",
+      "utterance": "Where can I locate my card PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4002",
+      "utterance": "Where is my card PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4036",
+      "utterance": "How do I set up my card PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4007",
+      "utterance": "How will I know my pin number?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4097",
+      "utterance": "Can you deliver the PIN separately?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4086",
+      "utterance": "Is the PIN sent in another message?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-4070",
+      "utterance": "do i need to wait to get my card before getting a pin",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-6533",
+      "utterance": "I would like to verify my source of funds.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6550",
+      "utterance": "Is there a way to see my money's source?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6486",
+      "utterance": "Show me how to look at the source of my current funds?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6582",
+      "utterance": "Can someone please explain to me where my source of funds came from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6545",
+      "utterance": "What is the source of funds for my money?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6559",
+      "utterance": "How can I receive verification for the source of my funds?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6520",
+      "utterance": "I need to know where my funds come from.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6493",
+      "utterance": "Can you tell me where my readily available cash has come from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6510",
+      "utterance": "Is there a way for me to check my balance?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6555",
+      "utterance": "Is there a way to lookup where funds came from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6512",
+      "utterance": "Where do my available funds come from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6503",
+      "utterance": "I require verification for my source of funds.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6524",
+      "utterance": "Is there a way to see where my money originally came from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6587",
+      "utterance": "I'd like to know where my funds come from.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6489",
+      "utterance": "who can put money in my account?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6552",
+      "utterance": "I must verify the source of my funds",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6562",
+      "utterance": "I need to verify my funds.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6487",
+      "utterance": "Can I trace where my funds came from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-396",
+      "utterance": "where do you find your exchange rates?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-297",
+      "utterance": "How is the exchange rate doing?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-320",
+      "utterance": "Where are you getting your exchange rates from?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-349",
+      "utterance": "How does the exchange rate work?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-392",
+      "utterance": "How can I tell what foreign exchange rate I will get?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-304",
+      "utterance": "Do you have the best exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-333",
+      "utterance": "How do you find the exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-314",
+      "utterance": "What are the current exchange rates?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-326",
+      "utterance": "What method do you use for the exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-378",
+      "utterance": "Your exchange rates are coming from where?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-298",
+      "utterance": "I would like to know how exchange rates are calculated when transferring funds.",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-321",
+      "utterance": "How is the exchange rate calculated?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-391",
+      "utterance": "I am travelling and I was wondering what your exchange rates are",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-331",
+      "utterance": "Where can I find the exchange rate for my transfer?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-317",
+      "utterance": "How's the exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-384",
+      "utterance": "How did you guys get your exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-339",
+      "utterance": "What is your opinion on the exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-301",
+      "utterance": "Do you know what your exchange rates are?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    }
+  ],
+  "held_out": [
+    {
+      "id": "banking77-796a-test-1758",
+      "utterance": "I was attempting to purchase a golf club off eBay yesterday, but my credit card was declined. I tried multiple times, and again this morning. Can you check into my card please?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1743",
+      "utterance": "What is the reason my transfer was declined?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1745",
+      "utterance": "My transfer was declined",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1726",
+      "utterance": "How can I fix my card, it got declined twice.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1731",
+      "utterance": "If the transfer details have already but reviewed and confirmed that they are correct, what other reason would cause my transfer to be declined?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1732",
+      "utterance": "Why did I get a transfer declined?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1759",
+      "utterance": "I think my transfer was declined, but why?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1730",
+      "utterance": "The card got declined twice when I tried to use it to buy something online yesterday.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1721",
+      "utterance": "Good morning. I tried to make a purchase with my credit card last night and again this morning. Both times it was declined. Can you investigate?",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1722",
+      "utterance": "I am getting continuous failure for all my transfers. I have cross checked each recipient detail again and again and everything is correct.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-test-1243",
+      "utterance": "Are PIN separately?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1264",
+      "utterance": "Please help in finding my card PIN, thank you!",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1262",
+      "utterance": "Why isn't my PIN available yet?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1279",
+      "utterance": "where can user find pin?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1268",
+      "utterance": "I cannot locate the card PIN.",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1251",
+      "utterance": "I just got my new card but am not sure how to check its PIN.",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1250",
+      "utterance": "Where in the app can I find my PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1277",
+      "utterance": "Where is the card PIN?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1249",
+      "utterance": "where in the app can i find out about my new pin",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-1245",
+      "utterance": "How do I set-up my PIN for the new card?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-test-2032",
+      "utterance": "Where can I see the source of my money?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2000",
+      "utterance": "Can I verify the source of my funds?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2030",
+      "utterance": "How can I see where my money comes from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2017",
+      "utterance": "Help me check where the funds came from.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2018",
+      "utterance": "I want to know where the funds come from.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2022",
+      "utterance": "Can I see that history on my funds and where they came from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2008",
+      "utterance": "Why do you need all this information about my Source of Funds?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2034",
+      "utterance": "Where do my funds come from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2001",
+      "utterance": "I want information about the source of funds.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-2037",
+      "utterance": "How do I become aware of where my funds come from?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-test-89",
+      "utterance": "what are exchange rates based on",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-118",
+      "utterance": "when does the rate get determined",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-93",
+      "utterance": "Is it a good time to exchange?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-96",
+      "utterance": "Can you tell me where you get your exchange rates?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-109",
+      "utterance": "what is the exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-88",
+      "utterance": "How are exchange rates calculated?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-119",
+      "utterance": "What is the current exchange rate for me?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-114",
+      "utterance": "Can you tell me the foreign exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-84",
+      "utterance": "How do I find the exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-test-111",
+      "utterance": "How are you determining your exchange rates?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    }
+  ],
+  "validation": [
+    {
+      "id": "banking77-796a-train-5577",
+      "utterance": "It seems you keep declining my transfers. Before, it's always worked very well.Just now when I tried to buy something the card was declined. I tried more than once and it was the same thing each time.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-5652",
+      "utterance": "Why does my card continually get declined? I thought I had enough money in there but I've tried several times now and it still isn't working.",
+      "route": "R17",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "id": "banking77-796a-train-4026",
+      "utterance": "Where is the PIN for my card located?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-3997",
+      "utterance": "my pin hasn't arrived in the post! How do I cancel it or get a new one?",
+      "route": "R42",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "id": "banking77-796a-train-6541",
+      "utterance": "How can I find the source for my available funds and money?",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-6528",
+      "utterance": "I need to verify the source of funds.",
+      "route": "R68",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    },
+    {
+      "id": "banking77-796a-train-348",
+      "utterance": "Is there an exchange rate?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "id": "banking77-796a-train-368",
+      "utterance": "How do you do exchanges?",
+      "route": "R93",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    }
+  ],
+  "payload_sha256": "sha256:fc3f906440aafc975dd34de95e2adcfa84bde7f167ecb72bb45d92f9b817afb1"
+}

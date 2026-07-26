@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "treatment_id": "model-generated-banking77-fresh-labels-two-padded-schedules-v1",
+  "data_sha256": "2dc52c1b06002f44e03986d675cd05f078d4690fe3ee0a41be27c00c7135afb1",
+  "train_sha256": "sha256:d4fc5788711b80953f463b6f166b63a6e7d9bbd0d9eeb2e77127e5e1fe523839",
+  "selection_sha256": "sha256:ff86de5164a574e9b0e2ba49987ac8ca011f12b6e8596dce2cd8761bbb0af35f",
+  "test_sha256": "sha256:86d0b4408cfe573e04c934071c3b0fb68942b4e5e5d1aeb2559d8c1b19ad2473",
+  "contract_sha256": "848762a028f3340265e69ff8e09228f13f25aeba1c65ae601868022b41daafe3",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "seed": 20260726,
+  "routes": ["R17", "R42", "R68", "R93"],
+  "train_ids": [
+    "banking77-796a-train-5656", "banking77-796a-train-5637", "banking77-796a-train-5572", "banking77-796a-train-5612", "banking77-796a-train-5589", "banking77-796a-train-5556", "banking77-796a-train-5546", "banking77-796a-train-5545", "banking77-796a-train-5606", "banking77-796a-train-5645", "banking77-796a-train-5610", "banking77-796a-train-5626", "banking77-796a-train-5615", "banking77-796a-train-5617", "banking77-796a-train-5571", "banking77-796a-train-5665", "banking77-796a-train-5638", "banking77-796a-train-5574",
+    "banking77-796a-train-4024", "banking77-796a-train-4077", "banking77-796a-train-4010", "banking77-796a-train-4050", "banking77-796a-train-4052", "banking77-796a-train-3996", "banking77-796a-train-4029", "banking77-796a-train-4013", "banking77-796a-train-4030", "banking77-796a-train-3995", "banking77-796a-train-4038", "banking77-796a-train-4016", "banking77-796a-train-4002", "banking77-796a-train-4036", "banking77-796a-train-4007", "banking77-796a-train-4097", "banking77-796a-train-4086", "banking77-796a-train-4070",
+    "banking77-796a-train-6533", "banking77-796a-train-6550", "banking77-796a-train-6486", "banking77-796a-train-6582", "banking77-796a-train-6545", "banking77-796a-train-6559", "banking77-796a-train-6520", "banking77-796a-train-6493", "banking77-796a-train-6510", "banking77-796a-train-6555", "banking77-796a-train-6512", "banking77-796a-train-6503", "banking77-796a-train-6524", "banking77-796a-train-6587", "banking77-796a-train-6489", "banking77-796a-train-6552", "banking77-796a-train-6562", "banking77-796a-train-6487",
+    "banking77-796a-train-396", "banking77-796a-train-297", "banking77-796a-train-320", "banking77-796a-train-349", "banking77-796a-train-392", "banking77-796a-train-304", "banking77-796a-train-333", "banking77-796a-train-314", "banking77-796a-train-326", "banking77-796a-train-378", "banking77-796a-train-298", "banking77-796a-train-321", "banking77-796a-train-391", "banking77-796a-train-331", "banking77-796a-train-317", "banking77-796a-train-384", "banking77-796a-train-339", "banking77-796a-train-301"
+  ],
+  "selection_ids": [
+    "banking77-796a-train-5577", "banking77-796a-train-5652",
+    "banking77-796a-train-4026", "banking77-796a-train-3997",
+    "banking77-796a-train-6541", "banking77-796a-train-6528",
+    "banking77-796a-train-348", "banking77-796a-train-368"
+  ],
+  "selection_source": "validation"
+}

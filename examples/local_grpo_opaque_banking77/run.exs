@@ -77,10 +77,18 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   def run do
     cond do
       System.get_env("IMP_GRPO_OPAQUE_FRESH") == "1" -> fresh()
+      System.get_env("IMP_GRPO_OPAQUE_PREFLIGHT_ONLY") == "1" -> preflight_only()
       System.get_env("IMP_GRPO_OPAQUE_RESTORE_PREFLIGHT_ONLY") == "1" -> restore_preflight()
       System.get_env("IMP_GRPO_OPAQUE_RESUME_PREFLIGHT_ONLY") == "1" -> resume_preflight()
       true -> parent()
     end
+  end
+
+  defp preflight_only do
+    paths = paths!()
+    require_new_output!(paths.output)
+    _rows = preflight!(paths, :write)
+    IO.puts("opaque-route GRPO preflight complete: #{treatment_id()}")
   end
 
   defp resume_preflight do
@@ -111,7 +119,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
   defp run_parent(paths, resume?) do
     rows = preflight!(paths, if(resume?, do: :verify, else: :write))
-    trainer = trainer(paths, {:local_grpo_opaque_banking77, @seed})
+    trainer = trainer(paths, {:local_grpo_opaque_banking77, seed()})
     portable = program(Imp.req_llm("openai:portable-base"))
 
     base_selection =
@@ -159,10 +167,10 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
       summary = %{
         status: "complete",
-        treatment_id: @treatment_id,
+        treatment_id: treatment_id(),
         scope:
           "one task/model #{train_steps()}-step ordinary model-generated opaque-route local GRPO result",
-        model: @model,
+        model: model(),
         adapter: "Elixir.Imp.Adapter.JSON",
         training_generation_mode: "sample",
         evaluation_generation_mode: "greedy",
@@ -249,7 +257,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
   defp train!(paths, rows, trainer) do
     training_lm = %TRLLM{
-      model: @model,
+      model: model(),
       worker_key: trainer.worker_key,
       response_field: :route,
       timeout: 120_000
@@ -265,7 +273,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
         num_train_steps: train_steps(),
         num_dspy_examples_per_grpo_step: train_width(),
         num_rollouts_per_grpo_step: 4,
-        seed: @seed,
+        seed: seed(),
         train_kwargs: Definition.train_kwargs(),
         checkpoint_selection: :best_validation,
         num_steps_for_val: 1,
@@ -308,14 +316,14 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     Code.ensure_loaded!(Imp.Optimizer.GRPO)
 
     unless state["provider"] == "trl" and state["status"] == "succeeded" and
-             state["model"] == @model,
+             state["model"] == model(),
            do: raise("retained completed GRPO job identity drift")
 
     job =
       TrainingJob.new(%{
         id: Map.fetch!(state, "id"),
         provider: :trl,
-        model: @model,
+        model: model(),
         status: :succeeded,
         result_model: Map.fetch!(state, "result_model"),
         metadata: state["metadata"] |> Imp.Optimizer.Report.decode_term()
@@ -355,7 +363,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     rows = preflight!(paths, :verify)
     job = TrainingJob.load!(paths.job)
     portable = Imp.load!(paths.program)
-    trainer = trainer(paths, {:local_grpo_opaque_banking77_fresh, @seed})
+    trainer = trainer(paths, {:local_grpo_opaque_banking77_fresh, seed()})
     selection = read_json!(Path.join(paths.output, "04-selection.json"))
     selected_arm = selection["selected_arm"]
 
@@ -400,12 +408,12 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   end
 
   defp preflight!(paths, mode) when mode in [:write, :verify] do
-    unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
+    unless sha256_file(paths.data) == data_sha256(), do: raise("Banking77 data digest drift")
     unless File.regular?(paths.python), do: raise("pinned TRL Python is missing")
     unless File.dir?(paths.model), do: raise("pinned Qwen snapshot is missing")
     unless File.regular?(paths.contract), do: raise("pinned TRL contract is missing")
 
-    unless sha256_file(paths.contract) == @contract_sha256,
+    unless sha256_file(paths.contract) == contract_sha256(),
       do: raise("pinned opaque-route TRL contract digest drift")
 
     contract = read_json!(paths.contract)
@@ -419,31 +427,31 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
            do: raise("pinned opaque-route TRL optimizer contract drift")
 
     source = read_json!(paths.data)
-    train = ordered_rows!(source["train"], @train_ids)
-    selection = ordered_rows!(source["train"], @selection_ids)
+    train = ordered_rows!(source["train"], train_ids())
+    selection = ordered_rows!(source[selection_source()], selection_ids())
     test = source["held_out"]
 
     unless TRLProtocol.digest(Enum.map(train, &Imp.Optimizer.Report.encode_term/1)) ==
-             @train_sha256,
+             train_sha256(),
            do: raise("frozen train split drift")
 
     unless TRLProtocol.digest(Enum.map(selection, &Imp.Optimizer.Report.encode_term/1)) ==
-             @selection_sha256,
+             selection_sha256(),
            do: raise("frozen selection split drift")
 
-    unless source["digests"]["held_out"] == @test_sha256 and length(test) == 40,
+    unless test_digest(source, test) == test_sha256() and length(test) == 40,
       do: raise("frozen untouched test split drift")
 
     stage = %{
       status: "complete",
-      treatment_id: @treatment_id,
-      model: @model,
+      treatment_id: treatment_id(),
+      model: model(),
       runner_sha256: sha256_file(__ENV__.file),
       contract_sha256: sha256_file(paths.contract),
-      data_sha256: @data_sha256,
-      train_sha256: @train_sha256,
-      selection_sha256: @selection_sha256,
-      test_sha256: @test_sha256,
+      data_sha256: data_sha256(),
+      train_sha256: train_sha256(),
+      selection_sha256: selection_sha256(),
+      test_sha256: test_sha256(),
       train_steps: train_steps(),
       train_width: train_width(),
       contract_path: paths.contract,
@@ -557,7 +565,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   defp metrics(stage), do: Map.take(stage, [:accuracy, :macro_f1, :errors])
 
   defp macro_f1(rows) do
-    Enum.map(@routes, fn route ->
+    Enum.map(routes(), fn route ->
       tp = Enum.count(rows, &(&1.expected == route and &1.actual == route))
       fp = Enum.count(rows, &(&1.expected != route and &1.actual == route))
       fn_count = Enum.count(rows, &(&1.expected == route and &1.actual != route))
@@ -650,7 +658,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     output =
       System.get_env(
         "IMP_GRPO_OPAQUE_OUTPUT",
-        "/Users/deepfates/.cache/imp/trl/#{@treatment_id}"
+        "/Users/deepfates/.cache/imp/trl/#{treatment_id()}"
       )
 
     %{
@@ -737,6 +745,73 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
 
     if File.regular?(Path.join(paths.output, "result.json")),
       do: raise("completed GRPO output cannot be resumed")
+  end
+
+  defp treatment do
+    case System.get_env("IMP_GRPO_OPAQUE_TREATMENT_CONFIG") do
+      nil ->
+        %{
+          "schema_version" => 1,
+          "treatment_id" => @treatment_id,
+          "data_sha256" => @data_sha256,
+          "train_sha256" => @train_sha256,
+          "selection_sha256" => @selection_sha256,
+          "test_sha256" => @test_sha256,
+          "contract_sha256" => @contract_sha256,
+          "model" => @model,
+          "seed" => @seed,
+          "routes" => @routes,
+          "train_ids" => @train_ids,
+          "selection_ids" => @selection_ids,
+          "selection_source" => "train"
+        }
+
+      path ->
+        path
+        |> Path.expand()
+        |> File.read!()
+        |> Jason.decode!()
+        |> validate_treatment!()
+    end
+  end
+
+  defp validate_treatment!(config) do
+    required = ~w(
+      schema_version treatment_id data_sha256 train_sha256 selection_sha256 test_sha256
+      contract_sha256 model seed routes train_ids selection_ids selection_source
+    )
+
+    unless Map.keys(config) |> Enum.sort() == Enum.sort(required),
+      do: raise("GRPO opaque treatment config has missing or unsupported fields")
+
+    unless config["schema_version"] == 1 and is_binary(config["treatment_id"]) and
+             is_binary(config["data_sha256"]) and is_binary(config["train_sha256"]) and
+             is_binary(config["selection_sha256"]) and is_binary(config["test_sha256"]) and
+             is_binary(config["contract_sha256"]) and is_binary(config["model"]) and
+             is_integer(config["seed"]) and length(config["routes"]) == 4 and
+             length(config["train_ids"]) == 72 and length(config["selection_ids"]) == 8 and
+             config["selection_source"] in ["train", "validation"],
+           do: raise("GRPO opaque treatment config has invalid field values")
+
+    config
+  end
+
+  defp data_sha256, do: treatment()["data_sha256"]
+  defp train_sha256, do: treatment()["train_sha256"]
+  defp selection_sha256, do: treatment()["selection_sha256"]
+  defp test_sha256, do: treatment()["test_sha256"]
+  defp contract_sha256, do: treatment()["contract_sha256"]
+  defp model, do: treatment()["model"]
+  defp seed, do: treatment()["seed"]
+  defp treatment_id, do: treatment()["treatment_id"]
+  defp routes, do: treatment()["routes"]
+  defp train_ids, do: treatment()["train_ids"]
+  defp selection_ids, do: treatment()["selection_ids"]
+  defp selection_source, do: treatment()["selection_source"]
+
+  defp test_digest(source, test) do
+    get_in(source, ["digests", "held_out"]) ||
+      TRLProtocol.digest(Enum.map(test, &Imp.Optimizer.Report.encode_term/1))
   end
 
   defp train_steps, do: Definition.train_steps()

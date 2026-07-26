@@ -190,6 +190,7 @@ defmodule Imp.MixProject do
       Path.wildcard("examples/local_signature_optimizer_banking77/**/*") ++
       Path.wildcard("examples/local_simba_banking77/**/*") ++
       Path.wildcard("examples/provider_free_ticket_router/**/*") ++
+      ["benchmarks/data/grpo-usefulness-banking77-v1.json"] ++
       product_docs() ++
       livebooks() ++
       [
