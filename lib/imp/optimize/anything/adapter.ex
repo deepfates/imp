@@ -38,6 +38,7 @@ defmodule Imp.Optimize.Anything.Adapter do
     optimization_state_store: nil,
     checkpoint_identity: nil,
     refiner: nil,
+    cache_evaluation: false,
     best_example_evals_k: @default_best_example_evals_k,
     capture_stdio: false,
     raise_on_exception: true,
@@ -60,6 +61,7 @@ defmodule Imp.Optimize.Anything.Adapter do
           optimization_state_store: pid(),
           checkpoint_identity: map() | nil,
           refiner: keyword() | nil,
+          cache_evaluation: boolean(),
           best_example_evals_k: non_neg_integer(),
           capture_stdio: boolean(),
           raise_on_exception: boolean(),
@@ -97,6 +99,7 @@ defmodule Imp.Optimize.Anything.Adapter do
       optimization_state: Keyword.get(opts, :optimization_state, %OptimizationState{}),
       checkpoint_identity: Keyword.get(opts, :checkpoint_identity),
       refiner: Keyword.get(opts, :refiner),
+      cache_evaluation: Keyword.get(opts, :cache_evaluation, false),
       best_example_evals_k:
         Keyword.get(opts, :best_example_evals_k, @default_best_example_evals_k),
       capture_stdio: Keyword.get(opts, :capture_stdio, false),
@@ -171,7 +174,11 @@ defmodule Imp.Optimize.Anything.Adapter do
         end)
       end)
 
-    evaluations = evaluate_grouped(adapter, contexts)
+    {evaluation_contexts, context_positions} =
+      maybe_deduplicate_contexts(contexts, adapter.cache_evaluation)
+
+    unique_evaluations = evaluate_grouped(adapter, evaluation_contexts)
+    evaluations = Enum.map(context_positions, &Enum.fetch!(unique_evaluations, &1))
 
     Enum.each(Enum.zip(contexts, evaluations), fn {context, evaluation} ->
       if is_nil(evaluation.trajectory.error) do
@@ -354,6 +361,33 @@ defmodule Imp.Optimize.Anything.Adapter do
     catch
       kind, reason -> {:raised, kind, reason, __STACKTRACE__, public_candidate, example, index}
     end
+  end
+
+  defp maybe_deduplicate_contexts(contexts, false) do
+    {contexts, indexes(length(contexts))}
+  end
+
+  # Pinned v0.1.4 coalesces duplicate cache misses inside one grouped call,
+  # then expands the single result back into every original ordered slot.
+  defp maybe_deduplicate_contexts(contexts, true) do
+    {unique, positions, _seen, _count} =
+      Enum.reduce(contexts, {[], [], %{}, 0}, fn context, {unique, positions, seen, count} ->
+        key =
+          :erlang.term_to_binary(
+            {context.evaluator_candidate, context.public_example},
+            [:deterministic]
+          )
+
+        case Map.fetch(seen, key) do
+          {:ok, position} ->
+            {unique, [position | positions], seen, count}
+
+          :error ->
+            {[context | unique], [count | positions], Map.put(seen, key, count), count + 1}
+        end
+      end)
+
+    {Enum.reverse(unique), Enum.reverse(positions)}
   end
 
   defp evaluate_grouped(_adapter, []), do: []
@@ -1045,6 +1079,10 @@ defmodule Imp.Optimize.Anything.Adapter do
       raise ArgumentError, ":capture_stdio must be a boolean"
     end
 
+    unless is_boolean(adapter.cache_evaluation) do
+      raise ArgumentError, ":cache_evaluation must be a boolean"
+    end
+
     unless is_integer(adapter.max_concurrency) and adapter.max_concurrency > 0 do
       raise ArgumentError, ":max_concurrency must be a positive integer"
     end
@@ -1095,6 +1133,7 @@ defmodule Imp.Optimize.Anything.Adapter do
       :optimization_state,
       :checkpoint_identity,
       :refiner,
+      :cache_evaluation,
       :best_example_evals_k,
       :batch_evaluator,
       :capture_stdio,
@@ -1117,6 +1156,9 @@ defmodule Imp.Optimize.Anything.Adapter do
   defp validate_candidate_key!(key) do
     raise ArgumentError, ":candidate_key must be an atom or string, got: #{inspect(key)}"
   end
+
+  defp indexes(0), do: []
+  defp indexes(size), do: Enum.to_list(0..(size - 1))
 
   defp validate_structured_codec!(:structured, %StructuredCandidate{}), do: :ok
   defp validate_structured_codec!(format, nil) when format in [:named, :string], do: :ok

@@ -115,6 +115,57 @@ defmodule Imp.Optimize.Anything.RunnerTest do
            ]
   end
 
+  test "cached batch evaluation deduplicates repeated structured pairs without losing identity" do
+    receiver = self()
+
+    artifact = %{
+      enabled: true,
+      retries: 2,
+      threshold: 0.75,
+      labels: ["priority", "billing"]
+    }
+
+    selection = %{split: :selection, id: "same-row"}
+
+    result =
+      Anything.run(
+        artifact,
+        nil,
+        dataset: [%{split: :train, id: "train-only"}],
+        valset: [selection, selection],
+        batch_evaluator: fn pairs ->
+          send(receiver, {:batch, pairs})
+          Enum.map(pairs, fn {_candidate, example} -> {1.0, %{id: example.id}} end)
+        end,
+        fallback_proposer: fn candidate, component, _records, _iteration ->
+          Map.fetch!(candidate, component)
+        end,
+        config: Config.new(engine: [max_candidate_proposals: 0, cache_evaluation: true])
+      )
+
+    assert Result.best_candidate(result) == artifact
+    assert result.validation_subscores == [%{0 => 1.0, 1 => 1.0}]
+    assert_receive {:batch, [{^artifact, ^selection}]}
+    refute_receive {:batch, _pairs}
+
+    Anything.run(
+      artifact,
+      nil,
+      dataset: [%{split: :train, id: "train-only"}],
+      valset: [selection, selection],
+      batch_evaluator: fn pairs ->
+        send(receiver, {:uncached_batch, pairs})
+        Enum.map(pairs, fn {_candidate, example} -> {1.0, %{id: example.id}} end)
+      end,
+      fallback_proposer: fn candidate, component, _records, _iteration ->
+        Map.fetch!(candidate, component)
+      end,
+      config: Config.new(engine: [max_candidate_proposals: 0, cache_evaluation: false])
+    )
+
+    assert_receive {:uncached_batch, [{^artifact, ^selection}, {^artifact, ^selection}]}
+  end
+
   test "public batch evaluator alone receives nil example in single-task mode" do
     receiver = self()
 

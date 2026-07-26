@@ -92,6 +92,7 @@ defmodule Imp.Optimize.Anything.Runner do
         best_example_evals_k: config.engine.best_example_evals_k,
         capture_stdio: config.engine.capture_stdio,
         refiner: refiner_options(config),
+        cache_evaluation: config.engine.cache_evaluation,
         max_concurrency: max_concurrency(config),
         timeout: Keyword.get(opts, :timeout, 30_000)
       ]
