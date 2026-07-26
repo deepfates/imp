@@ -7,6 +7,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @usefulness_data "benchmarks/data/grpo-usefulness-banking77-v1.json"
   @usefulness_config "examples/local_grpo_opaque_banking77/usefulness-v1-treatment.json"
   @usefulness_result "examples/local_grpo_opaque_banking77/exercised-usefulness-v1-result.json"
+  @semantic_config "examples/local_grpo_opaque_banking77/semantic-v1-treatment.json"
 
   setup_all do
     output =
@@ -187,6 +188,31 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     assert digest.(data["train"]) == config["train_sha256"]
     assert digest.(data["validation"]) == config["selection_sha256"]
     assert digest.(data["held_out"]) == config["test_sha256"]
+  end
+
+  test "disclosed-semantics treatment changes only the frozen information boundary and seed" do
+    opaque = @usefulness_config |> File.read!() |> Jason.decode!()
+    semantic = @semantic_config |> File.read!() |> Jason.decode!()
+
+    assert semantic["schema_version"] == 2
+
+    assert semantic["treatment_id"] ==
+             "model-generated-banking77-disclosed-route-semantics-v1"
+
+    for key <-
+          ~w(data_sha256 train_sha256 selection_sha256 test_sha256 contract_sha256 model routes selection_source) do
+      assert semantic[key] == opaque[key]
+    end
+
+    assert semantic["seed"] != opaque["seed"]
+    assert semantic["instruction"] =~ "R17 means a transfer was declined"
+    assert semantic["instruction"] =~ "R42 means the customer wants to obtain a physical card"
+    assert semantic["instruction"] =~ "R68 means the customer must verify the source of funds"
+    assert semantic["instruction"] =~ "R93 means the customer is asking about an exchange rate"
+
+    source = File.read!(@source)
+    assert source =~ "instruction_sha256: TRLProtocol.digest(instruction())"
+    assert source =~ "Definition.instruction()"
   end
 
   test "retained run preserves a complete neutral usefulness result" do

@@ -427,8 +427,17 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
            do: raise("pinned opaque-route TRL optimizer contract drift")
 
     source = read_json!(paths.data)
-    train = ordered_rows!(source["train"], train_ids())
-    selection = ordered_rows!(source[selection_source()], selection_ids())
+
+    {train, selection} =
+      case treatment()["schema_version"] do
+        1 ->
+          {ordered_rows!(source["train"], treatment()["train_ids"]),
+           ordered_rows!(source[selection_source()], treatment()["selection_ids"])}
+
+        2 ->
+          {source["train"], source[selection_source()]}
+      end
+
     test = source["held_out"]
 
     unless TRLProtocol.digest(Enum.map(train, &Imp.Optimizer.Report.encode_term/1)) ==
@@ -452,6 +461,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
       train_sha256: train_sha256(),
       selection_sha256: selection_sha256(),
       test_sha256: test_sha256(),
+      instruction_sha256: TRLProtocol.digest(instruction()),
       train_steps: train_steps(),
       train_width: train_width(),
       contract_path: paths.contract,
@@ -498,7 +508,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     Imp.predict(
       Imp.signature(
         "utterance -> route: enum[R17,R42,R68,R93]",
-        Definition.instruction()
+        instruction()
       ),
       lm: lm,
       adapter: Imp.Adapter.JSON,
@@ -776,22 +786,38 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   end
 
   defp validate_treatment!(config) do
-    required = ~w(
+    identity = ~w(
       schema_version treatment_id data_sha256 train_sha256 selection_sha256 test_sha256
-      contract_sha256 model seed routes train_ids selection_ids selection_source
+      contract_sha256 model seed routes selection_source
     )
+
+    required =
+      case config["schema_version"] do
+        1 -> identity ++ ~w(train_ids selection_ids)
+        2 -> identity ++ ["instruction"]
+        _other -> []
+      end
 
     unless Map.keys(config) |> Enum.sort() == Enum.sort(required),
       do: raise("GRPO opaque treatment config has missing or unsupported fields")
 
-    unless config["schema_version"] == 1 and is_binary(config["treatment_id"]) and
+    unless config["schema_version"] in [1, 2] and is_binary(config["treatment_id"]) and
              is_binary(config["data_sha256"]) and is_binary(config["train_sha256"]) and
              is_binary(config["selection_sha256"]) and is_binary(config["test_sha256"]) and
              is_binary(config["contract_sha256"]) and is_binary(config["model"]) and
              is_integer(config["seed"]) and length(config["routes"]) == 4 and
-             length(config["train_ids"]) == 72 and length(config["selection_ids"]) == 8 and
              config["selection_source"] in ["train", "validation"],
            do: raise("GRPO opaque treatment config has invalid field values")
+
+    if config["schema_version"] == 1 and
+         (length(config["train_ids"]) != 72 or length(config["selection_ids"]) != 8) do
+      raise("GRPO opaque treatment config has invalid field values")
+    end
+
+    if config["schema_version"] == 2 and
+         (not is_binary(config["instruction"]) or String.trim(config["instruction"]) == "") do
+      raise("GRPO opaque treatment config has an invalid instruction")
+    end
 
     config
   end
@@ -805,9 +831,8 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
   defp seed, do: treatment()["seed"]
   defp treatment_id, do: treatment()["treatment_id"]
   defp routes, do: treatment()["routes"]
-  defp train_ids, do: treatment()["train_ids"]
-  defp selection_ids, do: treatment()["selection_ids"]
   defp selection_source, do: treatment()["selection_source"]
+  defp instruction, do: treatment()["instruction"] || Definition.instruction()
 
   defp test_digest(source, test) do
     get_in(source, ["digests", "held_out"]) ||

@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "treatment_id": "model-generated-banking77-disclosed-route-semantics-v1",
+  "data_sha256": "2dc52c1b06002f44e03986d675cd05f078d4690fe3ee0a41be27c00c7135afb1",
+  "train_sha256": "sha256:d4fc5788711b80953f463b6f166b63a6e7d9bbd0d9eeb2e77127e5e1fe523839",
+  "selection_sha256": "sha256:ff86de5164a574e9b0e2ba49987ac8ca011f12b6e8596dce2cd8761bbb0af35f",
+  "test_sha256": "sha256:86d0b4408cfe573e04c934071c3b0fb68942b4e5e5d1aeb2559d8c1b19ad2473",
+  "contract_sha256": "848762a028f3340265e69ff8e09228f13f25aeba1c65ae601868022b41daafe3",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "seed": 20260727,
+  "routes": ["R17", "R42", "R68", "R93"],
+  "selection_source": "validation",
+  "instruction": "Classify the customer request into exactly one route code. R17 means a transfer was declined. R42 means the customer wants to obtain a physical card. R68 means the customer must verify the source of funds. R93 means the customer is asking about an exchange rate. Return exactly one of R17, R42, R68, or R93."
+}

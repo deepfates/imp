@@ -128,3 +128,31 @@ execution reproduced the selected base artifact and ordered results
 byte-for-byte. This is a complete neutral result on one fresh-label slice, not
 evidence of useful learning, general GRPO/mmGRPO effectiveness, parity,
 production reliability, or BEAM superiority.
+
+## Disclosed-semantics treatment
+
+`semantic-v1-treatment.json` defines a separate ordinary classification
+treatment over the same source-frozen 72/8/40 rows. Unlike the opaque-label
+treatments, its instruction discloses the meaning of each route code. The
+model, official TRL 1.6 defaults, LoRA shape, 38-step schedule, exact semantic
+reward, validation-only arm selection, and frozen test boundary are unchanged.
+The instruction digest is retained in preflight so a resumed job cannot cross
+the information boundary.
+
+This condition asks whether the completed GRPO engine can improve a small,
+learnable real classification task; it does not ask the policy to infer a
+secret permutation. Exact-route reward still requires the semantically correct
+class, so returning valid JSON or a well-formed route token alone cannot earn
+reward. Run it once from a new output directory with the existing cached model
+and worker:
+
+```sh
+export IMP_GRPO_OPAQUE_TREATMENT_CONFIG="$PWD/examples/local_grpo_opaque_banking77/semantic-v1-treatment.json"
+export IMP_BANKING77_DATA="$PWD/benchmarks/data/grpo-usefulness-banking77-v1.json"
+export IMP_GRPO_OPAQUE_OUTPUT=/new/empty/output
+mix run examples/local_grpo_opaque_banking77/run.exs
+```
+
+The trained arm is deployed only if it beats base on the eight validation
+rows. A completed positive, neutral, or negative result remains specific to
+this task, model, seed, and budget.
