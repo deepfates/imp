@@ -170,6 +170,7 @@ defmodule Imp.Optimizer.DemoCandidates do
 
     inputs
     |> Map.merge(Map.new(outputs))
+    |> Map.put("imp_augmented", true)
     |> Imp.Example.new()
     |> Imp.Example.with_inputs(Map.keys(inputs))
   end

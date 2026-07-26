@@ -67,6 +67,24 @@ The implementation performs:
 Reports preserve effective configuration, parameter assignments, trial kind,
 full-evaluation history, call accounting, seed, upstream release, and commit.
 
+Grounded instruction proposals follow the released predictor-major decision
+order. Proposal slot `j` for each named predictor starts from that predictor's
+demo set `j`, then visits later and earlier sets cyclically, admitting only
+bootstrapped trajectory demonstrations until the context limit is reached.
+Slot zero renders no task demonstrations, matching the released special case.
+Imp stores the bootstrap provenance as the internal `imp_augmented` example
+field; it is unavailable through `Example.keys/items/values` and is stripped
+from both proposal payloads and task-adapter rendering. Labeled examples remain
+eligible for the categorical demo search but cannot silently replace the
+trajectory evidence grounding an instruction proposal.
+
+DSPy gives every predictor/proposal call a random `randint` rollout ID from one
+shared Python RNG. Imp uses a collision-free predictor-major sequence derived
+from the declared seed and records predictor index, proposal/demo-set index,
+grounded-demo count, and rollout ID in the MIPRO report. That is a deliberate
+BEAM RNG/replay difference; the proposal/demo evidence and search-space
+topology, rather than incidental integer identity, are the shared contract.
+
 DSPy delegates this stage to Optuna's multivariate `TPESampler`; Imp uses a
 native joint categorical Parzen implementation with explicit immutable random
 state. The engines are expected to share the search-space, observation, and

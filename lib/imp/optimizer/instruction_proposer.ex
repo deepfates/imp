@@ -27,23 +27,38 @@ defmodule Imp.Optimizer.InstructionProposer do
     case Keyword.get(opts, :lm) || Keyword.get(opts, :proposer_lm) do
       nil ->
         {fallback_slots(fallback, count, opts),
-         %{status: :fallback, calls: 0, errors: [:proposal_lm_not_configured]}}
+         %{
+           status: :fallback,
+           calls: 0,
+           errors: [:proposal_lm_not_configured],
+           slots: proposal_slots(opts, count)
+         }}
 
       lm ->
-        proposal_indices(count)
-        |> Enum.map_reduce(%{calls: 0, errors: []}, fn index, metadata ->
+        proposal_indices(count, opts)
+        |> Enum.map_reduce(%{calls: 0, errors: [], slots: []}, fn index, metadata ->
+          demos = proposal_demos(opts, index)
+          rollout_id = proposal_rollout_id(opts, index)
+
           proposal_opts =
             opts
             |> Keyword.update(:seed, index, &(&1 + index))
             |> Keyword.put(:proposal_index, index)
-            |> Keyword.put(:demos, proposal_demos(opts, index))
+            |> Keyword.put(:demos, demos)
+
+          metadata = %{
+            metadata
+            | slots:
+                metadata.slots ++
+                  [proposal_slot(opts, index, demos, rollout_id)]
+          }
 
           result =
             Imp.LM.generate(
               lm,
               messages(program, trainset, proposal_opts),
               proposal_lm_opts(lm, proposal_response_format,
-                rollout_id: Keyword.get(proposal_opts, :seed, index),
+                rollout_id: rollout_id,
                 temperature: Keyword.get(opts, :temperature, 1.0)
               )
             )
@@ -93,14 +108,25 @@ defmodule Imp.Optimizer.InstructionProposer do
          Keyword.get(opts, :count, 5),
          opts
        ),
-       %{status: :fallback, calls: 0, errors: [{:proposal_exception, Exception.message(error)}]}}
+       %{
+         status: :fallback,
+         calls: 0,
+         errors: [{:proposal_exception, Exception.message(error)}],
+         slots: proposal_slots(opts, Keyword.get(opts, :count, 5))
+       }}
   catch
     kind, reason ->
       {fallback_slots(
          fallback_candidates(program, trainset, opts),
          Keyword.get(opts, :count, 5),
          opts
-       ), %{status: :fallback, calls: 0, errors: [{:proposal_throw, kind, reason}]}}
+       ),
+       %{
+         status: :fallback,
+         calls: 0,
+         errors: [{:proposal_throw, kind, reason}],
+         slots: proposal_slots(opts, Keyword.get(opts, :count, 5))
+       }}
   end
 
   @doc false
@@ -118,6 +144,23 @@ defmodule Imp.Optimizer.InstructionProposer do
   end
 
   def grounded_demo_rotation(_demo_sets, _proposal_index, _max_examples), do: []
+
+  @doc false
+  def grounded_augmented_demos(demo_sets, proposal_index, max_examples \\ 3)
+
+  def grounded_augmented_demos(_demo_sets, 0, _max_examples), do: []
+
+  def grounded_augmented_demos(demo_sets, proposal_index, max_examples)
+      when is_list(demo_sets) and demo_sets != [] and is_integer(proposal_index) and
+             proposal_index > 0 and is_integer(max_examples) and max_examples >= 0 do
+    demo_sets
+    |> rotate(proposal_index)
+    |> List.flatten()
+    |> Enum.filter(&augmented_demo?/1)
+    |> Enum.take(max_examples)
+  end
+
+  def grounded_augmented_demos(_demo_sets, _proposal_index, _max_examples), do: []
 
   defp propose_with_lm(lm, program, trainset, opts, count, fallback) do
     lm
@@ -160,6 +203,7 @@ defmodule Imp.Optimizer.InstructionProposer do
     payload = %{
       current_instruction: Imp.Optimizer.InstructionSearch.current_instruction(program),
       predictor_name: Keyword.get(opts, :predictor_name, :main),
+      predictor_index: Keyword.get(opts, :predictor_index, 0),
       proposal_index: Keyword.get(opts, :proposal_index, 0),
       scored_examples: scored_examples
     }
@@ -236,7 +280,7 @@ defmodule Imp.Optimizer.InstructionProposer do
   defp proposal_demos(opts, index) do
     case Keyword.get(opts, :demo_sets) do
       sets when is_list(sets) and sets != [] ->
-        grounded_demo_rotation(sets, index, Keyword.get(opts, :num_demos_in_context, 3))
+        grounded_augmented_demos(sets, index, Keyword.get(opts, :num_demos_in_context, 3))
 
       _ ->
         Keyword.get(opts, :demos, [])
@@ -249,7 +293,12 @@ defmodule Imp.Optimizer.InstructionProposer do
     after_offset ++ before
   end
 
-  defp normalize_example(%Imp.Example{} = example), do: Imp.Example.to_map(example)
+  defp normalize_example(%Imp.Example{} = example) do
+    example
+    |> Imp.Example.items()
+    |> Map.new()
+  end
+
   defp normalize_example(example) when is_map(example), do: example
   defp normalize_example(example), do: inspect(example)
 
@@ -283,8 +332,47 @@ defmodule Imp.Optimizer.InstructionProposer do
   defp maybe_put(payload, _key, false, _value), do: payload
   defp maybe_put(payload, key, true, value), do: Map.put(payload, key, value)
 
-  defp proposal_indices(count) when count > 0, do: 0..(count - 1)
-  defp proposal_indices(_count), do: []
+  defp proposal_indices(count, opts) when count > 0 do
+    available =
+      case Keyword.get(opts, :demo_sets) do
+        sets when is_list(sets) and sets != [] -> min(count, length(sets))
+        _other -> count
+      end
+
+    if available > 0, do: 0..(available - 1), else: []
+  end
+
+  defp proposal_indices(_count, _opts), do: []
+
+  defp proposal_rollout_id(opts, index) do
+    Keyword.get(opts, :seed, 0) + Keyword.get(opts, :rollout_id_offset, 0) + index
+  end
+
+  defp proposal_slots(opts, count) do
+    Enum.map(proposal_indices(count, opts), fn index ->
+      demos = proposal_demos(opts, index)
+      proposal_slot(opts, index, demos, proposal_rollout_id(opts, index))
+    end)
+  end
+
+  defp proposal_slot(opts, index, demos, rollout_id) do
+    %{
+      predictor_name: Keyword.get(opts, :predictor_name, :main),
+      predictor_index: Keyword.get(opts, :predictor_index, 0),
+      proposal_index: index,
+      demo_set_index: index,
+      grounded_demo_count: length(demos),
+      rollout_id: rollout_id
+    }
+  end
+
+  defp augmented_demo?(%Imp.Example{} = example),
+    do: Imp.Example.get(example, :imp_augmented, false) == true
+
+  defp augmented_demo?(example) when is_map(example),
+    do: Map.get(example, :imp_augmented, Map.get(example, "imp_augmented", false)) == true
+
+  defp augmented_demo?(_example), do: false
 
   defp proposal_lm_opts(lm, response_format, opts) do
     if proposal_response_format_enabled?(lm, response_format) do
@@ -346,10 +434,12 @@ defmodule Imp.Optimizer.InstructionProposer do
   defp fallback_at(fallback, index), do: Enum.at(fallback, rem(index, length(fallback)))
 
   defp fallback_slots(fallback, count, opts) do
+    indices = proposal_indices(count, opts)
+
     if Keyword.get(opts, :preserve_slots, false) do
-      Enum.map(proposal_indices(count), &fallback_at(fallback, &1))
+      Enum.map(indices, &fallback_at(fallback, &1))
     else
-      Enum.take(fallback, count)
+      Enum.take(fallback, length(indices))
     end
   end
 

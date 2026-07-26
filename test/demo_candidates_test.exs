@@ -67,6 +67,17 @@ defmodule Imp.Optimizer.DemoCandidatesTest do
     assert [[], [labeled], [bootstrapped | _]] = candidates.main
     assert Imp.Example.to_map(labeled).answer == "yes"
     assert Imp.Example.to_map(bootstrapped).answer == "yes"
+    assert Imp.Example.get(bootstrapped, :imp_augmented)
+    refute :imp_augmented in Imp.Example.keys(bootstrapped)
+    refute true in Imp.Example.values(bootstrapped)
+    refute Enum.any?(Imp.Example.items(bootstrapped), &(elem(&1, 0) == "imp_augmented"))
+
+    rendered =
+      program.signature
+      |> Imp.Adapter.Chat.format(%{question: "next"}, demos: [bootstrapped])
+      |> inspect()
+
+    refute rendered =~ "imp_augmented"
   end
 
   test "zero-shot candidate building still produces grounding demos for proposal" do
@@ -82,8 +93,8 @@ defmodule Imp.Optimizer.DemoCandidatesTest do
       )
 
     assert [[], [first_demo], [second_demo]] = candidates.main
-    assert Imp.Example.to_map(first_demo) == %{question: "q", answer: "yes"}
-    assert Imp.Example.to_map(second_demo) == %{question: "q", answer: "yes"}
+    assert Map.new(Imp.Example.items(first_demo)) == %{question: "q", answer: "yes"}
+    assert Map.new(Imp.Example.items(second_demo)) == %{question: "q", answer: "yes"}
   end
 
   test "keeps the canonical third candidate in source trainset order" do
@@ -124,12 +135,12 @@ defmodule Imp.Optimizer.DemoCandidatesTest do
       )
 
     assert [[], [first_demo], [second_first_demo]] = candidates.first
-    assert Imp.Example.to_map(first_demo) == %{question: "q again", hint: "two"}
-    assert Imp.Example.to_map(second_first_demo) == %{question: "q again", hint: "two"}
+    assert Map.new(Imp.Example.items(first_demo)) == %{question: "q again", hint: "two"}
+    assert Map.new(Imp.Example.items(second_first_demo)) == %{question: "q again", hint: "two"}
 
     assert [[], [second_demo], [second_second_demo]] = candidates.second
-    assert Imp.Example.to_map(second_demo) == %{hint: "two", answer: "yes"}
-    assert Imp.Example.to_map(second_second_demo) == %{hint: "two", answer: "yes"}
+    assert Map.new(Imp.Example.items(second_demo)) == %{hint: "two", answer: "yes"}
+    assert Map.new(Imp.Example.items(second_second_demo)) == %{hint: "two", answer: "yes"}
   end
 
   test "aborts bootstrapping when the configured error budget is exhausted" do

@@ -74,7 +74,8 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
       )
 
     assert candidates == ["Instruction 20", "Instruction 21"]
-    assert report == %{status: :ok, calls: 2, errors: []}
+    assert %{status: :ok, calls: 2, errors: [], slots: slots} = report
+    assert Enum.map(slots, & &1.rollout_id) == [20, 21]
     assert_received {:proposal_rollout, 20}
     assert_received {:proposal_rollout, 21}
 
@@ -106,14 +107,14 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
     assert ["Use the provider proposal."] =
              InstructionProposer.propose(program, [example], lm: lm, count: 1)
 
-    assert {["Use the provider proposal."], %{status: :ok, calls: 1, errors: []}} =
+    assert {["Use the provider proposal."], %{status: :ok, calls: 1, errors: [], slots: [_]}} =
              InstructionProposer.propose_with_report(program, [example],
                lm: lm,
                count: 1
              )
   end
 
-  test "proposal slots rotate grounded demo sets and preserve repeated instructions" do
+  test "proposal slots rotate only augmented demos and preserve repeated instructions" do
     parent = self()
 
     lm = %{
@@ -129,25 +130,31 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
 
     program = Imp.predict("question -> answer")
 
-    demos =
-      Enum.map(["a", "b", "c"], fn question ->
-        [Imp.example(question: question, answer: question) |> Imp.with_inputs(:question)]
-      end)
+    labeled = Imp.example(question: "labeled", answer: "labeled") |> Imp.with_inputs(:question)
+
+    augmented = fn question ->
+      Imp.example(question: question, answer: question, imp_augmented: true)
+      |> Imp.with_inputs(:question)
+    end
+
+    demos = [[], [labeled], [augmented.("a"), augmented.("b")], [augmented.("c")]]
 
     {candidates, report} =
       InstructionProposer.propose_with_report(program, List.flatten(demos),
         lm: lm,
-        count: 3,
+        count: 4,
         seed: 10,
         demo_sets: demos,
         preserve_slots: true
       )
 
-    assert candidates == ["same instruction", "same instruction", "same instruction"]
-    assert report.calls == 3
+    assert candidates == List.duplicate("same instruction", 4)
+    assert report.calls == 4
     assert_received {:proposal_demos, 10, []}
-    assert_received {:proposal_demos, 11, [%{"answer" => "b", "question" => "b"} | _]}
-    assert_received {:proposal_demos, 12, [%{"answer" => "c", "question" => "c"} | _]}
+    assert_received {:proposal_demos, 11, [%{"answer" => "a", "question" => "a"} | _]}
+    assert_received {:proposal_demos, 12, [%{"answer" => "a", "question" => "a"} | _]}
+    assert_received {:proposal_demos, 13, [%{"answer" => "c", "question" => "c"} | _]}
+    refute inspect(report.slots) =~ "imp_augmented"
   end
 
   test "required typed transport sends an exact schema and rejects narrative substitutes" do
@@ -166,7 +173,7 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
 
     assert {[
               "Classify by the demonstrated route mapping."
-            ], %{status: :ok, calls: 1, errors: []}} =
+            ], %{status: :ok, calls: 1, errors: [], slots: [_]}} =
              InstructionProposer.propose_with_report(program, [example],
                lm: typed,
                count: 1,

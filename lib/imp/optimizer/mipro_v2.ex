@@ -330,7 +330,10 @@ defmodule Imp.Optimizer.MIPROv2 do
       )
 
     {instruction_pairs, proposal_metadata} =
-      Enum.map_reduce(predictors, %{}, fn %{name: name, predictor: predictor}, metadata ->
+      predictors
+      |> Enum.with_index()
+      |> Enum.map_reduce(%{}, fn {%{name: name, predictor: predictor}, predictor_index},
+                                 metadata ->
         demo_sets = Map.fetch!(demo_candidates, name)
 
         {proposed, report} =
@@ -341,6 +344,8 @@ defmodule Imp.Optimizer.MIPROv2 do
             preserve_slots: true,
             program_context: program,
             predictor_name: name,
+            predictor_index: predictor_index,
+            rollout_id_offset: predictor_index * config.num_instruct_candidates,
             program_aware: config.program_aware_proposer,
             data_aware: config.data_aware_proposer,
             tip_aware: config.tip_aware_proposer,
