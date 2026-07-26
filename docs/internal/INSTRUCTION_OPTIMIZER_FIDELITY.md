@@ -97,6 +97,14 @@ structured-response substitution rather than silently claiming parity. Its
 selected mode is part of durable checkpoint compatibility, so a resumed study
 cannot drift between proposer algorithms.
 
+The fidelity path deliberately fails closed when a summary or proposal LM call
+fails or returns an invalid marker envelope. DSPy catches failures while
+building later summary batches and may summarize the observations accumulated
+so far (and can disable data awareness after broader construction failures).
+Imp does not silently reduce the sealed proposer's information after a failed
+call; matched runs stop and retain the transport/parser failure instead. This
+is an operational safety deviation, not prompt-construction parity.
+
 DSPy delegates this stage to Optuna's multivariate `TPESampler`; Imp uses a
 native joint categorical Parzen implementation with explicit immutable random
 state. The engines are expected to share the search-space, observation, and

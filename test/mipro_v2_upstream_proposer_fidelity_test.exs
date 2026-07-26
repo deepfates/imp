@@ -131,6 +131,47 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     end
   end
 
+  test "dataset summary skips COMPLETE batches and continues like pinned DSPy" do
+    owner = self()
+
+    answers = [
+      %{observations: "first"},
+      %{observations: "COMPLETE"},
+      %{observations: "later"},
+      %{summary: "firstlater"}
+    ]
+
+    agent = start_supervised!({Agent, fn -> answers end})
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:summary_call, messages})
+          Agent.get_and_update(agent, fn [answer | rest] -> {answer, rest} end)
+        end
+      )
+
+    signature = Imp.signature("text -> route")
+
+    trainset =
+      Enum.map(0..29, fn index ->
+        Imp.example(text: "request-#{index}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    assert UpstreamProposer.summarize!(lm, trainset, signature, 10) == "firstlater"
+    assert Agent.get(agent, & &1) == []
+
+    calls =
+      Enum.map(1..4, fn _ ->
+        receive do
+          {:summary_call, messages} -> messages
+        end
+      end)
+
+    final_user = calls |> List.last() |> List.last() |> Map.fetch!(:content)
+    assert final_user =~ "[[ ## observations ## ]]\nfirstlater"
+  end
+
   @tag :evidence_infrastructure
   test "five-call transcript is byte-identical to pinned DSPy 3.2.1" do
     unless File.exists?(@python) and File.dir?(@source) do

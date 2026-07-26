@@ -35,8 +35,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
       )
       |> Imp.get(:observations)
 
-    observations =
-      Enum.reduce(rest, observations, fn batch, accumulated ->
+    {observations, _skips} =
+      Enum.reduce_while(rest, {observations, 0}, fn batch, {accumulated, skips} ->
         next =
           call!(
             lm,
@@ -46,9 +46,12 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
           )
           |> Imp.get(:observations)
 
-        if String.starts_with?(String.upcase(next), "COMPLETE"),
-          do: accumulated,
-          else: accumulated <> next
+        if String.starts_with?(String.upcase(next), "COMPLETE") do
+          skips = skips + 1
+          if skips >= 5, do: {:halt, {accumulated, skips}}, else: {:cont, {accumulated, skips}}
+        else
+          {:cont, {accumulated <> next, skips}}
+        end
       end)
 
     call!(lm, observation_summarizer_signature(), %{observations: observations}, temperature: 1.0)
