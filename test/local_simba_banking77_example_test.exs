@@ -71,4 +71,61 @@ defmodule Imp.LocalSIMBABanking77ExampleTest do
              }
            ])
   end
+
+  test "demo-only selection is mutated and its artifact matches the selected finalist" do
+    lm = Imp.LM.Static.new()
+    baseline = Imp.predict("question -> answer", lm: lm)
+
+    demo =
+      Imp.example(question: "Capital of France?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+
+    selected = Imp.Predict.Predict.with_demos(baseline, [demo])
+
+    selected_parameters =
+      apply(LocalSIMBABanking77.Audit, :parameter_snapshot, [selected])
+
+    report =
+      Imp.Optimizer.Report.new(%{
+        optimizer: :simba,
+        best_score: 1.0,
+        metadata: %{
+          final_candidates: [
+            %{finalist_index: 0, score: 0.0, parameters: []},
+            %{finalist_index: 1, score: 1.0, parameters: selected_parameters}
+          ]
+        }
+      })
+
+    selected = Imp.Optimizer.Report.attach(selected, report)
+
+    artifact =
+      Imp.Optimizer.Artifact.from_optimized_program(selected,
+        artifact_id: "simba-demo-only"
+      )
+
+    assert apply(LocalSIMBABanking77.Audit, :selection_kind, [baseline, selected]) == "mutated"
+
+    assert :ok =
+             apply(LocalSIMBABanking77.Audit, :verify_selected_artifact!, [
+               artifact,
+               baseline,
+               selected,
+               report
+             ])
+
+    mismatched_report =
+      put_in(report.metadata.final_candidates, [
+        %{finalist_index: 0, score: 1.0, parameters: []}
+      ])
+
+    assert_raise RuntimeError, ~r/does not match a best-scoring SIMBA finalist/, fn ->
+      apply(LocalSIMBABanking77.Audit, :verify_selected_artifact!, [
+        artifact,
+        baseline,
+        selected,
+        mismatched_report
+      ])
+    end
+  end
 end

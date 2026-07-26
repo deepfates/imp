@@ -50,6 +50,40 @@ defmodule LocalSIMBABanking77.ObservedLM do
 end
 
 defmodule LocalSIMBABanking77.Audit do
+  def parameter_snapshot(program) do
+    Enum.map(Imp.ProgramParameters.predictors(program), fn %{name: name, predictor: predictor} ->
+      %{name: name, instruction: predictor.signature.instructions, demos: predictor.demos}
+    end)
+  end
+
+  def selection_kind(baseline, selected) do
+    if parameter_snapshot(selected) == parameter_snapshot(baseline),
+      do: "baseline",
+      else: "mutated"
+  end
+
+  def verify_selected_artifact!(artifact, baseline, selected, report) do
+    selected_parameters = parameter_snapshot(selected)
+
+    artifact_parameters =
+      artifact
+      |> Imp.Optimizer.Artifact.apply(baseline)
+      |> parameter_snapshot()
+
+    unless artifact_parameters == selected_parameters do
+      raise "selected artifact champion does not match the selected program"
+    end
+
+    unless Enum.any?(report.metadata.final_candidates, fn finalist ->
+             finalist.score == report.best_score and
+               finalist.parameters == selected_parameters
+           end) do
+      raise "selected artifact champion does not match a best-scoring SIMBA finalist"
+    end
+
+    :ok
+  end
+
   def count_mutated_finalists(final_candidates, baseline_instruction) do
     Enum.count(final_candidates, fn candidate ->
       candidate.finalist_index > 0 and
@@ -108,6 +142,7 @@ defmodule LocalSIMBABanking77.Runner do
 
       report = Report.fetch(selected)
       artifact = Artifact.from_optimized_program(selected, artifact_id: "local-simba-banking77")
+      :ok = Audit.verify_selected_artifact!(artifact, baseline, selected, report)
       artifact_path = Path.join(paths.output, "selected-parameters.json")
       :ok = Artifact.write!(artifact, artifact_path)
 
@@ -401,11 +436,7 @@ defmodule LocalSIMBABanking77.Runner do
       artifact_identity: job.result_model,
       baseline_score: report.metadata.baseline_score,
       selected_score: report.best_score,
-      selected:
-        if(selected.signature.instructions == baseline_instruction,
-          do: "baseline",
-          else: "mutated"
-        ),
+      selected: Audit.selection_kind(baseline, selected),
       baseline_instruction: baseline_instruction,
       selected_instruction: selected.signature.instructions,
       candidate_count: report.candidate_count,
