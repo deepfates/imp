@@ -182,6 +182,16 @@ Current implementation fidelity is pinned to GEPA v0.1.4; earlier comparisons
 against the v0.1.1 checkout are kept as history in the repository's internal
 notes, which also track how each pinned upstream commit is recorded.
 
+The source checkout includes an ordinary real-model program under
+`examples/local_gepa_banking77`. Its analyzer and classifier use different
+local runtimes; the classifier is a verified retained MLX SFT artifact. The
+example runs a bounded GEPA proposal on frozen train/selection rows, evaluates
+the selected program on untouched rows, writes the parameter-only artifact,
+and reconstructs the trusted program in a fresh OS BEAM. Its retained exercised
+result is neutral: the real proposal scored below the baseline, selection kept
+the baseline instructions, and the 40-row selected output reproduced exactly.
+That is operational lifecycle evidence, not optimizer lift.
+
 ## Tools And MCP
 
 Tools are ordinary structs called directly or handed to react-family

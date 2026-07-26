@@ -62,6 +62,12 @@ It measures the same typed program before and after deterministic few-shot
 compilation from an ordinary consumer project; the package gate also runs it
 offline from the built artifact.
 
+For the real local optimizer lifecycle, the
+[Banking77 GEPA example](examples/local_gepa_banking77/README.md) composes two
+different local model runtimes, evaluates a GEPA proposal using train/selection
+only, applies the selected named parameters, and reproduces the untouched result
+after restarting the exact trained artifact in a fresh OS BEAM.
+
 ## Because the program is a value, the rest is ordinary engineering
 
 Each stage below is one stop on the [Learning Path](docs/LEARNING_PATH.md),

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "source_base_commit": "517daee",
+  "scope": "one local heterogeneous GEPA Banking77 program lifecycle",
+  "models": {
+    "analyzer_and_reflector": "ollama:llama3.2:3b@a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+    "classifier_artifact_sha256": "d52aca6b049e9e015b0934bc56e4a120a6d669fb21bc5c7068c527e0f994dc44"
+  },
+  "split_counts": {"train": 16, "selection": 8, "untouched_test": 40},
+  "optimization": {
+    "baseline_selection_score": 0.375,
+    "proposal_selection_score": 0.0,
+    "selected_score": 0.375,
+    "selected": "baseline",
+    "candidate_count": 2,
+    "reflection_calls": 2,
+    "logical_calls": 26,
+    "transport_attempts": 26
+  },
+  "untouched_test": {
+    "baseline": {"accuracy": 0.475, "macro_f1": 0.33333333333333337, "errors": 0},
+    "selected": {"accuracy": 0.475, "macro_f1": 0.33333333333333337, "errors": 0}
+  },
+  "fresh_os": {
+    "byte_identical": true,
+    "prediction_digest": "2c47c40a8aee091bb2331ed9d7e9b73e16de9d85d26d71a7c94e2b4cd56b4152"
+  },
+  "exclusions": [
+    "positive GEPA effectiveness",
+    "general optimizer effectiveness",
+    "paper-family parity",
+    "provider behavior",
+    "BEAM superiority"
+  ]
+}
