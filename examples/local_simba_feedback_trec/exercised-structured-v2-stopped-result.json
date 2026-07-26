@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "stopped_before_reflection_selection_or_heldout",
+  "treatment_id": "local-simba-feedback-trec-structured-v2",
+  "runtime_commit": "d16b76d",
+  "contract_sha256": "1f29446db7aa4ac99683422f3833f313912445ec7c2c9d44776e84f26530d3b8",
+  "model": {
+    "id": "ollama:llama3.2:3b",
+    "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "optimization": {
+    "logical_calls": 46,
+    "transport_attempts": 46,
+    "task_calls": 46,
+    "strict_parse_errors": 46,
+    "reflection_calls": 0,
+    "candidate_count": 0,
+    "mutated_rule_finalists": 0
+  },
+  "representative_raw_output": "{\n  \"route\": \"K47\"\n}",
+  "heldout_opened": false,
+  "fresh_process_attempted": false,
+  "stop_reason": "Ollama honored the exact one-field JSON schema, but SingleField treated the returned JSON text as a bare scalar instead of decoding the schema envelope. Every task call therefore failed parsing before SIMBA could reflect or admit a candidate.",
+  "retained_stage_sha256": {
+    "preflight": "fe3fb100246d2fd2c026954dc3bb04aa6c1d6d72378046d626c9821d31c0da57",
+    "optimization": "e615afd2834f002fb32560919a0211907c7449904bcd103c94ab75e171c2eab4",
+    "selected_parameters": "4deeea3be0e36eb6578acc5d9235fb49521a6d3ffaa1d6007208de20a794cf1d",
+    "source_program": "dd35f239819c5e97169ee63bf8d25a291afd55ac11af54e8ce7ffd7e71dfa655",
+    "failure": "19b4b7bc261487fee54f071c6fa388d0ecc311c29171e181f7854ae06d953c73"
+  },
+  "claim_boundary": "This stopped result proves Ollama produced schema-conforming one-field JSON under 46 one-attempt task transports and exposes an Imp adapter decode defect. It is not a SIMBA win or loss and establishes no reflection, mutation, selection, held-out behavior, artifact consumption, parity, reliability, or BEAM superiority."
+}

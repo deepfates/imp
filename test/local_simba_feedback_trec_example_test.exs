@@ -6,6 +6,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
   @old_simba "benchmarks/data/simba-trec-coarse-v1.json"
   @old_grpo "examples/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
   @stopped_result "examples/local_simba_feedback_trec/exercised-stopped-result.json"
+  @structured_stopped_result "examples/local_simba_feedback_trec/exercised-structured-v2-stopped-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_FEEDBACK_TREC_DEFINE_ONLY")
@@ -157,6 +158,18 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
     refute result["heldout_opened"]
     refute result["fresh_process_attempted"]
     assert result["claim_boundary"] =~ "does not establish a SIMBA win or loss"
+  end
+
+  test "schema transport stop remains an adapter measurement failure" do
+    result = Jason.decode!(File.read!(@structured_stopped_result))
+
+    assert result["status"] == "stopped_before_reflection_selection_or_heldout"
+    assert result["optimization"]["transport_attempts"] == 46
+    assert result["optimization"]["strict_parse_errors"] == 46
+    assert result["optimization"]["reflection_calls"] == 0
+    assert result["optimization"]["candidate_count"] == 0
+    refute result["heldout_opened"]
+    assert result["claim_boundary"] =~ "not a SIMBA win or loss"
   end
 
   defp split_frequencies(rows) do

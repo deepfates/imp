@@ -78,3 +78,11 @@ rows, opaque route meanings, prompts, metric feedback, validation boundary,
 SIMBA seed/configuration, budgets, and strict typed parser remain frozen. It
 does not strip or normalize any predecessor output. The v1 stopped result
 remains immutable, and v2 may still produce no mutation or no held-out lift.
+
+The v2 execution is retained in
+`exercised-structured-v2-stopped-result.json`. Ollama honored the schema and
+returned exact one-field JSON objects, but the then-current `SingleField`
+parser treated those JSON strings as bare enum values. All 46 task transports
+therefore failed before reflection, selection, or held-out access. Imp now
+decodes only an exact one-field schema object—extra fields, arrays, quoted
+scalars, labels, and prose still fail—without changing the frozen task.
