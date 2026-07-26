@@ -54,3 +54,17 @@ the task program, writing an artifact that does not reproduce the selected
 parameters, hitting cache instead of transport, or loading a different model or
 parameter snapshot in the fresh process. A completed result is evidence about
 this one task/model only, not general SIMBA effectiveness or DSPy parity.
+
+## Retained execution
+
+The frozen run stopped before selection or held-out evaluation. It completed
+four SIMBA steps and 52 one-attempt local transports, including six reflection
+calls and one reflection containing semantic metric feedback. The exact 3B
+model nevertheless returned labeled or malformed values such as `route\nK47`
+under the strict single-field contract. Sixteen task parses failed, no mutation
+candidate was admitted, and the runner failed closed. The immutable summary is
+[`exercised-stopped-result.json`](exercised-stopped-result.json).
+
+This is a model/typed-format measurement failure, not a SIMBA loss. Held-out
+labels remained unopened, and no selected artifact or fresh-process behavior
+was claimed.

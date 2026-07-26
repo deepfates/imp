@@ -5,6 +5,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
   @contract "examples/local_simba_feedback_trec/task-contract.json"
   @old_simba "benchmarks/data/simba-trec-coarse-v1.json"
   @old_grpo "examples/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
+  @stopped_result "examples/local_simba_feedback_trec/exercised-stopped-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_FEEDBACK_TREC_DEFINE_ONLY")
@@ -136,6 +137,24 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
     assert source =~ "@max_optimization_transports 130"
     assert source =~ "@max_optimization_transports + 120"
     assert source =~ "stage.logical_calls == 40 and stage.transport_attempts == 40"
+  end
+
+  test "retained execution remains an incomplete format-boundary result" do
+    result = Jason.decode!(File.read!(@stopped_result))
+
+    assert result["status"] == "stopped_before_selection_or_heldout"
+
+    assert result["contract_sha256"] ==
+             apply(LocalSIMBAFeedbackTREC.Contract, :contract_sha256, [])
+
+    assert result["optimization"]["logical_calls"] == 52
+    assert result["optimization"]["transport_attempts"] == 52
+    assert result["optimization"]["feedback_reflection_calls"] == 1
+    assert result["optimization"]["candidate_count"] == 0
+    assert result["optimization"]["strict_parse_errors"] == 16
+    refute result["heldout_opened"]
+    refute result["fresh_process_attempted"]
+    assert result["claim_boundary"] =~ "does not establish a SIMBA win or loss"
   end
 
   defp split_frequencies(rows) do

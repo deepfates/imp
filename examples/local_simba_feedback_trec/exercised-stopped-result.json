@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status": "stopped_before_selection_or_heldout",
+  "treatment_id": "local-simba-feedback-trec-binary-v1",
+  "runtime_commit": "452ba09334bec740d935ec24420cc5a1dc971626",
+  "contract_sha256": "1f29446db7aa4ac99683422f3833f313912445ec7c2c9d44776e84f26530d3b8",
+  "model": {
+    "id": "ollama:llama3.2:3b",
+    "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "optimization": {
+    "completed_steps": 4,
+    "logical_calls": 52,
+    "transport_attempts": 52,
+    "task_calls": 46,
+    "reflection_calls": 6,
+    "feedback_reflection_calls": 1,
+    "candidate_count": 0,
+    "mutated_rule_finalists": 0,
+    "strict_parse_errors": 16,
+    "internal_baseline_score": 0.5
+  },
+  "representative_raw_outputs": [
+    "route\nK47",
+    "route ['K11']",
+    "route K38"
+  ],
+  "heldout_opened": false,
+  "fresh_process_attempted": false,
+  "stop_reason": "The exact local model repeatedly included a field label, brackets, or an out-of-enum value despite the strict single-field instruction. The adapter correctly rejected those outputs, trajectory sampling admitted no mutation candidate, and the runner stopped before selection and held-out evaluation.",
+  "retained_stage_sha256": {
+    "preflight": "7e8e80a142068c41cbf08deef23c90b340f94fb8b14a7c0453a61e992d5a9b09",
+    "optimization": "a047058610f8198331f286d25183d600a2c9cf8e749c5ddfd4e1eaa69be336f4",
+    "selected_parameters": "58c4ce536b2b1d1ef7deb9a3938f781f679bec4296c6d72fc658a9f7eb614c85",
+    "source_program": "dd35f239819c5e97169ee63bf8d25a291afd55ac11af54e8ce7ffd7e71dfa655",
+    "failure": "529a8b30cd05ca445b9f25c46526c7fd5650f08f0c0cb6857a77f37ceef418e2"
+  },
+  "claim_boundary": "This stopped run proves that an ordinary provider-free SIMBA invocation executed 52 one-attempt local transports, passed semantic metric feedback into reflection, and failed closed when no valid mutation candidate emerged. It does not establish a SIMBA win or loss, selected-artifact consumption, held-out effectiveness, DSPy parity, production reliability, or BEAM superiority."
+}
