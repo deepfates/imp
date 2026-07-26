@@ -14,6 +14,17 @@ defmodule Imp.TRLProtocolTest do
              TRLProtocol.digest(put_in(right, ["z", Access.at(0), "b"], 3))
   end
 
+  test "canonical JSON follows CPython finite-float spelling" do
+    assert TRLProtocol.canonical_json(%{
+             "fixed" => 1.0e15,
+             "negative_zero" => -0.0,
+             "positive_exponent" => 1.0e16,
+             "padded_exponent" => 1.0e-7,
+             "subnormal" => 5.0e-324
+           }) ==
+             ~s({"fixed":1000000000000000.0,"negative_zero":-0.0,"padded_exponent":1e-07,"positive_exponent":1e+16,"subnormal":5e-324})
+  end
+
   test "session recursively allowlists the pinned engine, dataset, schedule, optimizer, and RNG" do
     session = TRLProtocol.session!(session_attrs())
     assert :ok = TRLProtocol.validate(session)

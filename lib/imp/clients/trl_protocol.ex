@@ -5,7 +5,9 @@ defmodule Imp.Clients.TRLProtocol do
   This module does not execute Python or train a model. It defines the narrow,
   JSON-safe contract that a supervised worker around pinned TRL `v1.6.0` can
   implement. Every envelope is recursively allowlisted, canonically hashed,
-  and identity-bound before it can be accepted.
+  and identity-bound before it can be accepted. CPython `json.dumps` is the
+  single numeric-spelling authority for cross-runtime envelope bytes; Imp uses
+  `Imp.PyFloat.repr/1` for finite floats instead of Jason's Erlang spelling.
 
   A worker must durably spool the sealed update before mutation, publish its
   checkpoint and receipt as one atomic commit, and return the stored receipt
@@ -80,7 +82,7 @@ defmodule Imp.Clients.TRLProtocol do
        |> Base.encode16(case: :lower))
   end
 
-  @doc "Encodes JSON with recursively sorted object keys for cross-runtime hashing."
+  @doc "Encodes JSON with sorted keys and CPython-owned finite-float spelling."
   @spec canonical_json(term()) :: binary()
   def canonical_json(value), do: value |> canonical_iodata() |> IO.iodata_to_binary()
 
@@ -561,7 +563,7 @@ defmodule Imp.Clients.TRLProtocol do
 
   defp canonical_iodata(value) when is_float(value) do
     if finite?(value),
-      do: Jason.encode!(value),
+      do: Imp.PyFloat.repr(value),
       else: raise(ArgumentError, "non-finite JSON number")
   end
 

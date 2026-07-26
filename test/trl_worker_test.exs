@@ -39,6 +39,41 @@ defmodule Imp.TRLWorkerTest do
     assert result["sha256"] == TRLProtocol.digest(value)
   end
 
+  test "pinned CPython owns adversarial and retained rollout float bytes", %{worker: worker} do
+    adversarial =
+      [
+        0.0,
+        -0.0,
+        1.0,
+        -1.0,
+        1.0e-7,
+        1.0e-6,
+        1.0e-5,
+        1.0e15,
+        1.0e16,
+        1.0e20,
+        1.0e21,
+        1.2345678901234567,
+        5.0e-324,
+        2.2250738585072014e-308,
+        1.7976931348623157e308,
+        -5.547390460968018,
+        -0.0019170732703059912,
+        -4.768370445162873e-7
+      ]
+
+    value = %{"finite_floats" => adversarial ++ generated_finite_floats(2_048)}
+
+    assert {:ok, result} =
+             TRLWorker.request(worker, %{"op" => "protocol_self_test", "value" => value}, 5_000)
+
+    assert result["canonical"] == TRLProtocol.canonical_json(value)
+    assert result["sha256"] == TRLProtocol.digest(value)
+    assert result["canonical"] =~ "1000000000000000.0"
+    assert result["canonical"] =~ "1e-07"
+    assert result["canonical"] =~ "-4.768370445162873e-07"
+  end
+
   test "unknown operations and missing model fail without an accepted mutation", context do
     assert {:error,
             {:trl_worker,
@@ -138,6 +173,22 @@ defmodule Imp.TRLWorkerTest do
     assert group["predictor"] == %{"__imp_type__" => "atom", "value" => "predict"}
     assert group["group_id"]["__imp_type__"] == "tuple"
     assert Enum.map(samples, & &1["reward"]) == [1.0, 0.0, 0.0, 0.0]
+  end
+
+  defp generated_finite_floats(count) do
+    0x9E3779B97F4A7C15
+    |> Stream.iterate(fn bits ->
+      Bitwise.band(
+        bits * 6_364_136_223_846_793_005 + 1_442_695_040_888_963_407,
+        0xFFFFFFFFFFFFFFFF
+      )
+    end)
+    |> Stream.reject(fn bits -> Bitwise.band(Bitwise.bsr(bits, 52), 0x7FF) == 0x7FF end)
+    |> Stream.map(fn bits ->
+      <<value::float-64>> = <<bits::unsigned-64>>
+      value
+    end)
+    |> Enum.take(count)
   end
 
   test "trainer atomically retains projected groups before worker validation", context do
