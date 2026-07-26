@@ -6,6 +6,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @result "examples/local_grpo_opaque_banking77/exercised-result.json"
   @usefulness_data "benchmarks/data/grpo-usefulness-banking77-v1.json"
   @usefulness_config "examples/local_grpo_opaque_banking77/usefulness-v1-treatment.json"
+  @usefulness_result "examples/local_grpo_opaque_banking77/exercised-usefulness-v1-result.json"
 
   setup_all do
     output =
@@ -208,6 +209,29 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     assert result["base_test"] == result["trained_test"]
     assert result["base_test"]["accuracy"] == 0.475
     assert result["selected_arm"] == "base"
+    assert result["fresh_selected_arm"] == "base"
+    assert result["fresh_byte_identical"]
+  end
+
+  test "fresh-label treatment preserves its separate neutral result" do
+    result = @usefulness_result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "complete"
+    assert length(result["training_steps"]) == 38
+    assert Enum.all?(result["training_steps"], & &1["trainable_tensors_changed"])
+    assert Enum.all?(result["training_steps"], &(length(Enum.uniq(&1["rewards"])) > 1))
+
+    assert Enum.count(result["training_steps"], &Enum.any?(&1["advantages"], fn x -> x != 0 end)) ==
+             37
+
+    assert result["base_selection"] == result["trained_selection"]
+    assert result["base_selection"]["accuracy"] == 0.25
+    assert result["selected_arm"] == "base"
+
+    assert result["base_test"] == result["trained_test"]
+    assert result["base_test"]["accuracy"] == 0.4
+    assert_in_delta result["base_test"]["macro_f1"], 0.2812903225806451, 1.0e-12
+    assert result["base_test"]["errors"] == 2
     assert result["fresh_selected_arm"] == "base"
     assert result["fresh_byte_identical"]
   end

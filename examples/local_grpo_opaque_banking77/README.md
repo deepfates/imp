@@ -117,3 +117,14 @@ establish general GRPO effectiveness or parity; a neutral or negative result
 cannot establish GRPO ineffectiveness. No source label, row, reward, prompt,
 seed, optimizer setting, selection rule, or test metric may change after base
 evaluation begins.
+
+The immutable run in `exercised-usefulness-v1-result.json` completed all 38
+official TRL/MPS updates. Every update changed trainable tensors, all 38 had
+non-uniform semantic rewards, and 37 had non-zero group-relative advantages.
+Every trained checkpoint nevertheless tied base at 0.25 validation accuracy,
+so stable selection retained base. Base and trained then tied on the frozen
+forty at 0.40 accuracy / 0.28129 macro-F1 / two parse errors; fresh OS
+execution reproduced the selected base artifact and ordered results
+byte-for-byte. This is a complete neutral result on one fresh-label slice, not
+evidence of useful learning, general GRPO/mmGRPO effectiveness, parity,
+production reliability, or BEAM superiority.
