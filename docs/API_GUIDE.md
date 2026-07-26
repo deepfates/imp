@@ -689,6 +689,18 @@ the optimizer report. It does not serialize the consumer module, LMs, adapters,
 callbacks, credentials, or arbitrary state. Train and validation remain GEPA
 inputs; untouched test data is evaluated separately after selection.
 
+The same handoff works after any program optimizer that retains an optimizer
+report, including MIPROv2, SIMBA, InferRules, bootstrap, and random-search
+families:
+
+```elixir
+selected = Imp.optimize!(program, optimizer, trainset, validation)
+artifact =
+  Imp.Optimizer.Artifact.from_optimized_program(selected,
+    artifact_id: "support-router-v1"
+  )
+```
+
 `LabeledFewShot.new/1` follows DSPy 3.2.1's user-visible defaults: `k: 16`,
 deterministic sampling without replacement, and seed zero. Use `sample: false`
 for the ordered first-`k` path, or set `seed:` for another reproducible BEAM

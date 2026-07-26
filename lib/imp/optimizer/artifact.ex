@@ -126,6 +126,51 @@ defmodule Imp.Optimizer.Artifact do
           "optimizer parameter candidate requires a program struct and keyword options, got: #{Kernel.inspect({id, program, opts})}"
   end
 
+  @doc """
+  Captures the selected parameters and attached report from an optimized program.
+
+  This is the shared durable handoff for program optimizers. The returned
+  artifact contains no consumer module or runtime binding; deploying code must
+  reconstruct a trusted compatible program and call `apply/4`.
+  """
+  @spec from_optimized_program(struct(), keyword()) :: artifact()
+  def from_optimized_program(program, opts \\ [])
+
+  def from_optimized_program(program, opts) when is_struct(program) and is_list(opts) do
+    validate_keyword!(opts, [:artifact_id, :provenance], "from_optimized_program/2")
+
+    report =
+      Report.fetch(program) ||
+        raise(ArgumentError, "optimized program does not carry an Imp optimizer report")
+
+    optimizer = report.optimizer
+
+    unless is_atom(optimizer) or (is_binary(optimizer) and optimizer != "") do
+      raise ArgumentError, "optimized program report does not identify its optimizer"
+    end
+
+    id = Keyword.get(opts, :artifact_id, "#{optimizer}-champion")
+
+    unless is_binary(id) and id != "" do
+      raise ArgumentError, "optimizer artifact id must be a non-empty string"
+    end
+
+    candidate =
+      parameter_candidate(id, program,
+        score: report.best_score,
+        report: report,
+        metadata: %{optimizer: optimizer}
+      )
+
+    provenance = opts |> Keyword.get(:provenance, %{}) |> Map.put_new(:optimizer, optimizer)
+    new(candidate, [], provenance: provenance)
+  end
+
+  def from_optimized_program(program, opts) do
+    raise ArgumentError,
+          "from_optimized_program/2 requires a program struct and keyword options, got: #{Kernel.inspect({program, opts})}"
+  end
+
   @doc "Creates a versioned artifact from one champion and zero or more challengers."
   @spec new(candidate(), [candidate()], keyword()) :: artifact()
   def new(champion, challengers \\ [], opts \\ []) when is_list(challengers) and is_list(opts) do

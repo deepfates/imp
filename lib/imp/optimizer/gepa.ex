@@ -350,15 +350,12 @@ defmodule Imp.Optimizer.GEPA do
     compile_opts = Keyword.take(opts, [:resume_state, :checkpoint_fn])
     {compiled, report} = compile_with_report(optimizer, program, trainset, devset, compile_opts)
 
-    candidate =
-      Artifact.parameter_candidate(opts[:artifact_id], compiled,
-        score: report.best_score,
-        report: report,
-        metadata: %{optimizer: :gepa}
+    artifact =
+      Artifact.from_optimized_program(compiled,
+        artifact_id: opts[:artifact_id],
+        provenance: opts[:provenance]
       )
 
-    provenance = Map.put_new(opts[:provenance], :optimizer, :gepa)
-    artifact = Artifact.new(candidate, [], provenance: provenance)
     {compiled, report, artifact}
   end
 

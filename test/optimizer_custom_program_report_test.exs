@@ -1,7 +1,7 @@
 defmodule Imp.OptimizerCustomProgramReportTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Optimizer.Report
+  alias Imp.Optimizer.{Artifact, Report}
   alias Imp.TestSupport.TwoStageOptimizerProgram
 
   test "shared attachment retains one report on a custom multi-predictor program" do
@@ -98,5 +98,37 @@ defmodule Imp.OptimizerCustomProgramReportTest do
     assert Enum.all?(Imp.ProgramParameters.predictors(compiled), fn %{predictor: predictor} ->
              match?(%Report{optimizer: :simba}, Report.fetch(predictor))
            end)
+
+    artifact =
+      Artifact.from_optimized_program(compiled,
+        artifact_id: "simba-router-v1",
+        provenance: %{split: "final"}
+      )
+
+    assert %{
+             champion_id: "simba-router-v1",
+             candidates: [%{"score" => 1.0}],
+             provenance: %{"optimizer" => "simba", "split" => "final"}
+           } = Artifact.inspect(artifact)
+
+    fresh = TwoStageOptimizerProgram.new(lm)
+    applied = Artifact.apply(artifact, fresh)
+    assert Report.fetch(applied) == nil
+    assert {:ok, prediction} = Imp.call(applied, %{utterance: "unknown payment"})
+    assert Imp.get(prediction, :route) == "R42"
+  end
+
+  test "shared artifact capture rejects missing reports and unsupported options" do
+    program = TwoStageOptimizerProgram.new(Imp.LM.Static.new())
+
+    assert_raise ArgumentError, ~r/does not carry an Imp optimizer report/, fn ->
+      Artifact.from_optimized_program(program)
+    end
+
+    attached = Report.attach(program, Report.new(optimizer: :mipro_v2, best_score: 0.5))
+
+    assert_raise ArgumentError, ~r/unknown .* options.*executable/, fn ->
+      Artifact.from_optimized_program(attached, executable: true)
+    end
   end
 end
