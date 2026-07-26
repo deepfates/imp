@@ -37,6 +37,8 @@ The runners additionally fail closed on:
   dispatch (unused reservation never creates extra calls);
 - actual upstream provider versus OpenRouter gateway identity, service tier,
   token counts, and reconciled gateway-reported versus adapter-computed cost;
+- MIPRO optimizer marker parsing before DSPy's data-aware fallback boundary;
+  ordinary task-output parse failures remain matched score-zero rows;
 - both runtimes durably sealing all nine selections before either can open the
   untouched file.
 

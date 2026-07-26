@@ -109,13 +109,15 @@ do not enter proposal messages or the search space. Calls, failures, budgets,
 cache effects, and RNG advancement remain observable and are therefore still
 matched rather than optimized away.
 
-The fidelity path deliberately fails closed when a summary or proposal LM call
-fails or returns an invalid marker envelope. DSPy catches failures while
-building later summary batches and may summarize the observations accumulated
-so far (and can disable data awareness after broader construction failures).
-Imp does not silently reduce the sealed proposer's information after a failed
-call; matched runs stop and retain the transport/parser failure instead. This
-is an operational safety deviation, not prompt-construction parity.
+The fidelity path matches DSPy when an ordinary later summary-batch call fails:
+it stops extending the observations and asks the summarizer to use the prefix
+already accumulated. Budget, route, cost, transport, and cancellation guards
+remain fatal rather than entering that ordinary fallback. The sealed matched
+runner also validates MIPRO optimizer marker envelopes before DSPy's broader
+data-aware construction fallback, so malformed first-summary output cannot
+silently remove information on only one arm. GEPA reflection parse retry remains
+the pinned algorithm's own two-attempt behavior rather than being recast as an
+operational guard.
 
 DSPy delegates this stage to Optuna's multivariate `TPESampler`; Imp's default
 uses a native joint categorical Parzen implementation with explicit immutable

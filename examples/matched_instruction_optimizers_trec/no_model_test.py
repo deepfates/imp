@@ -55,6 +55,20 @@ class NoModelBoundaryTest(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.OperationalSafetyAbort, "route drift"):
             dspy_style_fallback()
 
+    def test_mipro_optimizer_parser_guard_is_arm_scoped_and_fail_closed(self):
+        capture = MODULE.Capture()
+        capture.set_phase(1, "mipro_v2", "compile")
+        with self.assertRaisesRegex(RuntimeError, "exact Chat marker"):
+            MODULE.validate_mipro_optimizer_envelope(capture, "optimizer", "malformed")
+
+        MODULE.validate_mipro_optimizer_envelope(
+            capture,
+            "optimizer",
+            "[[ ## observations ## ]]\nuseful summary\n\n[[ ## completed ## ]]\n",
+        )
+        capture.set_phase(1, "gepa", "compile")
+        MODULE.validate_mipro_optimizer_envelope(capture, "optimizer", "malformed")
+
     def test_first_response_drift_stops_before_second_dispatch(self):
         dispatches = []
 

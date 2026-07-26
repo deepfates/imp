@@ -799,7 +799,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     )
 
     require!(
-      value["fail_closed"] == ~w(model route cost transport_attempt parser budget),
+      value["fail_closed"] == ~w(model route cost transport_attempt optimizer_parser budget),
       "fail-closed accounting drift"
     )
   end

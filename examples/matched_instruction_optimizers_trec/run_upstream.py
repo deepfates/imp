@@ -42,6 +42,12 @@ class OperationalSafetyAbort(BaseException):
     """Bypasses DSPy's ordinary Exception containment for route/cost/budget drift."""
 
 
+MIPRO_OPTIMIZER_ENVELOPE = re.compile(
+    r"\A\s*\[\[ ## (observations|summary|proposed_instruction) ## \]\]\s*\n"
+    r"(?s:.+?)\s*\n\s*\[\[ ## completed ## \]\]\s*\Z"
+)
+
+
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -426,12 +432,23 @@ def install_runtime(args: argparse.Namespace):
                 )
                 if response is not None and error is None and self.expected_model is not None:
                     try:
+                        validate_mipro_optimizer_envelope(
+                            self.capture, self.role, field(message, "content")
+                        )
                         evidence = transport_evidence(self.capture.calls[-1], self.expected_model)
                         self.capture.reconcile_cost(evidence["gateway_reported_cost"])
                     except Exception as exc:
                         raise OperationalSafetyAbort(str(exc)) from exc
 
     return dspy, RecordingLM
+
+
+def validate_mipro_optimizer_envelope(capture: Capture, role: str, content: Any) -> None:
+    phase = capture.phase or {}
+    if role != "optimizer" or phase.get("arm") != "mipro_v2":
+        return
+    if not isinstance(content, str) or MIPRO_OPTIMIZER_ENVELOPE.fullmatch(content) is None:
+        raise RuntimeError("MIPRO optimizer response violated the exact Chat marker envelope")
 
 
 def verify_runtime_dependencies(manifest: dict[str, Any]) -> None:
