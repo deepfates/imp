@@ -8,6 +8,11 @@ defmodule Imp.Optimizer.GEPA do
   minibatch improvement before validation, and maintains the source-shaped
   per-instance Pareto archive in its internal optimization engine.
 
+  `:candidate_selection_strategy` controls the parent program sampled for the
+  next reflection. It defaults to pinned GEPA's `:pareto` policy and also
+  accepts `:current_best`, the other released built-ins, or a validated custom
+  `Imp.Optimizer.GEPA.CandidateSelector` module/struct.
+
   The `:callbacks` option accepts callback modules or `{module, context}`
   tuples implementing any subset of the documented GEPA callback contract.
   Hooks are synchronous and observational; failures are isolated from
@@ -59,6 +64,7 @@ defmodule Imp.Optimizer.GEPA do
     callbacks: [],
     component_feedback: %{},
     feedback_fn: nil,
+    candidate_selection_strategy: :pareto,
     module_selector: :round_robin,
     generations: 4,
     combee: false,
@@ -89,6 +95,7 @@ defmodule Imp.Optimizer.GEPA do
     callbacks: [type: {:custom, Callback, :validate, []}, default: []],
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
+    candidate_selection_strategy: [type: :any, default: :pareto],
     module_selector: [
       type: {:custom, __MODULE__, :validate_module_selector, []},
       default: :round_robin
@@ -163,6 +170,8 @@ defmodule Imp.Optimizer.GEPA do
       callbacks: opts[:callbacks],
       component_feedback: opts[:component_feedback],
       feedback_fn: opts[:feedback_fn],
+      candidate_selection_strategy:
+        validate_candidate_selection_strategy!(opts[:candidate_selection_strategy]),
       module_selector: opts[:module_selector],
       generations: opts[:generations],
       combee: opts[:combee],
@@ -239,6 +248,7 @@ defmodule Imp.Optimizer.GEPA do
     engine_opts =
       [
         max_iterations: optimizer.generations,
+        candidate_selection_strategy: optimizer.candidate_selection_strategy,
         module_selector: optimizer.module_selector,
         combee: optimizer.combee,
         sampling_strategy: optimizer.sampling_strategy,
@@ -293,6 +303,7 @@ defmodule Imp.Optimizer.GEPA do
         metadata: %{
           feedback: feedback,
           component_feedback: optimizer.component_feedback |> Map.keys() |> Enum.sort(),
+          candidate_selection_strategy: policy_name(optimizer.candidate_selection_strategy),
           generations: optimizer.generations,
           minibatch_size: state.combee_policy.effective_batch_size,
           proposal_concurrency: optimizer.proposal_concurrency,
@@ -602,6 +613,11 @@ defmodule Imp.Optimizer.GEPA do
 
   def validate_proposal_concurrency(value) do
     {:error, "expected :auto or a positive integer, got: #{inspect(value)}"}
+  end
+
+  defp validate_candidate_selection_strategy!(strategy) do
+    Imp.Optimizer.GEPA.CandidateSelector.validate!(strategy)
+    strategy
   end
 
   defp validate_sampling_strategy!(:single), do: :single

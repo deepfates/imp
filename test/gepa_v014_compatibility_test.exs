@@ -5,6 +5,27 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
   alias Imp.Optimizer.GEPA, as: GEPAOptimizer
   alias Imp.Optimizer.Trajectory
 
+  test "public GEPA forwards the released candidate parent selector" do
+    optimizer =
+      GEPAOptimizer.new(fn _example, _prediction -> 1.0 end,
+        candidate_selection_strategy: :current_best,
+        generations: 0
+      )
+
+    assert optimizer.candidate_selection_strategy == :current_best
+
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "yes"} end)
+      )
+
+    row = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
+    selected = GEPAOptimizer.compile(optimizer, program, [row], [row])
+
+    assert Imp.Optimizer.Report.fetch(selected).metadata.candidate_selection_strategy ==
+             :current_best
+  end
+
   defmodule BatchAdapter do
     @behaviour Adapter
     defstruct [:owner, :state]
