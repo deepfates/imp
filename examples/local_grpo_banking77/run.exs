@@ -68,8 +68,8 @@ defmodule LocalGRPOBanking77.Runner do
           config: %{}
         ),
         trainer: trainer,
-        num_train_steps: 1,
-        num_dspy_examples_per_grpo_step: 1,
+        num_train_steps: train_steps(),
+        num_dspy_examples_per_grpo_step: train_width(),
         num_rollouts_per_grpo_step: 4,
         seed: @seed,
         status_poll_interval_ms: 0,
@@ -81,16 +81,32 @@ defmodule LocalGRPOBanking77.Runner do
     {:ok, result} = Imp.train(program(training_lm), optimizer, examples(rows.train))
     job = result.job
     {:ok, manifest} = TRLArtifact.verify_job(job)
-    observation = job.result_model |> Path.join("trl-observation.json") |> read_json!()
-    update = job.result_model |> Path.join("update-1.json") |> read_json!()
+
+    step_artifacts =
+      Enum.map(1..train_steps(), fn step ->
+        path = job.result_model |> Path.dirname() |> Path.join("step-#{step}")
+
+        %{
+          step: step,
+          path: path,
+          observation: path |> Path.join("trl-observation.json") |> read_json!(),
+          update: path |> Path.join("update-#{step}.json") |> read_json!()
+        }
+      end)
+
+    final_step = List.last(step_artifacts)
+    observation = final_step.observation
+    update = final_step.update
 
     training_stage = %{
       status: "complete",
       job: encode_job(job),
       artifact_payload_sha256: manifest["payload_sha256"],
       observation: observation,
+      steps: step_artifacts,
       group: update["groups"],
-      selected_train_row_id: selected_train_row_id(update, rows.train)
+      selected_train_row_ids:
+        Enum.flat_map(step_artifacts, &selected_train_row_ids(&1.update, rows.train))
     }
 
     Atomic.write!(Path.join(paths.output, "02-training.json"), training_stage)
@@ -117,7 +133,18 @@ defmodule LocalGRPOBanking77.Runner do
         status: "complete",
         scope: "one task/model one-update ordinary model-generated local GRPO result",
         model: @model,
-        trainable_tensors_changed: observation["trainable_tensors_changed"],
+        trainable_tensors_changed:
+          Enum.any?(step_artifacts, & &1.observation["trainable_tensors_changed"]),
+        training_steps:
+          Enum.map(step_artifacts, fn artifact ->
+            %{
+              step: artifact.step,
+              rewards: artifact.observation["rewards"],
+              advantages: artifact.observation["advantages"],
+              training_loss: artifact.observation["training_loss"],
+              trainable_tensors_changed: artifact.observation["trainable_tensors_changed"]
+            }
+          end),
         rewards: observation["rewards"],
         advantages: observation["advantages"],
         training_loss: observation["training_loss"],
@@ -228,6 +255,7 @@ defmodule LocalGRPOBanking77.Runner do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     unless File.regular?(paths.python), do: raise("pinned TRL Python is missing")
     unless File.dir?(paths.model), do: raise("pinned Qwen snapshot is missing")
+    unless File.regular?(paths.contract), do: raise("pinned TRL contract is missing")
 
     source = read_json!(paths.data)
     train = ordered_rows!(source["train"], @train_ids)
@@ -252,6 +280,9 @@ defmodule LocalGRPOBanking77.Runner do
       train_sha256: @train_sha256,
       selection_sha256: @selection_sha256,
       test_sha256: @test_sha256,
+      train_steps: train_steps(),
+      train_width: train_width(),
+      contract_path: paths.contract,
       train_ids: Enum.map(train, & &1["id"]),
       selection_ids: Enum.map(selection, & &1["id"]),
       test_ids: Enum.map(test, & &1["id"])
@@ -266,6 +297,7 @@ defmodule LocalGRPOBanking77.Runner do
       python: paths.python,
       model_path: paths.model,
       root: paths.sessions,
+      contract_path: paths.contract,
       worker_key: key,
       timeout: 900_000
     )
@@ -358,14 +390,18 @@ defmodule LocalGRPOBanking77.Runner do
     |> then(&(Enum.sum(&1) / length(&1)))
   end
 
-  defp selected_train_row_id(update, rows) do
-    prompt =
-      update["groups"] |> hd() |> Map.fetch!("prompt") |> Enum.map_join("\n", & &1["content"])
+  defp selected_train_row_ids(update, rows) do
+    Enum.map(update["groups"], fn group ->
+      prompt = group |> Map.fetch!("prompt") |> Enum.map_join("\n", & &1["content"])
 
-    case Enum.filter(rows, &String.contains?(prompt, &1["utterance"])) do
-      [%{"id" => id}] -> id
-      matches -> raise("sealed update did not identify one frozen train row: #{inspect(matches)}")
-    end
+      case Enum.filter(rows, &String.contains?(prompt, &1["utterance"])) do
+        [%{"id" => id}] ->
+          id
+
+        matches ->
+          raise("sealed group did not identify one frozen train row: #{inspect(matches)}")
+      end
+    end)
   end
 
   defp encode_job(job) do
@@ -387,6 +423,9 @@ defmodule LocalGRPOBanking77.Runner do
       {"IMP_GRPO_FRESH_OUTPUT", output},
       {"IMP_TRL_PYTHON", paths.python},
       {"IMP_TRL_MODEL", paths.model},
+      {"IMP_TRL_CONTRACT", paths.contract},
+      {"IMP_GRPO_TRAIN_STEPS", Integer.to_string(train_steps())},
+      {"IMP_GRPO_TRAIN_WIDTH", Integer.to_string(train_width())},
       {"IMP_BANKING77_DATA", paths.data}
     ]
 
@@ -418,6 +457,11 @@ defmodule LocalGRPOBanking77.Runner do
         ),
       model:
         System.get_env("IMP_TRL_MODEL", "/Users/deepfates/.cache/imp/trl/feasibility-v1/model"),
+      contract:
+        System.get_env(
+          "IMP_TRL_CONTRACT",
+          Path.join(repo, "priv/trl_worker/qwen-one-update-contract.json")
+        ),
       data:
         System.get_env(
           "IMP_BANKING77_DATA",
@@ -436,6 +480,22 @@ defmodule LocalGRPOBanking77.Runner do
   end
 
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()
+
+  defp train_steps, do: positive_env!("IMP_GRPO_TRAIN_STEPS", 1)
+  defp train_width, do: positive_env!("IMP_GRPO_TRAIN_WIDTH", 1)
+
+  defp positive_env!(name, default) do
+    case System.get_env(name) do
+      nil ->
+        default
+
+      value ->
+        case Integer.parse(value) do
+          {number, ""} when number > 0 -> number
+          _ -> raise("#{name} must be a positive integer")
+        end
+    end
+  end
 
   defp sha256_file(path) do
     path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)

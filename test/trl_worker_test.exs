@@ -108,7 +108,7 @@ defmodule Imp.TRLWorkerTest do
              %{"accepted" => false, "code" => "model_missing", "message" => _message}}} =
              TRLWorker.request(context.worker, %{"op" => "initialize"}, 5_000)
 
-    refute File.exists?(Path.join(context.root, "accepted-intent.json"))
+    refute File.exists?(Path.join(context.root, "accepted-intent-1.json"))
     refute File.exists?(Path.join(context.root, "artifact"))
   end
 
@@ -318,6 +318,7 @@ defmodule Imp.TRLWorkerTest do
       |> Jason.decode!()
       |> Map.drop(["semantic_group", "controlled_rollouts"])
       |> put_in(["optimizer", "num_generations"], 2)
+      |> put_in(["optimizer", "max_steps"], 2)
       |> Map.put("acceptance", %{
         "require_non_uniform_rewards" => false,
         "require_non_uniform_advantages" => false,
@@ -353,11 +354,15 @@ defmodule Imp.TRLWorkerTest do
         "payload_sha256": "sha256:session",
         "optimizer": {"config_sha256": "sha256:optimizer"},
         "rng": {"algorithm": "exsss", "state_sha256": "sha256:rng"},
-        "behavior_policy": {"model": "pinned-local"},
-        "prompt_schedule": {"steps": [{"step": 0, "ordered_row_sha256s": [#{inspect(source_sha256)}, #{inspect(second_source_sha256)}]}]},
+        "behavior_policy": {"model": "pinned-local", "tokenizer_sha256": "sha256:tokenizer"},
+        "prompt_schedule": {"steps": [
+            {"step": 0, "ordered_row_sha256s": [#{inspect(source_sha256)}, #{inspect(second_source_sha256)}]},
+            {"step": 1, "ordered_row_sha256s": [#{inspect(second_source_sha256)}]},
+        ]},
     }
     worker.model = object()
     worker.tokenizer = Tokenizer()
+    assert worker._status()["pending_batch_ids"] == ["trl-step-0-group-0", "trl-step-0-group-1"]
     group = {
         "batch_id": "trl-step-0-group-0",
         "group_id": [0, "router", 0],
@@ -398,6 +403,16 @@ defmodule Imp.TRLWorkerTest do
     assert prepared["groups"][0]["prompt"][0]["content"].endswith("2+2")
     assert prepared["groups"][1]["prompt"][0]["content"].endswith("3+3")
     assert (worker.root / "prepared-controlled-group.json").is_file()
+    worker.step = 1
+    worker.checkpoint = {
+        "payload_sha256": "sha256:checkpoint-1",
+        "optimizer": {"global_step": 1, "state_sha256": "sha256:optimizer-1"},
+        "rng": {"algorithm": "exsss", "state_sha256": "sha256:rng-1"},
+    }
+    worker.artifact = {"payload_sha256": "sha256:artifact-1", "receipt_sha256s": []}
+    assert worker._current_training_state() == (worker.checkpoint["optimizer"], worker.checkpoint["rng"])
+    assert worker._current_behavior_policy()["artifact_sha256"] == "sha256:artifact-1"
+    assert worker._status()["pending_batch_ids"] == ["trl-step-1-group-0"]
     """
 
     assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)

@@ -14,6 +14,7 @@ import json
 import math
 import os
 import pathlib
+import shutil
 import struct
 import sys
 import tempfile
@@ -142,11 +143,15 @@ class Worker:
 
     @property
     def intent_path(self) -> pathlib.Path:
-        return self.root / "accepted-intent.json"
+        return self.root / f"accepted-intent-{self.step + 1}.json"
 
     @property
     def artifact_path(self) -> pathlib.Path:
-        return self.root / "artifact"
+        step = max(self.step, 1)
+        return self.root / "artifacts" / f"step-{step}"
+
+    def next_artifact_path(self) -> pathlib.Path:
+        return self.root / "artifacts" / f"step-{self.step + 1}"
 
     def initialize(self) -> dict[str, Any]:
         self._verify_environment()
@@ -215,10 +220,11 @@ class Worker:
             raise WorkerError("engine_identity_mismatch", "session engine is not pinned TRL")
         if self.model is None:
             raise WorkerError("worker_not_initialized", "initialize must precede session binding")
-        if len(protocol.get("prompt_schedule", {}).get("steps", [])) != 1:
+        steps = protocol.get("prompt_schedule", {}).get("steps", [])
+        if len(steps) != self.contract["optimizer"]["max_steps"]:
             raise WorkerError(
                 "unsupported_step_budget",
-                "the local TRL worker currently supports exactly one durable optimizer update",
+                "session schedule differs from the pinned optimizer step budget",
             )
         if self.protocol_path.exists():
             previous = json.loads(self.protocol_path.read_text())
@@ -234,7 +240,10 @@ class Worker:
             raise WorkerError("session_not_found", "durable session does not exist")
         self.protocol = json.loads(self.protocol_path.read_text())
         validate_envelope(self.protocol, "imp_trl_grpo_session")
+        self.initialize()
         self._load_durable_result()
+        if self.step > 0:
+            self._load_latest_adapter()
         result = self._status()
         result["protocol"] = self.protocol
         result["model"] = self.protocol["behavior_policy"]["model"]
@@ -243,8 +252,8 @@ class Worker:
     def prepare_update(self, request: dict[str, Any]) -> dict[str, Any]:
         if self.protocol is None or self.model is None or self.tokenizer is None:
             raise WorkerError("worker_not_bound", "initialized session is required")
-        if self.step != 0:
-            raise WorkerError("one_update_budget_exhausted", "local TRL worker permits exactly one update")
+        if self.step >= self.contract["optimizer"]["max_steps"]:
+            raise WorkerError("update_budget_exhausted", "local TRL worker step budget is exhausted")
         groups = request.get("groups")
         expected_groups = len(
             self.protocol["prompt_schedule"]["steps"][self.step]["ordered_row_sha256s"]
@@ -262,25 +271,14 @@ class Worker:
         self._validate_controlled_groups(encoded_groups)
         self._validate_acceptance_assertions(encoded_groups)
 
-        optimizer_state = {
-            "global_step": 0,
-            "state_sha256": digest(
-                {"initial": self.protocol["optimizer"]["config_sha256"], "step": 0}
-            ),
-        }
-        rng_state = {
-            "algorithm": self.protocol["rng"]["algorithm"],
-            "state_sha256": digest(
-                {"initial": self.protocol["rng"]["state_sha256"], "step": 0}
-            ),
-        }
+        optimizer_state, rng_state = self._current_training_state()
         attrs = {
             "session_id": self.protocol["session_id"],
             "session_payload_sha256": self.protocol["payload_sha256"],
             "step_id": request["step_id"],
             "idempotency_key": request["idempotency_key"],
-            "trainer_step": 0,
-            "behavior_policy": self.protocol["behavior_policy"],
+            "trainer_step": self.step,
+            "behavior_policy": self._current_behavior_policy(),
             "optimizer": optimizer_state,
             "rng": rng_state,
             "groups": encoded_groups,
@@ -449,7 +447,7 @@ class Worker:
         if canonical(expected) != canonical(actual):
             raise WorkerError("prepared_update_mismatch", "sealed update differs from prepared values")
 
-        if self.receipt is not None:
+        if self.receipt is not None and self.receipt["trainer_step"] == update["trainer_step"] + 1:
             if self.receipt["accepted_update_sha256"] == update["payload_sha256"]:
                 return self._mutation_result()
             raise WorkerError("replay_payload_mismatch", "idempotency key already has different content")
@@ -468,8 +466,8 @@ class Worker:
         return self._train_once(update)
 
     def terminate(self) -> dict[str, Any]:
-        if self.step != 1 or self.artifact is None:
-            raise WorkerError("incomplete_training", "the single accepted update did not complete")
+        if self.step != self.contract["optimizer"]["max_steps"] or self.artifact is None:
+            raise WorkerError("incomplete_training", "the pinned optimizer step budget did not complete")
         result = self._status()
         result["status"] = "succeeded"
         return result
@@ -479,6 +477,7 @@ class Worker:
         assert torch is not None and self.model is not None and self.tokenizer is not None
         from datasets import Dataset
         from peft import LoraConfig, TaskType
+        from transformers import TrainerCallback
         from trl import GRPOConfig, GRPOTrainer
 
         groups = update["groups"]
@@ -508,11 +507,27 @@ class Worker:
                 self.imp_advantages = result["advantages"].detach().cpu().tolist()
                 return result
 
+        target_step = self.step + 1
+
+        class StopAfterAcceptedStep(TrainerCallback):
+            def on_step_end(self, _args, state, control, **_kwargs):
+                if state.global_step >= target_step:
+                    control.should_training_stop = True
+                return control
+
+        class RestoreMPSRNG(TrainerCallback):
+            def on_train_begin(callback_self, _args, _state, control, **_kwargs):
+                if self.step > 0:
+                    rng_path = self.artifact_path / "mps-rng.pt"
+                    state = torch.load(rng_path, map_location="cpu", weights_only=True)
+                    torch.mps.set_rng_state(state)
+                return control
+
         cfg = self.contract["optimizer"]
         output = self.root / "trainer-output"
         args = GRPOConfig(
             output_dir=str(output),
-            max_steps=1,
+            max_steps=self.contract["optimizer"]["max_steps"],
             per_device_train_batch_size=len(groups) * cfg["num_generations"],
             gradient_accumulation_steps=1,
             generation_batch_size=len(groups) * cfg["num_generations"],
@@ -529,7 +544,9 @@ class Worker:
             seed=cfg["seed"],
             data_seed=cfg["seed"],
             shuffle_dataset=False,
-            save_strategy="no",
+            save_strategy="steps",
+            save_steps=1,
+            save_total_limit=None,
             logging_strategy="steps",
             logging_steps=1,
             report_to=[],
@@ -537,14 +554,16 @@ class Worker:
             remove_unused_columns=False,
         )
         lora = cfg["lora"]
-        peft_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
-            r=lora["rank"],
-            lora_alpha=lora["alpha"],
-            lora_dropout=lora["dropout"],
-            target_modules=lora["target_modules"],
-            bias="none",
-        )
+        peft_config = None
+        if self.step == 0:
+            peft_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM,
+                r=lora["rank"],
+                lora_alpha=lora["alpha"],
+                lora_dropout=lora["dropout"],
+                target_modules=lora["target_modules"],
+                bias="none",
+            )
         trainer = ObservedGRPOTrainer(
             model=self.model,
             args=args,
@@ -553,16 +572,22 @@ class Worker:
             processing_class=self.tokenizer,
             peft_config=peft_config,
             rollout_func=rollout_func,
+            callbacks=[StopAfterAcceptedStep(), RestoreMPSRNG()],
         )
         self.trainer = trainer
         self.model = trainer.model
         self._assert_trainable_device(self.model, "mps")
         before_digest = self._trainable_digest(self.model)
-        train_result = trainer.train()
+        resume_checkpoint = str(self.artifact_path / "trainer-checkpoint") if self.step > 0 else None
+        train_result = trainer.train(resume_from_checkpoint=resume_checkpoint)
         self._assert_trainable_device(self.model, "mps")
         after_digest = self._trainable_digest(self.model)
-        if trainer.state.global_step != 1:
-            raise WorkerError("optimizer_step_mismatch", f"expected step 1, got {trainer.state.global_step}", accepted=True)
+        if trainer.state.global_step != target_step:
+            raise WorkerError(
+                "optimizer_step_mismatch",
+                f"expected step {target_step}, got {trainer.state.global_step}",
+                accepted=True,
+            )
         acceptance = self._acceptance()
         if acceptance["require_weight_change"] and before_digest == after_digest:
             raise WorkerError("trainable_tensor_unchanged", "LoRA tensors did not change", accepted=True)
@@ -585,27 +610,36 @@ class Worker:
                     accepted=True,
                 )
 
-        staging = self.root / ".artifact.tmp"
+        staging = self.root / f".artifact-step-{target_step}.tmp"
         if staging.exists():
             raise WorkerError("artifact_staging_exists", "prior partial artifact requires inspection", accepted=True)
         staging.mkdir()
         adapter_dir = staging / "adapter"
         trainer.save_model(str(adapter_dir))
         trainer.save_state()
+        checkpoint_source = output / f"checkpoint-{target_step}"
+        if not checkpoint_source.is_dir():
+            raise WorkerError(
+                "trainer_checkpoint_missing",
+                f"official Trainer checkpoint-{target_step} is missing",
+                accepted=True,
+            )
+        shutil.copytree(checkpoint_source, staging / "trainer-checkpoint")
         trainer_state_source = output / "trainer_state.json"
         if trainer_state_source.is_file():
             atomic_write(staging / "trainer-state.json", trainer_state_source.read_bytes())
         torch.save(trainer.optimizer.state_dict(), staging / "optimizer.pt")
+        torch.save(torch.mps.get_rng_state(), staging / "mps-rng.pt")
         rng_record = {
             "torch_cpu_sha256": "sha256:" + hashlib.sha256(torch.get_rng_state().numpy().tobytes()).hexdigest(),
             "torch_mps_sha256": self._mps_rng_digest(torch),
             "seed": cfg["seed"],
         }
         write_json(staging / "rng-state.json", rng_record)
-        write_json(staging / "update-1.json", update)
+        write_json(staging / f"update-{target_step}.json", update)
 
         optimizer_after = {
-            "global_step": 1,
+            "global_step": target_step,
             "state_sha256": file_digest(staging / "optimizer.pt"),
         }
         rng_after = {
@@ -616,8 +650,8 @@ class Worker:
             "imp_trl_grpo_checkpoint",
             {
                 "session_id": self.protocol["session_id"],
-                "trainer_step": 1,
-                "accepted_update_sha256s": [update["payload_sha256"]],
+                "trainer_step": target_step,
+                "accepted_update_sha256s": self._accepted_update_sha256s() + [update["payload_sha256"]],
                 "artifact_sha256": after_digest,
                 "optimizer": optimizer_after,
                 "rng": rng_after,
@@ -630,9 +664,9 @@ class Worker:
                 "session_id": self.protocol["session_id"],
                 "idempotency_key": update["idempotency_key"],
                 "accepted_update_sha256": update["payload_sha256"],
-                "trainer_step": 1,
+                "trainer_step": target_step,
                 "artifact": {
-                    "before_sha256": self.protocol["behavior_policy"]["artifact_sha256"],
+                    "before_sha256": update["behavior_policy"]["artifact_sha256"],
                     "after_sha256": after_digest,
                 },
                 "optimizer": {
@@ -649,7 +683,7 @@ class Worker:
                 },
             },
         )
-        write_json(staging / "receipt-1.json", receipt)
+        write_json(staging / f"receipt-{target_step}.json", receipt)
         write_json(
             staging / "trl-observation.json",
             {
@@ -661,7 +695,7 @@ class Worker:
                 ],
                 "trainable_before_sha256": before_digest,
                 "trainable_after_sha256": after_digest,
-                "global_step_before": 0,
+                "global_step_before": self.step,
                 "global_step_after": trainer.state.global_step,
                 "training_loss": float(train_result.training_loss),
                 "trainable_tensors_changed": before_digest != after_digest,
@@ -676,22 +710,24 @@ class Worker:
                 "session_id": self.protocol["session_id"],
                 "base_model": self.protocol["behavior_policy"]["model"],
                 "base_model_sha256": self.protocol["behavior_policy"]["artifact_sha256"],
-                "trainer_step": 1,
+                "trainer_step": target_step,
                 "checkpoint_sha256": checkpoint["payload_sha256"],
-                "receipt_sha256s": [receipt["payload_sha256"]],
+                "receipt_sha256s": self._receipt_sha256s() + [receipt["payload_sha256"]],
                 "files": files,
             },
         )
         write_json(staging / "imp-trl-artifact.json", artifact)
-        os.replace(staging, self.artifact_path)
+        target = self.next_artifact_path()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(staging, target)
         directory = os.open(self.root, os.O_RDONLY)
         try:
             os.fsync(directory)
         finally:
             os.close(directory)
 
-        self.step = 1
-        self.accepted_batch_ids = [group["batch_id"] for group in groups]
+        self.step = target_step
+        self.accepted_batch_ids += [group["batch_id"] for group in groups]
         self.receipt = receipt
         self.checkpoint = checkpoint
         self.artifact = artifact
@@ -868,10 +904,10 @@ class Worker:
         }
         if set(optimizer) != required_optimizer:
             raise WorkerError("invalid_optimizer_contract", "optimizer contract keys do not match")
-        if optimizer["max_steps"] != 1:
+        if not isinstance(optimizer["max_steps"], int) or optimizer["max_steps"] < 1:
             raise WorkerError(
-                "unsupported_step_budget",
-                "the local TRL worker currently supports exactly one durable optimizer update",
+                "invalid_optimizer_contract",
+                "max_steps must be a positive durable optimizer budget",
             )
         if not isinstance(optimizer["num_generations"], int) or optimizer["num_generations"] < 2:
             raise WorkerError("invalid_optimizer_contract", "num_generations must be at least two")
@@ -925,8 +961,17 @@ class Worker:
         return result
 
     def _load_durable_result(self) -> None:
-        manifest_path = self.artifact_path / "imp-trl-artifact.json"
-        if not manifest_path.is_file():
+        artifacts_root = self.root / "artifacts"
+        steps = []
+        if artifacts_root.is_dir():
+            for path in artifacts_root.iterdir():
+                if path.is_dir() and path.name.startswith("step-"):
+                    try:
+                        steps.append(int(path.name.removeprefix("step-")))
+                    except ValueError:
+                        raise WorkerError("artifact_step_identity_invalid", "invalid step directory")
+
+        if not steps:
             if self.intent_path.exists():
                 raise WorkerError(
                     "ambiguous_prior_acceptance",
@@ -935,15 +980,127 @@ class Worker:
                 )
             self.step = 0
             return
+        expected_steps = list(range(1, max(steps) + 1))
+        if sorted(steps) != expected_steps:
+            raise WorkerError("artifact_step_chain_incomplete", "durable step sequence has a gap")
+
+        accepted_batch_ids = []
+        prior_receipts = []
+        for step in expected_steps:
+            path = artifacts_root / f"step-{step}"
+            manifest = json.loads((path / "imp-trl-artifact.json").read_text())
+            checkpoint = json.loads((path / "trainer-checkpoint.json").read_text())
+            receipt = json.loads((path / f"receipt-{step}.json").read_text())
+            update = json.loads((path / f"update-{step}.json").read_text())
+            validate_envelope(manifest, "imp_trl_grpo_artifact")
+            validate_envelope(checkpoint, "imp_trl_grpo_checkpoint")
+            validate_envelope(receipt, "imp_trl_grpo_receipt")
+            validate_envelope(update, "imp_trl_grpo_update")
+            self._verify_artifact_inventory(path, manifest)
+            observation = json.loads((path / "trl-observation.json").read_text())
+            rng_record = json.loads((path / "rng-state.json").read_text())
+            if checkpoint["artifact_sha256"] != observation["trainable_after_sha256"]:
+                raise WorkerError("checkpoint_tensor_identity_mismatch", "checkpoint tensor digest differs")
+            if checkpoint["optimizer"]["state_sha256"] != file_digest(path / "optimizer.pt"):
+                raise WorkerError("checkpoint_optimizer_identity_mismatch", "optimizer bytes differ")
+            if checkpoint["rng"]["state_sha256"] != digest(rng_record):
+                raise WorkerError("checkpoint_rng_identity_mismatch", "trainer RNG record differs")
+            if receipt["accepted_update_sha256"] != update["payload_sha256"]:
+                raise WorkerError("receipt_update_identity_mismatch", "receipt update digest differs")
+            if receipt["checkpoint"]["payload_sha256"] != checkpoint["payload_sha256"]:
+                raise WorkerError("receipt_checkpoint_identity_mismatch", "receipt checkpoint differs")
+            if manifest["checkpoint_sha256"] != checkpoint["payload_sha256"]:
+                raise WorkerError("artifact_checkpoint_identity_mismatch", "artifact checkpoint differs")
+            prior_receipts.append(receipt["payload_sha256"])
+            if manifest["trainer_step"] != step or manifest["receipt_sha256s"] != prior_receipts:
+                raise WorkerError("artifact_step_chain_mismatch", "durable artifact chain differs")
+            accepted_batch_ids.extend(group["batch_id"] for group in update["groups"])
+
+        self.step = max(steps)
+        if self.intent_path.exists():
+            raise WorkerError(
+                "ambiguous_prior_acceptance",
+                "next-step sealed intent exists without a durable artifact",
+                accepted=True,
+            )
+        manifest_path = self.artifact_path / "imp-trl-artifact.json"
         self.artifact = json.loads(manifest_path.read_text())
         self.checkpoint = json.loads((self.artifact_path / "trainer-checkpoint.json").read_text())
-        self.receipt = json.loads((self.artifact_path / "receipt-1.json").read_text())
-        accepted_update = json.loads((self.artifact_path / "update-1.json").read_text())
-        self.accepted_batch_ids = [group["batch_id"] for group in accepted_update["groups"]]
+        self.receipt = json.loads((self.artifact_path / f"receipt-{self.step}.json").read_text())
+        self.accepted_batch_ids = accepted_batch_ids
         validate_envelope(self.artifact, "imp_trl_grpo_artifact")
         validate_envelope(self.checkpoint, "imp_trl_grpo_checkpoint")
         validate_envelope(self.receipt, "imp_trl_grpo_receipt")
-        self.step = 1
+
+    def _load_latest_adapter(self) -> None:
+        if self.model is None:
+            raise WorkerError("worker_not_initialized", "base model must load before adapter resume")
+        from peft import PeftModel
+
+        self.model = PeftModel.from_pretrained(
+            self.model,
+            str(self.artifact_path / "adapter"),
+            is_trainable=True,
+        )
+        self.model.to("mps")
+        self._assert_trainable_device(self.model, "mps")
+        observation = json.loads((self.artifact_path / "trl-observation.json").read_text())
+        if self._trainable_digest(self.model) != observation["trainable_after_sha256"]:
+            raise WorkerError("resume_adapter_identity_mismatch", "resumed LoRA tensors differ")
+
+    def _verify_artifact_inventory(
+        self, artifact_path: pathlib.Path, manifest: dict[str, Any]
+    ) -> None:
+        manifest_path = artifact_path / "imp-trl-artifact.json"
+        expected_files = sorted(
+            manifest["files"]
+            + [
+                {
+                    "path": "imp-trl-artifact.json",
+                    "size": manifest_path.stat().st_size,
+                    "sha256": file_digest(manifest_path),
+                }
+            ],
+            key=lambda entry: entry["path"],
+        )
+        actual_files = sorted(safe_tree_inventory(artifact_path), key=lambda entry: entry["path"])
+        if actual_files != expected_files:
+            raise WorkerError("artifact_inventory_mismatch", "durable artifact bytes changed")
+
+    def _current_training_state(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        assert self.protocol is not None
+        if self.step == 0:
+            return (
+                {
+                    "global_step": 0,
+                    "state_sha256": digest(
+                        {"initial": self.protocol["optimizer"]["config_sha256"], "step": 0}
+                    ),
+                },
+                {
+                    "algorithm": self.protocol["rng"]["algorithm"],
+                    "state_sha256": digest(
+                        {"initial": self.protocol["rng"]["state_sha256"], "step": 0}
+                    ),
+                },
+            )
+        return self.checkpoint["optimizer"], self.checkpoint["rng"]
+
+    def _current_behavior_policy(self) -> dict[str, Any]:
+        assert self.protocol is not None
+        if self.step == 0:
+            return self.protocol["behavior_policy"]
+        return {
+            "model": str(self.artifact_path),
+            "artifact_sha256": self.artifact["payload_sha256"],
+            "tokenizer_sha256": self.protocol["behavior_policy"]["tokenizer_sha256"],
+        }
+
+    def _accepted_update_sha256s(self) -> list[str]:
+        return [] if self.step == 0 else list(self.checkpoint["accepted_update_sha256s"])
+
+    def _receipt_sha256s(self) -> list[str]:
+        return [] if self.step == 0 else list(self.artifact["receipt_sha256s"])
 
     def _pending_batch_ids(self) -> list[str]:
         assert self.protocol is not None
