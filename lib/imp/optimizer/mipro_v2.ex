@@ -14,8 +14,15 @@ defmodule Imp.Optimizer.MIPROv2 do
   one-instruction JSON schema (`:off`, `:auto`, or `:required`).
   """
 
-  alias Imp.Clients.TRLProtocol
-  alias Imp.Optimizer.{DemoCandidates, InstructionProposer, Report, Sampling, SearchPolicy}
+  alias Imp.Optimizer.{
+    DemoCandidates,
+    DurableCallbackIdentity,
+    InstructionProposer,
+    Report,
+    Sampling,
+    SearchPolicy
+  }
+
   alias Imp.Optimizer.MIPROv2.{Checkpoint, Config}
   alias Imp.Optimizer.SearchPolicy.CategoricalTPE, as: CategoricalPolicy
 
@@ -65,7 +72,8 @@ defmodule Imp.Optimizer.MIPROv2 do
       task_lm: runtime_opts[:task_lm],
       teacher: runtime_opts[:teacher],
       metric_threshold: runtime_opts[:metric_threshold],
-      metric_identity: normalize_metric_identity!(runtime_opts[:metric_identity]),
+      metric_identity:
+        DurableCallbackIdentity.normalize!(runtime_opts[:metric_identity], :metric_identity),
       init_temperature: Keyword.get(runtime_opts, :init_temperature, 1.0),
       proposal_response_format: Keyword.get(runtime_opts, :proposal_response_format, :off),
       max_errors: Keyword.get(runtime_opts, :max_errors, :infinity),
@@ -210,8 +218,22 @@ defmodule Imp.Optimizer.MIPROv2 do
             "MIPROv2 requires :prompt_lm or a concrete LM on the program's first predictor"
     end
 
-    durable? = durable_run?(optimizer, run_opts)
-    metric_identity = resolve_metric_identity!(optimizer, durable?)
+    durable? =
+      DurableCallbackIdentity.durable?(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable_controls?(run_opts)
+      )
+
+    metric_identity =
+      DurableCallbackIdentity.resolve!(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable?,
+        "MIPROv2",
+        :metric_identity
+      )
+
     compatibility = resume_compatibility(program, predictors, config, optimizer, metric_identity)
 
     {artifacts, state, resumed?} =
@@ -702,95 +724,10 @@ defmodule Imp.Optimizer.MIPROv2 do
   defp runtime_identity(port) when is_port(port), do: :runtime_port
   defp runtime_identity(value), do: value
 
-  defp durable_run?(optimizer, run_opts) do
-    not is_nil(optimizer.metric_identity) or derivable_metric_identity?(optimizer.metric) or
-      not is_nil(run_opts[:resume_state]) or not is_nil(run_opts[:checkpoint_fn]) or
+  defp durable_controls?(run_opts) do
+    not is_nil(run_opts[:resume_state]) or not is_nil(run_opts[:checkpoint_fn]) or
       run_opts[:max_trials] != :infinity
   end
-
-  defp resolve_metric_identity!(%{metric_identity: identity}, _durable?)
-       when not is_nil(identity),
-       do: Map.put(identity, "kind", "declared")
-
-  defp resolve_metric_identity!(%{metric: metric}, durable?) when is_function(metric) do
-    cond do
-      derivable_metric_identity?(metric) ->
-        %{
-          "kind" => "external_function",
-          "module" => metric |> :erlang.fun_info(:module) |> elem(1) |> Atom.to_string(),
-          "name" => metric |> :erlang.fun_info(:name) |> elem(1) |> Atom.to_string(),
-          "arity" => metric |> :erlang.fun_info(:arity) |> elem(1)
-        }
-
-      durable? ->
-        raise ArgumentError,
-              "durable MIPROv2 with an anonymous or captured metric requires :metric_identity " <>
-                "with stable JSON-safe id/version/config; got metric #{inspect(metric)}"
-
-      true ->
-        nil
-    end
-  end
-
-  defp resolve_metric_identity!(_optimizer, false), do: nil
-
-  defp derivable_metric_identity?(metric) when is_function(metric) do
-    metric |> :erlang.fun_info(:type) |> elem(1) == :external
-  end
-
-  defp derivable_metric_identity?(_metric), do: false
-
-  defp normalize_metric_identity!(nil), do: nil
-
-  defp normalize_metric_identity!(identity) do
-    unless is_map(identity) and not is_struct(identity) and
-             Map.keys(identity) |> Enum.all?(&is_binary/1) do
-      raise ArgumentError,
-            ":metric_identity must use string keys and contain JSON-safe id, version, and config"
-    end
-
-    unless Map.keys(identity) |> Enum.sort() == ["config", "id", "version"] and
-             is_binary(identity["id"]) and String.trim(identity["id"]) != "" and
-             valid_identity_version?(identity["version"]) and
-             json_safe_identity_value?(identity["config"]) do
-      raise ArgumentError,
-            ":metric_identity must contain exactly non-empty string id, string/integer version, " <>
-              "and already JSON-safe config"
-    end
-
-    %{
-      "id" => identity["id"],
-      "version" => identity["version"],
-      "config_sha256" => TRLProtocol.digest(identity["config"])
-    }
-  end
-
-  defp json_safe_identity_value?(nil), do: true
-  defp json_safe_identity_value?(value) when is_binary(value) or is_boolean(value), do: true
-  defp json_safe_identity_value?(value) when is_integer(value), do: true
-
-  defp json_safe_identity_value?(value) when is_float(value) do
-    try do
-      value |> :erlang.float_to_binary([:compact]) |> then(&(&1 not in ["nan", "inf", "-inf"]))
-    rescue
-      ArgumentError -> false
-    end
-  end
-
-  defp json_safe_identity_value?(values) when is_list(values),
-    do: Enum.all?(values, &json_safe_identity_value?/1)
-
-  defp json_safe_identity_value?(map) when is_map(map) and not is_struct(map),
-    do:
-      Enum.all?(map, fn {key, value} ->
-        is_binary(key) and json_safe_identity_value?(value)
-      end)
-
-  defp json_safe_identity_value?(_value), do: false
-
-  defp valid_identity_version?(version) when is_integer(version), do: version >= 0
-  defp valid_identity_version?(version) when is_binary(version), do: String.trim(version) != ""
-  defp valid_identity_version?(_version), do: false
 
   defp full_record(trial, params, score, program, kind),
     do: %{trial: trial, params: params, score: score, program: program, kind: kind}
@@ -847,7 +784,7 @@ defmodule Imp.Optimizer.MIPROv2 do
   end
 
   defp validate_runtime!(optimizer) do
-    :ok = validate_normalized_metric_identity!(optimizer.metric_identity)
+    :ok = DurableCallbackIdentity.validate_normalized!(optimizer.metric_identity, "MIPROv2")
 
     unless is_number(optimizer.init_temperature) and optimizer.init_temperature >= 0,
       do: raise(ArgumentError, "init_temperature must be a non-negative number")
@@ -874,20 +811,6 @@ defmodule Imp.Optimizer.MIPROv2 do
            do: raise(ArgumentError, "max_errors must be :infinity or a non-negative integer")
 
     optimizer
-  end
-
-  defp validate_normalized_metric_identity!(nil), do: :ok
-
-  defp validate_normalized_metric_identity!(identity) do
-    unless is_map(identity) and
-             Map.keys(identity) |> Enum.sort() ==
-               ["config_sha256", "id", "version"] and is_binary(identity["id"]) and
-             String.trim(identity["id"]) != "" and valid_identity_version?(identity["version"]) and
-             is_binary(identity["config_sha256"]) do
-      raise ArgumentError, "invalid normalized MIPROv2 metric identity"
-    end
-
-    :ok
   end
 
   defp enforce_error_budget!(_errors, :infinity), do: :ok

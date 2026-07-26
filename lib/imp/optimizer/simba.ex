@@ -9,11 +9,12 @@ defmodule Imp.Optimizer.SIMBA do
   population and performs final selection on the full validation dataset.
   """
 
-  alias Imp.Optimizer.{Report, Sampling, SearchPolicy, TrajectoryRunner}
+  alias Imp.Optimizer.{DurableCallbackIdentity, Report, Sampling, SearchPolicy, TrajectoryRunner}
   alias Imp.Optimizer.SIMBA.{Buckets, Checkpoint, Population}
 
   defstruct [
     :metric,
+    :metric_identity,
     :prompt_lm,
     :teacher_lm,
     bsize: 32,
@@ -33,6 +34,7 @@ defmodule Imp.Optimizer.SIMBA do
     :num_candidates,
     :max_steps,
     :max_demos,
+    :metric_identity,
     :prompt_lm,
     :teacher_lm,
     :demo_input_field_maxlen,
@@ -55,6 +57,8 @@ defmodule Imp.Optimizer.SIMBA do
 
     %__MODULE__{
       metric: metric,
+      metric_identity:
+        DurableCallbackIdentity.normalize!(opts[:metric_identity], :metric_identity),
       bsize: Keyword.get(opts, :bsize, 32),
       num_candidates: Keyword.get(opts, :num_candidates, 6),
       max_steps: Keyword.get(opts, :max_steps, 8),
@@ -211,7 +215,31 @@ defmodule Imp.Optimizer.SIMBA do
     if is_nil(prompt_lm),
       do: raise(ArgumentError, "SIMBA requires :prompt_lm or a concrete program LM")
 
-    compatibility = resume_compatibility(program, predictors, trainset, final_set, optimizer)
+    durable? =
+      DurableCallbackIdentity.durable?(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable_controls?(run_opts)
+      )
+
+    metric_identity =
+      DurableCallbackIdentity.resolve!(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable?,
+        "SIMBA",
+        :metric_identity
+      )
+
+    compatibility =
+      resume_compatibility(
+        program,
+        predictors,
+        trainset,
+        final_set,
+        optimizer,
+        metric_identity
+      )
 
     {state, resumed?} =
       case run_opts[:resume_state] do
@@ -269,7 +297,7 @@ defmodule Imp.Optimizer.SIMBA do
         state
       end
 
-    checkpoint = Checkpoint.dump(compatibility, state)
+    checkpoint = if durable?, do: Checkpoint.dump(compatibility, state)
     complete? = state.completed_steps == optimizer.max_steps
     scored_finalists = state.final_evaluations
     best = if complete?, do: Enum.max_by(scored_finalists, & &1.score), else: nil
@@ -315,6 +343,8 @@ defmodule Imp.Optimizer.SIMBA do
           final_evaluation_calls: state.final_evaluation_calls,
           search_policy: SearchPolicy.dump(state.population.policy),
           resumed: resumed?,
+          durable: durable?,
+          metric_identity: metric_identity,
           run_status: if(complete?, do: :complete, else: :paused),
           completed_steps: state.completed_steps,
           resume_state: checkpoint,
@@ -990,7 +1020,14 @@ defmodule Imp.Optimizer.SIMBA do
     state
   end
 
-  defp resume_compatibility(program, predictors, trainset, final_set, optimizer) do
+  defp resume_compatibility(
+         program,
+         predictors,
+         trainset,
+         final_set,
+         optimizer,
+         metric_identity
+       ) do
     payload = %{
       optimizer: %{
         bsize: optimizer.bsize,
@@ -1005,7 +1042,7 @@ defmodule Imp.Optimizer.SIMBA do
         seed: optimizer.seed
       },
       datasets: %{trainset: trainset, final_set: final_set},
-      metric: runtime_identity(optimizer.metric),
+      metric: metric_identity,
       prompt_lm: runtime_identity(optimizer.prompt_lm),
       teacher_lm: runtime_identity(optimizer.teacher_lm),
       predictors:
@@ -1055,6 +1092,11 @@ defmodule Imp.Optimizer.SIMBA do
   defp runtime_identity(reference) when is_reference(reference), do: :runtime_reference
   defp runtime_identity(port) when is_port(port), do: :runtime_port
   defp runtime_identity(value), do: value
+
+  defp durable_controls?(run_opts) do
+    not is_nil(run_opts[:resume_state]) or not is_nil(run_opts[:checkpoint_fn]) or
+      run_opts[:max_steps] != :infinity
+  end
 
   defp finalist_programs(winners, limit) do
     winners
@@ -1129,6 +1171,8 @@ defmodule Imp.Optimizer.SIMBA do
   end
 
   defp validate!(optimizer) do
+    :ok = DurableCallbackIdentity.validate_normalized!(optimizer.metric_identity, "SIMBA")
+
     for {key, value, minimum} <- [
           {:bsize, optimizer.bsize, 1},
           {:num_candidates, optimizer.num_candidates, 1},

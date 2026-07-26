@@ -883,21 +883,32 @@ resumed =
 ```
 
 Because `metric` is commonly an anonymous or captured function, durable
-MIPROv2 runs require the constructor's `metric_identity:` map shown above.
+MIPROv2 and SIMBA runs require the constructor's `metric_identity:` map shown above.
 It must contain exactly string-keyed, already JSON-safe `id`, `version`, and
 `config` fields; config numbers must be finite. Imp binds the id and version plus a canonical SHA-256 digest
 of the config into every checkpoint; the config itself is not copied there.
 Changing the declared identity or config refuses resume before proposal or task
 evaluation. A public `&Module.function/2` metric can derive its own stable
 identity. An anonymous metric without an identity remains valid only for a
-complete in-process run with no checkpoint, resume, or `max_trials` control;
+complete in-process run with no checkpoint, resume, `max_trials`, or invocation-level
+`max_steps` control;
 that report explicitly has `metadata.durable == false` and no `resume_state`.
 
 For SIMBA, build the optimizer, then use the corresponding five-argument call
 and invocation-level `max_steps:` option:
 
 ```elixir
-simba = Imp.Optimizer.SIMBA.new(metric, bsize: 1, num_candidates: 2, max_steps: 1)
+simba =
+  Imp.Optimizer.SIMBA.new(metric,
+    bsize: 1,
+    num_candidates: 2,
+    max_steps: 1,
+    metric_identity: %{
+      "id" => "my_app.exact_answer",
+      "version" => 1,
+      "config" => %{"field" => "answer"}
+    }
+  )
 
 Imp.Optimizer.SIMBA.compile(simba, program, trainset, devset,
   max_steps: 1,

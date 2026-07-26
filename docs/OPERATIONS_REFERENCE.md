@@ -35,7 +35,7 @@ interrupted in-flight work is retried.
 Checkpoints do not serialize executable callbacks or live LM clients. Resume
 with the original program shape, datasets, and search configuration, while
 supplying the current metric and LM callbacks through the runtime optimizer and
-program. For MIPROv2, an anonymous or captured metric must also declare a stable
+program. For MIPROv2 and SIMBA, an anonymous or captured metric must also declare a stable
 `metric_identity` with string-keyed JSON-safe `id`, `version`, and finite-valued `config`.
 Imp persists the id/version/config digest rather than the config and refuses
 identity or config drift before evaluation. A public `&Module.function/2`

@@ -3,6 +3,9 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
 
   alias Imp.Optimizer.{Report, SIMBA}
 
+  def exact_metric(example, prediction),
+    do: Imp.Metrics.exact_match(:answer).(example, prediction)
+
   test "JSON checkpoint resume matches an uninterrupted run and rebinds runtime callbacks" do
     uninterrupted_state = start_supervised!({Agent, fn -> counters() end}, id: :simba_full)
     {program, optimizer, trainset, final_set} = fixture(uninterrupted_state)
@@ -207,7 +210,177 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
              report.metadata.final_evaluation_calls - completed_final_calls
   end
 
-  defp fixture(state) do
+  test "declared metric identity permits fresh captures and rejects config drift before work" do
+    state = start_supervised!({Agent, fn -> counters() end}, id: :simba_metric_source)
+    identity = metric_identity(%{"field" => "answer", "mode" => "exact"})
+
+    {program, optimizer, trainset, final_set} =
+      fixture(state, captured_metric(state), identity)
+
+    checkpoint =
+      optimizer
+      |> SIMBA.compile(program, trainset, final_set, max_steps: 1)
+      |> Report.fetch()
+      |> then(& &1.metadata.resume_state)
+      |> json_round_trip()
+
+    replacement =
+      start_supervised!(
+        Supervisor.child_spec({Agent, fn -> counters() end}, id: :simba_metric_replacement)
+      )
+
+    {_program, drifted, _trainset, _final_set} =
+      fixture(
+        replacement,
+        captured_metric(replacement),
+        metric_identity(%{"field" => "answer", "mode" => "case_insensitive"})
+      )
+
+    assert_raise ArgumentError,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
+                 fn ->
+                   SIMBA.compile(drifted, program, trainset, final_set,
+                     resume_state: checkpoint,
+                     max_steps: 0
+                   )
+                 end
+
+    assert Agent.get(replacement, & &1) == counters()
+
+    {_program, rebound, _trainset, _final_set} =
+      fixture(replacement, captured_metric(replacement), identity)
+
+    report =
+      rebound
+      |> SIMBA.compile(program, trainset, final_set,
+        resume_state: checkpoint,
+        max_steps: 0
+      )
+      |> Report.fetch()
+
+    assert report.metadata.resumed
+    assert report.metadata.durable
+    assert report.metadata.completed_steps == 1
+    assert report.metadata.metric_identity["kind"] == "declared"
+    assert report.metadata.metric_identity["id"] == "exact-answer"
+    assert report.metadata.metric_identity["version"] == 1
+    assert report.metadata.metric_identity["config_sha256"] =~ "sha256:"
+    refute Map.has_key?(report.metadata.metric_identity, "config")
+  end
+
+  test "durable anonymous metric without declared identity fails before work" do
+    state = start_supervised!({Agent, fn -> counters() end})
+    owner = self()
+
+    metric = fn example, prediction ->
+      send(owner, :metric_called)
+      exact_metric(example, prediction)
+    end
+
+    {program, optimizer, trainset, final_set} = fixture(state, metric, nil)
+
+    assert_raise ArgumentError, ~r/requires :metric_identity/, fn ->
+      SIMBA.compile(optimizer, program, trainset, final_set, max_steps: 1)
+    end
+
+    assert Agent.get(state, & &1) == counters()
+    refute_received :metric_called
+  end
+
+  test "anonymous metric may complete in process without durable state" do
+    state = start_supervised!({Agent, fn -> counters() end})
+
+    {program, optimizer, trainset, final_set} =
+      fixture(state, Imp.Metrics.exact_match(:answer), nil)
+
+    report = optimizer |> SIMBA.compile(program, trainset, final_set) |> Report.fetch()
+
+    refute report.metadata.durable
+    assert is_nil(report.metadata.metric_identity)
+    assert is_nil(report.metadata.resume_state)
+    assert report.metadata.run_status == :complete
+  end
+
+  test "external named metric derives durable identity" do
+    state = start_supervised!({Agent, fn -> counters() end})
+    {program, optimizer, trainset, final_set} = fixture(state, &__MODULE__.exact_metric/2, nil)
+
+    report = optimizer |> SIMBA.compile(program, trainset, final_set) |> Report.fetch()
+
+    assert report.metadata.durable
+
+    assert report.metadata.metric_identity == %{
+             "arity" => 2,
+             "kind" => "external_function",
+             "module" => Atom.to_string(__MODULE__),
+             "name" => "exact_metric"
+           }
+
+    assert is_map(report.metadata.resume_state)
+  end
+
+  test "metric identity is strict JSON-safe data" do
+    assert_raise ArgumentError, ~r/already JSON-safe config/, fn ->
+      SIMBA.new(&__MODULE__.exact_metric/2,
+        metric_identity: metric_identity(%{"field" => :answer})
+      )
+    end
+
+    assert_raise ArgumentError, ~r/use string keys/, fn ->
+      SIMBA.new(&__MODULE__.exact_metric/2,
+        metric_identity: %{id: "exact-answer", version: 1, config: %{}}
+      )
+    end
+
+    assert_raise ArgumentError, ~r/contain exactly/, fn ->
+      SIMBA.new(&__MODULE__.exact_metric/2,
+        metric_identity: %{
+          "id" => "exact-answer",
+          "version" => 1,
+          "config" => %{},
+          "extra" => true
+        }
+      )
+    end
+  end
+
+  @tag :tmp_dir
+  test "fresh OS resumes declared captures and refuses config drift before work", %{
+    tmp_dir: tmp_dir
+  } do
+    checkpoint = Path.join(tmp_dir, "checkpoint.json")
+    created = Path.join(tmp_dir, "created.json")
+    resumed = Path.join(tmp_dir, "resumed.json")
+    refused = Path.join(tmp_dir, "refused.json")
+
+    assert {output, 0} = fresh_os(["create", checkpoint, created])
+    assert output == ""
+    assert File.exists?(checkpoint)
+
+    assert {output, 0} = fresh_os(["resume", checkpoint, resumed, "same"])
+    assert output == ""
+
+    resumed_result = resumed |> File.read!() |> Jason.decode!()
+    assert resumed_result["status"] == "resumed"
+    assert resumed_result["resumed"]
+    assert resumed_result["completed_steps"] == 1
+    assert resumed_result["counters"] == %{"task_calls" => 0, "prompt_calls" => 0}
+
+    assert {_output, 2} = fresh_os(["resume", checkpoint, refused, "drift"])
+    refused_result = refused |> File.read!() |> Jason.decode!()
+    assert refused_result["status"] == "refused"
+    assert refused_result["error"] =~ "does not match the program runtime"
+    assert refused_result["counters"] == %{"task_calls" => 0, "prompt_calls" => 0}
+  end
+
+  defp captured_metric(state) do
+    fn example, prediction ->
+      _ = Agent.get(state, & &1.task_calls)
+      exact_metric(example, prediction)
+    end
+  end
+
+  defp fixture(state, metric \\ Imp.Metrics.exact_match(:answer), identity \\ metric_identity()) do
     task_lm = %{
       module: Imp.LM.Static,
       opts: [
@@ -253,20 +426,40 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
       end
 
     optimizer =
-      SIMBA.new(Imp.Metrics.exact_match(:answer),
+      SIMBA.new(metric,
         bsize: 2,
         num_candidates: 2,
         max_steps: 3,
         max_demos: 0,
         prompt_lm: prompt_lm,
         max_concurrency: 1,
-        seed: 41
+        seed: 41,
+        metric_identity: identity
       )
 
     {program, optimizer, trainset, final_set}
   end
 
   defp counters, do: %{task_calls: 0, prompt_calls: 0, checkpoints: []}
+
+  defp metric_identity(config \\ %{"field" => "answer"}) do
+    %{"id" => "exact-answer", "version" => 1, "config" => config}
+  end
+
+  defp fresh_os(args) do
+    expression = """
+    case Imp.Test.SIMBAMetricResumeOS.run(System.argv()) do
+      :ok -> :ok
+      {:error, _error} -> System.halt(2)
+    end
+    """
+
+    System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", expression, "--" | args],
+      cd: File.cwd!(),
+      env: [{"MIX_ENV", "test"}],
+      stderr_to_stdout: true
+    )
+  end
 
   defp json_round_trip(value), do: value |> Jason.encode!() |> Jason.decode!()
 end

@@ -142,6 +142,14 @@ program/optimizer LM callbacks therefore provide the executable behavior after
 resume; closure captures such as process handles or credentials may be rebound
 without embedding them in the artifact.
 
+Captured MIPROv2 and SIMBA metrics cross that boundary only with an explicit
+string-keyed `metric_identity` containing JSON-safe `id`, `version`, and
+`config`. Checkpoints bind the id and version plus the canonical config digest,
+never the executable closure or raw config. Public `&Module.function/2` metrics
+derive stable module/name/arity identity. Anonymous metrics without a declared
+identity remain available for complete in-process optimization, but those runs
+are explicitly non-durable and expose no resume checkpoint.
+
 Resume validates a run-configuration digest covering the program/predictor shape,
 resolved datasets, search configuration, and relevant runtime identities. For
 MIPROv2 and SIMBA, this includes each predictor's LM, adapter, demos, config,
