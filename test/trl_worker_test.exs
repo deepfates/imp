@@ -78,4 +78,44 @@ defmodule Imp.TRLWorkerTest do
     lm = %TRLLM{model: "Qwen/pinned", worker_key: {:missing, make_ref()}}
     assert {:error, :trl_worker_not_running} = Imp.LM.generate(lm, [], rollout_id: 0)
   end
+
+  test "trainer projects atom-keyed Imp groups to the worker's plain JSON shape" do
+    groups = [
+      %{
+        batch_id: "trl-batch-0",
+        predictor: :predict,
+        group_id: {0, :predict, 0},
+        group: [
+          %{
+            messages: [%{role: "user", content: "one"}],
+            completion: %{content: "R17"},
+            reward: 1.0
+          },
+          %{
+            messages: [%{role: "user", content: "one"}],
+            completion: %{content: "R42"},
+            reward: 0.0
+          },
+          %{
+            messages: [%{role: "user", content: "one"}],
+            completion: %{content: "R68"},
+            reward: 0.0
+          },
+          %{
+            messages: [%{role: "user", content: "one"}],
+            completion: %{content: "R93"},
+            reward: 0.0
+          }
+        ]
+      }
+    ]
+
+    assert [%{"batch_id" => "trl-batch-0", "group" => samples} = group] =
+             TRLTrainer.encode_groups(groups)
+
+    assert length(samples) == 4
+    assert group["predictor"] == %{"__imp_type__" => "atom", "value" => "predict"}
+    assert group["group_id"]["__imp_type__"] == "tuple"
+    assert Enum.map(samples, & &1["reward"]) == [1.0, 0.0, 0.0, 0.0]
+  end
 end

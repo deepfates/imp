@@ -103,7 +103,7 @@ defmodule Imp.Clients.TRLTrainer do
     with {:ok, prepared} <-
            request(trainer, worker, %{
              "op" => "prepare_update",
-             "groups" => Imp.Optimizer.Report.encode_term(groups),
+             "groups" => encode_groups(groups),
              "step_id" => Keyword.fetch!(opts, :step_id),
              "idempotency_key" => Keyword.fetch!(opts, :idempotency_key)
            }),
@@ -264,4 +264,7 @@ defmodule Imp.Clients.TRLTrainer do
     |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
   end
+
+  @doc false
+  def encode_groups(groups), do: Imp.Optimizer.Report.json_projection(groups)
 end

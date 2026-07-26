@@ -1,0 +1,29 @@
+{
+  "contract_sha256": "sha256:7e8d91bd20083d0dc08018eeba8c2d48b36ae173d787f6f9dde03161bdfe8b18",
+  "cleanup": {
+    "worker_process_alive_after_runner": false
+  },
+  "finished_at": "2026-07-26T02:48:59.568064Z",
+  "git_commit": "1beb3f2c0db08994b37487f480c269e3f76b7150",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "preflight": {
+    "dependencies": {
+      "peft": "0.18.1",
+      "torch": "2.10.0",
+      "transformers": "4.57.6",
+      "trl": "1.6.0"
+    },
+    "model_runtime_bytes": 999586347,
+    "model_safetensors_sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+    "mps_available": true,
+    "mps_built": true
+  },
+  "reason": "{:grpo_execution_and_termination_failed, %{\"accepted\" => false, \"code\" => \"generation_count_mismatch\", \"message\" => \"group sample count differs from frozen contract\"}, {:trl_worker, %{\"accepted\" => false, \"code\" => \"incomplete_training\", \"message\" => \"the single accepted update did not complete\"}}}",
+  "row_id": "banking77-train-2511",
+  "row_sha256": "sha256:dd5e7f7ca000bf4c92c81fe93b2b4fb3d05a52989a5cb8f2ab643f25f8242b91",
+  "schema_version": 1,
+  "scope": "one real local MPS LoRA GRPO update feasibility only",
+  "started_at": "2026-07-26T02:48:51.995696Z",
+  "status": "stopped",
+  "worker_registered_before_finally_cleanup": true
+}
