@@ -97,6 +97,18 @@ structured-response substitution rather than silently claiming parity. Its
 selected mode is part of durable checkpoint compatibility, so a resumed study
 cannot drift between proposer algorithms.
 
+The public compile path also reproduces DSPy's otherwise surprising zero-shot
+bootstrap before proposal. For six candidates over 20 rows it constructs the
+zero arm plus five bootstrap rounds, advances the same CPython RNG through four
+shuffle/size decisions, and stops each round when its accepted-demo target is
+met. With an always-accepting metric this is nine task calls before nine prompt
+calls (three summary plus six proposal); with no accepted examples the bounded
+bootstrap maximum is 100 task calls. Because `fewshot_aware_proposer: false`
+and zero-shot search discard every resulting demo, bootstrap content and scores
+do not enter proposal messages or the search space. Calls, failures, budgets,
+cache effects, and RNG advancement remain observable and are therefore still
+matched rather than optimized away.
+
 The fidelity path deliberately fails closed when a summary or proposal LM call
 fails or returns an invalid marker envelope. DSPy catches failures while
 building later summary batches and may summarize the observations accumulated

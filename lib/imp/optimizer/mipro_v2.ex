@@ -16,7 +16,8 @@ defmodule Imp.Optimizer.MIPROv2 do
   `:proposer_fidelity` defaults to Imp's documented `:beam_native` grounded
   proposer. Set it to `:dspy_3_2_1` for the narrow matched-comparison path with
   `program_aware_proposer: false`, `fewshot_aware_proposer: false`, and data/tip
-  awareness enabled; unsupported combinations fail before any LM call.
+  awareness enabled in zero-shot mode; unsupported combinations fail before
+  any LM call.
   """
 
   alias Imp.Optimizer.{
@@ -30,6 +31,7 @@ defmodule Imp.Optimizer.MIPROv2 do
 
   alias Imp.Optimizer.MIPROv2.{Checkpoint, Config}
   alias Imp.Optimizer.MIPROv2.PythonRandom
+  alias Imp.Optimizer.MIPROv2.UpstreamBootstrap
   alias Imp.Optimizer.MIPROv2.UpstreamProposer
   alias Imp.Optimizer.SearchPolicy.CategoricalTPE, as: CategoricalPolicy
 
@@ -321,20 +323,33 @@ defmodule Imp.Optimizer.MIPROv2 do
 
   defp setup_run(optimizer, config, program, predictors, prompt_lm) do
     teacher = optimizer.teacher || program
+    proposal_rng = PythonRandom.new(config.seed)
 
-    {demo_candidates, bootstrap_metadata} =
-      DemoCandidates.build(program, config.trainset, optimizer.metric,
-        runtime: :mipro_v2,
-        candidate_count: config.num_fewshot_candidates,
-        max_bootstrapped_demos: bootstrap_demo_limit(config),
-        max_labeled_demos: config.max_labeled_demos,
-        metric_threshold: optimizer.metric_threshold,
-        teacher: teacher,
-        seed: config.seed,
-        max_concurrency: optimizer.max_concurrency,
-        timeout: optimizer.timeout,
-        max_errors: optimizer.max_errors
-      )
+    {demo_candidates, bootstrap_metadata, proposal_rng} =
+      if config.proposer_fidelity == :dspy_3_2_1 do
+        UpstreamBootstrap.build!(teacher, config.trainset, optimizer.metric, proposal_rng,
+          candidate_count: config.num_fewshot_candidates,
+          metric_threshold: optimizer.metric_threshold,
+          timeout: optimizer.timeout,
+          max_errors: optimizer.max_errors
+        )
+      else
+        {candidates, metadata} =
+          DemoCandidates.build(program, config.trainset, optimizer.metric,
+            runtime: :mipro_v2,
+            candidate_count: config.num_fewshot_candidates,
+            max_bootstrapped_demos: bootstrap_demo_limit(config),
+            max_labeled_demos: config.max_labeled_demos,
+            metric_threshold: optimizer.metric_threshold,
+            teacher: teacher,
+            seed: config.seed,
+            max_concurrency: optimizer.max_concurrency,
+            timeout: optimizer.timeout,
+            max_errors: optimizer.max_errors
+          )
+
+        {candidates, metadata, proposal_rng}
+      end
 
     dataset_summary =
       if config.proposer_fidelity == :dspy_3_2_1 do
@@ -345,8 +360,6 @@ defmodule Imp.Optimizer.MIPROv2 do
           config.view_data_batch_size
         )
       end
-
-    proposal_rng = PythonRandom.new(config.seed)
 
     {instruction_pairs, {proposal_metadata, _proposal_rng}} =
       predictors

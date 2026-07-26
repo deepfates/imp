@@ -33,6 +33,27 @@ defmodule Imp.Optimizer.MIPROv2.PythonRandom do
     {lower + offset, rng}
   end
 
+  @spec shuffle(%__MODULE__{}, list(term())) :: {list(term()), %__MODULE__{}}
+  def shuffle(%__MODULE__{} = rng, values) when length(values) < 2, do: {values, rng}
+
+  def shuffle(%__MODULE__{} = rng, values) when is_list(values) do
+    array = :array.from_list(values)
+
+    {array, rng} =
+      Enum.reduce((length(values) - 1)..1//-1, {array, rng}, fn index, {array, rng} ->
+        {selected, rng} = randbelow(rng, index + 1)
+        left = :array.get(index, array)
+        right = :array.get(selected, array)
+
+        array =
+          array |> then(&:array.set(index, right, &1)) |> then(&:array.set(selected, left, &1))
+
+        {array, rng}
+      end)
+
+    {:array.to_list(array), rng}
+  end
+
   defp randbelow(rng, n) when n > 0 do
     bits = bit_length(n)
     {value, rng} = getrandbits(rng, bits)

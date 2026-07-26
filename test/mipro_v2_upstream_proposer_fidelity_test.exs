@@ -6,6 +6,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   @python "tmp/dspy-parity-venv/bin/python"
   @source "tmp/dspy-3.2.1"
   @runner "test/support/dspy_3_2_1_mipro_proposer_tape.py"
+  @public_runner "test/support/dspy_3_2_1_mipro_public_compile_tape.py"
   @commit "29448ae12756abdd14bd8796c819247ebb83673c"
 
   def metric(expected, prediction),
@@ -21,6 +22,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         fewshot_aware_proposer: false,
         data_aware_proposer: true,
         tip_aware_proposer: true,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
         proposer_fidelity: :dspy_3_2_1
       )
 
@@ -28,6 +31,14 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     assert_raise ArgumentError, ~r/currently requires/, fn ->
       Config.new(proposer_fidelity: :dspy_3_2_1)
+    end
+
+    assert_raise ArgumentError, ~r/max_bootstrapped_demos: 0/, fn ->
+      Config.new(
+        proposer_fidelity: :dspy_3_2_1,
+        program_aware_proposer: false,
+        fewshot_aware_proposer: false
+      )
     end
 
     assert_raise ArgumentError, ~r/proposer_fidelity/, fn ->
@@ -38,6 +49,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
       Imp.Optimizer.MIPROv2.new(&__MODULE__.metric/2,
         program_aware_proposer: false,
         fewshot_aware_proposer: false,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
         proposer_fidelity: :dspy_3_2_1,
         proposal_response_format: :required
       )
@@ -173,6 +186,108 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   end
 
   @tag :evidence_infrastructure
+  test "public zero-shot compile matches bootstrap call graph and RNG-advanced proposals" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@public_runner)],
+        env: [{"PYTHONPATH", Path.expand(@source)}],
+        stderr_to_stdout: false
+      )
+
+    upstream = Jason.decode!(output)
+    assert upstream["commit"] == @commit
+    assert length(upstream["task_messages"]) == 9
+    assert length(upstream["prompt_messages"]) == 9
+    assert upstream["demos_discarded"]
+
+    owner = self()
+
+    prompt_answers =
+      [
+        %{observations: "first observations"},
+        %{observations: "second observations"},
+        %{summary: "frozen dataset summary"}
+      ] ++ Enum.map(0..5, &%{proposed_instruction: "candidate #{&1}"})
+
+    prompt_agent = start_supervised!({Agent, fn -> prompt_answers end})
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(owner, {:public_prompt_call, messages, opts})
+          Agent.get_and_update(prompt_agent, fn [answer | rest] -> {answer, rest} end)
+        end
+      )
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:public_task_call, messages})
+          %{route: "K11"}
+        end
+      )
+
+    program =
+      "text -> route"
+      |> Imp.signature("Route the opaque request.")
+      |> Imp.predict(lm: task_lm, adapter: Imp.Adapter.Chat)
+
+    trainset =
+      Enum.map(0..19, fn index ->
+        text = index |> Integer.to_string() |> String.pad_leading(2, "0")
+        Imp.example(text: "request-#{text}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    valset = [Imp.example(text: "validation", route: "K11") |> Imp.with_inputs(:text)]
+
+    optimizer =
+      Imp.Optimizer.MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 6,
+        num_trials: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        program_aware_proposer: false,
+        fewshot_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        proposer_fidelity: :dspy_3_2_1,
+        seed: 9
+      )
+
+    paused = Imp.Optimizer.MIPROv2.compile(optimizer, program, trainset, valset, max_trials: 0)
+    report = Imp.Optimizer.Report.fetch(paused)
+
+    prompt_calls = collect_tagged_calls(:public_prompt_call, 9, [])
+    task_calls = collect_tagged_calls(:public_task_call, 10, [])
+
+    assert Enum.map(prompt_calls, fn {messages, _opts} -> stringify(messages) end) ==
+             upstream["prompt_messages"]
+
+    assert task_calls |> Enum.take(9) |> Enum.map(&stringify/1) == upstream["task_messages"]
+
+    assert Enum.map(Enum.drop(prompt_calls, 3), fn {_messages, opts} -> opts[:rollout_id] end) ==
+             upstream["rollout_ids"]
+
+    assert report.metadata.bootstrap.trajectory_count == 9
+    assert report.metadata.bootstrap.maximum_task_calls == 100
+    assert Enum.map(report.metadata.bootstrap.rounds, & &1.calls) == [0, 3, 3, 1, 1, 1]
+    assert report.metadata.proposals.main.total_setup_calls == 9
+
+    assert report.metadata.proposals.main.slots |> Enum.map(& &1.rollout_id) ==
+             upstream["rollout_ids"]
+
+    artifacts =
+      report.metadata.resume_state["payload"]["artifacts"]
+      |> Imp.Optimizer.Report.decode_term()
+
+    assert artifacts.search_demos == nil
+    assert artifacts.instruction_candidates.main == upstream["instructions"]
+    assert Agent.get(prompt_agent, & &1) == []
+  end
+
+  @tag :evidence_infrastructure
   test "five-call transcript is byte-identical to pinned DSPy 3.2.1" do
     unless File.exists?(@python) and File.dir?(@source) do
       flunk("run scripts/setup_dspy_stable_source.sh and scripts/setup_dspy_parity_env.sh")
@@ -256,6 +371,17 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
       {:call, messages, opts} -> collect_calls(count - 1, [{messages, opts} | calls])
     after
       1_000 -> flunk("missing #{count} proposer calls")
+    end
+  end
+
+  defp collect_tagged_calls(_tag, 0, calls), do: Enum.reverse(calls)
+
+  defp collect_tagged_calls(tag, count, calls) do
+    receive do
+      {^tag, messages, opts} -> collect_tagged_calls(tag, count - 1, [{messages, opts} | calls])
+      {^tag, messages} -> collect_tagged_calls(tag, count - 1, [messages | calls])
+    after
+      1_000 -> flunk("missing #{count} #{tag} calls")
     end
   end
 
