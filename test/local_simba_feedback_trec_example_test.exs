@@ -3,6 +3,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
 
   @source "examples/local_simba_feedback_trec/run.exs"
   @contract "examples/local_simba_feedback_trec/task-contract.json"
+  @treatment "examples/local_simba_feedback_trec/usefulness-v4-treatment.json"
   @old_simba "benchmarks/data/simba-trec-coarse-v1.json"
   @old_grpo "examples/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
   @stopped_result "examples/local_simba_feedback_trec/exercised-stopped-result.json"
@@ -90,7 +91,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
   test "ordinary compile boundary excludes held-out and requires rendered rule lifecycle" do
     source = File.read!(@source)
 
-    assert source =~ ~s(@treatment_id "local-simba-feedback-trec-schema-decode-v3")
+    assert source =~ ~s(@treatment_id "local-simba-feedback-trec-phi4-reflection-v4")
 
     assert source =~ "examples(rows.train, rows.contract, true)"
     assert source =~ "examples(rows.validation, rows.contract, false)"
@@ -100,6 +101,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
 
     assert source =~ "max_demos: config[\"max_demos\"]"
     assert source =~ "stage.mutated_rule_finalists > 0"
+    assert source =~ "stage.matched_main_advice_responses > 0"
     assert source =~ "stage.rendered_rule_calls > 0"
     assert source =~ "stage.feedback_reflection_calls > 0"
     assert source =~ "Artifact.from_optimized_program"
@@ -141,6 +143,66 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
     assert source =~ "@max_optimization_transports 130"
     assert source =~ "@max_optimization_transports + 120"
     assert source =~ "stage.logical_calls == 40 and stage.transport_attempts == 40"
+  end
+
+  test "V4 changes only the reflection model from the frozen task condition" do
+    contract = Jason.decode!(File.read!(@contract))
+    treatment = Jason.decode!(File.read!(@treatment))
+
+    assert treatment["treatment_id"] == "local-simba-feedback-trec-phi4-reflection-v4"
+
+    assert treatment["task_contract"]["sha256"] ==
+             apply(LocalSIMBAFeedbackTREC.Contract, :contract_sha256, [])
+
+    assert treatment["task_model"] == contract["model"]
+    assert treatment["optimizer"] == contract["optimizer"]
+    assert treatment["splits"] == %{"train" => 20, "validation" => 6, "held_out" => 40}
+
+    assert treatment["reflection_model"] == %{
+             "id" => "ollama:phi4:latest",
+             "inventory_name" => "phi4:latest",
+             "digest" => "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
+           }
+
+    assert treatment["runtime"] == %{
+             "cache" => false,
+             "http_retry" => false,
+             "json_fallback" => false,
+             "max_concurrency" => 1,
+             "max_optimization_transports" => 130,
+             "max_retries" => 0,
+             "max_total_transports" => 250,
+             "reflection_max_tokens" => 768,
+             "reflection_temperature" => 0,
+             "task_max_tokens" => 32,
+             "task_temperature" => 0,
+             "timeout_ms" => 120_000
+           }
+  end
+
+  @tag :tmp_dir
+  test "observer atomically retains exact reflection output and module keys", %{tmp_dir: tmp_dir} do
+    path = Path.join(tmp_dir, "reflection-responses.json")
+    {:ok, observer} = apply(LocalSIMBAFeedbackTREC.Observer, :start_link, [path])
+    :ok = apply(LocalSIMBAFeedbackTREC.Observer, :phase, [observer, "optimization"])
+
+    raw = ~s({"discussion":"contrast","module_advice":{"main":"Use the metric feedback."}})
+
+    lm =
+      struct(LocalSIMBAFeedbackTREC.ObservedLM,
+        inner: Imp.LM.Static.new(handler: fn _messages, _opts -> raw end),
+        observer: observer,
+        role: :reflection
+      )
+
+    assert {:ok, ^raw} = Imp.LM.generate(lm, [%{role: :user, content: "reflect"}], [])
+
+    ledger = path |> File.read!() |> Jason.decode!()
+    assert ledger["status"] == "in_progress"
+    assert [response] = ledger["reflection_responses"]
+    assert response["raw_output"] == raw
+    assert response["module_keys"] == ["main"]
+    assert response["matched_main_advice"] == "Use the metric feedback."
   end
 
   test "retained execution remains an incomplete format-boundary result" do

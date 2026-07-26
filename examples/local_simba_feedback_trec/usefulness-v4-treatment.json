@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "treatment_id": "local-simba-feedback-trec-phi4-reflection-v4",
+  "predecessor": {
+    "treatment_id": "local-simba-feedback-trec-schema-decode-v3",
+    "result_path": "examples/local_simba_feedback_trec/exercised-schema-decode-v3-stopped-result.json"
+  },
+  "task_contract": {
+    "path": "examples/local_simba_feedback_trec/task-contract.json",
+    "sha256": "1f29446db7aa4ac99683422f3833f313912445ec7c2c9d44776e84f26530d3b8"
+  },
+  "task_model": {
+    "id": "ollama:llama3.2:3b",
+    "inventory_name": "llama3.2:3b",
+    "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "reflection_model": {
+    "id": "ollama:phi4:latest",
+    "inventory_name": "phi4:latest",
+    "digest": "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
+  },
+  "splits": {
+    "train": 20,
+    "validation": 6,
+    "held_out": 40
+  },
+  "optimizer": {
+    "bsize": 5,
+    "num_candidates": 2,
+    "max_steps": 4,
+    "max_demos": 0,
+    "seed": 2026072602
+  },
+  "runtime": {
+    "max_concurrency": 1,
+    "task_temperature": 0,
+    "task_max_tokens": 32,
+    "reflection_temperature": 0,
+    "reflection_max_tokens": 768,
+    "timeout_ms": 120000,
+    "cache": false,
+    "max_retries": 0,
+    "http_retry": false,
+    "json_fallback": false,
+    "max_optimization_transports": 130,
+    "max_total_transports": 250
+  },
+  "selection": "Validation only; retain baseline on an exact score tie. Held-out labels remain unavailable until the selected artifact is persisted.",
+  "interpretation": "Positive, neutral, negative, or baseline selection are all valid. This one treatment may establish a genuine feedback-derived SIMBA rule mutation, validation selection, selected-artifact application, held-out behavior, and fresh-process reproduction only for this task and exact local model pair. It cannot establish general SIMBA effectiveness, full DSPy parity, production reliability, or BEAM superiority."
+}

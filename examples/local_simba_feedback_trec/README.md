@@ -103,3 +103,23 @@ the runner stopped before selection and held-out access. The exact reflection
 response text was not retained; empty, irrelevant, and instruction-identical
 advice therefore remain unresolved rather than inferred. This is a real
 reflection/no-mutation result for one task/model, not optimizer ineffectiveness.
+
+## Frozen Phi-4 reflection condition
+
+The separately named current treatment is
+`local-simba-feedback-trec-phi4-reflection-v4`, frozen in
+`usefulness-v4-treatment.json`. It preserves the exact V3 task contract, source
+rows and 20/6/40 split, `llama3.2:3b` task model, task and reflection prompts,
+semantic metric, strict schema, SIMBA `bsize`, candidate/step/demo budgets,
+seed, one-attempt policy, and cache-disabled runtime. Its only treatment change
+is the already-local `phi4:latest` reflection model at manifest digest
+`ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba`.
+
+V4 atomically retains every exact reflection output and its `module_advice`
+keys. A candidate counts only when nonblank advice for the named `main`
+predictor is appended and rendered into real task messages. Validation alone
+selects the winner, with baseline retained on ties; held-out rows remain closed
+until the selected artifact is written. Positive, neutral, negative, or
+baseline selection are all valid outcomes. Even a positive result would remain
+specific to this task and exact local model pair rather than proving general
+SIMBA effectiveness or DSPy parity.

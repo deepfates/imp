@@ -14,6 +14,7 @@ end
 
 defmodule LocalSIMBAFeedbackTREC.Contract do
   @contract_sha256 "1f29446db7aa4ac99683422f3833f313912445ec7c2c9d44776e84f26530d3b8"
+  @treatment_sha256 "2fbb11c2cafba562f38084f68e156ccec4de286524bff6cdd14bfd2858175eb1"
   @labels ~w(DESC ENTY)
 
   def load!(imp, path) do
@@ -56,6 +57,42 @@ defmodule LocalSIMBAFeedbackTREC.Contract do
   end
 
   def contract_sha256, do: @contract_sha256
+  def treatment_sha256, do: @treatment_sha256
+
+  def load!(imp, path, treatment_path) do
+    rows = load!(imp, path)
+    treatment = load_treatment!(imp, path, treatment_path)
+    Map.put(rows, :treatment, treatment)
+  end
+
+  def load_treatment!(imp, contract_path, treatment_path) do
+    unless sha256_file(treatment_path) == @treatment_sha256,
+      do: raise("SIMBA V4 treatment contract drift")
+
+    treatment = treatment_path |> File.read!() |> Jason.decode!()
+
+    unless treatment["schema_version"] == 1 and
+             treatment["treatment_id"] == "local-simba-feedback-trec-phi4-reflection-v4" do
+      raise "unsupported SIMBA V4 treatment contract"
+    end
+
+    task_contract = treatment["task_contract"]
+
+    unless Path.expand(task_contract["path"], imp) == Path.expand(contract_path) and
+             task_contract["sha256"] == @contract_sha256 do
+      raise "SIMBA V4 treatment changed the task contract binding"
+    end
+
+    base = contract_path |> File.read!() |> Jason.decode!()
+
+    unless treatment["task_model"] == base["model"] and
+             treatment["optimizer"] == base["optimizer"] and
+             treatment["splits"] == %{"train" => 20, "validation" => 6, "held_out" => 40} do
+      raise "SIMBA V4 treatment changed the task model, split, or optimizer settings"
+    end
+
+    treatment
+  end
 
   defp resolve!(by_id, ids) when is_list(ids) do
     Enum.map(ids, fn id -> Map.fetch!(by_id, id) end)
@@ -108,14 +145,55 @@ defmodule LocalSIMBAFeedbackTREC.Contract do
 end
 
 defmodule LocalSIMBAFeedbackTREC.Observer do
-  def start_link, do: Agent.start_link(fn -> %{phase: "startup", calls: [], transports: []} end)
+  alias LocalSIMBAFeedbackTREC.Atomic
+
+  def start_link(reflection_ledger_path) do
+    Agent.start_link(fn ->
+      %{
+        phase: "startup",
+        next_call_id: 0,
+        calls: [],
+        responses: [],
+        transports: [],
+        reflection_ledger_path: reflection_ledger_path
+      }
+    end)
+  end
+
   def phase(pid, phase), do: Agent.update(pid, &%{&1 | phase: phase})
 
   def call(pid, role, messages) do
-    Agent.update(pid, fn state ->
-      entry = %{phase: state.phase, role: role, messages: messages}
-      %{state | calls: [entry | state.calls]}
+    Agent.get_and_update(pid, fn state ->
+      call_id = state.next_call_id
+      entry = %{call_id: call_id, phase: state.phase, role: role, messages: messages}
+      {call_id, %{state | next_call_id: call_id + 1, calls: [entry | state.calls]}}
     end)
+  end
+
+  def response(pid, call_id, role, result) do
+    snapshot =
+      Agent.get_and_update(pid, fn state ->
+        entry =
+          result
+          |> normalize_result()
+          |> Map.merge(%{call_id: call_id, phase: state.phase, role: role})
+
+        state = %{state | responses: [entry | state.responses]}
+        {ordered_snapshot(state), state}
+      end)
+
+    if role == :reflection do
+      Atomic.write!(snapshot.reflection_ledger_path, %{
+        status: "in_progress",
+        reflection_responses:
+          Enum.filter(
+            snapshot.responses,
+            &(&1.role == :reflection and &1.phase == "optimization")
+          )
+      })
+    end
+
+    :ok
   end
 
   def transport(pid, metadata) do
@@ -126,9 +204,63 @@ defmodule LocalSIMBAFeedbackTREC.Observer do
   end
 
   def snapshot(pid) do
-    Agent.get(pid, fn state ->
-      %{state | calls: Enum.reverse(state.calls), transports: Enum.reverse(state.transports)}
-    end)
+    Agent.get(pid, &ordered_snapshot/1)
+  end
+
+  defp ordered_snapshot(state) do
+    %{
+      state
+      | calls: Enum.reverse(state.calls),
+        responses: Enum.reverse(state.responses),
+        transports: Enum.reverse(state.transports)
+    }
+  end
+
+  defp normalize_result({:ok, raw}) do
+    case Imp.LM.Result.split(raw) do
+      {:ok, output, metadata} ->
+        decoded = decode_output(output)
+        advice = fetch_advice(decoded)
+
+        %{
+          status: "ok",
+          raw_output: Imp.Optimizer.Report.encode_term(output),
+          module_keys: advice |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort(),
+          matched_main_advice: nonblank_main_advice(advice),
+          lm_metadata: Imp.Optimizer.Report.encode_term(metadata)
+        }
+
+      {:error, reason} ->
+        %{status: "error", error: inspect(reason), raw_output: nil, module_keys: []}
+    end
+  end
+
+  defp normalize_result({:error, reason}),
+    do: %{status: "error", error: inspect(reason), raw_output: nil, module_keys: []}
+
+  defp decode_output(output) when is_map(output), do: output
+
+  defp decode_output(output) when is_binary(output) do
+    case Jason.decode(output) do
+      {:ok, decoded} when is_map(decoded) -> decoded
+      _ -> %{}
+    end
+  end
+
+  defp decode_output(_output), do: %{}
+
+  defp fetch_advice(decoded) do
+    case Map.get(decoded, "module_advice") || Map.get(decoded, :module_advice) do
+      advice when is_map(advice) -> advice
+      _ -> %{}
+    end
+  end
+
+  defp nonblank_main_advice(advice) do
+    case Map.get(advice, "main") || Map.get(advice, :main) do
+      value when is_binary(value) -> if(String.trim(value) == "", do: nil, else: value)
+      _ -> nil
+    end
   end
 end
 
@@ -136,8 +268,10 @@ defmodule LocalSIMBAFeedbackTREC.ObservedLM do
   defstruct [:inner, :observer, :role]
 
   def generate(lm, messages, opts) do
-    LocalSIMBAFeedbackTREC.Observer.call(lm.observer, lm.role, messages)
-    Imp.LM.generate(lm.inner, messages, opts)
+    call_id = LocalSIMBAFeedbackTREC.Observer.call(lm.observer, lm.role, messages)
+    result = Imp.LM.generate(lm.inner, messages, opts)
+    :ok = LocalSIMBAFeedbackTREC.Observer.response(lm.observer, call_id, lm.role, result)
+    result
   end
 
   def response_format_capability(%__MODULE__{inner: inner}),
@@ -189,7 +323,8 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   alias LocalSIMBAFeedbackTREC.{Atomic, Audit, Contract, ObservedLM, Observer}
 
   @contract "task-contract.json"
-  @treatment_id "local-simba-feedback-trec-schema-decode-v3"
+  @treatment "usefulness-v4-treatment.json"
+  @treatment_id "local-simba-feedback-trec-phi4-reflection-v4"
   @routes ~w(K11 K47)
   @max_optimization_transports 130
 
@@ -210,12 +345,14 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
         status: "preflight_complete",
         treatment_id: @treatment_id,
         contract_sha256: Contract.contract_sha256(),
+        treatment_sha256: Contract.treatment_sha256(),
         split_sizes: %{
           train: length(rows.train),
           validation: length(rows.validation),
           held_out: length(rows.held_out)
         },
-        model: rows.contract["model"]["id"],
+        task_model: rows.contract["model"]["id"],
+        reflection_model: rows.treatment["reflection_model"]["id"],
         max_total_transports: @max_optimization_transports + 120
       })
     )
@@ -224,14 +361,14 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   defp parent do
     paths = paths!()
     rows = preflight!(paths)
-    observer = observer!()
+    observer = observer!(paths)
 
     try do
       source = source_program(rows.contract)
       :ok = Imp.save!(source, paths.program)
       baseline = observe_program(source, observer)
       Observer.phase(observer, "optimization")
-      optimizer = optimizer(rows.contract, observer)
+      optimizer = optimizer(rows.contract, rows.treatment, observer)
 
       selected =
         SIMBA.compile(
@@ -282,7 +419,9 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
         treatment_id: @treatment_id,
         task_id: rows.contract["task_id"],
         contract_sha256: Contract.contract_sha256(),
-        model: rows.contract["model"]["id"],
+        treatment_sha256: Contract.treatment_sha256(),
+        task_model: rows.contract["model"]["id"],
+        reflection_model: rows.treatment["reflection_model"]["id"],
         splits: %{train: 20, validation: 6, held_out: 40},
         search: Map.drop(optimization, [:report]),
         held_out: %{
@@ -296,25 +435,33 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
 
       Atomic.write!(Path.join(paths.output, "result.json"), result)
       IO.puts(Jason.encode!(result, pretty: true))
+    rescue
+      error ->
+        snapshot = Observer.snapshot(observer)
+
+        Atomic.write!(Path.join(paths.output, "failure.json"), %{
+          status: "stopped",
+          treatment_id: @treatment_id,
+          reflection_responses:
+            Enum.filter(
+              snapshot.responses,
+              &(&1.role == :reflection and &1.phase == "optimization")
+            ),
+          error: Exception.format(:error, error, __STACKTRACE__)
+        })
+
+        reraise error, __STACKTRACE__
     after
       :telemetry.detach({__MODULE__, self()})
+      cleanup_models!(paths, [rows.contract["model"], rows.treatment["reflection_model"]])
     end
-  rescue
-    error ->
-      paths = paths!()
-
-      Atomic.write!(Path.join(paths.output, "failure.json"), %{
-        status: "stopped",
-        error: Exception.format(:error, error, __STACKTRACE__)
-      })
-
-      reraise error, __STACKTRACE__
   end
 
   defp fresh do
     paths = paths!()
-    rows = preflight!(paths)
-    observer = observer!()
+    rows = Contract.load!(paths.imp, paths.contract, paths.treatment)
+    verify_ollama!(rows.contract, rows.treatment)
+    observer = observer!(paths)
 
     try do
       source = Imp.load!(paths.program)
@@ -336,12 +483,13 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
       require_evaluation!(stage)
     after
       :telemetry.detach({__MODULE__, self()})
+      cleanup_models!(paths, [rows.contract["model"]], "04-fresh-cleanup.json")
     end
   end
 
   def load_contract_rows! do
     paths = paths!()
-    Contract.load!(paths.imp, paths.contract)
+    Contract.load!(paths.imp, paths.contract, paths.treatment)
   end
 
   def source_program(contract) do
@@ -402,14 +550,16 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   end
 
   defp preflight!(paths) do
-    rows = Contract.load!(paths.imp, paths.contract)
-    verify_ollama!(rows.contract)
+    rows = Contract.load!(paths.imp, paths.contract, paths.treatment)
+    verify_ollama!(rows.contract, rows.treatment)
 
     Atomic.write!(Path.join(paths.output, "00-preflight.json"), %{
       status: "complete",
       treatment_id: @treatment_id,
       contract_sha256: Contract.contract_sha256(),
-      model: rows.contract["model"],
+      treatment_sha256: Contract.treatment_sha256(),
+      task_model: rows.contract["model"],
+      reflection_model: rows.treatment["reflection_model"],
       train_ids: Enum.map(rows.train, & &1["id"]),
       validation_ids: Enum.map(rows.validation, & &1["id"]),
       held_out_ids: Enum.map(rows.held_out, & &1["id"])
@@ -418,7 +568,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
     rows
   end
 
-  defp optimizer(contract, observer) do
+  defp optimizer(contract, treatment, observer) do
     config = contract["optimizer"]
 
     SIMBA.new(metric(contract["route_mapping"]),
@@ -426,15 +576,15 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
       num_candidates: config["num_candidates"],
       max_steps: config["max_steps"],
       max_demos: config["max_demos"],
-      prompt_lm: observed(reflection_lm(contract), observer, :reflection),
+      prompt_lm: observed(reflection_lm(treatment), observer, :reflection),
       max_concurrency: 1,
       timeout: 120_000,
       seed: config["seed"]
     )
   end
 
-  defp reflection_lm(contract) do
-    Imp.req_llm(contract["model"]["id"],
+  defp reflection_lm(treatment) do
+    Imp.req_llm(treatment["reflection_model"]["id"],
       cache: false,
       temperature: 0,
       max_tokens: 768,
@@ -464,6 +614,9 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
     reflection_calls =
       Enum.filter(snapshot.calls, &(&1.phase == "optimization" and &1.role == :reflection))
 
+    reflection_responses =
+      Enum.filter(snapshot.responses, &(&1.phase == "optimization" and &1.role == :reflection))
+
     rendered_rule_calls =
       Enum.count(task_calls, fn call ->
         Enum.any?(mutated, fn finalist ->
@@ -491,6 +644,9 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
       mutated_rule_finalists: length(mutated),
       rendered_rule_calls: rendered_rule_calls,
       feedback_reflection_calls: feedback_reflection_calls,
+      matched_main_advice_responses:
+        Enum.count(reflection_responses, &is_binary(&1.matched_main_advice)),
+      reflection_responses: reflection_responses,
       task_calls: length(task_calls),
       reflection_calls: length(reflection_calls),
       logical_calls: length(snapshot.calls),
@@ -502,6 +658,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
 
   defp require_optimization!(stage) do
     unless stage.candidate_count > 0 and stage.mutated_rule_finalists > 0 and
+             stage.matched_main_advice_responses > 0 and
              stage.rendered_rule_calls > 0 and stage.feedback_reflection_calls > 0 and
              stage.logical_calls == stage.transport_attempts and
              stage.transport_attempts <= @max_optimization_transports do
@@ -591,19 +748,45 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
     end
   end
 
-  defp verify_ollama!(contract) do
-    model = contract["model"]
+  defp verify_ollama!(contract, treatment) do
     models = Req.get!("http://127.0.0.1:11434/api/tags", retry: false).body["models"]
 
-    unless Enum.any?(
-             models,
-             &(&1["name"] == model["inventory_name"] and &1["digest"] == model["digest"])
-           ),
-           do: raise("pinned local Ollama model is absent or changed")
+    for model <- [contract["model"], treatment["reflection_model"]] do
+      unless Enum.any?(
+               models,
+               &(&1["name"] == model["inventory_name"] and &1["digest"] == model["digest"])
+             ),
+             do:
+               raise("pinned local Ollama model is absent or changed: #{model["inventory_name"]}")
+    end
   end
 
-  defp observer! do
-    {:ok, observer} = Observer.start_link()
+  defp cleanup_models!(paths, models, filename \\ "99-cleanup.json") do
+    results =
+      Enum.map(models, fn model ->
+        response =
+          Req.post!("http://127.0.0.1:11434/api/generate",
+            json: %{model: model["inventory_name"], keep_alive: 0},
+            retry: false,
+            receive_timeout: 120_000
+          )
+
+        %{
+          model: model["inventory_name"],
+          digest: model["digest"],
+          status: response.status
+        }
+      end)
+
+    stage = %{status: "complete", unloaded_models: results}
+    Atomic.write!(Path.join(paths.output, filename), stage)
+
+    unless Enum.all?(results, &(&1.status in 200..299)),
+      do: raise("failed to unload one or more Ollama models")
+  end
+
+  defp observer!(paths) do
+    {:ok, observer} = Observer.start_link(paths.reflection_ledger)
 
     :ok =
       :telemetry.attach(
@@ -624,6 +807,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
         {"IMP_PATH", paths.imp},
         {"IMP_SIMBA_FEEDBACK_TREC_OUTPUT", paths.output},
         {"IMP_SIMBA_FEEDBACK_TREC_CONTRACT", paths.contract},
+        {"IMP_SIMBA_FEEDBACK_TREC_TREATMENT", paths.treatment},
         {"IMP_SIMBA_FEEDBACK_TREC_FRESH", "1"},
         {"IMP_SIMBA_FEEDBACK_TREC_FRESH_OUTPUT", output_path}
       ],
@@ -644,8 +828,12 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
       contract:
         System.get_env("IMP_SIMBA_FEEDBACK_TREC_CONTRACT", Path.join(__DIR__, @contract))
         |> Path.expand(),
+      treatment:
+        System.get_env("IMP_SIMBA_FEEDBACK_TREC_TREATMENT", Path.join(__DIR__, @treatment))
+        |> Path.expand(),
       program: Path.join(output, "source-program.json"),
-      artifact: Path.join(output, "selected-parameters.json")
+      artifact: Path.join(output, "selected-parameters.json"),
+      reflection_ledger: Path.join(output, "reflection-responses.json")
     }
   end
 
