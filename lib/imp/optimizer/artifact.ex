@@ -2,15 +2,16 @@ defmodule Imp.Optimizer.Artifact do
   @moduledoc """
   Durable champion/challenger lifecycle for portable optimizer outputs.
 
-  Artifacts contain checksummed `Imp.Saving` program states and redacted
-  provenance. Applying a candidate copies only optimizable predictor parameters
-  onto a compatible live program, preserving its runtime LMs, adapters, and
-  trusted callbacks.
+  Artifacts contain checksummed `Imp.Saving` program states or explicit
+  parameter-only snapshots and redacted provenance. Applying a candidate copies
+  only optimizable predictor parameters onto a compatible live program,
+  preserving its runtime LMs, adapters, and trusted callbacks.
   """
 
   import Kernel, except: [inspect: 1]
 
   alias Imp.Optimizer.GEPA.EvaluationCache.Codec
+  alias Imp.Optimizer.Artifact.ParameterSnapshot
   alias Imp.Optimizer.Report
   alias Imp.{ProgramParameters, Redaction, Saving}
 
@@ -101,6 +102,29 @@ defmodule Imp.Optimizer.Artifact do
         ArgumentError,
         "optimizer artifact candidate id must be a non-empty string, got: #{Kernel.inspect(id)}"
       )
+
+  @doc """
+  Builds a checksummed candidate containing only named predictor parameters.
+
+  Use this for consumer-defined multi-predictor modules that cannot and should
+  not be serialized as arbitrary structs. The artifact retains each predictor's
+  signature, demonstrations, and config, but never the consumer module, LM,
+  adapter, callbacks, or other runtime state. Reconstruct the trusted program in
+  the deploying application, then pass it to `apply/4`.
+  """
+  @spec parameter_candidate(String.t(), struct(), keyword()) :: candidate()
+  def parameter_candidate(id, program, opts \\ [])
+
+  def parameter_candidate(id, program, opts) when is_struct(program) and is_list(opts) do
+    program
+    |> ParameterSnapshot.from_program()
+    |> then(&candidate(id, &1, opts))
+  end
+
+  def parameter_candidate(id, program, opts) do
+    raise ArgumentError,
+          "optimizer parameter candidate requires a program struct and keyword options, got: #{Kernel.inspect({id, program, opts})}"
+  end
 
   @doc "Creates a versioned artifact from one champion and zero or more challengers."
   @spec new(candidate(), [candidate()], keyword()) :: artifact()
@@ -455,7 +479,13 @@ defmodule Imp.Optimizer.Artifact do
   defp name_identity(name) when is_binary(name), do: "string:" <> name
 
   defp validate_signature_compatibility!(left, right, identity) do
-    shape = fn signature -> signature |> Imp.Signature.dump() |> Map.delete("instructions") end
+    shape = fn signature ->
+      signature
+      |> Imp.Signature.dump()
+      |> Map.delete("instructions")
+      |> Jason.encode!()
+      |> Jason.decode!()
+    end
 
     unless shape.(left) == shape.(right) do
       raise ArgumentError,

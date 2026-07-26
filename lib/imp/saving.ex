@@ -313,6 +313,19 @@ defmodule Imp.Saving do
     }
   end
 
+  defp dump_state(%Imp.Optimizer.Artifact.ParameterSnapshot{} = snapshot) do
+    %{
+      "type" => "optimizer_parameter_snapshot",
+      "predictors" =>
+        Enum.map(snapshot.predictors, fn %{name: name, predictor: predictor} ->
+          %{
+            "name" => Imp.Optimizer.Report.encode_term(name),
+            "predictor" => dump(predictor)
+          }
+        end)
+    }
+  end
+
   defp dump_state(%Trajectory{} = trajectory), do: Trajectory.dump(trajectory)
 
   defp dump_state(%Imp.Agent{} = agent) do
@@ -727,6 +740,23 @@ defmodule Imp.Saving do
       )
 
     Imp.Optimizer.Ensemble.compile(ensemble, programs)
+  end
+
+  def load(%{"type" => "optimizer_parameter_snapshot"} = state) do
+    exact_keys!(state, ["type", "predictors"], "saved optimizer parameter snapshot")
+
+    entries =
+      state
+      |> require_list!("predictors")
+      |> Enum.map(fn entry ->
+        exact_keys!(entry, ["name", "predictor"], "saved optimizer parameter snapshot entry")
+
+        name = entry["name"] |> Imp.Optimizer.Report.decode_term() |> require_parameter_name!()
+        predictor = require_predict!(load(entry["predictor"]), "optimizer parameter snapshot")
+        %{name: name, predictor: predictor}
+      end)
+
+    Imp.Optimizer.Artifact.ParameterSnapshot.new(entries)
   end
 
   def load(%{"type" => "agent"} = state) do
@@ -1637,6 +1667,25 @@ defmodule Imp.Saving do
         raise ArgumentError,
               "saved Imp #{Map.get(state, "type", "program")} is missing required keys: #{inspect(missing)}"
     end
+  end
+
+  defp exact_keys!(state, keys, context) when is_map(state) do
+    if MapSet.equal?(MapSet.new(Map.keys(state)), MapSet.new(keys)) do
+      :ok
+    else
+      raise ArgumentError, "#{context} has unexpected or missing keys"
+    end
+  end
+
+  defp exact_keys!(_state, _keys, context) do
+    raise ArgumentError, "#{context} must be a map"
+  end
+
+  defp require_parameter_name!(name) when is_atom(name) or is_binary(name), do: name
+
+  defp require_parameter_name!(name) do
+    raise ArgumentError,
+          "saved optimizer parameter snapshot name must be an atom or string, got: #{inspect(name)}"
   end
 
   defp require_list!(state, key) do
