@@ -178,21 +178,12 @@ defmodule MatchedTRECImp.ObservedLM do
 
     expected_seed = if lm.role == :task, do: lm.seed
 
-    rendered_bytes = (messages |> Jason.encode!() |> byte_size()) + 16 * (length(messages) + 1)
-
     with :ok <-
            ensure(
              configured_seed == expected_seed,
              :route,
              :request_seed_drift,
              "#{lm.role} request seed drift: configured=#{inspect(configured_seed)} expected=#{inspect(expected_seed)}"
-           ),
-         :ok <-
-           ensure(
-             rendered_bytes <= lm.max_input_tokens,
-             :budget,
-             :input_envelope_exceeded,
-             "#{lm.role} rendered request conservative token bound #{rendered_bytes} exceeds #{lm.max_input_tokens}"
            ),
          :ok <-
            MatchedTRECImp.Observer.reserve_call!(lm.observer, lm.seed, lm.arm, lm.role) do

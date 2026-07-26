@@ -492,6 +492,44 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
              )
   end
 
+  test "input ceilings use provider token evidence rather than JSON byte length" do
+    evidence = %{
+      model: "openai/gpt-5.4-mini",
+      route: "OpenAI",
+      gateway: "openrouter",
+      service_tier: "default",
+      input_tokens: 4_096,
+      output_tokens: 1,
+      finish_reason: "stop",
+      content: String.duplicate("x", 4_603),
+      gateway_reported_cost: 0.001,
+      computed_cost: 0.001
+    }
+
+    expected = %{
+      "logical" => "openai/gpt-5.4-mini",
+      "imp" => "openai/gpt-5.4-mini",
+      "endpoint_provider" => "OpenAI",
+      "max_input_tokens" => 4_096,
+      "max_output_tokens" => 256
+    }
+
+    assert :ok =
+             MatchedInstructionOptimizersTREC.ResponseEvidence.validate_contract(
+               evidence,
+               expected
+             )
+
+    assert {:error, {:response_identity_or_usage_drift, _}} =
+             MatchedInstructionOptimizersTREC.ResponseEvidence.validate_contract(
+               %{evidence | input_tokens: 4_097},
+               expected
+             )
+
+    runner = File.read!("examples/matched_instruction_optimizers_trec/run_imp.exs")
+    refute runner =~ "rendered request conservative token bound"
+  end
+
   defp perfect_rows(path) do
     path
     |> File.stream!()
