@@ -46,6 +46,30 @@ defmodule MatchedInstructionOptimizersTREC.ResponseEvidence do
 
   def costs_reconcile?(_gateway, _computed), do: false
 
+  @doc false
+  def validate_contract(evidence, expected) when is_map(evidence) and is_map(expected) do
+    valid? =
+      evidence.model in [expected["logical"], expected["imp"]] and
+        String.downcase(to_string(evidence.route)) ==
+          String.downcase(expected["endpoint_provider"]) and
+        evidence.gateway == "openrouter" and
+        evidence.service_tier in [nil, "default", "standard"] and
+        is_number(evidence.input_tokens) and
+        evidence.input_tokens <= expected["max_input_tokens"] and
+        is_number(evidence.output_tokens) and
+        evidence.output_tokens <= expected["max_output_tokens"] and
+        is_binary(evidence.finish_reason) and
+        is_binary(evidence.content) and
+        is_number(evidence.gateway_reported_cost) and
+        is_number(evidence.computed_cost) and
+        costs_reconcile?(evidence.gateway_reported_cost, evidence.computed_cost)
+
+    if valid?, do: :ok, else: {:error, {:response_identity_or_usage_drift, evidence}}
+  end
+
+  def validate_contract(evidence, _expected),
+    do: {:error, {:response_identity_or_usage_drift, evidence}}
+
   defp normalize_finish_reason(value) when is_atom(value), do: Atom.to_string(value)
   defp normalize_finish_reason(value), do: value
 

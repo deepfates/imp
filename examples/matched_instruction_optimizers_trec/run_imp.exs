@@ -253,27 +253,16 @@ defmodule MatchedTRECImp.ObservedLM do
       MatchedTRECImp.Observer.reconcile_cost!(lm.observer, evidence.gateway_reported_cost)
     end
 
-    unless evidence.model in [expected["logical"], expected["imp"]] and
-             String.downcase(to_string(evidence.route)) ==
-               String.downcase(expected["endpoint_provider"]) and
-             evidence.gateway == "openrouter" and
-             evidence.service_tier in [nil, "default", "standard"] and
-             is_number(evidence.input_tokens) and
-             evidence.input_tokens <= expected["max_input_tokens"] and
-             is_number(evidence.output_tokens) and
-             evidence.output_tokens <= expected["max_output_tokens"] and
-             is_binary(evidence.finish_reason) and is_binary(evidence.content) and
-             is_number(evidence.gateway_reported_cost) and
-             is_number(evidence.computed_cost) and
-             MatchedInstructionOptimizersTREC.ResponseEvidence.costs_reconcile?(
-               evidence.gateway_reported_cost,
-               evidence.computed_cost
-             ) do
-      operational_error(
-        :route,
-        :response_identity_or_usage_drift,
-        "first-response route/model/tier/token/cost drift: #{inspect(evidence)}"
-      )
+    case MatchedInstructionOptimizersTREC.ResponseEvidence.validate_contract(evidence, expected) do
+      :ok ->
+        :ok
+
+      {:error, {:response_identity_or_usage_drift, _evidence}} ->
+        operational_error(
+          :route,
+          :response_identity_or_usage_drift,
+          "first-response route/model/tier/token/cost drift: #{inspect(evidence)}"
+        )
     end
   rescue
     error ->

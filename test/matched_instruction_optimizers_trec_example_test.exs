@@ -441,6 +441,41 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
            )
   end
 
+  test "a valid observed response returns the success sentinel required by LM.generate" do
+    evidence = %{
+      model: "openai/gpt-5.4-mini",
+      route: "OpenAI",
+      gateway: "openrouter",
+      service_tier: "default",
+      input_tokens: 202,
+      output_tokens: 23,
+      finish_reason: "stop",
+      content: "[[ ## route ## ]]\nK11\n[[ ## completed ## ]]",
+      gateway_reported_cost: 0.000255,
+      computed_cost: 0.000254
+    }
+
+    expected = %{
+      "logical" => "openai/gpt-5.4-mini",
+      "imp" => "openai/gpt-5.4-mini",
+      "endpoint_provider" => "OpenAI",
+      "max_input_tokens" => 4_096,
+      "max_output_tokens" => 256
+    }
+
+    assert :ok =
+             MatchedInstructionOptimizersTREC.ResponseEvidence.validate_contract(
+               evidence,
+               expected
+             )
+
+    assert {:error, {:response_identity_or_usage_drift, _}} =
+             MatchedInstructionOptimizersTREC.ResponseEvidence.validate_contract(
+               %{evidence | route: "WrongProvider"},
+               expected
+             )
+  end
+
   defp perfect_rows(path) do
     path
     |> File.stream!()
