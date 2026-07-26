@@ -115,12 +115,12 @@ class NoModelBoundaryTest(unittest.TestCase):
                     model="openai/gpt-5.4-mini",
                     provider="WrongProvider",
                     service_tier="default",
-                    usage={"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0},
+                    usage={"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0001},
                     choices=[types.SimpleNamespace(
                         finish_reason="stop",
                         message=types.SimpleNamespace(content="ok"),
                     )],
-                    _hidden_params={"custom_llm_provider": "openrouter", "response_cost": 0.0},
+                    _hidden_params={"custom_llm_provider": "openrouter", "response_cost": 0.0001},
                 )
 
         prior = sys.modules.get("dspy")
@@ -152,6 +152,7 @@ class NoModelBoundaryTest(unittest.TestCase):
                     lm.forward(messages=[{"role": "user", "content": "question"}])
             self.assertEqual(len(dispatches), 1)
             self.assertEqual(len(capture.calls), 1)
+            self.assertEqual(capture.actual_cost, 0.0001)
         finally:
             if prior is None:
                 sys.modules.pop("dspy", None)

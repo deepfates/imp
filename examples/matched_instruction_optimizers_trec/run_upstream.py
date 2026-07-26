@@ -454,11 +454,13 @@ def install_runtime(args: argparse.Namespace):
                 )
                 if response is not None and error is None and self.expected_model is not None:
                     try:
+                        gateway_cost = field(usage, "cost")
+                        if isinstance(gateway_cost, (int, float)) and gateway_cost >= 0:
+                            self.capture.reconcile_cost(gateway_cost)
                         validate_mipro_optimizer_envelope(
                             self.capture, self.role, field(message, "content")
                         )
-                        evidence = transport_evidence(self.capture.calls[-1], self.expected_model)
-                        self.capture.reconcile_cost(evidence["gateway_reported_cost"])
+                        transport_evidence(self.capture.calls[-1], self.expected_model)
                     except Exception as exc:
                         raise OperationalSafetyAbort(str(exc)) from exc
 
@@ -940,6 +942,9 @@ def main() -> None:
             {"schema_version": 3, "runtime": "upstream", "status": "stopped",
              "source_commits": commits,
              "call_budgets": ACTIVE_CAPTURE.call_budgets if ACTIVE_CAPTURE else {},
+             "calls": ACTIVE_CAPTURE.calls if ACTIVE_CAPTURE else [],
+             "actual_cost": ACTIVE_CAPTURE.actual_cost if ACTIVE_CAPTURE else 0.0,
+             "usd_reserved": ACTIVE_CAPTURE.usd_reserved if ACTIVE_CAPTURE else 0.0,
              "error": repr(exc)},
         )
         raise

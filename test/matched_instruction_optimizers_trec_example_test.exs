@@ -404,6 +404,31 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
              MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
   end
 
+  test "response evidence prefers the gateway scalar over an adapter cost breakdown" do
+    envelope = %{
+      __imp_lm_output__: %{"route" => "K11"},
+      __imp_lm_metadata__: %{
+        req_llm: %{
+          provider: "openrouter",
+          model: "openai/gpt-5.4-mini",
+          finish_reason: :stop,
+          content: "[[ ## route ## ]]\nK11\n[[ ## completed ## ]]",
+          usage: %{
+            "cost" => 0.00022125,
+            cost: %{total: 0.000222, input_cost: 0.000145, output_cost: 0.000077},
+            total_cost: 0.000222
+          }
+        }
+      }
+    }
+
+    assert %{
+             gateway_reported_cost: 0.00022125,
+             provider_cost: 0.00022125,
+             computed_cost: 0.000222
+           } = MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!({:ok, envelope})
+  end
+
   defp perfect_rows(path) do
     path
     |> File.stream!()

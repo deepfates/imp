@@ -249,6 +249,10 @@ defmodule MatchedTRECImp.ObservedLM do
     evidence = MatchedInstructionOptimizersTREC.ResponseEvidence.from_result!(result)
     expected = lm.expected_model
 
+    if is_number(evidence.gateway_reported_cost) and evidence.gateway_reported_cost >= 0 do
+      MatchedTRECImp.Observer.reconcile_cost!(lm.observer, evidence.gateway_reported_cost)
+    end
+
     unless evidence.model in [expected["logical"], expected["imp"]] and
              String.downcase(to_string(evidence.route)) ==
                String.downcase(expected["endpoint_provider"]) and
@@ -267,8 +271,6 @@ defmodule MatchedTRECImp.ObservedLM do
         :response_identity_or_usage_drift,
         "first-response route/model/tier/token/cost drift: #{inspect(evidence)}"
       )
-    else
-      MatchedTRECImp.Observer.reconcile_cost!(lm.observer, evidence.gateway_reported_cost)
     end
   rescue
     error ->
@@ -375,7 +377,11 @@ defmodule MatchedTRECImp.Runner do
         runtime: "imp",
         status: "stopped",
         source_commits: source_commits_for_stopped_output(),
-        call_budgets: stopped_call_budgets(),
+        call_budgets: stopped_observer_field(:call_budgets),
+        actual_cost: stopped_observer_field(:actual_cost),
+        usd_reserved: stopped_observer_field(:usd_reserved),
+        lm_results: stopped_observer_field(:responses),
+        transport_events: stopped_observer_field(:transports),
         error: Exception.format(:error, error, __STACKTRACE__)
       })
 
@@ -1130,13 +1136,19 @@ defmodule MatchedTRECImp.Runner do
     _error -> %{"imp" => "unavailable", "dspy" => "unavailable", "gepa" => "unavailable"}
   end
 
-  defp stopped_call_budgets do
+  defp stopped_observer_field(field) do
     case Process.get(:matched_trec_observer) do
-      pid when is_pid(pid) -> Report.encode_term(Observer.snapshot(pid).call_budgets)
-      _ -> %{}
+      pid when is_pid(pid) ->
+        pid
+        |> Observer.snapshot()
+        |> Map.fetch!(field)
+        |> Report.encode_term()
+
+      _ ->
+        nil
     end
   rescue
-    _error -> %{}
+    _error -> nil
   end
 
   defp map_get(value, key) when is_map(value) do
