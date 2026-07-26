@@ -160,6 +160,16 @@ instruction incorrectly mapped `R42` to entity and `R68` to human; the frozen
 dataset legend is `R17=DESC`, `R42=HUM`, `R68=LOC`, `R93=NUM`. Entity is not in
 the slice. The partial run is not a usefulness result.
 
+`trec-correct-semantics-v1-treatment.json` is the separately named factual
+correction. It keeps the exact data digests, 24/8/40 rows, model, seed, pinned
+TRL/MPS contract, fourteen-step budget, LoRA settings, four sampled completions
+per group, semantic reward, selection rule, and held-out metric. Its only
+change from the stopped condition is the source-correct public task legend:
+`R17=description`, `R42=person`, `R68=location`, and `R93=numeric`. It is not a
+continuation or reinterpretation of the three stopped updates, and it must be
+reported as a separate one-task/model result whether positive, neutral,
+negative, or stopped.
+
 The trained arm is deployed only if it beats base on the eight validation
 rows. A completed positive, neutral, or negative result remains specific to
 this task, model, seed, and budget.

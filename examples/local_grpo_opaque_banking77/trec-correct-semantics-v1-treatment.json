@@ -1,0 +1,33 @@
+{
+  "schema_version": 3,
+  "treatment_id": "model-generated-trec-coarse-correct-disclosed-semantics-v1",
+  "data_sha256": "6643645cc3bcd79a5236b7e3920a5c37526be178df2e02f20652d9a16eef51ad",
+  "train_sha256": "sha256:ba839d83f895a820c35ee4ac361ea1b5fea407ac3ea814680dc6dd97239d5d5b",
+  "selection_sha256": "sha256:87ba369eafbd0dac41d245697f0b5122a1b7265a67b954456e0e455226ca2eb8",
+  "test_sha256": "sha256:a44903a421e3e0befd8021eaa977eab9be5b63941c36a5591321e331dcfd72a4",
+  "contract_sha256": "1354373e1f70e3b849d65ef10d5f8770e7fae3a9b38b5c3bd94d6a25586a8366",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "seed": 20260729,
+  "routes": [
+    "R17",
+    "R42",
+    "R68",
+    "R93"
+  ],
+  "selection_source": "validation",
+  "input_field": "question",
+  "instruction": "Classify the question by the kind of answer it asks for. R17 means a description, definition, or explanation. R42 means a person or group of people. R68 means a location. R93 means a numeric answer such as a count, date, distance, amount, or percentage. Return exactly one of R17, R42, R68, or R93.",
+  "train_steps": 14,
+  "train_kwargs": {
+    "learning_rate": 0.00001,
+    "beta": 0.0,
+    "loss_type": "dapo",
+    "scale_rewards": "group"
+  },
+  "source_schedule": {
+    "source_rows": 24,
+    "groups": 56,
+    "twice": 16,
+    "thrice": 8
+  }
+}

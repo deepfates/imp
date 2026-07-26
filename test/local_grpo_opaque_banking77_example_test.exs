@@ -10,6 +10,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   @semantic_config "examples/local_grpo_opaque_banking77/semantic-v1-treatment.json"
   @semantic_stopped_result "examples/local_grpo_opaque_banking77/exercised-semantic-v1-stopped-result.json"
   @trec_config "examples/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
+  @trec_correct_config "examples/local_grpo_opaque_banking77/trec-correct-semantics-v1-treatment.json"
   @trec_contract "priv/trl_worker/qwen-trec-14-step-contract.json"
   @trec_stopped_result "examples/local_grpo_opaque_banking77/exercised-trec-semantic-v1-stopped-result.json"
   @trec_source_guided_result "examples/local_grpo_opaque_banking77/exercised-trec-source-guided-v1-result.json"
@@ -275,6 +276,39 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     assert result["selected_arm"] == nil
     refute result["untouched_test_opened"]
     assert result["stop_reason"] =~ "R42=HUM, R68=LOC"
+  end
+
+  test "corrected TREC treatment changes only the factual route legend" do
+    stopped = @trec_config |> File.read!() |> Jason.decode!()
+    corrected = @trec_correct_config |> File.read!() |> Jason.decode!()
+    data = "benchmarks/data/simba-trec-coarse-v1.json" |> File.read!() |> Jason.decode!()
+
+    assert corrected["treatment_id"] ==
+             "model-generated-trec-coarse-correct-disclosed-semantics-v1"
+
+    for key <-
+          ~w(schema_version data_sha256 train_sha256 selection_sha256 test_sha256 contract_sha256 model seed routes selection_source input_field train_steps train_kwargs source_schedule) do
+      assert corrected[key] == stopped[key]
+    end
+
+    route_coarse =
+      data["train"]
+      |> Enum.group_by(& &1["route"], & &1["coarse"])
+      |> Map.new(fn {route, values} -> {route, Enum.uniq(values)} end)
+
+    assert route_coarse == %{
+             "R17" => ["DESC"],
+             "R42" => ["HUM"],
+             "R68" => ["LOC"],
+             "R93" => ["NUM"]
+           }
+
+    instruction = corrected["instruction"]
+    assert instruction =~ "R17 means a description"
+    assert instruction =~ "R42 means a person or group of people"
+    assert instruction =~ "R68 means a location"
+    assert instruction =~ "R93 means a numeric answer"
+    refute instruction =~ "R42 means an entity"
   end
 
   test "retained run preserves a complete neutral usefulness result" do
