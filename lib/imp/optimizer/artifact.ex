@@ -528,6 +528,9 @@ defmodule Imp.Optimizer.Artifact do
       signature
       |> Imp.Signature.dump()
       |> Map.delete("instructions")
+      |> Map.update!("outputs", fn outputs ->
+        Enum.map(outputs, &Map.delete(&1, "prefix"))
+      end)
       |> Jason.encode!()
       |> Jason.decode!()
     end

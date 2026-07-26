@@ -245,6 +245,40 @@ defmodule Imp.Optimizer.ArtifactTest do
     end
   end
 
+  test "applies optimizer-owned output prefix changes without weakening the field contract" do
+    baseline = optimized("baseline")
+
+    selected =
+      baseline
+      |> Imp.ProgramParameters.put_instruction(:main, "selected")
+      |> put_output_prefix("_selected_answer")
+      |> Imp.Optimizer.Report.attach(
+        Report.new(optimizer: :copro, best_score: 0.8, candidate_count: 2)
+      )
+
+    artifact = Artifact.from_optimized_program(selected)
+    applied = Artifact.apply(artifact, baseline)
+    [predictor] = Imp.ProgramParameters.predictors(applied)
+
+    assert predictor.predictor.signature.instructions == "selected"
+    assert List.last(predictor.predictor.signature.outputs).prefix == "_selected_answer"
+
+    incompatible =
+      Imp.ProgramParameters.update_predictor(baseline, :main, fn predictor ->
+        outputs =
+          List.update_at(predictor.signature.outputs, -1, fn output ->
+            %{output | type: :integer}
+          end)
+
+        signature = %{predictor.signature | outputs: outputs}
+        Imp.Predict.Predict.with_signature(predictor, signature)
+      end)
+
+    assert_raise ArgumentError, ~r/incompatible signature/, fn ->
+      Artifact.apply(artifact, incompatible)
+    end
+  end
+
   test "rejects pre-canonical artifact schemas" do
     champion = Artifact.candidate("v1", optimized("legacy"))
 
@@ -288,6 +322,17 @@ defmodule Imp.Optimizer.ArtifactTest do
     Imp.chain_of_thought("question -> answer")
     |> Imp.ProgramParameters.put_instruction(:main, instruction)
     |> Imp.ProgramParameters.put_demos(:main, [demo])
+  end
+
+  defp put_output_prefix(program, prefix) do
+    Imp.ProgramParameters.update_predictor(program, :main, fn predictor ->
+      outputs =
+        List.update_at(predictor.signature.outputs, -1, fn output ->
+          %{output | prefix: prefix}
+        end)
+
+      Imp.Predict.Predict.with_signature(predictor, %{predictor.signature | outputs: outputs})
+    end)
   end
 
   defp runtime_program(instruction, answer, opts) do
