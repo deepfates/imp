@@ -661,6 +661,34 @@ Use:
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
 
+For a consumer-defined multi-predictor program, GEPA can return its selected
+program, report, and safe parameter-only artifact in one operation:
+
+```elixir
+{selected, report, artifact} =
+  Imp.Optimizer.GEPA.compile_with_artifact(
+    gepa,
+    program,
+    trainset,
+    validation,
+    artifact_id: "support-router-v1"
+  )
+
+:ok = Imp.Optimizer.Artifact.write!(artifact, "support-router.json")
+
+# In a fresh process, reconstruct trusted code and runtime clients first.
+fresh = MyApp.SupportRouter.new(runtime_lm)
+deployed =
+  "support-router.json"
+  |> Imp.Optimizer.Artifact.read!()
+  |> Imp.Optimizer.Artifact.apply(fresh)
+```
+
+The artifact contains named predictor signatures, demonstrations, configs, and
+the optimizer report. It does not serialize the consumer module, LMs, adapters,
+callbacks, credentials, or arbitrary state. Train and validation remain GEPA
+inputs; untouched test data is evaluated separately after selection.
+
 `LabeledFewShot.new/1` follows DSPy 3.2.1's user-visible defaults: `k: 16`,
 deterministic sampling without replacement, and seed zero. Use `sample: false`
 for the ordered first-`k` path, or set `seed:` for another reproducible BEAM

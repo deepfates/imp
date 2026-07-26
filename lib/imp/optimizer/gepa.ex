@@ -50,6 +50,7 @@ defmodule Imp.Optimizer.GEPA do
   }
 
   alias Imp.Optimizer.Report
+  alias Imp.Optimizer.Artifact
 
   defstruct [
     :metric,
@@ -135,6 +136,15 @@ defmodule Imp.Optimizer.GEPA do
       default: nil
     ]
   ]
+
+  @artifact_option_schema @compile_option_schema ++
+                            [
+                              artifact_id: [
+                                type: {:custom, __MODULE__, :validate_artifact_id, []},
+                                default: "gepa-champion"
+                              ],
+                              provenance: [type: :map, default: %{}]
+                            ]
 
   def new(metric, opts \\ []) do
     Imp.FunctionContract.validate!(metric, 2, "Imp.Optimizer.GEPA.new/2", "metric")
@@ -317,6 +327,39 @@ defmodule Imp.Optimizer.GEPA do
       })
 
     {Report.attach(compiled, report), report}
+  end
+
+  @doc """
+  Compiles a program and returns a safe, checksummed parameter artifact.
+
+  This is the durable path for consumer-defined multi-predictor modules. The
+  artifact contains only named predictor signatures, demonstrations, and
+  configuration plus the GEPA report. It never serializes the consumer module,
+  LMs, adapters, callbacks, or other executable runtime state. Reconstruct the
+  trusted program in the deploying application and apply the artifact with
+  `Imp.Optimizer.Artifact.apply/4`.
+  """
+  def compile_with_artifact(%__MODULE__{} = optimizer, program, trainset, devset, opts \\ []) do
+    opts =
+      Imp.Options.validate!(
+        opts,
+        @artifact_option_schema,
+        "Imp.Optimizer.GEPA.compile_with_artifact/5"
+      )
+
+    compile_opts = Keyword.take(opts, [:resume_state, :checkpoint_fn])
+    {compiled, report} = compile_with_report(optimizer, program, trainset, devset, compile_opts)
+
+    candidate =
+      Artifact.parameter_candidate(opts[:artifact_id], compiled,
+        score: report.best_score,
+        report: report,
+        metadata: %{optimizer: :gepa}
+      )
+
+    provenance = Map.put_new(opts[:provenance], :optimizer, :gepa)
+    artifact = Artifact.new(candidate, [], provenance: provenance)
+    {compiled, report, artifact}
   end
 
   defp proposer(reflection_lm, fallback_feedback, reflection_feedback) do
@@ -541,6 +584,11 @@ defmodule Imp.Optimizer.GEPA do
   def validate_feedback_fn(feedback_fn) do
     {:error, "expected nil or an arity-1 function, got: #{inspect(feedback_fn)}"}
   end
+
+  def validate_artifact_id(value) when is_binary(value) and value != "", do: {:ok, value}
+
+  def validate_artifact_id(value),
+    do: {:error, "must be a non-empty string, got: #{inspect(value)}"}
 
   @doc false
   def validate_module_selector(selector) do
