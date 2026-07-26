@@ -1,0 +1,56 @@
+{
+  "status": "complete_neutral",
+  "scope": "one pinned Qwen2.5-0.5B two-step, four-group-per-step ordinary model-generated GRPO run on the frozen Banking77 16/8/40 split",
+  "adapter": "Elixir.Imp.Adapter.JSON",
+  "training_generation_mode": "sample",
+  "evaluation_generation_mode": "greedy",
+  "training": {
+    "steps": 2,
+    "groups_per_step": 4,
+    "rollouts_per_group": 4,
+    "step_1_rewards": [1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0],
+    "step_1_advantages": [0.8658754229545593, -0.8658754229545593, -0.8658754229545593, 0.8658754229545593, 0.0, 0.0, 0.0, 0.0, -0.8658754229545593, 0.8658754229545593, 0.8658754229545593, -0.8658754229545593, -0.8658754229545593, 0.8658754229545593, 0.8658754229545593, -0.8658754229545593],
+    "step_2_rewards": [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0],
+    "step_2_advantages": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "training_loss": [0.0, 0.0],
+    "trainable_tensors_changed": true,
+    "artifact_sha256": "sha256:beec17d4f8109e2c48375967138db28bbc2d638ddd9f124504d711e5eb2a6848"
+  },
+  "selection": {
+    "base_accuracy": 0.875,
+    "trained_accuracy": 0.875,
+    "base_macro_f1": 0.8666666666666667,
+    "trained_macro_f1": 0.8666666666666667,
+    "base_errors": 0,
+    "trained_errors": 0,
+    "selected_arm": "base"
+  },
+  "untouched_test": {
+    "base_accuracy": 0.725,
+    "trained_accuracy": 0.725,
+    "base_macro_f1": 0.7128851540616246,
+    "trained_macro_f1": 0.7128851540616246,
+    "base_errors": 0,
+    "trained_errors": 0,
+    "fresh_selected_byte_identical": true
+  },
+  "diagnosis": {
+    "step_1": "all sixteen free autoregressive samples were valid JSON; three of four source groups had non-uniform semantic rewards and TRL computed non-uniform group-relative advantages",
+    "step_2": "all sixteen free autoregressive samples were malformed, producing uniform failure rewards and zero current-step advantages",
+    "selection": "the final trained artifact tied the base policy, so the declared stable selection rule retained base; no retrospective step-one checkpoint selection was performed"
+  },
+  "establishes": [
+    "ordinary free model generation with genuine semantic reward signal across current-step source groups",
+    "official two-step TRL continuation and changed LoRA trainable tensors",
+    "content-verified final artifact plus greedy selection and untouched evaluation",
+    "fresh-process reproduction of the honestly selected base arm"
+  ],
+  "excludes": [
+    "GRPO usefulness or improvement on this task",
+    "general GRPO learning or effectiveness",
+    "best-checkpoint selection",
+    "mmGRPO parity",
+    "production reliability",
+    "BEAM superiority"
+  ]
+}

@@ -74,3 +74,14 @@ zero, both steps were truthful no-ops, and base was retained. The current
 ordinary runner uses the public JSON adapter, which was selected independently
 before that result and keeps free autoregressive training rather than
 substituting a choice-normalized policy for GRPO.
+
+The corresponding immutable JSON-adapter treatment is
+`exercised-json-multistep-result.json`. Its first official step produced valid
+JSON samples, non-uniform semantic rewards and group-relative advantages, and
+changed the LoRA tensors. Its second step's samples were all malformed. The
+final trained policy tied base on frozen selection (`0.875` accuracy) and
+untouched test (`0.725` accuracy), so stable selection honestly retained base
+and a fresh OS BEAM reproduced it byte-for-byte. This establishes ordinary
+model-generated semantic signal and weight-changing lifecycle mechanics, but
+the neutral held-out result is neither a GRPO win nor a general optimizer loss.
+The run did not retrospectively select its step-one checkpoint.
