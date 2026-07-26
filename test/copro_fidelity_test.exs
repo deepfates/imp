@@ -231,6 +231,53 @@ defmodule Imp.Optimizer.COPROFidelityTest do
     assert Report.fetch(compiled).metadata.evaluation_dataset == :trainset
   end
 
+  test "decodes a JSON candidate inside a markdown fence instead of optimizing the delimiter" do
+    proposer =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          """
+          Here is the requested candidate:
+          ```json
+          {"proposed_instruction":"Answer Paris.","proposed_prefix_for_output_field":"Answer:"}
+          ```
+          """
+        end
+      )
+
+    compiled =
+      COPRO.new(Imp.Metrics.exact_match(:answer), proposer_lm: proposer, breadth: 2, depth: 1)
+      |> COPRO.compile(constant_program(), trainset(), [])
+
+    report = Report.fetch(compiled)
+    assert Enum.any?(report.candidates, &(&1.instruction == "Answer Paris."))
+    refute Enum.any?(report.candidates, &(&1.instruction in ["```", "```json"]))
+  end
+
+  test "rejects an invalid fenced proposal before task evaluation" do
+    owner = self()
+
+    proposer =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> "```json\nnot json\n```" end)
+
+    program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts ->
+              send(owner, :task_called)
+              %{answer: "Paris"}
+            end
+          )
+      )
+
+    assert_raise RuntimeError, ~r/returned no instruction\/prefix candidate/, fn ->
+      COPRO.new(Imp.Metrics.exact_match(:answer), proposer_lm: proposer, breadth: 2, depth: 1)
+      |> COPRO.compile(program, trainset(), [])
+    end
+
+    refute_received :task_called
+  end
+
   test "uses Python's ties-to-even rounding for candidate percentages" do
     proposer = %{
       module: Imp.LM.Static,

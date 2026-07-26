@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "stopped_before_heldout",
+  "runtime_commit": "5884132",
+  "dataset_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+  "models": {
+    "task_artifact": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+    "proposal_model": "ollama:llama3.2:3b",
+    "proposal_model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "search": {
+    "selection_dataset": "trainset",
+    "proposal_calls": 1,
+    "task_calls": 32,
+    "transport_attempts": 33,
+    "admitted_candidate": "```",
+    "candidate_rendered_calls": 16,
+    "baseline_score_percent": 56.25,
+    "candidate_score_percent": 50.0,
+    "selected": "baseline"
+  },
+  "heldout_opened": false,
+  "fresh_process_attempted": false,
+  "stop_reason": "COPRO's raw fallback parser admitted the opening delimiter of a Markdown-fenced JSON response as the instruction instead of decoding the enclosed JSON candidate or rejecting it.",
+  "retained_stage_sha256": {
+    "preflight": "83928bc5e68d7725e008f8d1b1fac132f4fcfa36e7bb67dafdc953b2ed89780b",
+    "optimization": "41f59da8d38e8f28fb9ce76e9a91f2c881661683563684efaa0a2fd6d1889111",
+    "failure": "43c8b7ea978e9bbd674cb3c1f66b5c609eff786ce60994222907b007eccdc2bc"
+  },
+  "claim_boundary": "This stopped result proves a non-scripted proposal transport, trainset candidate/baseline evaluation, and the pre-fix fence-admission bug. It is not valid proposal, held-out effectiveness, artifact, parity, or BEAM-superiority evidence."
+}

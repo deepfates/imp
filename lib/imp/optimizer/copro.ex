@@ -531,14 +531,43 @@ defmodule Imp.Optimizer.COPRO do
   defp decode_raw(%{} = raw), do: [raw]
 
   defp decode_raw(raw) when is_binary(raw) do
-    case Jason.decode(raw) do
-      {:ok, values} when is_list(values) -> values
-      {:ok, value} -> [value]
-      {:error, _} -> String.split(raw, "\n", trim: true)
+    case decode_json_values(raw) do
+      {:ok, values} ->
+        values
+
+      :error ->
+        case fenced_json(raw) do
+          {:ok, candidate} ->
+            case decode_json_values(candidate) do
+              {:ok, values} -> values
+              :error -> []
+            end
+
+          :none ->
+            raw
+            |> String.split("\n", trim: true)
+            |> Enum.reject(&(String.trim(&1) in ["```", "```json"]))
+        end
     end
   end
 
   defp decode_raw(_raw), do: []
+
+  defp decode_json_values(raw) do
+    case Jason.decode(raw) do
+      {:ok, values} when is_list(values) -> {:ok, values}
+      {:ok, value} -> {:ok, [value]}
+      {:error, _reason} -> :error
+    end
+  end
+
+  defp fenced_json(raw) do
+    case Regex.run(~r/```(?:json)?\s*\n(.*?)```/is, raw, capture: :all_but_first) do
+      [candidate] -> {:ok, String.trim(candidate)}
+      nil -> :none
+    end
+  end
+
   defp clean(value), do: value |> to_string() |> String.trim("\"") |> String.trim()
 
   defp evaluate!(program, trainset, metric, eval_opts) do

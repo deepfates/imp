@@ -37,3 +37,12 @@ application, and fresh-consumer behavior on one task/model. A positive result
 would not establish general COPRO effectiveness, whole-optimizer parity, or
 BEAM superiority. The forty rows are optimizer-held-out for this example, not
 globally untouched: earlier Imp work has used the same retained dataset.
+
+The first frozen execution is retained in
+`exercised-pre-fenced-json-fix-stopped-result.json`. The local proposer returned
+a Markdown-fenced JSON candidate, but COPRO's raw fallback parser admitted the
+opening fence delimiter as instruction `"```"`. That invalid candidate really
+ran through sixteen fused-model calls and lost to baseline `50.0%` to `56.25%`;
+the runner then stopped before held-out evaluation or artifact creation. COPRO
+now decodes the enclosed JSON or rejects an invalid fence before task work. The
+stopped score is parser-defect evidence, not optimizer effectiveness evidence.
