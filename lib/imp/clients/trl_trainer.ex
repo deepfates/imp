@@ -99,13 +99,22 @@ defmodule Imp.Clients.TRLTrainer do
         opts
       ) do
     worker = worker!(session)
+    step_id = Keyword.fetch!(opts, :step_id)
+    idempotency_key = Keyword.fetch!(opts, :idempotency_key)
+    projected_groups = encode_groups(groups)
 
-    with {:ok, prepared} <-
+    with :ok <-
+           persist_prepared_stage(trainer, session.id, %{
+             "step_id" => step_id,
+             "idempotency_key" => idempotency_key,
+             "groups" => projected_groups
+           }),
+         {:ok, prepared} <-
            request(trainer, worker, %{
              "op" => "prepare_update",
-             "groups" => encode_groups(groups),
-             "step_id" => Keyword.fetch!(opts, :step_id),
-             "idempotency_key" => Keyword.fetch!(opts, :idempotency_key)
+             "groups" => projected_groups,
+             "step_id" => step_id,
+             "idempotency_key" => idempotency_key
            }),
          {:ok, update} <- TRLProtocol.update(prepared),
          {:ok, result} <-
@@ -267,4 +276,31 @@ defmodule Imp.Clients.TRLTrainer do
 
   @doc false
   def encode_groups(groups), do: Imp.Optimizer.Report.json_projection(groups)
+
+  @doc false
+  def persist_prepared_stage(%__MODULE__{} = trainer, session_id, stage)
+      when is_binary(session_id) and is_map(stage) do
+    root =
+      trainer.root
+      |> Path.expand()
+      |> Path.join(safe_session_name(session_id))
+      |> Path.join("prepared-stages")
+
+    identity = TRLProtocol.digest(stage) |> String.replace_prefix("sha256:", "")
+    path = Path.join(root, identity <> ".json")
+    temporary = path <> ".tmp-#{System.unique_integer([:positive])}"
+    encoded = Jason.encode!(stage, pretty: true) <> "\n"
+
+    File.mkdir_p!(root)
+
+    try do
+      File.write!(temporary, encoded, [:sync])
+      File.rename!(temporary, path)
+      :ok
+    after
+      File.rm(temporary)
+    end
+  rescue
+    error -> {:error, {:trl_prepared_stage_persistence_failed, Exception.message(error)}}
+  end
 end

@@ -118,4 +118,26 @@ defmodule Imp.TRLWorkerTest do
     assert group["group_id"]["__imp_type__"] == "tuple"
     assert Enum.map(samples, & &1["reward"]) == [1.0, 0.0, 0.0, 0.0]
   end
+
+  test "trainer atomically retains projected groups before worker validation", context do
+    trainer =
+      TRLTrainer.new(
+        python: context.python,
+        model_path: context.model,
+        root: context.root,
+        contract_path: context.contract
+      )
+
+    stage = %{
+      "step_id" => "step-1",
+      "idempotency_key" => "step-1",
+      "groups" => [%{"group" => [%{"completion" => "R42", "reward" => 0.0}]}]
+    }
+
+    assert :ok = TRLTrainer.persist_prepared_stage(trainer, "session-1", stage)
+
+    [path] = Path.wildcard(Path.join(context.root, "*/prepared-stages/*.json"))
+    assert Jason.decode!(File.read!(path)) == stage
+    refute File.exists?(path <> ".tmp")
+  end
 end

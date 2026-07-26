@@ -3,8 +3,8 @@
   "cleanup": {
     "worker_process_alive_after_runner": false
   },
-  "finished_at": "2026-07-26T02:48:59.568064Z",
-  "git_commit": "1beb3f2c0db08994b37487f480c269e3f76b7150",
+  "finished_at": "2026-07-26T02:54:03.318128Z",
+  "git_commit": "5b04e3cec58f879ade3d953994cce2ca4ae1f17a",
   "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
   "preflight": {
     "dependencies": {
@@ -18,12 +18,19 @@
     "mps_available": true,
     "mps_built": true
   },
-  "reason": "{:grpo_execution_and_termination_failed, %{\"accepted\" => false, \"code\" => \"generation_count_mismatch\", \"message\" => \"group sample count differs from frozen contract\"}, {:trl_worker, %{\"accepted\" => false, \"code\" => \"incomplete_training\", \"message\" => \"the single accepted update did not complete\"}}}",
+  "reason": "{:grpo_execution_and_termination_failed, %{\"accepted\" => false, \"code\" => \"uniform_rewards\", \"message\" => \"non-uniform external rewards are required\"}, {:trl_worker, %{\"accepted\" => false, \"code\" => \"incomplete_training\", \"message\" => \"the single accepted update did not complete\"}}}",
   "row_id": "banking77-train-2511",
   "row_sha256": "sha256:dd5e7f7ca000bf4c92c81fe93b2b4fb3d05a52989a5cb8f2ab643f25f8242b91",
   "schema_version": 1,
   "scope": "one real local MPS LoRA GRPO update feasibility only",
-  "started_at": "2026-07-26T02:48:51.995696Z",
+  "stages": {
+    "causal_model_rollouts_completed": 4,
+    "protocol_update_sealed": false,
+    "trainer_constructed": false,
+    "uniform_reward_value": "unknown_due_to_pre_fix_recorder_overwrite",
+    "uniform_rewards": true
+  },
+  "started_at": "2026-07-26T02:53:59.679414Z",
   "status": "stopped",
   "worker_registered_before_finally_cleanup": true
 }
