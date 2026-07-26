@@ -630,6 +630,7 @@ class Worker:
             atomic_write(staging / "trainer-state.json", trainer_state_source.read_bytes())
         torch.save(trainer.optimizer.state_dict(), staging / "optimizer.pt")
         torch.save(torch.mps.get_rng_state(), staging / "mps-rng.pt")
+        self._copy_prior_envelopes(staging, target_step)
         rng_record = {
             "torch_cpu_sha256": "sha256:" + hashlib.sha256(torch.get_rng_state().numpy().tobytes()).hexdigest(),
             "torch_mps_sha256": self._mps_rng_digest(torch),
@@ -1047,6 +1048,20 @@ class Worker:
         observation = json.loads((self.artifact_path / "trl-observation.json").read_text())
         if self._trainable_digest(self.model) != observation["trainable_after_sha256"]:
             raise WorkerError("resume_adapter_identity_mismatch", "resumed LoRA tensors differ")
+
+    def _copy_prior_envelopes(self, staging: pathlib.Path, target_step: int) -> None:
+        for prior_step in range(1, target_step):
+            prior = self.root / "artifacts" / f"step-{prior_step}"
+            update = prior / f"update-{prior_step}.json"
+            receipt = prior / f"receipt-{prior_step}.json"
+            if not update.is_file() or not receipt.is_file():
+                raise WorkerError(
+                    "artifact_predecessor_missing",
+                    f"step {prior_step} update/receipt is unavailable",
+                    accepted=True,
+                )
+            shutil.copy2(update, staging)
+            shutil.copy2(receipt, staging)
 
     def _verify_artifact_inventory(
         self, artifact_path: pathlib.Path, manifest: dict[str, Any]

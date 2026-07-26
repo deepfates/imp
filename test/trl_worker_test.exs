@@ -413,6 +413,15 @@ defmodule Imp.TRLWorkerTest do
     assert worker._current_training_state() == (worker.checkpoint["optimizer"], worker.checkpoint["rng"])
     assert worker._current_behavior_policy()["artifact_sha256"] == "sha256:artifact-1"
     assert worker._status()["pending_batch_ids"] == ["trl-step-1-group-0"]
+    prior = worker.root / "artifacts" / "step-1"
+    prior.mkdir(parents=True)
+    (prior / "update-1.json").write_text("update-one")
+    (prior / "receipt-1.json").write_text("receipt-one")
+    staging = worker.root / "staging-step-2"
+    staging.mkdir()
+    worker._copy_prior_envelopes(staging, 2)
+    assert (staging / "update-1.json").read_text() == "update-one"
+    assert (staging / "receipt-1.json").read_text() == "receipt-one"
     """
 
     assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)
