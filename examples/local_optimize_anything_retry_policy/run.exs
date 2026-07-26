@@ -155,8 +155,9 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
   alias Imp.Optimize.Anything.{Config, Result}
   alias LocalOptimizeAnythingRetryPolicy.{Atomic, ObservedLM, Task}
 
-  @model "phi4:latest"
-  @digest "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
+  @model "llama3.3:latest"
+  @digest "a6eb4748fd2990ad2952b2335a95a7f952d1a06119a0aa6a2df6cd052a93a3fa"
+  @treatment_id "local-oa-retry-policy-llama3.3-v1"
 
   def run do
     cond do
@@ -168,6 +169,11 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
 
   defp parent do
     paths = paths!()
+    require_new_output!(paths.output)
+    run_parent(paths)
+  end
+
+  defp run_parent(paths) do
     verify_model!()
 
     result =
@@ -218,6 +224,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
 
     summary = %{
       status: "complete",
+      treatment_id: @treatment_id,
       scope: "one local mixed-type Optimize Anything retry-policy lifecycle",
       split_sizes: %{train: 8, selection: 6, untouched_test: 6},
       model: @model,
@@ -239,8 +246,6 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
     IO.puts(Jason.encode!(summary, pretty: true))
   rescue
     error ->
-      paths = paths!()
-
       Atomic.write!(Path.join(paths.output, "failure.json"), %{
         status: "stopped",
         error: Exception.format(:error, error, __STACKTRACE__)
@@ -416,8 +421,22 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
 
     %{
       imp: imp,
-      output: System.get_env("IMP_OA_OUTPUT", "/tmp/imp-local-oa-retry-policy") |> Path.expand()
+      output:
+        System.get_env(
+          "IMP_OA_OUTPUT",
+          "/Users/deepfates/.cache/imp/optimize-anything/#{@treatment_id}"
+        )
+        |> Path.expand()
     }
+  end
+
+  defp require_new_output!(path) do
+    case File.ls(path) do
+      {:error, :enoent} -> :ok
+      {:ok, []} -> :ok
+      {:ok, _entries} -> raise("IMP_OA_OUTPUT must be a new empty directory")
+      {:error, reason} -> raise("cannot inspect IMP_OA_OUTPUT: #{inspect(reason)}")
+    end
   end
 
   defp sha256(value),
