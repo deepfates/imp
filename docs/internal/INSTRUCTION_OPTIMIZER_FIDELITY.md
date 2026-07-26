@@ -85,6 +85,18 @@ grounded-demo count, and rollout ID in the MIPRO report. That is a deliberate
 BEAM RNG/replay difference; the proposal/demo evidence and search-space
 topology, rather than incidental integer identity, are the shared contract.
 
+For matched upstream comparisons, MIPROv2 also exposes an explicit
+`proposer_fidelity: :dspy_3_2_1` path. It is intentionally narrower than the
+default BEAM-native proposer: with program and few-shot awareness disabled and
+data/tip awareness enabled, it reproduces DSPy 3.2.1's three-call, 20-row
+dataset-summary pipeline, dynamic ChatAdapter signatures, five non-empty
+released tips plus the released no-tip choice, CPython MT19937 tip/rollout
+draws, one call per instruction candidate, marker parsing, and candidate-zero
+baseline overwrite. The mode rejects unsupported awareness combinations and
+structured-response substitution rather than silently claiming parity. Its
+selected mode is part of durable checkpoint compatibility, so a resumed study
+cannot drift between proposer algorithms.
+
 DSPy delegates this stage to Optuna's multivariate `TPESampler`; Imp uses a
 native joint categorical Parzen implementation with explicit immutable random
 state. The engines are expected to share the search-space, observation, and

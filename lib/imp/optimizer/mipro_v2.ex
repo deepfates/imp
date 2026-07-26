@@ -12,6 +12,11 @@ defmodule Imp.Optimizer.MIPROv2 do
   `:init_temperature` is the pinned DSPy proposal-temperature control.
   `:proposal_response_format` optionally binds each proposal to Imp's strict
   one-instruction JSON schema (`:off`, `:auto`, or `:required`).
+
+  `:proposer_fidelity` defaults to Imp's documented `:beam_native` grounded
+  proposer. Set it to `:dspy_3_2_1` for the narrow matched-comparison path with
+  `program_aware_proposer: false`, `fewshot_aware_proposer: false`, and data/tip
+  awareness enabled; unsupported combinations fail before any LM call.
   """
 
   alias Imp.Optimizer.{
@@ -24,6 +29,8 @@ defmodule Imp.Optimizer.MIPROv2 do
   }
 
   alias Imp.Optimizer.MIPROv2.{Checkpoint, Config}
+  alias Imp.Optimizer.MIPROv2.PythonRandom
+  alias Imp.Optimizer.MIPROv2.UpstreamProposer
   alias Imp.Optimizer.SearchPolicy.CategoricalTPE, as: CategoricalPolicy
 
   defstruct [
@@ -329,32 +336,72 @@ defmodule Imp.Optimizer.MIPROv2 do
         max_errors: optimizer.max_errors
       )
 
-    {instruction_pairs, proposal_metadata} =
+    dataset_summary =
+      if config.proposer_fidelity == :dspy_3_2_1 do
+        UpstreamProposer.summarize!(
+          prompt_lm,
+          config.trainset,
+          Imp.ProgramAccess.task_signature(program),
+          config.view_data_batch_size
+        )
+      end
+
+    proposal_rng = PythonRandom.new(config.seed)
+
+    {instruction_pairs, {proposal_metadata, _proposal_rng}} =
       predictors
       |> Enum.with_index()
-      |> Enum.map_reduce(%{}, fn {%{name: name, predictor: predictor}, predictor_index},
-                                 metadata ->
+      |> Enum.map_reduce({%{}, proposal_rng}, fn {%{name: name, predictor: predictor},
+                                                  predictor_index},
+                                                 {metadata, proposal_rng} ->
         demo_sets = Map.fetch!(demo_candidates, name)
 
-        {proposed, report} =
-          InstructionProposer.propose_with_report(predictor, config.trainset,
-            lm: prompt_lm,
-            count: config.num_instruct_candidates,
-            demo_sets: demo_sets,
-            preserve_slots: true,
-            program_context: program,
-            predictor_name: name,
-            predictor_index: predictor_index,
-            rollout_id_offset: predictor_index * config.num_instruct_candidates,
-            program_aware: config.program_aware_proposer,
-            data_aware: config.data_aware_proposer,
-            tip_aware: config.tip_aware_proposer,
-            fewshot_aware: config.fewshot_aware_proposer,
-            view_data_batch_size: config.view_data_batch_size,
-            temperature: optimizer.init_temperature,
-            proposal_response_format: optimizer.proposal_response_format,
-            seed: config.seed
-          )
+        {proposed, report, proposal_rng} =
+          if config.proposer_fidelity == :dspy_3_2_1 do
+            {proposed, report, proposal_rng} =
+              UpstreamProposer.propose_with_report_and_rng!(
+                prompt_lm,
+                predictor,
+                dataset_summary,
+                proposal_rng,
+                count: config.num_instruct_candidates,
+                temperature: optimizer.init_temperature,
+                seed: config.seed
+              )
+
+            report =
+              Map.merge(report, %{
+                dataset_summary_calls:
+                  if(predictor_index == 0, do: dataset_summary_call_count(config), else: 0),
+                total_setup_calls:
+                  config.num_instruct_candidates * length(predictors) +
+                    dataset_summary_call_count(config)
+              })
+
+            {proposed, report, proposal_rng}
+          else
+            {proposed, report} =
+              InstructionProposer.propose_with_report(predictor, config.trainset,
+                lm: prompt_lm,
+                count: config.num_instruct_candidates,
+                demo_sets: demo_sets,
+                preserve_slots: true,
+                program_context: program,
+                predictor_name: name,
+                predictor_index: predictor_index,
+                rollout_id_offset: predictor_index * config.num_instruct_candidates,
+                program_aware: config.program_aware_proposer,
+                data_aware: config.data_aware_proposer,
+                tip_aware: config.tip_aware_proposer,
+                fewshot_aware: config.fewshot_aware_proposer,
+                view_data_batch_size: config.view_data_batch_size,
+                temperature: optimizer.init_temperature,
+                proposal_response_format: optimizer.proposal_response_format,
+                seed: config.seed
+              )
+
+            {proposed, report, proposal_rng}
+          end
 
         original = predictor.signature.instructions
         pair = {name, replace_first(proposed, original, config.num_instruct_candidates)}
@@ -365,7 +412,7 @@ defmodule Imp.Optimizer.MIPROv2 do
             proposal_response_format: optimizer.proposal_response_format
           })
 
-        {pair, Map.put(metadata, name, report)}
+        {pair, {Map.put(metadata, name, report), proposal_rng}}
       end)
 
     instruction_candidates = Map.new(instruction_pairs)
@@ -743,6 +790,10 @@ defmodule Imp.Optimizer.MIPROv2 do
   defp bootstrap_demo_limit(%{zeroshot: true}), do: 3
   defp bootstrap_demo_limit(config), do: config.max_bootstrapped_demos
 
+  defp dataset_summary_call_count(config) do
+    min(10, ceil(length(config.trainset) / config.view_data_batch_size)) + 1
+  end
+
   defp config_metadata(config) do
     config
     |> Map.from_struct()
@@ -800,6 +851,12 @@ defmodule Imp.Optimizer.MIPROv2 do
           ArgumentError,
           "proposal_response_format must be :off, :auto, or :required"
         )
+
+    if optimizer.config.proposer_fidelity == :dspy_3_2_1 and
+         optimizer.proposal_response_format != :off do
+      raise ArgumentError,
+            ":dspy_3_2_1 proposer fidelity requires proposal_response_format: :off"
+    end
 
     unless is_integer(optimizer.max_concurrency) and optimizer.max_concurrency > 0,
       do: raise(ArgumentError, "max_concurrency must be a positive integer")

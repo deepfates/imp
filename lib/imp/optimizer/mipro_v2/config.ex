@@ -23,6 +23,7 @@ defmodule Imp.Optimizer.MIPROv2.Config do
             view_data_batch_size: 10,
             tip_aware_proposer: true,
             fewshot_aware_proposer: true,
+            proposer_fidelity: :beam_native,
             trainset: nil,
             valset: nil,
             zeroshot: nil,
@@ -46,7 +47,8 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     :data_aware_proposer,
     :view_data_batch_size,
     :tip_aware_proposer,
-    :fewshot_aware_proposer
+    :fewshot_aware_proposer,
+    :proposer_fidelity
   ]
 
   @doc false
@@ -235,6 +237,17 @@ defmodule Imp.Optimizer.MIPROv2.Config do
         ] do
       unless is_boolean(Map.fetch!(config, key)),
         do: raise(ArgumentError, "#{key} must be a boolean")
+    end
+
+    unless config.proposer_fidelity in [:beam_native, :dspy_3_2_1],
+      do: raise(ArgumentError, "proposer_fidelity must be :beam_native or :dspy_3_2_1")
+
+    if config.proposer_fidelity == :dspy_3_2_1 and
+         (config.program_aware_proposer or config.fewshot_aware_proposer or
+            not config.data_aware_proposer or not config.tip_aware_proposer) do
+      raise ArgumentError,
+            ":dspy_3_2_1 proposer fidelity currently requires program_aware_proposer: false, " <>
+              "fewshot_aware_proposer: false, data_aware_proposer: true, and tip_aware_proposer: true"
     end
 
     config
