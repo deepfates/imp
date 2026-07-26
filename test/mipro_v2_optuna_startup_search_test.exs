@@ -2,7 +2,8 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
   use ExUnit.Case, async: false
 
   alias Imp.Optimizer.MIPROv2
-  alias Imp.Optimizer.MIPROv2.{OperationalSafetyError, OptunaStartupPolicy}
+  alias Imp.OperationalSafetyError
+  alias Imp.Optimizer.MIPROv2.OptunaStartupPolicy
   alias Imp.Optimizer.{Report, SearchPolicy}
 
   @python "tmp/dspy-parity-venv/bin/python"

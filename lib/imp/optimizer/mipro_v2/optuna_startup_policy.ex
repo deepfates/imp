@@ -142,30 +142,3 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupPolicy do
   defp load_parameter!(value),
     do: raise(ArgumentError, "invalid Optuna startup parameter checkpoint: #{inspect(value)}")
 end
-
-defmodule Imp.Optimizer.MIPROv2.OperationalSafetyError do
-  @moduledoc """
-  Marks a fail-closed operational error during a MIPROv2 evaluation.
-
-  Task and adapter failures score zero in the pinned DSPy search mode. Budget,
-  route, cost, transport, and explicit cancellation guards inside a normalized
-  Imp program call should return this exception as their error reason. A guard
-  outside that boundary may raise it directly. MIPROv2 propagates either form
-  instead of turning a safety stop into a bad candidate score.
-  """
-
-  @kinds [:budget, :route, :cost, :transport, :cancellation]
-  defexception [:message, :kind, :reason]
-
-  def exception(opts) do
-    kind = Keyword.fetch!(opts, :kind)
-
-    unless kind in @kinds do
-      raise ArgumentError, "unsupported MIPROv2 operational safety kind: #{inspect(kind)}"
-    end
-
-    reason = Keyword.get(opts, :reason)
-    message = Keyword.get(opts, :message, "MIPROv2 operational #{kind} guard failed")
-    %__MODULE__{kind: kind, reason: reason, message: message}
-  end
-end

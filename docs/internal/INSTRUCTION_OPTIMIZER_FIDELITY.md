@@ -139,7 +139,7 @@ not general Optuna TPE parity.
 Pinned DSPy turns an evaluation exception into score zero and continues the
 study. The matched Imp mode does the same for ordinary task/adapter failures.
 Operational budget, route, cost, transport, or cancellation guards use
-`MIPROv2.OperationalSafetyError` and remain fail-closed instead of being
+`Imp.OperationalSafetyError` and remain fail-closed instead of being
 silently admitted as a poor candidate.
 
 DSPy's bootstrap utility hashes repeated calls and deterministically chooses an

@@ -36,7 +36,7 @@ defmodule Imp.Optimizer.MIPROv2 do
   }
 
   alias Imp.Optimizer.MIPROv2.{Checkpoint, Config}
-  alias Imp.Optimizer.MIPROv2.OperationalSafetyError
+  alias Imp.OperationalSafetyError
   alias Imp.Optimizer.MIPROv2.OptunaStartupPolicy
   alias Imp.Optimizer.MIPROv2.PythonRandom
   alias Imp.Optimizer.MIPROv2.UpstreamBootstrap
