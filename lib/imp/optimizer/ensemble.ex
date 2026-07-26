@@ -14,7 +14,7 @@ defmodule Imp.Optimizer.Ensemble.Program do
 
           {selected, %{mode: :ordered, seed: program.ensemble.seed}}
 
-        program.ensemble.size ->
+        positive_size?(program.ensemble.size) ->
           rng = selection_rng(program.ensemble.seed, inputs)
           {shuffled, _rng} = Imp.Optimizer.Sampling.shuffle(program.programs, rng)
 
@@ -39,6 +39,11 @@ defmodule Imp.Optimizer.Ensemble.Program do
       {:ok, Imp.Prediction.new(%{outputs: outputs}, metadata: %{ensemble_selection: selection})}
     end
   end
+
+  # DSPy selects a subset only when `size` is truthy. In that public contract,
+  # both `None` and `0` mean "use every program". Elixir treats zero as truthy,
+  # so an explicit numeric predicate is required to preserve the behavior.
+  defp positive_size?(size), do: is_integer(size) and size > 0
 
   defp selection_rng(seed, inputs) do
     derived_seed =
@@ -100,7 +105,9 @@ defmodule Imp.Optimizer.Ensemble do
   @moduledoc """
   Compile multiple programs into an ensemble program.
 
-  Each child program is called independently. A failed child contributes an
+  Each child program is called independently. `size: nil` and `size: 0` both
+  execute every child, matching DSPy's public subset-selection behavior. A
+  positive `:size` selects that many children. A failed child contributes an
   `{:error, reason}` entry to the ensemble outputs instead of crashing the whole
   ensemble. When a `:reduce_fn` is supplied, it receives only successful
   predictions; reducer exceptions or invalid reducer returns become structured
@@ -147,11 +154,15 @@ defmodule Imp.Optimizer.Ensemble do
     end
   end
 
-  def compile(%__MODULE__{} = ensemble, programs),
-    do: %Imp.Optimizer.Ensemble.Program{
-      programs: validate_programs!(programs),
+  def compile(%__MODULE__{} = ensemble, programs) do
+    programs = validate_programs!(programs)
+    validate_size!(ensemble.size, programs)
+
+    %Imp.Optimizer.Ensemble.Program{
+      programs: programs,
       ensemble: ensemble
     }
+  end
 
   defp validate_programs!(programs) do
     if Enumerable.impl_for(programs) do
@@ -161,6 +172,14 @@ defmodule Imp.Optimizer.Ensemble do
             "Imp.Optimizer.Ensemble.compile/2 expects an enumerable of programs; got: #{inspect(programs)}"
     end
   end
+
+  defp validate_size!(size, programs)
+       when is_integer(size) and size > length(programs) do
+    raise ArgumentError,
+          "Imp.Optimizer.Ensemble.compile/2 cannot sample :size #{size} from #{length(programs)} programs"
+  end
+
+  defp validate_size!(_size, _programs), do: :ok
 
   def validate_reduce_fn(nil), do: {:ok, nil}
   def validate_reduce_fn(reduce_fn) when is_function(reduce_fn, 1), do: {:ok, reduce_fn}

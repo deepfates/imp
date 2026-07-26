@@ -79,6 +79,29 @@ defmodule EnsembleReplayTest do
     assert Imp.load(state).ensemble.seed == 0
   end
 
+  test "size zero executes every program like pinned DSPy 3.2.1" do
+    programs = Enum.map([:left, :middle, :right], &%TaggedProgram{id: &1})
+
+    ensemble =
+      Imp.Optimizer.Ensemble.new(size: 0, seed: 42)
+      |> Imp.Optimizer.Ensemble.compile(programs)
+
+    assert {:ok, prediction} = Imp.call(ensemble, %{question: "all programs"})
+    assert prediction.metadata.ensemble_selection == %{mode: :all, seed: 42}
+
+    assert Enum.map(Imp.get(prediction, :outputs), fn {:ok, child} -> Imp.get(child, :id) end) ==
+             [:left, :middle, :right]
+  end
+
+  test "oversized subsets fail before any child can run" do
+    assert_raise ArgumentError,
+                 ~r/cannot sample :size 2 from 1 programs/,
+                 fn ->
+                   Imp.Optimizer.Ensemble.new(size: 2)
+                   |> Imp.Optimizer.Ensemble.compile([%TaggedProgram{id: :only}])
+                 end
+  end
+
   defp selected_ids(ensemble, inputs) do
     {:ok, prediction} = Imp.call(ensemble, inputs)
 
