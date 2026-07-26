@@ -75,7 +75,7 @@ defmodule LocalSIMBABanking77.Runner do
           bsize: 4,
           num_candidates: 2,
           max_steps: 1,
-          max_demos: 0,
+          max_demos: 4,
           prompt_lm: observed(ollama_lm(), observer, :reflection),
           max_concurrency: 1,
           timeout: 120_000,
@@ -266,7 +266,7 @@ defmodule LocalSIMBABanking77.Runner do
       Enum.count(task_calls, fn call ->
         Enum.any?(report.metadata.final_candidates, fn candidate ->
           candidate.finalist_index > 0 and
-            candidate_instructions_rendered?(candidate, call.messages, baseline_instruction)
+            candidate_parameters_rendered?(candidate, call.messages, baseline_instruction)
         end)
       end)
 
@@ -294,11 +294,17 @@ defmodule LocalSIMBABanking77.Runner do
     }
   end
 
-  defp candidate_instructions_rendered?(candidate, messages, baseline_instruction) do
-    case Enum.find(candidate.parameters, &(&1.name == :main)) do
+  defp candidate_parameters_rendered?(candidate, messages, baseline_instruction) do
+    parameter = Enum.find(candidate.parameters, &(&1.name == :main))
+
+    case parameter do
       %{instruction: instruction}
       when is_binary(instruction) and instruction != baseline_instruction ->
         Imp.Adapter.Instructions.rendered_objective?(instruction, messages)
+
+      %{demos: [_ | _]} ->
+        length(messages) >= 4 and
+          Enum.any?(messages, &(Map.get(&1, :role) == :assistant))
 
       _ ->
         false

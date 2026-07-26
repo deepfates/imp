@@ -18,6 +18,7 @@ defmodule Imp.LocalSIMBABanking77ExampleTest do
 
     assert source =~ "stage.rendered_mutation_calls > 0"
     assert source =~ "stage.mutated_candidates > 0"
+    assert source =~ "max_demos: 4"
     assert source =~ "cache: false"
     assert source =~ "stage.logical_calls == 40 and stage.transport_attempts == 40"
   end

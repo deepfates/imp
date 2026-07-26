@@ -8,6 +8,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       module: Imp.LM.Static,
       opts: [
         handler: fn messages, opts ->
+          send(parent, {:simba_task, messages})
           prompt = Enum.map_join(messages, "\n", & &1.content)
           rollout = Keyword.get(opts, :rollout_id, -1)
 
@@ -78,6 +79,24 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
     assert reflection_prompt =~ "Module main"
     assert reflection_prompt =~ "Input Fields"
     assert reflection_prompt =~ "better_program_trajectory"
+
+    task_messages =
+      Stream.repeatedly(fn ->
+        receive do
+          {:simba_task, messages} -> messages
+        after
+          0 -> :done
+        end
+      end)
+      |> Enum.take_while(&(&1 != :done))
+
+    if Enum.any?(report.metadata.final_candidates, fn finalist ->
+         Enum.any?(finalist.parameters, &(&1.demos != []))
+       end) do
+      assert Enum.any?(task_messages, fn messages ->
+               length(messages) >= 4 and Enum.any?(messages, &(&1.role == :assistant))
+             end)
+    end
   end
 
   test "does not register skipped identity programs as optimizer candidates" do
