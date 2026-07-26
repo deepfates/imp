@@ -198,6 +198,22 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert verify_offset < install_offset
   end
 
+  test "the live wrapper canary is independently capped at one call per production role" do
+    runner = File.read!("examples/matched_instruction_optimizers_trec/run_imp.exs")
+    canary = File.read!("examples/matched_instruction_optimizers_trec/run_wrapper_canary.exs")
+
+    assert runner =~ "System.get_env(\"IMP_MATCHED_TREC_LOAD_ONLY\") == \"1\""
+    assert canary =~ ~s(@arm "wrapper_canary_014a7fc")
+    assert canary =~ ~s("task_logical" => 1)
+    assert canary =~ ~s("optimizer_logical" => 1)
+    assert canary =~ ~s("total_logical" => 2)
+    assert canary =~ ~s("transports" => 2)
+    assert canary =~ "ObservedLM"
+    assert runner =~ "ResponseEvidence.validate_contract"
+    assert canary =~ "scientific_treatment: false"
+    assert {:ok, _ast} = Code.string_to_quoted(canary)
+  end
+
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do
     manifest = Contract.load!(@manifest)
 

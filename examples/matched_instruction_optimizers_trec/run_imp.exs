@@ -1177,4 +1177,6 @@ defmodule MatchedTRECImp.Runner do
   end
 end
 
-MatchedTRECImp.Runner.run()
+unless System.get_env("IMP_MATCHED_TREC_LOAD_ONLY") == "1" do
+  MatchedTRECImp.Runner.run()
+end
