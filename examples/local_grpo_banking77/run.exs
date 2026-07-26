@@ -48,6 +48,11 @@ defmodule LocalGRPOBanking77.Runner do
 
   defp parent do
     paths = paths!()
+    require_new_output!(paths.output)
+    run_parent(paths)
+  end
+
+  defp run_parent(paths) do
     rows = preflight!(paths)
     trainer = trainer(paths, {:local_grpo_banking77, @seed})
     portable = program(Imp.req_llm("openai:portable-base"))
@@ -144,6 +149,7 @@ defmodule LocalGRPOBanking77.Runner do
 
       summary = %{
         status: "complete",
+        treatment_id: @treatment_id,
         scope: "one task/model #{train_steps()}-step ordinary model-generated local GRPO result",
         model: @model,
         adapter: "Elixir.Imp.Adapter.JSON",
@@ -200,6 +206,9 @@ defmodule LocalGRPOBanking77.Runner do
 
     fresh_test = read_json!(fresh_path)
 
+    unless fresh_test["selected_arm"] == selection["selected_arm"],
+      do: raise("fresh process reproduced a different selected arm")
+
     unless fresh_test["reproduction_sha256"] == selected_test["reproduction_sha256"],
       do: raise("fresh selected predictions/errors differ")
 
@@ -218,8 +227,6 @@ defmodule LocalGRPOBanking77.Runner do
     IO.puts(Jason.encode!(summary, pretty: true))
   rescue
     error ->
-      paths = paths!()
-
       Atomic.write!(Path.join(paths.output, "failure.json"), %{
         status: "stopped",
         error: Exception.format(:error, error, __STACKTRACE__)
@@ -235,7 +242,7 @@ defmodule LocalGRPOBanking77.Runner do
     portable = Imp.load!(paths.program)
     trainer = trainer(paths, {:local_grpo_banking77_fresh, @seed})
     selection = read_json!(Path.join(paths.output, "04-selection.json"))
-    selected_arm = System.get_env("IMP_GRPO_FRESH_ARM", selection["selected_arm"])
+    selected_arm = selection["selected_arm"]
 
     {:ok, deployment, selected} =
       case selected_arm do
@@ -303,6 +310,8 @@ defmodule LocalGRPOBanking77.Runner do
       status: "complete",
       treatment_id: @treatment_id,
       model: @model,
+      runner_sha256: sha256_file(__ENV__.file),
+      contract_sha256: sha256_file(paths.contract),
       data_sha256: @data_sha256,
       train_sha256: @train_sha256,
       selection_sha256: @selection_sha256,
@@ -507,6 +516,15 @@ defmodule LocalGRPOBanking77.Runner do
   end
 
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()
+
+  defp require_new_output!(path) do
+    case File.ls(path) do
+      {:error, :enoent} -> :ok
+      {:ok, []} -> :ok
+      {:ok, _entries} -> raise("IMP_GRPO_OUTPUT must be a new empty directory")
+      {:error, reason} -> raise("cannot inspect IMP_GRPO_OUTPUT: #{inspect(reason)}")
+    end
+  end
 
   defp train_steps, do: positive_env!("IMP_GRPO_TRAIN_STEPS", 1)
   defp train_width, do: positive_env!("IMP_GRPO_TRAIN_WIDTH", 1)

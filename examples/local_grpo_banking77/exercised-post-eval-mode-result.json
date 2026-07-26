@@ -1,0 +1,181 @@
+{
+  "adapter": "Elixir.Imp.Adapter.JSON",
+  "advantages": [
+    0.8658754229545593,
+    -0.8658754229545593,
+    0.8658754229545593,
+    -0.8658754229545593,
+    -1.4997000694274902,
+    0.4999000132083893,
+    0.4999000132083893,
+    0.4999000132083893,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "artifact_path": "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-post-eval-mode-v1/sessions/f8f127055b2f612e473ec9ed3b24489488622b9754ff17624bb66610a1ece2b1/artifacts/step-1",
+  "artifact_sha256": "sha256:e496f1d41a6f1ac91b590b79ae057251cbb643d17e87d286aea40f77ad80ccf2",
+  "base_selection": {
+    "accuracy": 0.875,
+    "errors": 0,
+    "macro_f1": 0.8666666666666667
+  },
+  "base_test": {
+    "accuracy": 0.725,
+    "errors": 0,
+    "macro_f1": 0.7128851540616246
+  },
+  "evaluation_generation_mode": "greedy",
+  "fresh_artifact_path": "/Users/deepfates/.cache/imp/trl/feasibility-v1/model",
+  "fresh_artifact_sha256": "sha256:f580fafdd95d5cb540a3756c51b3462d380a25148baecf8c9bef266726264aa1",
+  "fresh_byte_identical": true,
+  "fresh_selected_arm": "base",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf67be50417f59c2c2f167def9a775",
+  "rewards": [
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "scope": "one task/model 2-step ordinary model-generated local GRPO result",
+  "selected_arm": "base",
+  "selected_validation_score": 0.875,
+  "selected_validation_step": 1,
+  "status": "complete",
+  "trainable_tensors_changed": true,
+  "trained_selection": {
+    "accuracy": 0.875,
+    "errors": 0,
+    "macro_f1": 0.8666666666666667
+  },
+  "trained_test": {
+    "accuracy": 0.725,
+    "errors": 0,
+    "macro_f1": 0.7128851540616246
+  },
+  "trainer_config": {
+    "beta": 0.0,
+    "learning_rate": 1.0e-6,
+    "loss_type": "dapo",
+    "scale_rewards": "group"
+  },
+  "training_generation_mode": "sample",
+  "training_loss": 3.3866276449856514e-10,
+  "training_steps": [
+    {
+      "advantages": [
+        0.8658754229545593,
+        -0.8658754229545593,
+        -0.8658754229545593,
+        0.8658754229545593,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.8658754229545593,
+        0.8658754229545593,
+        0.8658754229545593,
+        -0.8658754229545593,
+        -0.8658754229545593,
+        0.8658754229545593,
+        0.8658754229545593,
+        -0.8658754229545593
+      ],
+      "rewards": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0
+      ],
+      "step": 1,
+      "trainable_tensors_changed": true,
+      "training_loss": 0.0
+    },
+    {
+      "advantages": [
+        0.8658754229545593,
+        -0.8658754229545593,
+        0.8658754229545593,
+        -0.8658754229545593,
+        -1.4997000694274902,
+        0.4999000132083893,
+        0.4999000132083893,
+        0.4999000132083893,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rewards": [
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "step": 2,
+      "trainable_tensors_changed": true,
+      "training_loss": 3.3866276449856514e-10
+    }
+  ],
+  "validation_history": [
+    {
+      "artifact_sha256": "sha256:e496f1d41a6f1ac91b590b79ae057251cbb643d17e87d286aea40f77ad80ccf2",
+      "checkpoint_sha256": "sha256:0407819442104bff4897ed707bfdf2b6c6e2f4063e5ad197404c5b85e6f3d246",
+      "path": "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-post-eval-mode-v1/sessions/f8f127055b2f612e473ec9ed3b24489488622b9754ff17624bb66610a1ece2b1/artifacts/step-1",
+      "score": 0.875,
+      "step": 1
+    },
+    {
+      "artifact_sha256": "sha256:93cb4fbea682c83af5ca905a788669fa5b1f5b16260976ec663607fbb31c7130",
+      "checkpoint_sha256": "sha256:8a420fd8181c3a788bffe02572cddbb4d450963e704fc9fdf926b792cd6961d2",
+      "path": "/Users/deepfates/.cache/imp/trl/model-generated-banking77-json-post-eval-mode-v1/sessions/f8f127055b2f612e473ec9ed3b24489488622b9754ff17624bb66610a1ece2b1/artifacts/step-2",
+      "score": 0.875,
+      "step": 2
+    }
+  ]
+}

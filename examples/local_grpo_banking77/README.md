@@ -123,3 +123,20 @@ same inference-mode policy. The prior artifact remains immutable. This new run
 must still be read as one task/model result: even a positive held-out outcome
 would not establish general GRPO effectiveness, mmGRPO parity, production
 reliability, or BEAM superiority.
+
+The immutable result is `exercised-post-eval-mode-result.json` (SHA-256
+`7a80fb5ddeab50df8011f151ac2bd2684fe8e570da4d98b0293f3fc1b91b2b98`).
+Both steps produced non-uniform semantic rewards and advantages and changed
+the LoRA tensors. Step one and step two each scored `0.875` on selection, so
+earliest-on-tie retained step one; the trained arm then tied base on selection
+and untouched test (`0.725` accuracy, `0.71289` macro-F1, zero parse errors),
+so the outer rule retained base. Fresh OS execution reproduced the selected
+base outputs byte-for-byte. The exact run used source commit `b93ad6d`, runner
+SHA-256 `a358c0cdcc65f09405bb9fb5edab46a862b5baf0a94791be530c35a55651107c`,
+and two-step contract SHA-256
+`b09fa6c4acefa26ccaa9a4bd045dca853c9e9f572b0801bccd92cd3946245fcf`.
+This is a valid neutral held-out result, not useful learned behavior.
+
+New executions fail before preflight if their output directory is non-empty,
+bind the exact runner and contract digests, and derive the fresh-process arm
+only from the persisted selection stage.
