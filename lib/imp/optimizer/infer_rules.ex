@@ -8,8 +8,9 @@ defmodule Imp.Optimizer.InferRules do
   `BootstrapFewShot`, formats each predictor's observed input/output examples,
   asks a fresh rule-induction program for actionable rules, appends those rules
   to the predictor's instructions, and evaluates each candidate. Imp retains
-  the bootstrapped baseline as an additional safety candidate so rule induction
-  cannot silently regress the supplied program.
+  both the supplied source program and the bootstrapped baseline as safety
+  candidates. The source is evaluated first, so neither bootstrapping nor rule
+  induction can silently regress it on the selection set.
 
   Candidate programs and signatures remain immutable and isolated, so a later
   proposal cannot rewrite an already selected candidate through shared Python
@@ -146,7 +147,11 @@ defmodule Imp.Optimizer.InferRules do
     evaluator = evaluator(devset, optimizer, evaluation_max_errors)
 
     evaluated =
-      [%{program: baseline, index: :baseline, rules: %{}, baseline: true} | candidates]
+      [
+        %{program: program, index: :source, rules: %{}, source: true, baseline: false},
+        %{program: baseline, index: :baseline, rules: %{}, source: false, baseline: true}
+        | candidates
+      ]
       |> Enum.map(&evaluate_candidate(evaluator, &1))
 
     {best, best_score} = select_best(evaluated, baseline)
@@ -165,7 +170,7 @@ defmodule Imp.Optimizer.InferRules do
 
     report_candidates =
       Enum.map(evaluated, fn row ->
-        Map.take(row, [:index, :rules, :baseline, :score, :status, :error, :errors])
+        Map.take(row, [:index, :rules, :source, :baseline, :score, :status, :error, :errors])
       end)
 
     report =
@@ -178,6 +183,7 @@ defmodule Imp.Optimizer.InferRules do
         metadata: %{
           implementation: :native_rule_induction,
           upstream: "DSPy 3.2.1 InferRules",
+          source_protected: true,
           baseline_protected: true,
           bootstrap: report_summary(bootstrap_report),
           explicit_candidates: optimizer.candidates != [],

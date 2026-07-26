@@ -473,6 +473,54 @@ defmodule OptimizerReportTest do
     assert Enum.all?(prompts, &(&1 =~ "answer: Paris"))
   end
 
+  test "InferRules selection protects the supplied program when bootstrapping regresses it" do
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          if Enum.any?(messages, &(&1.role == :assistant)),
+            do: %{answer: "wrong"},
+            else: %{answer: "right"}
+        end
+      )
+
+    rule_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{reasoning: "controlled", natural_language_rules: "Keep the answer concise."}
+        end
+      )
+
+    train = [Imp.example(question: "train", answer: "right") |> Imp.with_inputs(:question)]
+    dev = [Imp.example(question: "dev", answer: "right") |> Imp.with_inputs(:question)]
+    source = Imp.predict("question -> answer", lm: task_lm)
+
+    compiled =
+      Imp.Optimizer.InferRules.new(Imp.Metrics.exact_match(:answer),
+        rule_lm: rule_lm,
+        num_candidates: 1,
+        num_rules: 1,
+        max_bootstrapped_demos: 1,
+        max_labeled_demos: 0
+      )
+      |> Imp.Optimizer.InferRules.compile(source, train, dev)
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+
+    assert report.best_score == 1.0
+    assert report.metadata.source_protected
+    assert report.metadata.baseline_protected
+    assert report.candidate_count == 3
+
+    assert [%{index: :source, score: 1.0}, baseline, rule] = report.candidates
+    assert baseline.index == :baseline
+    assert_in_delta baseline.score, 0.0, 1.0e-12
+    assert_in_delta rule.score, 0.0, 1.0e-12
+
+    assert compiled.demos == []
+    assert {:ok, prediction} = Imp.call(compiled, %{question: "later"})
+    assert Imp.get(prediction, :answer) == "right"
+  end
+
   test "InferRules applies max_errors to public-facade candidate evaluation" do
     failing_lm =
       Imp.LM.Static.new(handler: fn _messages, _opts -> raise "candidate task failure" end)

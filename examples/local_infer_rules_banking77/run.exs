@@ -61,7 +61,7 @@ defmodule LocalInferRulesBanking77.Runner do
   @data_sha256 "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18"
   @rule_model "llama3.2:3b"
   @rule_digest "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
-  @run_id "local-infer-rules-banking77-v1"
+  @run_id "local-infer-rules-banking77-v2-source-protected"
 
   def run, do: if(System.get_env("IMP_INFER_FRESH") == "1", do: fresh(), else: parent())
 
@@ -289,7 +289,7 @@ defmodule LocalInferRulesBanking77.Runner do
   end
 
   defp require_optimization!(stage) do
-    unless stage.candidate_count == 2 and stage.proposal_calls == 1 and stage.rule_calls == 1 and
+    unless stage.candidate_count == 3 and stage.proposal_calls == 1 and stage.rule_calls == 1 and
              stage.proposal_attempts == 1 and stage.transport_attempts == stage.task_calls + 1 and
              stage.induced_rule_candidates == 1,
            do: raise("InferRules did not complete one real rule candidate: #{inspect(stage)}")

@@ -1,0 +1,46 @@
+{
+  "status": "complete_with_falsified_source_protection",
+  "scope": "one local InferRules Banking77 lifecycle before source-program selection protection",
+  "source_commits": {
+    "runner": "80912e7",
+    "fresh_demo_decode": "64ecdc7"
+  },
+  "split_sizes": {"train": 16, "selection": 8, "untouched_test": 40},
+  "task_artifact": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+  "rule_model": {
+    "id": "llama3.2:3b",
+    "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "optimization": {
+    "proposal_calls": 1,
+    "proposal_attempts": 1,
+    "rule_transports": 1,
+    "candidate_count": 2,
+    "induced_rule_candidates": 1,
+    "bootstrapped_baseline_score": 0.25,
+    "rule_candidate_score": 0.25,
+    "selected": "bootstrapped_baseline"
+  },
+  "selection": {
+    "source": {"accuracy": 0.625, "macro_f1": 0.5333333333333333, "errors": 0},
+    "compiled": {"accuracy": 0.25, "macro_f1": 0.1, "errors": 0}
+  },
+  "untouched_test": {
+    "source": {"accuracy": 0.475, "macro_f1": 0.33333333333333337, "errors": 0},
+    "compiled": {"accuracy": 0.25, "macro_f1": 0.1, "errors": 0}
+  },
+  "fresh_process": {
+    "byte_identical": true,
+    "logical_calls": 40,
+    "transport_attempts": 40,
+    "artifact_identity_matched": true
+  },
+  "artifact_sha256": {
+    "optimization_stage": "de46ee35a9e7eac4ce246e108e762971563b269738feadc99a91b3f35b52d533",
+    "compiled_test_stage": "218c9bd428e234a3136d04b5509862ff94a849881b25f206def5f02aa9899cd3",
+    "fresh_test_stage": "5f05956ad92de76752be51c8b151a09ba8f08ea59c5bd7b2ca034596f577bf59",
+    "selected_program": "d1c201b49ffbcf9d50081443ec1883548db24d3cff57db593f49514bee3686ad"
+  },
+  "falsified_behavior": "InferRules protected only its bootstrapped baseline. BootstrapFewShot itself regressed the supplied program, so the compiled result silently regressed validation and untouched behavior despite the documented source-safety claim.",
+  "claim_boundary": "This proves one natural rule proposal/evaluation and fresh-process lifecycle while falsifying pre-fix source protection. It is not InferRules lift, whole-loop equivalence, general effectiveness, production reliability, or BEAM superiority."
+}
