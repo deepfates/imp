@@ -30,14 +30,20 @@ defmodule Imp.Optimizer.GEPA.InstructionProposal do
   @instruction_keys ["instruction", :instruction, "new_instruction", :new_instruction]
 
   @doc false
-  def messages(current_instruction, reflective_dataset, global_feedback \\ nil)
+  def messages(
+        current_instruction,
+        reflective_dataset,
+        global_feedback \\ nil,
+        mode \\ :beam_native
+      )
       when is_binary(current_instruction) and is_list(reflective_dataset) do
     reflective_dataset = append_global_feedback(reflective_dataset, global_feedback)
 
     prompt =
       @prompt_template
       |> String.replace("<curr_param>", current_instruction)
-      |> String.replace("<side_info>", format_samples(reflective_dataset))
+      |> String.replace("<side_info>", format_samples(reflective_dataset, mode))
+      |> maybe_trim_upstream_template(mode)
 
     [%{role: :user, content: prompt}]
   end
@@ -94,21 +100,32 @@ defmodule Imp.Optimizer.GEPA.InstructionProposal do
 
   defp append_global_feedback(dataset, _feedback), do: dataset
 
-  defp format_samples(samples) do
+  defp format_samples(samples, mode) do
     samples
     |> Enum.with_index(1)
     |> Enum.map_join("\n\n", fn {sample, index} ->
-      "# Example #{index}\n" <> render_sample(sample)
+      "# Example #{index}\n" <> render_sample(sample, mode)
     end)
   end
 
-  defp render_sample(sample) when is_map(sample) do
+  defp render_sample(sample, :gepa_v0_1_4) when is_map(sample) do
+    ["Inputs", "Generated Outputs", "Feedback"]
+    |> Enum.filter(&Map.has_key?(sample, &1))
+    |> Enum.map_join("", fn key ->
+      "## #{key}\n" <> render_value(Map.fetch!(sample, key), 3)
+    end)
+  end
+
+  defp render_sample(sample, _mode) when is_map(sample) do
     Enum.map_join(sample, "", fn {key, value} ->
       "## #{key}\n" <> render_value(value, 3)
     end)
   end
 
-  defp render_sample(sample), do: "## Value\n" <> render_value(sample, 3)
+  defp render_sample(sample, _mode), do: "## Value\n" <> render_value(sample, 3)
+
+  defp maybe_trim_upstream_template(prompt, :gepa_v0_1_4), do: String.trim_trailing(prompt, "\n")
+  defp maybe_trim_upstream_template(prompt, _mode), do: prompt
 
   defp render_value(value, level) when is_map(value) do
     if map_size(value) == 0 do

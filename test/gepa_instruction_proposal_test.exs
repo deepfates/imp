@@ -3,6 +3,20 @@ defmodule Imp.Optimizer.GEPA.InstructionProposalTest do
 
   alias Imp.Optimizer.GEPA.InstructionProposal
 
+  test "optimizer exposes the pinned record mode without accepting global feedback drift" do
+    metric = fn _example, _prediction -> 1.0 end
+
+    optimizer = Imp.Optimizer.GEPA.new(metric, reflection_record_mode: :gepa_v0_1_4)
+    assert optimizer.reflection_record_mode == :gepa_v0_1_4
+
+    assert_raise ArgumentError, ~r/non-upstream global reflection record/, fn ->
+      Imp.Optimizer.GEPA.new(metric,
+        reflection_record_mode: :gepa_v0_1_4,
+        feedback_fn: fn _rows -> "global" end
+      )
+    end
+  end
+
   test "renders current instructions and reflective records in the pinned GEPA prompt shape" do
     [%{role: :user, content: prompt}] =
       InstructionProposal.messages(
@@ -40,6 +54,54 @@ defmodule Imp.Optimizer.GEPA.InstructionProposalTest do
       assert InstructionProposal.extract_instruction(response) == expected
       assert InstructionProposal.normalize(response) == {:ok, expected}
     end
+  end
+
+  test "pinned v0.1.4 mode renders exact ordered prompt bytes" do
+    record = %{
+      "Feedback" => "Use the expected opaque route.",
+      "Generated Outputs" => %{"route" => "K47"},
+      "Inputs" => %{"text" => "What kind of thing is a narwhal?"}
+    }
+
+    [%{role: :user, content: actual}] =
+      InstructionProposal.messages("Choose one route.", [record], nil, :gepa_v0_1_4)
+
+    expected =
+      """
+      I provided an assistant with the following instructions to perform a task for me:
+      ```
+      Choose one route.
+      ```
+
+      The following are examples of different task inputs provided to the assistant along with the assistant's response for each of them, and some feedback on how the assistant's response could be better:
+      ```
+      # Example 1
+      ## Inputs
+      ### text
+      What kind of thing is a narwhal?
+
+      ## Generated Outputs
+      ### route
+      K47
+
+      ## Feedback
+      Use the expected opaque route.
+
+
+      ```
+
+      Your task is to write a new instruction for the assistant.
+
+      Read the inputs carefully and identify the input format and infer detailed task description about the task I wish to solve with the assistant.
+
+      Read all the assistant responses and the corresponding feedback. Identify all niche and domain specific factual information about the task and include it in the instruction, as a lot of it may not be available to the assistant in the future. The assistant may have utilized a generalizable strategy to solve the task, if so, include that in the instruction as well.
+
+      Provide the new instructions within ``` blocks.
+      """
+      |> String.trim_trailing("\n")
+
+    assert actual == expected
+    refute String.ends_with?(actual, "\n")
   end
 
   test "normalizes typed and textual JSON adapter responses without installing the envelope" do

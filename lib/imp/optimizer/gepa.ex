@@ -22,6 +22,13 @@ defmodule Imp.Optimizer.GEPA do
   These callbacks shape reflective minibatches and are part of optimization;
   invalid names, invalid output, and callback failures stop the run.
 
+  `:reflection_record_mode` defaults to `:beam_native`, retaining scores and
+  traces alongside feedback. `:gepa_v0_1_4` emits the pinned DSPy adapter's
+  narrower `Inputs`/`Generated Outputs`/`Feedback` records and exact reflection
+  prompt bytes. The pinned mode rejects the separate global `:feedback_fn`
+  extension; use metric/component feedback so every reflection receives the
+  same information as upstream.
+
   `:proposal_concurrency` enables first-party GEPA speculative parallel
   proposals. Contexts are sampled sequentially from one archive and RNG
   snapshot, expensive proposal phases run concurrently, and all effects are
@@ -63,6 +70,7 @@ defmodule Imp.Optimizer.GEPA do
     :reflection_strategy,
     callbacks: [],
     component_feedback: %{},
+    reflection_record_mode: :beam_native,
     feedback_fn: nil,
     candidate_selection_strategy: :pareto,
     module_selector: :round_robin,
@@ -94,6 +102,10 @@ defmodule Imp.Optimizer.GEPA do
   @option_schema [
     callbacks: [type: {:custom, Callback, :validate, []}, default: []],
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
+    reflection_record_mode: [
+      type: {:in, [:beam_native, :gepa_v0_1_4]},
+      default: :beam_native
+    ],
     feedback_fn: [type: {:custom, __MODULE__, :validate_feedback_fn, []}, default: nil],
     candidate_selection_strategy: [type: :any, default: :pareto],
     module_selector: [
@@ -165,10 +177,16 @@ defmodule Imp.Optimizer.GEPA do
             ":max_reflection_cost requires a reflection strategy or LM with observable total_cost"
     end
 
+    if opts[:reflection_record_mode] == :gepa_v0_1_4 and is_function(opts[:feedback_fn], 1) do
+      raise ArgumentError,
+            ":feedback_fn adds a non-upstream global reflection record; use metric or component feedback with :reflection_record_mode :gepa_v0_1_4"
+    end
+
     %__MODULE__{
       metric: metric,
       callbacks: opts[:callbacks],
       component_feedback: opts[:component_feedback],
+      reflection_record_mode: opts[:reflection_record_mode],
       feedback_fn: opts[:feedback_fn],
       candidate_selection_strategy:
         validate_candidate_selection_strategy!(opts[:candidate_selection_strategy]),
@@ -242,7 +260,8 @@ defmodule Imp.Optimizer.GEPA do
       ProgramAdapter.new(program, optimizer.metric,
         max_concurrency: optimizer.max_concurrency,
         timeout: optimizer.timeout,
-        component_feedback: optimizer.component_feedback
+        component_feedback: optimizer.component_feedback,
+        reflection_record_mode: optimizer.reflection_record_mode
       )
 
     engine_opts =
@@ -284,7 +303,12 @@ defmodule Imp.Optimizer.GEPA do
         seed_candidate,
         trainset,
         devset,
-        proposer(optimizer.reflection_lm, feedback, reflection_feedback),
+        proposer(
+          optimizer.reflection_lm,
+          feedback,
+          reflection_feedback,
+          optimizer.reflection_record_mode
+        ),
         engine_opts
       )
 
@@ -303,6 +327,7 @@ defmodule Imp.Optimizer.GEPA do
         metadata: %{
           feedback: feedback,
           component_feedback: optimizer.component_feedback |> Map.keys() |> Enum.sort(),
+          reflection_record_mode: optimizer.reflection_record_mode,
           candidate_selection_strategy: policy_name(optimizer.candidate_selection_strategy),
           generations: optimizer.generations,
           minibatch_size: state.combee_policy.effective_batch_size,
@@ -370,7 +395,7 @@ defmodule Imp.Optimizer.GEPA do
     {compiled, report, artifact}
   end
 
-  defp proposer(reflection_lm, fallback_feedback, reflection_feedback) do
+  defp proposer(reflection_lm, fallback_feedback, reflection_feedback, reflection_record_mode) do
     fn candidate, component, records, generation, aggregation ->
       case reflection_lm do
         nil ->
@@ -391,7 +416,8 @@ defmodule Imp.Optimizer.GEPA do
             records,
             generation,
             reflection_feedback,
-            aggregation
+            aggregation,
+            reflection_record_mode
           )
       end
     end
@@ -428,10 +454,16 @@ defmodule Imp.Optimizer.GEPA do
          records,
          _generation,
          feedback,
-         _aggregation
+         _aggregation,
+         reflection_record_mode
        ) do
     messages =
-      InstructionProposal.messages(Map.fetch!(candidate, component), records, feedback)
+      InstructionProposal.messages(
+        Map.fetch!(candidate, component),
+        records,
+        feedback,
+        reflection_record_mode
+      )
 
     case lm |> Imp.LM.generate(messages, []) |> Imp.LM.Result.unwrap() do
       {:ok, response} ->

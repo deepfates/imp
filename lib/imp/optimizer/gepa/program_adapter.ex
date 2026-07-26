@@ -7,12 +7,20 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   alias Imp.Optimizer.TrajectoryRunner
 
   @enforce_keys [:program, :metric]
-  defstruct [:program, :metric, component_feedback: %{}, max_concurrency: 1, timeout: 30_000]
+  defstruct [
+    :program,
+    :metric,
+    component_feedback: %{},
+    reflection_record_mode: :beam_native,
+    max_concurrency: 1,
+    timeout: 30_000
+  ]
 
   @type t :: %__MODULE__{
           program: struct(),
           metric: function(),
           component_feedback: %{optional(atom()) => ComponentFeedback.callback()},
+          reflection_record_mode: :beam_native | :gepa_v0_1_4,
           max_concurrency: pos_integer(),
           timeout: timeout()
         }
@@ -24,10 +32,18 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
       |> Keyword.get(:component_feedback)
       |> validate_component_feedback!(program)
 
+    reflection_record_mode = Keyword.get(opts, :reflection_record_mode, :beam_native)
+
+    unless reflection_record_mode in [:beam_native, :gepa_v0_1_4] do
+      raise ArgumentError,
+            "GEPA reflection record mode must be :beam_native or :gepa_v0_1_4"
+    end
+
     %__MODULE__{
       program: program,
       metric: metric,
       component_feedback: component_feedback,
+      reflection_record_mode: reflection_record_mode,
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
       timeout: Keyword.get(opts, :timeout, 30_000)
     }
@@ -74,7 +90,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   end
 
   @impl true
-  def make_reflective_dataset(%__MODULE__{}, candidate, result, components_to_update) do
+  def make_reflective_dataset(%__MODULE__{} = adapter, candidate, result, components_to_update) do
     Candidate.validate!(candidate)
 
     Map.new(components_to_update, fn component ->
@@ -84,13 +100,56 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         aligned
         |> Enum.zip(result.side_information |> Map.get(component, []) |> pad(length(aligned)))
         |> Enum.flat_map(fn
-          {nil, nil} -> []
-          {nil, feedback} -> [%{"Feedback" => inspect(feedback)}]
-          {trajectory, feedback} -> [reflection_record(trajectory, feedback)]
+          {nil, nil} ->
+            []
+
+          {nil, feedback} ->
+            [feedback_only_record(feedback, adapter.reflection_record_mode)]
+
+          {trajectory, feedback} ->
+            case reflection_record(
+                   trajectory,
+                   feedback,
+                   component,
+                   adapter.reflection_record_mode
+                 ) do
+              nil -> []
+              record -> [record]
+            end
         end)
 
       {component, records}
     end)
+  end
+
+  @impl true
+  def get_adapter_state(%__MODULE__{reflection_record_mode: mode}) do
+    %{"reflection_record_mode" => Atom.to_string(mode)}
+  end
+
+  @impl true
+  def set_adapter_state(
+        %__MODULE__{reflection_record_mode: :beam_native} = adapter,
+        state
+      )
+      when is_map(state) and map_size(state) == 0 do
+    adapter
+  end
+
+  def set_adapter_state(%__MODULE__{reflection_record_mode: mode} = adapter, state) do
+    expected = Atom.to_string(mode)
+
+    case state do
+      %{"reflection_record_mode" => ^expected} ->
+        adapter
+
+      %{reflection_record_mode: ^mode} ->
+        adapter
+
+      _ ->
+        raise ArgumentError,
+              "GEPA resume reflection record mode does not match the runtime adapter"
+    end
   end
 
   defp side_information(trajectories, components, callbacks, capture_traces?) do
@@ -200,7 +259,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     end
   end
 
-  defp reflection_record(trajectory, feedback) do
+  defp reflection_record(trajectory, feedback, _component, :beam_native) do
     %{
       "Inputs" => example_inputs(trajectory.example),
       "Generated Outputs" => prediction_output(trajectory.prediction),
@@ -209,6 +268,50 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
       "Trace" => trajectory.trace
     }
   end
+
+  defp reflection_record(trajectory, feedback, component, :gepa_v0_1_4) do
+    case component_step(trajectory.trace, component) do
+      nil ->
+        nil
+
+      step ->
+        %{
+          "Inputs" => stringify_fields(step.inputs),
+          "Generated Outputs" => stringify_fields(step.outputs),
+          "Feedback" => feedback_text(feedback || trajectory.feedback || trajectory.error)
+        }
+    end
+  end
+
+  defp feedback_only_record(feedback, :beam_native), do: %{"Feedback" => inspect(feedback)}
+
+  defp feedback_only_record(feedback, :gepa_v0_1_4),
+    do: %{"Feedback" => feedback_text(feedback)}
+
+  defp component_step(trace, component) when is_list(trace) do
+    Enum.find(trace, fn
+      %{predictor: ^component} -> true
+      _ -> false
+    end)
+  end
+
+  defp component_step(_trace, _component), do: nil
+
+  defp stringify_fields(fields) when is_map(fields) do
+    Map.new(fields, fn {key, value} -> {to_string(key), python_string(value)} end)
+  end
+
+  defp stringify_fields(value), do: python_string(value)
+
+  defp feedback_text(nil), do: ""
+  defp feedback_text(value) when is_binary(value), do: value
+  defp feedback_text(value), do: python_string(value)
+
+  defp python_string(true), do: "True"
+  defp python_string(false), do: "False"
+  defp python_string(nil), do: "None"
+  defp python_string(value) when is_binary(value), do: value
+  defp python_string(value), do: to_string(value)
 
   defp example_inputs(%Imp.Example{} = example),
     do: example |> Imp.Example.inputs() |> Imp.Example.to_map()
