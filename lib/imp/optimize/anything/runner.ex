@@ -345,6 +345,11 @@ defmodule Imp.Optimize.Anything.Runner do
     Return only the complete replacement value for this component as strict JSON.
     Preserve every required nested field, list position, and value type. Do not return
     the complete artifact, commentary, or a patch.
+
+    The response is the component value itself, never an object keyed by the component
+    name. For a scalar current value such as `500`, return a scalar such as `1000`, not
+    `{"#{context.component}": 1000}`. For an object or list current value, return the
+    complete replacement object or list with exactly the same shape.
     """
   end
 

@@ -132,6 +132,8 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
       refute inspect(result.rejected) =~ "imp_optimize_anything_structured_component"
       assert_receive {:reflection, ^response, [%{content: prompt}]}
       assert prompt =~ "complete replacement value"
+      assert prompt =~ "component value itself"
+      assert prompt =~ ~s|`{"policy": 1000}`|
       assert prompt =~ ~s("retries": 1)
       assert_receive {:evaluated, ^response, ^seed}
     end)

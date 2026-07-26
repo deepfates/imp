@@ -177,6 +177,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
             engine: [
               max_candidate_proposals: 1,
               seed: 29,
+              raise_on_exception: false,
               parallel: false,
               max_workers: 1,
               cache_evaluation: false
