@@ -8,7 +8,9 @@ defmodule Imp.Optimizer.GEPA.BatchSampler do
   reset the consumer's sampling policy.
   """
 
-  @type rng_state :: :rand.state()
+  alias Imp.Optimizer.GEPA.Random
+
+  @type rng_state :: Random.state()
   @type context :: %{iteration: non_neg_integer(), call_index: non_neg_integer()}
 
   @callback minibatch_size(struct()) :: pos_integer()
@@ -528,14 +530,7 @@ defmodule Imp.Optimizer.GEPA.BatchSampler do
   end
 
   defp shuffled_indexes(size, rng_state) do
-    0..(size - 1)
-    |> Enum.map_reduce(rng_state, fn id, rng_state ->
-      {key, rng_state} = :rand.uniform_s(rng_state)
-      {{key, id}, rng_state}
-    end)
-    |> then(fn {decorated, rng_state} ->
-      {decorated |> Enum.sort_by(&elem(&1, 0)) |> Enum.map(&elem(&1, 1)), rng_state}
-    end)
+    Random.shuffle(Enum.to_list(0..(size - 1)), rng_state)
   end
 
   defp pad(ids, size) do
@@ -599,10 +594,9 @@ defmodule Imp.Optimizer.GEPA.BatchSampler do
   end
 
   defp validate_rng!(rng_state) do
-    :rand.export_seed_s(rng_state)
-    :ok
-  rescue
-    _error -> raise ArgumentError, "custom GEPA batch sampler returned an invalid RNG state"
+    if Random.valid?(rng_state),
+      do: :ok,
+      else: raise(ArgumentError, "custom GEPA batch sampler returned an invalid RNG state")
   end
 
   defp encode_checkpoint_term!(value, field) do

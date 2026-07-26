@@ -29,6 +29,14 @@ defmodule Imp.Optimizer.GEPA do
   extension; use metric/component feedback so every reflection receives the
   same information as upstream.
 
+  `:execution_profile` defaults to `:beam_native`. The opt-in
+  `:gepa_v0_1_4` profile seals the pinned single-proposal search semantics:
+  CPython's persisted MT19937 stream is shared by Pareto selection and
+  Fisher-Yates minibatch sampling, perfect minibatches are skipped at `1.0`,
+  evaluation caching is disabled, and one failed batched reflection is retried
+  once as the corresponding single task. The retry is counted and bounded at
+  two reflection transports per iteration.
+
   `:proposal_concurrency` enables first-party GEPA speculative parallel
   proposals. Contexts are sampled sequentially from one archive and RNG
   snapshot, expensive proposal phases run concurrently, and all effects are
@@ -69,6 +77,7 @@ defmodule Imp.Optimizer.GEPA do
     :reflection_lm,
     :reflection_strategy,
     callbacks: [],
+    execution_profile: :beam_native,
     component_feedback: %{},
     reflection_record_mode: :beam_native,
     feedback_fn: nil,
@@ -92,6 +101,11 @@ defmodule Imp.Optimizer.GEPA do
     acceptance_policy: :strict_improvement,
     merge_acceptance_policy: :equal_or_better,
     raise_on_exception: true,
+    skip_perfect_score: false,
+    perfect_score: nil,
+    cache_evaluation: true,
+    rng_algorithm: :beam_native,
+    reflection_failure_policy: :single_attempt_fail_closed,
     stopper: nil,
     max_metric_calls: :infinity,
     max_full_evaluations: :infinity,
@@ -100,6 +114,7 @@ defmodule Imp.Optimizer.GEPA do
   ]
 
   @option_schema [
+    execution_profile: [type: {:in, [:beam_native, :gepa_v0_1_4]}, default: :beam_native],
     callbacks: [type: {:custom, Callback, :validate, []}, default: []],
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     reflection_record_mode: [
@@ -167,7 +182,9 @@ defmodule Imp.Optimizer.GEPA do
 
   def new(metric, opts \\ []) do
     Imp.FunctionContract.validate!(metric, 2, "Imp.Optimizer.GEPA.new/2", "metric")
+    requested_opts = opts
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.GEPA.new/2")
+    opts = resolve_execution_profile!(requested_opts, opts)
     reflection_strategy = ReflectionStrategy.validate!(opts[:reflection_strategy])
     max_reflection_cost = validate_cost_limit!(opts[:max_reflection_cost])
 
@@ -184,6 +201,7 @@ defmodule Imp.Optimizer.GEPA do
 
     %__MODULE__{
       metric: metric,
+      execution_profile: opts[:execution_profile],
       callbacks: opts[:callbacks],
       component_feedback: opts[:component_feedback],
       reflection_record_mode: opts[:reflection_record_mode],
@@ -209,6 +227,11 @@ defmodule Imp.Optimizer.GEPA do
       acceptance_policy: opts[:acceptance_policy],
       merge_acceptance_policy: opts[:merge_acceptance_policy],
       raise_on_exception: opts[:raise_on_exception],
+      skip_perfect_score: opts[:skip_perfect_score],
+      perfect_score: opts[:perfect_score],
+      cache_evaluation: opts[:cache_evaluation],
+      rng_algorithm: opts[:rng_algorithm],
+      reflection_failure_policy: opts[:reflection_failure_policy],
       stopper: opts[:stopper],
       reflection_lm: opts[:reflection_lm],
       reflection_strategy: reflection_strategy,
@@ -266,6 +289,7 @@ defmodule Imp.Optimizer.GEPA do
 
     engine_opts =
       [
+        execution_profile: optimizer.execution_profile,
         max_iterations: optimizer.generations,
         candidate_selection_strategy: optimizer.candidate_selection_strategy,
         module_selector: optimizer.module_selector,
@@ -284,9 +308,14 @@ defmodule Imp.Optimizer.GEPA do
         acceptance_policy: optimizer.acceptance_policy,
         merge_acceptance_policy: optimizer.merge_acceptance_policy,
         raise_on_exception: optimizer.raise_on_exception,
+        skip_perfect_score: optimizer.skip_perfect_score,
+        perfect_score: optimizer.perfect_score,
+        cache_evaluation: optimizer.cache_evaluation,
+        rng_algorithm: optimizer.rng_algorithm,
+        reflection_failure_policy: optimizer.reflection_failure_policy,
         callbacks: optimizer.callbacks,
         stopper: optimizer.stopper,
-        max_metric_calls: optimizer.max_metric_calls,
+        max_metric_calls: profile_metric_limit(optimizer, trainset, devset),
         max_full_evaluations: optimizer.max_full_evaluations,
         max_reflection_calls: optimizer.max_reflection_calls,
         max_reflection_cost: optimizer.max_reflection_cost,
@@ -328,6 +357,9 @@ defmodule Imp.Optimizer.GEPA do
           feedback: feedback,
           component_feedback: optimizer.component_feedback |> Map.keys() |> Enum.sort(),
           reflection_record_mode: optimizer.reflection_record_mode,
+          execution_profile: optimizer.execution_profile,
+          reflection_failure_policy: optimizer.reflection_failure_policy,
+          rng_algorithm: optimizer.rng_algorithm,
           candidate_selection_strategy: policy_name(optimizer.candidate_selection_strategy),
           generations: optimizer.generations,
           minibatch_size: state.combee_policy.effective_batch_size,
@@ -609,6 +641,87 @@ defmodule Imp.Optimizer.GEPA do
 
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."
+
+  defp resolve_execution_profile!(requested, opts) do
+    case opts[:execution_profile] do
+      :beam_native ->
+        opts
+        |> Keyword.put(:skip_perfect_score, false)
+        |> Keyword.put(:perfect_score, nil)
+        |> Keyword.put(:cache_evaluation, true)
+        |> Keyword.put(:rng_algorithm, :beam_native)
+        |> Keyword.put(:reflection_failure_policy, :single_attempt_fail_closed)
+
+      :gepa_v0_1_4 ->
+        requirements = [
+          reflection_record_mode: :gepa_v0_1_4,
+          candidate_selection_strategy: :pareto,
+          module_selector: :round_robin,
+          combee: false,
+          sampling_strategy: :single,
+          selection_strategy: :all_improvements,
+          proposal_concurrency: 1,
+          max_concurrency: 1,
+          use_merge: false,
+          frontier_type: :instance,
+          evaluation_policy: :full,
+          acceptance_policy: :strict_improvement
+        ]
+
+        Enum.each(requirements, fn {key, expected} ->
+          if Keyword.has_key?(requested, key) and Keyword.fetch!(requested, key) != expected do
+            raise ArgumentError,
+                  ":execution_profile :gepa_v0_1_4 requires #{inspect(key)}: #{inspect(expected)}"
+          end
+        end)
+
+        reflection_limit = opts[:generations] * 2
+
+        if Keyword.has_key?(requested, :max_reflection_calls) and
+             opts[:max_reflection_calls] != reflection_limit do
+          raise ArgumentError,
+                ":execution_profile :gepa_v0_1_4 requires :max_reflection_calls #{reflection_limit} " <>
+                  "(two attempted reflection transports per iteration)"
+        end
+
+        opts
+        |> Keyword.merge(requirements)
+        |> Keyword.put(:skip_perfect_score, true)
+        |> Keyword.put(:perfect_score, 1.0)
+        |> Keyword.put(:cache_evaluation, false)
+        |> Keyword.put(:rng_algorithm, :python_v3)
+        |> Keyword.put(
+          :reflection_failure_policy,
+          :gepa_v0_1_4_batch_then_single_retry
+        )
+        |> Keyword.put(:max_reflection_calls, reflection_limit)
+    end
+  end
+
+  defp profile_metric_limit(%__MODULE__{execution_profile: :beam_native} = optimizer, _, _),
+    do: optimizer.max_metric_calls
+
+  defp profile_metric_limit(
+         %__MODULE__{execution_profile: :gepa_v0_1_4} = optimizer,
+         trainset,
+         devset
+       ) do
+    minibatch_size = optimizer.minibatch_size || min(3, length(trainset))
+    required = length(devset) + optimizer.generations * (2 * minibatch_size + length(devset))
+
+    case optimizer.max_metric_calls do
+      :infinity ->
+        required
+
+      ^required ->
+        required
+
+      configured ->
+        raise ArgumentError,
+              ":execution_profile :gepa_v0_1_4 requires :max_metric_calls #{required} for " <>
+                "this validation set, minibatch, and iteration budget; got: #{inspect(configured)}"
+    end
+  end
 
   defp validate_limit!(:infinity, _name), do: :infinity
   defp validate_limit!(value, _name) when is_integer(value) and value >= 0, do: value

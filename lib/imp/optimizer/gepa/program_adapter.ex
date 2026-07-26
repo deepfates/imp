@@ -62,6 +62,11 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         program_id: candidate_id(candidate)
       )
 
+    case operational_safety_error(trajectories) do
+      nil -> :ok
+      %Imp.OperationalSafetyError{} = error -> raise error
+    end
+
     scores = Enum.map(trajectories, & &1.score)
     outputs = Enum.map(trajectories, & &1.prediction)
     objective_scores = project_objective_scores(trajectories)
@@ -104,7 +109,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
             []
 
           {nil, feedback} ->
-            [feedback_only_record(feedback, adapter.reflection_record_mode)]
+            feedback_only_records(feedback, adapter.reflection_record_mode)
 
           {trajectory, feedback} ->
             case reflection_record(
@@ -285,8 +290,10 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   defp feedback_only_record(feedback, :beam_native), do: %{"Feedback" => inspect(feedback)}
 
-  defp feedback_only_record(feedback, :gepa_v0_1_4),
-    do: %{"Feedback" => feedback_text(feedback)}
+  defp feedback_only_records(feedback, :beam_native),
+    do: [feedback_only_record(feedback, :beam_native)]
+
+  defp feedback_only_records(_feedback, :gepa_v0_1_4), do: []
 
   defp component_step(trace, component) when is_list(trace) do
     Enum.find(trace, fn
@@ -329,4 +336,23 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
   end
+
+  defp operational_safety_error(value), do: find_operational_safety(value)
+
+  defp find_operational_safety(%Imp.OperationalSafetyError{} = error), do: error
+
+  defp find_operational_safety(%_{} = struct),
+    do: struct |> Map.from_struct() |> find_operational_safety()
+
+  defp find_operational_safety(map) when is_map(map) do
+    Enum.find_value(map, fn {_key, value} -> find_operational_safety(value) end)
+  end
+
+  defp find_operational_safety(list) when is_list(list),
+    do: Enum.find_value(list, &find_operational_safety/1)
+
+  defp find_operational_safety(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.find_value(&find_operational_safety/1)
+
+  defp find_operational_safety(_value), do: nil
 end

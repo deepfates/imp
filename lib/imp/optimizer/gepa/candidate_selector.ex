@@ -7,14 +7,15 @@ defmodule Imp.Optimizer.GEPA.CandidateSelector do
   the persisted engine RNG and must return `{candidate_id, rng_state}`.
   """
 
-  alias Imp.Optimizer.GEPA.Engine
+  alias Imp.Optimizer.GEPA.{Engine, Random}
   alias __MODULE__.{CurrentBest, EpsilonGreedy, Pareto, TopKPareto}
 
   @type candidate_id :: non_neg_integer()
-  @type selection :: {candidate_id(), :rand.state()}
+  @type rng_state :: Random.state()
+  @type selection :: {candidate_id(), rng_state()}
 
-  @callback select_candidate(Engine.State.t(), :rand.state()) :: selection()
-  @callback select_candidate(struct(), Engine.State.t(), :rand.state()) :: selection()
+  @callback select_candidate(Engine.State.t(), rng_state()) :: selection()
+  @callback select_candidate(struct(), Engine.State.t(), rng_state()) :: selection()
   @callback identity() :: term()
   @callback identity(struct()) :: term()
   @optional_callbacks select_candidate: 2, select_candidate: 3, identity: 0, identity: 1
@@ -62,7 +63,7 @@ defmodule Imp.Optimizer.GEPA.CandidateSelector do
   end
 
   @doc false
-  @spec select(term(), Engine.State.t()) :: {Engine.Entry.t(), :rand.state()}
+  @spec select(term(), Engine.State.t()) :: {Engine.Entry.t(), rng_state()}
   def select(strategy, %Engine.State{} = state) do
     result = invoke(strategy, state)
 
@@ -117,10 +118,7 @@ defmodule Imp.Optimizer.GEPA.CandidateSelector do
   end
 
   defp valid_rng?(rng_state) do
-    :rand.export_seed_s(rng_state)
-    true
-  rescue
-    _error -> false
+    Random.valid?(rng_state)
   end
 
   defmodule Pareto do

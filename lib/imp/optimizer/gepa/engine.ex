@@ -20,6 +20,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
     ModuleSelector,
     Proposal,
     ProposalSelection,
+    Random,
     Reflection,
     ReflectionStrategy,
     Result,
@@ -462,6 +463,14 @@ defmodule Imp.Optimizer.GEPA.Engine do
   defp runtime_profile?(_policy), do: false
 
   defp strategy_path?(opts, proposal_policy) do
+    if Keyword.get(opts, :execution_profile, :beam_native) == :gepa_v0_1_4 do
+      false
+    else
+      strategy_path_for_beam?(opts, proposal_policy)
+    end
+  end
+
+  defp strategy_path_for_beam?(opts, proposal_policy) do
     configured? =
       Keyword.has_key?(opts, :sampling_strategy) or Keyword.has_key?(opts, :selection_strategy) or
         not is_nil(Keyword.get(opts, :reflection_strategy))
@@ -3104,7 +3113,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
     do: load_proposal_policy(dumped, 4, requested)
 
   defp strategy_configuration(opts) do
-    %{
+    configuration = %{
       sampling_strategy:
         opts
         |> Keyword.get(:sampling_strategy, :single)
@@ -3118,6 +3127,19 @@ defmodule Imp.Optimizer.GEPA.Engine do
         |> Keyword.get(:acceptance_policy, Acceptance.default(:mutation))
         |> strategy_value_identity()
     }
+
+    case Keyword.get(opts, :execution_profile, :beam_native) do
+      :beam_native ->
+        configuration
+
+      profile ->
+        Map.merge(configuration, %{
+          execution_profile: profile,
+          reflection_failure_policy:
+            Keyword.get(opts, :reflection_failure_policy, :single_attempt_fail_closed),
+          rng_algorithm: Keyword.get(opts, :rng_algorithm, :beam_native)
+        })
+    end
   end
 
   defp strategy_value_identity({:callback, callback}) when is_function(callback) do
@@ -3410,7 +3432,11 @@ defmodule Imp.Optimizer.GEPA.Engine do
           max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity),
           max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity)
         ),
-      rng_state: seed_rng(Keyword.get(opts, :seed, 0)),
+      rng_state:
+        Random.new(
+          Keyword.get(opts, :seed, 0),
+          Keyword.get(opts, :rng_algorithm, :beam_native)
+        ),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
       evaluation_policy:
         opts |> Keyword.get(:evaluation_policy, :full) |> EvaluationPolicy.resolve!(),
@@ -4138,7 +4164,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
     batch = Enum.map(ids, &Enum.fetch!(valset, &1))
 
     metric_calls =
-      Adapter.metric_call_reservation(adapter, batch, candidate, capture_traces: true)
+      Adapter.metric_call_reservation(adapter, batch, candidate, capture_traces: false)
 
     event = %{
       iteration: iteration,
@@ -4295,12 +4321,19 @@ defmodule Imp.Optimizer.GEPA.Engine do
       missing_batch = Enum.map(missing_indexes, &Enum.fetch!(batch, &1))
 
       reservation =
-        Adapter.metric_call_reservation(adapter, missing_batch, candidate, capture_traces: true)
+        Adapter.metric_call_reservation(adapter, missing_batch, candidate, capture_traces: false)
 
       with :ok <- Budget.authorize_evaluation(state.budget, reservation, kind) do
         notify_evaluation_start(opts, batch, false, event)
 
-        case evaluate_singleton_batch(adapter, candidate, missing_batch, event[:deadline], opts) do
+        case evaluate_singleton_batch(
+               adapter,
+               candidate,
+               missing_batch,
+               false,
+               event[:deadline],
+               opts
+             ) do
           {:ok, missing_result} ->
             result = backend.assemble(batch, hits, missing_indexes, missing_result)
             actual_calls = metric_calls(missing_result, length(missing_batch))
@@ -4331,19 +4364,26 @@ defmodule Imp.Optimizer.GEPA.Engine do
         adapter,
         batch,
         candidate,
-        capture_traces: true
+        capture_traces: capture_traces
       )
 
     with :ok <- Budget.authorize_evaluation(state.budget, reservation, kind) do
       notify_evaluation_start(opts, batch, capture_traces, event)
 
-      case evaluate_singleton_batch(adapter, candidate, batch, event[:deadline], opts) do
+      case evaluate_singleton_batch(
+             adapter,
+             candidate,
+             batch,
+             capture_traces,
+             event[:deadline],
+             opts
+           ) do
         {:ok, result} ->
           actual_calls = metric_calls(result, length(batch))
 
           case record_with_reservation(state.budget, actual_calls, reservation, kind) do
             {:ok, budget} ->
-              cache_result = capture_traces or Keyword.get(opts, :cache_evaluation, true)
+              cache_result = Keyword.get(opts, :cache_evaluation, true)
               cache = maybe_cache_result(state.cache, candidate, batch, result, cache_result)
               notify_budget_updated(opts, state, budget, actual_calls, event.iteration)
               notify_evaluation_end(opts, result, event)
@@ -4361,17 +4401,20 @@ defmodule Imp.Optimizer.GEPA.Engine do
     end
   end
 
-  defp evaluate_singleton_batch(adapter, candidate, batch, deadline, opts) do
+  defp evaluate_singleton_batch(adapter, candidate, batch, capture_traces, deadline, opts) do
     result =
       adapter
       |> Evaluation.batch_evaluate([{candidate, batch}],
-        capture_traces: true,
+        capture_traces: capture_traces,
         deadline: deadline
       )
       |> hd()
 
     {:ok, result}
   rescue
+    error in Imp.OperationalSafetyError ->
+      reraise error, __STACKTRACE__
+
     error ->
       if Keyword.get(opts, :raise_on_exception, true) do
         reraise error, __STACKTRACE__
@@ -4507,7 +4550,10 @@ defmodule Imp.Optimizer.GEPA.Engine do
          state,
          opts
        ) do
-    reservation = reflection_call_reservation(components, dataset, state.combee_policy)
+    reservation =
+      reflection_call_reservation(components, dataset, state.combee_policy) *
+        reflection_attempt_limit(opts)
+
     id = reservation_id(:reflection, iteration)
 
     with {:ok, ledger} <-
@@ -4587,17 +4633,19 @@ defmodule Imp.Optimizer.GEPA.Engine do
          opts
        ) do
     records = Map.get(dataset, component, [])
-    reservation = ComBee.reflection_call_reservation(records, state.combee_policy)
+    base_reservation = ComBee.reflection_call_reservation(records, state.combee_policy)
+    reservation = base_reservation * reflection_attempt_limit(opts)
 
     case Budget.authorize_reflections(state.budget, reservation) do
       :ok ->
-        case ComBee.propose(
+        case propose_with_failure_policy(
                proposer,
                candidate,
                component,
                records,
                iteration,
-               state.combee_policy
+               state.combee_policy,
+               reflection_attempt_limit(opts)
              ) do
           {:ok, text, calls, report} ->
             state = record_reflection_result(state, calls, reservation, report, opts)
@@ -4605,13 +4653,75 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
           {:error, reason, calls, report} ->
             state = record_reflection_result(state, calls, reservation, report, opts)
-            {:error, reason, report, state}
+
+            case operational_safety_error(reason) do
+              nil -> {:error, reason, report, state}
+              %Imp.OperationalSafetyError{} = error -> raise error
+            end
         end
 
       {:error, reason} ->
         {:error, reason, nil, state}
     end
   end
+
+  defp propose_with_failure_policy(
+         proposer,
+         candidate,
+         component,
+         records,
+         iteration,
+         policy,
+         attempts_left,
+         calls \\ 0
+       ) do
+    case ComBee.propose(proposer, candidate, component, records, iteration, policy) do
+      {:ok, text, attempt_calls, report} ->
+        {:ok, text, calls + attempt_calls, report}
+
+      {:error, reason, attempt_calls, report} ->
+        if attempts_left > 1 and is_nil(operational_safety_error(reason)) do
+          propose_with_failure_policy(
+            proposer,
+            candidate,
+            component,
+            records,
+            iteration,
+            policy,
+            attempts_left - 1,
+            calls + attempt_calls
+          )
+        else
+          {:error, reason, calls + attempt_calls, report}
+        end
+    end
+  end
+
+  defp reflection_attempt_limit(opts) do
+    case Keyword.get(opts, :reflection_failure_policy, :single_attempt_fail_closed) do
+      :single_attempt_fail_closed -> 1
+      :gepa_v0_1_4_batch_then_single_retry -> 2
+    end
+  end
+
+  defp operational_safety_error(value), do: find_operational_safety(value)
+
+  defp find_operational_safety(%Imp.OperationalSafetyError{} = error), do: error
+
+  defp find_operational_safety(%_{} = struct),
+    do: struct |> Map.from_struct() |> find_operational_safety()
+
+  defp find_operational_safety(map) when is_map(map) do
+    Enum.find_value(map, fn {_key, value} -> find_operational_safety(value) end)
+  end
+
+  defp find_operational_safety(list) when is_list(list),
+    do: Enum.find_value(list, &find_operational_safety/1)
+
+  defp find_operational_safety(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.find_value(&find_operational_safety/1)
+
+  defp find_operational_safety(_value), do: nil
 
   defp record_reflection_result(state, calls, reservation, report, opts) do
     if calls > reservation do
@@ -4933,6 +5043,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
   defp callback_config(opts) do
     Map.new(%{
+      execution_profile: Keyword.get(opts, :execution_profile, :beam_native),
       max_iterations: Keyword.get(opts, :max_iterations, 10),
       minibatch_size:
         Keyword.get(opts, :effective_minibatch_size, Keyword.get(opts, :minibatch_size)),
@@ -4946,6 +5057,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
       track_best_outputs: Keyword.get(opts, :track_best_outputs, false),
       cache_evaluation: Keyword.get(opts, :cache_evaluation, true),
       cache_evaluation_storage: Keyword.get(opts, :cache_evaluation_storage, :memory),
+      rng_algorithm: Keyword.get(opts, :rng_algorithm, :beam_native),
+      reflection_failure_policy:
+        Keyword.get(opts, :reflection_failure_policy, :single_attempt_fail_closed),
       max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
       max_full_evaluations: Keyword.get(opts, :max_full_evaluations, :infinity),
       max_reflection_calls: Keyword.get(opts, :max_reflection_calls, :infinity),
@@ -5368,17 +5482,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
     :ok
   end
 
-  defp dump_rng(rng_state) do
-    {:exsss, [first | second]} = :rand.export_seed_s(rng_state)
-    %{"algorithm" => "exsss", "words" => [first, second]}
-  end
-
-  defp load_rng!(%{"algorithm" => "exsss", "words" => [first, second]})
-       when is_integer(first) and is_integer(second),
-       do: :rand.seed_s({:exsss, [first | second]})
-
-  defp load_rng!(value), do: raise(ArgumentError, "invalid GEPA RNG state: #{inspect(value)}")
-  defp seed_rng(seed), do: :rand.seed_s(:exsss, {seed + 1, seed + 2, seed + 3})
+  defp dump_rng(rng_state), do: Random.dump(rng_state)
+  defp load_rng!(value), do: Random.load!(value)
 
   defp iteration_range(first, last) when first <= last, do: first..last
   defp iteration_range(_first, _last), do: []
@@ -5427,6 +5532,11 @@ defmodule Imp.Optimizer.GEPA.Engine do
     proposal_timeout = Keyword.get(opts, :proposal_timeout, :infinity)
     sampling_strategy = Keyword.get(opts, :sampling_strategy, :single)
     selection_strategy = Keyword.get(opts, :selection_strategy, :all_improvements)
+    execution_profile = Keyword.get(opts, :execution_profile, :beam_native)
+    rng_algorithm = Keyword.get(opts, :rng_algorithm, :beam_native)
+
+    reflection_failure_policy =
+      Keyword.get(opts, :reflection_failure_policy, :single_attempt_fail_closed)
 
     merge_acceptance_policy =
       Keyword.get(opts, :merge_acceptance_policy, Acceptance.default(:merge))
@@ -5442,6 +5552,31 @@ defmodule Imp.Optimizer.GEPA.Engine do
     validate_sampling_strategy!(sampling_strategy)
     ProposalSelection.validate!(selection_strategy)
     ReflectionStrategy.validate!(reflection_strategy)
+
+    unless execution_profile in [:beam_native, :gepa_v0_1_4],
+      do: raise(ArgumentError, ":execution_profile must be :beam_native or :gepa_v0_1_4")
+
+    unless rng_algorithm in [:beam_native, :python_v3],
+      do: raise(ArgumentError, ":rng_algorithm must be :beam_native or :python_v3")
+
+    unless reflection_failure_policy in [
+             :single_attempt_fail_closed,
+             :gepa_v0_1_4_batch_then_single_retry
+           ],
+           do: raise(ArgumentError, "invalid :reflection_failure_policy")
+
+    if execution_profile == :gepa_v0_1_4 do
+      unless rng_algorithm == :python_v3 and
+               reflection_failure_policy == :gepa_v0_1_4_batch_then_single_retry and
+               Keyword.get(opts, :candidate_selection_strategy, :pareto) == :pareto and
+               Keyword.get(opts, :module_selector, :round_robin) == :round_robin and
+               sampling_strategy == :single and selection_strategy == :all_improvements and
+               proposal_concurrency == 1 and not use_merge and not cache_evaluation and
+               skip_perfect_score and perfect_score == 1.0 and frontier_type == :instance and
+               Keyword.get(opts, :evaluation_policy, :full) == :full do
+        raise ArgumentError, "GEPA v0.1.4 execution profile options are inconsistent"
+      end
+    end
 
     unless max_reflection_calls == :infinity or
              (is_integer(max_reflection_calls) and max_reflection_calls >= 0) do

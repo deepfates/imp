@@ -855,10 +855,10 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
         seed: 5
       )
 
-    assert_receive {:singleton_batch, 1, [{"0", [10, 11]}], true}
+    assert_receive {:singleton_batch, 1, [{"0", [10, 11]}], false}
     assert_receive {:singleton_batch, 1, [{"0", [_train_id]}], true}
-    assert_receive {:singleton_batch, 1, [{"1", [_train_id]}], true}
-    assert_receive {:singleton_batch, 1, [{"1", [10, 11]}], true}
+    assert_receive {:singleton_batch, 1, [{"1", [_train_id]}], false}
+    assert_receive {:singleton_batch, 1, [{"1", [10, 11]}], false}
     refute_receive :direct_evaluate_called
     assert state.budget.metric_calls == 6
     assert Enum.map(state.candidates, & &1.candidate.main) == ["0", "1"]

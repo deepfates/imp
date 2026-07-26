@@ -53,7 +53,7 @@ defmodule Imp.Optimizer.GEPA.Frontier do
     do: candidates |> mapping(policy) |> Pareto.candidate_ids()
 
   @doc "Samples a frontier candidate in proportion to its surviving winner coverage."
-  @spec sample([candidate_result()], policy(), :rand.state()) :: {candidate_id(), :rand.state()}
+  @spec sample([candidate_result()], policy(), term()) :: {candidate_id(), term()}
   def sample(candidates, policy, rng_state) when is_list(candidates) do
     candidates
     |> mapping(policy)

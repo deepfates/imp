@@ -48,7 +48,7 @@ defmodule Imp.Optimizer.GEPA.Adapter do
       module.batch_evaluate(adapter, items, opts)
     else
       Enum.map(items, fn {candidate, batch} ->
-        evaluate(adapter, batch, candidate, Keyword.put(opts, :capture_traces, true))
+        evaluate(adapter, batch, candidate, opts)
       end)
     end
   end

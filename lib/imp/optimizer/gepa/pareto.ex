@@ -1,6 +1,9 @@
 defmodule Imp.Optimizer.GEPA.Pareto do
   @moduledoc "Winner-set mapping, pruning, and sampling for GEPA frontiers."
 
+  alias Imp.Optimizer.GEPA.Random
+  alias Imp.Optimizer.MIPROv2.PythonRandom
+
   @type candidate_id :: term()
   @type frontier_key :: term()
   @type mapping :: %{optional(frontier_key()) => MapSet.t(candidate_id())}
@@ -44,23 +47,48 @@ defmodule Imp.Optimizer.GEPA.Pareto do
   end
 
   @doc "Samples a source-faithful Pareto candidate in proportion to winner-set coverage."
-  @spec sample(mapping(), %{optional(candidate_id()) => number()}, :rand.state()) ::
-          {candidate_id(), :rand.state()}
+  @spec sample(mapping(), %{optional(candidate_id()) => number()}, Random.state()) ::
+          {candidate_id(), Random.state()}
   def sample(mapping, aggregate_scores, rng_state) do
     sampling_list =
       mapping
       |> remove_dominated(aggregate_scores)
-      |> Enum.sort_by(fn {key, _front} -> inspect(key) end)
-      |> Enum.flat_map(fn {_key, front} -> front |> Enum.sort_by(&inspect/1) end)
+      |> sampling_list(rng_state)
 
     case sampling_list do
       [] ->
         raise ArgumentError, "cannot sample from an empty GEPA Pareto frontier"
 
       candidates ->
-        {position, rng_state} = :rand.uniform_s(length(candidates), rng_state)
-        {Enum.at(candidates, position - 1), rng_state}
+        {position, rng_state} = Random.integer(length(candidates), rng_state)
+        {Enum.at(candidates, position), rng_state}
     end
+  end
+
+  # Pinned GEPA builds a frequency dictionary by walking validation IDs in
+  # loader order, then expands candidates in first-seen dictionary order.
+  # The sealed comparator uses integer validation IDs and candidate indexes,
+  # for which Erlang term ordering exactly reconstructs that Python order.
+  defp sampling_list(mapping, %PythonRandom{}) do
+    {order, frequencies} =
+      mapping
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.reduce({[], %{}}, fn {_key, front}, {order, frequencies} ->
+        front
+        |> Enum.sort()
+        |> Enum.reduce({order, frequencies}, fn candidate, {order, frequencies} ->
+          order = if Map.has_key?(frequencies, candidate), do: order, else: order ++ [candidate]
+          {order, Map.update(frequencies, candidate, 1, &(&1 + 1))}
+        end)
+      end)
+
+    Enum.flat_map(order, &List.duplicate(&1, Map.fetch!(frequencies, &1)))
+  end
+
+  defp sampling_list(mapping, _beam_rng) do
+    mapping
+    |> Enum.sort_by(fn {key, _front} -> inspect(key) end)
+    |> Enum.flat_map(fn {_key, front} -> front |> Enum.sort_by(&inspect/1) end)
   end
 
   @spec candidate_ids(mapping(), %{optional(candidate_id()) => number()}) :: [candidate_id()]

@@ -27,6 +27,13 @@ defmodule Imp.Optimizer.GEPA.Evaluation do
   @doc "Evaluates and validates ordered candidate/batch pairs through the adapter batch seam."
   @spec batch_evaluate(Adapter.t(), [{Candidate.t(), [term()]}], keyword()) :: [Result.t()]
   def batch_evaluate(adapter, items, opts \\ []) when is_list(items) and is_list(opts) do
+    capture_traces = Keyword.get(opts, :capture_traces, true)
+
+    unless is_boolean(capture_traces) do
+      raise ArgumentError, ":capture_traces must be a boolean"
+    end
+
+    opts = Keyword.put(opts, :capture_traces, capture_traces)
     results = Adapter.batch_evaluate(adapter, items, opts)
 
     unless is_list(results) and length(results) == length(items) do
@@ -35,7 +42,7 @@ defmodule Imp.Optimizer.GEPA.Evaluation do
     end
 
     Enum.zip_with(items, results, fn {candidate, batch}, result ->
-      Result.validate!(result, length(batch), candidate, true)
+      Result.validate!(result, length(batch), candidate, capture_traces)
     end)
   end
 end
