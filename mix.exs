@@ -184,6 +184,7 @@ defmodule Imp.MixProject do
       Path.wildcard("examples/local_infer_rules_banking77/**/*") ++
       Path.wildcard("examples/local_knn_few_shot_banking77/**/*") ++
       Path.wildcard("examples/local_mipro_banking77/**/*") ++
+      Path.wildcard("examples/local_optimize_anything_retry_policy/**/*") ++
       Path.wildcard("examples/local_random_search_banking77/**/*") ++
       Path.wildcard("examples/local_simba_banking77/**/*") ++
       Path.wildcard("examples/provider_free_ticket_router/**/*") ++

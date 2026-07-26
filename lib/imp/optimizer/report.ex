@@ -47,6 +47,7 @@ defmodule Imp.Optimizer.Report do
     "labeled_few_shot" => :labeled_few_shot,
     "mipro_v2" => :mipro_v2,
     "random_search" => :random_search,
+    "signature_optimizer" => :signature_optimizer,
     "simba" => :simba
   }
   @optimizer_modules %{
@@ -61,6 +62,7 @@ defmodule Imp.Optimizer.Report do
     labeled_few_shot: Imp.Optimizer.LabeledFewShot,
     mipro_v2: Imp.Optimizer.MIPROv2,
     random_search: Imp.Optimizer.RandomSearch,
+    signature_optimizer: Imp.Optimizer.SignatureOptimizer,
     simba: Imp.Optimizer.SIMBA
   }
 

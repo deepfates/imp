@@ -6,7 +6,8 @@ defmodule Imp.Optimizer.InstructionSearch do
   instruction-only workflows such as `Imp.Optimizer.SignatureOptimizer` and
   coordinate prompt optimization. It evaluates each proposed instruction on the
   dev set, evaluates the original program as a baseline, and attaches an
-  optimizer report to the selected program.
+  optimizer report to the selected program. The original program wins
+  equal-score ties so a rewrite must demonstrate an actual validation gain.
 
   Failed candidates are recorded in the report instead of aborting the whole
   compile. If every evaluation fails, `compile/6` returns the original program
@@ -186,7 +187,9 @@ defmodule Imp.Optimizer.InstructionSearch do
 
       _ ->
         {best_score, best, _instruction, _metadata} =
-          Enum.max_by(successes, fn {score, _candidate, _instruction, _metadata} -> score end)
+          Enum.max_by(successes, fn {score, _candidate, _instruction, metadata} ->
+            {score, if(metadata.baseline, do: 1, else: 0)}
+          end)
 
         {best_score, best, report_candidates, errors,
          %{

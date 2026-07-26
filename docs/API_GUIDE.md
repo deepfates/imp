@@ -681,6 +681,31 @@ Use:
 | `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
 | `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
 
+`SignatureOptimizer` is Imp's narrow one-predictor instruction optimizer. Give
+it a proposer LM for task-aware proposals grounded in the program signature and
+a bounded view of the training examples:
+
+```elixir
+signature_optimizer =
+  Imp.Optimizer.SignatureOptimizer.new(metric,
+    proposer_lm: proposal_lm,
+    num_candidates: 4,
+    seed: 17,
+    temperature: 0.7,
+    view_data_batch_size: 8
+  )
+
+selected = Imp.optimize!(program, signature_optimizer, trainset, validation)
+```
+
+The proposal LM is called once per requested slot with a distinct deterministic
+rollout id. Malformed or failed slots use the documented native fallback and
+remain visible in the `:signature_optimizer` report. For a manual search, pass
+`candidates: [...]` instead; configuring both sources is rejected. Validation
+alone selects the returned instruction, and the original program wins ties.
+Multi-predictor instruction mutation remains the job of GEPA, SIMBA, MIPROv2,
+or a consumer program with an explicit named-parameter contract.
+
 For a consumer-defined multi-predictor program, GEPA can return its selected
 program, report, and safe parameter-only artifact in one operation:
 

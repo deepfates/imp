@@ -710,17 +710,15 @@ defmodule PackageContractTest do
         fixture_selection_set
       )
 
-    # SignatureOptimizer deliberately delegates the candidate comparison to
-    # InstructionSearch, so the attached report names the underlying search.
     verify_program_optimizer.(
       :signature_optimizer,
-      :instruction_search,
+      :signature_optimizer,
       signature_optimized
     )
 
     unless Imp.Optimizer.InstructionSearch.current_instruction(signature_optimized) ==
-             "Answer with the city only." do
-      raise "SignatureOptimizer package lifecycle did not apply its candidate"
+             Imp.Optimizer.InstructionSearch.current_instruction(program) do
+      raise "SignatureOptimizer package lifecycle did not protect its equal-score baseline"
     end
 
     ensemble =
