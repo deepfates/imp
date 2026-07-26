@@ -3,6 +3,7 @@ defmodule Imp.LocalSIMBATRECExampleTest do
 
   @source "examples/local_simba_trec/run.exs"
   @data "benchmarks/data/simba-trec-coarse-v1.json"
+  @result "examples/local_simba_trec/exercised-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_TREC_DEFINE_ONLY")
@@ -91,5 +92,31 @@ defmodule Imp.LocalSIMBATRECExampleTest do
     assert Keyword.get(lm.opts, :max_retries) == 0
     assert Keyword.get(lm.opts, :req_http_options) == [retry: false, max_retries: 0]
     assert loaded.config[:json_fallback] == false
+  end
+
+  test "retained result preserves the format-failed SIMBA mutation lifecycle" do
+    result = @result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "complete"
+
+    assert result["search"] == %{
+             "baseline_score" => 0.0,
+             "selected_score" => 0.0,
+             "selected" => "baseline",
+             "candidate_count" => 1,
+             "mutated_finalists" => 1,
+             "rendered_mutation_calls" => 26,
+             "logical_calls" => 96,
+             "transport_attempts" => 96
+           }
+
+    assert result["held_out_test"]["baseline"] == %{
+             "accuracy" => 0.0,
+             "macro_f1" => 0.0,
+             "errors" => 40
+           }
+
+    assert result["held_out_test"]["selected"] == result["held_out_test"]["baseline"]
+    assert result["fresh_process"]["byte_identical"]
   end
 end

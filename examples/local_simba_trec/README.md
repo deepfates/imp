@@ -29,3 +29,14 @@ result would be one task/model mutation and held-out-usefulness result. A
 baseline selection or held-out regression is an equally valid negative result.
 Neither outcome establishes general SIMBA effectiveness, full DSPy parity,
 production reliability, or BEAM superiority.
+
+The immutable first run is retained in `exercised-result.json`. SIMBA created
+one real demonstration mutation and rendered it in 26 task calls across 96
+single-attempt optimization transports. Baseline and mutation both scored zero
+on validation, so stable selection retained baseline. All forty baseline and
+selected held-out calls then failed the strict typed contract: `llama3.2:3b`
+emitted shortened markers such as `[[ R42 ]]` instead of the rendered
+`[[ ## route ## ]]` field. The selected baseline artifact still saved, loaded,
+and reproduced all ordered errors byte-for-byte in a fresh OS BEAM. This is a
+complete operational run but an incomplete usefulness measurement; it does not
+establish a selected SIMBA mutation or task quality.
