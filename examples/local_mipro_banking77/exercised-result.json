@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "runtime_base_commit": "8a4e260",
+  "dataset_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+  "split_sizes": {"train": 16, "selection": 8, "untouched_test": 40},
+  "models": {
+    "task_artifact": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+    "proposal_model": "ollama:llama3.2:3b",
+    "proposal_model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "search": {
+    "num_candidates": 2,
+    "num_trials": 2,
+    "baseline_selection_score": 0.625,
+    "trial_scores": [0.625, 0.5],
+    "selected_selection_score": 0.625,
+    "selected": "baseline",
+    "logical_calls": 42,
+    "transport_attempts": 42,
+    "errors": []
+  },
+  "untouched_test": {
+    "baseline": {"accuracy": 0.475, "macro_f1": 0.33333333333333337, "parse_errors": 0},
+    "selected": {"accuracy": 0.475, "macro_f1": 0.33333333333333337, "parse_errors": 0}
+  },
+  "selected_instruction": "Choose exactly one opaque route code for the customer utterance.",
+  "selected_parameter_artifact_sha256": "d94e762370a07adb6b75ee05c723c645b4b5e455c180b498e306f1066734ebe1",
+  "fresh_process": {
+    "byte_identical": true,
+    "reproduction_sha256": "2c47c40a8aee091bb2331ed9d7e9b73e16de9d85d26d71a7c94e2b4cd56b4152",
+    "logical_calls": 40,
+    "transport_attempts": 40
+  },
+  "claim_boundary": "One local task/model run proves the ordinary MIPROv2 search, baseline retention, parameter artifact, and fresh-process lifecycle. The proposed instruction was worse on selection and was rejected. This is not general MIPROv2 effectiveness, exact Optuna parity, or BEAM superiority."
+}

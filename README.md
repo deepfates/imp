@@ -68,6 +68,12 @@ different local model runtimes, evaluates a GEPA proposal using train/selection
 only, applies the selected named parameters, and reproduces the untouched result
 after restarting the exact trained artifact in a fresh OS BEAM.
 
+For joint instruction and few-shot search, the
+[Banking77 MIPROv2 example](examples/local_mipro_banking77/README.md) runs the
+public optimizer with an exact local fused task model and local proposal model,
+keeps the worse proposal out on validation, and reapplies the selected
+parameter artifact in a fresh OS BEAM.
+
 For local weight optimization, the
 [Banking77 GRPO example](examples/local_grpo_banking77/README.md) runs ordinary
 model-generated Qwen rollouts through Imp's public GRPO API, an official pinned

@@ -180,6 +180,7 @@ defmodule Imp.MixProject do
       Path.wildcard("examples/deployment/**/*") ++
       Path.wildcard("examples/local_gepa_banking77/**/*") ++
       Path.wildcard("examples/local_grpo_banking77/**/*") ++
+      Path.wildcard("examples/local_mipro_banking77/**/*") ++
       Path.wildcard("examples/provider_free_ticket_router/**/*") ++
       product_docs() ++
       livebooks() ++
