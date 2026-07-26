@@ -13,7 +13,7 @@ defmodule Imp.Optimize.Anything.Runner do
     Tracking
   }
 
-  alias Imp.Optimizer.GEPA.{Candidate, Engine}
+  alias Imp.Optimizer.GEPA.{Candidate, CandidateSelector, Engine}
 
   @string_candidate_key :current_candidate
   @single_instance :__imp_optimize_anything_single_instance__
@@ -77,6 +77,7 @@ defmodule Imp.Optimize.Anything.Runner do
         structured_codec: structured_codec,
         checkpoint_identity:
           checkpoint_identity(
+            config,
             mode,
             trainset,
             valset,
@@ -726,6 +727,7 @@ defmodule Imp.Optimize.Anything.Runner do
   defp minimum_limit(left, right), do: min(left, right)
 
   defp checkpoint_identity(
+         config,
          mode,
          trainset,
          valset,
@@ -736,7 +738,7 @@ defmodule Imp.Optimize.Anything.Runner do
        ) do
     %{
       "type" => "imp_optimize_anything_run_identity",
-      "schema_version" => 2,
+      "schema_version" => 3,
       "mode" => Atom.to_string(mode),
       "trainset_sha256" => dataset_digest!(trainset, :dataset),
       "valset_sha256" => dataset_digest!(valset, :valset),
@@ -746,8 +748,27 @@ defmodule Imp.Optimize.Anything.Runner do
           batch_evaluator,
           evaluator_contract,
           declared_identity
-        )
+        ),
+      "candidate_selection_sha256" =>
+        candidate_selection_digest!(config.engine.candidate_selection_strategy)
     }
+  end
+
+  defp candidate_selection_digest!(strategy) do
+    strategy
+    |> CandidateSelector.checkpoint_identity!()
+    |> Config.Persistence.json_safe!([:candidate_selection_strategy])
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  rescue
+    error in ArgumentError ->
+      reraise ArgumentError,
+              [
+                message:
+                  "Optimize Anything candidate selection strategy cannot be checkpoint-identified: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   defp evaluation_digest!(evaluator, batch_evaluator, contract, declared_identity) do

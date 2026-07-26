@@ -121,6 +121,10 @@ admission judgement with `:strict_improvement`, `:improvement_or_equal`, or an
 are also supported. The strategy configuration is checkpoint-bound, so resume
 cannot silently switch policies with the same task width. Arbitrary Python
 strategy objects have no native callback contract and are rejected explicitly.
+Custom parent-candidate selector modules are bound by module identity. A
+configurable selector struct must additionally implement `identity/1`; its
+JSON-safe stable identity is bound into the OA run checkpoint and drift is
+refused before evaluator work.
 
 The returned result remains immutable, matching the pinned public result
 boundary. Use `Imp.Optimize.Anything.best_candidate/1` to obtain the native

@@ -272,8 +272,14 @@ defmodule Imp.Optimize.Anything.Adapter do
     end
 
     unless stored == expected do
-      raise ArgumentError,
-            "Optimize Anything resume run identity mismatch: stored #{inspect(stored)}, requested #{inspect(expected)}"
+      if stored["schema_version"] == expected["schema_version"] and
+           stored["candidate_selection_sha256"] != expected["candidate_selection_sha256"] do
+        raise ArgumentError,
+              "Optimize Anything candidate selection strategy identity mismatch on resume"
+      else
+        raise ArgumentError,
+              "Optimize Anything resume run identity mismatch: stored #{inspect(stored)}, requested #{inspect(expected)}"
+      end
     end
 
     validate_restored_optimization_state!(state, adapter.best_example_evals_k)

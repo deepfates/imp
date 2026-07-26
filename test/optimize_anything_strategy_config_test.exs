@@ -3,12 +3,26 @@ defmodule Imp.Optimize.Anything.StrategyConfigTest do
 
   alias Imp.Optimize.Anything
   alias Imp.Optimize.Anything.{Config, Result}
-  alias Imp.Optimizer.GEPA.Acceptance
+  alias Imp.Optimizer.GEPA.{Acceptance, CandidateSelector}
 
   defmodule ReleasedReflectionStrategy do
     def reflect(_candidate, _dataset, [component]) do
       %{new_texts: %{component => "1.0"}}
     end
+  end
+
+  defmodule VersionedParentSelector do
+    @behaviour CandidateSelector
+
+    defstruct [:version]
+
+    @impl true
+    def select_candidate(_selector, state, rng_state) do
+      {List.last(state.candidates).id, rng_state}
+    end
+
+    @impl true
+    def identity(selector), do: %{"version" => selector.version}
   end
 
   test "released reflection strategy executes through the public API and resumes from JSON" do
@@ -209,6 +223,63 @@ defmodule Imp.Optimize.Anything.StrategyConfigTest do
       )
 
     assert resumed.checkpoint["iteration"] == 2
+    assert Result.best_candidate(resumed) == "2"
+  end
+
+  test "checkpoint resume rejects parent-candidate selector config drift before evaluation" do
+    evaluator_calls = start_supervised!({Agent, fn -> 0 end})
+
+    evaluator = fn candidate, _example ->
+      Agent.update(evaluator_calls, &(&1 + 1))
+      String.to_integer(candidate)
+    end
+
+    proposer = fn _candidate, _component, _records, iteration -> Integer.to_string(iteration) end
+
+    run = fn selector, overrides ->
+      Anything.run(
+        "0",
+        evaluator,
+        Keyword.merge(
+          [
+            dataset: [%{id: :train}],
+            valset: [%{id: :selection}],
+            fallback_proposer: proposer,
+            config:
+              Config.new(
+                engine: [
+                  max_candidate_proposals: 2,
+                  candidate_selection_strategy: selector
+                ]
+              )
+          ],
+          overrides
+        )
+      )
+    end
+
+    {:checkpoint, checkpoint} =
+      catch_throw(
+        run.(%VersionedParentSelector{version: "v1"},
+          checkpoint_fn: fn checkpoint ->
+            if checkpoint["iteration"] == 1,
+              do: throw({:checkpoint, checkpoint}),
+              else: :ok
+          end
+        )
+      )
+
+    calls_before_resume = Agent.get(evaluator_calls, & &1)
+
+    assert_raise ArgumentError, ~r/candidate selection.*identity mismatch/, fn ->
+      run.(%VersionedParentSelector{version: "v2"}, resume_state: checkpoint)
+    end
+
+    assert Agent.get(evaluator_calls, & &1) == calls_before_resume
+
+    resumed =
+      run.(%VersionedParentSelector{version: "v1"}, resume_state: checkpoint)
+
     assert Result.best_candidate(resumed) == "2"
   end
 

@@ -15,7 +15,9 @@ defmodule Imp.Optimizer.GEPA.CandidateSelector do
 
   @callback select_candidate(Engine.State.t(), :rand.state()) :: selection()
   @callback select_candidate(struct(), Engine.State.t(), :rand.state()) :: selection()
-  @optional_callbacks select_candidate: 2, select_candidate: 3
+  @callback identity() :: term()
+  @callback identity(struct()) :: term()
+  @optional_callbacks select_candidate: 2, select_candidate: 3, identity: 0, identity: 1
 
   @built_ins [:pareto, :current_best, :epsilon_greedy, :top_k_pareto]
 
@@ -35,6 +37,28 @@ defmodule Imp.Optimizer.GEPA.CandidateSelector do
     raise ArgumentError,
           ":candidate_selection_strategy must be a released strategy, selector module, or selector struct, got: " <>
             inspect(strategy)
+  end
+
+  @doc false
+  def checkpoint_identity!(strategy) when strategy in @built_ins,
+    do: %{kind: :built_in, name: strategy}
+
+  def checkpoint_identity!(%module{} = strategy) do
+    unless function_exported?(module, :identity, 1) do
+      raise ArgumentError,
+            "durable custom candidate selector #{inspect(module)} must implement identity/1"
+    end
+
+    %{kind: :struct, module: Atom.to_string(module), identity: module.identity(strategy)}
+  end
+
+  def checkpoint_identity!(module) when is_atom(module) do
+    identity =
+      if function_exported?(module, :identity, 0),
+        do: module.identity(),
+        else: :stateless
+
+    %{kind: :module, module: Atom.to_string(module), identity: identity}
   end
 
   @doc false
