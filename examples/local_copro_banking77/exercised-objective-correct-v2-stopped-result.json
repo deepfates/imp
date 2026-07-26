@@ -1,0 +1,71 @@
+{
+  "treatment_id": "local-copro-banking77-objective-correct-v2",
+  "status": "stopped",
+  "task": "four-intent opaque-route Banking77 classification",
+  "models": {
+    "task": "retained verified MLX-fused Qwen2.5-0.5B-Instruct-4bit artifact",
+    "proposer": "ollama:llama3.2:3b@a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+  },
+  "split_sizes": {
+    "copro_train_and_selection": 16,
+    "optimizer_heldout_test": 40
+  },
+  "search": {
+    "baseline_score": 56.25,
+    "candidate_score": 62.5,
+    "selected": "candidate",
+    "selected_instruction": "Select a valid route code from the available options based on the customer's input.",
+    "candidate_instruction_rendered_calls": 16,
+    "logical_calls": 33,
+    "transport_attempts": 33
+  },
+  "optimizer_heldout_test": {
+    "baseline": {
+      "accuracy": 0.475,
+      "macro_f1": 0.33333333333333337,
+      "parse_errors": 0,
+      "logical_calls": 40,
+      "transport_attempts": 40,
+      "reproduction_sha256": "2c47c40a8aee091bb2331ed9d7e9b73e16de9d85d26d71a7c94e2b4cd56b4152"
+    },
+    "selected": {
+      "accuracy": 0.55,
+      "macro_f1": 0.46512886090891203,
+      "parse_errors": 0,
+      "logical_calls": 40,
+      "transport_attempts": 40,
+      "reproduction_sha256": "ae3340ad1cddb5e6b592afa01bbf724c424af3ce1f54f7f8910b72936474562c"
+    }
+  },
+  "fresh_process": {
+    "exact_artifact_identity": true,
+    "artifact_application": "succeeded after bd3e19b",
+    "accuracy": 0.575,
+    "macro_f1": 0.5145941015506232,
+    "parse_errors": 0,
+    "logical_calls": 40,
+    "transport_attempts": 40,
+    "rendered_instruction_count": 40,
+    "reproduction_sha256": "2a52740ce6898bfab659fcb853e9c4acdd18e10c0b19dbbe72a32bcde966d377",
+    "byte_identical": false,
+    "differing_rows": [
+      {
+        "id": "banking77-test-1088",
+        "parent_prediction": "R68",
+        "fresh_prediction": "R42",
+        "expected": "R42"
+      }
+    ]
+  },
+  "retained_stage_sha256": {
+    "preflight": "a14130e597f0ef19809dd5fa42a09761817281877dc582659b758c4b00042d5d",
+    "optimization": "b68bc3f43a173d3ed3f02806c3962ef80b17c69d639543a619384db07f285135",
+    "baseline_heldout": "e31a7c2add05a8f132d1595524d1c37bcd8e0eb5bf5f6d471602c0a29048e2fe",
+    "selected_heldout": "a84ea0a5613b1d1e8a6d3f8efbdd4daa31808756dd77a10ffdeb5ac509518f68",
+    "selected_parameters": "f1e21662211dc24c72b8e852192d4ec43e990b9c4ccf524bba226edd3cae62e4",
+    "training_job": "8f25d1a86b6ec5423e83a66803e418b6e9fc2f0844332ea48f4f94a6abe7cab5"
+  },
+  "stop_reason": "The exact selected artifact loaded and served in a fresh OS BEAM, but one of forty ordered predictions differed from the retained selected-stage result, so the byte-identical lifecycle acceptance failed.",
+  "diagnosis": "The saved artifact, exact served-model identity, selected instruction rendering, call counts, and parse contract all matched. The retained evidence does not include request bytes or token logits, so it cannot distinguish backend numerical/state dependence from an unobserved request difference.",
+  "claim_boundary": "This one task/model execution proves a genuine source-correct COPRO instruction mutation, trainset selection, task-specific held-out lift in the parent process, durable artifact application, and exact fused-artifact serving after restart. It does not prove byte-identical generation across MLX server restarts, general COPRO effectiveness, multi-seed effectiveness, whole-optimizer parity, production reliability, or BEAM superiority."
+}

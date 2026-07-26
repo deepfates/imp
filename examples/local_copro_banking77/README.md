@@ -87,3 +87,24 @@ uniqueness. V2 changes only that repaired proposal prompt: task/proposer models
 and digests, 16/40 rows, schema, metric, breadth/depth/temperature, call budget,
 and one-attempt policy remain unchanged. It executes once and may still retain
 baseline or stop without held-out access.
+
+The immutable V2 execution is retained in
+`exercised-objective-correct-v2-stopped-result.json`. The proposal was a real
+instruction mutation, improved COPRO's sixteen-row train selection score from
+`56.25%` to `62.5%`, and reached all sixteen candidate calls. On the forty
+optimizer-held-out rows, the selected program improved accuracy from `47.5%`
+to `55.0%` and macro-F1 from `0.3333` to `0.4651`, with no parse errors.
+
+The selected parameter artifact initially exposed a product bug: artifact
+compatibility rejected COPRO's source-owned final-output-prefix mutation.
+Commit `bd3e19b` now permits only output-prefix and instruction changes while
+keeping field names, kinds, types, constraints, descriptions, metadata, and
+input prefixes exact. The continuation loaded that artifact, served the exact
+fused model in a fresh OS BEAM, rendered the selected instruction for all forty
+single-attempt calls, and produced no parse errors. It nevertheless differed
+on one ordered prediction, so the byte-identical lifecycle acceptance failed
+and the run remains stopped. The retained evidence cannot decide whether that
+single-row difference came from MLX backend state/numerics or an unobserved
+wire difference. The parent-process held-out lift is task-specific evidence;
+it is not general or multi-seed COPRO effectiveness, full parity, production
+reliability, or BEAM superiority.
