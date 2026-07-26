@@ -1070,7 +1070,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "new/1"
       ],
@@ -1090,7 +1090,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "new/3"
       ],
@@ -1128,7 +1128,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "lookup/1",
         "start/2",
@@ -1170,7 +1170,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "new/1",
         "verify_job/1"
@@ -1239,7 +1239,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "new/1"
       ],
@@ -1259,7 +1259,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "fulfill/2",
         "merge_status/2",
@@ -1358,7 +1358,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "req_llm_dispatcher/2",
         "resume/3",
@@ -1414,7 +1414,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "verify/2",
         "verify_job/1"
@@ -1438,7 +1438,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "start/2",
         "start_base/1",
@@ -1481,7 +1481,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "generate/3"
       ],
@@ -1517,7 +1517,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "artifact!/1",
         "artifact/1",
@@ -1601,7 +1601,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "new/1"
       ],
@@ -1792,7 +1792,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "active_status?/1",
         "cancel/1",

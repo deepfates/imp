@@ -56,6 +56,9 @@ defmodule PublicAPIManifestTest do
     assert %{"kind" => "type", "name" => "t/0"} in modules["Imp.Example"]["types"]
     assert %{"name" => "call/2", "optional" => false} in modules["Imp.Module"]["callbacks"]
     assert modules["Imp.Optimizer"]["category"] == "spi"
+    assert modules["Imp.Clients.ReqLLM"]["category"] == "stable"
+    assert modules["Imp.Clients.TrainingJob"]["category"] == "experimental"
+    assert modules["Imp.Clients.TRLTrainer"]["category"] == "experimental"
 
     assert %{"name" => "run/3", "optional" => false} in modules["Imp.Optimizer"][
              "callbacks"
