@@ -70,6 +70,10 @@ defmodule Imp.Optimizer.InferRules do
     :timeout
   ]
 
+  @compile_option_schema [
+    teacher: [type: :any, default: nil]
+  ]
+
   def new(metric, opts \\ []) do
     Imp.FunctionContract.validate!(
       metric,
@@ -103,19 +107,27 @@ defmodule Imp.Optimizer.InferRules do
 
   @impl true
   def run(%__MODULE__{} = optimizer, program, opts) do
-    invocation = Imp.Optimizer.invocation_options(opts)
-    {teacher, invocation} = Keyword.pop(invocation, :teacher)
+    invocation =
+      opts
+      |> Imp.Optimizer.invocation_options()
+      |> validate_compile_options!()
 
-    with :ok <- Imp.Optimizer.reject_options(invocation) do
-      {:ok,
-       compile(
-         optimizer,
-         program,
-         Imp.Optimizer.fetch_dataset!(opts, :trainset),
-         Keyword.get(opts, :validation),
-         teacher: teacher
-       )}
-    end
+    {:ok,
+     compile(
+       optimizer,
+       program,
+       Imp.Optimizer.fetch_dataset!(opts, :trainset),
+       Keyword.get(opts, :validation),
+       invocation
+     )}
+  end
+
+  @impl true
+  def validate_invocation_options(opts) do
+    _validated = validate_compile_options!(opts)
+    :ok
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset),
@@ -126,6 +138,7 @@ defmodule Imp.Optimizer.InferRules do
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset, opts)
       when is_list(opts) do
+    opts = validate_compile_options!(opts)
     {trainset, devset} = datasets(trainset, devset)
     ensure_predictors!(program)
 
@@ -203,6 +216,11 @@ defmodule Imp.Optimizer.InferRules do
     attach_report(best, report)
   end
 
+  def compile(%__MODULE__{}, _program, _trainset, _devset, opts) do
+    raise ArgumentError,
+          "Imp.Optimizer.InferRules.compile/5 expects keyword options, got: #{inspect(opts)}"
+  end
+
   defp format_examples(examples, %Imp.Signature{} = signature) do
     input_names = Imp.Signature.input_names(signature)
     output_names = Imp.Signature.output_names(signature)
@@ -216,6 +234,14 @@ defmodule Imp.Optimizer.InferRules do
       "Input Fields:\n#{inputs}\n\n=========\nOutput Fields:\n#{outputs}\n\n"
     end)
     |> Enum.join()
+  end
+
+  defp validate_compile_options!(opts) do
+    Imp.Options.validate!(
+      opts,
+      @compile_option_schema,
+      "Imp.Optimizer.InferRules.compile/5"
+    )
   end
 
   defp build_candidates(%{candidates: candidates}, baseline, _trainset, _rule_lm)
