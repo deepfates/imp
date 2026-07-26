@@ -1,0 +1,21 @@
+{
+  "accepted_augmented_demos": 4,
+  "artifact_identity": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+  "augmented_demo_rendered_calls": 24,
+  "candidate_scores": [
+    {"kind": "zero_shot", "score": 62.5, "seed": -3},
+    {"kind": "shuffled_bootstrap", "score": 50.0, "seed": 0},
+    {"kind": "labels_only", "score": 25.0, "seed": -2},
+    {"kind": "unshuffled_bootstrap", "score": 25.0, "seed": -1}
+  ],
+  "claim_boundary": "One retained-model/task RandomSearch lifecycle with real local teacher bootstrap; not general effectiveness, exact RNG parity, reliability, or BEAM superiority.",
+  "fresh_byte_identical": true,
+  "optimization_calls": {"task": 32, "teacher": 10, "transports": 42},
+  "run_id": "local-random-search-banking77-v1",
+  "selected_kind": "zero_shot",
+  "selected_seed": -3,
+  "selected_test": {"accuracy": 0.475, "errors": 0, "macro_f1": 0.33333333333333337},
+  "split_sizes": {"frozen_test": 40, "selection": 8, "train": 16},
+  "status": "complete",
+  "teacher_model": "llama3.2:3b"
+}

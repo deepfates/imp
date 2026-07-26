@@ -83,6 +83,13 @@ retrieves real training neighbors for the fused classifier, renders accepted
 demonstrations, rejects a worse validation result, and reproduces the selected
 saved program after a fresh OS restart.
 
+For standalone demo-set search, the
+[Banking77 RandomSearch example](examples/local_random_search_banking77/README.md)
+uses a separate real local teacher, proves accepted augmented demonstrations
+reach fused-model candidate messages, honestly retains zero-shot when every
+demo candidate is worse, and reproduces the selected saved program after a
+fresh OS restart.
+
 For introspective minibatch search, the
 [Banking77 SIMBA example](examples/local_simba_banking77/README.md) samples the
 same real fused task model, evaluates a genuine demonstration mutation, rejects
