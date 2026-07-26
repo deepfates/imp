@@ -13,6 +13,7 @@ defmodule Imp.Optimizer.Report do
   @optimizer_report_tag_keys MapSet.put(@report_keys, "__imp_type__")
   @atom_tag_keys MapSet.new(["__imp_type__", "value"])
   @tuple_tag_keys MapSet.new(["__imp_type__", "items"])
+  @improper_list_tag_keys MapSet.new(["__imp_type__", "heads", "tail"])
   @example_tag_keys MapSet.new(["__imp_type__", "fields", "input_keys", "demos"])
   @image_tag_keys MapSet.new([
                     "__imp_type__",
@@ -243,7 +244,19 @@ defmodule Imp.Optimizer.Report do
     end
   end
 
-  defp dump_value(list) when is_list(list), do: Enum.map(list, &dump_value/1)
+  defp dump_value(list) when is_list(list) do
+    case split_list(list) do
+      {:proper, items} ->
+        Enum.map(items, &dump_value/1)
+
+      {:improper, heads, tail} ->
+        %{
+          "__imp_type__" => "improper_list",
+          "heads" => Enum.map(heads, &dump_value/1),
+          "tail" => dump_value(tail)
+        }
+    end
+  end
 
   defp dump_value(tuple) when is_tuple(tuple) do
     %{
@@ -313,7 +326,19 @@ defmodule Imp.Optimizer.Report do
     end
   end
 
-  defp dump_projection(list) when is_list(list), do: Enum.map(list, &dump_projection/1)
+  defp dump_projection(list) when is_list(list) do
+    case split_list(list) do
+      {:proper, items} ->
+        Enum.map(items, &dump_projection/1)
+
+      {:improper, heads, tail} ->
+        %{
+          "__imp_type__" => "improper_list",
+          "heads" => Enum.map(heads, &dump_projection/1),
+          "tail" => dump_projection(tail)
+        }
+    end
+  end
 
   defp dump_projection(tuple) when is_tuple(tuple) do
     %{
@@ -376,6 +401,21 @@ defmodule Imp.Optimizer.Report do
     state
     |> Map.delete("__imp_type__")
     |> load()
+  end
+
+  defp load_value(%{"__imp_type__" => "improper_list"} = state) do
+    validate_exact_tag!(state, @improper_list_tag_keys, "improper list")
+
+    case state do
+      %{"heads" => heads, "tail" => tail} when is_list(heads) and heads != [] ->
+        heads
+        |> Enum.map(&load_value/1)
+        |> Enum.reverse()
+        |> Enum.reduce(load_value(tail), fn head, acc -> [head | acc] end)
+
+      _state ->
+        raise ArgumentError, "malformed Imp improper-list JSON tag"
+    end
   end
 
   defp load_value(%{"__imp_type__" => "example"} = state) do
@@ -496,6 +536,11 @@ defmodule Imp.Optimizer.Report do
       raise ArgumentError, "malformed Imp #{tag_name} JSON tag"
     end
   end
+
+  defp split_list(list), do: split_list(list, [])
+  defp split_list([], reversed), do: {:proper, Enum.reverse(reversed)}
+  defp split_list([head | tail], reversed), do: split_list(tail, [head | reversed])
+  defp split_list(tail, reversed), do: {:improper, Enum.reverse(reversed), tail}
 
   defp reject_canonical_key_collisions!(map, context) do
     _keys =

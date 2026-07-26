@@ -134,6 +134,25 @@ defmodule OptimizerReportTest do
            |> Imp.Optimizer.Report.decode_term() == value
   end
 
+  test "lossless term codec preserves improper provider metadata lists" do
+    value = %{headers: [{"x-request-id", "req-1"} | "messages"]}
+
+    encoded = Imp.Optimizer.Report.encode_term(value)
+
+    assert encoded
+           |> Jason.encode!()
+           |> Jason.decode!()
+           |> Imp.Optimizer.Report.decode_term() == value
+
+    assert_raise ArgumentError, ~r/malformed Imp improper-list JSON tag/, fn ->
+      Imp.Optimizer.Report.decode_term(%{
+        "__imp_type__" => "improper_list",
+        "heads" => [],
+        "tail" => "messages"
+      })
+    end
+  end
+
   test "public report serialization drops credential-bearing fields" do
     report =
       Imp.Optimizer.Report.new(%{
