@@ -113,10 +113,11 @@ protects the caller's source program when bootstrap or rule induction regresses.
 
 For arbitrary structured artifacts, the
 [retry-policy Optimize Anything example](examples/local_optimize_anything_retry_policy/README.md)
-uses a local model under an exact component schema to improve a mixed
-boolean/integer configuration, selects it on separate scenarios, applies the
-native map to the real policy evaluator, and reproduces improved untouched
-behavior in a fresh OS BEAM.
+starts with a provider-free two-domain walkthrough that applies native retry
+and scheduling artifacts, resumes them from checkpoints, contains malformed
+proposals, and reproduces both consumers in a fresh OS BEAM. The same example
+also includes a separately scoped local-model retry-policy run under an exact
+component schema.
 
 For local weight optimization, the
 [Banking77 GRPO example](examples/local_grpo_banking77/README.md) runs ordinary

@@ -1,5 +1,42 @@
 # Local Optimize Anything retry policy
 
+## Provider-free two-domain walkthrough
+
+`provider_free.exs` is the quickest ordinary OA lifecycle: it needs no model,
+provider, benchmark command, or retained campaign artifact. From this directory:
+
+```sh
+mix deps.get
+IMP_OA_PROVIDER_FREE_OUTPUT=/tmp/imp-oa-two-domains mix run provider_free.exs
+```
+
+The same public `Imp.Optimize.Anything.run/3` entry point optimizes two native
+JSON-safe artifacts with different executable boundaries:
+
+- a retry-controller configuration is installed into a function that returns
+  `drop`, `escalate`, or an exact retry delay;
+- a scheduling heuristic is installed into a function that returns a concrete
+  dispatch order for heterogeneous work.
+
+Both runs use disjoint train, selection, and untouched-test rows. A deterministic
+consumer-owned `StructuredStrategy` proposes a known candidate, the run is
+interrupted after its sealed proposal round, and JSON checkpoint resume must not
+repeat evaluation. The selected native map and complete result are persisted,
+loaded, applied to the real consumer functions in a fresh OS BEAM, and required
+to reproduce identical ordered outcomes. Companion proposals demonstrate two
+fail-closed paths: a partial retry artifact and a scheduler mutation outside the
+selected component.
+
+This walkthrough proves the generic OA loop and Imp-native structured extension
+can validate, isolate, select, resume, persist, and apply artifacts in two
+different domains. The deterministic target strategies make it lifecycle and
+application evidence, not proposal intelligence or general effectiveness.
+Pinned upstream v0.1.4 compatibility remains the separate string/`dict[str,
+str]` surface; the mixed boolean/integer/nested maps here are intentionally an
+Imp extension.
+
+## Local model retry-policy run
+
 This ordinary local example optimizes a mixed-type retry-controller
 configuration through `Imp.Optimize.Anything.run/3`. The artifact contains
 booleans and integers; a pinned local `phi4:latest` proposes strict replacement
