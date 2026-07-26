@@ -87,3 +87,13 @@ six exact untouched cases and reproduced byte-for-byte after fresh load. This
 proves that ordinary round-robin search contains malformed fields and executes
 valid mutations independently, but it still does not provide an admitted OA
 mutation or usefulness lift.
+
+The current `local-oa-retry-policy-typed-round-robin-v1` condition changes only
+the proposal transport contract: `structured_response_format: :required` sends
+the exact selected component type as a strict JSON schema, wrapped under a
+single `value` field. The wrapper is transport framing and is removed before
+the existing seed-derived shape validator runs. The same pinned `phi4` model,
+six round-robin fields, objective, seed artifact, evaluator, budgets, and 8/6/6
+split remain in force. The schema is part of the durable structured-candidate
+identity, so a checkpoint cannot be resumed under a different proposal
+contract.

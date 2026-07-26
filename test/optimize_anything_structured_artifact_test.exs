@@ -5,6 +5,17 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
   alias Imp.Optimize.Anything.{Config, Result}
   alias Imp.Optimizer.Report
 
+  defmodule SchemaCapableLM do
+    defstruct [:owner, :response]
+
+    def generate(lm, _messages, opts) do
+      send(lm.owner, {:schema_lm_opts, opts})
+      {:ok, lm.response}
+    end
+
+    def response_format_capability(_lm), do: Imp.LM.Capability.json_schema()
+  end
+
   test "optimizes a native mixed-type artifact without exposing the text-engine codec" do
     receiver = self()
 
@@ -197,6 +208,117 @@ defmodule Imp.Optimize.Anything.StructuredArtifactTest do
     assert result.candidates == [seed, target]
     assert result.validation_scores == [0.0, 1.0]
     assert Result.best_candidate(result) == target
+  end
+
+  test "required structured response format sends the exact component schema and unwraps transport framing" do
+    seed = %{enabled: false, retries: 1}
+
+    lm = %SchemaCapableLM{owner: self(), response: ~s({"value":true})}
+
+    result =
+      Anything.run(
+        seed,
+        fn artifact, _example -> if artifact.enabled, do: 1.0, else: 0.0 end,
+        dataset: [:train],
+        valset: [:selection],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1],
+            reflection: [
+              reflection_lm: lm,
+              module_selector: :round_robin,
+              structured_response_format: :required
+            ]
+          )
+      )
+
+    assert Result.best_candidate(result) == %{enabled: true, retries: 1}
+
+    assert_receive {:schema_lm_opts,
+                    [
+                      response_format: %{
+                        type: "json_schema",
+                        json_schema: %{
+                          strict: true,
+                          schema: %{
+                            "additionalProperties" => false,
+                            "properties" => %{"value" => %{"type" => "boolean"}},
+                            "required" => ["value"],
+                            "type" => "object"
+                          }
+                        }
+                      }
+                    ]}
+  end
+
+  test "auto structured response format is capability gated and persisted" do
+    config =
+      Config.new(
+        engine: [max_candidate_proposals: 0],
+        reflection: [structured_response_format: :auto]
+      )
+
+    assert config |> Config.to_map() |> Jason.encode!() |> Jason.decode!() |> Config.from_map() ==
+             config
+
+    receiver = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          send(receiver, {:unstructured_opts, opts})
+          ~s({"value":true})
+        end
+      )
+
+    result =
+      Anything.run(
+        %{enabled: false},
+        fn artifact, _example -> if artifact.enabled, do: 1.0, else: 0.0 end,
+        dataset: [:train],
+        valset: [:selection],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1],
+            reflection: [reflection_lm: lm, structured_response_format: :auto]
+          )
+      )
+
+    assert Result.best_candidate(result) == %{enabled: true}
+    assert_receive {:unstructured_opts, opts}
+    refute Keyword.has_key?(opts, :response_format)
+  end
+
+  test "structured response contract is bound into durable candidate identity" do
+    seed = %{enabled: false}
+    evaluator = fn artifact, _example -> if artifact.enabled, do: 1.0, else: 0.0 end
+    proposer = fn _artifact, _component, _records, _iteration -> true end
+
+    result =
+      Anything.run(seed, evaluator,
+        dataset: [:train],
+        valset: [:selection],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1],
+            reflection: [structured_response_format: :required]
+          ),
+        fallback_proposer: proposer
+      )
+
+    assert_raise ArgumentError, ~r/resume checkpoint is invalid/, fn ->
+      Anything.run(seed, evaluator,
+        dataset: [:train],
+        valset: [:selection],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1],
+            reflection: [structured_response_format: :off]
+          ),
+        fallback_proposer: proposer,
+        resume_state: result.checkpoint
+      )
+    end
   end
 
   test "evaluator failures retain the native artifact when exceptions are configured as scores" do

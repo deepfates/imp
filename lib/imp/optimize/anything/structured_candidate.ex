@@ -11,22 +11,49 @@ defmodule Imp.Optimize.Anything.StructuredCandidate do
   @payload_type "imp_optimize_anything_structured_component"
   @payload_version 1
 
-  @enforce_keys [:schema, :digest]
-  defstruct [:schema, :digest]
+  @enforce_keys [:schema, :digest, :proposal_contract]
+  defstruct [:schema, :digest, :proposal_contract]
 
-  @type t :: %__MODULE__{schema: map(), digest: String.t()}
+  @type t :: %__MODULE__{
+          schema: map(),
+          digest: String.t(),
+          proposal_contract: :off | :auto | :required
+        }
 
   @doc false
-  def new!(artifact) when is_map(artifact) and map_size(artifact) > 0 do
+  def new!(artifact, proposal_contract \\ :off)
+
+  def new!(artifact, proposal_contract)
+      when is_map(artifact) and map_size(artifact) > 0 and
+             proposal_contract in [:off, :auto, :required] do
     validate_component_keys!(artifact)
     schema = Map.new(artifact, fn {key, value} -> {key, schema!(value, [key])} end)
-    digest = schema |> :erlang.term_to_binary([:deterministic]) |> sha256()
-    %__MODULE__{schema: schema, digest: digest}
+    digest = {schema, proposal_contract} |> :erlang.term_to_binary([:deterministic]) |> sha256()
+    %__MODULE__{schema: schema, digest: digest, proposal_contract: proposal_contract}
   end
 
-  def new!(artifact) do
+  def new!(artifact, proposal_contract) do
     raise ArgumentError,
-          "structured Optimize Anything seed must be a non-empty map, got: #{inspect(artifact)}"
+          "structured Optimize Anything seed must be a non-empty map and proposal contract must be :off, :auto, or :required, got: #{inspect({artifact, proposal_contract})}"
+  end
+
+  @doc false
+  def response_format(%__MODULE__{} = codec, component) do
+    schema = codec |> fetch_schema!(component) |> json_schema()
+
+    %{
+      type: "json_schema",
+      json_schema: %{
+        name: "imp_optimize_anything_component",
+        strict: true,
+        schema: %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "properties" => %{"value" => schema},
+          "required" => ["value"]
+        }
+      }
+    }
   end
 
   @doc false
@@ -103,6 +130,7 @@ defmodule Imp.Optimize.Anything.StructuredCandidate do
     response = extract_fenced_text(response)
 
     with {:ok, decoded} <- Jason.decode(response),
+         decoded <- unwrap_response_value(decoded),
          {:ok, normalized} <- normalize(fetch_schema!(codec, component), decoded, [component]) do
       encoded = encode_component!(codec, component, normalized)
 
@@ -317,6 +345,37 @@ defmodule Imp.Optimize.Anything.StructuredCandidate do
 
   defp json_value(value) when is_list(value), do: Enum.map(value, &json_value/1)
   defp json_value(value), do: value
+
+  defp unwrap_response_value(%{"value" => value} = response) when map_size(response) == 1,
+    do: value
+
+  defp unwrap_response_value(response), do: response
+
+  defp json_schema(:string), do: %{"type" => "string"}
+  defp json_schema(:boolean), do: %{"type" => "boolean"}
+  defp json_schema(:integer), do: %{"type" => "integer"}
+  defp json_schema(:float), do: %{"type" => "number"}
+  defp json_schema(:null), do: %{"type" => "null"}
+
+  defp json_schema({:list, items}) do
+    %{
+      "type" => "array",
+      "prefixItems" => Enum.map(items, &json_schema/1),
+      "minItems" => length(items),
+      "maxItems" => length(items)
+    }
+  end
+
+  defp json_schema({:map, fields}) do
+    properties = Map.new(fields, fn {key, value} -> {to_string(key), json_schema(value)} end)
+
+    %{
+      "type" => "object",
+      "additionalProperties" => false,
+      "properties" => properties,
+      "required" => properties |> Map.keys() |> Enum.sort()
+    }
+  end
 
   defp extract_fenced_text(text) do
     case Regex.run(~r/```[^\n]*\n(.*?)```/s, text, capture: :all_but_first) do

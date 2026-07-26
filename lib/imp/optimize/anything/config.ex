@@ -296,13 +296,17 @@ defmodule Imp.Optimize.Anything.Config do
     alias Imp.Optimize.Anything.Config.Persistence
     alias Imp.Optimizer.GEPA.ReflectionStrategy
 
-    @enum_fields [:batch_sampler, :module_selector]
+    @enum_fields [:batch_sampler, :module_selector, :structured_response_format]
     @schema [
       skip_perfect_score: [type: :boolean, default: false],
       perfect_score: [type: :any, default: nil],
       batch_sampler: [type: :any, default: :epoch_shuffled],
       reflection_minibatch_size: [type: {:or, [:pos_integer, nil]}, default: nil],
       module_selector: [type: :any, default: :round_robin],
+      structured_response_format: [
+        type: {:in, [:off, :auto, :required]},
+        default: :off
+      ],
       reflection_strategy: [type: :any, default: nil],
       reflection_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
       reflection_prompt_template: [type: {:or, [:string, :map, nil]}, default: nil],
@@ -314,6 +318,7 @@ defmodule Imp.Optimize.Anything.Config do
               batch_sampler: :epoch_shuffled,
               reflection_minibatch_size: nil,
               module_selector: :round_robin,
+              structured_response_format: :off,
               reflection_strategy: nil,
               reflection_lm: nil,
               reflection_prompt_template: nil,

@@ -48,6 +48,14 @@ hash and checkpoint it. The seed fixes exact map keys, list lengths, and value
 types; malformed, partial, type-changing, and no-op proposals are rejected.
 The `__imp_type__` key is reserved at every depth for Imp's durable wire tags.
 
+`reflection.structured_response_format` controls typed proposal transport for
+structured artifacts. `:required` sends the exact component schema, `:auto`
+uses it only when the LM declares schema support, and `:off` (the default)
+keeps the pinned text reflection transport. The strict provider envelope has
+the form `{"value": ...}` and is removed before the native artifact is
+validated. The selected mode contributes to checkpoint identity; changing it
+cannot silently resume prior proposal work.
+
 Structured mode currently rejects refiners, merge, external tracking, custom
 callbacks, reflection strategies, and custom candidate/module selectors because those extensions
 consume GEPA's text-component representation. Built-in selection, caching,

@@ -157,7 +157,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
 
   @model "phi4:latest"
   @digest "ac896e5b8b34a1f4efa7b14d7520725140d5512484457fab45d2a4ea14c69dba"
-  @treatment_id "local-oa-retry-policy-round-robin-v1"
+  @treatment_id "local-oa-retry-policy-typed-round-robin-v1"
 
   def run do
     cond do
@@ -195,7 +195,11 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
               cache_evaluation: false,
               acceptance_criterion: :strict_improvement
             ],
-            reflection: [reflection_lm: proposal_lm(), module_selector: :round_robin]
+            reflection: [
+              reflection_lm: proposal_lm(),
+              module_selector: :round_robin,
+              structured_response_format: :required
+            ]
           )
       )
 

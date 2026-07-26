@@ -40,5 +40,6 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyExampleTest do
     assert source =~ "IMP_OA_FRESH"
     assert source =~ "IMP_OA_SELECTED_ONLY"
     assert source =~ "cache: false"
+    assert source =~ "structured_response_format: :required"
   end
 end

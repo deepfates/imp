@@ -1037,6 +1037,17 @@ reflection strategies, and custom selectors remain text-only and are rejected up
 mode rather than receiving an encoded substitute. The `__imp_type__` key is
 reserved at every depth for Imp's durable wire tags.
 
+For model-backed structured proposals, set
+`reflection: [structured_response_format: :required]` to send a strict,
+component-specific JSON schema on every reflection call. `:auto` sends it only
+when the LM declares JSON-schema capability; the default `:off` preserves the
+pinned text-only reflection transport. The schema uses an exact
+`{"value": component}` envelope because provider structured-output protocols
+require an object root. Imp removes that transport envelope and then applies
+the same exact seed-derived key, list-length, and value-type validation. This
+mode is bound into the structured checkpoint identity, so resume refuses drift
+before evaluation.
+
 Pinned text-map workflows may instead set
 `reflection: [reflection_strategy: MyStrategy]`, where `MyStrategy` exports
 `reflect/3`. This released GEPA surface owns proposal generation and works

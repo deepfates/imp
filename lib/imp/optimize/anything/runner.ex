@@ -214,11 +214,11 @@ defmodule Imp.Optimize.Anything.Runner do
   defp normalize_seed(seed, _config, _opts, _trainset) when is_binary(seed),
     do: {%{@string_candidate_key => seed}, :string, @string_candidate_key, nil}
 
-  defp normalize_seed(seed, _config, _opts, _trainset) when is_map(seed) do
+  defp normalize_seed(seed, config, _opts, _trainset) when is_map(seed) do
     if Enum.all?(seed, fn {_component, value} -> is_binary(value) end) do
       {Candidate.validate!(seed), :named, nil, nil}
     else
-      codec = StructuredCandidate.new!(seed)
+      codec = StructuredCandidate.new!(seed, config.reflection.structured_response_format)
       {StructuredCandidate.encode_candidate!(codec, seed), :structured, nil, codec}
     end
   end
@@ -311,9 +311,14 @@ defmodule Imp.Optimize.Anything.Runner do
           structured?: not is_nil(structured_codec)
         })
 
+      lm_opts = structured_lm_opts(lm, structured_codec, component)
+
       response =
         lm
-        |> Imp.LM.generate([%{role: :user, content: Multimodal.content(prompt, images)}], [])
+        |> Imp.LM.generate(
+          [%{role: :user, content: Multimodal.content(prompt, images)}],
+          lm_opts
+        )
         |> lm_text!()
 
       if structured_codec,
@@ -322,6 +327,24 @@ defmodule Imp.Optimize.Anything.Runner do
         else: extract_fenced_text(response)
     end
   end
+
+  defp structured_lm_opts(_lm, nil, _component), do: []
+
+  defp structured_lm_opts(_lm, %StructuredCandidate{proposal_contract: :off}, _component),
+    do: []
+
+  defp structured_lm_opts(lm, %StructuredCandidate{proposal_contract: :auto} = codec, component) do
+    if Imp.LM.response_format_capability(lm).response_schema,
+      do: [response_format: StructuredCandidate.response_format(codec, component)],
+      else: []
+  end
+
+  defp structured_lm_opts(
+         _lm,
+         %StructuredCandidate{proposal_contract: :required} = codec,
+         component
+       ),
+       do: [response_format: StructuredCandidate.response_format(codec, component)]
 
   defp render_reflection_prompt(nil, %{structured?: true} = context) do
     """
@@ -351,6 +374,9 @@ defmodule Imp.Optimize.Anything.Runner do
     name. For a scalar current value such as `500`, return a scalar such as `1000`, not
     `{"#{context.component}": 1000}`. For an object or list current value, return the
     complete replacement object or list with exactly the same shape.
+
+    When the transport supplies a response schema, follow its exact `{\"value\": ...}`
+    wrapper. The wrapper is transport framing, not part of the artifact component.
     """
   end
 
