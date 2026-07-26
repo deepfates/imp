@@ -531,9 +531,9 @@ defmodule Imp.UpstreamFidelity do
       disposition: :gap,
       release_blocking: false,
       local_conformance: :structural,
-      evidence_rung: "C1",
+      evidence_rung: "C2",
       claim_boundary:
-        "local structural and behavioral conformance only; this is not paper-family reproduction evidence",
+        "pinned structural conformance plus one local operational multi-predictor lifecycle; this is not general effectiveness or paper-family reproduction evidence",
       ticket: "imp-yme4",
       imp: [Imp.Optimizer.GEPA, Imp.Optimize.Anything],
       invariants: [
@@ -541,21 +541,27 @@ defmodule Imp.UpstreamFidelity do
         "the admitted provider-free T1 differential matches 15 structural cases against the exact GEPA v0.1.4 checkout and retains its RNG, resume, and release-metadata deviations",
         "reflective mutation uses per-example feedback and trajectories in focused local tests",
         "candidate lineage, Pareto state, and source-versioned results are retained locally",
-        "C1 conformance does not establish matched upstream or paper-family outcomes"
+        "an ordinary local Banking77 workflow optimized two named predictors, retained the better baseline when reflection regressed, persisted the selected parameter artifact, and reproduced it in a fresh OS process",
+        "C2 operation does not establish matched upstream effectiveness or paper-family outcomes"
       ],
       evidence: %{
         tests: [
           "test/optimize_anything_runner_test.exs",
           "test/gepa_engine_test.exs",
+          "test/gepa_parameter_artifact_lifecycle_test.exs",
+          "test/local_gepa_banking77_example_test.exs",
           "test/gepa_contract_artifact_test.exs",
           "test/gepa_replication_artifact_test.exs"
         ],
-        docs: ["docs/ADVANCED.md", "docs/internal/RESEARCH_LANDSCAPE.md"],
+        docs: [
+          "docs/ADVANCED.md",
+          "examples/local_gepa_banking77/README.md",
+          "docs/internal/RESEARCH_LANDSCAPE.md"
+        ],
         artifacts: [
           "benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json"
         ],
         missing: [
-          "C2 real operational GEPA execution evidence",
           "C3 multi-seed held-out effectiveness under matched controls",
           "C4 full paper-family campaign evidence",
           "C5 independently reproduced outcome evidence"
@@ -593,7 +599,9 @@ defmodule Imp.UpstreamFidelity do
         "BetterTogether composes arbitrary named and repeated optimizer steps in strategy order",
         "BetterTogether evaluates the baseline and every successful prefix, selects the best validated prefix with earlier ties winning, and otherwise returns the latest successful prefix",
         "BetterTogether stops at the first failed optimizer step and returns the best candidate found so far",
-        "provider-backed weight steps complete training and rebind trained model state portably"
+        "provider-backed weight steps complete training and rebind trained model state portably",
+        "a completed local TRL job restarts only through an explicit trusted runtime, loads the verified LoRA tensors, and checks artifact identity on every generation",
+        "the same trusted runtime can serve the exact pinned base policy explicitly, so consumers can measure base and trained programs through the same Imp adapter path"
       ],
       evidence: %{
         tests: [
@@ -605,7 +613,8 @@ defmodule Imp.UpstreamFidelity do
           "test/protocol_training/provider_training_lifecycle_test.exs",
           "test/public_surface_test.exs",
           "test/trl_protocol_test.exs",
-          "test/trl_protocol_grpo_lifecycle_test.exs"
+          "test/trl_protocol_grpo_lifecycle_test.exs",
+          "test/local_grpo_opaque_banking77_example_test.exs"
         ],
         docs: [
           "docs/ADVANCED.md",
@@ -618,7 +627,7 @@ defmodule Imp.UpstreamFidelity do
         missing: [
           "paid-provider weight-training execution evidence",
           "BetterTogether paid-provider lifecycle completion",
-          "a real TRL/PyTorch worker, GRPO loss/gradient execution, and changed model weights (the current TRL protocol server is deterministic and no-model)",
+          "general or consistently useful model-sampled GRPO learning; the complete local multi-step TRL/MPS treatments changed trainable tensors and reproduced verified artifacts, but the retained source-disjoint outcomes were neutral or regressed on held-out data",
           "matched Avatar and AvatarOptimizer effectiveness",
           "matched BetterTogether and GRPO effectiveness"
         ]

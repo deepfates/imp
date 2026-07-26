@@ -80,9 +80,10 @@ defmodule Imp.UpstreamFidelityTest do
     assert gepa.status == :gap
     refute gepa.release_blocking
     assert gepa.local_conformance == :structural
-    assert gepa.evidence_rung == "C1"
-    assert gepa.claim_boundary =~ "not paper-family reproduction evidence"
-    assert Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C2 "))
+    assert gepa.evidence_rung == "C2"
+    assert gepa.claim_boundary =~ "not general effectiveness"
+    refute Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C2 "))
+    assert Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C3 "))
     assert Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C5 "))
     assert by_id["product.learning_path"].status == :conformant
     assert by_id["product.release"].status == :conformant

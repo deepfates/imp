@@ -496,21 +496,24 @@ Semantic invariants:
 - the admitted provider-free T1 differential matches 15 structural cases against the exact GEPA v0.1.4 checkout and retains its RNG, resume, and release-metadata deviations
 - reflective mutation uses per-example feedback and trajectories in focused local tests
 - candidate lineage, Pareto state, and source-versioned results are retained locally
-- C1 conformance does not establish matched upstream or paper-family outcomes
+- an ordinary local Banking77 workflow optimized two named predictors, retained the better baseline when reflection regressed, persisted the selected parameter artifact, and reproduced it in a fresh OS process
+- C2 operation does not establish matched upstream effectiveness or paper-family outcomes
 
 Executable evidence:
 
 - test: `test/optimize_anything_runner_test.exs`
 - test: `test/gepa_engine_test.exs`
+- test: `test/gepa_parameter_artifact_lifecycle_test.exs`
+- test: `test/local_gepa_banking77_example_test.exs`
 - test: `test/gepa_contract_artifact_test.exs`
 - test: `test/gepa_replication_artifact_test.exs`
 - docs: `docs/ADVANCED.md`
+- docs: `examples/local_gepa_banking77/README.md`
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json`
 
 Missing evidence or behavior:
 
-- C2 real operational GEPA execution evidence
 - C3 multi-seed held-out effectiveness under matched controls
 - C4 full paper-family campaign evidence
 - C5 independently reproduced outcome evidence
@@ -532,10 +535,8 @@ Semantic invariants:
 - BetterTogether evaluates the baseline and every successful prefix, selects the best validated prefix with earlier ties winning, and otherwise returns the latest successful prefix
 - BetterTogether stops at the first failed optimizer step and returns the best candidate found so far
 - provider-backed weight steps complete training and rebind trained model state portably
-- a completed local TRL job restarts only through an explicit trusted runtime,
-  loads the verified LoRA tensors, and checks artifact identity on every generation
-- the same trusted runtime can serve the exact pinned base policy explicitly,
-  so consumers can measure base and trained programs through the same Imp adapter path
+- a completed local TRL job restarts only through an explicit trusted runtime, loads the verified LoRA tensors, and checks artifact identity on every generation
+- the same trusted runtime can serve the exact pinned base policy explicitly, so consumers can measure base and trained programs through the same Imp adapter path
 
 Executable evidence:
 
@@ -548,7 +549,7 @@ Executable evidence:
 - test: `test/public_surface_test.exs`
 - test: `test/trl_protocol_test.exs`
 - test: `test/trl_protocol_grpo_lifecycle_test.exs`
-- module: `Imp.Clients.TRLDeployment`
+- test: `test/local_grpo_opaque_banking77_example_test.exs`
 - docs: `docs/ADVANCED.md`
 - docs: [docs/internal/COVERAGE_MATRIX.md](https://github.com/deepfates/imp/blob/main/docs/internal/COVERAGE_MATRIX.md) (repository only, not shipped in the package)
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
@@ -558,10 +559,7 @@ Missing evidence or behavior:
 
 - paid-provider weight-training execution evidence
 - BetterTogether paid-provider lifecycle completion
-- general or consistently useful model-sampled GRPO learning. Imp now has a
-  complete 33-step, 66-group local TRL/MPS treatment with validation-selected
-  deployment and fresh-process reproduction, but its one source-disjoint TREC
-  result regressed on held-out accuracy and macro-F1
+- general or consistently useful model-sampled GRPO learning; the complete local multi-step TRL/MPS treatments changed trainable tensors and reproduced verified artifacts, but the retained source-disjoint outcomes were neutral or regressed on held-out data
 - matched Avatar and AvatarOptimizer effectiveness
 - matched BetterTogether and GRPO effectiveness
 
