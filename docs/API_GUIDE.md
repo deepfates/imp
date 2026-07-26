@@ -867,6 +867,27 @@ program =
   )
 ```
 
+Top-level `max_errors:` and `max_concurrency:` belong to BetterTogether's
+baseline and prefix-selection evaluation. Put child optimizer controls under
+`optimizer_compile_args:`. COPRO's internal trainset evaluation, for example,
+uses its public `num_threads:` and `max_errors:` compile options:
+
+```elixir
+Imp.Optimizer.BetterTogether.compile(
+  optimizer,
+  base_program,
+  trainset,
+  validation_set,
+  strategy: [:w, :p],
+  max_concurrency: 1,
+  max_errors: :infinity,
+  optimizer_compile_args: %{p: [num_threads: 1, max_errors: :infinity]}
+)
+```
+
+BetterTogether validates declared child options before evaluating the baseline.
+Unknown COPRO options fail loudly and no child option is silently dropped.
+
 `TrainingJobAdoption` declares the training-result protocol only because
 `BetterTogether` uses that protocol for weight-bearing steps. Its result
 metadata records `training_performed: false`; it accepts only supported,

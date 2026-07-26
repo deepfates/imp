@@ -22,6 +22,12 @@ defmodule Imp.Optimizer.BetterTogether do
   submitted job. Generic asynchronous optimizers must return this job type. The
   default weight optimizer has no inferred provider: callers must replace it or
   configure a BootstrapFinetune trainer before a weight-bearing strategy can run.
+
+  `max_errors` and `max_concurrency` on `compile/5` control BetterTogether's
+  baseline and prefix-selection evaluations. Child-specific compile options go
+  in `optimizer_compile_args`; for example, COPRO's internal trainset evaluation
+  accepts `num_threads` and `max_errors` there. Declared child options are
+  validated before baseline evaluation, and no option is silently discarded.
   """
 
   alias Imp.Clients.TrainingJob
@@ -110,8 +116,9 @@ defmodule Imp.Optimizer.BetterTogether do
 
   def compile(%__MODULE__{} = bt, student, trainset, valset, opts \\ []) do
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.BetterTogether.compile/5")
-    :ok = ensure_report_storage(student)
     steps = strategy_steps(opts[:strategy])
+    :ok = validate_step_compile_options!(bt.optimizers, opts[:optimizer_compile_args])
+    :ok = ensure_report_storage(student)
     {trainset, valset} = prepare_validation!(trainset, valset, opts[:valset_ratio])
     evaluator = evaluator(bt.metric, valset, opts)
 
@@ -1341,6 +1348,35 @@ defmodule Imp.Optimizer.BetterTogether do
 
   defp compile_args_for(compile_args, key) do
     Map.get(compile_args, key, Map.get(compile_args, existing_atom_or_string(key), []))
+  end
+
+  defp validate_step_compile_options!(optimizers, compile_args) do
+    Enum.each(compile_args, fn {key, opts} ->
+      optimizer =
+        case fetch_optimizer(optimizers, key) do
+          {:ok, optimizer} ->
+            optimizer
+
+          {:error, reason} ->
+            raise ArgumentError,
+                  "Imp.Optimizer.BetterTogether.compile/5: invalid optimizer_compile_args " <>
+                    "for #{inspect(key)}: #{inspect(reason)}"
+        end
+
+      invocation_opts = Keyword.drop(opts, [:trainset, :validation, :teacher])
+
+      case Imp.Optimizer.validate_invocation_options(optimizer, invocation_opts) do
+        result when result in [:ok, :deferred] ->
+          :ok
+
+        {:error, reason} ->
+          raise ArgumentError,
+                "Imp.Optimizer.BetterTogether.compile/5: invalid optimizer_compile_args " <>
+                  "for #{inspect(key)}: #{inspect(reason)}"
+      end
+    end)
+
+    :ok
   end
 
   defp fetch_optimizer(optimizers, key) do

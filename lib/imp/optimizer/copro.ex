@@ -70,15 +70,26 @@ defmodule Imp.Optimizer.COPRO do
 
   @impl true
   def run(%__MODULE__{} = optimizer, program, opts) do
-    with :ok <- Imp.Optimizer.reject_options(Imp.Optimizer.invocation_options(opts)) do
-      {:ok,
-       compile(
-         optimizer,
-         program,
-         Imp.Optimizer.fetch_dataset!(opts, :trainset),
-         Keyword.get(opts, :validation, [])
-       )}
-    end
+    eval_opts = Imp.Optimizer.invocation_options(opts)
+
+    {:ok,
+     compile(
+       optimizer,
+       program,
+       Imp.Optimizer.fetch_dataset!(opts, :trainset),
+       Keyword.get(opts, :validation, []),
+       eval_opts
+     )}
+  end
+
+  @impl true
+  def validate_invocation_options(opts) do
+    _validated =
+      Imp.Options.validate!(opts, @eval_option_schema, "Imp.Optimizer.COPRO.compile/5")
+
+    :ok
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
   end
 
   # `devset` remains accepted for the Imp optimizer contract. DSPy's COPRO

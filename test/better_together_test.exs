@@ -600,6 +600,84 @@ defmodule BetterTogetherTest do
            end)
   end
 
+  test "routes COPRO evaluation options through a composed prompt step" do
+    copro =
+      Imp.Optimizer.COPRO.new(metric(),
+        breadth: 2,
+        depth: 1,
+        proposal_max_concurrency: 1
+      )
+
+    assert {:ok, direct_copro} =
+             Imp.Optimizer.run(copro, program(),
+               trainset: examples(),
+               validation: examples(),
+               num_threads: 1,
+               max_errors: :infinity
+             )
+
+    direct_report = Imp.Optimizer.Report.fetch(direct_copro)
+    assert direct_report.metadata.max_errors == :infinity
+    assert direct_report.metadata.max_errors_source == :explicit
+
+    compiled =
+      metric()
+      |> BetterTogether.new(%{
+        p: copro,
+        after_p: %CompileArgsOptimizer{owner: self()}
+      })
+      |> BetterTogether.compile(program(), examples(), examples(),
+        strategy: [:p, :after_p],
+        max_errors: 1,
+        max_concurrency: 1,
+        shuffle_trainset_between_steps: false,
+        optimizer_compile_args: %{
+          p: [num_threads: 1, max_errors: :infinity],
+          after_p: [marker: :after_copro]
+        }
+      )
+
+    assert_received {:compile_args, after_opts}
+    assert after_opts[:marker] == :after_copro
+    refute Keyword.has_key?(after_opts, :num_threads)
+    refute Keyword.has_key?(after_opts, :max_errors)
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+    assert report.errors == []
+    assert Enum.map(report.candidates, & &1.strategy) == ["", "p", "p -> after_p"]
+  end
+
+  test "rejects unsupported declared child options before baseline evaluation" do
+    owner = self()
+
+    observed_program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts ->
+              send(owner, :unexpected_baseline_call)
+              %{answer: "Paris"}
+            end
+          )
+      )
+
+    optimizer =
+      BetterTogether.new(metric(), %{
+        p: Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1)
+      })
+
+    assert_raise ArgumentError,
+                 ~r/invalid optimizer_compile_args.*unknown options.*unknown_control/s,
+                 fn ->
+                   BetterTogether.compile(optimizer, observed_program, examples(), examples(),
+                     strategy: :p,
+                     optimizer_compile_args: %{p: [unknown_control: true]}
+                   )
+                 end
+
+    refute_received :unexpected_baseline_call
+  end
+
   test "routes global and per-step teachers through a generic optimizer contract" do
     global_teacher = program()
 
