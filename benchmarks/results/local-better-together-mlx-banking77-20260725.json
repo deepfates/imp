@@ -1,0 +1,44 @@
+{
+  "__imp_type__": "map",
+  "entries": [
+    [
+      {
+        "__imp_type__": "atom",
+        "value": "error"
+      },
+      {
+        "__imp_type__": "map",
+        "entries": [
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "message"
+            },
+            "acceptance failure: {:wrong_source_commit, \"59626147df2b0fcd49fdddaf3e7b5980b522a4fb\"}"
+          ],
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "exception"
+            },
+            "RuntimeError"
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "__imp_type__": "atom",
+        "value": "status"
+      },
+      "stopped"
+    ],
+    [
+      {
+        "__imp_type__": "atom",
+        "value": "elapsed_ms"
+      },
+      30
+    ]
+  ]
+}
