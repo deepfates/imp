@@ -548,7 +548,7 @@
             "optimize!(program, optimizer, trainset)"
           ],
           "optimize!/4": [
-            "optimize!(program, optimizer, trainset, validation)"
+            "optimize!(program, optimizer, trainset, validation_or_opts)"
           ],
           "optimize!/5": [
             "optimize!(program, optimizer, trainset, validation, opts)"
@@ -557,7 +557,7 @@
             "optimize(program, optimizer, trainset)"
           ],
           "optimize/4": [
-            "optimize(program, optimizer, trainset, validation)"
+            "optimize(program, optimizer, trainset, validation_or_opts)"
           ],
           "optimize/5": [
             "optimize(program, optimizer, trainset, validation, opts)"
@@ -738,6 +738,18 @@
       "module": "Imp.Adapter.PlanFirst",
       "signatures": {},
       "source": "lib/imp/adapter/plan_first.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Adapter.SingleField",
+      "signatures": {},
+      "source": "lib/imp/adapter/single_field.ex",
       "struct_fields": [],
       "types": []
     },
@@ -1489,6 +1501,7 @@
       "source": "lib/imp/clients/trl_lm.ex",
       "struct_fields": [
         "artifact_sha256",
+        "generation_mode",
         "model",
         "response_field",
         "rollout_source",
@@ -1649,6 +1662,14 @@
           "optional": true
         },
         {
+          "name": "reinforcement_artifact/2",
+          "optional": true
+        },
+        {
+          "name": "reinforcement_artifact/3",
+          "optional": true
+        },
+        {
           "name": "reinforcement_status/1",
           "optional": true
         },
@@ -1695,6 +1716,7 @@
         "finetune/4",
         "reconcile_finetune/2",
         "reconcile_reinforcement/2",
+        "reinforcement_artifact/3",
         "reinforcement_status/2",
         "reinforcement_step/4",
         "start_reinforcement/3",
@@ -1715,6 +1737,8 @@
           "reconcile_finetune/2": [],
           "reconcile_reinforcement/1": [],
           "reconcile_reinforcement/2": [],
+          "reinforcement_artifact/2": [],
+          "reinforcement_artifact/3": [],
           "reinforcement_status/1": [],
           "reinforcement_status/2": [],
           "reinforcement_step/3": [],
@@ -1738,6 +1762,9 @@
           ],
           "reconcile_reinforcement/2": [
             "reconcile_reinforcement(provider, dispatch_id)"
+          ],
+          "reinforcement_artifact/3": [
+            "reinforcement_artifact(provider, session, selection)"
           ],
           "reinforcement_status/2": [
             "reinforcement_status(provider, session)"
@@ -3890,6 +3917,7 @@
         "init_temperature",
         "metric",
         "proposal_max_concurrency",
+        "proposal_response_format",
         "proposer_lm",
         "track_stats"
       ],
@@ -4185,6 +4213,7 @@
       "struct_fields": [
         "callback_timeout_ms",
         "checkpoint_path",
+        "checkpoint_selection",
         "failure_score",
         "format_failure_score",
         "max_status_polls",
@@ -4452,11 +4481,13 @@
       "source": "lib/imp/optimizer/mipro_v2.ex",
       "struct_fields": [
         "config",
+        "init_temperature",
         "max_concurrency",
         "max_errors",
         "metric",
         "metric_threshold",
         "prompt_lm",
+        "proposal_response_format",
         "startup_trials",
         "task_lm",
         "teacher",
@@ -4593,7 +4624,8 @@
         "validate_optional_max_errors/1",
         "validate_optional_non_negative/1",
         "validate_optional_number/1",
-        "validate_optional_positive/1"
+        "validate_optional_positive/1",
+        "validate_restrict/1"
       ],
       "kind": "struct",
       "macros": [],
@@ -4620,6 +4652,9 @@
           ],
           "validate_optional_positive/1": [
             "validate_optional_positive(value)"
+          ],
+          "validate_restrict/1": [
+            "validate_restrict(values)"
           ]
         }
       },
@@ -4829,7 +4864,14 @@
       "source": "lib/imp/optimizer/signature_optimizer.ex",
       "struct_fields": [
         "candidates",
-        "metric"
+        "extra_instructions",
+        "metric",
+        "num_candidates",
+        "proposal_response_format",
+        "proposer_lm",
+        "seed",
+        "temperature",
+        "view_data_batch_size"
       ],
       "types": []
     },

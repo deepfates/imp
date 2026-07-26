@@ -693,6 +693,11 @@ it a proposer LM for task-aware proposals grounded in the program signature and
 a bounded view of the training examples:
 
 ```elixir
+proposal_lm =
+  Imp.LM.Static.new(
+    handler: fn _messages, _opts -> ~s(["Answer with the requested field."]) end
+  )
+
 signature_optimizer =
   Imp.Optimizer.SignatureOptimizer.new(metric,
     proposer_lm: proposal_lm,
@@ -702,7 +707,7 @@ signature_optimizer =
     view_data_batch_size: 8
   )
 
-selected = Imp.optimize!(program, signature_optimizer, trainset, validation)
+selected = Imp.optimize!(program, signature_optimizer, trainset, devset)
 ```
 
 The proposal LM is called once per requested slot with a distinct deterministic
