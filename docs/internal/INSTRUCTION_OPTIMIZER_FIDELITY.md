@@ -143,7 +143,12 @@ resume; closure captures such as process handles or credentials may be rebound
 without embedding them in the artifact.
 
 Resume validates a run-configuration digest covering the program/predictor shape,
-resolved datasets, search configuration, and relevant runtime identities, then
+resolved datasets, search configuration, and relevant runtime identities. For
+MIPROv2, this includes each predictor's LM, adapter, demos, config, and dynamic
+binding policy after applying `task_lm`; observations from a paused study cannot
+therefore be resumed under a different task model or call policy. Live callback
+captures remain intentionally excluded so equivalent callbacks can acquire fresh
+process handles or credentials. Validation then
 validates a SHA-256 payload checksum and structural invariants. A different
 dataset, program shape, or search budget is rejected. These checks detect
 mismatch and accidental corruption; they are not keyed signatures, proof of

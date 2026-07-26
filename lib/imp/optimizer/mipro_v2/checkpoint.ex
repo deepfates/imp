@@ -55,7 +55,7 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
 
     unless compatibility == expected_compatibility do
       raise ArgumentError,
-            "MIPROv2 resume state does not match the program, datasets, or search configuration"
+            "MIPROv2 resume state does not match the program runtime, datasets, or search configuration"
     end
 
     loaded = %{

@@ -86,10 +86,45 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     ]
 
     assert_raise ArgumentError,
-                 ~r/does not match the program, datasets, or search configuration/,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
                  fn ->
                    MIPROv2.compile(optimizer, program, trainset, changed_valset,
                      resume_state: checkpoint
+                   )
+                 end
+  end
+
+  test "resume rejects task runtime and predictor parameter drift", %{state: state} do
+    {program, optimizer, trainset, valset} = fixture(state)
+
+    checkpoint =
+      optimizer
+      |> MIPROv2.compile(program, trainset, valset, max_trials: 1)
+      |> Report.fetch()
+      |> then(& &1.metadata.resume_state)
+      |> Jason.encode!()
+      |> Jason.decode!()
+
+    changed_lm = %{program.lm | opts: Keyword.put(program.lm.opts, :runtime_tag, :changed)}
+    changed_runtime = %{program | lm: changed_lm}
+
+    assert_raise ArgumentError,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
+                 fn ->
+                   MIPROv2.compile(optimizer, changed_runtime, trainset, valset,
+                     resume_state: checkpoint,
+                     max_trials: 0
+                   )
+                 end
+
+    changed_parameters = %{program | config: [temperature: 0.25]}
+
+    assert_raise ArgumentError,
+                 ~r/does not match the program runtime, datasets, or search configuration/,
+                 fn ->
+                   MIPROv2.compile(optimizer, changed_parameters, trainset, valset,
+                     resume_state: checkpoint,
+                     max_trials: 0
                    )
                  end
   end
