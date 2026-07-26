@@ -1428,6 +1428,49 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
+        "start/2",
+        "start_base/1",
+        "stop/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Clients.TRLDeployment",
+      "signatures": {
+        "functions": {
+          "start/2": [
+            "start(job, trainer)"
+          ],
+          "start_base/1": [
+            "start_base(trainer)"
+          ],
+          "stop/1": [
+            "stop(job)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/clients/trl_deployment.ex",
+      "struct_fields": [
+        "adapter_sha256",
+        "artifact_path",
+        "artifact_sha256",
+        "kind",
+        "lm",
+        "worker"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
         "generate/3"
       ],
       "kind": "struct",
@@ -1438,17 +1481,26 @@
           "generate/3": [
             "generate(lm, messages, opts)"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/clients/trl_lm.ex",
       "struct_fields": [
+        "artifact_sha256",
         "model",
         "response_field",
         "rollout_source",
         "timeout",
         "worker_key"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -3441,6 +3493,10 @@
         {
           "name": "run/3",
           "optional": false
+        },
+        {
+          "name": "validate_invocation_options/1",
+          "optional": true
         }
       ],
       "category": "spi",
@@ -3455,7 +3511,8 @@
       "module": "Imp.Optimizer",
       "signatures": {
         "callbacks": {
-          "run/3": []
+          "run/3": [],
+          "validate_invocation_options/1": []
         },
         "functions": {
           "capabilities/1": [
@@ -3501,6 +3558,7 @@
         "apply/4",
         "candidate/3",
         "compare/4",
+        "from_optimized_program/2",
         "inspect/1",
         "new/3",
         "parameter_candidate/3",
@@ -3522,6 +3580,9 @@
           ],
           "compare/4": [
             "compare(artifact, left, right, opts \\\\ [])"
+          ],
+          "from_optimized_program/2": [
+            "from_optimized_program(program, opts \\\\ [])"
           ],
           "inspect/1": [
             "inspect(artifact)"
@@ -3872,8 +3933,10 @@
       "category": "advanced",
       "functions": [
         "compile/5",
+        "compile_with_artifact/5",
         "compile_with_report/5",
         "new/2",
+        "validate_artifact_id/1",
         "validate_feedback_fn/1",
         "validate_proposal_concurrency/1"
       ],
@@ -3885,11 +3948,17 @@
           "compile/5": [
             "compile(optimizer, program, trainset, devset, opts \\\\ [])"
           ],
+          "compile_with_artifact/5": [
+            "compile_with_artifact(optimizer, program, trainset, devset, opts \\\\ [])"
+          ],
           "compile_with_report/5": [
             "compile_with_report(optimizer, program, trainset, devset, opts \\\\ [])"
           ],
           "new/2": [
             "new(metric, opts \\\\ [])"
+          ],
+          "validate_artifact_id/1": [
+            "validate_artifact_id(value)"
           ],
           "validate_feedback_fn/1": [
             "validate_feedback_fn(feedback_fn)"

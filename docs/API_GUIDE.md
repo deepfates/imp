@@ -694,7 +694,7 @@ report, including MIPROv2, SIMBA, InferRules, bootstrap, and random-search
 families:
 
 ```elixir
-selected = Imp.optimize!(program, optimizer, trainset, validation)
+selected = Imp.optimize!(program, optimizer, trainset, devset)
 artifact =
   Imp.Optimizer.Artifact.from_optimized_program(selected,
     artifact_id: "support-router-v1"
