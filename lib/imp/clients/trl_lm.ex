@@ -9,21 +9,20 @@ defmodule Imp.Clients.TRLLM do
 
   @behaviour Imp.LM
 
-  defstruct [:model, :worker_key, response_field: :route, timeout: 120_000]
+  defstruct [
+    :model,
+    :worker_key,
+    response_field: :route,
+    rollout_source: :model_generated,
+    timeout: 120_000
+  ]
 
   def generate(%__MODULE__{} = lm, messages, opts) do
-    with [{worker, _value}] <-
+    with :ok <- validate_rollout_source(lm),
+         [{worker, _value}] <-
            Registry.lookup(Imp.Clients.TRLWorker.Registry, lm.worker_key),
          {:ok, result} <-
-           Imp.Clients.TRLWorker.request(
-             worker,
-             %{
-               "op" => "generate",
-               "messages" => normalize_messages(messages),
-               "rollout_id" => Keyword.get(opts, :rollout_id, 0)
-             },
-             lm.timeout
-           ),
+           Imp.Clients.TRLWorker.request(worker, rollout_request(lm, messages, opts), lm.timeout),
          completion when is_binary(completion) <- result["completion"] do
       {:ok, %{lm.response_field => String.trim(completion)}}
     else
@@ -33,12 +32,35 @@ defmodule Imp.Clients.TRLLM do
     end
   end
 
+  defp validate_rollout_source(%__MODULE__{rollout_source: source})
+       when source in [:model_generated, :controlled_external],
+       do: :ok
+
+  defp validate_rollout_source(%__MODULE__{rollout_source: source}),
+    do: {:error, {:invalid_trl_rollout_source, source}}
+
   @impl true
   def generate(messages, opts) do
     case Imp.Settings.fetch!(:lm) do
       %__MODULE__{} = lm -> generate(lm, messages, opts)
       _other -> {:error, :trl_lm_not_configured}
     end
+  end
+
+  defp rollout_request(%__MODULE__{rollout_source: :model_generated}, messages, opts) do
+    %{
+      "op" => "generate",
+      "messages" => normalize_messages(messages),
+      "rollout_id" => Keyword.get(opts, :rollout_id, 0)
+    }
+  end
+
+  defp rollout_request(%__MODULE__{rollout_source: :controlled_external}, messages, opts) do
+    %{
+      "op" => "controlled_completion",
+      "messages" => normalize_messages(messages),
+      "rollout_id" => Keyword.get(opts, :rollout_id, 0)
+    }
   end
 
   defp normalize_messages(messages) do

@@ -240,6 +240,8 @@ class Worker:
             raise WorkerError("semantic_group_mismatch", "exactly one prompt group is required")
 
         encoded_groups = [self._encode_group(groups[0], 0)]
+        self._persist_prepared_group(encoded_groups)
+        self._validate_controlled_groups(encoded_groups)
         prompt_text = "\n".join(
             message["content"] for message in encoded_groups[0]["prompt"]
         )
@@ -313,6 +315,27 @@ class Worker:
             "rollout_id": rollout_id,
             "seed": seed,
             "model": self.protocol["behavior_policy"]["model"],
+            "rollout_source": "model_generated",
+        }
+
+    def controlled_completion(self, request: dict[str, Any]) -> dict[str, Any]:
+        if self.protocol is None or self.model is None or self.tokenizer is None:
+            raise WorkerError("worker_not_bound", "initialized session is required")
+        rollout_id = request.get("rollout_id")
+        controlled = self.contract.get("controlled_rollouts")
+        if not isinstance(rollout_id, int) or not isinstance(controlled, list):
+            raise WorkerError("controlled_rollout_unavailable", "controlled rollout contract is absent")
+        if rollout_id < 0 or rollout_id >= len(controlled):
+            raise WorkerError("controlled_rollout_order_mismatch", "controlled rollout id is out of order")
+        self._messages(request.get("messages"))
+        completion = controlled[rollout_id]
+        if not isinstance(completion, str) or not completion:
+            raise WorkerError("invalid_controlled_completion", "controlled completion must be non-empty text")
+        return {
+            "completion": completion,
+            "rollout_id": rollout_id,
+            "model": self.protocol["behavior_policy"]["model"],
+            "rollout_source": "controlled_external",
         }
 
     def apply_update(self, update: dict[str, Any]) -> dict[str, Any]:
@@ -610,6 +633,33 @@ class Worker:
             "samples": encoded_samples,
         }
 
+    def _persist_prepared_group(self, encoded_groups: list[dict[str, Any]]) -> None:
+        write_json(
+            self.root / "prepared-controlled-group.json",
+            {
+                "rollout_source": "controlled_external"
+                if self.contract.get("controlled_rollouts") is not None
+                else "model_generated",
+                "groups": encoded_groups,
+            },
+        )
+
+    def _validate_controlled_groups(self, encoded_groups: list[dict[str, Any]]) -> None:
+        controlled = self.contract.get("controlled_rollouts")
+        if controlled is None:
+            return
+        samples = encoded_groups[0]["samples"]
+        if not isinstance(controlled, list) or len(controlled) != len(samples):
+            raise WorkerError("controlled_rollout_count_mismatch", "controlled rollout count differs from samples")
+        for position, sample in enumerate(samples):
+            source = controlled[position]
+            rendered = f"[[ ## route ## ]]\n{source}\n\n[[ ## completed ## ]]\n"
+            if sample["completion"] not in (source, rendered):
+                raise WorkerError(
+                    "controlled_rollout_order_mismatch",
+                    "controlled completion differs from its canonical adapter rendering",
+                )
+
     def _completion_logprobs(self, prompt_ids: list[int], completion_ids: list[int]) -> list[float]:
         torch = self.torch
         ids = torch.tensor([prompt_ids + completion_ids], dtype=torch.long, device="mps")
@@ -784,6 +834,8 @@ def dispatch(worker: Worker, request: dict[str, Any]) -> Any:
         return worker._status()
     if op == "generate":
         return worker.generate(request)
+    if op == "controlled_completion":
+        return worker.controlled_completion(request)
     if op == "prepare_update":
         return worker.prepare_update(request)
     if op == "apply_update":

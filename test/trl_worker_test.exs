@@ -79,6 +79,27 @@ defmodule Imp.TRLWorkerTest do
     assert {:error, :trl_worker_not_running} = Imp.LM.generate(lm, [], rollout_id: 0)
   end
 
+  test "the controlled rollout LM remains explicit and cannot silently create a worker" do
+    lm = %TRLLM{
+      model: "Qwen/pinned",
+      worker_key: {:missing, make_ref()},
+      rollout_source: :controlled_external
+    }
+
+    assert {:error, :trl_worker_not_running} = Imp.LM.generate(lm, [], rollout_id: 0)
+  end
+
+  test "the rollout LM rejects unknown rollout sources before transport" do
+    lm = %TRLLM{
+      model: "Qwen/pinned",
+      worker_key: {:missing, make_ref()},
+      rollout_source: :not_a_rollout_source
+    }
+
+    assert {:error, {:invalid_trl_rollout_source, :not_a_rollout_source}} =
+             Imp.LM.generate(lm, [], rollout_id: 0)
+  end
+
   test "trainer projects atom-keyed Imp groups to the worker's plain JSON shape" do
     groups = [
       %{
@@ -139,5 +160,25 @@ defmodule Imp.TRLWorkerTest do
     [path] = Path.wildcard(Path.join(context.root, "*/prepared-stages/*.json"))
     assert Jason.decode!(File.read!(path)) == stage
     refute File.exists?(path <> ".tmp")
+  end
+
+  test "controlled completion source has one canonical adapter rendering", context do
+    script = """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("imp_trl_worker", #{inspect(Path.expand("../priv/trl_worker/worker.py", __DIR__))})
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    worker = object.__new__(module.Worker)
+    worker.contract = {"controlled_rollouts": ["R17", "R42", "R68", "R93"]}
+    groups = [{"samples": [
+      {"completion": "[[ ## route ## ]]\\nR17\\n\\n[[ ## completed ## ]]\\n"},
+      {"completion": "[[ ## route ## ]]\\nR42\\n\\n[[ ## completed ## ]]\\n"},
+      {"completion": "[[ ## route ## ]]\\nR68\\n\\n[[ ## completed ## ]]\\n"},
+      {"completion": "[[ ## route ## ]]\\nR93\\n\\n[[ ## completed ## ]]\\n"}
+    ]}]
+    worker._validate_controlled_groups(groups)
+    """
+
+    assert {"", 0} = System.cmd(context.python, ["-c", script], stderr_to_stdout: true)
   end
 end
