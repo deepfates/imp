@@ -116,8 +116,13 @@ For arbitrary structured artifacts, the
 starts with a provider-free two-domain walkthrough that applies native retry
 and scheduling artifacts, resumes them from checkpoints, contains malformed
 proposals, and reproduces both consumers in a fresh OS BEAM. The same example
-also includes a separately scoped local-model retry-policy run under an exact
-component schema.
+also preserves a separately scoped pinned Phi-4 run under an exact component
+schema: the model proposed a nontrivial retry-policy mutation, validation chose
+it without access to the test rows, and the applied policy improved untouched
+behavior from four to five exact cases before reproducing in a fresh OS BEAM.
+The deterministic walkthrough proves arbitrary-artifact lifecycle and
+application; the one-task/model run is narrow proposer/usefulness evidence, not
+general Optimize Anything effectiveness.
 
 For local weight optimization, the
 [Banking77 GRPO example](examples/local_grpo_banking77/README.md) runs ordinary
