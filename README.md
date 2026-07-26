@@ -110,6 +110,14 @@ TRL LoRA update on MPS, train/selection/untouched-test separation, exact
 artifact verification, and selected-program reproduction in a fresh OS BEAM.
 Its retained run is an honest no-signal result rather than a claimed win.
 
+For a harder learned-behavior check, the
+[opaque-route Banking77 GRPO example](examples/local_grpo_opaque_banking77/README.md)
+withholds the route meanings from the prompt, trains on 152 real
+model-generated semantic-reward groups across 38 durable TRL/MPS updates, and
+deploys the validation-selected artifact in a fresh OS process. Its retained
+result is a complete neutral outcome: real tensor changes did not change
+validation or frozen-test predictions.
+
 ## Because the program is a value, the rest is ordinary engineering
 
 Each stage below is one stop on the [Learning Path](docs/LEARNING_PATH.md),

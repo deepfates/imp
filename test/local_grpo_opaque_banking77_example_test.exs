@@ -3,6 +3,7 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
 
   @source "examples/local_grpo_opaque_banking77/run.exs"
   @contract "priv/trl_worker/qwen-opaque-38-step-contract.json"
+  @result "examples/local_grpo_opaque_banking77/exercised-result.json"
 
   setup_all do
     output =
@@ -27,7 +28,6 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     output: output
   } do
     refute File.exists?(output)
-    refute File.exists?("examples/local_grpo_opaque_banking77/exercised-result.json")
 
     assert apply(LocalGRPOOpaqueBanking77.Definition, :train_steps, []) == 38
     assert apply(LocalGRPOOpaqueBanking77.Definition, :train_width, []) == 4
@@ -145,6 +145,30 @@ defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
     assert source =~ "IMP_GRPO_OPAQUE_FRESH"
     assert source =~ "fresh selected predictions/errors differ"
     assert source =~ "TRLDeployment.stop(deployment)"
+  end
+
+  test "retained run preserves a complete neutral usefulness result" do
+    result = @result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "complete"
+
+    assert result["source_schedule"] == %{
+             "scheduler" => "dspy_pinned_full_batch_padding",
+             "source_rows" => 72,
+             "groups" => 152,
+             "twice" => 64,
+             "thrice" => 8
+           }
+
+    assert length(result["training_steps"]) == 38
+    assert Enum.all?(result["training_steps"], & &1["trainable_tensors_changed"])
+    assert Enum.count(result["training_steps"], &(Enum.uniq(&1["rewards"]) |> length() > 1)) == 37
+    assert result["base_selection"] == result["trained_selection"]
+    assert result["base_test"] == result["trained_test"]
+    assert result["base_test"]["accuracy"] == 0.475
+    assert result["selected_arm"] == "base"
+    assert result["fresh_selected_arm"] == "base"
+    assert result["fresh_byte_identical"]
   end
 
   defp restore_env(name, nil), do: System.delete_env(name)

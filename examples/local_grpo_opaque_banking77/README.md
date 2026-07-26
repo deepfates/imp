@@ -69,3 +69,13 @@ GRPO or mmGRPO effectiveness, parity with DSPy beyond the pinned scheduler and
 public lifecycle contracts, production reliability, or BEAM superiority. The
 40 test rows have appeared in earlier Imp work, so they are optimizer-held-out
 here but not globally untouched research data.
+
+The retained run in `exercised-result.json` is a complete neutral result. All
+38 official updates changed trainable tensors; 37 steps had non-uniform rewards
+and 36 had non-zero group-relative advantages. Nevertheless, every trained
+checkpoint scored the same 0.25 validation accuracy as base, and base and the
+selected step-one trained artifact both scored 0.475 accuracy / 0.45758
+macro-F1 / zero errors on the frozen forty rows. Stable selection retained
+base, and fresh OS execution reproduced its exact artifact identity and ordered
+outputs byte-for-byte. This establishes that the full ordinary usefulness path
+can return an honest non-win; it does not establish learned improvement.
