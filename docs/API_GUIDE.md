@@ -706,6 +706,49 @@ Use:
 and `labeled_sample:` through `Imp.optimize!/5`. Unknown or malformed controls
 are rejected before teacher or task execution rather than being ignored.
 
+Longer RandomSearch runs can pause after any fully built and evaluated
+candidate. Give captured metrics a stable identity, then bound each invocation
+by the number of new candidates it may seal:
+
+```elixir
+checkpoint_path = Path.join(System.tmp_dir!(), "random-search.json")
+
+persist = fn checkpoint ->
+  temporary_path = checkpoint_path <> ".tmp"
+  File.write!(temporary_path, Jason.encode!(checkpoint))
+  File.rename!(temporary_path, checkpoint_path)
+end
+
+random_search =
+  Imp.Optimizer.RandomSearch.new(metric,
+    candidates: 8,
+    metric_identity: %{
+      "id" => "my_app.exact_answer",
+      "version" => 1,
+      "config" => %{"field" => "answer"}
+    }
+  )
+
+paused =
+  Imp.optimize!(program, random_search, trainset, devset,
+    max_candidates: 2,
+    checkpoint_fn: persist
+  )
+
+resumed =
+  Imp.optimize!(program, random_search, trainset, devset,
+    resume_state: Imp.Optimizer.Report.fetch(paused).metadata.resume_state,
+    checkpoint_fn: persist
+  )
+```
+
+The checkpoint retains the exact DSPy seed/baseline order and completed
+candidate programs. Resume never repeats a sealed candidate; interruption
+during bootstrap or validation replays that candidate as one unit, and no
+partial score can enter selection. The identity stores only the declared id,
+version, and a digest of its JSON-safe config. Anonymous metrics still support
+complete in-process search, explicitly without a resume state.
+
 `SignatureOptimizer` is Imp's narrow one-predictor instruction optimizer. Give
 it a proposer LM for task-aware proposals grounded in the program signature and
 a bounded view of the training examples:

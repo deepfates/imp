@@ -7,12 +7,27 @@ defmodule Imp.Optimizer.RandomSearch do
   ordering match the authority. Seeded draws use Imp's deterministic
   BEAM-native sampler, so they do not claim Python MT19937 sequence parity.
   Candidate evaluation scores use DSPy's rounded percentage scale.
+
+  Durable invocations accept `:max_candidates`, `:checkpoint_fn`, and
+  `:resume_state`. A candidate is sealed only after both its bootstrap/build
+  stage and full validation evaluation finish; interrupted candidates replay as
+  a unit, while completed candidates do not. Captured metrics require a stable
+  JSON-safe `:metric_identity`. Complete anonymous-metric runs remain available
+  in process without a checkpoint.
   """
 
-  alias Imp.Optimizer.{BootstrapFewShot, Sampling}
+  alias Imp.Optimizer.{
+    BootstrapFewShot,
+    DurableCallbackIdentity,
+    Report,
+    Sampling
+  }
+
+  alias Imp.Optimizer.RandomSearch.Checkpoint
 
   defstruct [
     :metric,
+    :metric_identity,
     teacher_settings: [],
     max_bootstrapped_demos: 4,
     max_labeled_demos: 16,
@@ -37,6 +52,7 @@ defmodule Imp.Optimizer.RandomSearch do
     max_errors: [type: {:custom, __MODULE__, :validate_optional_max_errors, []}, default: nil],
     stop_at_score: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
     metric_threshold: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
+    metric_identity: [type: :any, default: nil],
     # Historical Imp spellings. They are normalized immediately and do not
     # change DSPy's fixed seed schedule.
     candidates: [type: {:custom, __MODULE__, :validate_optional_non_negative, []}, default: nil],
@@ -50,7 +66,16 @@ defmodule Imp.Optimizer.RandomSearch do
   @compile_option_schema [
     teacher: [type: :any, default: nil],
     restrict: [type: {:custom, __MODULE__, :validate_restrict, []}, default: nil],
-    labeled_sample: [type: :boolean, default: true]
+    labeled_sample: [type: :boolean, default: true],
+    resume_state: [
+      type: {:custom, Imp.Optimize.Anything, :validate_resume_state, []},
+      default: nil
+    ],
+    checkpoint_fn: [
+      type: {:custom, Imp.Optimize.Anything, :validate_checkpoint_fn, []},
+      default: nil
+    ],
+    max_candidates: [type: {:or, [:non_neg_integer, {:in, [:infinity]}]}, default: :infinity]
   ]
 
   def new(metric, opts \\ []) do
@@ -62,6 +87,8 @@ defmodule Imp.Optimizer.RandomSearch do
 
     %__MODULE__{
       metric: metric,
+      metric_identity:
+        DurableCallbackIdentity.normalize!(opts[:metric_identity], :metric_identity),
       teacher_settings: opts[:teacher_settings],
       max_bootstrapped_demos: max_bootstrapped_demos,
       max_labeled_demos: opts[:max_labeled_demos],
@@ -151,6 +178,7 @@ defmodule Imp.Optimizer.RandomSearch do
     labeled_sample = Keyword.get(opts, :labeled_sample, true)
     {max_errors, max_errors_source} = resolve_max_errors!(optimizer.max_errors)
     optimizer = %{optimizer | max_errors: max_errors}
+    :ok = DurableCallbackIdentity.validate_normalized!(optimizer.metric_identity, "RandomSearch")
 
     candidate_seeds =
       optimizer.num_candidate_programs
@@ -161,10 +189,139 @@ defmodule Imp.Optimizer.RandomSearch do
       raise RuntimeError, "RandomSearch restrict excluded every DSPy candidate seed"
     end
 
-    {records, errors} =
-      candidate_seeds
-      |> Enum.with_index()
-      |> Enum.reduce_while({[], []}, fn {seed, evaluation_order}, {records, errors} ->
+    durable? =
+      DurableCallbackIdentity.durable?(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable_controls?(opts)
+      )
+
+    metric_identity =
+      DurableCallbackIdentity.resolve!(
+        optimizer.metric,
+        optimizer.metric_identity,
+        durable?,
+        "RandomSearch",
+        :metric_identity
+      )
+
+    compatibility =
+      resume_compatibility(
+        student,
+        trainset,
+        valset,
+        optimizer,
+        teacher,
+        restrict,
+        labeled_sample,
+        metric_identity,
+        max_errors_source
+      )
+
+    {state, resumed?} =
+      case opts[:resume_state] do
+        nil ->
+          state = %{records: [], errors: [], next_index: 0, stopped: false}
+          emit_checkpoint(opts[:checkpoint_fn], durable?, compatibility, state)
+          {state, false}
+
+        checkpoint ->
+          state = Checkpoint.load!(checkpoint, compatibility, student)
+          validate_resumed_state!(state, candidate_seeds, optimizer.stop_at_score)
+          {state, true}
+      end
+
+    candidate_limit = invocation_candidate_limit(state.next_index, opts[:max_candidates])
+
+    state =
+      run_candidates(
+        state,
+        candidate_seeds,
+        candidate_limit,
+        student,
+        trainset,
+        valset,
+        teacher,
+        optimizer,
+        labeled_sample,
+        opts[:checkpoint_fn],
+        durable?,
+        compatibility
+      )
+
+    records = state.records
+    errors = state.errors
+    complete? = state.stopped or state.next_index == length(candidate_seeds)
+
+    ranked = Enum.sort_by(records, &{-&1.score, &1.evaluation_order})
+    best = List.first(ranked)
+
+    report_candidates =
+      Enum.map(ranked, fn candidate ->
+        candidate
+        |> Map.drop([:program, :evaluation_order])
+        |> Map.put(:demos, predictor_demos(candidate.program))
+      end)
+
+    checkpoint = if durable?, do: Checkpoint.dump(compatibility, state)
+    selected = if is_nil(best), do: reset_student(student), else: best.program
+
+    attach_report(
+      selected,
+      Report.new(%{
+        optimizer: :random_search,
+        best_score: if(is_nil(best), do: nil, else: best.score),
+        candidate_count: length(report_candidates),
+        candidates: report_candidates,
+        errors: errors,
+        metadata: %{
+          status: if(errors == [], do: :ok, else: :with_errors),
+          candidate_seeds: Enum.map(records, & &1.seed),
+          evaluated_candidate_count: length(records),
+          valset_size: length(valset),
+          trainset_size: length(trainset),
+          stop_at_score: optimizer.stop_at_score,
+          max_errors: max_errors,
+          max_errors_source: max_errors_source,
+          score_scale: :percentage,
+          sampling_rng: :beam_native,
+          sampling_schedule: :dspy_3_2_1_seed_lifecycle,
+          durable: durable?,
+          metric_identity: metric_identity,
+          resumed: resumed?,
+          run_status: if(complete?, do: :complete, else: :paused),
+          completed_candidates: state.next_index,
+          resume_state: checkpoint
+        }
+      })
+    )
+  end
+
+  defp run_candidates(
+         state,
+         candidate_seeds,
+         candidate_limit,
+         student,
+         trainset,
+         valset,
+         teacher,
+         optimizer,
+         labeled_sample,
+         checkpoint_fn,
+         durable?,
+         compatibility
+       ) do
+    cond do
+      state.stopped or state.next_index == length(candidate_seeds) ->
+        state
+
+      candidate_budget_exhausted?(state.next_index, candidate_limit) ->
+        state
+
+      true ->
+        evaluation_order = state.next_index
+        seed = Enum.fetch!(candidate_seeds, evaluation_order)
+
         {program, source_metadata} =
           candidate_program(student, trainset, teacher, optimizer, seed, labeled_sample)
 
@@ -184,50 +341,149 @@ defmodule Imp.Optimizer.RandomSearch do
             evaluation_order: evaluation_order
           })
 
-        records = records ++ [record]
-        errors = errors ++ contextualize_errors(result.errors, seed)
+        stopped =
+          not is_nil(optimizer.stop_at_score) and result.score >= optimizer.stop_at_score
 
-        if not is_nil(optimizer.stop_at_score) and result.score >= optimizer.stop_at_score do
-          {:halt, {records, errors}}
-        else
-          {:cont, {records, errors}}
-        end
-      end)
-
-    ranked = Enum.sort_by(records, &{-&1.score, &1.evaluation_order})
-    best = hd(ranked)
-
-    report_candidates =
-      Enum.map(ranked, fn candidate ->
-        candidate
-        |> Map.drop([:program, :evaluation_order])
-        |> Map.put(:demos, predictor_demos(candidate.program))
-      end)
-
-    attach_report(
-      best.program,
-      Imp.Optimizer.Report.new(%{
-        optimizer: :random_search,
-        best_score: best.score,
-        candidate_count: length(report_candidates),
-        candidates: report_candidates,
-        errors: errors,
-        metadata: %{
-          status: if(errors == [], do: :ok, else: :with_errors),
-          candidate_seeds: Enum.map(records, & &1.seed),
-          evaluated_candidate_count: length(records),
-          valset_size: length(valset),
-          trainset_size: length(trainset),
-          stop_at_score: optimizer.stop_at_score,
-          max_errors: max_errors,
-          max_errors_source: max_errors_source,
-          score_scale: :percentage,
-          sampling_rng: :beam_native,
-          sampling_schedule: :dspy_3_2_1_seed_lifecycle
+        state = %{
+          records: state.records ++ [record],
+          errors: state.errors ++ contextualize_errors(result.errors, seed),
+          next_index: evaluation_order + 1,
+          stopped: stopped
         }
-      })
-    )
+
+        emit_checkpoint(checkpoint_fn, durable?, compatibility, state)
+
+        run_candidates(
+          state,
+          candidate_seeds,
+          candidate_limit,
+          student,
+          trainset,
+          valset,
+          teacher,
+          optimizer,
+          labeled_sample,
+          checkpoint_fn,
+          durable?,
+          compatibility
+        )
+    end
   end
+
+  defp invocation_candidate_limit(_completed, :infinity), do: :infinity
+  defp invocation_candidate_limit(completed, maximum), do: completed + maximum
+
+  defp candidate_budget_exhausted?(_completed, :infinity), do: false
+  defp candidate_budget_exhausted?(completed, limit), do: completed >= limit
+
+  defp durable_controls?(opts) do
+    not is_nil(opts[:resume_state]) or not is_nil(opts[:checkpoint_fn]) or
+      opts[:max_candidates] != :infinity
+  end
+
+  defp emit_checkpoint(_callback, false, _compatibility, _state), do: :ok
+  defp emit_checkpoint(nil, true, _compatibility, _state), do: :ok
+
+  defp emit_checkpoint(callback, true, compatibility, state) do
+    callback.(Checkpoint.dump(compatibility, state))
+    :ok
+  end
+
+  defp resume_compatibility(
+         student,
+         trainset,
+         valset,
+         optimizer,
+         teacher,
+         restrict,
+         labeled_sample,
+         metric_identity,
+         max_errors_source
+       ) do
+    payload = %{
+      datasets: %{trainset: trainset, valset: valset},
+      metric: metric_identity,
+      optimizer:
+        optimizer
+        |> Map.from_struct()
+        |> Map.drop([:metric, :metric_identity])
+        |> runtime_identity()
+        |> Map.put(:max_errors_source, max_errors_source),
+      invocation: %{
+        teacher: runtime_identity(teacher),
+        restrict: restrict,
+        labeled_sample: labeled_sample
+      },
+      program_module: student.__struct__,
+      predictors:
+        Enum.map(Imp.ProgramParameters.predictors(student), fn %{name: name, predictor: predictor} ->
+          %{
+            name: name,
+            signature: predictor.signature,
+            demos: predictor.demos,
+            config: predictor.config,
+            lm: runtime_identity(predictor.lm),
+            adapter: runtime_identity(predictor.adapter),
+            dynamic_lm?: predictor.dynamic_lm?,
+            dynamic_adapter?: predictor.dynamic_adapter?
+          }
+        end)
+    }
+
+    digest =
+      payload
+      |> Report.encode_term()
+      |> :erlang.term_to_binary([:deterministic])
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    %{"sha256" => digest}
+  end
+
+  defp validate_resumed_state!(state, candidate_seeds, stop_at_score) do
+    expected_seeds = Enum.take(candidate_seeds, state.next_index)
+
+    unless state.next_index == length(state.records) and
+             Enum.map(state.records, & &1.seed) == expected_seeds and
+             Enum.map(state.records, & &1.evaluation_order) ==
+               evaluation_indices(state.next_index) do
+      raise ArgumentError, "RandomSearch resume state does not follow the candidate seed schedule"
+    end
+
+    reached_stop? =
+      not is_nil(stop_at_score) and
+        Enum.any?(state.records, &(&1.score >= stop_at_score))
+
+    unless state.stopped == reached_stop? do
+      raise ArgumentError, "RandomSearch resume state stop condition is inconsistent"
+    end
+
+    state
+  end
+
+  defp evaluation_indices(0), do: []
+  defp evaluation_indices(count), do: Enum.to_list(0..(count - 1))
+
+  defp runtime_identity(callback) when is_function(callback) do
+    Map.new([:module, :name, :arity, :type, :uniq, :index], fn key ->
+      {key, callback |> :erlang.fun_info(key) |> elem(1)}
+    end)
+  end
+
+  defp runtime_identity(%_{} = struct), do: struct |> Map.from_struct() |> runtime_identity()
+
+  defp runtime_identity(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {key, runtime_identity(value)} end)
+
+  defp runtime_identity(list) when is_list(list), do: Enum.map(list, &runtime_identity/1)
+
+  defp runtime_identity(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.map(&runtime_identity/1) |> List.to_tuple()
+
+  defp runtime_identity(pid) when is_pid(pid), do: :runtime_pid
+  defp runtime_identity(reference) when is_reference(reference), do: :runtime_reference
+  defp runtime_identity(port) when is_port(port), do: :runtime_port
+  defp runtime_identity(value), do: value
 
   defp validate_compile_options!(opts) do
     Imp.Options.validate!(opts, @compile_option_schema, "Imp.Optimizer.RandomSearch.compile/5")
