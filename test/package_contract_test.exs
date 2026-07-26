@@ -13,6 +13,11 @@ defmodule PackageContractTest do
     "RELEASE_NOTES.md",
     "README.md",
     "docs/API_GUIDE.md",
+    "examples/deployment/lib/imp_deployment/program_server.ex",
+    "examples/deployment/lib/imp_deployment/support_pipeline.ex",
+    "examples/deployment/lib/imp_deployment/workflow.ex",
+    "examples/deployment/load_workflow.exs",
+    "examples/deployment/run_workflow.exs",
     "examples/provider_free_ticket_router/README.md",
     "examples/provider_free_ticket_router/mix.exs",
     "examples/provider_free_ticket_router/run.exs",
@@ -305,6 +310,10 @@ defmodule PackageContractTest do
     for prefix <- @excluded_prefixes do
       refute Enum.any?(files, &String.starts_with?(&1, prefix))
     end
+
+    refute Enum.any?(files, fn path ->
+             path |> Path.split() |> Enum.any?(&(&1 in ["_build", "deps"]))
+           end)
 
     for file <- @excluded_files do
       refute file in files

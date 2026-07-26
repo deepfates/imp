@@ -7,6 +7,13 @@ Versioning once the first public package is released.
 
 ### Added
 
+- The packaged OTP deployment reference now includes a complete provider-free
+  product workflow: typed declaration, disjoint evaluation, deterministic
+  few-shot compilation across a real two-predictor pipeline, parameter
+  inspection, checksummed artifact save/load and compatible hot reload, bounded
+  concurrent serving, and crash/timeout
+  containment. Its planted static-LM lift is labeled as lifecycle evidence,
+  not optimizer effectiveness.
 - A packaged provider-free ticket-router consumer now demonstrates the complete
   typed program → held-out evaluation → deterministic few-shot compilation
   lifecycle. The Hex clean-room gate copies it outside the package and runs it

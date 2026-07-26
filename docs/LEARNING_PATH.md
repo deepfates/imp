@@ -341,6 +341,17 @@ only at runtime, and executes requests in bounded `Task.Supervisor` workers,
 returning overloads and timeouts instead of letting one slow provider call
 block the program server.
 
+Its provider-free `run_workflow.exs` is the capstone for this path: one command
+declares and measures a typed two-predictor analysis → routing support
+program, compiles and inspects selected
+demonstrations, evaluates a disjoint test split, saves and hot-reloads the
+checksummed parameter artifact onto the trusted reconstructed module, serves
+concurrent calls, and proves a killed or timed-out
+worker does not take down the server. The planted static LM makes those product
+mechanics deterministic; its score is explicitly not real-model effectiveness.
+The package gate repeats the saved selected program's load and call in a second
+OS process against the unpacked artifact.
+
 For your own deployment, keep the artifact path, model name, API key,
 concurrency limits, and retry policy in runtime configuration. Evaluate the
 candidate before promotion, rebind the live LM at startup, and watch status,

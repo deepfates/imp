@@ -25,6 +25,24 @@ defmodule ImpDeployment.ProgramServer do
           "timeout must be :infinity or a positive integer, got: #{inspect(timeout)}"
   end
 
+  @doc "Atomically loads a verified program artifact for subsequent calls."
+  def reload(path) when is_binary(path), do: reload(__MODULE__, path)
+
+  def reload(server, path) when is_binary(path) do
+    GenServer.call(server, {:reload, path})
+  catch
+    :exit, reason -> {:error, {:unavailable, reason}}
+  end
+
+  @doc "Applies a verified selected-parameter artifact to the trusted running program."
+  def reload_parameters(path) when is_binary(path), do: reload_parameters(__MODULE__, path)
+
+  def reload_parameters(server, path) when is_binary(path) do
+    GenServer.call(server, {:reload_parameters, path})
+  catch
+    :exit, reason -> {:error, {:unavailable, reason}}
+  end
+
   @impl true
   def init(opts) do
     program = Keyword.get_lazy(opts, :program, &load_program/0)
@@ -41,6 +59,20 @@ defmodule ImpDeployment.ProgramServer do
   @impl true
   def handle_call(:runtime, _from, state) do
     {:reply, state, state}
+  end
+
+  def handle_call({:reload, path}, _from, state) do
+    case read_program(path, state.program) do
+      {:ok, program} -> {:reply, :ok, %{state | program: program}}
+      {:error, reason} -> {:reply, {:error, {:invalid_artifact, reason}}, state}
+    end
+  end
+
+  def handle_call({:reload_parameters, path}, _from, state) do
+    case read_parameters(path, state.program) do
+      {:ok, program} -> {:reply, :ok, %{state | program: program}}
+      {:error, reason} -> {:reply, {:error, {:invalid_artifact, reason}}, state}
+    end
   end
 
   defp run(runtime, inputs, timeout) do
@@ -69,8 +101,65 @@ defmodule ImpDeployment.ProgramServer do
   end
 
   defp load_program do
-    path = System.fetch_env!("IMP_ARTIFACT_PATH")
-    Imp.load!(path, registry: ImpDeployment.Callbacks.registry())
+    if System.get_env("IMP_WORKFLOW_BASELINE") == "1" do
+      ImpDeployment.Workflow.program()
+    else
+      path = System.fetch_env!("IMP_ARTIFACT_PATH")
+      Imp.load!(path, registry: ImpDeployment.Callbacks.registry())
+    end
+  end
+
+  defp read_parameters(path, current) do
+    artifact = Imp.Optimizer.Artifact.read!(path)
+    program = Imp.Optimizer.Artifact.apply(artifact, current)
+
+    if compatible_contract?(current, program),
+      do: {:ok, program},
+      else: {:error, "selected parameters do not match the running typed program"}
+  rescue
+    error -> {:error, Exception.message(error)}
+  catch
+    kind, reason -> {:error, Exception.format_banner(kind, reason)}
+  end
+
+  defp read_program(path, current) do
+    program = Imp.load!(path, registry: ImpDeployment.Callbacks.registry())
+
+    if compatible_contract?(current, program) do
+      {:ok, program}
+    else
+      {:error, "program type or typed predictor contract does not match the running program"}
+    end
+  rescue
+    error -> {:error, Exception.message(error)}
+  catch
+    kind, reason -> {:error, Exception.format_banner(kind, reason)}
+  end
+
+  defp compatible_contract?(%current_type{} = current, %loaded_type{} = loaded)
+       when current_type == loaded_type do
+    contract_shape(current) == contract_shape(loaded)
+  end
+
+  defp compatible_contract?(_current, _loaded), do: false
+
+  defp contract_shape(program) do
+    program
+    |> Imp.ProgramParameters.predictors()
+    |> Enum.map(fn %{name: name, predictor: predictor} ->
+      signature = Imp.Signature.dump(predictor.signature)
+
+      fields = fn kind ->
+        signature
+        |> Map.fetch!(kind)
+        |> Enum.map(&Map.take(&1, ["name", "kind", "type", "metadata"]))
+        |> Jason.encode!()
+        |> Jason.decode!()
+      end
+
+      {to_string(name), %{inputs: fields.("inputs"), outputs: fields.("outputs")}}
+    end)
+    |> Enum.sort()
   end
 
   defp execute(program, lm, inputs) do
@@ -78,15 +167,18 @@ defmodule ImpDeployment.ProgramServer do
   end
 
   defp runtime_lm do
-    case System.get_env("IMP_STATIC_ANSWER") do
-      nil ->
+    cond do
+      System.get_env("IMP_STATIC_WORKFLOW") == "1" ->
+        ImpDeployment.Workflow.static_lm()
+
+      answer = System.get_env("IMP_STATIC_ANSWER") ->
+        Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: answer} end)
+
+      true ->
         Imp.req_llm(System.fetch_env!("IMP_MODEL"),
           api_key: System.fetch_env!("IMP_API_KEY"),
           temperature: 0
         )
-
-      answer ->
-        %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: answer} end]}
     end
   end
 end

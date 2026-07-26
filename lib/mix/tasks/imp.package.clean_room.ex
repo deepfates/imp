@@ -196,6 +196,39 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
 
     executable = Path.join(release_dir, "bin/imp_deployment")
     run!(executable, ["eval", expression], deployment_dir, release_env)
+
+    workflow_artifact = Path.join(output, "selected-workflow-program.json")
+
+    workflow_env =
+      [
+        {"IMP_WORKFLOW_ARTIFACT_PATH", workflow_artifact},
+        {"IMP_WORKFLOW_KEEP_ARTIFACT", "1"}
+        | env
+      ]
+
+    workflow_output =
+      offline_mix!(
+        deployment_dir,
+        ["run", "--no-start", "--no-compile", "--no-deps-check", "run_workflow.exs"],
+        workflow_env
+      )
+
+    unless workflow_output =~
+             "Imp OTP workflow passed: selection 0.25 -> 1.0, untouched 1.0" do
+      Mix.raise("packaged deployment workflow did not complete its cold OTP lifecycle")
+    end
+
+    fresh_output =
+      offline_mix!(
+        deployment_dir,
+        ["run", "--no-start", "--no-compile", "--no-deps-check", "load_workflow.exs"],
+        workflow_env
+      )
+
+    unless fresh_output =~
+             "Imp OTP workflow fresh-process load passed: harbor/high with 2 predictors x 4 demos" do
+      Mix.raise("packaged deployment workflow did not load in a fresh OS process")
+    end
   end
 
   defp write_consumer!(consumer_dir, package_dir, lockfile) do

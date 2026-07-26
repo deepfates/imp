@@ -3,11 +3,148 @@ defmodule DeploymentReferenceTest do
 
   @example_root Path.expand("../examples/deployment", __DIR__)
 
-  setup_all do
-    Code.require_file(Path.join(@example_root, "lib/imp_deployment/callbacks.ex"))
-    Code.require_file(Path.join(@example_root, "lib/imp_deployment/program_server.ex"))
-    Code.require_file(Path.join(@example_root, "lib/imp_deployment/application.ex"))
-    :ok
+  Code.require_file(Path.join(@example_root, "lib/imp_deployment/callbacks.ex"))
+  Code.require_file(Path.join(@example_root, "lib/imp_deployment/support_pipeline.ex"))
+  Code.require_file(Path.join(@example_root, "lib/imp_deployment/workflow.ex"))
+  Code.require_file(Path.join(@example_root, "lib/imp_deployment/program_server.ex"))
+  Code.require_file(Path.join(@example_root, "lib/imp_deployment/application.ex"))
+
+  test "the routing predictor consumes the analysis predictor output" do
+    test_pid = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          rendered = Enum.map_join(messages, "\n", & &1.content)
+
+          if String.contains?(rendered, "`team`") do
+            send(test_pid, {:routing_messages, rendered})
+            %{team: "beacon", urgency: "high"}
+          else
+            %{analysis: "stage-one-account-security-sentinel"}
+          end
+        end
+      )
+
+    assert {:ok, prediction} =
+             Imp.context([lm: lm], fn ->
+               Imp.call(ImpDeployment.Workflow.program(), %{ticket: "Account access issue"})
+             end)
+
+    assert_receive {:routing_messages, rendered}
+    assert rendered =~ "stage-one-account-security-sentinel"
+    assert Imp.get(prediction, :team) == "beacon"
+
+    assert prediction.metadata.support_pipeline == %{
+             analysis: "stage-one-account-security-sentinel",
+             stages: [:analyze, :route]
+           }
+  end
+
+  test "ordinary workflow compiles, inspects, persists, hot-reloads, and contains failures" do
+    artifact =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-deployment-workflow-#{System.unique_integer([:positive])}.json"
+      )
+
+    invalid = artifact <> ".invalid"
+    incompatible = artifact <> ".incompatible"
+
+    on_exit(fn ->
+      File.rm(artifact)
+      File.rm(invalid)
+      File.rm(incompatible)
+    end)
+
+    lm = ImpDeployment.Workflow.static_lm()
+    base = ImpDeployment.Workflow.program()
+    candidate = ImpDeployment.Workflow.compile(base)
+
+    assert ImpDeployment.Workflow.evaluate(base, ImpDeployment.Workflow.selection_set(), lm).score ==
+             0.25
+
+    assert ImpDeployment.Workflow.evaluate(
+             candidate,
+             ImpDeployment.Workflow.selection_set(),
+             lm
+           ).score == 1.0
+
+    assert ImpDeployment.Workflow.evaluate(candidate, ImpDeployment.Workflow.testset(), lm).score ==
+             1.0
+
+    parameters = ImpDeployment.Workflow.selected_parameters(candidate)
+    demo_parameters = Enum.filter(parameters, &(&1["kind"] == "demos"))
+    assert length(demo_parameters) == 2
+    assert Enum.all?(demo_parameters, &(length(&1["value"]) == 4))
+    assert Enum.all?(parameters, &is_binary(&1["digest"]))
+
+    server = start_program_runtime(base, lm, max_children: 4)
+
+    assert {:ok, before_reload} =
+             deployment_call(server, %{ticket: "The API is down for every customer"}, 1_000)
+
+    assert Imp.get(before_reload, :team) == "atlas"
+
+    selected_artifact = ImpDeployment.Workflow.optimizer_artifact(candidate)
+    :ok = Imp.Optimizer.Artifact.write!(selected_artifact, artifact)
+    loaded_artifact = Imp.Optimizer.Artifact.read!(artifact)
+
+    loaded_selected =
+      Imp.Optimizer.Artifact.apply(loaded_artifact, ImpDeployment.Workflow.program())
+
+    assert ImpDeployment.Workflow.selected_parameters(loaded_selected) == parameters
+    assert :ok = ImpDeployment.ProgramServer.reload_parameters(server, artifact)
+
+    concurrent =
+      1..4
+      |> Enum.map(fn index ->
+        Task.async(fn ->
+          deployment_call(server, %{ticket: "Request #{index}: refund the invoice"}, 1_000)
+        end)
+      end)
+      |> Task.await_many(5_000)
+
+    assert Enum.all?(concurrent, fn {:ok, prediction} -> Imp.get(prediction, :team) == "atlas" end)
+
+    File.write!(invalid, ~s({"not":"an Imp artifact"}))
+
+    assert {:error, {:invalid_artifact, _reason}} =
+             ImpDeployment.ProgramServer.reload_parameters(server, invalid)
+
+    incompatible_program =
+      Imp.optimize!(
+        Imp.predict("question -> answer"),
+        Imp.Optimizer.LabeledFewShot.new(k: 0),
+        []
+      )
+
+    incompatible_program
+    |> Imp.Optimizer.Artifact.from_optimized_program()
+    |> Imp.Optimizer.Artifact.write!(incompatible)
+
+    assert {:error, {:invalid_artifact, reason}} =
+             ImpDeployment.ProgramServer.reload_parameters(server, incompatible)
+
+    assert reason =~ "predictor set is incompatible"
+
+    assert {:ok, still_selected} =
+             deployment_call(server, %{ticket: "A leaked password still works"}, 1_000)
+
+    assert Imp.get(still_selected, :team) == "beacon"
+
+    assert {:error, {:worker_crash, :killed}} =
+             deployment_call(server, %{ticket: "IMP_DEMO_CRASH"}, 1_000)
+
+    assert {:error, :timeout} =
+             deployment_call(server, %{ticket: "IMP_DEMO_HANG"}, 25)
+
+    assert Process.alive?(server)
+
+    assert {:ok, after_failures} =
+             deployment_call(server, %{ticket: "Where are the import docs?"}, 1_000)
+
+    assert Imp.get(after_failures, :team) == "quill"
   end
 
   test "reference OTP server loads a checksummed registry-backed artifact and serves calls" do
@@ -165,11 +302,15 @@ defmodule DeploymentReferenceTest do
     mix_file = File.read!(Path.join(@example_root, "mix.exs"))
     readme = File.read!(Path.join(@example_root, "README.md"))
 
-    assert mix_file =~ ~s({:imp, "~> 0.1"})
+    assert mix_file =~ ~s(elixir: "~> 1.19")
+    assert mix_file =~ ~s({:imp, "~> 0.2"})
     assert mix_file =~ "IMP_PATH"
     assert readme =~ "supervised startup"
     assert readme =~ "IMP_MODEL"
     assert readme =~ "IMP_MAX_CONCURRENCY"
+    assert readme =~ "two-predictor program"
+    assert readme =~ "reload_parameters/1"
+    assert readme =~ "second `mix run` process"
   end
 
   defp start_runtime(executor, opts \\ []) do
@@ -187,6 +328,16 @@ defmodule DeploymentReferenceTest do
       )
 
     {server, task_supervisor}
+  end
+
+  defp start_program_runtime(program, lm, opts) do
+    task_supervisor =
+      start_supervised!({Task.Supervisor, max_children: Keyword.fetch!(opts, :max_children)})
+
+    start_supervised!(
+      {ImpDeployment.ProgramServer,
+       name: nil, task_supervisor: task_supervisor, program: program, lm: lm}
+    )
   end
 
   defp restore_env(name, nil), do: System.delete_env(name)

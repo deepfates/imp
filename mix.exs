@@ -177,38 +177,45 @@ defmodule Imp.MixProject do
     # Keep packaging and dependency compilation on one canonical runtime list.
     # Local benchmark/evidence control files remain available only to a
     # top-level dev/test checkout.
-    runtime_source_files() ++
-      Path.wildcard("examples/deployment/**/*") ++
-      Path.wildcard("examples/local_copro_banking77/**/*") ++
-      Path.wildcard("examples/local_gepa_banking77/**/*") ++
-      Path.wildcard("examples/local_grpo_banking77/**/*") ++
-      Path.wildcard("examples/local_grpo_opaque_banking77/**/*") ++
-      Path.wildcard("examples/local_infer_rules_banking77/**/*") ++
-      Path.wildcard("examples/local_knn_few_shot_banking77/**/*") ++
-      Path.wildcard("examples/local_mipro_banking77/**/*") ++
-      Path.wildcard("examples/local_optimize_anything_retry_policy/**/*") ++
-      Path.wildcard("examples/local_random_search_banking77/**/*") ++
-      Path.wildcard("examples/local_signature_optimizer_banking77/**/*") ++
-      Path.wildcard("examples/local_simba_banking77/**/*") ++
-      Path.wildcard("examples/local_simba_trec/**/*") ++
-      Path.wildcard("examples/provider_free_ticket_router/**/*") ++
-      [
-        "benchmarks/data/grpo-usefulness-banking77-v1.json",
-        "benchmarks/data/simba-trec-coarse-v1.json"
-      ] ++
-      product_docs() ++
-      livebooks() ++
-      [
-        ".formatter.exs",
-        "CHANGELOG.md",
-        "LICENSE",
-        "RELEASE_NOTES.md",
-        "assets/imp-with-cards.jpg",
-        "priv/public_api.json",
-        "priv/tutorial/support_tickets.json",
-        "README.md",
-        "mix.exs"
-      ]
+    (runtime_source_files() ++
+       Path.wildcard("examples/deployment/**/*") ++
+       Path.wildcard("examples/local_copro_banking77/**/*") ++
+       Path.wildcard("examples/local_gepa_banking77/**/*") ++
+       Path.wildcard("examples/local_grpo_banking77/**/*") ++
+       Path.wildcard("examples/local_grpo_opaque_banking77/**/*") ++
+       Path.wildcard("examples/local_infer_rules_banking77/**/*") ++
+       Path.wildcard("examples/local_knn_few_shot_banking77/**/*") ++
+       Path.wildcard("examples/local_mipro_banking77/**/*") ++
+       Path.wildcard("examples/local_optimize_anything_retry_policy/**/*") ++
+       Path.wildcard("examples/local_random_search_banking77/**/*") ++
+       Path.wildcard("examples/local_signature_optimizer_banking77/**/*") ++
+       Path.wildcard("examples/local_simba_banking77/**/*") ++
+       Path.wildcard("examples/local_simba_trec/**/*") ++
+       Path.wildcard("examples/provider_free_ticket_router/**/*") ++
+       [
+         "benchmarks/data/grpo-usefulness-banking77-v1.json",
+         "benchmarks/data/simba-trec-coarse-v1.json"
+       ] ++
+       product_docs() ++
+       livebooks() ++
+       [
+         ".formatter.exs",
+         "CHANGELOG.md",
+         "LICENSE",
+         "RELEASE_NOTES.md",
+         "assets/imp-with-cards.jpg",
+         "priv/public_api.json",
+         "priv/tutorial/support_tickets.json",
+         "README.md",
+         "mix.exs"
+       ])
+    |> Enum.reject(&transient_package_path?/1)
+  end
+
+  defp transient_package_path?(path) do
+    path
+    |> Path.split()
+    |> Enum.any?(&(&1 in ["_build", "deps"]))
   end
 
   defp product_docs do
