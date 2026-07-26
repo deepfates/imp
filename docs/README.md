@@ -59,7 +59,13 @@ Every guide and notebook follows the same product story:
 
 The notebooks in `livebooks/` follow the manual spine with runnable code. The
 first notebook makes real model calls when `OPENAI_API_KEY` is set and tells
-you exactly what to set when it is not.
+you exactly what to set when it is not. Open them from anywhere: a notebook
+first resolves the Imp checkout or unpacked package beside its own file, rather
+than mistaking the shell's current Mix project for Imp. Set `IMP_PATH` only
+when you deliberately keep the notebook somewhere else; an invalid explicit
+path is rejected instead of silently installing unrelated code. Source
+checkouts use their lockfile, while unpacked packages resolve their declared
+dependencies without assuming that a release artifact ships `mix.lock`.
 
 - [01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)
 - [02 Programming, Not Prompting](../livebooks/02_programming_not_prompting.livemd)

@@ -1,5 +1,5 @@
 defmodule LivebookContractTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   @stale_terms [
     "not production" <> " ready",
@@ -26,13 +26,51 @@ defmodule LivebookContractTest do
     for path <- livebooks do
       body = File.read!(path)
 
-      assert body =~
-               "Mix.install([{:imp, path: repo}], lockfile: Path.join(repo, \"mix.lock\"))"
+      assert body =~ "File.regular?(Path.join(path, \"lib/imp.ex\"))"
+      assert body =~ "[explicit_repo, Path.expand(\"..\", __DIR__), File.cwd!()]"
+      assert body =~ "Mix.install([{:imp, path: repo}], install_opts)"
+      assert body =~ "if File.regular?(Path.join(repo, \"mix.lock\"))"
+      assert body =~ "IMP_PATH does not point to an Imp source checkout or unpacked package"
 
       for term <- @stale_terms do
         refute String.contains?(String.downcase(body), String.downcase(term))
       end
     end
+  end
+
+  @tag timeout: 180_000
+  test "Livebook setup ignores an unrelated current Mix project" do
+    root = File.cwd!()
+    notebook = Path.join(root, "livebooks/02_programming_not_prompting.livemd")
+
+    foreign =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-livebook-foreign-cwd-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(foreign)
+    File.write!(Path.join(foreign, "mix.exs"), "# deliberately not an Imp project\n")
+    on_exit(fn -> File.rm_rf(foreign) end)
+
+    script = ~S'''
+    notebook = System.fetch_env!("IMP_LIVEBOOK_CONTRACT_NOTEBOOK")
+    body = File.read!(notebook)
+    [_, setup | _] = Regex.run(~r/```elixir\n(.*?)\n```/s, body)
+    {_value, binding} = Code.eval_string(setup, [], file: notebook)
+    IO.puts("resolved_imp_repo=" <> Keyword.fetch!(binding, :repo))
+    '''
+
+    {output, status} =
+      System.cmd("env", ["-u", "IMP_PATH", "elixir", "-e", script],
+        cd: foreign,
+        env: [{"IMP_LIVEBOOK_CONTRACT_NOTEBOOK", notebook}],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+    assert output =~ "resolved_imp_repo=#{root}"
+    refute output =~ "resolved_imp_repo=#{foreign}"
   end
 
   test "operations Livebook names the full local gate set" do
@@ -70,7 +108,15 @@ defmodule LivebookContractTest do
     refute body =~ "LIVE_PROVIDER"
     refute body =~ "{:skip"
     refute body =~ "proof failed"
-    refute body =~ ~r/^\s*raise /m
+
+    [_setup | reader_blocks] =
+      Regex.scan(~r/```elixir\n(.*?)```/s, body, capture: :all_but_first)
+      |> List.flatten()
+
+    refute Enum.join(reader_blocks, "\n") =~ ~r/^\s*raise /m
+
+    assert body =~
+             ~s(raise "IMP_PATH does not point to an Imp source checkout or unpacked package")
 
     # Missing credentials produce friendly setup guidance, not a bare tuple.
     assert body =~ "setup_guidance"
