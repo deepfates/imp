@@ -496,7 +496,8 @@ defmodule Imp.UpstreamFidelity do
         "proposal, bootstrapping, search, and selection stages are independently observable",
         "a source-bound T1 differential matches 33 declared DSPy 3.3.0b1 MIPROv2 and SIMBA structural cases while retaining RNG, sampler, and proposer-call-graph deviations",
         "a provider-free exact DSPy 3.2.1 InferRules differential exercises formatting, rule updates, implicit train/validation splitting, multi-predictor traversal, candidate scoring, and the drop-one-example context recovery schedule while exposing upstream mutable signature aliasing and retaining rollout-ID differences",
-        "the admitted one-seed live AIME preflight is operational T2 evidence only; optimization effectiveness still requires multi-seed held-out lift under matched budgets"
+        "the admitted one-seed live AIME preflight is operational T2 evidence only",
+        "on one frozen three-seed strong-model TREC contract, Imp MIPROv2 improved its own baseline by mean 0.1458 held-out accuracy with a positive 95% clustered interval; this is task-specific C3 evidence, not general MIPROv2 or instruction-family effectiveness"
       ],
       evidence: %{
         tests: [
@@ -508,11 +509,12 @@ defmodule Imp.UpstreamFidelity do
         docs: ["docs/API_GUIDE.md"],
         artifacts: [
           "benchmarks/evidence/admitted/instruction_contract/0d032ab3266c2eb8aef9ea021a1a445688cbdc4e208d9bde9d57037b1f302a49.json",
-          "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json"
+          "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json",
+          "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
         ],
         missing: [
           "whole-optimizer and held-out effectiveness evidence for InferRules, plus any upstream parity authority for the native SignatureOptimizer extension",
-          "C3 multi-seed held-out MIPROv2 and SIMBA effectiveness under matched controls",
+          "C3 multi-seed held-out SIMBA effectiveness and cross-task MIPROv2 generalization under matched controls",
           "paper-scale lift evidence"
         ]
       }
@@ -531,9 +533,9 @@ defmodule Imp.UpstreamFidelity do
       disposition: :gap,
       release_blocking: false,
       local_conformance: :structural,
-      evidence_rung: "C2",
+      evidence_rung: "C3",
       claim_boundary:
-        "pinned structural conformance plus one local operational multi-predictor lifecycle; this is not general effectiveness or paper-family reproduction evidence",
+        "pinned structural conformance, one local operational multi-predictor lifecycle, and one matched three-seed held-out TREC result; this is not general effectiveness, superiority, or paper-family reproduction evidence",
       ticket: "imp-yme4",
       imp: [Imp.Optimizer.GEPA, Imp.Optimize.Anything],
       invariants: [
@@ -542,7 +544,8 @@ defmodule Imp.UpstreamFidelity do
         "reflective mutation uses per-example feedback and trajectories in focused local tests",
         "candidate lineage, Pareto state, and source-versioned results are retained locally",
         "an ordinary local Banking77 workflow optimized two named predictors, retained the better baseline when reflection regressed, persisted the selected parameter artifact, and reproduced it in a fresh OS process",
-        "C2 operation does not establish matched upstream effectiveness or paper-family outcomes"
+        "on one frozen strong-model TREC contract, Imp GEPA improved its own baseline by mean 0.4000 held-out accuracy and cleared a preregistered -0.05 noninferiority margin against pinned DSPy GEPA",
+        "the matched TREC result is task-specific C3 evidence and does not establish general effectiveness, superiority, or paper-family outcomes"
       ],
       evidence: %{
         tests: [
@@ -559,10 +562,11 @@ defmodule Imp.UpstreamFidelity do
           "docs/internal/RESEARCH_LANDSCAPE.md"
         ],
         artifacts: [
-          "benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json"
+          "benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json",
+          "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
         ],
         missing: [
-          "C3 multi-seed held-out effectiveness under matched controls",
+          "cross-task matched effectiveness beyond the frozen TREC contract",
           "C4 full paper-family campaign evidence",
           "C5 independently reproduced outcome evidence"
         ]

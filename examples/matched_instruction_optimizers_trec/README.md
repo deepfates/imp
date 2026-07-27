@@ -17,10 +17,27 @@ within -0.05 held-out accuracy of its pinned upstream counterpart. A clean
 negative result falsifies that headline; it does not authorize changing seeds,
 messages, models, splits, budgets, or parsing after results.
 
-## Current boundary
+## Completed outcome
 
-The treatment is launch-authorized under the owner's `$100` aggregate workshop
-provider ceiling. A coordinated partial run falsified the old
+The sealed treatment completed on 2026-07-27 under the owner's `$100` aggregate
+workshop provider ceiling. Imp GEPA improved its mean untouched accuracy over
+its own baseline by `+0.4000` (source-ID-clustered 95% interval
+`[0.2958, 0.5042]`, Holm-adjusted `p = 0.00020`). Its mean difference from
+pinned DSPy GEPA was `-0.0083`, with 95% interval `[-0.0458, 0.0292]`, clearing
+the preregistered `-0.05` noninferiority margin. Imp MIPROv2 also improved its
+own baseline by `+0.1458`, with interval `[0.0458, 0.2458]` and Holm-adjusted
+`p = 0.00270`. The frozen headline therefore passed with GEPA as the declared
+winner.
+
+The committed compact result is
+`benchmarks/results/matched-instruction-optimizers-trec-20260726.json`. It binds
+the full retained Imp, upstream, and aggregate artifacts by SHA-256; those raw
+artifacts remain local because they contain 181 MB of per-call evidence.
+The treatment used 6,491 calls and `$3.13862325` in provider-reported cost.
+Adding the conservative pre-treatment workshop bound yields at most
+`$6.221975` against the `$100` ceiling.
+
+A coordinated partial run had previously falsified the old
 assumption that four nominal GEPA generations imply exactly four runtime
 iterations. Pinned GEPA checks `max_metric_calls = 280` only between iterations
 and legally finishes an iteration that began below the limit. For the frozen
@@ -102,8 +119,8 @@ the three seeds, applies Holm correction to the two Imp improvement tests, and
 checks noninferiority for the winning optimizer.
 
 Several stopped integration attempts made provider calls but never opened the
-untouched barrier and support no optimizer outcome. Including the latest
-legal-envelope stop and the coordinator's reported other workshop usage, the
-conservative aggregate before this authorized continuation is at most
-`$3.08335175`. Until a complete run exists, this comparison supports no
-effectiveness, parity, generality, or BEAM-native superiority claim.
+untouched barrier and support no optimizer outcome. The completed artifact
+supports only this task/model-specific matched result. It does not establish
+general GEPA or MIPROv2 effectiveness, paper-family replication, DSPy
+superiority, BEAM-native superiority, or evidence for SIMBA, COPRO, InferRules,
+or any other optimizer family.

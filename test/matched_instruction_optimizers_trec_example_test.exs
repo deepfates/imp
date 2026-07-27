@@ -38,6 +38,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
   alias MatchedInstructionOptimizersTREC.Aggregator
 
   @manifest "examples/matched_instruction_optimizers_trec/contract.json"
+  @result "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
 
   test "freezes exact authorities, dataset IDs, models, and runtime request controls" do
     manifest = Contract.load!(@manifest)
@@ -291,6 +292,37 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert imp_runner =~ "System.trap_signal(:sigterm"
     assert imp_runner =~ "stopped_payload(observer, source_commits"
     assert upstream_runner =~ "signal.signal(signal.SIGTERM, coordinated_stop)"
+  end
+
+  test "completed matched outcome keeps its exact task-specific claim boundary" do
+    result = @result |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "complete"
+    assert result["manifest"]["sha256"] == Contract.load!(@manifest)["manifest_sha256"]
+    assert result["dataset"]["test_visible_to_optimization_or_selection"] == false
+    assert result["paired_acceptance"]["headline_passed"]
+    assert result["paired_acceptance"]["winning_optimizer"] == "gepa"
+
+    assert get_in(result, ["paired_acceptance", "imp_gepa_minus_imp_baseline", "mean"]) ==
+             0.4
+
+    assert get_in(
+             result,
+             ["paired_acceptance", "imp_gepa_minus_upstream_gepa", "confidence_interval_95"]
+           ) == [-0.04583333333333334, 0.029166666666666667]
+
+    assert get_in(
+             result,
+             ["paired_acceptance", "imp_gepa_minus_upstream_gepa", "noninferiority_passed"]
+           )
+
+    assert result["execution"]["treatment_cost_usd"] == 3.13862325
+    assert "BEAM-native superiority" in result["claim_boundary"]["excludes"]
+
+    assert Enum.any?(
+             result["claim_boundary"]["excludes"],
+             &String.starts_with?(&1, "SIMBA, COPRO, InferRules")
+           )
   end
 
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do

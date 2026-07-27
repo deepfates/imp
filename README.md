@@ -77,6 +77,16 @@ public optimizer with an exact local fused task model and local proposal model,
 keeps the worse proposal out on validation, and reapplies the selected
 parameter artifact in a fresh OS BEAM.
 
+For the matched upstream result, the
+[strong-model TREC comparison](examples/matched_instruction_optimizers_trec/README.md)
+uses the same GPT-5.4 Mini task model, Claude Sonnet 4.6 optimizer model,
+messages, disjoint splits, seeds, and semantic budgets in Imp and pinned DSPy.
+On that frozen contract, Imp GEPA improved mean untouched accuracy by `+0.4000`
+over its baseline and cleared the preregistered `-0.05` noninferiority margin
+against DSPy GEPA. Imp MIPROv2 also improved its own baseline by `+0.1458`.
+This is one task/model-specific C3 result, not general optimizer effectiveness
+or BEAM superiority.
+
 For per-request retrieval and metric-gated bootstrapping, the
 [Banking77 KNNFewShot example](examples/local_knn_few_shot_banking77/README.md)
 retrieves real training neighbors for the fused classifier, renders accepted
@@ -195,11 +205,13 @@ whole-library equivalence or optimizer effectiveness. The [conformance
 report](docs/CONFORMANCE.md) enumerates every surface with its own evidence: a
 differential where one exists, a behavioral contract or deliberate
 Elixir-native equivalent where the mechanics differ, and an honest gap where
-an upstream-matched outcome is not yet proven. Imp uses supervision,
-process isolation, and bounded concurrency as native design choices; it does
-not claim comparative advantage without powered paired evidence. [Imp for DSPy
-users](docs/IMP_FOR_DSPY_USERS.md) maps every name you already know and states
-exactly what differs.
+an upstream-matched outcome is not yet proven. One sealed three-seed TREC
+comparison now establishes task-specific GEPA noninferiority and Imp-baseline
+lift for GEPA and MIPROv2; it does not wash over the remaining family gaps. Imp
+uses supervision, process isolation, and bounded concurrency as native design
+choices; it does not claim comparative advantage without powered paired
+evidence. [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) maps every name you
+already know and states exactly what differs.
 
 The package ships one generated API truth in `priv/public_api.json`. HexDocs
 groups the `Imp` facade and stable modules as the compatibility center, marks
