@@ -77,4 +77,16 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
 
     assert {:ok, _quoted} = runner |> Code.string_to_quoted()
   end
+
+  test "stopped result remains incomplete and test-opaque" do
+    result = (@root <> "/exercised-result.json") |> File.read!() |> Jason.decode!()
+
+    assert result["status"] == "stopped_incomplete"
+    assert result["completed_stage"]["baseline_train"] == 0.0
+    assert result["optimizer"]["candidate_count"] == 0
+    assert result["optimizer"]["selection_occurred"] == false
+    assert result["untouched_test"] == %{"decoded" => false, "scored" => false}
+    assert result["provider_spend_usd"] == 0.0
+    assert result["interpretation"] =~ "neither GEPA lift nor GEPA loss"
+  end
 end

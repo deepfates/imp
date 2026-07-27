@@ -44,3 +44,12 @@ Studio's loaded-process list contains that identity alone, and requires the
 OpenAI-compatible global model catalog to route that custom identity exactly
 once before it proceeds. It then always unloads the process. Its retained
 result is written atomically beside this README.
+
+The sealed V1 run is permanently stopped and incomplete. Its first train
+baseline was `0.0`: the local model exhausted the task envelope in
+`reasoning_content` and returned no parseable final content. While the first dev
+batch was in flight, an omitted post-load context guard found that LM Studio
+reported `262144` rather than the sealed `32768`; execution stopped before any
+candidate, selection, or test access. `exercised-result.json` retains that
+boundary. It is a model-format/launch measurement, not a GEPA outcome, and V1
+must not be resumed or rerun.

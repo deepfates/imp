@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "treatment_id": "local-gepa-ifbench-cross-task-v1",
+  "status": "stopped_incomplete",
+  "stopped_at_stage": "seed_2026072701_baseline_dev",
+  "reason": "LM Studio reported an active contextLength of 262144 instead of the sealed 32768; the post-launch guard was missing and execution was stopped without resuming",
+  "completed_stage": {
+    "seed": 2026072701,
+    "baseline_train": 0.0,
+    "train_rows": 16,
+    "usage": {
+      "input_tokens": 4507,
+      "output_tokens": 16368,
+      "usd": 0.0
+    }
+  },
+  "incomplete_stage": {
+    "name": "baseline_dev",
+    "rows": 24,
+    "committed_rows": 0,
+    "in_flight_rows_at_stop": 4
+  },
+  "optimizer": {
+    "candidate_count": 0,
+    "selection_occurred": false
+  },
+  "untouched_test": {
+    "decoded": false,
+    "scored": false
+  },
+  "retained_response_diagnosis": "The completed train calls exhausted the 1024-token envelope in reasoning_content and supplied no parseable final content; this is model-format failure before optimization, not a GEPA effectiveness result.",
+  "interpretation": "Incomplete measurement. It establishes neither GEPA lift nor GEPA loss and must not be resumed, rerun, or promoted as source-disjoint C3 evidence.",
+  "provider_spend_usd": 0.0,
+  "source_commits": {
+    "dspy": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "gepa_artifact": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+    "imp_predecessor": "93c454695decc8cf7a89900164d97075d42d9d6a",
+    "launch_head": "9bc7941226f41365c5b277ffc90f04a4832f5af1"
+  }
+}
