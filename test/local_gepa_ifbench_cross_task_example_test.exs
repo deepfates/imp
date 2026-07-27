@@ -15,7 +15,10 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
              "93c454695decc8cf7a89900164d97075d42d9d6a"
 
     assert contract["treatment_id"] == "local-gepa-ifbench-cross-task-v2"
-    assert contract["status"] == "draft"
+    assert contract["status"] == "sealed"
+
+    assert contract["authority"]["imp_predecessor_commit"] ==
+             "d588a62e4f809e3ed33c5ea7b9dd0dd560932298"
 
     assert contract["dataset"]["counts"] == %{
              "train" => 16,
