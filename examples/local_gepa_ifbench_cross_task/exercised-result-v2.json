@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "treatment_id": "local-gepa-ifbench-cross-task-v2",
+  "status": "stopped_incomplete",
+  "reason": "Stopped after an independent authority review required release-profile reconciliation and a cross-family experiment rather than further GEPA-only execution.",
+  "completed_stage": {
+    "seed": 2026072701,
+    "baseline_train": 0.4375,
+    "baseline_selection": 0.4375,
+    "train_rows": 16,
+    "selection_rows": 24,
+    "usage": {
+      "input_tokens": 29492,
+      "output_tokens": 41014,
+      "usd": 0.0
+    }
+  },
+  "optimizer": {
+    "candidate_count": 0,
+    "selection_occurred": false
+  },
+  "untouched_test": {
+    "decoded": false,
+    "scored": false
+  },
+  "interpretation": "The reasoning-disabled envelope made the baseline measurable, but this stopped baseline-only execution is neither a GEPA outcome nor cross-task effectiveness evidence and must not be resumed.",
+  "provider_spend_usd": 0.0,
+  "launch_head": "96af7a75cb52d78eab63e9d44db332a77d1d744f"
+}

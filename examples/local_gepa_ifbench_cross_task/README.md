@@ -59,3 +59,11 @@ reported `262144` rather than the sealed `32768`; execution stopped before any
 candidate, selection, or test access. `exercised-result.json` retains that
 boundary. It is a model-format/launch measurement, not a GEPA outcome, and V1
 must not be resumed or rerun.
+
+V2 proved the reasoning-disabled envelope was measurable: its complete 16-row
+train and 24-row selection baselines both scored `0.4375`. It was then stopped
+before its first optimizer candidate when independent release review required
+canonical release-profile reconciliation and a cross-family condition instead
+of more GEPA-only execution. The test file remained unopened. The retained
+`exercised-result-v2.json` is baseline/format evidence only and V2 must not be
+resumed.

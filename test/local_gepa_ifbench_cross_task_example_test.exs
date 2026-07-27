@@ -100,5 +100,13 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
     assert result["untouched_test"] == %{"decoded" => false, "scored" => false}
     assert result["provider_spend_usd"] == 0.0
     assert result["interpretation"] =~ "neither GEPA lift nor GEPA loss"
+
+    v2 = (@root <> "/exercised-result-v2.json") |> File.read!() |> Jason.decode!()
+    assert v2["status"] == "stopped_incomplete"
+    assert v2["completed_stage"]["baseline_train"] == 0.4375
+    assert v2["completed_stage"]["baseline_selection"] == 0.4375
+    assert v2["optimizer"]["candidate_count"] == 0
+    assert v2["untouched_test"] == %{"decoded" => false, "scored" => false}
+    assert v2["interpretation"] =~ "neither a GEPA outcome nor cross-task effectiveness"
   end
 end
