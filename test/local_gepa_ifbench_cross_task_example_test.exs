@@ -8,7 +8,10 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
     manifest = (@root <> "/data/source-manifest.json") |> File.read!() |> Jason.decode!()
 
     assert contract["treatment_id"] == "local-gepa-ifbench-cross-task-v1"
-    assert contract["status"] in ["draft", "sealed", "complete", "stopped"]
+    assert contract["status"] == "sealed"
+
+    assert contract["authority"]["imp_predecessor_commit"] ==
+             "93c454695decc8cf7a89900164d97075d42d9d6a"
 
     assert contract["dataset"]["counts"] == %{
              "train" => 16,

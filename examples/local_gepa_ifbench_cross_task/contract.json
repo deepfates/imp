@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "treatment_id": "local-gepa-ifbench-cross-task-v1",
-  "status": "draft",
+  "status": "sealed",
   "authority": {
     "gepa_artifact_commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
     "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
-    "imp_predecessor_commit": "TO_BE_SEALED"
+    "imp_predecessor_commit": "93c454695decc8cf7a89900164d97075d42d9d6a"
   },
   "dataset": {
     "root": "data",

@@ -29,5 +29,17 @@ python3 scripts/build_gepa_ifbench_cross_task.py \
 mix test test/local_gepa_ifbench_cross_task_example_test.exs
 ```
 
-The live runner is intentionally disabled until `contract.json` is sealed on a
-clean commit. Its retained result is written atomically beside this README.
+The treatment is sealed to the exact predecessor in `contract.json`. From a
+clean checkout with the pinned GEPA artifact and Python environment available,
+run it once with:
+
+```sh
+IMP_GEPA_ROOT="$PWD/tmp/gepa-artifact" \
+IMP_GEPA_PYTHON="$PWD/tmp/ifbench-parity-venv/bin/python" \
+python3 examples/local_gepa_ifbench_cross_task/run_local.py
+```
+
+The coordinator starts only the exact local model identity, verifies that both
+LM Studio's process list and OpenAI-compatible catalog expose that identity
+alone, then always unloads it. Its retained result is written atomically beside
+this README.
