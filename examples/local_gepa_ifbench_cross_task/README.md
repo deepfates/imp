@@ -39,7 +39,8 @@ IMP_GEPA_PYTHON="$PWD/tmp/ifbench-parity-venv/bin/python" \
 python3 examples/local_gepa_ifbench_cross_task/run_local.py
 ```
 
-The coordinator starts only the exact local model identity, verifies that both
-LM Studio's process list and OpenAI-compatible catalog expose that identity
-alone, then always unloads it. Its retained result is written atomically beside
-this README.
+The coordinator starts only the exact local model identity, verifies that LM
+Studio's loaded-process list contains that identity alone, and requires the
+OpenAI-compatible global model catalog to route that custom identity exactly
+once before it proceeds. It then always unloads the process. Its retained
+result is written atomically beside this README.

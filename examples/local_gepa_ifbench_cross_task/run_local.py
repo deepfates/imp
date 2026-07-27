@@ -25,7 +25,10 @@ def require_exact_loaded_identity(identifier: str) -> None:
     with urllib.request.urlopen("http://127.0.0.1:1234/v1/models", timeout=30) as response:
         catalog = json.load(response)
     model_ids = [entry.get("id") for entry in catalog.get("data", [])]
-    if model_ids != [identifier]:
+    # LM Studio's OpenAI-compatible catalog lists downloaded identities, not
+    # only the process shown by `lms ps`. The process list above owns loaded
+    # isolation; the API catalog must expose the custom routed identity once.
+    if model_ids.count(identifier) != 1:
         raise SystemExit(f"LM Studio API catalog identity drift: {model_ids!r}")
 
 
