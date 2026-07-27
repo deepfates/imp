@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "treatment_id": "matched-instruction-family-ifbench-v1",
+  "status": "draft_no_network_authority",
+  "claim_boundary": "one source-disjoint IFBench task/model condition; not general instruction-optimizer effectiveness, GEPA paper replication, or BEAM superiority",
+  "authorities": {
+    "dspy_version": "3.2.1",
+    "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "gepa_version": "0.1.4",
+    "gepa_commit": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+    "gepa_artifact_commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
+  },
+  "dataset": {
+    "receipt": "data/receipt.json",
+    "counts": {"train": 16, "selection": 32, "held_out": 64},
+    "program": "IFBenchCoT2StageProgram",
+    "metric": "mean executable constraint satisfaction",
+    "held_out_access": "after every selected artifact is durably sealed in both runtimes"
+  },
+  "models": {
+    "task": "openai/gpt-5.4-mini",
+    "optimizer": "anthropic/claude-sonnet-4.6"
+  },
+  "seeds": [2026072705, 2026072706],
+  "arms": ["baseline", "gepa", "mipro_v2", "simba", "copro", "infer_rules", "signature_optimizer_native"],
+  "semantic_budget": {
+    "maximum_metric_calls_per_optimizer": 64,
+    "current_iteration_may_complete": true,
+    "family_native_stopping_is_preserved": true
+  },
+  "request": {
+    "task": {"max_input_tokens": 4096, "max_tokens": 768},
+    "optimizer": {"max_input_tokens": 16384, "max_tokens": 1024},
+    "retry": false,
+    "max_retries": 0,
+    "fallbacks": false,
+    "transports_per_logical_call": 1
+  },
+  "outer_safety": {
+    "task_calls": 9216,
+    "optimizer_calls": 168,
+    "task_usd_per_reserved_call": 0.007104,
+    "optimizer_usd_per_reserved_call": 0.08064,
+    "new_spend_usd_max": 79.017984,
+    "known_workshop_aggregate_before_usd_lte": 6.221975,
+    "workshop_aggregate_after_usd_lte": 85.239959,
+    "authorized_workshop_ceiling_usd": 100.0
+  },
+  "acceptance": {
+    "negative_results_are_complete": true,
+    "multiple_family_inference": "source-id clustered bootstrap with Holm correction",
+    "matched_comparison": "same routes, source rows, seeds, messages, semantic opportunity, scorer, and stop rule for every pinned DSPy family",
+    "native_control": "SignatureOptimizer is Imp-only and cannot satisfy upstream parity"
+  },
+  "launch_blockers": [
+    "cross-runtime no-model message and information-flow differential",
+    "family-specific legal call-envelope derivation",
+    "current route capability and price revalidation",
+    "paired coordinator preflight"
+  ]
+}
