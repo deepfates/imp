@@ -635,14 +635,16 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
       trainset = Imp.Datasets.jsonl(paths.train, input_keys)
       devset = Imp.Datasets.jsonl(paths.dev, input_keys)
-      testset = Imp.Datasets.jsonl(paths.test, input_keys)
+      test_count = jsonl_row_count!(paths.test)
       validate_family_spec!(spec)
 
       seed_context = %{
         spec: spec,
         trainset: trainset,
         devset: devset,
-        testset: testset,
+        test_path: paths.test,
+        test_count: test_count,
+        input_keys: input_keys,
         lm: lm,
         reflection_lm: reflection_lm,
         judge_lm: judge_lm,
@@ -660,7 +662,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         split_counts: %{
           train: length(trainset),
           dev: length(devset),
-          test: length(testset)
+          test: test_count
         },
         seeds: seeds,
         generations: generations,
@@ -750,7 +752,8 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
                             seed_progress
                             |> Map.put("usage", usage_fn.())
                             |> progress_fn.()
-                          end
+                          end,
+                          fn -> Agent.get(progress_agent, & &1) end
                         )
                       end)
                     end,
@@ -826,7 +829,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         "metric_calls" => budget,
         "token_cost" => token_cost!(usage, token_cost, pricing_source, family),
         "optimizer_budgets" => %{
-          "baseline" => length(testset),
+          "baseline" => test_count,
           "dspy_gepa" => budget,
           "imp_gepa" => budget,
           "mipro_v2" => budget
@@ -958,12 +961,14 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     })
   end
 
-  defp run_seed(context, seed, progress, progress_fn) do
+  defp run_seed(context, seed, progress, progress_fn, progress_get) do
     %{
       spec: spec,
       trainset: trainset,
       devset: devset,
-      testset: testset,
+      test_path: test_path,
+      test_count: test_count,
+      input_keys: input_keys,
       lm: lm,
       reflection_lm: reflection_lm,
       judge_lm: judge_lm,
@@ -990,10 +995,10 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
     evaluation_timeout = get_in(execution, ["lm", "optimizer_timeout_ms"]) || 30_000
 
-    baseline =
+    baseline_before_selection =
       baseline_scores(
         program,
-        [train: trainset, dev: devset, test: testset],
+        [train: trainset, dev: devset],
         metric,
         max_concurrency,
         evaluation_timeout,
@@ -1003,7 +1008,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
     optimizer_checkpoint_fn = fn optimizer_state ->
       progress
-      |> Map.put("baseline", stringify_scores(baseline))
+      |> Map.put("baseline", stringify_partial_scores(baseline_before_selection))
       |> Map.put("optimizer_state", optimizer_state)
       |> progress_fn.()
     end
@@ -1030,6 +1035,29 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         resume_state: progress["optimizer_state"],
         checkpoint_fn: optimizer_checkpoint_fn
       )
+
+    # Keep the test envelope opaque until the optimizer has returned its
+    # selected program. Baseline test scoring remains paired, but neither its
+    # labels nor outcomes can enter proposal, selection, or resume state.
+    testset = Imp.Datasets.jsonl(test_path, input_keys)
+
+    unless length(testset) == test_count do
+      raise ArgumentError,
+            "GEPA deferred test row count drift: expected #{test_count}, got #{length(testset)}"
+    end
+
+    baseline_test =
+      baseline_scores(
+        program,
+        [test: testset],
+        metric,
+        max_concurrency,
+        evaluation_timeout,
+        progress_get.(),
+        progress_fn
+      ).test
+
+    baseline = Map.put(baseline_before_selection, :test, baseline_test)
 
     metric_calls = Map.get(report.metadata, :metric_calls)
     metric_call_limit = Map.get(report.metadata, :max_metric_calls)
@@ -1476,8 +1504,8 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     result |> Map.new(fn {key, value} -> {Atom.to_string(key), value} end)
   end
 
-  defp stringify_scores(scores) do
-    %{"train" => scores.train, "dev" => scores.dev, "test" => scores.test}
+  defp stringify_partial_scores(scores) do
+    %{"train" => scores.train, "dev" => scores.dev}
   end
 
   defp atomize_seed_result(result) do
@@ -1843,6 +1871,12 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
       "dev" => "sha256:" <> file_sha256(paths.dev),
       "test" => "sha256:" <> file_sha256(paths.test)
     }
+  end
+
+  defp jsonl_row_count!(path) do
+    path
+    |> File.stream!([], :line)
+    |> Enum.count(&(String.trim(&1) != ""))
   end
 
   defp seed_variance(seed_results) do

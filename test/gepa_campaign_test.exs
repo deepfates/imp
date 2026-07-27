@@ -22,6 +22,46 @@ defmodule GepaCampaignTest do
     end
   end
 
+  defmodule SelectionBarrierCallback do
+    @behaviour Imp.Optimizer.GEPA.Callback
+
+    @impl true
+    def on_optimization_end(_event, owner), do: send(owner, :gepa_selection_sealed)
+  end
+
+  test "GEPA campaign keeps test rows behind the selected-program boundary" do
+    dataset_root = tmp_dir("gepa-campaign-heldout-barrier")
+    rows_dir = tmp_dir("gepa-campaign-heldout-barrier-rows")
+    write_dataset_root!(dataset_root)
+    owner = self()
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, opts ->
+          prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+          send(owner, {:gepa_task_prompt, prompt})
+          static_gold_handler(messages, opts)
+        end
+      ]
+    }
+
+    GepaCampaign.run(
+      campaign_opts(dataset_root, rows_dir,
+        lm: lm,
+        optimizer_callbacks: [{SelectionBarrierCallback, owner}]
+      )
+    )
+
+    events = drain_barrier_events([])
+
+    {before_selection, [:gepa_selection_sealed | after_selection]} =
+      Enum.split_while(events, &(&1 != :gepa_selection_sealed))
+
+    refute Enum.any?(before_selection, &test_prompt?/1)
+    assert Enum.any?(after_selection, &test_prompt?/1)
+  end
+
   test "Imp GEPA campaign keeps local HoVer retrieval out of full replication evidence" do
     dataset_root = tmp_dir("gepa-campaign-data")
     upstream_dir = tmp_dir("gepa-campaign-upstream")
@@ -391,7 +431,7 @@ defmodule GepaCampaignTest do
 
     assert_received %{
       event: :seed_checkpoint,
-      phase: :baseline,
+      phase: :optimizer,
       baseline_splits: ["dev", "test", "train"]
     }
   end
@@ -937,6 +977,18 @@ defmodule GepaCampaignTest do
       opts: [handler: &static_gold_handler/2]
     }
   end
+
+  defp drain_barrier_events(events) do
+    receive do
+      :gepa_selection_sealed -> drain_barrier_events(events ++ [:gepa_selection_sealed])
+      {:gepa_task_prompt, prompt} -> drain_barrier_events(events ++ [{:prompt, prompt}])
+    after
+      0 -> events
+    end
+  end
+
+  defp test_prompt?({:prompt, prompt}), do: String.contains?(prompt, "test problem")
+  defp test_prompt?(_event), do: false
 
   defp static_gold_handler(messages, _opts) do
     prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
