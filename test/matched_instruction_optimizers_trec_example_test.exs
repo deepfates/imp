@@ -57,8 +57,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert manifest["models"]["optimizer"]["logical"] == "anthropic/claude-sonnet-4.6"
     assert get_in(manifest, ["execution", "request", "task", "seed"]) == "experiment_seed"
 
-    assert manifest["launch_status"] ==
-             "blocked_workshop_spend_ceiling_after_gepa_legal_envelope"
+    assert manifest["launch_status"] == "sealed"
 
     assert get_in(manifest, ["runtime_dependencies", "upstream", "packages", "optuna"]) ==
              "4.9.0"
@@ -280,6 +279,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert coordinator =~ ~S|env.pop("OPENROUTER_API_KEY", None)|
     assert coordinator =~ ~s(cwd=HERE)
     assert coordinator =~ ~S|PRIOR_SPEND_BOUND = Decimal("3.08335175")|
+    assert coordinator =~ ~S|WORKSHOP_CEILING = Decimal("100.00")|
     assert coordinator =~ "stdin=subprocess.DEVNULL"
     assert coordinator =~ "require_rescued_stop_artifacts()"
     assert coordinator =~ "imp = preflight_imp(manifest_sha)"

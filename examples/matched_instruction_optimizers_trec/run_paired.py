@@ -25,7 +25,7 @@ DSPY_ROOT = ROOT / "tmp" / "dspy-3.2.1"
 GEPA_ROOT = ROOT / "tmp" / "gepa-v0.1.4"
 UPSTREAM_PYTHON = ROOT / "tmp" / "dspy-parity-venv" / "bin" / "python"
 PRIOR_SPEND_BOUND = Decimal("3.08335175")
-WORKSHOP_CEILING = Decimal("50.00")
+WORKSHOP_CEILING = Decimal("100.00")
 PREFLIGHT_PREFIX = "PAIRED_PREFLIGHT_JSON="
 
 
@@ -223,6 +223,7 @@ def preflight() -> dict[str, Any]:
         "source_commit": git(ROOT, "rev-parse", "HEAD"),
         "manifest_sha256": manifest_sha,
         "prior_spend_bound": str(PRIOR_SPEND_BOUND),
+        "workshop_ceiling": str(WORKSHOP_CEILING),
         "treatment_maximum": str(maximum),
         "combined_maximum": str(PRIOR_SPEND_BOUND + maximum),
         "imp": imp,

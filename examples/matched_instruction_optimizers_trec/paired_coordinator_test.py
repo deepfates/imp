@@ -27,14 +27,15 @@ class PairedCoordinatorTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "secret"}):
             self.assertNotIn("OPENROUTER_API_KEY", paired.preflight_environment())
 
-    def test_revised_legal_envelope_blocks_the_workshop_spend_ceiling(self) -> None:
+    def test_revised_legal_envelope_fits_the_authorized_workshop_spend_ceiling(self) -> None:
         manifest = json.loads((HERE / "contract.json").read_text())
         self.assertEqual(paired.worst_case_usd(manifest), paired.Decimal("59.10912000"))
+        self.assertEqual(paired.WORKSHOP_CEILING, paired.Decimal("100.00"))
         self.assertEqual(
             paired.PRIOR_SPEND_BOUND + paired.worst_case_usd(manifest),
             paired.Decimal("62.19247175"),
         )
-        self.assertGreater(
+        self.assertLessEqual(
             paired.PRIOR_SPEND_BOUND + paired.worst_case_usd(manifest),
             paired.WORKSHOP_CEILING,
         )

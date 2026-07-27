@@ -1,6 +1,6 @@
 # Strong matched instruction optimizers on TREC
 
-This directory defines the launch-blocked strong-model comparison for Imp and
+This directory defines the sealed strong-model comparison for Imp and
 pinned DSPy. It supersedes the small local diagnostic at commit `0a6cafe` for
 release decisions; that diagnostic remains historical evidence, not a flagship.
 
@@ -19,7 +19,8 @@ messages, models, splits, budgets, or parsing after results.
 
 ## Current boundary
 
-The treatment is launch-blocked. A coordinated partial run falsified the old
+The treatment is launch-authorized under the owner's `$100` aggregate workshop
+provider ceiling. A coordinated partial run falsified the old
 assumption that four nominal GEPA generations imply exactly four runtime
 iterations. Pinned GEPA checks `max_metric_calls = 280` only between iterations
 and legally finishes an iteration that began below the limit. For the frozen
@@ -31,10 +32,10 @@ task and 48 optimizer transports after selection and untouched evaluation.
 Across both runtimes and three seeds, the revised outer safety envelope is
 7,140 task calls plus 342 optimizer calls. Its conservative reservation is
 $59.10912. With the current conservative workshop aggregate of $3.08335175,
-the combined worst case is $62.19247175 and exceeds the owner's $50 ceiling.
-No runner has provider authority while this remains unresolved. The semantic
-stopping rule is unchanged; the outer cap is operational only, and firing it
-makes the treatment inconclusive rather than scoring a truncated arm.
+the combined worst case is $62.19247175 and fits the owner's `$100` ceiling.
+The semantic stopping rule is unchanged; the outer cap is operational only,
+and firing it makes the treatment inconclusive rather than scoring a truncated
+arm.
 
 The runners additionally fail closed on:
 
@@ -103,6 +104,6 @@ checks noninferiority for the winning optimizer.
 Several stopped integration attempts made provider calls but never opened the
 untouched barrier and support no optimizer outcome. Including the latest
 legal-envelope stop and the coordinator's reported other workshop usage, the
-conservative aggregate is at most `$3.08335175`. Until a complete run exists,
-this comparison supports no effectiveness, parity, generality, or BEAM-native
-superiority claim.
+conservative aggregate before this authorized continuation is at most
+`$3.08335175`. Until a complete run exists, this comparison supports no
+effectiveness, parity, generality, or BEAM-native superiority claim.

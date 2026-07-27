@@ -164,7 +164,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
       },
       "runtime_configs" => runtime_configs(manifest, per_seed_runtime),
       "claim_boundary" =>
-        "launch-blocked matched system comparison; baseline and frozen injected-instruction task messages must match, live candidates must be rendered, and optimizer trajectories use pinned fidelity modes"
+        "sealed matched system comparison; baseline and frozen injected-instruction task messages must match, live candidates must be rendered, and optimizer trajectories use pinned fidelity modes"
     }
   end
 
