@@ -29,6 +29,18 @@ def require_exact_loaded_identity(identifier: str) -> None:
         raise SystemExit(f"LM Studio API catalog identity drift: {model_ids!r}")
 
 
+def require_exact_inventory(model: dict) -> None:
+    inventory = json.loads(run("lms", "ls", "--json").stdout)
+    matches = [entry for entry in inventory if entry.get("modelKey") == model["inventory_key"]]
+    if len(matches) != 1:
+        raise SystemExit(f"LM Studio inventory identity drift: {matches!r}")
+    entry = matches[0]
+    if entry.get("selectedVariant") != model["selected_variant"]:
+        raise SystemExit(f"LM Studio selected variant drift: {entry.get('selectedVariant')!r}")
+    if entry.get("sizeBytes") != model["size_bytes"]:
+        raise SystemExit(f"LM Studio inventory byte-size drift: {entry.get('sizeBytes')!r}")
+
+
 def main() -> None:
     contract = json.loads((HERE / "contract.json").read_text())
     if contract["status"] != "sealed":
@@ -41,6 +53,7 @@ def main() -> None:
         raise SystemExit("LM Studio must begin with no loaded models for this isolated run")
 
     model = contract["model"]
+    require_exact_inventory(model)
     identifier = model["runtime_identifier"]
     load = run(
         "lms", "load", model["inventory_key"],

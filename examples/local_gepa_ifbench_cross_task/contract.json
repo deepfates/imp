@@ -13,7 +13,9 @@
     "counts": {"train": 16, "selection": 24, "untouched_test": 48}
   },
   "model": {
-    "inventory_key": "qwen/qwen3.6-35b-a3b@4bit",
+    "inventory_key": "qwen/qwen3.6-35b-a3b",
+    "selected_variant": "qwen/qwen3.6-35b-a3b@4bit",
+    "size_bytes": 20429364306,
     "runtime_identifier": "imp-ifbench-qwen36-35b-a3b-4bit",
     "base_url": "http://127.0.0.1:1234/v1",
     "task_temperature": 0.2,

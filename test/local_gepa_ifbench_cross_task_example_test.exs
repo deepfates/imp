@@ -21,6 +21,9 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
 
     assert contract["optimizer"]["seeds"] == [2_026_072_701, 2_026_072_702, 2_026_072_703]
     assert contract["optimizer"]["metric_call_limit"] == 104
+    assert contract["model"]["inventory_key"] == "qwen/qwen3.6-35b-a3b"
+    assert contract["model"]["selected_variant"] == "qwen/qwen3.6-35b-a3b@4bit"
+    assert contract["model"]["size_bytes"] == 20_429_364_306
 
     assert manifest["gepa_artifact_commit"] ==
              "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
@@ -68,6 +71,7 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
     assert coordinator =~ ~s(if loaded:)
     assert coordinator =~ ~s("lms", "unload")
     assert coordinator =~ "require_exact_loaded_identity(identifier)"
+    assert coordinator =~ "require_exact_inventory(model)"
     assert coordinator =~ ~s(/v1/models)
     assert coordinator =~ ~s("git", "status")
 
