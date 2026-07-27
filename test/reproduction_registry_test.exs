@@ -73,9 +73,9 @@ defmodule Imp.ReproductionRegistryTest do
     assert copro["admitted_evidence"] == %{
              "tier" => "t1",
              "artifact" =>
-               "benchmarks/evidence/admitted/copro_isolation/5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e.json",
+               "benchmarks/evidence/admitted/copro_isolation/ced5027a2bda222f6acd990f922d82041fd6f8a22b34664ad97722810644c5a3.json",
              "artifact_sha256" =>
-               "5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e",
+               "ced5027a2bda222f6acd990f922d82041fd6f8a22b34664ad97722810644c5a3",
              "protocol_id" => "copro_isolation"
            }
   end
@@ -151,13 +151,13 @@ defmodule Imp.ReproductionRegistryTest do
          "78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317"},
       "grpo" =>
         {"mmgrpo_differential",
-         "7c54695dcbbd4b6606a3da1d51afad858e663df5e2442adfef2c68f9ed724b51"},
+         "f7eb66096fab79d39f2bdb40d612778a68a569e55baffb82309ac44cb0af6571"},
       "better_together" =>
         {"better_together_differential",
-         "0a41f1cfd445c75a60dc930d5242c8bd4dd708dbc2b61e6ede7a8a843a1870c9"},
+         "aaf39e81fc2fa8f288814b7d438dd2c31411f2b8856b162bc82f50a76780cb79"},
       "ensemble" =>
         {"ensemble_differential",
-         "3a7d990af2dd277371e33f81d53d5640dfa50beac6b843a2511cfe24ac5a61e1"}
+         "c614e943063dab5507254a6a3cc412651de5124e06d04f1a0c9f80c8aa7bd21a"}
     }
 
     Enum.each(expected_admissions, fn {id, {protocol_id, sha256}} ->

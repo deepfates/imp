@@ -8,7 +8,7 @@ Elixir-native equivalents: 7
 Tracking: 1
 Gaps: 3
 Claim-specific non-blocking gaps: 3
-Invalid evidence: 7
+Invalid evidence: 0
 Invalid aggregate rows: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -474,9 +474,9 @@ Executable evidence:
 Current-profile capability evidence:
 
 - `LabeledFewShot`: valid; claims: claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: labeled_few_shot=valid
-- `BootstrapFewShot`: invalid_evidence; claims: claim.optimizer.bootstrap_few_shot.semantic_conformance (informational); receipts: bootstrap_few_shot=INVALID
-- `BootstrapRS`: invalid_evidence; claims: no current-profile claim; receipts: bootstrap_random_search=INVALID
-- `RandomSearch`: invalid_evidence; claims: claim.optimizer.random_search.semantic_conformance (informational); receipts: bootstrap_random_search=INVALID
+- `BootstrapFewShot`: valid; claims: claim.optimizer.bootstrap_few_shot.semantic_conformance (informational); receipts: bootstrap_few_shot=valid
+- `BootstrapRS`: valid; claims: no current-profile claim; receipts: bootstrap_random_search=valid
+- `RandomSearch`: valid; claims: claim.optimizer.random_search.semantic_conformance (informational); receipts: bootstrap_random_search=valid
 
 
 Missing evidence or behavior:
@@ -544,7 +544,7 @@ Executable evidence:
 
 Current-profile capability evidence:
 
-- `COPRO`: invalid_evidence; claims: claim.optimizer.copro.semantic_conformance (informational); receipts: copro=INVALID
+- `COPRO`: valid; claims: claim.optimizer.copro.semantic_conformance (informational); receipts: copro=valid
 - `MIPROv2`: valid; claims: claim.optimizer.mipro_v2.matched_trec_effectiveness (informational); receipts: optimizer_miprov2=valid
 - `SIMBA`: valid; claims: no current-profile claim; receipts: optimizer_simba=valid
 - `InferRules`: valid; claims: no current-profile claim; receipts: infer_rules=valid
@@ -640,9 +640,9 @@ Current-profile capability evidence:
 - `Avatar`: valid; claims: claim.optimizer.avatar_actor.api (blocking), claim.optimizer.avatar_actor.semantic_conformance (informational); receipts: avatar=valid
 - `AvatarOptimizer`: valid; claims: claim.optimizer.avatar_optimizer.api (blocking), claim.optimizer.avatar_optimizer.semantic_conformance (informational); receipts: avatar_optimizer=valid
 - `BootstrapFinetune`: valid; claims: claim.optimizer.bootstrap_finetune.api (blocking), claim.optimizer.bootstrap_finetune.semantic_conformance (informational), claim.local_mlx_weight_training.effectiveness (blocking); receipts: bootstrap_finetune=valid
-- `GRPO`: invalid_evidence; claims: claim.optimizer.mmgrpo.api (blocking), claim.optimizer.mmgrpo.semantic_conformance (informational); receipts: grpo=INVALID
-- `BetterTogether`: invalid_evidence; claims: claim.optimizer.better_together.api (blocking), claim.optimizer.better_together.semantic_conformance (informational); receipts: better_together=INVALID
-- `Ensemble`: invalid_evidence; claims: claim.optimizer.ensemble.api (blocking), claim.optimizer.ensemble.semantic_conformance (informational); receipts: ensemble=INVALID
+- `GRPO`: valid; claims: claim.optimizer.mmgrpo.api (blocking), claim.optimizer.mmgrpo.semantic_conformance (informational); receipts: grpo=valid
+- `BetterTogether`: valid; claims: claim.optimizer.better_together.api (blocking), claim.optimizer.better_together.semantic_conformance (informational); receipts: better_together=valid
+- `Ensemble`: valid; claims: claim.optimizer.ensemble.api (blocking), claim.optimizer.ensemble.semantic_conformance (informational); receipts: ensemble=valid
 
 
 Missing evidence or behavior:

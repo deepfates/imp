@@ -90,7 +90,7 @@ defmodule Imp.UpstreamFidelityTest do
     assert by_id["product.release"].status == :conformant
     assert by_id["optimization.anything"].status == :gap
 
-    assert report.summary.invalid_evidence >= 1
+    assert report.summary.invalid_evidence == 0
     assert report.summary.invalid_rows == 0
     assert report.summary.local_conformance == 1
     assert report.summary.manifest_missing == 0
@@ -102,7 +102,7 @@ defmodule Imp.UpstreamFidelityTest do
     assert report.blocking_ids == []
 
     bootstrap = Enum.find(few_shot.capabilities, &(&1.surface == "BootstrapFewShot"))
-    assert bootstrap.status == :invalid_evidence
+    assert bootstrap.status == :valid
 
     assert Enum.any?(
              bootstrap.claims,
@@ -149,7 +149,7 @@ defmodule Imp.UpstreamFidelityTest do
 
     report = Imp.UpstreamFidelity.report(root: root)
 
-    assert report.summary.invalid_evidence > 0
+    assert report.summary.invalid_rows > 0
     refute report.summary.passing
     assert Enum.all?(report.surfaces, &(&1.status == :invalid_evidence))
 
