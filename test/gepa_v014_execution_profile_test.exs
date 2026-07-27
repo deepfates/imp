@@ -81,6 +81,55 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
     def generate(%__MODULE__{reason: reason}, _messages, _opts), do: {:error, reason}
   end
 
+  defmodule OvershootAdapter do
+    @behaviour Adapter
+    defstruct [:parent_calls]
+
+    @impl true
+    def evaluate(adapter, batch, candidate, opts) do
+      level = String.to_integer(candidate.main)
+      capture? = Keyword.get(opts, :capture_traces, false)
+
+      scores =
+        cond do
+          Enum.all?(batch, &(&1.id >= 100)) ->
+            Enum.map(batch, fn _ -> if(level == 0, do: 0.4, else: 0.6) end)
+
+          level == 1 ->
+            Enum.map(batch, fn _ -> 1.0 end)
+
+          capture? and Agent.get_and_update(adapter.parent_calls, &{&1, &1 + 1}) < 23 ->
+            Enum.map(batch, fn _ -> 1.0 end)
+
+          true ->
+            Enum.map(batch, fn _ -> 0.0 end)
+        end
+
+      trajectories =
+        if capture? do
+          %{
+            main:
+              Enum.zip_with(batch, scores, fn row, score ->
+                %Trajectory{index: row.id, example: row, score: score, trace: []}
+              end)
+          }
+        else
+          %{}
+        end
+
+      Result.new(batch, scores,
+        trajectories: trajectories,
+        side_information: %{main: Enum.map(batch, & &1.id)},
+        metadata: %{metric_calls: length(batch)}
+      )
+    end
+
+    @impl true
+    def make_reflective_dataset(_adapter, _candidate, result, components) do
+      Map.new(components, &{&1, Enum.map(result.outputs, fn row -> %{"id" => row.id} end)})
+    end
+  end
+
   test "pinned profile reproduces the four-iteration CPython parent and minibatch schedule" do
     Enum.each(@seeds, fn seed ->
       state = run_profile(seed)
@@ -102,9 +151,9 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
 
       assert actual == Map.fetch!(@expected, seed)
       assert state.budget.metric_calls == 280
-      assert state.budget.max_metric_calls == 280
+      assert state.budget.max_metric_calls == 330
       assert state.budget.reflection_calls == 4
-      assert state.budget.max_reflection_calls == 8
+      assert state.budget.max_reflection_calls == 48
 
       checkpoint = state |> Engine.dump_state() |> json_round_trip()
       assert checkpoint["rng_state"]["algorithm"] == "python_mt19937"
@@ -130,7 +179,7 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
     assert optimizer.perfect_score == 1.0
     refute optimizer.cache_evaluation
     assert optimizer.rng_algorithm == :python_v3
-    assert optimizer.max_reflection_calls == 8
+    assert optimizer.max_reflection_calls == :infinity
 
     lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
     program = Imp.predict("question -> answer", lm: lm)
@@ -139,9 +188,53 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
 
     {_compiled, report} = GEPA.compile_with_report(optimizer, program, trainset, validation)
     assert report.metadata.max_metric_calls == 280
-    assert report.metadata.metric_calls == 80
+    assert report.metadata.operational_metric_call_cap == 330
+    assert report.metadata.max_reflection_calls == 48
+    assert report.metadata.metric_calls == 280
     assert report.metadata.reflection_calls == 0
     assert report.candidate_count == 1
+  end
+
+  test "pinned stopper permits the exact legal current-iteration overshoot" do
+    assert GEPA.v014_budget_envelope(40, 10, 280) == %{
+             max_metric_calls: 330,
+             max_reflection_calls: 48,
+             max_iterations: 24
+           }
+
+    {:ok, parent_calls} = Agent.start_link(fn -> 0 end)
+
+    state =
+      Engine.run(
+        %OvershootAdapter{parent_calls: parent_calls},
+        %{main: "0"},
+        Enum.map(0..39, &%{id: &1}),
+        Enum.map(100..139, &%{id: &1}),
+        fn _candidate, _component, _records, _iteration -> "1" end,
+        execution_profile: :gepa_v0_1_4,
+        rng_algorithm: :python_v3,
+        reflection_failure_policy: :gepa_v0_1_4_batch_then_single_retry,
+        max_iterations: 24,
+        minibatch_size: 10,
+        candidate_selection_strategy: :pareto,
+        module_selector: :round_robin,
+        sampling_strategy: :single,
+        selection_strategy: :all_improvements,
+        proposal_concurrency: 1,
+        acceptance_policy: :strict_improvement,
+        use_merge: false,
+        cache_evaluation: false,
+        skip_perfect_score: true,
+        perfect_score: 1.0,
+        stopper: Imp.Optimizer.GEPA.Stopper.max_metric_calls(280),
+        max_metric_calls: 330,
+        max_reflection_calls: 48,
+        seed: 5
+      )
+
+    assert state.budget.metric_calls == 330
+    assert state.stop_reason == {:stopper, [{:max_metric_calls, 330, 280}]}
+    assert Enum.map(state.candidates, & &1.candidate.main) == ["0", "1"]
   end
 
   test "pinned reflection retries one failed singleton and accounts both attempts" do
@@ -242,8 +335,8 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
           cache_evaluation: false,
           skip_perfect_score: true,
           perfect_score: 1.0,
-          max_metric_calls: 280,
-          max_reflection_calls: 8,
+          max_metric_calls: 330,
+          max_reflection_calls: 48,
           seed: seed
         ],
         overrides

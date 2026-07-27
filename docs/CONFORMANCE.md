@@ -493,6 +493,7 @@ Imp modules: `Imp.Optimizer.GEPA`, `Imp.Optimize.Anything`
 Semantic invariants:
 
 - the local engine and adapter contracts track pinned standalone GEPA v0.1.4 structure
+- the opt-in v0.1.4 execution profile checks its semantic metric-call limit between iterations, permits the pinned legal completion of an already-started iteration, and reports the distinct operational overshoot envelope
 - the admitted provider-free T1 differential matches 15 structural cases against the exact GEPA v0.1.4 checkout and retains its RNG, resume, and release-metadata deviations
 - reflective mutation uses per-example feedback and trajectories in focused local tests
 - candidate lineage, Pareto state, and source-versioned results are retained locally

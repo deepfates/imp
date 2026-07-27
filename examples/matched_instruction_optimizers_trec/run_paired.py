@@ -24,7 +24,7 @@ TMP = ROOT / "tmp" / "matched_instruction_optimizers_trec"
 DSPY_ROOT = ROOT / "tmp" / "dspy-3.2.1"
 GEPA_ROOT = ROOT / "tmp" / "gepa-v0.1.4"
 UPSTREAM_PYTHON = ROOT / "tmp" / "dspy-parity-venv" / "bin" / "python"
-PRIOR_SPEND_BOUND = Decimal("1.58349300")
+PRIOR_SPEND_BOUND = Decimal("3.08335175")
 WORKSHOP_CEILING = Decimal("50.00")
 PREFLIGHT_PREFIX = "PAIRED_PREFLIGHT_JSON="
 
@@ -194,7 +194,7 @@ def preflight() -> dict[str, Any]:
     )
 
     maximum = worst_case_usd(manifest)
-    require(maximum == Decimal("38.43072000"), f"sealed maximum spend drift: {maximum}")
+    require(maximum == Decimal("59.10912000"), f"sealed maximum spend drift: {maximum}")
     require(PRIOR_SPEND_BOUND + maximum <= WORKSHOP_CEILING, "workshop spend ceiling would be exceeded")
 
     imp = preflight_imp(manifest_sha)
@@ -234,7 +234,23 @@ def preflight() -> dict[str, Any]:
 
 def stop_peer(process: subprocess.Popen[Any]) -> None:
     if process.poll() is None:
-        os.killpg(process.pid, signal.SIGINT)
+        os.killpg(process.pid, signal.SIGTERM)
+
+
+def require_rescued_stop_artifacts() -> None:
+    for runtime in ("imp", "upstream"):
+        path = TMP / f"{runtime}-result.json"
+        require(path.is_file(), f"{runtime} did not rescue a stopped artifact")
+        result = json.loads(path.read_text())
+        require(result.get("status") == "stopped", f"{runtime} rescue status is not stopped")
+        require(
+            isinstance(result.get("actual_cost"), (int, float)) and result["actual_cost"] >= 0,
+            f"{runtime} rescue lacks actual cost",
+        )
+        require(
+            isinstance(result.get("usd_reserved"), (int, float)) and result["usd_reserved"] >= 0,
+            f"{runtime} rescue lacks reserved cost",
+        )
 
 
 def run_peers() -> int:
@@ -245,7 +261,13 @@ def run_peers() -> int:
     env["IMP_MATCHED_TREC_IMP_SELECTION"] = str(TMP / "imp-result.json.selection-sealed.json")
     (TMP / "sealed").mkdir(parents=True, exist_ok=False)
     peers = [
-        subprocess.Popen(["mix", "run", "run_imp.exs"], cwd=HERE, env=env, start_new_session=True),
+        subprocess.Popen(
+            ["mix", "run", "run_imp.exs"],
+            cwd=HERE,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        ),
         subprocess.Popen(
             [
                 str(UPSTREAM_PYTHON),
@@ -257,9 +279,11 @@ def run_peers() -> int:
             ],
             cwd=ROOT,
             env=env,
+            stdin=subprocess.DEVNULL,
             start_new_session=True,
         ),
     ]
+    failure: int | None = None
     try:
         while True:
             statuses = [peer.poll() for peer in peers]
@@ -267,9 +291,10 @@ def run_peers() -> int:
             if failures:
                 for peer in peers:
                     stop_peer(peer)
-                return failures[0]
+                failure = failures[0]
+                break
             if all(status == 0 for status in statuses):
-                return 0
+                break
             time.sleep(0.25)
     except BaseException:
         for peer in peers:
@@ -278,10 +303,14 @@ def run_peers() -> int:
     finally:
         for peer in peers:
             try:
-                peer.wait(timeout=10)
+                peer.wait(timeout=30)
             except subprocess.TimeoutExpired:
                 os.killpg(peer.pid, signal.SIGKILL)
                 peer.wait()
+    if failure is not None:
+        require_rescued_stop_artifacts()
+        return failure
+    return 0
 
 
 def coordinate(preflight_only: bool = False) -> int:

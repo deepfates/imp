@@ -311,6 +311,18 @@ defmodule MatchedTRECImp.Runner do
         observer
       )
 
+    signal_id = {__MODULE__, :coordinator_stop, make_ref()}
+
+    {:ok, ^signal_id} =
+      System.trap_signal(:sigterm, signal_id, fn ->
+        atomic_write!(
+          @output,
+          stopped_payload(observer, source_commits, "coordinator requested graceful stop")
+        )
+
+        :ok
+      end)
+
     try do
       work_items = for seed <- manifest["seeds"], arm <- manifest["arms"], do: {seed, arm}
 
@@ -352,6 +364,7 @@ defmodule MatchedTRECImp.Runner do
       IO.puts(Jason.encode!(result, pretty: true))
     after
       :telemetry.detach(telemetry_id)
+      System.untrap_signal(:sigterm, signal_id)
     end
   rescue
     error ->
@@ -1131,10 +1144,31 @@ defmodule MatchedTRECImp.Runner do
         |> Report.encode_term()
 
       _ ->
-        nil
+        stopped_observer_default(field)
     end
   rescue
-    _error -> nil
+    _error -> stopped_observer_default(field)
+  end
+
+  defp stopped_observer_default(field) when field in [:actual_cost, :usd_reserved], do: 0.0
+  defp stopped_observer_default(:call_budgets), do: %{}
+  defp stopped_observer_default(field) when field in [:responses, :transports], do: []
+
+  defp stopped_payload(observer, source_commits, error) do
+    snapshot = Observer.snapshot(observer)
+
+    %{
+      schema_version: 3,
+      runtime: "imp",
+      status: "stopped",
+      source_commits: source_commits,
+      call_budgets: Report.encode_term(snapshot.call_budgets),
+      actual_cost: snapshot.actual_cost,
+      usd_reserved: snapshot.usd_reserved,
+      lm_results: Report.encode_term(snapshot.responses),
+      transport_events: Report.encode_term(snapshot.transports),
+      error: error
+    }
   end
 
   defp map_get(value, key) when is_map(value) do

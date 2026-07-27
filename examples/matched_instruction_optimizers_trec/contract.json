@@ -308,10 +308,10 @@
         "total_logical": 120
       },
       "gepa": {
-        "task_logical": 400,
-        "optimizer_logical": 8,
-        "transports": 408,
-        "total_logical": 408
+        "task_logical": 450,
+        "optimizer_logical": 48,
+        "transports": 498,
+        "total_logical": 498
       },
       "mipro_v2": {
         "task_logical": 620,
@@ -389,6 +389,6 @@
     "dspy": "https://github.com/stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
     "gepa": "https://github.com/gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
   },
-  "launch_status": "sealed",
+  "launch_status": "blocked_workshop_spend_ceiling_after_gepa_legal_envelope",
   "intent": "sealed_strong_model_matched_system_comparison"
 }

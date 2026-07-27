@@ -19,11 +19,22 @@ messages, models, splits, budgets, or parsing after results.
 
 ## Current boundary
 
-The exact treatment is sealed after the integrated pinned GEPA execution,
-MIPRO information-flow, dependency, route, and fail-closed preflights passed.
-The safe predispatch ceilings are 6,840 task calls plus 102 optimizer calls across both runtimes. Their
-conservative reservation is $38.43072. The aggregate workshop spend must be
-confirmed immediately before launch against the owner's $50 ceiling.
+The treatment is launch-blocked. A coordinated partial run falsified the old
+assumption that four nominal GEPA generations imply exactly four runtime
+iterations. Pinned GEPA checks `max_metric_calls = 280` only between iterations
+and legally finishes an iteration that began below the limit. For the frozen
+40-row validation set and 10-row minibatch, the exact no-model envelope is 330
+task metric calls, at most 24 started iterations, and at most 48 reflection
+transports. The complete GEPA arm's separate operational caps are therefore 450
+task and 48 optimizer transports after selection and untouched evaluation.
+
+Across both runtimes and three seeds, the revised outer safety envelope is
+7,140 task calls plus 342 optimizer calls. Its conservative reservation is
+$59.10912. With the current conservative workshop aggregate of $3.08335175,
+the combined worst case is $62.19247175 and exceeds the owner's $50 ceiling.
+No runner has provider authority while this remains unresolved. The semantic
+stopping rule is unchanged; the outer cap is operational only, and firing it
+makes the treatment inconclusive rather than scoring a truncated arm.
 
 The runners additionally fail closed on:
 
@@ -82,13 +93,16 @@ Before giving either child the provider key, the coordinator checks both
 runtime locks and revisions, the exact Imp example cwd, manifest and route
 shape, empty active result/barrier state, the cross-runtime guard-equivalence
 gate, and the sealed cumulative spend bound. Either preflight failure starts
-neither peer; either runtime failure interrupts the other. The shared aggregator
+neither peer; either runtime failure interrupts the other. Interrupted peers get
+a bounded SIGTERM rescue window to persist stopped artifacts and exact cost
+state before process-group force termination. The shared aggregator
 recomputes all row metrics, performs source-ID-clustered paired bootstrap across
 the three seeds, applies Holm correction to the two Imp improvement tests, and
 checks noninferiority for the winning optimizer.
 
 Several stopped integration attempts made provider calls but never opened the
-untouched barrier and support no optimizer outcome. Their conservative
-cumulative spend bound before the coordinated run is `$1.58349300`. Until a
-complete run exists, this comparison supports no effectiveness, parity,
-generality, or BEAM-native superiority claim.
+untouched barrier and support no optimizer outcome. Including the latest
+legal-envelope stop and the coordinator's reported other workshop usage, the
+conservative aggregate is at most `$3.08335175`. Until a complete run exists,
+this comparison supports no effectiveness, parity, generality, or BEAM-native
+superiority claim.

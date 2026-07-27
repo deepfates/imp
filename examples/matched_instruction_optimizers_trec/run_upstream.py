@@ -15,6 +15,7 @@ import json
 import os
 import platform
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,8 @@ import urllib.request
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
+
+from gepa_budget_envelope import envelope as gepa_budget_envelope
 
 
 HERE = Path(__file__).resolve().parent
@@ -41,6 +44,10 @@ ACTIVE_CAPTURE: "Capture | None" = None
 
 class OperationalSafetyAbort(BaseException):
     """Bypasses DSPy's ordinary Exception containment for route/cost/budget drift."""
+
+
+class CoordinatedStop(BaseException):
+    """Requests the normal stopped-artifact path before coordinator termination."""
 
 
 MIPRO_OPTIMIZER_ENVELOPE = re.compile(
@@ -158,11 +165,16 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError("strong matched seed/arm contract drift")
     expected_ceilings = {
         "baseline": {"task_logical": 120, "optimizer_logical": 0, "transports": 120, "total_logical": 120},
-        "gepa": {"task_logical": 400, "optimizer_logical": 8, "transports": 408, "total_logical": 408},
+        "gepa": {"task_logical": 450, "optimizer_logical": 48, "transports": 498, "total_logical": 498},
         "mipro_v2": {"task_logical": 620, "optimizer_logical": 9, "transports": 629, "total_logical": 629},
     }
     if manifest.get("execution", {}).get("call_ceilings") != expected_ceilings:
         raise RuntimeError("diagnostic call-ceiling contract drift")
+    gepa = manifest["optimizer"]["gepa"]
+    semantic_limit = 40 + gepa["iterations"] * (2 * gepa["minibatch_size"] + 40)
+    budget = gepa_budget_envelope(40, gepa["minibatch_size"], semantic_limit)
+    if budget != {"max_metric_calls": 330, "max_reflection_calls": 48, "max_iterations": 24}:
+        raise RuntimeError(f"pinned GEPA legal-iteration envelope drift: {budget!r}")
     if manifest.get("optimizer", {}).get("mipro_v2", {}).get("num_candidates") != 6:
         raise RuntimeError("MIPRO public num_candidates contract drift")
     splits = manifest.get("dataset", {}).get("splits", {})
@@ -918,6 +930,11 @@ def main() -> None:
     parser.add_argument("--dspy-root", type=Path, required=True)
     parser.add_argument("--gepa-root", type=Path, required=True)
     args = parser.parse_args()
+
+    def coordinated_stop(signum: int, _frame: Any) -> None:
+        raise CoordinatedStop(f"coordinator signal {signum}")
+
+    signal.signal(signal.SIGTERM, coordinated_stop)
     try:
         run(args)
     except BaseException as exc:

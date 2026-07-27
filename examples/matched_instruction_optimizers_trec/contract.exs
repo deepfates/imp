@@ -54,6 +54,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     require!(
       manifest["launch_status"] in [
         "blocked_pending_gepa_execution_and_fail_closed_preflight",
+        "blocked_workshop_spend_ceiling_after_gepa_legal_envelope",
         "sealed"
       ],
       "launch_status drift"
@@ -110,6 +111,17 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     optimizer_calls = total_calls - task_calls
 
     request = manifest["execution"]["request"]
+    gepa = manifest["optimizer"]["gepa"]
+
+    semantic_gepa_calls =
+      counts.selection + gepa["iterations"] * (2 * gepa["minibatch_size"] + counts.selection)
+
+    gepa_envelope =
+      Imp.Optimizer.GEPA.v014_budget_envelope(
+        counts.selection,
+        gepa["minibatch_size"],
+        semantic_gepa_calls
+      )
 
     %{
       "schema_version" => 3,
@@ -128,6 +140,16 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
         "held_out" => counts.held_out
       },
       "per_seed_per_runtime" => per_seed_runtime,
+      "gepa_stopping" => %{
+        "semantic_max_metric_calls" => semantic_gepa_calls,
+        "legal_iteration_metric_call_cap" => gepa_envelope.max_metric_calls,
+        "legal_reflection_transport_cap" => gepa_envelope.max_reflection_calls,
+        "maximum_started_iterations" => gepa_envelope.max_iterations,
+        "outer_complete_task_transport_cap" =>
+          gepa_envelope.max_metric_calls + counts.selection + counts.held_out,
+        "rule" =>
+          "check semantic max between iterations; every legally started iteration completes"
+      },
       "worst_case" => %{
         "task_calls" => task_calls,
         "optimizer_calls" => optimizer_calls,
@@ -652,10 +674,10 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
         "total_logical" => 120
       },
       "gepa" => %{
-        "task_logical" => 400,
-        "optimizer_logical" => 8,
-        "transports" => 408,
-        "total_logical" => 408
+        "task_logical" => 450,
+        "optimizer_logical" => 48,
+        "transports" => 498,
+        "total_logical" => 498
       },
       "mipro_v2" => %{
         "task_logical" => 620,

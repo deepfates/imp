@@ -34,8 +34,10 @@ defmodule Imp.Optimizer.GEPA do
   CPython's persisted MT19937 stream is shared by Pareto selection and
   Fisher-Yates minibatch sampling, perfect minibatches are skipped at `1.0`,
   evaluation caching is disabled, and one failed batched reflection is retried
-  once as the corresponding single task. The retry is counted and bounded at
-  two reflection transports per iteration.
+  once as the corresponding single task. Like pinned GEPA, `max_metric_calls`
+  is checked between iterations: an iteration that legally starts is allowed
+  to finish. Separate internal metric/reflection envelopes bound that legal
+  overshoot; they are not alternate stopping rules.
 
   `:proposal_concurrency` enables first-party GEPA speculative parallel
   proposals. Contexts are sampled sequentially from one archive and RNG
@@ -66,7 +68,8 @@ defmodule Imp.Optimizer.GEPA do
     Engine,
     InstructionProposal,
     ProgramAdapter,
-    ReflectionStrategy
+    ReflectionStrategy,
+    Stopper
   }
 
   alias Imp.Optimizer.Report
@@ -287,10 +290,12 @@ defmodule Imp.Optimizer.GEPA do
         reflection_record_mode: optimizer.reflection_record_mode
       )
 
+    envelope = profile_budget_envelope(optimizer, trainset, devset)
+
     engine_opts =
       [
         execution_profile: optimizer.execution_profile,
-        max_iterations: optimizer.generations,
+        max_iterations: envelope.max_iterations,
         candidate_selection_strategy: optimizer.candidate_selection_strategy,
         module_selector: optimizer.module_selector,
         combee: optimizer.combee,
@@ -314,10 +319,10 @@ defmodule Imp.Optimizer.GEPA do
         rng_algorithm: optimizer.rng_algorithm,
         reflection_failure_policy: optimizer.reflection_failure_policy,
         callbacks: optimizer.callbacks,
-        stopper: optimizer.stopper,
-        max_metric_calls: profile_metric_limit(optimizer, trainset, devset),
+        stopper: profile_stopper(optimizer, envelope),
+        max_metric_calls: envelope.operational_metric_call_cap,
         max_full_evaluations: optimizer.max_full_evaluations,
-        max_reflection_calls: optimizer.max_reflection_calls,
+        max_reflection_calls: envelope.operational_reflection_call_cap,
         max_reflection_cost: optimizer.max_reflection_cost,
         reflection_strategy: optimizer.reflection_strategy,
         reflection_cost_source: optimizer.reflection_strategy || optimizer.reflection_lm,
@@ -379,7 +384,8 @@ defmodule Imp.Optimizer.GEPA do
           merge_candidates: Enum.count(state.history, &(&1[:operation] == :merge)),
           merges_accepted: state.total_merges_tested,
           metric_calls: state.budget.metric_calls,
-          max_metric_calls: state.budget.max_metric_calls,
+          max_metric_calls: envelope.semantic_max_metric_calls,
+          operational_metric_call_cap: state.budget.max_metric_calls,
           reflection_calls: state.budget.reflection_calls,
           max_reflection_calls: state.budget.max_reflection_calls,
           max_reflection_cost: optimizer.max_reflection_cost,
@@ -675,15 +681,6 @@ defmodule Imp.Optimizer.GEPA do
           end
         end)
 
-        reflection_limit = opts[:generations] * 2
-
-        if Keyword.has_key?(requested, :max_reflection_calls) and
-             opts[:max_reflection_calls] != reflection_limit do
-          raise ArgumentError,
-                ":execution_profile :gepa_v0_1_4 requires :max_reflection_calls #{reflection_limit} " <>
-                  "(two attempted reflection transports per iteration)"
-        end
-
         opts
         |> Keyword.merge(requirements)
         |> Keyword.put(:skip_perfect_score, true)
@@ -694,14 +691,19 @@ defmodule Imp.Optimizer.GEPA do
           :reflection_failure_policy,
           :gepa_v0_1_4_batch_then_single_retry
         )
-        |> Keyword.put(:max_reflection_calls, reflection_limit)
     end
   end
 
-  defp profile_metric_limit(%__MODULE__{execution_profile: :beam_native} = optimizer, _, _),
-    do: optimizer.max_metric_calls
+  defp profile_budget_envelope(%__MODULE__{execution_profile: :beam_native} = optimizer, _, _) do
+    %{
+      semantic_max_metric_calls: optimizer.max_metric_calls,
+      operational_metric_call_cap: optimizer.max_metric_calls,
+      operational_reflection_call_cap: optimizer.max_reflection_calls,
+      max_iterations: optimizer.generations
+    }
+  end
 
-  defp profile_metric_limit(
+  defp profile_budget_envelope(
          %__MODULE__{execution_profile: :gepa_v0_1_4} = optimizer,
          trainset,
          devset
@@ -709,18 +711,91 @@ defmodule Imp.Optimizer.GEPA do
     minibatch_size = optimizer.minibatch_size || min(3, length(trainset))
     required = length(devset) + optimizer.generations * (2 * minibatch_size + length(devset))
 
-    case optimizer.max_metric_calls do
-      :infinity ->
-        required
-
-      ^required ->
-        required
-
-      configured ->
-        raise ArgumentError,
-              ":execution_profile :gepa_v0_1_4 requires :max_metric_calls #{required} for " <>
-                "this validation set, minibatch, and iteration budget; got: #{inspect(configured)}"
+    unless optimizer.max_metric_calls in [:infinity, required] do
+      raise ArgumentError,
+            ":execution_profile :gepa_v0_1_4 requires :max_metric_calls #{required} for " <>
+              "this validation set, minibatch, and nominal iteration budget; got: " <>
+              inspect(optimizer.max_metric_calls)
     end
+
+    envelope = v014_budget_envelope(length(devset), minibatch_size, required)
+
+    unless optimizer.max_reflection_calls in [:infinity, envelope.max_reflection_calls] do
+      raise ArgumentError,
+            ":execution_profile :gepa_v0_1_4 requires :max_reflection_calls " <>
+              "#{envelope.max_reflection_calls} for every legally started iteration; got: " <>
+              inspect(optimizer.max_reflection_calls)
+    end
+
+    %{
+      semantic_max_metric_calls: required,
+      operational_metric_call_cap: envelope.max_metric_calls,
+      operational_reflection_call_cap: envelope.max_reflection_calls,
+      max_iterations: envelope.max_iterations
+    }
+  end
+
+  defp profile_stopper(%__MODULE__{execution_profile: :beam_native, stopper: stopper}, _envelope),
+    do: stopper
+
+  defp profile_stopper(%__MODULE__{stopper: nil}, envelope),
+    do: Stopper.max_metric_calls(envelope.semantic_max_metric_calls)
+
+  defp profile_stopper(%__MODULE__{stopper: stopper}, envelope),
+    do: Stopper.any([Stopper.max_metric_calls(envelope.semantic_max_metric_calls), stopper])
+
+  @doc false
+  def v014_budget_envelope(validation_size, minibatch_size, semantic_max_metric_calls)
+      when is_integer(validation_size) and validation_size >= 0 and
+             is_integer(minibatch_size) and minibatch_size > 0 and
+             is_integer(semantic_max_metric_calls) and semantic_max_metric_calls >= 0 do
+    increments = [minibatch_size, 2 * minibatch_size, 2 * minibatch_size + validation_size]
+
+    reachable =
+      reachable_pre_iteration_counts(
+        MapSet.new([validation_size]),
+        increments,
+        semantic_max_metric_calls
+      )
+
+    legal_starts = Enum.filter(reachable, &(&1 < semantic_max_metric_calls))
+
+    max_metric_calls =
+      case legal_starts do
+        [] -> validation_size
+        starts -> Enum.max(starts) + Enum.max(increments)
+      end
+
+    max_iterations =
+      if validation_size < semantic_max_metric_calls do
+        div(semantic_max_metric_calls - validation_size + minibatch_size - 1, minibatch_size)
+      else
+        0
+      end
+
+    %{
+      max_metric_calls: max_metric_calls,
+      max_reflection_calls: 2 * max_iterations,
+      max_iterations: max_iterations
+    }
+  end
+
+  defp reachable_pre_iteration_counts(reachable, increments, limit) do
+    expanded =
+      Enum.reduce(reachable, reachable, fn count, acc ->
+        if count < limit do
+          Enum.reduce(increments, acc, fn increment, acc ->
+            next = count + increment
+            if next < limit, do: MapSet.put(acc, next), else: acc
+          end)
+        else
+          acc
+        end
+      end)
+
+    if MapSet.size(expanded) == MapSet.size(reachable),
+      do: expanded,
+      else: reachable_pre_iteration_counts(expanded, increments, limit)
   end
 
   defp validate_limit!(:infinity, _name), do: :infinity

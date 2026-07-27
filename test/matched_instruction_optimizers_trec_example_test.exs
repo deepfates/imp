@@ -57,7 +57,8 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
     assert manifest["models"]["optimizer"]["logical"] == "anthropic/claude-sonnet-4.6"
     assert get_in(manifest, ["execution", "request", "task", "seed"]) == "experiment_seed"
 
-    assert manifest["launch_status"] == "sealed"
+    assert manifest["launch_status"] ==
+             "blocked_workshop_spend_ceiling_after_gepa_legal_envelope"
 
     assert get_in(manifest, ["runtime_dependencies", "upstream", "packages", "optuna"]) ==
              "4.9.0"
@@ -99,17 +100,28 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     assert plan["per_seed_per_runtime"] == %{
              "baseline" => %{"task_calls" => 120, "optimizer_calls" => 0, "total_calls" => 120},
-             "gepa" => %{"task_calls" => 400, "optimizer_calls" => 8, "total_calls" => 408},
+             "gepa" => %{"task_calls" => 450, "optimizer_calls" => 48, "total_calls" => 498},
              "mipro_v2" => %{"task_calls" => 620, "optimizer_calls" => 9, "total_calls" => 629}
            }
 
-    assert plan["worst_case"] == %{
-             "task_calls" => 6_840,
-             "optimizer_calls" => 102,
-             "total_calls" => 6_942,
-             "input_tokens" => 29_687_808,
-             "output_tokens" => 1_855_488,
-             "usd" => 38.43072
+    assert Map.delete(plan["worst_case"], "usd") == %{
+             "task_calls" => 7_140,
+             "optimizer_calls" => 342,
+             "total_calls" => 7_482,
+             "input_tokens" => 34_848_768,
+             "output_tokens" => 2_178_048
+           }
+
+    assert_in_delta plan["worst_case"]["usd"], 59.10912, 1.0e-12
+
+    assert plan["gepa_stopping"] == %{
+             "semantic_max_metric_calls" => 280,
+             "legal_iteration_metric_call_cap" => 330,
+             "legal_reflection_transport_cap" => 48,
+             "maximum_started_iterations" => 24,
+             "outer_complete_task_transport_cap" => 450,
+             "rule" =>
+               "check semantic max between iterations; every legally started iteration completes"
            }
 
     assert get_in(plan, ["runtime_configs", "imp", "adapter_rendering"]) ==
@@ -119,6 +131,23 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     assert get_in(plan, ["runtime_configs", "imp", "arm_call_ceilings"]) ==
              get_in(plan, ["runtime_configs", "upstream", "arm_call_ceilings"])
+  end
+
+  test "Elixir and Python derive the same pinned legal-iteration envelope" do
+    script = "examples/matched_instruction_optimizers_trec/gepa_budget_envelope.py"
+    assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
+
+    assert Jason.decode!(output) == %{
+             "max_metric_calls" => 330,
+             "max_reflection_calls" => 48,
+             "max_iterations" => 24
+           }
+
+    assert Imp.Optimizer.GEPA.v014_budget_envelope(40, 10, 280) == %{
+             max_metric_calls: 330,
+             max_reflection_calls: 48,
+             max_iterations: 24
+           }
   end
 
   test "role-aware budget refuses before a dispatch can exceed any ceiling" do
@@ -245,15 +274,23 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
   test "paired coordinator refuses authority until both runtime preflights pass" do
     script = "examples/matched_instruction_optimizers_trec/paired_coordinator_test.py"
     assert {output, 0} = System.cmd("python3", [script], stderr_to_stdout: true)
-    assert output =~ "Ran 4 tests"
+    assert output =~ "Ran 6 tests"
 
     coordinator = File.read!("examples/matched_instruction_optimizers_trec/run_paired.py")
     assert coordinator =~ ~S|env.pop("OPENROUTER_API_KEY", None)|
     assert coordinator =~ ~s(cwd=HERE)
-    assert coordinator =~ ~S|PRIOR_SPEND_BOUND = Decimal("1.58349300")|
+    assert coordinator =~ ~S|PRIOR_SPEND_BOUND = Decimal("3.08335175")|
+    assert coordinator =~ "stdin=subprocess.DEVNULL"
+    assert coordinator =~ "require_rescued_stop_artifacts()"
     assert coordinator =~ "imp = preflight_imp(manifest_sha)"
     assert coordinator =~ "upstream = preflight_upstream(manifest)"
     assert coordinator =~ "return 0 if preflight_only else run_peers()"
+
+    imp_runner = File.read!("examples/matched_instruction_optimizers_trec/run_imp.exs")
+    upstream_runner = File.read!("examples/matched_instruction_optimizers_trec/run_upstream.py")
+    assert imp_runner =~ "System.trap_signal(:sigterm"
+    assert imp_runner =~ "stopped_payload(observer, source_commits"
+    assert upstream_runner =~ "signal.signal(signal.SIGTERM, coordinated_stop)"
   end
 
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do
