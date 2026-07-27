@@ -268,28 +268,51 @@ end
 ```
 
 GEPA, MIPROv2, and SIMBA also support consumer-defined program graphs and live
-runtime clients that should not be serialized. For those programs, persist only
-the parameters selected on validation:
+runtime clients that should not be serialized. The shared parameter-artifact
+lifecycle is executable with an ordinary optimized program:
 
 ```elixir
-# `selected` is the program returned by Imp.optimize!/4 with GEPA, MIPROv2,
-# or SIMBA after separate train and validation evaluation.
+lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "security"} end)
+base = Imp.predict("ticket -> team", lm: lm)
+
+trainset = [
+  Imp.example(ticket: "Suspicious login", team: "security")
+  |> Imp.with_inputs(:ticket)
+]
+
+selected =
+  Imp.optimize!(base, Imp.Optimizer.LabeledFewShot.new(k: 1), trainset)
+
 artifact =
   Imp.Optimizer.Artifact.from_optimized_program(selected,
     artifact_id: "ticket-router-v1"
   )
 
-:ok = Imp.Optimizer.Artifact.write!(artifact, "ticket-router-parameters.json")
+path =
+  Path.join(
+    System.tmp_dir!(),
+    "ticket-router-parameters-#{System.unique_integer([:positive])}.json"
+  )
 
-# In a restarted application, rebuild trusted code and runtime clients first.
-fresh_router = MyApp.TicketRouter.new(runtime_lm)
+try do
+  :ok = Imp.Optimizer.Artifact.write!(artifact, path)
 
-deployed =
-  "ticket-router-parameters.json"
-  |> Imp.Optimizer.Artifact.read!()
-  |> Imp.Optimizer.Artifact.apply(fresh_router)
+  # Rebuild trusted code and runtime clients before applying saved parameters.
+  fresh_router = Imp.predict("ticket -> team", lm: lm)
 
-%Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(deployed)
+  deployed =
+    path
+    |> Imp.Optimizer.Artifact.read!()
+    |> Imp.Optimizer.Artifact.apply(fresh_router)
+
+  %Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(deployed)
+  report = Imp.Optimizer.Report.fetch(deployed)
+  {:ok, prediction} = Imp.call(deployed, %{ticket: "Suspicious login"})
+  {Imp.get(prediction, :team), report.optimizer}
+after
+  File.rm(path)
+end
+#=> {"security", :labeled_few_shot}
 ```
 
 The parameter artifact carries named predictor signatures, demonstrations,
@@ -299,7 +322,8 @@ requires the fresh program to expose the same compatible named predictors; a
 mismatch fails instead of partially installing state. GEPA can produce the
 selected program, report, and artifact together with
 `Imp.Optimizer.GEPA.compile_with_artifact/5`; MIPROv2 and SIMBA use the shared
-`from_optimized_program/2` path above. The [API Guide](API_GUIDE.md#optimize-a-program)
+`from_optimized_program/2` path demonstrated above after their own separate
+train and validation evaluation. The [API Guide](API_GUIDE.md#optimize-a-program)
 shows both forms, while the local
 [GEPA](../examples/local_gepa_banking77/README.md),
 [MIPROv2](../examples/local_mipro_banking77/README.md), and

@@ -670,6 +670,11 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         minibatch_size: 1,
         minibatch_full_eval_steps: 2,
         prompt_lm: prompt_lm,
+        metric_identity: %{
+          "id" => "failure-campaign-exact-answer",
+          "version" => 1,
+          "config" => %{"field" => "answer"}
+        },
         startup_trials: 1,
         seed: 31
       )
@@ -719,6 +724,11 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         max_steps: 2,
         max_demos: 0,
         prompt_lm: prompt_lm,
+        metric_identity: %{
+          "id" => "failure-campaign-exact-answer",
+          "version" => 1,
+          "config" => %{"field" => "answer"}
+        },
         max_concurrency: 1,
         seed: 41
       )

@@ -90,6 +90,7 @@
         "Imp.ContextWindowExceededError",
         "Imp.EvaluationCancelledError",
         "Imp.LMError",
+        "Imp.OperationalSafetyError",
         "Imp.Retrieve.Memory"
       ],
       "prefixes": [

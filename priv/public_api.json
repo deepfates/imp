@@ -3489,6 +3489,23 @@
     },
     {
       "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.OperationalSafetyError",
+      "signatures": {},
+      "source": "lib/imp/operational_safety_error.ex",
+      "struct_fields": [
+        "__exception__",
+        "kind",
+        "message",
+        "reason"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
       "category": "experimental",
       "functions": [
         "best_candidate/1",
@@ -4072,11 +4089,13 @@
       "source": "lib/imp/optimizer/gepa.ex",
       "struct_fields": [
         "acceptance_policy",
+        "cache_evaluation",
         "callbacks",
         "candidate_selection_strategy",
         "combee",
         "component_feedback",
         "evaluation_policy",
+        "execution_profile",
         "feedback_fn",
         "frontier_type",
         "generations",
@@ -4091,14 +4110,19 @@
         "metric",
         "minibatch_size",
         "module_selector",
+        "perfect_score",
         "proposal_concurrency",
         "proposal_timeout",
         "raise_on_exception",
+        "reflection_failure_policy",
         "reflection_lm",
+        "reflection_record_mode",
         "reflection_strategy",
+        "rng_algorithm",
         "sampling_strategy",
         "seed",
         "selection_strategy",
+        "skip_perfect_score",
         "stopper",
         "timeout",
         "use_merge"
@@ -4532,7 +4556,9 @@
         "compile/3",
         "compile/4",
         "compile/5",
-        "new/2"
+        "new/2",
+        "operational_error!/3",
+        "operational_error/3"
       ],
       "kind": "struct",
       "macros": [],
@@ -4550,6 +4576,12 @@
           ],
           "new/2": [
             "new(metric, opts \\\\ [])"
+          ],
+          "operational_error!/3": [
+            "operational_error!(kind, reason, opts \\\\ [])"
+          ],
+          "operational_error/3": [
+            "operational_error(kind, reason, opts \\\\ [])"
           ]
         }
       },
