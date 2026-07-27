@@ -216,6 +216,33 @@ defmodule Imp.ReproductionRegistryTest do
     end
   end
 
+  test "audit retains capability-local evidence failures without laundering other features" do
+    registry = read_json!(@registry)
+    authorities = read_json!(@authorities)
+    feature_index = Enum.find_index(registry["features"], &(&1["id"] == "semantic_f1"))
+
+    broken =
+      put_in(
+        registry,
+        ["features", Access.at(feature_index), "admitted_evidence", "artifact_sha256"],
+        String.duplicate("0", 64)
+      )
+
+    audit = ReproductionRegistry.audit(broken, authorities, File.cwd!())
+    by_id = Map.new(audit["features"], &{&1["id"], &1})
+
+    refute audit["valid"]
+    refute by_id["semantic_f1"]["evidence_valid"]
+
+    assert Enum.any?(
+             by_id["semantic_f1"]["evidence_errors"],
+             &String.contains?(&1, "content-addressed path")
+           )
+
+    assert by_id["product_release"]["evidence_valid"]
+    assert by_id["product_release"]["evidence_errors"] == []
+  end
+
   test "rejects nonexistent tasks, wildcard artifacts, and inflated claims" do
     registry = read_json!(@registry)
     authorities = read_json!(@authorities)

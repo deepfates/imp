@@ -44,6 +44,67 @@ defmodule Imp.ReproductionRegistry do
               __STACKTRACE__
   end
 
+  @doc false
+  def audit!(path \\ "benchmarks/reproductions.json", opts \\ []) do
+    registry = path |> File.read!() |> Jason.decode!()
+    authority_path = Keyword.get(opts, :authority_path, "benchmarks/authorities.json")
+    root = Keyword.get(opts, :root, File.cwd!())
+    audit(registry, Imp.EvidenceAuthorities.load!(authority_path), root)
+  rescue
+    error in [File.Error, Jason.DecodeError, ArgumentError, KeyError] ->
+      reraise ArgumentError,
+              [
+                message:
+                  "invalid reproduction registry #{Path.expand(path)}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
+  end
+
+  @doc false
+  def audit(
+        %{"schema_version" => 2, "protocols" => protocols, "features" => features} = registry,
+        %{"families" => families},
+        root
+      )
+      when is_map(protocols) and map_size(protocols) > 0 and is_list(features) and features != [] do
+    authority_by_id = Map.new(families, &{Map.fetch!(&1, "id"), &1})
+
+    validate_unique_ids!(features)
+    validate_exact_authority_coverage!(features, authority_by_id)
+    validate_surface_token_coverage!(features, authority_by_id)
+    Enum.each(protocols, &validate_protocol!(&1, root))
+
+    feature_results =
+      Enum.map(features, fn feature ->
+        errors =
+          try do
+            validate_feature!(feature, authority_by_id, protocols, root)
+            []
+          rescue
+            error in [ArgumentError, KeyError] -> [Exception.message(error)]
+          end
+
+        %{
+          "id" => feature["id"],
+          "authority_family" => feature["authority_family"],
+          "protocol_ids" => feature["protocol_ids"] || [],
+          "surface_tokens" => feature["surface_tokens"] || [],
+          "public_surfaces" => feature["public_surfaces"] || [],
+          "evidence_valid" => errors == [],
+          "evidence_errors" => errors
+        }
+      end)
+
+    %{
+      "registry" => registry,
+      "valid" => Enum.all?(feature_results, & &1["evidence_valid"]),
+      "features" => feature_results
+    }
+  end
+
+  def audit(_registry, _authorities, _root),
+    do: raise(ArgumentError, "expected schema_version 2 with protocols and features")
+
   def validate!(
         %{"schema_version" => 2, "protocols" => protocols, "features" => features} = registry,
         %{"families" => families},

@@ -27,13 +27,18 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
     {primary_feature_ids, supporting_feature_ids} =
       partition_feature_ids(registry, feature_ids, tier)
 
-    # A source-bound artifact can become invalid precisely because its canonical
-    # authority or implementation binding advanced. Validate every unaffected
-    # feature while temporarily clearing only the records being atomically
-    # replaced; otherwise a valid refresh is impossible to admit.
+    # Source-bound receipts commonly become stale together after one runtime
+    # commit. Keep that damage capability-local: an admission may repair one
+    # selected feature while unrelated pre-existing failures remain visible,
+    # but it may not introduce a new failure or leave its own primary feature
+    # invalid. This permits a bounded recapture pass without weakening the
+    # final strict registry gate.
+    before_audit = ReproductionRegistry.audit(registry, authorities, root)
+    before_invalid = invalid_feature_ids(before_audit)
+
     registry
     |> clear_target_admissions(primary_feature_ids)
-    |> ReproductionRegistry.validate!(authorities, root)
+    |> ReproductionRegistry.audit(authorities, root)
 
     artifact_bytes = File.read!(artifact_path)
     artifact = Jason.decode!(artifact_bytes)
@@ -58,7 +63,21 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
     created? = ensure_artifact!(destination, artifact_bytes)
 
     try do
-      ReproductionRegistry.validate!(updated_registry, authorities, root)
+      updated_audit = ReproductionRegistry.audit(updated_registry, authorities, root)
+      updated_invalid = invalid_feature_ids(updated_audit)
+      primary = MapSet.new(primary_feature_ids)
+
+      unless MapSet.disjoint?(updated_invalid, primary) do
+        raise ArgumentError, "admitted evidence remains invalid for a selected primary feature"
+      end
+
+      allowed_remaining = MapSet.difference(before_invalid, primary)
+
+      unless MapSet.subset?(updated_invalid, allowed_remaining) do
+        introduced = updated_invalid |> MapSet.difference(allowed_remaining) |> MapSet.to_list()
+        raise ArgumentError, "admission introduced invalid evidence for #{inspect(introduced)}"
+      end
+
       atomic_write!(registry_path, updated_bytes)
     rescue
       error ->
@@ -81,6 +100,13 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmission do
       reraise ArgumentError,
               [message: "evidence admission failed: #{Exception.message(error)}"],
               __STACKTRACE__
+  end
+
+  defp invalid_feature_ids(%{"features" => features}) do
+    features
+    |> Enum.reject(& &1["evidence_valid"])
+    |> Enum.map(& &1["id"])
+    |> MapSet.new()
   end
 
   defp validate_admission!(

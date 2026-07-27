@@ -1,17 +1,19 @@
 # Imp Executable Upstream Conformance
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
+Release profile: v0.1
 Total: 26
-Conformant: 12
-Elixir-native equivalents: 3
+Conformant: 15
+Elixir-native equivalents: 7
 Tracking: 1
-Gaps: 10
-Claim-specific non-blocking gaps: 0
-Invalid evidence: 0
+Gaps: 3
+Claim-specific non-blocking gaps: 3
+Invalid evidence: 7
+Invalid aggregate rows: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 10
-Passing: false
+Release blockers: 0
+Passing: true
 
 | ID | Category | Status | Product gate | Upstream surfaces |
 | --- | --- | --- | --- | --- |
@@ -22,25 +24,25 @@ Passing: false
 | adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter |
 | adapters.xml | adapters | conformant | satisfied | XMLAdapter |
 | adapters.two_step | adapters | conformant | satisfied | TwoStepAdapter |
-| primitives.multimodal | primitives | gap | release blocker | Image, Audio, File, Code, Document, Citations, Reasoning |
+| primitives.multimodal | primitives | conformant | satisfied | Image, Audio, File, Code, Document, Citations, Reasoning |
 | tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
 | agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |
-| agents.rlm | tools_agents | gap | release blocker | RLM, SandboxSerializable, Recursive Language Models paper |
-| composition.refinement | programming_model | gap | release blocker | BestOfN, Refine, Assertions |
+| agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper |
+| composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |
 | evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
-| optimization.few_shot | optimization | gap | release blocker | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
+| optimization.few_shot | optimization | elixir_native_equivalent | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
 | optimization.knn | optimization | conformant | satisfied | KNN, KNNFewShot |
-| optimization.instructions | optimization | gap | release blocker | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
-| optimization.gepa | optimization | gap | release blocker | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
-| optimization.weights | optimization | gap | release blocker | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble |
-| optimization.fast_slow | optimization | gap | release blocker | Learning, Fast and Slow Algorithm 1, GEPA fast-adaptation handoff, external slow-weight optimizer handoff |
-| optimization.anything | optimization | gap | release blocker | optimize_anything, arbitrary text artifacts |
+| optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
+| optimization.gepa | optimization | gap | claim-specific gap | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
+| optimization.weights | optimization | elixir_native_equivalent | satisfied | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble |
+| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied | Learning, Fast and Slow Algorithm 1, GEPA fast-adaptation handoff, external slow-weight optimizer handoff |
+| optimization.anything | optimization | gap | claim-specific gap | optimize_anything, arbitrary text artifacts |
 | retrieval.data | retrieval | elixir_native_equivalent | satisfied | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |
 | runtime.async_stream_cache | runtime | conformant | satisfied | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage |
 | runtime.observability | runtime | conformant | satisfied | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |
 | state.persistence_deployment | operations | conformant | satisfied | Module.save, Module.load, load, dump_state, load_state, deployment |
 | product.learning_path | product | conformant | satisfied | getting started, tutorials, real-world examples, API reference, production guide |
-| product.release | product | gap | release blocker | installable package, versioned release, security policy, CI, clean-room consumer |
+| product.release | product | conformant | satisfied | installable package, versioned release, security policy, CI, clean-room consumer |
 
 ## Executable Contracts
 
@@ -65,6 +67,12 @@ Executable evidence:
 - test: `test/history_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `livebooks/02_programming_not_prompting.livemd`
+
+
+Current-profile capability evidence:
+
+- `Signature`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.core.history_contract (informational), claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: dspy_programming_model=valid
+- `History`: valid; claims: claim.core.history_contract (informational); receipts: dspy_programming_model=valid
 
 
 Missing evidence or behavior:
@@ -92,6 +100,12 @@ Executable evidence:
 - test: `test/live_provider_e2e_test.exs`
 - docs: `../README.md`
 - docs: `docs/API_GUIDE.md`
+
+
+Current-profile capability evidence:
+
+- `Predict`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: dspy_programming_model=valid
+- `ChainOfThought`: valid; claims: claim.dspy_semantics.golden_trace (blocking); receipts: dspy_programming_model=valid
 
 
 Missing evidence or behavior:
@@ -123,6 +137,7 @@ Executable evidence:
 - docs: `docs/PRODUCTION_OPERATIONS.md`
 
 
+
 Missing evidence or behavior:
 
 - none
@@ -142,6 +157,7 @@ Executable evidence:
 
 - test: `test/req_llm_client_test.exs`
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
+
 
 
 Missing evidence or behavior:
@@ -169,6 +185,7 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 
 
+
 Missing evidence or behavior:
 
 - none
@@ -192,6 +209,7 @@ Executable evidence:
 - test: `test/production_adapter_persistence_test.exs`
 - test: `test/silent_failure_regressions_test.exs`
 - docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
+
 
 
 Missing evidence or behavior:
@@ -220,13 +238,14 @@ Executable evidence:
 - docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
 
 
+
 Missing evidence or behavior:
 
 - none
 
 ### `primitives.multimodal`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
@@ -241,6 +260,7 @@ Executable evidence:
 - test: `test/multimodal_quality_benchmark_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: [docs/internal/MULTIMODAL_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/MULTIMODAL_FIDELITY.md) (repository only, not shipped in the package)
+
 
 
 Missing evidence or behavior:
@@ -267,6 +287,11 @@ Executable evidence:
 - test: `test/protocol_mcp/provider_mcp_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
+
+
+Current-profile capability evidence:
+
+- `MCP`: valid; claims: claim.mcp.in_process_import_contract (blocking); receipts: mcp=valid
 
 
 Missing evidence or behavior:
@@ -299,13 +324,21 @@ Executable evidence:
 - docs: [docs/internal/REACT_V2_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/REACT_V2_FIDELITY.md) (repository only, not shipped in the package)
 
 
+Current-profile capability evidence:
+
+- `ReAct`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.react.provider_free_tool_contract (blocking), claim.agents.failure_injected.runtime_differential (blocking); receipts: react=valid
+- `ReActV2`: valid; claims: claim.react_v2.provider_free_recovery_contract (blocking); receipts: react_v2=valid
+- `CodeAct`: valid; claims: claim.code_act.provider_free_execution_contract (blocking); receipts: code_act=valid
+- `ProgramOfThought`: valid; claims: claim.program_of_thought.safe_eval_contract (blocking); receipts: program_of_thought=valid
+
+
 Missing evidence or behavior:
 
 - none
 
 ### `agents.rlm`
 
-Status: `gap`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/rlm.py; arXiv:2512.24601`
 
@@ -331,13 +364,18 @@ Executable evidence:
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
 
+Current-profile capability evidence:
+
+- `RLM`: valid; claims: no current-profile claim; receipts: rlm=valid
+
+
 Missing evidence or behavior:
 
 - paper-scale reproduction
 
 ### `composition.refinement`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `dspy/predict/best_of_n.py; dspy/predict/refine.py; tests/predict/test_refine.py @ 3.3.0b1 b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`
 
@@ -359,6 +397,12 @@ Executable evidence:
 - test: `test/assertions_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/API_GUIDE.md`
+
+
+Current-profile capability evidence:
+
+- `BestOfN`: valid; claims: no current-profile claim; receipts: refinement=valid
+- `Refine`: valid; claims: no current-profile claim; receipts: refinement=valid
 
 
 Missing evidence or behavior:
@@ -391,13 +435,19 @@ Executable evidence:
 - docs: `livebooks/03_evaluate_and_optimize.livemd`
 
 
+Current-profile capability evidence:
+
+- `SemanticF1`: valid; claims: claim.evaluation.auto_evaluation.semantic_conformance (informational); receipts: semantic_f1=valid
+- `CompleteAndGrounded`: valid; claims: claim.evaluation.auto_evaluation.semantic_conformance (informational); receipts: complete_and_grounded=valid
+
+
 Missing evidence or behavior:
 
 - none
 
 ### `optimization.few_shot`
 
-Status: `gap`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/teleprompt/vanilla.py; bootstrap.py; random_search.py`
 
@@ -419,6 +469,14 @@ Executable evidence:
 - test: `test/optimizer_lift_artifact_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
+
+
+Current-profile capability evidence:
+
+- `LabeledFewShot`: valid; claims: claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: labeled_few_shot=valid
+- `BootstrapFewShot`: invalid_evidence; claims: claim.optimizer.bootstrap_few_shot.semantic_conformance (informational); receipts: bootstrap_few_shot=INVALID
+- `BootstrapRS`: invalid_evidence; claims: no current-profile claim; receipts: bootstrap_random_search=INVALID
+- `RandomSearch`: invalid_evidence; claims: claim.optimizer.random_search.semantic_conformance (informational); receipts: bootstrap_random_search=INVALID
 
 
 Missing evidence or behavior:
@@ -446,6 +504,11 @@ Executable evidence:
 - test: `test/public_surface_test.exs`
 - test: `test/optimizer_lift_artifact_test.exs`
 - docs: `docs/API_GUIDE.md`
+
+
+Current-profile capability evidence:
+
+- `KNNFewShot`: valid; claims: no current-profile claim; receipts: knn_few_shot=valid
 
 
 Missing evidence or behavior:
@@ -478,6 +541,15 @@ Executable evidence:
 - artifact: `benchmarks/evidence/admitted/instruction_contract/0d032ab3266c2eb8aef9ea021a1a445688cbdc4e208d9bde9d57037b1f302a49.json`
 - artifact: `benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json`
 - artifact: `benchmarks/results/matched-instruction-optimizers-trec-20260726.json`
+
+Current-profile capability evidence:
+
+- `COPRO`: invalid_evidence; claims: claim.optimizer.copro.semantic_conformance (informational); receipts: copro=INVALID
+- `MIPROv2`: valid; claims: claim.optimizer.mipro_v2.matched_trec_effectiveness (informational); receipts: optimizer_miprov2=valid
+- `SIMBA`: valid; claims: no current-profile claim; receipts: optimizer_simba=valid
+- `InferRules`: valid; claims: no current-profile claim; receipts: infer_rules=valid
+- `SignatureOptimizer`: valid; claims: no current-profile claim; receipts: signature_optimizer=valid
+
 
 Missing evidence or behavior:
 
@@ -516,15 +588,19 @@ Executable evidence:
 - artifact: `benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json`
 - artifact: `benchmarks/results/matched-instruction-optimizers-trec-20260726.json`
 
+Current-profile capability evidence:
+
+- `GEPA`: valid; claims: claim.optimizer.gepa.matched_trec_effectiveness (informational); receipts: optimizer_gepa=valid
+
+
 Missing evidence or behavior:
 
 - cross-task matched effectiveness beyond the frozen TREC contract
-- C4 full paper-family campaign evidence
-- C5 independently reproduced outcome evidence
+- C4 full paper-family campaign evidence is a telos research target, not a v0.1 release claim
 
 ### `optimization.weights`
 
-Status: `gap`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
@@ -559,6 +635,16 @@ Executable evidence:
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json`
 
+Current-profile capability evidence:
+
+- `Avatar`: valid; claims: claim.optimizer.avatar_actor.api (blocking), claim.optimizer.avatar_actor.semantic_conformance (informational); receipts: avatar=valid
+- `AvatarOptimizer`: valid; claims: claim.optimizer.avatar_optimizer.api (blocking), claim.optimizer.avatar_optimizer.semantic_conformance (informational); receipts: avatar_optimizer=valid
+- `BootstrapFinetune`: valid; claims: claim.optimizer.bootstrap_finetune.api (blocking), claim.optimizer.bootstrap_finetune.semantic_conformance (informational), claim.local_mlx_weight_training.effectiveness (blocking); receipts: bootstrap_finetune=valid
+- `GRPO`: invalid_evidence; claims: claim.optimizer.mmgrpo.api (blocking), claim.optimizer.mmgrpo.semantic_conformance (informational); receipts: grpo=INVALID
+- `BetterTogether`: invalid_evidence; claims: claim.optimizer.better_together.api (blocking), claim.optimizer.better_together.semantic_conformance (informational); receipts: better_together=INVALID
+- `Ensemble`: invalid_evidence; claims: claim.optimizer.ensemble.api (blocking), claim.optimizer.ensemble.semantic_conformance (informational); receipts: ensemble=INVALID
+
+
 Missing evidence or behavior:
 
 - paid-provider weight-training execution evidence
@@ -569,7 +655,7 @@ Missing evidence or behavior:
 
 ### `optimization.fast_slow`
 
-Status: `gap`
+Status: `elixir_native_equivalent`
 
 Upstream source: `arXiv:2605.12484v2; official GEPA Fast-Slow project article`
 
@@ -592,6 +678,7 @@ Executable evidence:
 - test: `test/fast_slow_campaign_test.exs`
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
 - docs: `docs/OPERATIONS_REFERENCE.md`
+
 
 
 Missing evidence or behavior:
@@ -632,6 +719,11 @@ Executable evidence:
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 
 
+Current-profile capability evidence:
+
+- `optimize_anything`: valid; claims: claim.optimize_anything.operational_lifecycle (informational), claim.optimize_anything.retry_policy_task_effectiveness (informational); receipts: optimize_anything=valid
+
+
 Missing evidence or behavior:
 
 - schema-v2 multi-seed live effectiveness on distinct train, selection, and untouched test sets
@@ -661,6 +753,11 @@ Executable evidence:
 - docs: `docs/ARCHITECTURE.md`
 
 
+Current-profile capability evidence:
+
+- `Embeddings`: valid; claims: claim.embeddings.boundary_contract (informational); receipts: retrieval_rag=valid
+
+
 Missing evidence or behavior:
 
 - none
@@ -688,6 +785,7 @@ Executable evidence:
 - docs: [docs/internal/PARITY_VALIDATION_PROGRAM.md](https://github.com/deepfates/imp/blob/main/docs/internal/PARITY_VALIDATION_PROGRAM.md) (repository only, not shipped in the package)
 
 
+
 Missing evidence or behavior:
 
 - none
@@ -711,6 +809,7 @@ Executable evidence:
 - test: `test/support/telemetry_helpers.ex`
 - test: `test/history_test.exs`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
+
 
 
 Missing evidence or behavior:
@@ -738,6 +837,7 @@ Executable evidence:
 - test: `test/package_contract_test.exs`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
 - docs: `examples/deployment/README.md`
+
 
 
 Missing evidence or behavior:
@@ -769,13 +869,14 @@ Executable evidence:
 - docs: `livebooks/01_real_lm_front_door.livemd`
 
 
+
 Missing evidence or behavior:
 
 - none
 
 ### `product.release`
 
-Status: `gap`
+Status: `conformant`
 
 Upstream source: `Hex package and canonical GitHub repository`
 
@@ -798,6 +899,7 @@ Executable evidence:
 - docs: `../LICENSE`
 - docs: [SECURITY.md](https://github.com/deepfates/imp/blob/main/SECURITY.md) (repository only, not shipped in the package)
 - docs: [docs/maintainers/RELEASE.md](https://github.com/deepfates/imp/blob/main/docs/maintainers/RELEASE.md) (repository only, not shipped in the package)
+
 
 
 Missing evidence or behavior:

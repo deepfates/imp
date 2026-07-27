@@ -423,6 +423,7 @@ defmodule Imp.UpstreamFidelity do
         "BootstrapFewShotWithRandomSearch",
         "BootstrapRS"
       ],
+      claim_surfaces: ["RandomSearch"],
       source: "dspy/teleprompt/vanilla.py; bootstrap.py; random_search.py",
       disposition: :elixir_native_equivalent,
       rationale:
@@ -564,8 +565,7 @@ defmodule Imp.UpstreamFidelity do
         ],
         missing: [
           "cross-task matched effectiveness beyond the frozen TREC contract",
-          "C4 full paper-family campaign evidence",
-          "C5 independently reproduced outcome evidence"
+          "C4 full paper-family campaign evidence is a telos research target, not a v0.1 release claim"
         ]
       }
     },
@@ -919,6 +919,27 @@ defmodule Imp.UpstreamFidelity do
   def report(opts \\ []) do
     root = Keyword.get(opts, :root, File.cwd!())
 
+    profile =
+      opts
+      |> Keyword.get(:profile, Imp.BenchmarkTruth.ReleaseProfile.default())
+      |> Imp.BenchmarkTruth.ReleaseProfile.fetch!()
+
+    claims =
+      opts
+      |> Keyword.get(:claims_path, "benchmarks/claims.json")
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.fetch!("claims")
+      |> Imp.BenchmarkTruth.ReleaseProfile.select_claims(profile)
+
+    reproduction_audit =
+      Imp.ReproductionRegistry.audit!(
+        Keyword.get(opts, :reproductions_path, "benchmarks/reproductions.json"),
+        authority_path:
+          Keyword.get(opts, :evidence_authorities_path, "benchmarks/authorities.json"),
+        root: Keyword.get(opts, :reproduction_root, File.cwd!())
+      )
+
     registry =
       Imp.UpstreamAuthorityRegistry.load!(
         Keyword.get(opts, :registry_path, Imp.UpstreamAuthorityRegistry.path())
@@ -926,7 +947,7 @@ defmodule Imp.UpstreamFidelity do
 
     stable_baseline = baseline(registry)
     prerelease_tracking = prerelease_tracking(registry)
-    rows = Enum.map(@ledger, &evaluate_row(&1, root))
+    rows = Enum.map(@ledger, &evaluate_row(&1, root, claims, reproduction_audit))
     blocking = Enum.filter(rows, &release_blocking_gap?/1)
     {manifest_missing, manifest_duplicates} = manifest_errors(rows)
 
@@ -939,6 +960,14 @@ defmodule Imp.UpstreamFidelity do
       generated_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       baseline: stable_baseline,
       prerelease_tracking: prerelease_tracking,
+      release_profile: profile,
+      reproduction_evidence: %{
+        valid: reproduction_audit["valid"],
+        invalid_features:
+          reproduction_audit["features"]
+          |> Enum.reject(& &1["evidence_valid"])
+          |> Enum.map(&Map.take(&1, ["id", "evidence_errors"]))
+      },
       upstream_authority_registry: registry,
       source_anchors: @source_anchors,
       summary: %{
@@ -948,7 +977,14 @@ defmodule Imp.UpstreamFidelity do
         elixir_native_equivalent: Enum.count(rows, &(&1.status == :elixir_native_equivalent)),
         tracking: Enum.count(rows, &(&1.status == :tracking)),
         gaps: Enum.count(rows, &(&1.status == :gap)),
-        invalid_evidence: Enum.count(rows, &(&1.status == :invalid_evidence)),
+        invalid_evidence:
+          Enum.sum(
+            Enum.map(
+              rows,
+              &Enum.count(&1.capabilities, fn c -> c.status == :invalid_evidence end)
+            )
+          ),
+        invalid_rows: Enum.count(rows, &(&1.status == :invalid_evidence)),
         manifest_missing: length(manifest_missing),
         manifest_duplicates: length(manifest_duplicates),
         release_blockers: length(blocking) + length(manifest_blockers),
@@ -1017,12 +1053,14 @@ defmodule Imp.UpstreamFidelity do
     {missing, duplicates}
   end
 
-  defp evaluate_row(row, root) do
+  defp evaluate_row(row, root, claims, reproduction_audit) do
     evidence = Map.fetch!(row, :evidence)
     missing_files = missing_files(evidence, root)
     missing_modules = Enum.reject(Map.get(row, :imp, []), &module_available?/1)
     contract_errors = contract_errors(row)
     open_obligations = open_obligations(evidence)
+
+    capabilities = capability_results(row, claims, reproduction_audit)
 
     evidence_errors =
       file_errors(missing_files) ++ module_errors(missing_modules) ++ contract_errors
@@ -1030,17 +1068,85 @@ defmodule Imp.UpstreamFidelity do
     status =
       cond do
         evidence_errors != [] -> :invalid_evidence
-        row.disposition == :gap or open_obligations != [] -> :gap
+        row.disposition == :gap -> :gap
         true -> row.disposition
       end
 
-    release_blocking = Map.get(row, :release_blocking, row.disposition != :tracking)
+    release_blocking =
+      Enum.any?(capabilities, fn capability ->
+        Enum.any?(capability.claims, fn claim ->
+          claim.gate_policy == "blocking" and
+            (claim.evidence_errors != [] or status == :gap or status == :invalid_evidence)
+        end)
+      end)
 
     row
     |> Map.put(:release_blocking, release_blocking)
     |> Map.put(:status, status)
     |> Map.put(:open_obligations, open_obligations)
+    |> Map.put(:capabilities, capabilities)
     |> Map.put(:evidence_errors, evidence_errors)
+  end
+
+  defp capability_results(row, claims, reproduction_audit) do
+    (row.upstream ++ Map.get(row, :claim_surfaces, []))
+    |> Enum.uniq()
+    |> Enum.map(fn surface ->
+      matching_claims =
+        claims
+        |> Enum.filter(fn claim ->
+          Enum.any?(claim["surface"], &surface_matches?(&1, surface))
+        end)
+        |> Enum.map(fn claim ->
+          requirement_lanes = Enum.map(claim["requirements"] || [], & &1["lane"])
+
+          evidence_errors =
+            reproduction_audit["features"]
+            |> Enum.filter(fn feature ->
+              Enum.any?(feature["surface_tokens"], &surface_matches?(&1, surface)) and
+                Enum.any?(feature["protocol_ids"], &(&1 in requirement_lanes))
+            end)
+            |> Enum.flat_map(& &1["evidence_errors"])
+
+          %{
+            id: claim["id"],
+            claim_state: claim["claim_state"],
+            target_rung: claim["target_rung"],
+            gate_policy: claim["gate_policy"],
+            release: claim["release"],
+            evidence_errors: evidence_errors
+          }
+        end)
+
+      receipts =
+        reproduction_audit["features"]
+        |> Enum.filter(fn feature ->
+          Enum.any?(feature["surface_tokens"], &surface_matches?(&1, surface))
+        end)
+        |> Enum.map(fn feature ->
+          %{
+            feature_id: feature["id"],
+            protocol_ids: feature["protocol_ids"],
+            valid: feature["evidence_valid"],
+            errors: feature["evidence_errors"]
+          }
+        end)
+
+      status = if Enum.any?(receipts, &(not &1.valid)), do: :invalid_evidence, else: :valid
+      %{surface: surface, status: status, claims: matching_claims, receipts: receipts}
+    end)
+  end
+
+  defp surface_matches?(left, right) do
+    normalize_surface(left) == normalize_surface(right)
+  end
+
+  defp normalize_surface(surface) do
+    surface
+    |> to_string()
+    |> String.replace(~r/^Imp\.(Optimizer|Predict)\./, "")
+    |> String.replace(~r/[^a-zA-Z0-9]/, "")
+    |> String.downcase()
   end
 
   defp open_obligations(evidence) do

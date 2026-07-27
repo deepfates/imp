@@ -67,6 +67,7 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     # Imp Executable Upstream Conformance
 
     Baseline: DSPy #{report.baseline.version} (`#{report.baseline.git_sha}`)
+    Release profile: #{report.release_profile["id"]}
     Total: #{report.summary.total}
     Conformant: #{report.summary.conformant}
     Elixir-native equivalents: #{report.summary.elixir_native_equivalent}
@@ -74,6 +75,7 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     Gaps: #{report.summary.gaps}
     Claim-specific non-blocking gaps: #{report.summary.non_blocking_gaps}
     Invalid evidence: #{report.summary.invalid_evidence}
+    Invalid aggregate rows: #{report.summary.invalid_rows}
     Missing manifest surfaces: #{report.summary.manifest_missing}
     Duplicate manifest owners: #{report.summary.manifest_duplicates}
     Release blockers: #{report.summary.release_blockers}
@@ -144,6 +146,35 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
         items -> Enum.map_join(items, "\n", &"- #{&1}")
       end
 
+    capabilities =
+      surface.capabilities
+      |> Enum.filter(&(&1.claims != [] or &1.receipts != []))
+      |> Enum.map_join("\n", fn capability ->
+        claims =
+          case capability.claims do
+            [] -> "no current-profile claim"
+            items -> Enum.map_join(items, ", ", &"#{&1.id} (#{&1.gate_policy})")
+          end
+
+        receipts =
+          case capability.receipts do
+            [] ->
+              "no cited registry receipt"
+
+            items ->
+              Enum.map_join(items, ", ", fn receipt ->
+                "#{receipt.feature_id}=#{if receipt.valid, do: "valid", else: "INVALID"}"
+              end)
+          end
+
+        "- `#{capability.surface}`: #{capability.status}; claims: #{claims}; receipts: #{receipts}"
+      end)
+
+    capability_section =
+      if capabilities == "",
+        do: "",
+        else: "\nCurrent-profile capability evidence:\n\n#{capabilities}\n"
+
     rationale =
       case Map.get(surface, :rationale) do
         nil -> ""
@@ -167,6 +198,7 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     #{tests}
     #{docs}
     #{artifacts}
+    #{capability_section}
 
     Missing evidence or behavior:
 
