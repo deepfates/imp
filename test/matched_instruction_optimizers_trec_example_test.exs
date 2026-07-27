@@ -349,6 +349,70 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
     assert aggregate["uncertainty"]["method"] == "source_id_cluster_bootstrap_all_three_seeds"
 
+    legacy_typed_nil = %{"__imp_type__" => "atom", "value" => "nil"}
+
+    legacy_imp_projection =
+      result.("imp")
+      |> update_in(["seeds"], fn seeds ->
+        Enum.map(seeds, fn seed ->
+          update_in(seed, ["arms"], fn arms ->
+            Enum.map(arms, fn arm ->
+              Enum.reduce(~w(selection held_out), arm, fn split, arm ->
+                rows = get_in(arm, ["rows", split])
+
+                arm
+                |> put_in(
+                  ["rows", split],
+                  Enum.map(rows, &Map.put(&1, "error", legacy_typed_nil))
+                )
+                |> put_in([split, "parse_errors"], length(rows))
+              end)
+            end)
+          end)
+        end)
+      end)
+
+    File.write!(imp_path, Jason.encode!(legacy_imp_projection))
+    legacy_aggregate = Aggregator.aggregate!(@manifest, imp_path, upstream_path)
+
+    assert get_in(
+             legacy_aggregate,
+             ["metrics", "imp", "2026072602", "baseline", "held_out", "parse_errors"]
+           ) == 0
+
+    losing_baseline_rows =
+      Enum.map(held_out, fn row ->
+        %{row | "parsed_route" => nil, "correct" => false, "error" => "synthetic_miss"}
+      end)
+
+    imp_with_winner =
+      result.("imp")
+      |> update_in(["seeds"], fn seeds ->
+        Enum.map(seeds, fn seed ->
+          update_in(seed, ["arms"], fn arms ->
+            Enum.map(arms, fn
+              %{"arm" => "baseline"} = arm ->
+                arm
+                |> put_in(["held_out"], %{
+                  "accuracy" => 0.0,
+                  "macro_f1" => 0.0,
+                  "parse_errors" => length(losing_baseline_rows),
+                  "count" => length(losing_baseline_rows)
+                })
+                |> put_in(["rows", "held_out"], losing_baseline_rows)
+
+              arm ->
+                arm
+            end)
+          end)
+        end)
+      end)
+
+    File.write!(imp_path, Jason.encode!(imp_with_winner))
+    winning_aggregate = Aggregator.aggregate!(@manifest, imp_path, upstream_path)
+    assert winning_aggregate["acceptance"]["headline_passed"]
+    assert winning_aggregate["acceptance"]["winning_optimizer"] in ~w(gepa mipro_v2)
+
     tampered =
       put_in(
         result.("upstream"),

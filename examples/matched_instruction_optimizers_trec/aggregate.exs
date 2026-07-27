@@ -88,8 +88,20 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
              )
          }
 
-         assert_summary!(arm["selection"], recomputed["selection"], "selection")
-         assert_summary!(arm["held_out"], recomputed["held_out"], "held_out")
+         assert_summary!(
+           arm["selection"],
+           recomputed["selection"],
+           "selection",
+           splits["selection"]
+         )
+
+         assert_summary!(
+           arm["held_out"],
+           recomputed["held_out"],
+           "held_out",
+           splits["held_out"]
+         )
+
          {arm["arm"], recomputed}
        end)}
     end)
@@ -109,17 +121,32 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
     %{
       "accuracy" => Enum.count(rows, & &1["correct"]) / length(rows),
       "macro_f1" => macro_f1(rows),
-      "parse_errors" => Enum.count(rows, &(not is_nil(&1["error"]))),
+      "parse_errors" => Enum.count(rows, &error_present?/1),
       "count" => length(rows)
     }
   end
 
   defp recompute_rows!(_, _), do: raise(ArgumentError, "result rows must be a list")
 
-  defp assert_summary!(claimed, recomputed, split) do
+  defp assert_summary!(claimed, recomputed, split, rows) do
+    claimed =
+      if claimed["parse_errors"] ==
+           recomputed["parse_errors"] + Enum.count(rows, &legacy_typed_nil_error?/1) do
+        Map.put(claimed, "parse_errors", recomputed["parse_errors"])
+      else
+        claimed
+      end
+
     unless claimed == recomputed,
       do: raise(ArgumentError, "#{split} summary does not match scored rows")
   end
+
+  defp error_present?(%{"error" => error}), do: not is_nil(error) and not legacy_typed_nil?(error)
+
+  defp legacy_typed_nil_error?(%{"error" => error}), do: legacy_typed_nil?(error)
+
+  defp legacy_typed_nil?(%{"__imp_type__" => "atom", "value" => "nil"}), do: true
+  defp legacy_typed_nil?(_), do: false
 
   defp macro_f1(rows) do
     @routes
@@ -202,7 +229,8 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
       "noninferiority_margin" => margin,
       "winning_optimizer_imp_minus_upstream" => noninferiority,
       "headline_passed" =>
-        not is_nil(winning_arm) and noninferiority["confidence_interval"][0] > margin,
+        not is_nil(winning_arm) and
+          Enum.at(noninferiority["confidence_interval"], 0) > margin,
       "rule" =>
         "Holm-adjusted Imp improvement over baseline at alpha 0.05, then the same optimizer's Imp-minus-DSPy 95% lower bound must exceed -0.05"
     }

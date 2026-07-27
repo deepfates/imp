@@ -745,7 +745,7 @@ defmodule MatchedTRECImp.Runner do
         expected: row.route,
         parsed_route: actual,
         correct: actual == row.route,
-        error: Report.encode_term(error),
+        error: if(is_nil(error), do: nil, else: Report.encode_term(error)),
         raw_response: raw_response,
         prediction_metadata: Report.encode_term(metadata),
         rendered_messages: hd(messages).messages,
