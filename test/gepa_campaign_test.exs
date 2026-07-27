@@ -29,6 +29,39 @@ defmodule GepaCampaignTest do
     def on_optimization_end(_event, owner), do: send(owner, :gepa_selection_sealed)
   end
 
+  defmodule ZeroCostUsageLM do
+    def generate(_messages, _opts) do
+      :telemetry.execute(
+        [:req_llm, :token_usage],
+        %{tokens: %{input_tokens: 10, output_tokens: 5}, total_cost: 0.0},
+        %{}
+      )
+
+      {:ok, %{reasoning: "Solved.", answer: "42"}}
+    end
+  end
+
+  test "GEPA campaign accepts zero-cost local usage with real token accounting" do
+    dataset_root = tmp_dir("gepa-campaign-zero-cost-local")
+    rows_dir = tmp_dir("gepa-campaign-zero-cost-local-rows")
+    write_dataset_root!(dataset_root)
+
+    result =
+      GepaCampaign.run(
+        campaign_opts(dataset_root, rows_dir,
+          lm: %{module: ZeroCostUsageLM, opts: []},
+          token_cost: nil,
+          pricing_source: "local LM Studio usage telemetry; zero provider spend"
+        )
+      )
+
+    [row] = result.report["rows"]
+    assert row["token_cost"]["usd"] == 0.0
+    assert row["token_cost"]["input_tokens"] > 0
+    assert row["token_cost"]["output_tokens"] > 0
+    assert row["token_cost"]["pricing_source"] =~ "zero provider spend"
+  end
+
   test "GEPA campaign keeps test rows behind the selected-program boundary" do
     dataset_root = tmp_dir("gepa-campaign-heldout-barrier")
     rows_dir = tmp_dir("gepa-campaign-heldout-barrier-rows")

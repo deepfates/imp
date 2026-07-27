@@ -1661,7 +1661,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         raise ArgumentError,
               "Imp GEPA #{family} row requires ReqLLM usage telemetry or explicit token_cost"
 
-      usage["usd"] > 0 and usage["input_tokens"] > 0 and usage["output_tokens"] > 0 ->
+      usage["usd"] >= 0 and usage["input_tokens"] > 0 and usage["output_tokens"] > 0 ->
         Map.put(usage, "pricing_source", pricing_source)
 
       true ->
