@@ -1015,21 +1015,32 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
     semantic_progress = Map.get(execution, "semantic_progress")
 
+    gepa_options =
+      execution
+      |> Map.get("gepa", %{})
+      |> gepa_options!()
+
     {compiled, report} =
-      GEPA.new(metric,
-        seed: seed,
-        generations: generations,
-        max_concurrency: max_concurrency,
-        timeout: evaluation_timeout,
-        reflection_lm: reflection_lm,
-        max_metric_calls: budget,
-        callbacks: optimizer_callbacks,
-        component_feedback: component_feedback,
-        raise_on_exception: false,
-        stopper: semantic_progress_stopper(semantic_progress),
-        feedback_fn: fn _trainset ->
-          "Improve #{spec["family"]} by matching #{spec["output_key"]} exactly. Seed #{seed}."
-        end
+      GEPA.new(
+        metric,
+        Keyword.merge(
+          [
+            seed: seed,
+            generations: generations,
+            max_concurrency: max_concurrency,
+            timeout: evaluation_timeout,
+            reflection_lm: reflection_lm,
+            max_metric_calls: budget,
+            callbacks: optimizer_callbacks,
+            component_feedback: component_feedback,
+            raise_on_exception: false,
+            stopper: semantic_progress_stopper(semantic_progress),
+            feedback_fn: fn _trainset ->
+              "Improve #{spec["family"]} by matching #{spec["output_key"]} exactly. Seed #{seed}."
+            end
+          ],
+          gepa_options
+        )
       )
       |> GEPA.compile_with_report(program, trainset, devset,
         resume_state: progress["optimizer_state"],
@@ -1115,6 +1126,71 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         |> GepaComponentFeedback.identity()
         |> maybe_mark_upstream_ifbench_feedback(spec, execution)
     }
+  end
+
+  defp gepa_options!(options) when options == %{}, do: []
+
+  defp gepa_options!(options) when is_map(options) do
+    allowed =
+      MapSet.new([
+        "minibatch_size",
+        "candidate_selection_strategy",
+        "module_selector",
+        "acceptance_policy"
+      ])
+
+    unknown =
+      options |> Map.keys() |> MapSet.new() |> MapSet.difference(allowed) |> MapSet.to_list()
+
+    if unknown != [] do
+      raise ArgumentError, "unsupported GEPA campaign options: #{inspect(Enum.sort(unknown))}"
+    end
+
+    []
+    |> maybe_put_gepa_option(
+      :minibatch_size,
+      options["minibatch_size"],
+      &positive_integer!/1
+    )
+    |> maybe_put_gepa_option(
+      :candidate_selection_strategy,
+      options["candidate_selection_strategy"],
+      &enum_option!(&1, "candidate_selection_strategy", %{"pareto" => :pareto})
+    )
+    |> maybe_put_gepa_option(
+      :module_selector,
+      options["module_selector"],
+      &enum_option!(&1, "module_selector", %{"round_robin" => :round_robin, "all" => :all})
+    )
+    |> maybe_put_gepa_option(
+      :acceptance_policy,
+      options["acceptance_policy"],
+      &enum_option!(&1, "acceptance_policy", %{"strict_improvement" => :strict_improvement})
+    )
+  end
+
+  defp gepa_options!(_options),
+    do: raise(ArgumentError, "GEPA campaign options must be a map")
+
+  defp maybe_put_gepa_option(options, _key, nil, _validator), do: options
+
+  defp maybe_put_gepa_option(options, key, value, validator),
+    do: Keyword.put(options, key, validator.(value))
+
+  defp positive_integer!(value) when is_integer(value) and value > 0, do: value
+
+  defp positive_integer!(value),
+    do:
+      raise(
+        ArgumentError,
+        "GEPA campaign minibatch_size must be positive, got: #{inspect(value)}"
+      )
+
+  defp enum_option!(value, name, allowed) do
+    case Map.fetch(allowed, value) do
+      {:ok, normalized} -> normalized
+      :error -> raise ArgumentError, "unsupported GEPA campaign #{name}: #{inspect(value)}"
+    end
   end
 
   defp semantic_progress_stopper(nil), do: nil
@@ -1235,8 +1311,13 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     end
   end
 
-  defp program_for(%{"program" => "IFBenchCoT2StageProgram"}, lm, _execution) do
-    IFBenchTwoStage.new(lm, adapter: Chat)
+  defp program_for(%{"program" => "IFBenchCoT2StageProgram"}, lm, execution) do
+    config =
+      if get_in(execution, ["lm", "json_fallback"]) == false,
+        do: [json_fallback: false],
+        else: []
+
+    IFBenchTwoStage.new(lm, adapter: Chat, config: config)
   end
 
   defp program_for(%{"program" => "PAPILLON"}, lm, _execution) do

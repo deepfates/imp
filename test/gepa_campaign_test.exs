@@ -821,12 +821,29 @@ defmodule GepaCampaignTest do
         campaign_id: "gepa-campaign-optimizer-config",
         seeds: [17, 29],
         token_cost: explicit_costs(["AIMEBench"], [17, 29]),
+        execution: %{
+          "gepa" => %{
+            "minibatch_size" => 2,
+            "candidate_selection_strategy" => "pareto",
+            "module_selector" => "round_robin",
+            "acceptance_policy" => "strict_improvement"
+          }
+        },
         optimizer_callbacks: [{OptimizerConfigCallback, self()}]
       )
       |> GepaCampaign.run()
 
-    assert_receive {:optimizer_config, %{seed: 17, max_metric_calls: 4}}
-    assert_receive {:optimizer_config, %{seed: 29, max_metric_calls: 4}}
+    expected = %{
+      max_metric_calls: 4,
+      minibatch_size: 2,
+      candidate_selection_strategy: :pareto,
+      module_selector: :round_robin
+    }
+
+    assert_receive {:optimizer_config, %{seed: 17} = first}
+    assert Map.take(first, Map.keys(expected)) == expected
+    assert_receive {:optimizer_config, %{seed: 29} = second}
+    assert Map.take(second, Map.keys(expected)) == expected
 
     [row] = result.report["rows"]
     evidence = row["metric_call_evidence"]

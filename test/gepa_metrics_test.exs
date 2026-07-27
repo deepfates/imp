@@ -106,7 +106,7 @@ defmodule GepaMetricsTest do
 
     File.write!(
       bridge,
-      "#!/bin/sh\nprintf '%s\\n' '{\"descriptions\":[\"Include alpha.\",\"Do not use commas.\"]}'\n"
+      "#!/bin/sh\nprintf '%s\\n' 'Downloaded punkt_tab on rank 0' '{\"descriptions\":[\"Include alpha.\",\"Do not use commas.\"]}'\n"
     )
 
     on_exit(fn -> File.rm(bridge) end)
@@ -219,7 +219,7 @@ defmodule GepaMetricsTest do
       {"count:conjunctions", %{"small_n" => 3}, "and but or"},
       {"count:pronouns", %{"N" => 4}, "she/her and they/them"},
       {"count:person_names", %{"N" => 3}, "Emma and Liam met Sophia."},
-      {"count:words_japanese", %{"N" => 2}, "alpha 日本 beta 東京"},
+      {"count:words_japanese", %{"N" => 2.0}, "alpha 日本 beta 東京"},
       {"count:keywords_multiple",
        %{
          "keyword1" => "alpha",

@@ -213,7 +213,7 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
              stderr_to_stdout: true
            ) do
         {output, 0} ->
-          descriptions = output |> Jason.decode!() |> Map.fetch!("descriptions")
+          descriptions = output |> decode_last_json_object!() |> Map.fetch!("descriptions")
 
           unless length(descriptions) == length(outcomes) and
                    Enum.all?(descriptions, &(is_binary(&1) and String.trim(&1) != "")) do
@@ -236,6 +236,22 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
 
   defp default_ifbench_description_bridge do
     Path.expand("../../../scripts/ifbench_upstream_describe.py", __DIR__)
+  end
+
+  defp decode_last_json_object!(output) do
+    output
+    |> String.split("\n", trim: true)
+    |> Enum.reverse()
+    |> Enum.find_value(fn line ->
+      case Jason.decode(line) do
+        {:ok, value} when is_map(value) -> value
+        _other -> nil
+      end
+    end)
+    |> case do
+      nil -> raise ArgumentError, "IFBench upstream description bridge returned no JSON object"
+      value -> value
+    end
   end
 
   defp executable_available?(executable) when is_binary(executable) do
@@ -419,7 +435,7 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   end
 
   defp ifbench_following?("count:words_japanese", args, _prompt, value) do
-    position = Map.get(args, "N", 1)
+    position = integer_arg!(args, "N", 1)
 
     value
     |> String.split(~r/\s+/, trim: true)
@@ -984,7 +1000,7 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   end
 
   defp ifbench_following?("sentence:keyword", args, _prompt, value) do
-    position = Map.get(args, "N", 0)
+    position = integer_arg!(args, "N", 0)
     keyword = args |> Map.get("word", "") |> to_string() |> String.downcase()
 
     value
@@ -1340,6 +1356,20 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   defp ifbench_following?(instruction_id, _args, _prompt, _value) do
     raise ArgumentError,
           "unsupported IFBench instruction #{inspect(instruction_id)}; Imp cannot claim IFBench parity until this id is ported or explicitly gated"
+  end
+
+  defp integer_arg!(args, key, default) do
+    case Map.get(args, key, default) do
+      value when is_integer(value) ->
+        value
+
+      value when is_float(value) and value == trunc(value) ->
+        trunc(value)
+
+      value ->
+        raise ArgumentError,
+              "IFBench integer argument #{inspect(key)} must be integral, got: #{inspect(value)}"
+    end
   end
 
   defp ifbench_nlp_bridge(instruction_id, args, value, fallback) do
