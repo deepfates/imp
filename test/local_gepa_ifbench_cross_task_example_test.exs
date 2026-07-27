@@ -5,13 +5,17 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
 
   test "contract binds the pinned source-disjoint IFBench treatment" do
     contract = (@root <> "/contract.json") |> File.read!() |> Jason.decode!()
+    v1 = (@root <> "/contract-v1.json") |> File.read!() |> Jason.decode!()
     manifest = (@root <> "/data/source-manifest.json") |> File.read!() |> Jason.decode!()
 
-    assert contract["treatment_id"] == "local-gepa-ifbench-cross-task-v1"
-    assert contract["status"] == "sealed"
+    assert v1["treatment_id"] == "local-gepa-ifbench-cross-task-v1"
+    assert v1["status"] == "sealed"
 
-    assert contract["authority"]["imp_predecessor_commit"] ==
+    assert v1["authority"]["imp_predecessor_commit"] ==
              "93c454695decc8cf7a89900164d97075d42d9d6a"
+
+    assert contract["treatment_id"] == "local-gepa-ifbench-cross-task-v2"
+    assert contract["status"] == "draft"
 
     assert contract["dataset"]["counts"] == %{
              "train" => 16,
@@ -24,6 +28,11 @@ defmodule LocalGEPAIFBenchCrossTaskExampleTest do
     assert contract["model"]["inventory_key"] == "qwen/qwen3.6-35b-a3b"
     assert contract["model"]["selected_variant"] == "qwen/qwen3.6-35b-a3b@4bit"
     assert contract["model"]["size_bytes"] == 20_429_364_306
+    assert contract["model"]["reasoning_effort"] == "none"
+    assert contract["model"]["context_length"] == 262_144
+    assert contract["format_canary"]["typed_output"] == %{"label" => "blue"}
+    assert contract["format_canary"]["reasoning_tokens"] == 0
+    assert contract["format_canary"]["transport_attempts"] == 1
 
     assert manifest["gepa_artifact_commit"] ==
              "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"

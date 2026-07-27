@@ -1,7 +1,7 @@
 defmodule LocalGEPAIFBenchCrossTask.Runner do
   @root __DIR__
   @contract Path.join(@root, "contract.json")
-  @result Path.join(@root, "exercised-result.json")
+  @result Path.join(@root, "exercised-result-v2.json")
 
   def run do
     contract = @contract |> File.read!() |> Jason.decode!()
@@ -28,6 +28,7 @@ defmodule LocalGEPAIFBenchCrossTask.Runner do
       api_key: "lm-studio-local",
       cache: false,
       max_retries: 0,
+      reasoning_effort: reasoning_effort!(model["reasoning_effort"]),
       req_http_options: [retry: false, max_retries: 0]
     ]
 
@@ -214,8 +215,25 @@ defmodule LocalGEPAIFBenchCrossTask.Runner do
     loaded = Jason.decode!(output)
     identifier = contract["model"]["runtime_identifier"]
     matching = Enum.filter(loaded, &(&1["identifier"] == identifier))
+    require!(length(loaded) == 1, "LM Studio must have exactly one loaded model")
     require!(length(matching) == 1, "exact frozen LM Studio identifier is not loaded once")
+    [entry] = matching
+    require!(entry["modelKey"] == contract["model"]["inventory_key"], "model key drift")
+    require!(entry["selectedVariant"] == contract["model"]["selected_variant"], "variant drift")
+    require!(entry["sizeBytes"] == contract["model"]["size_bytes"], "model byte-size drift")
+
+    require!(
+      entry["contextLength"] == contract["model"]["context_length"],
+      "context length drift"
+    )
+
+    require!(entry["parallel"] == contract["model"]["parallel"], "parallelism drift")
   end
+
+  defp reasoning_effort!("none"), do: :none
+
+  defp reasoning_effort!(value),
+    do: raise("unsupported local reasoning effort: #{inspect(value)}")
 
   defp require_sealed!(%{"status" => "sealed"}), do: :ok
   defp require_sealed!(_contract), do: raise("cross-task treatment is not sealed")

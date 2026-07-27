@@ -29,9 +29,15 @@ python3 scripts/build_gepa_ifbench_cross_task.py \
 mix test test/local_gepa_ifbench_cross_task_example_test.exs
 ```
 
-The treatment is sealed to the exact predecessor in `contract.json`. From a
-clean checkout with the pinned GEPA artifact and Python environment available,
-run it once with:
+V1's original sealed envelope remains in `contract-v1.json`. Its immutable
+stopped result is `exercised-result.json`.
+
+The separately named V2 in `contract.json` keeps the data, seeds, optimizer,
+metric, temperatures, output ceilings, and go rule unchanged. It explicitly
+disables reasoning after a one-call synthetic typed-format canary returned a
+valid final field with zero reasoning tokens, and binds the context length to
+LM Studio's actual loaded-process value. Once V2 is sealed to an exact clean
+predecessor, run it once with:
 
 ```sh
 IMP_GEPA_ROOT="$PWD/tmp/gepa-artifact" \

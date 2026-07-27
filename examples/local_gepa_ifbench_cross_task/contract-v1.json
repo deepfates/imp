@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "treatment_id": "local-gepa-ifbench-cross-task-v2",
-  "status": "draft",
+  "treatment_id": "local-gepa-ifbench-cross-task-v1",
+  "status": "sealed",
   "authority": {
     "gepa_artifact_commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
     "dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c",
-    "imp_predecessor_commit": "TO_BE_SEALED"
+    "imp_predecessor_commit": "93c454695decc8cf7a89900164d97075d42d9d6a"
   },
   "dataset": {
     "root": "data",
@@ -16,14 +16,13 @@
     "inventory_key": "qwen/qwen3.6-35b-a3b",
     "selected_variant": "qwen/qwen3.6-35b-a3b@4bit",
     "size_bytes": 20429364306,
-    "runtime_identifier": "imp-ifbench-v2-qwen36-35b-a3b-4bit",
+    "runtime_identifier": "imp-ifbench-qwen36-35b-a3b-4bit",
     "base_url": "http://127.0.0.1:1234/v1",
     "task_temperature": 0.2,
     "reflection_temperature": 0.7,
     "task_max_tokens": 1024,
     "reflection_max_tokens": 2048,
-    "reasoning_effort": "none",
-    "context_length": 262144,
+    "context_length": 32768,
     "parallel": 4
   },
   "optimizer": {
@@ -38,15 +37,5 @@
     "primary_metric": "mean_fraction_of_executable_IFBench_constraints_satisfied",
     "go_rule": "positive mean paired test lift and positive lift in all three seeds",
     "interpretation": "source-disjoint task-specific C3 only"
-  },
-  "format_canary": {
-    "input": "Synthetic canary: the explicit color is blue.",
-    "typed_output": {"label": "blue"},
-    "input_tokens": 205,
-    "output_tokens": 14,
-    "reasoning_tokens": 0,
-    "finish_reason": "stop",
-    "transport_attempts": 1,
-    "provider_spend_usd": 0.0
   }
 }
