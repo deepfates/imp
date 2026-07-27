@@ -30,8 +30,8 @@ artifact and consumer integrity, not a release-version decision.
 
 Be precise about what kind of thing this release is, in three layers:
 
-**Proven here, with receipts you can run.** The complete DSPy 3.2.1 surface,
-realized natively: the signature DSL, program shapes from `predict` through
+**Proven here, with receipts you can run.** A broad substantive DSPy 3.2.1
+surface, realized natively: the signature DSL, program shapes from `predict` through
 ReAct, CodeAct, and a sandboxed recursive controller, evaluation, fifteen
 optimizers, retrieval, MCP, streaming, and persistence. "Faithful port" is a
 checked claim, not a slogan — and checkable by you. The optimizer and adapter
@@ -42,17 +42,20 @@ dispositions — differential, Elixir-native equivalent, or honest gap. It is
 not a blanket "everything matches upstream"; it is a per-surface ledger you
 can audit. See [Evidence](docs/EVIDENCE.md) for the C0–C5 ladder this is
 graded on and [Conformance](docs/CONFORMANCE.md) for the per-surface table. One complete
-effectiveness result ships with its artifact: the
+effectiveness results ship with scoped artifacts: the
 [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s router improves
 from 25–30% to 85% on held-out data across three committed live runs, for
-about a cent, and you can rerun the experiment yourself.
+about a cent. On a separately frozen matched TREC contract, Imp GEPA improved
+its baseline by `+0.4000` and cleared the preregistered noninferiority margin
+against pinned DSPy GEPA; MIPROv2 improved its own baseline by `+0.1458`.
+Neither result is a general optimizer-effectiveness claim.
 
 **Borrowed honestly — with the gap named.** The optimization *algorithms'*
 effectiveness evidence comes from their published literature (DSPy, MIPROv2,
 SIMBA, GEPA) — which verified *those implementations on those tasks*. Imp's
-differentials verify that our machinery matches the upstream mechanics; they
-do not yet verify that matched machinery reproduces matched outcomes with
-live models, and we have not measured that ourselves for most optimizers.
+differentials verify their named mechanics; they do not establish whole-loop
+parity. The matched TREC result answers one outcome question, while most
+optimizers still lack matched live outcomes.
 That transfer question is tracked as open targets in the ledger, not assumed
 away. What we can say from our own committed evidence: demonstration-based
 compilation produces real held-out lift (the tutorial's result), and whether

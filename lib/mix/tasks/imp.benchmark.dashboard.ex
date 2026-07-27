@@ -213,6 +213,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           max_age_hours
         ),
       "instruction_optimizer_contract" => instruction_optimizer_contract,
+      "matched_instruction_optimizers" => matched_instruction_optimizers_lane(max_age_hours),
       "optimizer_lift" => optimizer_lift,
       "auto_evaluation_contract" =>
         auto_evaluation_contract_lane(reproduction_registry, max_age_hours),
@@ -287,6 +288,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
           ),
           max_age_hours
         ),
+      "optimize_anything_task_specific" => optimize_anything_task_specific_lane(max_age_hours),
       "rag_tool_agent" =>
         rag_tool_agent_lane(
           Keyword.get(opts, :rag_tool_agent_dir),
@@ -1530,6 +1532,97 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
     else
       _ -> missing_lane("optimizer_lift", "no optimizer-lift-parity artifact found in #{dir}")
     end
+  end
+
+  defp matched_instruction_optimizers_lane(max_age_hours) do
+    path = "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
+
+    with {:ok, artifact} <- read_artifact(path),
+         true <- valid_matched_instruction_optimizer_result?(artifact) do
+      acceptance = artifact["paired_acceptance"]
+
+      artifact_lane("matched_instruction_optimizers", path, artifact, max_age_hours,
+        passing: true,
+        full_evidence: true,
+        freshness: :immutable_admission,
+        scale: "task_specific_c3",
+        summary: %{
+          "campaign_id" => artifact["campaign_id"],
+          "headline_passed" => acceptance["headline_passed"],
+          "winning_optimizer" => acceptance["winning_optimizer"],
+          "gepa_lift" => get_in(acceptance, ["imp_gepa_minus_imp_baseline", "mean"]),
+          "mipro_v2_lift" => get_in(acceptance, ["imp_mipro_v2_minus_imp_baseline", "mean"]),
+          "gepa_noninferiority" =>
+            get_in(acceptance, ["imp_gepa_minus_upstream_gepa", "noninferiority_passed"])
+        },
+        limitation:
+          "One frozen task/model contract; this does not establish cross-task effectiveness, paper replication, superiority, or another optimizer family."
+      )
+    else
+      _ ->
+        missing_lane(
+          "matched_instruction_optimizers",
+          "the committed matched GEPA/MIPROv2 TREC result is missing or fails its exact boundary checks"
+        )
+    end
+  end
+
+  defp optimize_anything_task_specific_lane(max_age_hours) do
+    path =
+      "examples/local_optimize_anything_retry_policy/exercised-typed-round-robin-result.json"
+
+    with {:ok, artifact} <- read_artifact(path),
+         true <- valid_optimize_anything_task_specific_result?(artifact) do
+      artifact_lane("optimize_anything_task_specific", path, artifact, max_age_hours,
+        passing: true,
+        full_evidence: true,
+        freshness: :immutable_admission,
+        scale: "task_specific_c3",
+        summary: %{
+          "treatment_id" => artifact["treatment_id"],
+          "model" => artifact["model"],
+          "baseline_exact" => get_in(artifact, ["untouched_test", "baseline", "exact"]),
+          "selected_exact" => get_in(artifact, ["untouched_test", "selected", "exact"]),
+          "fresh_byte_identical" => artifact["fresh_byte_identical"]
+        },
+        limitation:
+          "One local mixed-type retry-policy task; this does not establish general Optimize Anything effectiveness, schema-v2 portfolio evidence, or upstream parity."
+      )
+    else
+      _ ->
+        missing_lane(
+          "optimize_anything_task_specific",
+          "the committed task-specific Optimize Anything result is missing or fails its exact boundary checks"
+        )
+    end
+  end
+
+  defp valid_optimize_anything_task_specific_result?(artifact) do
+    artifact["treatment_id"] == "local-oa-retry-policy-typed-round-robin-v1" and
+      artifact["status"] == "complete" and artifact["selected"] == "mutated" and
+      artifact["fresh_byte_identical"] == true and
+      artifact["split_sizes"] == %{"train" => 8, "selection" => 6, "untouched_test" => 6} and
+      get_in(artifact, ["untouched_test", "baseline", "exact"]) == 4 and
+      get_in(artifact, ["untouched_test", "selected", "exact"]) == 5
+  end
+
+  defp valid_matched_instruction_optimizer_result?(artifact) do
+    acceptance = artifact["paired_acceptance"] || %{}
+    gepa = acceptance["imp_gepa_minus_imp_baseline"] || %{}
+    mipro = acceptance["imp_mipro_v2_minus_imp_baseline"] || %{}
+    noninferiority = acceptance["imp_gepa_minus_upstream_gepa"] || %{}
+    execution = artifact["execution"] || %{}
+
+    artifact["artifact_type"] == "imp_dspy_matched_instruction_optimizer_outcome" and
+      artifact["campaign_id"] == "matched-strong-instruction-optimizers-trec-v1" and
+      artifact["status"] == "complete" and
+      acceptance["headline_passed"] == true and acceptance["winning_optimizer"] == "gepa" and
+      is_number(gepa["mean"]) and gepa["mean"] > 0 and
+      is_number(mipro["mean"]) and mipro["mean"] > 0 and
+      noninferiority["noninferiority_passed"] == true and
+      execution["treatment_cost_usd"] == 3.13862325 and
+      get_in(execution, ["imp", "held_out_parse_errors_after_typed_nil_normalization"]) == 0 and
+      get_in(execution, ["upstream", "held_out_parse_errors"]) == 0
   end
 
   defp gepa_replication_lane(dir, max_age_hours) do

@@ -514,7 +514,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
       request_log
       |> File.read!()
       |> decode_jsonl()
-      |> Enum.map(& &1["body_sha256"])
+      |> Enum.map(& &1["canonical_body_sha256"])
 
     assert length(Enum.uniq(request_digests)) == 1
 

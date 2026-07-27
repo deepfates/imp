@@ -34,23 +34,25 @@ receipts.
 
 ## Where the ledger stands
 
-As of v0.2.0, the ledger holds **64 claims: 44 asserted, 20 still targets.**
+The current unreleased candidate's ledger holds **68 claims: 48 asserted, 20 still targets.**
 
 | Rung | Claims | Asserted |
 | --- | --- | --- |
 | C0 | 9 | 9 |
 | C1 | 25 | 25 |
-| C2 | 9 | 8 |
-| C3 | 19 | 2 |
-| C4 | 2 | 0 |
+| C2 | 10 | 9 |
+| C3 | 21 | 5 |
+| C4 | 3 | 0 |
 
-**Reconciliation — asserted is not proven.** The 44 asserted rows are
+**Reconciliation — asserted is not proven.** The 48 asserted rows are
 maintainer attestations. In a fresh source checkout, `mix
 benchmark.dashboard --profile v0.1` recomputes claim state from committed
-evidence alone and reports **0 of the 44 proven, 25 blocked, 19
+evidence alone and reports **3 of the 48 proven, 25 blocked, 23
 informational** (profile ready: false): most asserted rows cite lane
 evidence that maintainers generate locally under `tmp/` and that is not
-committed, so a fresh clone cannot replay it. That gap is real and tracked:
+committed, so a fresh clone cannot replay it. The committed matched GEPA and
+MIPROv2 TREC outcomes and task-specific Optimize Anything result are the three
+current exceptions. The remaining gap is real and tracked:
 CI recomputes this reconciliation from committed evidence on every pull
 request and fails when this paragraph drifts from the computed state
 (`test/evidence_reconciliation_test.exs`). Until the gap closes, treat
@@ -61,12 +63,14 @@ Read the shape honestly: the exists-and-conforms level is asserted with
 differential lanes behind it, but only the committed subset replays from a
 fresh checkout. Most effectiveness claims are still targets — Imp does not
 claim an optimizer helps your task until a held-out score in a committed
-artifact says so. The two asserted C3 rows are the local MLX weight-training
+artifact says so. The five asserted C3 rows are the local MLX weight-training
 campaign and the [ticket-routing tutorial](TUTORIAL_TICKET_ROUTING.md)'s
-25–30% → 85% result; both artifacts are content-addressed in the repository.
-Optimize Anything is not among them: its immutable pre-v2 artifact selected
-and scored on the same development set and is retained only as T2 execution
-evidence pending a three-split rerun.
+25–30% → 85% result, plus the task-specific matched TREC outcomes for GEPA and
+MIPROv2, and the task-specific Optimize Anything retry-policy result. Their
+exact scopes and limitations live in the claim rows.
+The broader Optimize Anything portfolio target is still open: its older
+provider campaign selected and scored on the same development set, while the
+asserted C3 row is limited to the later disjoint local retry-policy task.
 
 ## Where the receipts live
 
@@ -85,10 +89,10 @@ evidence pending a three-split rerun.
 A skeptic reading these docs meets three different numbers, and each counts a
 different thing. **Surfaces** are the grouped upstream capability areas the
 [conformance report](CONFORMANCE.md) totals — 26 of them. **Claims** are the
-graded rows in this ledger — 64, each targeting a rung and each attached to one
+graded rows in this ledger — 68, each targeting a rung and each attached to one
 surface. **Requirement ids** are the individual checks nested inside claims, so
-with the 64 claim ids they account for the 130 `id` fields in
-`benchmarks/claims.json`. These numbers are current as of v0.2.0 and are
+with the 68 claim ids they account for the 138 `id` fields in
+`benchmarks/claims.json`. These numbers describe the current unreleased candidate and are
 asserted nowhere but here — the dashboard is the authority if it disagrees.
 
 The discipline behind the ledger is simple: an unclaimed surface is a place

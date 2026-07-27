@@ -320,7 +320,6 @@ defmodule Imp.UpstreamFidelity do
       disposition: :elixir_native_equivalent,
       rationale:
         "Imp implements the recursive controller as a bounded BEAM-native effect interpreter with supervised subcalls, shared budgets, transactional replay, and no Python runtime dependency; paper-scale effectiveness remains a separately gated research claim.",
-      release_blocking: false,
       ticket: "de-c7ui",
       imp: [Imp.Predict.RLM, Imp.Predict.RLM.SandboxSerializable],
       invariants: [
@@ -482,7 +481,6 @@ defmodule Imp.UpstreamFidelity do
       source:
         "dspy/teleprompt/copro_optimizer.py; mipro_optimizer_v2.py; simba.py; infer_rules.py",
       disposition: :gap,
-      release_blocking: false,
       ticket: "de-9x31",
       imp: [
         Imp.Optimizer.COPRO,
@@ -531,7 +529,6 @@ defmodule Imp.UpstreamFidelity do
       source:
         "gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975 (standalone v0.1.4 structural authority)",
       disposition: :gap,
-      release_blocking: false,
       local_conformance: :structural,
       evidence_rung: "C3",
       claim_boundary:
@@ -647,7 +644,6 @@ defmodule Imp.UpstreamFidelity do
       ],
       source: "arXiv:2605.12484v2; official GEPA Fast-Slow project article",
       disposition: :elixir_native_equivalent,
-      release_blocking: false,
       ticket: "de-4bkz",
       rationale:
         "The official code page still says code coming soon. Imp provides a BEAM-native, provider-neutral implementation of Algorithm 1's orchestration order with durable effect intents, enforced operation budgets, ordered events, exact advantage-group accounting, and fail-closed recovery. The slow-weight callback is an external handoff; Imp does not implement or verify CISPO, a gradient step, or resulting model weights.",
@@ -683,7 +679,7 @@ defmodule Imp.UpstreamFidelity do
       category: :optimization,
       upstream: ["optimize_anything", "arbitrary text artifacts"],
       source: "arXiv:2605.19633; gepa-ai optimize-anything",
-      disposition: :tracking,
+      disposition: :gap,
       ticket: "de-16fo",
       imp: [
         Imp.Optimize.Anything,
@@ -847,7 +843,7 @@ defmodule Imp.UpstreamFidelity do
       ticket: "de-2ia5",
       imp: [Imp],
       invariants: [
-        "one progressive path teaches the complete product",
+        "one progressive path teaches the stable center and names experimental gaps",
         "examples use canonical public APIs",
         "credential-gated cells prove provider-relevant behavior",
         "documentation never outruns evidence"
@@ -899,6 +895,9 @@ defmodule Imp.UpstreamFidelity do
           "LICENSE",
           "SECURITY.md",
           "docs/maintainers/RELEASE.md"
+        ],
+        missing: [
+          "a published versioned Hex release; owner publication is intentionally frozen pending explicit check-in"
         ]
       }
     }
@@ -1023,6 +1022,7 @@ defmodule Imp.UpstreamFidelity do
     missing_files = missing_files(evidence, root)
     missing_modules = Enum.reject(Map.get(row, :imp, []), &module_available?/1)
     contract_errors = contract_errors(row)
+    open_obligations = open_obligations(evidence)
 
     evidence_errors =
       file_errors(missing_files) ++ module_errors(missing_modules) ++ contract_errors
@@ -1030,7 +1030,7 @@ defmodule Imp.UpstreamFidelity do
     status =
       cond do
         evidence_errors != [] -> :invalid_evidence
-        row.disposition == :gap -> :gap
+        row.disposition == :gap or open_obligations != [] -> :gap
         true -> row.disposition
       end
 
@@ -1039,7 +1039,14 @@ defmodule Imp.UpstreamFidelity do
     row
     |> Map.put(:release_blocking, release_blocking)
     |> Map.put(:status, status)
+    |> Map.put(:open_obligations, open_obligations)
     |> Map.put(:evidence_errors, evidence_errors)
+  end
+
+  defp open_obligations(evidence) do
+    evidence
+    |> Map.get(:missing, [])
+    |> Enum.filter(&present?/1)
   end
 
   defp missing_files(evidence, root) do

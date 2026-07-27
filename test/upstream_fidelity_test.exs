@@ -32,7 +32,8 @@ defmodule Imp.UpstreamFidelityTest do
     assert react.rationale =~ "fails fast"
 
     weights = by_id["optimization.weights"]
-    assert weights.status == :elixir_native_equivalent
+    assert weights.status == :gap
+    assert weights.disposition == :elixir_native_equivalent
     assert "Avatar" in weights.upstream
     assert "AvatarOptimizer" in weights.upstream
     assert Imp.Predict.Avatar in weights.imp
@@ -68,36 +69,38 @@ defmodule Imp.UpstreamFidelityTest do
              "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
            ]
 
-    assert by_id["primitives.multimodal"].status == :conformant
+    assert by_id["primitives.multimodal"].status == :gap
     few_shot = by_id["optimization.few_shot"]
-    assert few_shot.status == :elixir_native_equivalent
+    assert few_shot.status == :gap
+    assert few_shot.disposition == :elixir_native_equivalent
     assert few_shot.rationale =~ "explicit serializable BEAM RNG"
     assert Enum.any?(few_shot.invariants, &String.starts_with?(&1, "LabeledFewShot defaults"))
-    assert by_id["agents.rlm"].status == :elixir_native_equivalent
+    assert by_id["agents.rlm"].status == :gap
     assert by_id["optimization.instructions"].status == :gap
-    refute by_id["optimization.instructions"].release_blocking
+    assert by_id["optimization.instructions"].release_blocking
     gepa = by_id["optimization.gepa"]
     assert gepa.status == :gap
-    refute gepa.release_blocking
+    assert gepa.release_blocking
     assert gepa.local_conformance == :structural
     assert gepa.evidence_rung == "C3"
     assert gepa.claim_boundary =~ "one matched three-seed held-out TREC result"
     refute Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C3 "))
     assert Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C5 "))
     assert by_id["product.learning_path"].status == :conformant
-    assert by_id["product.release"].status == :conformant
+    assert by_id["product.release"].status == :gap
+    assert by_id["optimization.anything"].status == :gap
 
     assert report.summary.invalid_evidence == 0
     assert report.summary.local_conformance == 1
     assert report.summary.manifest_missing == 0
     assert report.summary.manifest_duplicates == 0
     assert report.summary.gaps > 0
-    assert report.summary.non_blocking_gaps > 0
-    assert report.summary.release_blockers < report.summary.gaps
-    assert report.summary.passing
-    refute "optimization.instructions" in report.blocking_ids
-    refute "optimization.weights" in report.blocking_ids
-    assert report.blocking_ids == []
+    assert report.summary.non_blocking_gaps == 0
+    assert report.summary.release_blockers == report.summary.gaps
+    refute report.summary.passing
+    assert "optimization.instructions" in report.blocking_ids
+    assert "optimization.weights" in report.blocking_ids
+    assert "product.release" in report.blocking_ids
   end
 
   test "every stable surface has exactly one owning ledger row" do
@@ -172,19 +175,16 @@ defmodule Imp.UpstreamFidelityTest do
       assert body =~ "### `#{row.id}`"
     end
 
-    assert body =~
-             "| optimization.weights | optimization | elixir_native_equivalent | satisfied |"
+    assert body =~ "| optimization.weights | optimization | gap | release blocker |"
 
-    assert body =~
-             "| optimization.few_shot | optimization | elixir_native_equivalent | satisfied |"
+    assert body =~ "| optimization.few_shot | optimization | gap | release blocker |"
 
-    assert body =~ "| optimization.instructions | optimization | gap | claim-specific gap |"
-    assert body =~ "| optimization.anything | optimization | tracking | tracked |"
+    assert body =~ "| optimization.instructions | optimization | gap | release blocker |"
+    assert body =~ "| optimization.anything | optimization | gap | release blocker |"
 
     assert body =~
              "schema-v2 multi-seed live effectiveness on distinct train, selection, and untouched test sets"
 
-    assert body =~
-             "| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied |"
+    assert body =~ "| optimization.fast_slow | optimization | gap | release blocker |"
   end
 end

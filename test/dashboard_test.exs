@@ -375,10 +375,10 @@ defmodule DashboardTest do
     assert dashboard["claims"]["summary"]["blocked"] ==
              length(dashboard["claims"]["blocking_requirements"])
 
-    # 11 evidence-backed informational conformance claims from the admission
-    # campaign plus the 8 informational census claims for previously unclaimed
-    # public surfaces (claims census reconciliation, PR #16).
-    assert dashboard["claims"]["summary"]["informational"] == 19
+    # Informational claims include narrow conformance rows plus committed,
+    # task-specific GEPA, MIPROv2, and Optimize Anything outcomes. They remain
+    # outside the profile-ready blocker count.
+    assert dashboard["claims"]["summary"]["informational"] == 23
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -388,6 +388,9 @@ defmodule DashboardTest do
 
     assert dashboard["claims"]["summary"]["proven"] == length(proven_claim_ids)
     assert "claim.local_mlx_weight_training.effectiveness" in proven_claim_ids
+    assert "claim.optimizer.gepa.matched_trec_effectiveness" in proven_claim_ids
+    assert "claim.optimizer.mipro_v2.matched_trec_effectiveness" in proven_claim_ids
+    assert "claim.optimize_anything.retry_policy_task_effectiveness" in proven_claim_ids
 
     assert [
              "claim.dspy_semantics.golden_trace",

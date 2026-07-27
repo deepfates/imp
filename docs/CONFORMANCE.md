@@ -2,16 +2,16 @@
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Total: 26
-Conformant: 15
-Elixir-native equivalents: 7
-Tracking: 2
-Gaps: 2
-Claim-specific non-blocking gaps: 2
+Conformant: 12
+Elixir-native equivalents: 3
+Tracking: 1
+Gaps: 10
+Claim-specific non-blocking gaps: 0
 Invalid evidence: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 0
-Passing: true
+Release blockers: 10
+Passing: false
 
 | ID | Category | Status | Product gate | Upstream surfaces |
 | --- | --- | --- | --- | --- |
@@ -22,25 +22,25 @@ Passing: true
 | adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter |
 | adapters.xml | adapters | conformant | satisfied | XMLAdapter |
 | adapters.two_step | adapters | conformant | satisfied | TwoStepAdapter |
-| primitives.multimodal | primitives | conformant | satisfied | Image, Audio, File, Code, Document, Citations, Reasoning |
+| primitives.multimodal | primitives | gap | release blocker | Image, Audio, File, Code, Document, Citations, Reasoning |
 | tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
 | agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |
-| agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper |
-| composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |
+| agents.rlm | tools_agents | gap | release blocker | RLM, SandboxSerializable, Recursive Language Models paper |
+| composition.refinement | programming_model | gap | release blocker | BestOfN, Refine, Assertions |
 | evaluation.metrics | evaluation | conformant | satisfied | Evaluate, EvaluationResult, answer_exact_match, answer_passage_match, SemanticF1, CompleteAndGrounded |
-| optimization.few_shot | optimization | elixir_native_equivalent | satisfied | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
+| optimization.few_shot | optimization | gap | release blocker | LabeledFewShot, BootstrapFewShot, BootstrapFewShotWithRandomSearch, BootstrapRS |
 | optimization.knn | optimization | conformant | satisfied | KNN, KNNFewShot |
-| optimization.instructions | optimization | gap | claim-specific gap | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
-| optimization.gepa | optimization | gap | claim-specific gap | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
-| optimization.weights | optimization | elixir_native_equivalent | satisfied | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble |
-| optimization.fast_slow | optimization | elixir_native_equivalent | satisfied | Learning, Fast and Slow Algorithm 1, GEPA fast-adaptation handoff, external slow-weight optimizer handoff |
-| optimization.anything | optimization | tracking | tracked | optimize_anything, arbitrary text artifacts |
+| optimization.instructions | optimization | gap | release blocker | COPRO, MIPROv2, SIMBA, InferRules, SignatureOptimizer |
+| optimization.gepa | optimization | gap | release blocker | GEPA, GEPA advanced, GEPA 0.1.4 standalone API, GEPA 0.1.1 historical result contract |
+| optimization.weights | optimization | gap | release blocker | Avatar, AvatarOptimizer, BootstrapFinetune, GRPO, BetterTogether, Ensemble |
+| optimization.fast_slow | optimization | gap | release blocker | Learning, Fast and Slow Algorithm 1, GEPA fast-adaptation handoff, external slow-weight optimizer handoff |
+| optimization.anything | optimization | gap | release blocker | optimize_anything, arbitrary text artifacts |
 | retrieval.data | retrieval | elixir_native_equivalent | satisfied | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |
 | runtime.async_stream_cache | runtime | conformant | satisfied | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage |
 | runtime.observability | runtime | conformant | satisfied | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |
 | state.persistence_deployment | operations | conformant | satisfied | Module.save, Module.load, load, dump_state, load_state, deployment |
 | product.learning_path | product | conformant | satisfied | getting started, tutorials, real-world examples, API reference, production guide |
-| product.release | product | conformant | satisfied | installable package, versioned release, security policy, CI, clean-room consumer |
+| product.release | product | gap | release blocker | installable package, versioned release, security policy, CI, clean-room consumer |
 
 ## Executable Contracts
 
@@ -226,7 +226,7 @@ Missing evidence or behavior:
 
 ### `primitives.multimodal`
 
-Status: `conformant`
+Status: `gap`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
@@ -305,7 +305,7 @@ Missing evidence or behavior:
 
 ### `agents.rlm`
 
-Status: `elixir_native_equivalent`
+Status: `gap`
 
 Upstream source: `dspy/predict/rlm.py; arXiv:2512.24601`
 
@@ -337,7 +337,7 @@ Missing evidence or behavior:
 
 ### `composition.refinement`
 
-Status: `conformant`
+Status: `gap`
 
 Upstream source: `dspy/predict/best_of_n.py; dspy/predict/refine.py; tests/predict/test_refine.py @ 3.3.0b1 b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`
 
@@ -397,7 +397,7 @@ Missing evidence or behavior:
 
 ### `optimization.few_shot`
 
-Status: `elixir_native_equivalent`
+Status: `gap`
 
 Upstream source: `dspy/teleprompt/vanilla.py; bootstrap.py; random_search.py`
 
@@ -524,7 +524,7 @@ Missing evidence or behavior:
 
 ### `optimization.weights`
 
-Status: `elixir_native_equivalent`
+Status: `gap`
 
 Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
@@ -569,7 +569,7 @@ Missing evidence or behavior:
 
 ### `optimization.fast_slow`
 
-Status: `elixir_native_equivalent`
+Status: `gap`
 
 Upstream source: `arXiv:2605.12484v2; official GEPA Fast-Slow project article`
 
@@ -602,7 +602,7 @@ Missing evidence or behavior:
 
 ### `optimization.anything`
 
-Status: `tracking`
+Status: `gap`
 
 Upstream source: `arXiv:2605.19633; gepa-ai optimize-anything`
 
@@ -753,7 +753,7 @@ Upstream source: `dspy/docs/docs`
 Imp modules: `Imp`
 Semantic invariants:
 
-- one progressive path teaches the complete product
+- one progressive path teaches the stable center and names experimental gaps
 - examples use canonical public APIs
 - credential-gated cells prove provider-relevant behavior
 - documentation never outruns evidence
@@ -775,7 +775,7 @@ Missing evidence or behavior:
 
 ### `product.release`
 
-Status: `conformant`
+Status: `gap`
 
 Upstream source: `Hex package and canonical GitHub repository`
 
@@ -802,4 +802,4 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- none
+- a published versioned Hex release; owner publication is intentionally frozen pending explicit check-in

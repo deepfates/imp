@@ -1218,7 +1218,7 @@ Pinned text-map workflows may instead set
 `reflect/3`. This released GEPA surface owns proposal generation and works
 without a reflection LM. Contextual state is stored in the engine checkpoint
 and verified on JSON resume; the strategy remains a trusted runtime binding and
-is not serialized inside `Config.to_map/1`.
+is not serialized inside the config's durable map projection.
 
 Pinned GEPA v0.1.4's grouped evaluator surface is available through the same
 entry point: pass `nil` as the scalar evaluator and an arity-one
@@ -1247,7 +1247,7 @@ Multi-proposal controls are also engine settings on the nested public config.
 accepts `:all_improvements`, `:best_improvement`, `{:top_k, n}`, or the
 documented BEAM callback form. `acceptance_criterion` accepts
 `:strict_improvement`, pinned-name `:improvement_or_equal`, native alias
-`:equal_or_better`, or `Imp.Optimizer.GEPA.Acceptance.callback/1`. These values
+`:equal_or_better`, or `Imp.GEPA.Acceptance.callback/1`. These values
 control the real proposal batch, filtering, and admission decisions and are
 bound into resumable checkpoints; changing any of them on resume fails before
 evaluation. Unsupported Python strategy objects are rejected by config

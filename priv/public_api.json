@@ -105,6 +105,11 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Acceptance",
+      "source": "lib/imp/optimizer/gepa/acceptance.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.GEPA.Adapter",
       "source": "lib/imp/optimizer/gepa/adapter.ex"
     },
@@ -2803,6 +2808,137 @@
       ]
     },
     {
+      "callbacks": [],
+      "category": "spi",
+      "functions": [
+        "accept?/4",
+        "callback/1",
+        "decide/4",
+        "default/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.GEPA.Acceptance",
+      "signatures": {
+        "functions": {
+          "accept?/4": [
+            "accept?(policy, before_result, after_result, context \\\\ %{})"
+          ],
+          "callback/1": [
+            "callback(fun)"
+          ],
+          "decide/4": [
+            "decide(policy, before_result, after_result, context \\\\ %{})"
+          ],
+          "default/1": [
+            "default(operation)"
+          ]
+        },
+        "types": {
+          "callback/0": [],
+          "callback_decision/0": [],
+          "decision/0": [],
+          "policy/0": []
+        }
+      },
+      "source": "lib/imp/gepa/acceptance.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "callback/0"
+        },
+        {
+          "kind": "type",
+          "name": "callback_decision/0"
+        },
+        {
+          "kind": "type",
+          "name": "decision/0"
+        },
+        {
+          "kind": "type",
+          "name": "policy/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [
+        {
+          "name": "dump_state/1",
+          "optional": true
+        },
+        {
+          "name": "load_state/1",
+          "optional": true
+        },
+        {
+          "name": "reflect/3",
+          "optional": true
+        },
+        {
+          "name": "reflect/4",
+          "optional": false
+        },
+        {
+          "name": "reflect_many/2",
+          "optional": true
+        },
+        {
+          "name": "total_cost/1",
+          "optional": true
+        }
+      ],
+      "category": "spi",
+      "functions": [
+        "contextual/2"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.GEPA.ReflectionStrategy",
+      "signatures": {
+        "callbacks": {
+          "dump_state/1": [],
+          "load_state/1": [],
+          "reflect/3": [],
+          "reflect/4": [],
+          "reflect_many/2": [],
+          "total_cost/1": []
+        },
+        "functions": {
+          "contextual/2": [
+            "contextual(module, context)"
+          ]
+        },
+        "types": {
+          "candidate/0": [],
+          "component_name/0": [],
+          "job/0": [],
+          "proposal/0": []
+        }
+      },
+      "source": "lib/imp/gepa/reflection_strategy.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "candidate/0"
+        },
+        {
+          "kind": "type",
+          "name": "component_name/0"
+        },
+        {
+          "kind": "type",
+          "name": "job/0"
+        },
+        {
+          "kind": "type",
+          "name": "proposal/0"
+        }
+      ]
+    },
+    {
       "callbacks": [
         {
           "name": "post/4",
@@ -4128,71 +4264,6 @@
         "use_merge"
       ],
       "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "accept?/4",
-        "callback/1",
-        "decide/4",
-        "default/1"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.Optimizer.GEPA.Acceptance",
-      "signatures": {
-        "functions": {
-          "accept?/4": [
-            "accept?(policy, before_result, after_result, context \\\\ %{})"
-          ],
-          "callback/1": [
-            "callback(fun)"
-          ],
-          "decide/4": [
-            "decide(policy, before_result, after_result, context \\\\ %{})"
-          ],
-          "default/1": [
-            "default(atom)"
-          ]
-        },
-        "types": {
-          "callback/0": [],
-          "callback_decision/0": [],
-          "context/0": [],
-          "decision/0": [],
-          "operation/0": [],
-          "policy/0": []
-        }
-      },
-      "source": "lib/imp/optimizer/gepa/acceptance.ex",
-      "struct_fields": [],
-      "types": [
-        {
-          "kind": "type",
-          "name": "callback/0"
-        },
-        {
-          "kind": "type",
-          "name": "callback_decision/0"
-        },
-        {
-          "kind": "type",
-          "name": "context/0"
-        },
-        {
-          "kind": "type",
-          "name": "decision/0"
-        },
-        {
-          "kind": "type",
-          "name": "operation/0"
-        },
-        {
-          "kind": "type",
-          "name": "policy/0"
-        }
-      ]
     },
     {
       "callbacks": [

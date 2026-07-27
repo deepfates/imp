@@ -49,7 +49,7 @@ source checkout:
 {:imp, path: "path/to/imp"}
 ```
 
-The full manual ships in this repository under [docs/](docs/); it will land
+The full manual ships in this repository from the [documentation index](docs/README.md); it will land
 on hexdocs.pm with the Hex release. You will need an API key for a model
 provider (any [ReqLLM](https://hex.pm/packages/req_llm) provider works; the
 docs use OpenAI).
@@ -173,7 +173,7 @@ which grows this same router end to end.
   slow, fallible, concurrent effect: bounded supervised workers, compiled
   programs persisted as checksummed artifacts with no secrets inside,
   credentials bound at runtime, redacted telemetry on every call, retry,
-  and tool step. The [deployment example](examples/deployment) is a
+  and tool step. The [deployment example](examples/deployment/README.md) is a
   complete OTP application.
 
 ## The whole surface, stage by stage
@@ -225,7 +225,7 @@ and supported by tests, not frozen against the next minor release.
   step from first live call to deployment.
 - [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md): the full
   experiment behind the numbers, artifact included.
-- [Livebooks](livebooks/): the same path as runnable notebooks.
+- [Livebooks](livebooks/01_real_lm_front_door.livemd): the same path as runnable notebooks.
 - Reference: [API Guide](docs/API_GUIDE.md), [Glossary](docs/GLOSSARY.md),
   [Architecture](docs/ARCHITECTURE.md),
   [Production Operations](docs/PRODUCTION_OPERATIONS.md).

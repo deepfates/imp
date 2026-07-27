@@ -50,7 +50,7 @@ seams are why swapping `Imp.LM.Static` into tests requires no patching.
 **Supervision is the execution model, not an add-on.** Evaluation fan-out,
 tool execution, and sandboxed code all run in bounded, supervised workers.
 A slow provider call returns a timeout instead of hanging your program; a
-crashed interpreter restarts. The [deployment example](../examples/deployment)
+crashed interpreter restarts. The [deployment example](../examples/deployment/README.md)
 is a complete OTP application, not a snippet.
 
 **The sandboxes are Elixir.** `ProgramOfThought`, `CodeAct`, and RLM execute
@@ -79,16 +79,20 @@ Imp's conformance program tracks 26 upstream surface groups against DSPy
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| Conformant | 15 | Matches pinned DSPy 3.2.1 on the evidence cited by each surface; a family-level status does not imply that every upstream code path or optimizer outcome has been reproduced |
-| Elixir-native equivalent | 7 | Same capability, deliberately different mechanics (model runtime, ReAct internals, RLM sandbox, few-shot RNG, weight-optimizer plumbing, retrieval backends, fast/slow learning) |
-| Tracking | 2 | Following DSPy's unreleased 3.3 changes |
-| Gap | 2 | Missing exact-reproduction evidence, non-blocking and ticketed: the instruction-optimizer family and GEPA. Local behavior is tested; upstream-matched outcomes are not claimed |
+| Conformant | 12 | Matches the pinned reference on the evidence cited by each surface; a family-level status does not imply that every upstream code path or optimizer outcome has been reproduced |
+| Elixir-native equivalent | 3 | Same capability, deliberately different mechanics with no remaining obligation recorded for that grouped surface |
+| Tracking | 1 | Following DSPy's unreleased 3.3 normalized-runtime changes |
+| Gap | 10 | A named behavior or evidence obligation remains open. Advertised gaps block full ecosystem closure even when the implemented runtime is substantive. |
 
 The per-surface table is the [conformance report](CONFORMANCE.md). Behind
 the differential rows, the `scripts/` sidecars and `mix imp.benchmark.*_differential`
 tasks run real pinned DSPy 3.2.1 and compare arm to arm — a capture raises
 unless Imp's output matches upstream, so you can run them yourself and see
-the match. If this page and the code ever disagree, the code wins.
+the match. MIPROv2 and SIMBA structural cases additionally name their pinned
+DSPy 3.3.0b1 reference. The matched TREC result establishes one task-specific
+GEPA and MIPROv2 C3 outcome; it does not close the cross-task, paper, or other
+instruction-family gaps. If this page and the generated report disagree, the
+report wins.
 
 Ecosystem breadth is the real gap: DSPy has years of retriever integrations,
 observability partners, and community. Imp's seams for that are behaviours

@@ -464,3 +464,33 @@ identityless checkpoints fail closed instead of being guessed compatible.
 All 149 Optimize Anything tests passed with three expected skips. This repair
 changes resume safety only; it adds no natural mutation, held-out lift,
 provider campaign, whole-port parity, or BEAM-superiority claim.
+
+**2026-07-26T21:45:00Z**
+
+The sealed strong-model TREC comparator completed through the paired Imp and
+pinned DSPy runners. On the identical three-seed, 20-train / 40-selection /
+80-untouched contract, GPT-5.4 Mini task model, Claude Sonnet 4.6 optimizer
+model, rendered messages, and semantic opportunity budget, Imp GEPA improved
+its own mean untouched baseline by `+0.4000` with a source-ID-clustered 95%
+interval `[0.2958, 0.5042]` and cleared the preregistered `-0.05`
+noninferiority margin against DSPy GEPA. Imp MIPROv2 improved its own baseline
+by `+0.1458` with interval `[0.0458, 0.2458]`. The treatment made 6,491
+provider calls and reported `$3.13862325`; the conservative workshop aggregate
+remained at most `$6.221975` under the authorized `$100` ceiling. These are
+one-task/model C3 results, not general optimizer effectiveness, whole-family
+parity, or BEAM superiority.
+
+The subsequent adversarial release pass corrected the canonical generated
+conformance view rather than promoting that flagship across unrelated rows.
+Rows with nonempty `evidence.missing` now derive `gap` status, Optimize Anything
+remains a gap despite its real task-specific lifecycle result, and the
+owner-frozen unpublished Hex release remains an explicit product gap. The
+generated report currently has 26 rows: 12 conformant, 3 deliberate
+Elixir-native equivalents, 1 tracking row, and 10 release-blocking gaps; it
+therefore reports `Passing: false`. The claims registry now contains narrowly
+scoped C3 rows for the matched GEPA/MIPRO result and the retained Optimize
+Anything task result without changing broader targets. The cold source-package
+gate, clean-room consumer, OTP workflow, docs, and public API checks pass.
+Older admitted source-bound optimizer receipts remain stale where their bound
+source hashes no longer match current main; they have not been silently
+recaptured, and the claims dashboard correctly keeps the release profile false.

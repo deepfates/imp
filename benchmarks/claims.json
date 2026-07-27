@@ -269,7 +269,7 @@
       "id": "claim.optimizer.bootstrap_finetune.semantic_conformance",
       "claim_state": "asserted", "target_rung": "C1", "release": "v0.1",
       "scope": "Provider-free shared-LM multitask/per-predictor job topology, accepted trace-call membership, and the pred_ind corrective deviation against pinned DSPy 3.2.1 BootstrapFinetune.",
-      "limitations": ["Exact trace-row order, provider behavior, effectiveness, training-result quality, and full parity remain excluded; local MLX effectiveness is separate T2 evidence."],
+      "limitations": ["Exact trace-row order, provider behavior, effectiveness, training-result quality, and full parity remain excluded; the separate local MLX result is task-specific C3 evidence."],
       "statement": "Imp has source-bound C1 evidence for the admitted BootstrapFinetune topology and trace-membership observations and explicitly corrects DSPy 3.2.1 pred_ind shadowing.",
       "category": "optimizer", "surface": ["BootstrapFinetune"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
       "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/bootstrap_finetune_differential/8a226901c3fc2f02f005a2d6bd3057a80d73ae230205cf13f0ecf1617084ae9d.json", "test/weight_composition_differential_test.exs"],
@@ -432,9 +432,69 @@
       "requirements": [{"id": "optimizer.mmgrpo.effectiveness", "kind": "optimizer_effectiveness", "lane": "optimizer_lift", "evidence": "full", "threshold": "a pinned mmGRPO campaign demonstrates independently scored held-out effectiveness under matched controls"}]
     },
     {
+      "id": "claim.optimizer.gepa.matched_trec_effectiveness",
+      "claim_state": "asserted",
+      "target_rung": "C3",
+      "release": "v0.1",
+      "scope": "The frozen three-seed TREC contract using GPT-5.4 Mini for task calls, Claude Sonnet 4.6 for optimizer calls, 20 train / 40 selection / 80 untouched rows, and the pinned semantic opportunity budget.",
+      "limitations": [
+        "One task and model pair does not establish general GEPA effectiveness, paper-family replication, superiority over DSPy, or BEAM-native superiority."
+      ],
+      "statement": "On the frozen matched TREC contract, Imp GEPA improved mean untouched accuracy by 0.4000 over its own baseline and cleared the preregistered -0.05 noninferiority margin against pinned DSPy GEPA.",
+      "category": "optimizer",
+      "surface": ["GEPA"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "dspy_gepa_and_imp_baseline",
+      "gate_policy": "informational",
+      "sources": [
+        "benchmarks/results/matched-instruction-optimizers-trec-20260726.json",
+        "examples/matched_instruction_optimizers_trec/README.md",
+        "test/matched_instruction_optimizers_trec_example_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "optimizer.gepa.matched_trec_effectiveness",
+          "kind": "optimizer_effectiveness",
+          "lane": "matched_instruction_optimizers",
+          "evidence": "full",
+          "threshold": "the immutable result verifies positive Imp-baseline lift and the preregistered DSPy GEPA noninferiority decision"
+        }
+      ]
+    },
+    {
+      "id": "claim.optimizer.mipro_v2.matched_trec_effectiveness",
+      "claim_state": "asserted",
+      "target_rung": "C3",
+      "release": "v0.1",
+      "scope": "The frozen three-seed TREC contract using GPT-5.4 Mini for task calls, Claude Sonnet 4.6 for optimizer calls, 20 train / 40 selection / 80 untouched rows, and the pinned semantic opportunity budget.",
+      "limitations": [
+        "One task and model pair does not establish general MIPROv2 effectiveness, exact modeled-TPE parity, paper-scale replication, or BEAM-native superiority."
+      ],
+      "statement": "On the frozen matched TREC contract, Imp MIPROv2 improved mean untouched accuracy by 0.1458 over its own baseline with a positive 95% source-ID-clustered interval.",
+      "category": "optimizer",
+      "surface": ["MIPROv2"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "imp_baseline",
+      "gate_policy": "informational",
+      "sources": [
+        "benchmarks/results/matched-instruction-optimizers-trec-20260726.json",
+        "examples/matched_instruction_optimizers_trec/README.md",
+        "test/matched_instruction_optimizers_trec_example_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "optimizer.mipro_v2.matched_trec_effectiveness",
+          "kind": "optimizer_effectiveness",
+          "lane": "matched_instruction_optimizers",
+          "evidence": "full",
+          "threshold": "the immutable result verifies positive held-out Imp-baseline lift under the frozen matched contract"
+        }
+      ]
+    },
+    {
       "id": "claim.gepa_replication.full",
       "claim_state": "target",
-      "target_rung": "C3",
+      "target_rung": "C4",
       "release": "telos",
       "scope": "Telos research replication across the six named GEPA paper families; excludes a claim for unlisted datasets or optimizer families.",
       "limitations": ["Papillon and HoVer full-scope artifacts are incomplete."],
@@ -452,6 +512,67 @@
           "lane": "gepa_replication",
           "evidence": "full",
           "threshold": "gepa-replication artifact covers AIMEBench, HotpotQABench, hoverBench, IFBench, LiveBenchMathBench, and Papillon with required optimizer, budget, cost, seed, and split-gap fields"
+        }
+      ]
+    },
+    {
+      "id": "claim.optimize_anything.operational_lifecycle",
+      "claim_state": "asserted",
+      "target_rung": "C2",
+      "release": "v0.1",
+      "scope": "The public Optimize Anything lifecycle for JSON-safe structured artifacts, including proposal validation, evaluator invocation, selection, application, persistence, resume, and fresh-process consumption.",
+      "limitations": [
+        "Operational lifecycle evidence does not establish general effectiveness, schema-v2 portfolio completion, paper replication, or upstream comparative parity."
+      ],
+      "statement": "Imp executes and resumes arbitrary JSON-safe structured-artifact optimization through the public Optimize Anything lifecycle, applies the selected artifact to real consumer boundaries, and rejects malformed or tampered state.",
+      "category": "optimizer",
+      "surface": ["OptimizeAnything", "artifact_portfolio"],
+      "claim_type": "operational_contract",
+      "comparison": "imp_native",
+      "gate_policy": "informational",
+      "sources": [
+        "lib/imp/optimize/anything.ex",
+        "examples/local_optimize_anything_retry_policy/README.md",
+        "test/optimize_anything_structured_artifact_test.exs",
+        "test/local_optimize_anything_retry_policy_example_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "optimize_anything.operational_lifecycle",
+          "kind": "optimizer_operation",
+          "lane": "optimize_anything",
+          "evidence": "passing",
+          "threshold": "the admitted Optimize Anything artifact and public lifecycle tests establish bounded real execution without claiming C3"
+        }
+      ]
+    },
+    {
+      "id": "claim.optimize_anything.retry_policy_task_effectiveness",
+      "claim_state": "asserted",
+      "target_rung": "C3",
+      "release": "v0.1",
+      "scope": "One frozen local Phi-4 mixed-type retry-policy task with 8 train / 6 selection / 6 untouched cases and a proposer-generated nontrivial artifact mutation.",
+      "limitations": [
+        "One task/model result does not establish general Optimize Anything effectiveness, schema-v2 multi-seed portfolio evidence, upstream parity, or BEAM-native superiority."
+      ],
+      "statement": "On the frozen local retry-policy task, a proposer-generated mixed-type mutation was selected without test access, improved untouched exact behavior from four to five of six cases, and reproduced byte-identically after fresh load.",
+      "category": "optimizer",
+      "surface": ["OptimizeAnything", "artifact_portfolio"],
+      "claim_type": "functional_effectiveness",
+      "comparison": "imp_baseline",
+      "gate_policy": "informational",
+      "sources": [
+        "examples/local_optimize_anything_retry_policy/exercised-typed-round-robin-result.json",
+        "examples/local_optimize_anything_retry_policy/README.md",
+        "test/local_optimize_anything_retry_policy_result_test.exs"
+      ],
+      "requirements": [
+        {
+          "id": "optimize_anything.retry_policy_task_effectiveness",
+          "kind": "optimizer_effectiveness",
+          "lane": "optimize_anything_task_specific",
+          "evidence": "full",
+          "threshold": "the immutable result verifies disjoint splits, a selected nontrivial mutation, positive untouched exact lift, and fresh-process equivalence"
         }
       ]
     },

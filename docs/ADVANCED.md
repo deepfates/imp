@@ -78,7 +78,7 @@ being mistaken for the user artifact.
 
 For pinned GEPA v0.1.4 text candidates, `reflection.reflection_strategy` accepts
 a module exporting `reflect/3`, an arity-three function, or a contextual
-`Imp.Optimizer.GEPA.ReflectionStrategy`. The strategy owns proposal generation
+`Imp.GEPA.ReflectionStrategy`. The strategy owns proposal generation
 and therefore does not require `reflection_lm`. Its stable identity and
 contextual state are bound into the engine checkpoint, so JSON resume refuses
 strategy drift before evaluation. Executable strategy references remain trusted
@@ -117,7 +117,7 @@ For multiple proposals in one round, set `engine.sampling_strategy` to
 choose `engine.selection_strategy` (`:all_improvements`, `:best_improvement`,
 or `{:top_k, n}`). `engine.acceptance_criterion` controls the preceding
 admission judgement with `:strict_improvement`, `:improvement_or_equal`, or an
-`Imp.Optimizer.GEPA.Acceptance.callback/1`. BEAM-native selection callbacks
+`Imp.GEPA.Acceptance.callback/1`. BEAM-native selection callbacks
 are also supported. The strategy configuration is checkpoint-bound, so resume
 cannot silently switch policies with the same task width. Arbitrary Python
 strategy objects have no native callback contract and are rejected explicitly.

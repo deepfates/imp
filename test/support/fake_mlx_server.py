@@ -89,6 +89,10 @@ class Handler(BaseHTTPRequestHandler):
         body = self.rfile.read(length) if length else b""
 
         if args.record_requests:
+            decoded = json.loads(body) if body else None
+            canonical_body = json.dumps(
+                decoded, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
             with Path(args.record_requests).open("a", encoding="utf-8") as stream:
                 stream.write(
                     json.dumps(
@@ -97,6 +101,9 @@ class Handler(BaseHTTPRequestHandler):
                             "path": self.path,
                             "model": model,
                             "body_sha256": __import__("hashlib").sha256(body).hexdigest(),
+                            "canonical_body_sha256": __import__("hashlib")
+                            .sha256(canonical_body)
+                            .hexdigest(),
                         }
                     )
                     + "\n"

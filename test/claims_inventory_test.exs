@@ -20,7 +20,9 @@ defmodule ClaimsInventoryTest do
     live_provider_smoke
     livebook_execute
     local_mlx_weight_training
+    matched_instruction_optimizers
     optimize_anything
+    optimize_anything_task_specific
     optimizer_lift
     product_package
     protocol_gates

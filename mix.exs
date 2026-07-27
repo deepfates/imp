@@ -14,6 +14,7 @@ defmodule Imp.MixProject do
         main: "Imp",
         assets: %{"assets" => "assets"},
         api_reference: true,
+        warnings_as_errors: true,
         extras:
           ["README.md", "CHANGELOG.md", "RELEASE_NOTES.md"] ++ product_docs() ++ livebooks(),
         groups_for_modules: public_api_doc_groups(),
@@ -193,6 +194,7 @@ defmodule Imp.MixProject do
        Path.wildcard("examples/local_simba_trec/**/*") ++
        Path.wildcard("examples/provider_free_ticket_router/**/*") ++
        [
+         "examples/matched_instruction_optimizers_trec/README.md",
          "benchmarks/data/grpo-usefulness-banking77-v1.json",
          "benchmarks/data/simba-trec-coarse-v1.json"
        ] ++
@@ -289,11 +291,24 @@ defmodule Imp.MixProject do
   defp skip_filtered_doc_reference?(nil), do: false
 
   defp skip_filtered_doc_reference?(reference) do
-    reference = String.trim_leading(reference, "Elixir.")
+    reference =
+      reference
+      |> String.replace_prefix("t:", "")
+      |> String.replace_prefix("c:", "")
+      |> String.replace_prefix("m:", "")
+      |> String.trim_leading("Elixir.")
 
-    Enum.any?(canonical_internal_modules(), fn module_name ->
-      reference == module_name or String.starts_with?(reference, module_name <> ".")
-    end)
+    reference in [
+      "Imp.Adapter.JSON",
+      "Imp.Clients.TRLDeployment",
+      "Imp.Clients.TRLProtocol",
+      "Imp.Optimizer.GEPA.Acceptance",
+      "Imp.Optimizer.GEPA.BatchSampler",
+      "Imp.Optimizer.Utils"
+    ] or
+      Enum.any?(canonical_internal_modules(), fn module_name ->
+        reference == module_name or String.starts_with?(reference, module_name <> ".")
+      end)
   end
 
   defp aliases do
