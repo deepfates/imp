@@ -1,0 +1,30 @@
+{
+  "families": [
+    {
+      "dataset_scope": "capped_source_disjoint",
+      "dataset_source": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "family": "IFBench",
+      "input_keys": [
+        "prompt"
+      ],
+      "instructions": "Respond to the query while satisfying all instruction-following constraints.",
+      "max_per_split": null,
+      "metric_calls": 104,
+      "metric_fidelity": "pinned IFBench registry checks and source-exact reflective descriptions",
+      "output_key": "response",
+      "program": "IFBenchCoT2StageProgram",
+      "signature": "prompt -> response",
+      "split_checksums": {
+        "dev": "sha256:966657788a311346e23c142f299c2873c06fab6c0746a9a0f15f1fe2affc6353",
+        "test": "sha256:4d35f8377d2fd1cfa80cf3650b17e7410ee4f6104144bc32da49274e1a5fb3ed",
+        "train": "sha256:8211d7de7e73d9eb707a1d2c7c691451d08d8d7504d4da1843d189ef4c92455f"
+      },
+      "split_counts": {
+        "dev": 24,
+        "test": 48,
+        "train": 16
+      },
+      "upstream_metric": "IFBench.ifbench_metric.metric"
+    }
+  ]
+}

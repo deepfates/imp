@@ -1,0 +1,36 @@
+{
+  "gepa_artifact_commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+  "schema_version": 1,
+  "selection": {
+    "dev": {
+      "indices": [
+        0,
+        23
+      ],
+      "source": "IFBench_train.jsonl"
+    },
+    "test": {
+      "indices": [
+        0,
+        47
+      ],
+      "source": "IFBench_test.jsonl"
+    },
+    "train": {
+      "indices": [
+        300,
+        315
+      ],
+      "source": "IFBench_train.jsonl"
+    }
+  },
+  "source_files": {
+    "IFBench_test.jsonl": "11c3d683dcc7f4908a4d3cacd05c9a8bbd5484af2f8fde969e7abe2b8bad3e34",
+    "IFBench_train.jsonl": "a5ec13223a93879b7172da783d54669d5873dc4632b57fd6d961730c9679fc8c"
+  },
+  "split_checksums": {
+    "dev": "sha256:966657788a311346e23c142f299c2873c06fab6c0746a9a0f15f1fe2affc6353",
+    "test": "sha256:4d35f8377d2fd1cfa80cf3650b17e7410ee4f6104144bc32da49274e1a5fb3ed",
+    "train": "sha256:8211d7de7e73d9eb707a1d2c7c691451d08d8d7504d4da1843d189ef4c92455f"
+  }
+}
