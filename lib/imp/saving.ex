@@ -1384,6 +1384,7 @@ defmodule Imp.Saving do
 
   @req_llm_option_keys %{
     "temperature" => :temperature,
+    "seed" => :seed,
     "max_tokens" => :max_tokens,
     "top_p" => :top_p,
     "stop" => :stop,
@@ -1431,6 +1432,9 @@ defmodule Imp.Saving do
 
   defp decode_req_llm_option_value!(:max_retries, value),
     do: require_non_negative_integer!(value, "ReqLLM max_retries")
+
+  defp decode_req_llm_option_value!(:seed, value),
+    do: require_positive_integer!(value, "ReqLLM seed")
 
   defp decode_req_llm_option_value!(:req_http_options, value),
     do: decode_req_http_options!(value)

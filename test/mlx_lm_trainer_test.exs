@@ -427,6 +427,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
         api_key: "local",
         cache: false,
         temperature: 0.25,
+        seed: 17,
         max_tokens: 32,
         max_retries: 0,
         timeout: 10_000,
@@ -448,6 +449,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert rebound_lm.model.provider == :openai
     assert rebound_lm.opts[:cache] == false
     assert rebound_lm.opts[:temperature] == 0.25
+    assert rebound_lm.opts[:seed] == 17
     assert rebound_lm.opts[:max_tokens] == 32
     assert rebound_lm.opts[:max_retries] == 0
     assert rebound_lm.opts[:req_http_options] == [retry: false, max_retries: 0]
@@ -482,6 +484,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
       lm = Imp.ProgramAccess.lm(rebound)
       opts = %{
         cache: lm.opts[:cache],
+        seed: lm.opts[:seed],
         max_retries: lm.opts[:max_retries],
         req_http_options: Map.new(lm.opts[:req_http_options])
       }
@@ -507,12 +510,21 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert status == 0, output
     assert request_count(request_log) == 4
 
+    request_digests =
+      request_log
+      |> File.read!()
+      |> decode_jsonl()
+      |> Enum.map(& &1["body_sha256"])
+
+    assert length(Enum.uniq(request_digests)) == 1
+
     fresh = Jason.decode!(File.read!(fresh_path))
     assert fresh["answers"] == ["trained-behavior", "trained-behavior"]
     assert fresh["model"] == Path.expand(job.result_model)
     assert fresh["adapter"] == "Elixir.Imp.Adapter.Chat"
     assert fresh["config"] == %{"json_fallback" => false}
     assert fresh["opts"]["cache"] == false
+    assert fresh["opts"]["seed"] == 17
     assert fresh["opts"]["max_retries"] == 0
     assert fresh["opts"]["req_http_options"] == %{"retry" => false, "max_retries" => 0}
 
@@ -557,6 +569,9 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     assert {:error, {:mlx_lm_rebind_unsupported_options, [:base_url]}} =
              TrainingJob.rebind(job, program_for.(base_path, base_url: "http://invalid"))
+
+    assert {:error, {:mlx_lm_rebind_invalid_option, :seed, 0}} =
+             TrainingJob.rebind(job, program_for.(base_path, seed: 0))
 
     malformed_options = %{Imp.req_llm(base_path) | opts: [:not_a_pair]}
 

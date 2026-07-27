@@ -113,6 +113,7 @@ defmodule Imp.Clients.TrainingJob do
 
   @mlx_rebind_option_keys [
     :temperature,
+    :seed,
     :max_tokens,
     :top_p,
     :stop,
@@ -758,6 +759,7 @@ defmodule Imp.Clients.TrainingJob do
 
   defp validate_mlx_runtime_values(opts) do
     with :ok <- optional_boolean(opts, :cache),
+         :ok <- optional_positive_integer(opts, :seed),
          :ok <- optional_non_negative_integer(opts, :max_retries),
          :ok <- optional_non_negative_integer(opts, :retries),
          :ok <- optional_non_negative_integer(opts, :num_retries),
@@ -779,6 +781,14 @@ defmodule Imp.Clients.TrainingJob do
     case Keyword.fetch(opts, key) do
       :error -> :ok
       {:ok, value} when is_integer(value) and value >= 0 -> :ok
+      {:ok, value} -> {:error, {:mlx_lm_rebind_invalid_option, key, value}}
+    end
+  end
+
+  defp optional_positive_integer(opts, key) do
+    case Keyword.fetch(opts, key) do
+      :error -> :ok
+      {:ok, value} when is_integer(value) and value > 0 -> :ok
       {:ok, value} -> {:error, {:mlx_lm_rebind_invalid_option, key, value}}
     end
   end

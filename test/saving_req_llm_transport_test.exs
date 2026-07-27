@@ -5,6 +5,7 @@ defmodule Imp.SavingReqLLMTransportTest do
   @transport_opts [
     cache: false,
     temperature: 0,
+    seed: 17,
     max_tokens: 32,
     max_retries: 0,
     timeout: 120_000,
@@ -19,6 +20,7 @@ defmodule Imp.SavingReqLLMTransportTest do
     assert get_in(dumped, ["lm", "opts"]) == [
              ["cache", false],
              ["temperature", 0],
+             ["seed", 17],
              ["max_tokens", 32],
              ["max_retries", 0],
              ["timeout", 120_000],
@@ -79,6 +81,12 @@ defmodule Imp.SavingReqLLMTransportTest do
     assert_raise ArgumentError, ~r/saved ReqLLM max_retries must be a non-negative integer/, fn ->
       dumped
       |> put_in(["lm", "opts"], replace_option(opts, "max_retries", "0"))
+      |> Imp.load()
+    end
+
+    assert_raise ArgumentError, ~r/saved ReqLLM seed must be a positive integer/, fn ->
+      dumped
+      |> put_in(["lm", "opts"], replace_option(opts, "seed", 0))
       |> Imp.load()
     end
 
