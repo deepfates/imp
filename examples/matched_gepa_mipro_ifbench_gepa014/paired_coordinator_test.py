@@ -27,6 +27,41 @@ class PairedCoordinatorTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "secret"}):
             self.assertNotIn("OPENROUTER_API_KEY", paired.preflight_environment())
 
+    def test_shadow_reports_require_both_exact_transport_roles(self) -> None:
+        valid = {
+            "status": "pass",
+            "runtime": "upstream",
+            "provider_authority_present": False,
+            "held_out_loaded": False,
+            "transport_roles": ["task", "optimizer"],
+            "transport_count": 2,
+        }
+        parsed = paired.parse_shadow_report(
+            "PAIRED_SHADOW_JSON=" + json.dumps(valid), "upstream"
+        )
+        self.assertEqual(parsed, valid)
+        with self.assertRaisesRegex(RuntimeError, "one transport per role"):
+            paired.parse_shadow_report(
+                "PAIRED_SHADOW_JSON="
+                + json.dumps({**valid, "transport_roles": ["task", "task"]}),
+                "upstream",
+            )
+
+    def test_effective_gepa_identity_is_owned_by_source_and_api(self) -> None:
+        manifest = json.loads((HERE / "contract.json").read_text())
+        identity = manifest["authenticated_gepa_bridge"]["effective_identity"]
+        self.assertEqual(identity["source_commit"], manifest["authorities"]["gepa"]["commit"])
+        self.assertEqual(identity["installed_distribution_version"], "0.0.27")
+        self.assertEqual(identity["source_distribution_version"], "0.1.3")
+        self.assertIsNone(identity["module_version"])
+        for field in (
+            "source_tree",
+            "init_sha256",
+            "api_sha256",
+            "optimize_signature_sha256",
+        ):
+            self.assertRegex(identity[field], r"\A[0-9a-f]{40,64}\Z")
+
     def test_revised_legal_envelope_fits_the_authorized_workshop_spend_ceiling(
         self,
     ) -> None:
@@ -499,6 +534,27 @@ class PairedCoordinatorTest(unittest.TestCase):
             preflight.assert_not_called()
             run_peers.assert_not_called()
 
+    def test_shadow_only_uses_exact_peer_shadow_without_live_preflight(self) -> None:
+        with (
+            mock.patch.object(
+                paired,
+                "compatibility_preflight",
+                return_value={"status": "pass", "launch_commit": "a" * 40},
+            ),
+            mock.patch.object(
+                paired,
+                "shadow_peer_preflight",
+                return_value={"status": "pass", "provider_authority_present": False},
+            ) as shadow,
+            mock.patch.object(paired, "preflight") as preflight,
+            mock.patch.object(paired, "run_peers") as run_peers,
+            mock.patch("builtins.print"),
+        ):
+            self.assertEqual(paired.coordinate(shadow_only=True), 0)
+            shadow.assert_called_once()
+            preflight.assert_not_called()
+            run_peers.assert_not_called()
+
     def test_paired_surface_is_explicit_and_successor_only(self) -> None:
         manifest = json.loads((HERE / "contract.json").read_text())
         expected = {
@@ -509,7 +565,7 @@ class PairedCoordinatorTest(unittest.TestCase):
             "contract_runtime",
             "guard_equivalence",
             "imp_entry",
-            "imp_preflight",
+            "shadow_tls_server",
             "response_evidence",
             "source_identity",
             "stop_accounting",

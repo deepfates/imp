@@ -34,7 +34,7 @@ IFBENCH_NLTK_DATA = ROOT / "tmp" / "ifbench-parity-venv" / "nltk_data"
 IFBENCH_PYTHON = ROOT / "tmp" / "ifbench-parity-venv" / "bin" / "python"
 PRIOR_SPEND_BOUND = Decimal("7.59315275")
 WORKSHOP_CEILING = Decimal("100.00")
-PREFLIGHT_PREFIX = "PAIRED_PREFLIGHT_JSON="
+SHADOW_PREFIX = "PAIRED_SHADOW_JSON="
 
 
 def sha256_file(path: Path) -> str:
@@ -114,116 +114,151 @@ def preflight_environment() -> dict[str, str]:
     return env
 
 
-def preflight_imp(expected_manifest_sha: str, expected_commit: str) -> dict[str, Any]:
-    env = preflight_environment()
-    env["MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT"] = expected_commit
-    completed = subprocess.run(
-        ["mix", "run", "--no-start", "paired_preflight.exs"],
-        cwd=HERE,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-    )
-    require(completed.returncode == 0, f"Imp preflight failed:\n{completed.stdout}")
+def parse_shadow_report(output: str, runtime: str) -> dict[str, Any]:
     payloads = [
-        line.removeprefix(PREFLIGHT_PREFIX)
-        for line in completed.stdout.splitlines()
-        if line.startswith(PREFLIGHT_PREFIX)
+        line.removeprefix(SHADOW_PREFIX)
+        for line in output.splitlines()
+        if line.startswith(SHADOW_PREFIX)
     ]
-    require(len(payloads) == 1, "Imp preflight did not emit exactly one report")
+    require(len(payloads) == 1, f"{runtime} shadow did not emit exactly one report")
     report = json.loads(payloads[0])
-    require(report.get("status") == "pass", "Imp preflight status drift")
-    require(report.get("cwd") == str(HERE), "Imp consumer cwd drift")
-    require(
-        report.get("manifest_sha256") == expected_manifest_sha, "Imp manifest drift"
-    )
-    require(report.get("source_commit") == expected_commit, "Imp source commit drift")
+    require(report.get("status") == "pass", f"{runtime} shadow status drift")
+    require(report.get("runtime") == runtime, f"{runtime} shadow identity drift")
     require(
         report.get("provider_authority_present") is False,
-        "Imp preflight had provider authority",
+        f"{runtime} shadow had provider authority",
     )
     require(
-        report.get("held_out_loaded") is False, "Imp preflight loaded held-out data"
+        report.get("held_out_loaded") is False,
+        f"{runtime} shadow loaded held-out data",
+    )
+    require(
+        report.get("transport_roles") == ["task", "optimizer"]
+        and report.get("transport_count") == 2,
+        f"{runtime} shadow did not complete exactly one transport per role",
     )
     return report
 
 
-def preflight_upstream(manifest: dict[str, Any]) -> dict[str, Any]:
-    expected = manifest["runtime_dependencies"]["upstream"]
-    version = subprocess.check_output(
-        [
-            str(UPSTREAM_PYTHON),
-            "-c",
-            "import platform; print(platform.python_version())",
-        ],
-        text=True,
-        env=preflight_environment(),
-    ).strip()
-    require(version == expected["python"], f"upstream Python drift: {version}")
-    lock = resolve(expected["lock_path"])
-    require(sha256_file(lock) == expected["lock_sha256"], "upstream lock digest drift")
-    freeze = subprocess.check_output(
-        [str(UPSTREAM_PYTHON), "-m", "pip", "freeze", "--all"],
-        text=True,
-        env=preflight_environment(),
-    ).splitlines()
-    require(
-        ("\n".join(sorted(freeze)) + "\n").encode() == lock.read_bytes(),
-        "upstream materialized environment differs from lock",
-    )
-    actual = {
-        package: subprocess.check_output(
+def shadow_peer_preflight(manifest: dict[str, Any], launch_commit: str) -> dict[str, Any]:
+    """Execute the production peer entries against one owned local TLS server."""
+
+    with tempfile.TemporaryDirectory(prefix="imp-ifbench-gepa014-shadow-") as temporary:
+        root = Path(temporary)
+        ready = root / "ready.json"
+        ledger = root / "ledger.json"
+        server = subprocess.Popen(
             [
-                str(UPSTREAM_PYTHON),
-                "-c",
-                f"import importlib.metadata; print(importlib.metadata.version({package!r}))",
+                sys.executable,
+                str(HERE / "shadow_tls_server.py"),
+                "--ready",
+                str(ready),
+                "--ledger",
+                str(ledger),
             ],
-            text=True,
+            cwd=ROOT,
             env=preflight_environment(),
-        ).strip()
-        for package in expected["packages"]
-    }
-    require(actual == expected["packages"], f"upstream package drift: {actual!r}")
-    ifbench = manifest["runtime_dependencies"]["ifbench"]
-    require(
-        sha256_file(resolve(ifbench["requirements_path"]))
-        == ifbench["requirements_sha256"],
-        "IFBench requirements digest drift",
-    )
-    require(
-        IFBENCH_SITE_PACKAGES.resolve() == resolve(ifbench["site_packages_path"]),
-        "IFBench site-packages path drift",
-    )
-    require(
-        IFBENCH_NLTK_DATA.resolve() == resolve(ifbench["nltk_data_path"]),
-        "IFBench NLTK data path drift",
-    )
-    require(
-        tree_sha256(IFBENCH_NLTK_DATA) == ifbench["nltk_data_sha256"],
-        "IFBench NLTK data drift",
-    )
-    probe = subprocess.check_output(
-        [
-            str(UPSTREAM_PYTHON),
-            "-c",
-            "import importlib.metadata as m,json,sys; sys.path.insert(0,sys.argv[1]); print(json.dumps({n:m.version(n) for n in json.loads(sys.argv[2])},sort_keys=True))",
-            str(IFBENCH_SITE_PACKAGES),
-            json.dumps(sorted(ifbench["packages"])),
-        ],
-        text=True,
-        env=preflight_environment(),
-    ).strip()
-    require(json.loads(probe) == ifbench["packages"], "IFBench package drift")
-    return {
-        "status": "pass",
-        "python": version,
-        "packages": actual,
-        "ifbench_packages": ifbench["packages"],
-        "provider_authority_present": False,
-        "held_out_loaded": False,
-    }
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            deadline = time.monotonic() + 15
+            while not ready.is_file():
+                require(server.poll() is None, "local TLS shadow server exited before readiness")
+                require(time.monotonic() < deadline, "local TLS shadow server readiness timed out")
+                time.sleep(0.05)
+            readiness = json.loads(ready.read_text())
+            env = preflight_environment()
+            env.update(
+                {
+                    "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT": launch_commit,
+                    "MATCHED_IFBENCH_GEPA014_SHADOW": "1",
+                    "MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL": readiness["base_url"],
+                    "MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT": readiness["ca_cert"],
+                    "SSL_CERT_FILE": readiness["ca_cert"],
+                }
+            )
+            require("OPENROUTER_API_KEY" not in env, "shadow environment retained provider authority")
+            commands = {
+                "imp": (
+                    ["mix", "run", "run_imp.exs"],
+                    HERE,
+                ),
+                "upstream": (
+                    [
+                        str(UPSTREAM_PYTHON),
+                        str(HERE / "run_upstream.py"),
+                        "--dspy-root",
+                        str(DSPY_ROOT),
+                        "--gepa-root",
+                        str(GEPA_ROOT),
+                        "--gepa-artifact-root",
+                        str(GEPA_ARTIFACT_ROOT),
+                        "--ifbench-site-packages",
+                        str(IFBENCH_SITE_PACKAGES),
+                    ],
+                    ROOT,
+                ),
+            }
+            reports: dict[str, Any] = {}
+            for runtime, (command, cwd) in commands.items():
+                completed = subprocess.run(
+                    command,
+                    cwd=cwd,
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                    timeout=120,
+                )
+                require(
+                    completed.returncode == 0,
+                    f"{runtime} exact-entry shadow failed:\n{completed.stdout}",
+                )
+                reports[runtime] = parse_shadow_report(completed.stdout, runtime)
+        finally:
+            if server.poll() is None:
+                server.terminate()
+                try:
+                    server.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    os.killpg(server.pid, signal.SIGKILL)
+                    server.wait()
+        require(ledger.is_file(), "local TLS shadow server did not retain a ledger")
+        ledger_payload = json.loads(ledger.read_text())
+        requests = ledger_payload.get("requests", [])
+        posts = [request for request in requests if request.get("method") == "POST"]
+        gets = [request for request in requests if request.get("method") == "GET"]
+        require(len(gets) == 6, f"shadow readiness/catalog count drift: {len(gets)}")
+        require(len(posts) == 4, f"shadow transport count drift: {len(posts)}")
+        require(
+            sorted(request.get("model") for request in posts)
+            == [
+                "anthropic/claude-sonnet-4.6",
+                "anthropic/claude-sonnet-4.6",
+                "openai/gpt-5.4-mini",
+                "openai/gpt-5.4-mini",
+            ],
+            "shadow task/optimizer model identities drifted",
+        )
+        require(
+            all(request.get("tls_version") in {"TLSv1.2", "TLSv1.3"} for request in requests),
+            "shadow request bypassed TLS",
+        )
+        return {
+            "status": "pass",
+            "provider_authority_present": False,
+            "held_out_loaded": False,
+            "peers": reports,
+            "readiness_and_catalog_requests": len(gets),
+            "transport_requests": len(posts),
+            "ledger_sha256": hashlib.sha256(ledger.read_bytes()).hexdigest(),
+        }
 
 
 def live_catalog_snapshot(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -309,6 +344,7 @@ def compatibility_preflight() -> dict[str, Any]:
             "draft_unsealed_pending_surface_review",
             "blocked_live_preflight",
             "sealed",
+            "terminal_zero_call_stopped",
         ),
         "manifest launch state drift",
     )
@@ -597,8 +633,9 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
         "workshop spend ceiling would be exceeded",
     )
 
-    imp = preflight_imp(manifest_sha, compatibility["launch_commit"])
-    upstream = preflight_upstream(manifest)
+    shadow = shadow_peer_preflight(manifest, compatibility["launch_commit"])
+    imp = shadow["peers"]["imp"]
+    upstream = shadow["peers"]["upstream"]
 
     symmetry = subprocess.run(
         [sys.executable, str(HERE / "guard_equivalence.py")],
@@ -643,6 +680,7 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
         "combined_maximum": str(PRIOR_SPEND_BOUND + maximum),
         "imp": imp,
         "upstream": upstream,
+        "shadow_execution": shadow,
         "guard_equivalence": symmetry_report,
         "catalog_snapshot": catalog,
         "compatibility_gate": compatibility,
@@ -957,11 +995,21 @@ def run_peers(launch_commit: str) -> int:
     return 0
 
 
-def coordinate(preflight_only: bool = False, compatibility_only: bool = False) -> int:
+def coordinate(
+    preflight_only: bool = False,
+    compatibility_only: bool = False,
+    shadow_only: bool = False,
+) -> int:
     if compatibility_only:
         print(
             json.dumps(compatibility_preflight(), indent=2, sort_keys=True), flush=True
         )
+        return 0
+    if shadow_only:
+        compatibility = compatibility_preflight()
+        manifest = json.loads(MANIFEST.read_text())
+        report = shadow_peer_preflight(manifest, compatibility["launch_commit"])
+        print(json.dumps(report, indent=2, sort_keys=True), flush=True)
         return 0
     report = preflight(preflight_only)
     print(json.dumps(report, indent=2, sort_keys=True), flush=True)
@@ -972,8 +1020,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--compatibility-only", action="store_true")
+    parser.add_argument("--shadow-only", action="store_true")
     args = parser.parse_args()
-    raise SystemExit(coordinate(args.preflight_only, args.compatibility_only))
+    raise SystemExit(
+        coordinate(args.preflight_only, args.compatibility_only, args.shadow_only)
+    )
 
 
 if __name__ == "__main__":

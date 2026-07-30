@@ -10,12 +10,16 @@ It has no network authority until the successor manifest is separately sealed.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
+import importlib.metadata
 import importlib.util
 import json
 import os
+import platform
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +44,7 @@ _patched_dspy_gepa: Any | None = None
 _v1_source_commits: Any | None = None
 _v1_atomic_write: Any | None = None
 _v1_compile_arm: Any | None = None
+_effective_gepa_identity: dict[str, Any] | None = None
 
 
 class LaunchAdmissionError(RuntimeError):
@@ -78,7 +83,7 @@ def load_authenticated_runtime() -> Any:
     """Load optional treatment dependencies only after exact commit admission."""
 
     global v1, _source_bridge, _patched_dspy_gepa, _v1_source_commits
-    global _v1_atomic_write, _v1_compile_arm
+    global _v1_atomic_write, _v1_compile_arm, _effective_gepa_identity
     require_expected_launch_commit()
     if v1 is not None:
         return v1
@@ -134,7 +139,9 @@ def load_authenticated_runtime() -> Any:
     import dspy
     import gepa
 
-    bridge_module.authenticate_loaded_runtime(_source_bridge, dspy, gepa)
+    _effective_gepa_identity = bridge_module.authenticate_loaded_runtime(
+        _source_bridge, dspy, gepa
+    )
 
     sys.path.insert(0, str(V1_RUNNER.parent))
     spec = importlib.util.spec_from_file_location(
@@ -172,11 +179,202 @@ def load_authenticated_runtime() -> Any:
     _v1_atomic_write = runtime.atomic_write
     _v1_compile_arm = runtime.compile_arm
     runtime.source_commits = source_commits
+    runtime.verify_runtime_dependencies = verify_runtime_dependencies
     runtime.atomic_write = atomic_write
     runtime.build_program = build_program
     runtime.compile_arm = compile_arm
     v1 = runtime
     return runtime
+
+
+def verify_runtime_dependencies(manifest: dict[str, Any]) -> None:
+    """Verify the installed DSPy environment and the effective GEPA source.
+
+    DSPy 3.2.1 owns an installed GEPA 0.0.27 distribution, while this explicit
+    bridge executes the authenticated 0.1.4 source checkout. Distribution lookup
+    follows ``sys.path`` and therefore reports the checkout's stale 0.1.3
+    egg-info after the bridge is installed. Treating that value as runtime
+    identity caused the sealed live path to reject the very source it had
+    authenticated. The imported module, source tree, and API signature own the
+    effective identity; distribution metadata remains a separately checked
+    environment fact.
+    """
+
+    if v1 is None or _effective_gepa_identity is None:
+        raise RuntimeError("authenticated upstream runtime is not loaded")
+    expected = manifest["runtime_dependencies"]["upstream"]
+    if platform.python_version() != expected["python"]:
+        raise RuntimeError(
+            f"upstream Python drift: {platform.python_version()} != {expected['python']}"
+        )
+
+    actual = {
+        name: importlib.metadata.version(name)
+        for name in expected["packages"]
+        if name != "gepa"
+    }
+    if actual != {name: version for name, version in expected["packages"].items() if name != "gepa"}:
+        raise RuntimeError(f"upstream dependency version drift: {actual!r}")
+
+    installed_gepa = [
+        distribution
+        for distribution in importlib.metadata.distributions()
+        if (distribution.metadata.get("Name") or "").lower() == "gepa"
+        and Path(distribution._path).resolve().is_relative_to(Path(sys.prefix).resolve())
+    ]
+    if len(installed_gepa) != 1 or installed_gepa[0].version != expected["packages"]["gepa"]:
+        found = [
+            {"version": distribution.version, "path": str(Path(distribution._path).resolve())}
+            for distribution in installed_gepa
+        ]
+        raise RuntimeError(f"installed DSPy GEPA dependency drift: {found!r}")
+
+    effective = manifest["authenticated_gepa_bridge"]["effective_identity"]
+    observed = _effective_gepa_identity
+    module_path = Path(observed["module_path"]).resolve()
+    expected_module = (IMP_ROOT / effective["module_path"]).resolve()
+    checks = {
+        "module_path": module_path == expected_module,
+        "source_commit": observed["source_commit"] == effective["source_commit"],
+        "source_tree": observed["source_tree"] == effective["source_tree"],
+        "init_sha256": observed["init_sha256"] == effective["init_sha256"],
+        "api_sha256": observed["api_sha256"] == effective["api_sha256"],
+        "optimize_signature_sha256": observed["optimize_signature_sha256"]
+        == effective["optimize_signature_sha256"],
+        "module_version": observed["module_version"] == effective["module_version"],
+        "source_distribution_version": any(
+            item["version"] == effective["source_distribution_version"]
+            and Path(item["metadata_path"]).resolve().is_relative_to(
+                (IMP_ROOT / effective["source_root"]).resolve()
+            )
+            for item in observed["distribution_metadata"]
+        ),
+        "installed_distribution_version": installed_gepa[0].version
+        == effective["installed_distribution_version"],
+    }
+    failed = sorted(name for name, passed in checks.items() if not passed)
+    if failed:
+        raise RuntimeError("effective GEPA source/API identity drift: " + ", ".join(failed))
+
+    lock = (HERE / expected["lock_path"]).resolve()
+    if v1.sha256_file(lock) != expected["lock_sha256"]:
+        raise RuntimeError("upstream dependency lock digest drift")
+    freeze = subprocess.check_output(
+        [sys.executable, "-m", "pip", "freeze", "--all"], text=True
+    ).splitlines()
+    materialized = "\n".join(sorted(freeze)) + "\n"
+    if materialized.encode() != lock.read_bytes():
+        raise RuntimeError("materialized upstream environment differs from committed lock")
+
+
+def shadow_preflight(runtime: Any) -> None:
+    """Run the authenticated production peer through two local TLS transports."""
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dspy-root", type=Path, required=True)
+    parser.add_argument("--gepa-root", type=Path, required=True)
+    parser.add_argument("--gepa-artifact-root", type=Path, required=True)
+    parser.add_argument("--ifbench-site-packages", type=Path, required=True)
+    args = parser.parse_args()
+    if os.environ.get("OPENROUTER_API_KEY") is not None:
+        raise RuntimeError("upstream shadow preflight received provider authority")
+    base_url = os.environ["MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL"]
+    ca_cert = Path(os.environ["MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT"]).resolve()
+    if os.environ.get("SSL_CERT_FILE") != str(ca_cert):
+        raise RuntimeError("upstream shadow TLS trust does not match the owned CA")
+
+    tls_context = __import__("ssl").create_default_context(cafile=str(ca_cert))
+    with urllib.request.urlopen(base_url + "/health", context=tls_context, timeout=5) as response:
+        readiness = json.load(response)
+    if readiness != {"status": "ready"}:
+        raise RuntimeError("upstream shadow TLS readiness response drift")
+
+    manifest = runtime.load_manifest(args)
+    runtime.verify_clean_imp_tree()
+    verify_runtime_dependencies(manifest)
+    dspy, RecordingLM = runtime.install_runtime(args)
+    dspy.configure(adapter=dspy.ChatAdapter(use_json_adapter_fallback=False))
+    catalog_roles = []
+    for role in ("task", "optimizer"):
+        expected = manifest["models"][role]
+        with urllib.request.urlopen(
+            base_url + f"/api/v1/models/{expected['logical']}/endpoints",
+            context=tls_context,
+            timeout=5,
+        ) as response:
+            endpoints = json.load(response).get("data", {}).get("endpoints", [])
+        eligible = runtime.eligible_endpoints(
+            endpoints,
+            expected,
+            role,
+            manifest["execution"]["openrouter"][f"{role}_order"],
+        )
+        if not eligible:
+            raise RuntimeError(f"upstream shadow {role} catalog guard failed")
+        catalog_roles.append(role)
+    capture = runtime.Capture(manifest)
+    capture.register_budget(
+        0,
+        "shadow",
+        {
+            "task_logical": 1,
+            "optimizer_logical": 1,
+            "total_logical": 2,
+            "transports": 2,
+        },
+    )
+    request = manifest["execution"]["request"]
+    capture.set_phase(0, "shadow", "task")
+    task = RecordingLM(
+        manifest["models"]["task"]["upstream"],
+        api_base=base_url + "/v1",
+        api_key="local-shadow-only",
+        cache=False,
+        num_retries=0,
+        capture=capture,
+        role="task",
+        seed=17,
+        max_tokens=request["task"]["max_tokens"],
+        extra_body=runtime.openrouter_body(manifest, "task"),
+    )
+    task.forward(messages=[{"role": "user", "content": "shadow task"}], seed=17)
+    capture.set_phase(0, "shadow", "optimizer")
+    optimizer = RecordingLM(
+        manifest["models"]["optimizer"]["upstream"],
+        api_base=base_url + "/v1",
+        api_key="local-shadow-only",
+        cache=False,
+        num_retries=0,
+        capture=capture,
+        role="optimizer",
+        temperature=request["optimizer"]["temperature"],
+        max_tokens=request["optimizer"]["max_tokens"],
+        extra_body=runtime.openrouter_body(manifest, "optimizer"),
+    )
+    optimizer.forward(
+        messages=[{"role": "user", "content": "shadow optimizer"}], temperature=0.0
+    )
+    roles = [call["role"] for call in capture.calls]
+    if roles != ["task", "optimizer"]:
+        raise RuntimeError(f"upstream shadow transport roles drift: {roles!r}")
+    print(
+        "PAIRED_SHADOW_JSON="
+        + json.dumps(
+            {
+                "status": "pass",
+                "runtime": "upstream",
+                "provider_authority_present": False,
+                "held_out_loaded": False,
+                "transport_roles": roles,
+                "transport_count": len(capture.calls),
+                "catalog_roles": catalog_roles,
+                "effective_gepa_identity": _effective_gepa_identity,
+                "tls_ca_sha256": sha256_file(ca_cert),
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
 
 def rescue_accounting(value: dict[str, Any]) -> dict[str, Any]:
@@ -265,4 +463,8 @@ def compile_arm(*args: Any, **kwargs: Any):
 
 
 if __name__ == "__main__":
-    load_authenticated_runtime().main()
+    authenticated_runtime = load_authenticated_runtime()
+    if os.environ.get("MATCHED_IFBENCH_GEPA014_SHADOW") == "1":
+        shadow_preflight(authenticated_runtime)
+    else:
+        authenticated_runtime.main()

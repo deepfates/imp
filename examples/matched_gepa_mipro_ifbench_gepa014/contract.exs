@@ -106,7 +106,8 @@ defmodule MatchedGepaMiproIFBenchGepa014.Contract do
       manifest["launch_status"] in [
         "blocked_live_preflight",
         "sealed",
-        "draft_unsealed_pending_surface_review"
+        "draft_unsealed_pending_surface_review",
+        "terminal_zero_call_stopped"
       ],
       "launch status drift"
     )

@@ -295,6 +295,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
   @selection_output @output <> ".selection-sealed.json"
 
   def run do
+    ensure_transport_runtime_started!()
     manifest = MatchedGepaMiproIFBenchGepa014.Contract.load_optimization!(@manifest)
     launch_commit = require_expected_launch_commit!()
     require_launch_sealed!(manifest)
@@ -404,10 +405,103 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       reraise error, __STACKTRACE__
   end
 
+  def shadow_preflight do
+    ensure_transport_runtime_started!()
+
+    if System.get_env("OPENROUTER_API_KEY"),
+      do: raise("Imp shadow preflight received provider authority")
+
+    manifest = MatchedGepaMiproIFBenchGepa014.Contract.load_optimization!(@manifest)
+    launch_commit = require_expected_launch_commit!()
+    require_shadowable_status!(manifest)
+    source_commits = source_commits!(manifest, true, launch_commit)
+    verify_runtime_dependencies!(manifest)
+
+    base_url = System.fetch_env!("MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL")
+    ca_cert = System.fetch_env!("MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT")
+    connect_options = [transport_opts: [cacertfile: String.to_charlist(ca_cert)]]
+
+    %{status: 200, body: %{"status" => "ready"}} =
+      Req.get!(base_url <> "/health",
+        retry: false,
+        max_retries: 0,
+        connect_options: connect_options
+      )
+
+    catalog =
+      verify_models!(manifest,
+        catalog_base_url: base_url <> "/api/v1",
+        connect_options: connect_options
+      )
+
+    results =
+      Enum.map([task: 17, optimizer: nil], fn {role, seed} ->
+        lm = remote_lm(manifest, Atom.to_string(role), seed)
+
+        case Imp.Clients.ReqLLM.generate(
+               lm,
+               [%{role: :user, content: "shadow #{role}"}],
+               cache: false
+             ) do
+          {:ok, result} -> %{role: role, result: Report.encode_term(result)}
+          {:error, reason} -> raise "Imp shadow #{role} transport failed: #{inspect(reason)}"
+        end
+      end)
+
+    report = %{
+      status: "pass",
+      runtime: "imp",
+      source_commits: source_commits,
+      provider_authority_present: false,
+      held_out_loaded: false,
+      applications_started: %{
+        ssl: application_started?(:ssl),
+        req: application_started?(:req),
+        imp: application_started?(:imp)
+      },
+      transport_roles: Enum.map(results, & &1.role),
+      transport_count: length(results),
+      catalog_roles: catalog |> Map.keys() |> Enum.sort(),
+      tls_ca_sha256: sha256_file(ca_cert)
+    }
+
+    IO.puts("PAIRED_SHADOW_JSON=" <> Jason.encode!(report))
+    :ok
+  end
+
+  defp ensure_transport_runtime_started! do
+    Enum.each([:ssl, :req, :imp], fn application ->
+      case Application.ensure_all_started(application) do
+        {:ok, _started} ->
+          :ok
+
+        {:error, reason} ->
+          raise "cannot start required transport application #{application}: #{inspect(reason)}"
+      end
+    end)
+
+    unless Enum.all?([:ssl, :req, :imp], &application_started?/1),
+      do: raise("required transport applications are not running")
+  end
+
+  defp application_started?(application) do
+    Enum.any?(Application.started_applications(), fn {name, _description, _version} ->
+      name == application
+    end)
+  end
+
   defp require_launch_sealed!(%{"launch_status" => "sealed"}), do: :ok
 
   defp require_launch_sealed!(manifest) do
     raise "provider launch refused: #{manifest["launch_status"]}"
+  end
+
+  defp require_shadowable_status!(%{"launch_status" => status})
+       when status in ["sealed", "terminal_zero_call_stopped"],
+       do: :ok
+
+  defp require_shadowable_status!(manifest) do
+    raise "shadow preflight refused: #{manifest["launch_status"]}"
   end
 
   defp compile_and_seal({seed, arm}, manifest, rows, observer) do
@@ -841,16 +935,36 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     model = manifest["models"][role]
     request = manifest["execution"]["request"][role]
     guard = openrouter_guard(manifest, role)
+    shadow_base_url = System.get_env("MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL")
+    shadow_ca = System.get_env("MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT")
+
+    api_key =
+      if shadow_base_url, do: "local-shadow-only", else: System.fetch_env!("OPENROUTER_API_KEY")
+
+    req_http_options = [retry: false, max_retries: 0]
+
+    req_http_options =
+      if shadow_ca,
+        do:
+          Keyword.put(req_http_options, :connect_options,
+            transport_opts: [cacertfile: String.to_charlist(shadow_ca)]
+          ),
+        else: req_http_options
 
     opts = [
-      api_key: System.fetch_env!("OPENROUTER_API_KEY"),
+      api_key: api_key,
       cache: false,
       max_tokens: request["max_tokens"],
       max_retries: 0,
       timeout: 120_000,
       provider_options: [openrouter_provider: guard, openrouter_usage: %{include: true}],
-      req_http_options: [retry: false, max_retries: 0]
+      req_http_options: req_http_options
     ]
+
+    opts =
+      if shadow_base_url,
+        do: Keyword.put(opts, :base_url, shadow_base_url <> "/v1"),
+        else: opts
 
     opts =
       if is_nil(request["temperature"]),
@@ -888,12 +1002,22 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       expected_model: model_contract(manifest, Atom.to_string(role))
     }
 
-  defp verify_models!(manifest) do
+  defp verify_models!(manifest, opts \\ []) do
+    catalog_base_url = Keyword.get(opts, :catalog_base_url, "https://openrouter.ai/api/v1")
+    connect_options = Keyword.get(opts, :connect_options)
+
     snapshots =
       Map.new(~w(task optimizer), fn role ->
         expected = manifest["models"][role]
-        endpoint_url = "https://openrouter.ai/api/v1/models/#{expected["logical"]}/endpoints"
-        body = Req.get!(endpoint_url, retry: false, max_retries: 0).body
+        endpoint_url = "#{catalog_base_url}/models/#{expected["logical"]}/endpoints"
+        request_options = [retry: false, max_retries: 0]
+
+        request_options =
+          if connect_options,
+            do: Keyword.put(request_options, :connect_options, connect_options),
+            else: request_options
+
+        body = Req.get!(endpoint_url, request_options).body
         endpoints = get_in(body, ["data", "endpoints"]) || body["data"] || []
         tags = manifest["execution"]["openrouter"]["#{role}_order"]
 
@@ -1247,5 +1371,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
 end
 
 unless System.get_env("IMP_MATCHED_IFBENCH_GEPA014_LOAD_ONLY") == "1" do
-  MatchedIFBenchGepa014Imp.Runner.run()
+  if System.get_env("MATCHED_IFBENCH_GEPA014_SHADOW") == "1",
+    do: MatchedIFBenchGepa014Imp.Runner.shadow_preflight(),
+    else: MatchedIFBenchGepa014Imp.Runner.run()
 end

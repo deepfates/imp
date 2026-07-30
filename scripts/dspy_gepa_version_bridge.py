@@ -16,6 +16,8 @@ drift before optimizer construction.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import importlib.metadata
 import inspect
 from pathlib import Path
 import subprocess
@@ -29,6 +31,12 @@ DSPY_VERSION = "3.2.1"
 GEPA_VERSION = "0.1.4"
 DSPY_DECLARED_GEPA = "0.0.27"
 ACCEPTANCE_FIRST_RELEASE = "0.1.2"
+GEPA_TREE = "1fc992d1fdb124675351ed92161f1b807374774c"
+GEPA_INIT_SHA256 = "61cdac47f24d1f24315b8beb8d65e834a67a2a7a6cf9b667ecf6c669ddc6f4a6"
+GEPA_API_SHA256 = "228c4f80c782dc36afc19492bbb023eba12f257aaa22b947009efc473c4572f9"
+GEPA_OPTIMIZE_SIGNATURE_SHA256 = (
+    "3013681b7f46fbdb468db6e7c314bc17ac9c411a3c4c9f2f30eed7bdd5184ade"
+)
 
 
 class VersionBridgeError(RuntimeError):
@@ -64,6 +72,16 @@ def _git_head(root: Path) -> str:
     ).strip()
 
 
+def _git_tree(root: Path) -> str:
+    return subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], text=True
+    ).strip()
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _tag_has_acceptance(root: Path, tag: str) -> bool:
     source = subprocess.run(
         ["git", "-C", str(root), "show", f"{tag}:src/gepa/api.py"],
@@ -90,6 +108,8 @@ def install_source_bridge(dspy_root: Path, gepa_root: Path) -> VersionBridge:
         raise VersionBridgeError("DSPy source commit does not match pinned 3.2.1")
     if _git_head(gepa_root) != GEPA_COMMIT:
         raise VersionBridgeError("GEPA source commit does not match pinned 0.1.4")
+    if _git_tree(gepa_root) != GEPA_TREE:
+        raise VersionBridgeError("GEPA source tree does not match pinned 0.1.4")
 
     pyproject = (dspy_root / "pyproject.toml").read_text()
     declaration = f'"gepa[dspy]=={DSPY_DECLARED_GEPA}"'
@@ -118,7 +138,9 @@ def install_source_bridge(dspy_root: Path, gepa_root: Path) -> VersionBridge:
     )
 
 
-def authenticate_loaded_runtime(bridge: VersionBridge, dspy: Any, gepa: Any) -> None:
+def authenticate_loaded_runtime(
+    bridge: VersionBridge, dspy: Any, gepa: Any
+) -> dict[str, Any]:
     """Reject a shadowed 0.0.27 import or an incompatible public API."""
 
     dspy_file = Path(inspect.getfile(dspy)).resolve()
@@ -147,3 +169,40 @@ def authenticate_loaded_runtime(bridge: VersionBridge, dspy: Any, gepa: Any) -> 
         raise VersionBridgeError(
             "GEPA 0.1.4 public optimize surface is incomplete: " + ", ".join(missing)
         )
+
+    init_sha = _sha256(gepa_file)
+    api_file = gepa_file.parent / "api.py"
+    api_sha = _sha256(api_file)
+    signature = str(inspect.signature(gepa.optimize))
+    signature_sha = hashlib.sha256(signature.encode()).hexdigest()
+    if init_sha != GEPA_INIT_SHA256 or api_sha != GEPA_API_SHA256:
+        raise VersionBridgeError("GEPA imported source content differs from pinned 0.1.4")
+    if signature_sha != GEPA_OPTIMIZE_SIGNATURE_SHA256:
+        raise VersionBridgeError("GEPA optimize runtime signature differs from pinned 0.1.4")
+
+    # Distribution metadata is diagnostic only. The 0.1.4 tag's checked-out
+    # egg-info still says 0.1.3, while DSPy 3.2.1 installs 0.0.27. Neither
+    # metadata record identifies the source module that Python actually loaded.
+    distributions = sorted(
+        (
+            {
+                "version": distribution.version,
+                "metadata_path": str(Path(distribution._path).resolve()),
+            }
+            for distribution in importlib.metadata.distributions()
+            if (distribution.metadata.get("Name") or "").lower() == "gepa"
+        ),
+        key=lambda value: (value["metadata_path"], value["version"]),
+    )
+    return {
+        "module_path": str(gepa_file),
+        "source_root": str(bridge.gepa_root),
+        "source_commit": _git_head(bridge.gepa_root),
+        "source_tree": _git_tree(bridge.gepa_root),
+        "init_sha256": init_sha,
+        "api_sha256": api_sha,
+        "optimize_signature": signature,
+        "optimize_signature_sha256": signature_sha,
+        "distribution_metadata": distributions,
+        "module_version": getattr(gepa, "__version__", None),
+    }

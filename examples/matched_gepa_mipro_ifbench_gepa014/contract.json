@@ -65,9 +65,22 @@
   },
   "authenticated_gepa_bridge": {
     "path": "../../scripts/dspy_gepa_version_bridge.py",
-    "sha256": "155ac2beff251445704527ac928f2546a97b0acbd0190e3c451b798a7eb6638c",
+    "sha256": "ca2f154104aad75564d2a642ce1fe911e2e775d79f6f4a1e5b375f1b86b241fd",
     "admission_order": "exact launch commit, exact DSPy/GEPA source authentication, source bridge installation, then gepa/dspy/compatibility imports",
-    "option_policy": "no option dropping or translation; require complete GEPA 0.1.4 optimize signature"
+    "option_policy": "no option dropping or translation; require complete GEPA 0.1.4 optimize signature",
+    "effective_identity": {
+      "module_path": "tmp/gepa-v0.1.4/src/gepa/__init__.py",
+      "source_root": "tmp/gepa-v0.1.4",
+      "source_commit": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+      "source_tree": "1fc992d1fdb124675351ed92161f1b807374774c",
+      "init_sha256": "61cdac47f24d1f24315b8beb8d65e834a67a2a7a6cf9b667ecf6c669ddc6f4a6",
+      "api_sha256": "228c4f80c782dc36afc19492bbb023eba12f257aaa22b947009efc473c4572f9",
+      "optimize_signature_sha256": "3013681b7f46fbdb468db6e7c314bc17ac9c411a3c4c9f2f30eed7bdd5184ade",
+      "module_version": null,
+      "source_distribution_version": "0.1.3",
+      "installed_distribution_version": "0.0.27",
+      "identity_owner": "imported module path plus authenticated source commit/tree/content and runtime API signature; distribution metadata is diagnostic only"
+    }
   },
   "public_workflow_compatibility": {
     "gate_path": "../../scripts/dspy_optimizer_public_workflow_gate.py",
@@ -300,16 +313,16 @@
     "consumer_gitignore": {"path": ".gitignore", "sha256": "8304b37aa09dbb085a768a8b036b7dace48049b0865148f257d55e35bf4fc41f"},
     "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
     "consumer_project": {"path": "mix.exs", "sha256": "0fbcd8d51feac25aba18c9e4c0d8aca88b64eab80d123c3ca8d880f82df5ab40"},
-    "contract_runtime": {"path": "contract.exs", "sha256": "300bc60a62e5d3cf32beebcd71d37f15ee5984f41ef8d7e75910e041cfe55ed3"},
-    "coordinator": {"path": "run_paired.py", "sha256": "5395fadbc27d1a23d26237dd20733b5135551c11f63824b70c21010c2547f5fb"},
+    "contract_runtime": {"path": "contract.exs", "sha256": "daf2f127b2a9fddf581f17ad7a2a2b36335e3d3dd94de32e1eaa0d4a5c3ab28b"},
+    "coordinator": {"path": "run_paired.py", "sha256": "14d3db3c0fd5025934de4dd7de910e5ef0e167576de42f12341234b9567845eb"},
     "guard_equivalence": {"path": "guard_equivalence.py", "sha256": "1b0dfd6397fcf6e6118d71dff572ece462aa518dd6d52e4c149e49a166ad6630"},
-    "imp_entry": {"path": "run_imp.exs", "sha256": "303c38d7e105c3a06686cc88b7f014c0b8760cc7f43f8f1bfeb17b7ad555d1c6"},
-    "imp_preflight": {"path": "paired_preflight.exs", "sha256": "24b017b5bbb053292e5d80aadfa6f20c985a43bc5a45b4cb50e9cd199886bc99"},
+    "imp_entry": {"path": "run_imp.exs", "sha256": "8955fd8542398b5e50f630bc091e2430843e14c839d2f667c4a4e00a9b5eb95b"},
+    "shadow_tls_server": {"path": "shadow_tls_server.py", "sha256": "22cfd6adfd082fcf0612460416b7d1a5f933605cb72a97ac98fbc41dfa05359a"},
     "response_evidence": {"path": "response_evidence.exs", "sha256": "a2e627ba31b19511aa8243a45e37074bd108d4bf2b9134b1bc1237814cd1d27a"},
     "source_identity": {"path": "source_identity.exs", "sha256": "ed5c419009aa9a204e12b406c485efd75c119100aa3c7b822221201325193726"},
     "stop_accounting": {"path": "stop_accounting.exs", "sha256": "c2acb84373382c2436b602c112c36e93a7ab6797146032a4cfbb6d2b496cdcda"},
     "two_phase": {"path": "two_phase.exs", "sha256": "d7a92778338cca5e72a51aa8a46d54cce2a371525d22326465fcf30ed92e7e9e"},
-    "upstream_entry": {"path": "run_upstream.py", "sha256": "6fb9c439a489ff47ef0152b8bbd5a94f3931a2402d9d91e44c4bdb3160649ca0"}
+    "upstream_entry": {"path": "run_upstream.py", "sha256": "1fe5e15b7d8dae3400db2e5dc90f170afa055362be49d41201e8658214945f38"}
   },
   "provider_free_gate": {
     "source_path": "equivalence_gate.py",
@@ -319,6 +332,6 @@
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
-  "provider_authority": "coordinator_only_after_successful_live_preflight",
-  "launch_status": "sealed"
+  "provider_authority": "none_terminal_zero_call_stop; shadow-only coordinator path is credential-free",
+  "launch_status": "terminal_zero_call_stopped"
 }
