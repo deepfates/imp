@@ -257,9 +257,14 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     unless config.proposer_fidelity in [:beam_native, :dspy_3_2_1],
       do: raise(ArgumentError, "proposer_fidelity must be :beam_native or :dspy_3_2_1")
 
-    unless config.search_fidelity in [:beam_native, :dspy_3_2_1_optuna_4_9_0_startup] do
+    unless config.search_fidelity in [
+             :beam_native,
+             :dspy_3_2_1_optuna_4_9_0_startup,
+             :dspy_3_2_1_optuna_4_9_0
+           ] do
       raise ArgumentError,
-            "search_fidelity must be :beam_native or :dspy_3_2_1_optuna_4_9_0_startup"
+            "search_fidelity must be :beam_native, :dspy_3_2_1_optuna_4_9_0_startup, " <>
+              "or :dspy_3_2_1_optuna_4_9_0"
     end
 
     if config.proposer_fidelity == :dspy_3_2_1 and
@@ -272,11 +277,14 @@ defmodule Imp.Optimizer.MIPROv2.Config do
               "max_bootstrapped_demos: 0, and max_labeled_demos: 0"
     end
 
-    if config.search_fidelity == :dspy_3_2_1_optuna_4_9_0_startup and
+    if config.search_fidelity in [
+         :dspy_3_2_1_optuna_4_9_0_startup,
+         :dspy_3_2_1_optuna_4_9_0
+       ] and
          (config.proposer_fidelity != :dspy_3_2_1 or config.minibatch or
             config.max_bootstrapped_demos != 0 or config.max_labeled_demos != 0) do
       raise ArgumentError,
-            ":dspy_3_2_1_optuna_4_9_0_startup search fidelity requires " <>
+            "pinned DSPy 3.2.1/Optuna 4.9.0 search fidelity requires " <>
               "proposer_fidelity: :dspy_3_2_1, minibatch: false, " <>
               "max_bootstrapped_demos: 0, and max_labeled_demos: 0"
     end

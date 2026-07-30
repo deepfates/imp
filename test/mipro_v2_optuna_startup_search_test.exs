@@ -3,7 +3,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
 
   alias Imp.Optimizer.MIPROv2
   alias Imp.OperationalSafetyError
-  alias Imp.Optimizer.MIPROv2.OptunaStartupPolicy
+  alias Imp.Optimizer.MIPROv2.{OptunaStartupPolicy, OptunaTPEPolicy}
   alias Imp.Optimizer.{Report, SearchPolicy}
 
   @python "tmp/dspy-parity-venv/bin/python"
@@ -74,6 +74,39 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
              "numpy_random_state_mt19937"
   end
 
+  @tag :evidence_infrastructure
+  test "modeled categorical TPE matches Optuna through startup and first Bayesian trial" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@runner)], stderr_to_stdout: false)
+
+    upstream = Jason.decode!(output)
+
+    Enum.each(@schedules, fn {seed, _startup} ->
+      for {parameter_count, key} <- [{1, "one_parameter"}, {2, "two_parameter"}] do
+        expected = upstream["modeled_schedules"][Integer.to_string(seed)][key]
+
+        assert Enum.take(modeled_schedule(seed, parameter_count, expected), 10) ==
+                 Enum.take(expected, 10)
+      end
+    end)
+  end
+
+  test "modeled policy checkpoint resumes without replay or RNG drift" do
+    upstream = upstream_modeled_schedule(2_026_072_602, "two_parameter")
+    policy = new_modeled_policy(2_026_072_602, 2)
+    {first, policy} = drive_modeled(policy, Enum.take(upstream, 11))
+
+    loaded =
+      policy
+      |> SearchPolicy.dump()
+      |> SearchPolicy.load!([OptunaTPEPolicy])
+
+    {rest, loaded} = drive_modeled(loaded, Enum.drop(upstream, 11))
+
+    assert first ++ rest == Enum.map(upstream, & &1["params"])
+    assert length(SearchPolicy.dump(loaded)["state"]["observations"]) == 16
+  end
+
   test "public MIPRO checkpoint binds exact policy and resumes without replay" do
     {prompt_lm, prompt_agent} = prompt_lm(6)
     task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{route: "K11"} end)
@@ -133,7 +166,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
     end
   end
 
-  test "matched mode rejects modeled TPE entry and runtime drift before setup calls" do
+  test "startup-only mode rejects modeled TPE entry and runtime drift before setup calls" do
     owner = self()
 
     prompt_lm =
@@ -177,6 +210,37 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
 
     refute_received :unexpected_prompt_call
     refute_received :unexpected_task_call
+  end
+
+  test "public MIPRO compile crosses from startup into pinned modeled TPE" do
+    {prompt_lm, prompt_agent} = prompt_lm(4)
+    task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{route: "K11"} end)
+
+    compiled =
+      exact_optimizer(prompt_lm, task_lm,
+        num_candidates: 4,
+        num_trials: 15,
+        search_fidelity: :dspy_3_2_1_optuna_4_9_0
+      )
+      |> MIPROv2.compile(program(task_lm), trainset(), valset())
+
+    report = Report.fetch(compiled)
+
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@runner)], stderr_to_stdout: false)
+
+    expected = Jason.decode!(output)["constant_modeled_schedule"]
+
+    assert Enum.map(report.candidates, & &1.params["atom:main:instruction"]) ==
+             Enum.map(expected, & &1["params"]["0_predictor_instruction"])
+
+    assert report.metadata.sampler == :optuna_4_9_0_multivariate_categorical_tpe
+    refute report.metadata.exact_sampler_sequence_parity
+
+    assert report.metadata.exact_sampler_sequence_scope ==
+             :modeled_categorical_tpe_with_beam_float_tie_breaking
+
+    assert Agent.get(prompt_agent, & &1) == []
   end
 
   test "matched compile keeps first full-evaluation winner on ties and reports exact scope" do
@@ -307,6 +371,41 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
       {params, policy} = SearchPolicy.suggest(policy, :candidate)
       policy = SearchPolicy.observe(policy, %{params: params, score: 0.0})
       {params["0_predictor_instruction"], policy}
+    end)
+  end
+
+  defp upstream_modeled_schedule(seed, key) do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@runner)], stderr_to_stdout: false)
+
+    Jason.decode!(output)["modeled_schedules"][Integer.to_string(seed)][key]
+  end
+
+  defp modeled_schedule(seed, parameter_count, upstream) do
+    {params, _policy} = drive_modeled(new_modeled_policy(seed, parameter_count), upstream)
+
+    Enum.zip(params, upstream)
+    |> Enum.map(fn {params, trial} -> %{"params" => params, "score" => trial["score"]} end)
+  end
+
+  defp new_modeled_policy(seed, parameter_count) do
+    names = Enum.map(0..(parameter_count - 1), &"#{&1}_predictor_instruction")
+
+    OptunaTPEPolicy
+    |> SearchPolicy.new(
+      space: Map.new(names, &{&1, Enum.to_list(0..3)}),
+      parameter_order: names,
+      seed: seed,
+      startup_trials: 10
+    )
+    |> SearchPolicy.observe(%{params: Map.new(names, &{&1, 0}), score: 0.25})
+  end
+
+  defp drive_modeled(policy, trials) do
+    Enum.map_reduce(trials, policy, fn trial, policy ->
+      {params, policy} = SearchPolicy.suggest(policy, :candidate)
+      policy = SearchPolicy.observe(policy, %{params: params, score: trial["score"]})
+      {params, policy}
     end)
   end
 

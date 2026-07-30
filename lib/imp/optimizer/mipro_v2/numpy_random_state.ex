@@ -46,6 +46,33 @@ defmodule Imp.Optimizer.MIPROv2.NumpyRandomState do
   end
 
   @doc false
+  @spec uniforms(%__MODULE__{}, non_neg_integer()) :: {[float()], %__MODULE__{}}
+  def uniforms(%__MODULE__{} = rng, count) when is_integer(count) and count >= 0 do
+    Enum.map_reduce(1..count//1, rng, fn _, rng -> uniform_double(rng) end)
+  end
+
+  @doc false
+  @spec weighted_indices(%__MODULE__{}, [number()], non_neg_integer()) ::
+          {[non_neg_integer()], %__MODULE__{}}
+  def weighted_indices(%__MODULE__{} = rng, weights, count)
+      when is_list(weights) and weights != [] and is_integer(count) and count >= 0 do
+    total = Enum.sum(weights)
+
+    unless Enum.all?(weights, &(is_number(&1) and &1 >= 0)) and total > 0 do
+      raise ArgumentError, "weighted choice requires non-negative weights with positive mass"
+    end
+
+    normalized = Enum.map(weights, &(&1 / total))
+    cumulative = Enum.scan(normalized, &+/2)
+
+    Enum.map_reduce(1..count//1, rng, fn _, rng ->
+      {quantile, rng} = uniform_double(rng)
+      index = Enum.count(cumulative, &(&1 < quantile))
+      {min(index, length(weights) - 1), rng}
+    end)
+  end
+
+  @doc false
   def dump(%__MODULE__{state: state, index: index}) do
     %{
       "algorithm" => "numpy_random_state_mt19937",

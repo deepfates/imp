@@ -18,3 +18,11 @@ Obstacle: advertised optimizer names do not yet uniformly guarantee their defini
 
 Canonical claims classify every advertised family as stable or distinctly experimental. Every stable family reaches its defining state transition through the ordinary public API: proposal, mutation, search, composition, or weight update as applicable; validation selection; an intelligible report; and reusable application. DSPy, GEPA, and Optimize Anything derived families have pinned comparisons of observable inputs, information and evaluation opportunity, stopping, failures, and outputs. Intentional BEAM-native differences are named and exercised for user value rather than private call-graph identity. Ax is used as a competitive lens for ergonomics, concurrency, and failure visibility. Any stable family that falls back to a different hidden algorithm keeps this ticket open. Positive benchmark lift is not required here.
 
+## Implementation checkpoints
+
+- MIPROv2's pinned DSPy 3.2.1 path now continues beyond Optuna's random
+  startup into the real multivariate categorical TPE mechanism, with separate
+  NumPy-compatible RNG streams and durable surrogate observations. Independent
+  Optuna 4.9.0 execution binds startup and first modeled opportunity; longer
+  algebraic acquisition ties retain an explicit BEAM floating-point
+  tie-breaking deviation rather than an exact trial-tape claim.

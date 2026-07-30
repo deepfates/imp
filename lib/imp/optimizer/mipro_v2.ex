@@ -19,10 +19,13 @@ defmodule Imp.Optimizer.MIPROv2 do
   awareness enabled in zero-shot mode; unsupported combinations fail before
   any LM call.
 
-  `:search_fidelity` separately controls parameter search. The narrow
+  `:search_fidelity` separately controls parameter search. The legacy narrow
   `:dspy_3_2_1_optuna_4_9_0_startup` mode reproduces Optuna 4.9.0's NumPy
   RandomState startup sequence exactly and rejects configurations that would
-  enter modeled TPE. Imp's default categorical Parzen search remains a
+  enter modeled TPE. `:dspy_3_2_1_optuna_4_9_0` continues through Optuna's
+  multivariate categorical TPE phase with the pinned split, Parzen kernels,
+  candidate sampling, and independent NumPy RNG streams. Imp's default
+  categorical Parzen search remains a
   BEAM-native algorithm and does not claim Optuna trial-sequence parity.
 
   An explicit compile-time `seed: 0` is a real seed in the default BEAM-native
@@ -42,7 +45,7 @@ defmodule Imp.Optimizer.MIPROv2 do
 
   alias Imp.Optimizer.MIPROv2.{Checkpoint, Config}
   alias Imp.OperationalSafetyError
-  alias Imp.Optimizer.MIPROv2.OptunaStartupPolicy
+  alias Imp.Optimizer.MIPROv2.{OptunaStartupPolicy, OptunaTPEPolicy}
   alias Imp.Optimizer.MIPROv2.PythonRandom
   alias Imp.Optimizer.MIPROv2.UpstreamBootstrap
   alias Imp.Optimizer.MIPROv2.UpstreamProposer
@@ -340,7 +343,7 @@ defmodule Imp.Optimizer.MIPROv2 do
           algorithm: :mipro_v2,
           sampler: sampler_metadata(config),
           upstream_sampler: :optuna_multivariate_tpe,
-          exact_sampler_sequence_parity: exact_search_fidelity?(config),
+          exact_sampler_sequence_parity: exact_sampler_sequence_parity?(config),
           exact_sampler_sequence_scope: sampler_sequence_scope(config),
           optuna_release: optuna_release(config),
           upstream_release: upstream_release(config),
@@ -891,7 +894,8 @@ defmodule Imp.Optimizer.MIPROv2 do
           raise ArgumentError,
                 "pinned DSPy 3.2.1/Optuna 4.9.0 search requires startup_trials: 10"
 
-        config.num_trials > optimizer.startup_trials - 1 ->
+        startup_only_search_fidelity?(config) and
+            config.num_trials > optimizer.startup_trials - 1 ->
           raise ArgumentError,
                 "pinned DSPy 3.2.1/Optuna 4.9.0 startup fidelity supports at most " <>
                   "#{optimizer.startup_trials - 1} objective trials after the baseline; " <>
@@ -921,20 +925,46 @@ defmodule Imp.Optimizer.MIPROv2 do
     {OptunaStartupPolicy, [parameter_order: parameter_order]}
   end
 
+  defp search_policy(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0}, predictors) do
+    parameter_order =
+      Enum.flat_map(predictors, fn %{name: name} -> [param_key(name, :instruction)] end)
+
+    {OptunaTPEPolicy, [parameter_order: parameter_order]}
+  end
+
   defp exact_search_fidelity?(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup}),
     do: true
 
+  defp exact_search_fidelity?(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0}), do: true
+
   defp exact_search_fidelity?(_config), do: false
+
+  defp exact_sampler_sequence_parity?(config), do: startup_only_search_fidelity?(config)
+
+  defp startup_only_search_fidelity?(%{
+         search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup
+       }),
+       do: true
+
+  defp startup_only_search_fidelity?(_config), do: false
 
   defp sampler_metadata(config) do
     if exact_search_fidelity?(config),
-      do: :optuna_4_9_0_startup_random,
+      do:
+        if(startup_only_search_fidelity?(config),
+          do: :optuna_4_9_0_startup_random,
+          else: :optuna_4_9_0_multivariate_categorical_tpe
+        ),
       else: :joint_categorical_parzen
   end
 
   defp sampler_sequence_scope(config) do
     if exact_search_fidelity?(config),
-      do: :startup_only_before_modeled_tpe,
+      do:
+        if(startup_only_search_fidelity?(config),
+          do: :startup_only_before_modeled_tpe,
+          else: :modeled_categorical_tpe_with_beam_float_tie_breaking
+        ),
       else: :none
   end
 

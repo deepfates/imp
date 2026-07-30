@@ -138,6 +138,21 @@ than substituting Imp's Parzen model. Source-bound tests independently execute
 Optuna 4.9.0 for all three sealed comparison seeds. This startup-only result is
 not general Optuna TPE parity.
 
+For ordinary runs that must continue beyond startup,
+`:dspy_3_2_1_optuna_4_9_0` implements Optuna 4.9.0's multivariate categorical
+TPE mechanism: the 10%/25-trial good-set split, chronological kernel order,
+categorical Parzen kernels with a unit prior, 24 expected-improvement
+candidates, and independent NumPy-compatible startup and modeled RNG streams.
+Its checkpoint contains both MT19937 states and every ordered observation, so
+resume does not replay trials or restart the surrogate. Independent Optuna
+execution matches the complete startup and the first modeled opportunity for
+one- and two-predictor spaces; longer trajectories may choose a different
+member of an algebraically tied acquisition set because Erlang and NumPy reduce
+floating-point likelihoods differently. The report therefore marks exact
+trial-sequence parity false for modeled runs and names that tie boundary. This
+is a numerical tie-breaking deviation, not a different information flow,
+surrogate, candidate budget, or selection rule.
+
 Pinned DSPy turns an evaluation exception into score zero and continues the
 study. The matched Imp mode does the same for ordinary task/adapter failures.
 Operational budget, route, cost, transport, or cancellation guards use
