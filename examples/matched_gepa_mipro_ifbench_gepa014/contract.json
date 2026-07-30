@@ -319,6 +319,6 @@
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
-  "provider_authority": "disabled_pending_live_preflight_and_explicit_sealed_manifest",
-  "launch_status": "blocked_live_preflight"
+  "provider_authority": "coordinator_only_after_successful_live_preflight",
+  "launch_status": "sealed"
 }
