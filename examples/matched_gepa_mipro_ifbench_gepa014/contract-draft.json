@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "treatment_id": "matched-gepa-mipro-ifbench-dspy321-gepa014-successor-v1",
+  "status": "draft_unsealed_provider_disabled",
+  "intent": "same source-disjoint matched IFBench baseline+GEPA+MIPROv2 question as terminal v3, with authenticated DSPy 3.2.1 plus GEPA 0.1.4 source composition",
+  "provider_authority": false,
+  "held_out_access": false,
+  "compatibility_seal": {
+    "verdict": "SEAL",
+    "exact_imp_commit": "10328114f96975ebccf71f57a052bfe045b99a88",
+    "scope": [
+      "resolved MIPRO values observed at bootstrap, proposal, live Evaluate, and Optuna execution boundaries",
+      "ordinary evaluator ValueError remains candidate-local zero under pinned DSPy 3.2.1",
+      "production OperationalSafetyAbort escapes public MIPROv2.compile and remains fatal",
+      "containment documented as matched-upstream behavior rather than an Imp default",
+      "terminal v2 and v3 trees remain immutable"
+    ],
+    "v2_tree": "7760be791bb8681c5e9d245d5db0424ad010f53f",
+    "v3_tree": "e7be7ea051813fdb6f4029a6f9e135836e0d703d"
+  },
+  "source_bindings": {
+    "imp": {
+      "compatibility_checkpoint": "10328114f96975ebccf71f57a052bfe045b99a88",
+      "launch_commit": null,
+      "launch_commit_policy": "must be a later exact clean commit content-binding the complete paired runnable surface; null forbids launch"
+    },
+    "dspy": {
+      "version": "3.2.1",
+      "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+      "authority_manifest": "../../benchmarks/authority_sources/dspy-3.2.1-29448ae.json",
+      "authority_manifest_sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a"
+    },
+    "gepa": {
+      "version": "0.1.4",
+      "commit": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+      "authority_manifest": "../../benchmarks/authority_sources/gepa-0.1.4-8b0ce6c.json",
+      "authority_manifest_sha256": "443ea361efc8c7b94589627d750325617b2174e4cb0988650f070ca45f2d5908"
+    },
+    "authenticated_source_bridge": {
+      "path": "../../scripts/dspy_gepa_version_bridge.py",
+      "sha256": "155ac2beff251445704527ac928f2546a97b0acbd0190e3c451b798a7eb6638c",
+      "admission_order": "authenticate exact DSPy and GEPA commits, prepend GEPA 0.1.4 source, then import gepa and dspy",
+      "option_policy": "no dropping or translation; require the complete GEPA 0.1.4 optimize signature"
+    },
+    "public_workflow_gate": {
+      "path": "../../scripts/dspy_optimizer_public_workflow_gate.py",
+      "sha256": "80f48254aeee0bf269198e1cae1cd1fe09b4f1042a567909e00ee1d6e8517578",
+      "test_path": "../../test/dspy_optimizer_public_workflow_gate_test.exs",
+      "test_sha256": "7a4b3672748ff5a16cbaf78c8230d88387081d1851ba992f069c87f77b8ddea2",
+      "documentation_path": "../../docs/maintainers/DSPY_GEPA_MIPRO_PUBLIC_WORKFLOW.md",
+      "documentation_sha256": "e5095e75afff52a5c943376b0f45b8ec7b0c950438a77055f38a82a3af1f1ab3"
+    },
+    "failure_cardinality_compatibility": {
+      "module_path": "../../scripts/dspy_gepa_failure_compat.py",
+      "module_sha256": "a1c4f709710a8c85e6446683d91e142edcff1193779100a48cff849e3931b728",
+      "gate_path": "../../scripts/dspy_gepa_trace_semantics.py",
+      "gate_sha256": "8c94b49e0b3856a788fb6c53cbe945bb79643322d8ef65b396d7afbe008a5b49",
+      "scope": "GEPA adapter only; ordinary successes unchanged, arbitrary program/metric exceptions retain ordered diagnostic slots and never become reflection advice"
+    }
+  },
+  "immutable_predecessors": {
+    "v2": {
+      "terminal_commit": "f60e648",
+      "tree": "7760be791bb8681c5e9d245d5db0424ad010f53f",
+      "contract_path": "../matched_gepa_mipro_ifbench_v2/contract.json",
+      "contract_sha256": "eb1629c5b1ef8556207c02895fb000849aba1626b1f8684f9a2c445a3d202a69",
+      "imp_result_sha256": "b3db0956cd63bbb755b1f7ec38f7badca15596e9558aaf856a4f4f8c1b0e403f",
+      "upstream_result_sha256": "3c510331bff7a4de0881a570e46bb7931a6acf1b63520a634558d7d935208a7c"
+    },
+    "v3": {
+      "terminal_commit": "53fc20659228b92c388dfd9c4d2b006994b1832f",
+      "tree": "e7be7ea051813fdb6f4029a6f9e135836e0d703d",
+      "contract_path": "../matched_gepa_mipro_ifbench_v3/contract.json",
+      "contract_sha256": "c77a8164cbec3c98afd83b7b24dae10e555c125c150c50b0e491167b84970b7e",
+      "imp_result_sha256": "4a79790465a03fe2839a05fe737e069dc7283c9514a59a3b0ee0ea39d5c1c5f8",
+      "upstream_result_sha256": "6a237000dd1a870569fcda53a5530fb8449431cd645b077010e726215d894b23",
+      "status": "permanently_stopped_incomplete_unscored"
+    },
+    "reuse": "none: no calls, baselines, selections, artifacts, outcomes, or held-out access roll forward"
+  },
+  "scientific_design": {
+    "arms": [
+      "baseline",
+      "gepa",
+      "mipro_v2"
+    ],
+    "seeds": [
+      2026072705,
+      2026072706,
+      2026072707
+    ],
+    "dataset": {
+      "program": "IFBenchCoT2StageModule",
+      "train": {
+        "path": "../matched_instruction_family_ifbench/data/train.jsonl",
+        "rows": 16,
+        "sha256": "8d80f329bbab37a44fe2e2ea0ea8c7e69eeb976d8a8e51af5bcd4547b4221197"
+      },
+      "selection": {
+        "path": "../matched_instruction_family_ifbench/data/selection.jsonl",
+        "rows": 32,
+        "sha256": "f0c2d8e808e4783e496ecf189ead61fde4a1e80373ff85f3ea801883f68c7468"
+      },
+      "held_out": {
+        "path": "../matched_instruction_family_ifbench/data/held_out.jsonl",
+        "rows": 64,
+        "sealed_sha256_from_v3": "49779533faa842decda93a1221ce7bae615af82403e33e380ab69d2abc84610d",
+        "barrier": "unavailable until all 18 selection receipts and artifacts are sealed"
+      },
+      "metric": "mean executable constraint satisfaction",
+      "normalization": "none"
+    },
+    "models": {
+      "task": {
+        "logical": "openai/gpt-5.4-mini",
+        "provider": "OpenAI",
+        "temperature": null,
+        "seed": "experiment_seed",
+        "max_input_tokens": 4096,
+        "max_tokens": 768
+      },
+      "optimizer": {
+        "logical": "anthropic/claude-sonnet-4.6",
+        "provider": "Anthropic",
+        "temperature": 1,
+        "max_input_tokens": 16384,
+        "max_tokens": 1024
+      }
+    },
+    "optimizer_opportunity": {
+      "gepa": {
+        "semantic_max_metric_calls": 80,
+        "legal_metric_call_cap": 120,
+        "legal_reflection_call_cap": 12,
+        "reflection_minibatch_size": 8,
+        "candidate_selection": "pareto",
+        "module_selection": "round_robin",
+        "acceptance": "strict_improvement",
+        "selection": "all_improvements",
+        "use_merge": false
+      },
+      "mipro_v2": {
+        "num_candidates": 4,
+        "num_trials": 8,
+        "minibatch": false,
+        "max_bootstrapped_demos": 0,
+        "max_labeled_demos": 0,
+        "program_aware_proposer": false,
+        "data_aware_proposer": true,
+        "tip_aware_proposer": true,
+        "fewshot_aware_proposer": false,
+        "view_data_batch_size": 10,
+        "startup_trials": 10,
+        "search_fidelity": "dspy_3_2_1_optuna_4_9_0_startup"
+      }
+    },
+    "call_ceilings_per_runtime": {
+      "baseline": {
+        "task": 192,
+        "optimizer": 0,
+        "total": 192
+      },
+      "gepa": {
+        "task": 432,
+        "optimizer": 12,
+        "total": 444
+      },
+      "mipro_v2": {
+        "task": 864,
+        "optimizer": 11,
+        "total": 875
+      }
+    },
+    "metrics": {
+      "primary": "mean_fraction_executable_constraints_satisfied",
+      "paired_hypotheses": [
+        "optimizer_vs_own_baseline",
+        "Imp_vs_DSPy_same_family"
+      ],
+      "noninferiority_margin": -0.05,
+      "uncertainty": "source-id clustered bootstrap with Holm correction",
+      "negative_acceptance": "a clean negative result is retained and falsifies the corresponding task/model hypothesis"
+    }
+  },
+  "error_semantics": {
+    "mipro_evaluator_exception": "match pinned DSPy 3.2.1: inner ordinary Exception is contained as that candidate's zero score",
+    "imp_default": "unchanged; the matched containment is not promoted to a general Imp default",
+    "fatal_operational_guards": [
+      "model identity",
+      "route",
+      "privacy/data collection",
+      "fallback",
+      "transport attempt",
+      "request seed",
+      "input/output token envelope",
+      "cost",
+      "logical/transport call ceiling",
+      "held-out barrier",
+      "artifact identity"
+    ],
+    "fatal_type": "OperationalSafetyAbort(BaseException)",
+    "fatal_outcome": "stop both peers; treatment remains incomplete and unscored"
+  },
+  "budget": {
+    "authorized_workshop_ceiling": 100.0,
+    "prior_conservative_bound_before_v3": 7.36267325,
+    "v3_completed_cost": {
+      "imp": 0.11817375,
+      "upstream": 0.10520175
+    },
+    "v3_unresolved_in_flight_task_reservation": 0.007104,
+    "current_conservative_workshop_bound": 7.59315275,
+    "successor_new_spend_max": 74.552832,
+    "successor_combined_workshop_max": 82.14598475
+  },
+  "seal_requirements": [
+    "content-bind a complete separately named paired coordinator and both peer entries",
+    "authenticate exact clean launch commit before any optional treatment import",
+    "install and authenticate the GEPA 0.1.4 bridge before importing gepa or dspy",
+    "bind current catalog route, privacy, capability, and price truth",
+    "preserve coordinator-only launch and symmetric graceful-stop accounting",
+    "verify train and selection receipts without reading or hashing held-out bytes",
+    "retain terminal v2 and v3 trees byte-identically",
+    "obtain an explicit later seal; this draft itself grants no provider authority"
+  ]
+}
