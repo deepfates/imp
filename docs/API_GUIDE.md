@@ -234,6 +234,18 @@ explicitly. GEPA and COPRO do not fabricate local proposals or silently reuse
 the task program's LM. Training optimizers likewise require an explicit
 trainer; creating a training-shaped report is not a weight update.
 
+These names describe mechanisms, not guaranteed improvement. GEPA and MIPROv2
+have positive matched evidence on one frozen TREC task. COPRO, SIMBA, and
+InferRules execute their defining mechanisms through the public API, but do
+not yet have comparable positive effectiveness evidence; treat their
+effectiveness as experimental on your task.
+
+MIPROv2 has two intentional proposal modes. Its default BEAM-native mode uses
+explicit program structure and predictor signatures. Pinned DSPy 3.2.1
+fidelity accepts bounded, caller-supplied source text and reproduces DSPy's
+program-aware proposal information. Imp does not inspect source by default,
+and it does not claim that provider-adapter retry counts match Python.
+
 Optimizer reports describe the candidates, scores, selected parameters,
 stopping condition, and failures from that run:
 
