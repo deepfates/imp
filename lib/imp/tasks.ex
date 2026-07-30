@@ -12,6 +12,7 @@ defmodule Imp.Tasks.Admission do
 
   def transfer(token, pid), do: GenServer.call(__MODULE__, {:transfer, token, pid})
   def release(token), do: GenServer.call(__MODULE__, {:release, token})
+  def owned_by?(token, pid), do: GenServer.call(__MODULE__, {:owned_by?, token, pid})
   def status, do: GenServer.call(__MODULE__, :status)
 
   @impl true
@@ -65,6 +66,10 @@ defmodule Imp.Tasks.Admission do
 
   def handle_call({:release, token}, _from, state) do
     {:reply, :ok, state |> drop_lease(token) |> grant_waiters()}
+  end
+
+  def handle_call({:owned_by?, token, pid}, _from, state) do
+    {:reply, match?(%{pid: ^pid, phase: :active}, Map.get(state.leases, token)), state}
   end
 
   def handle_call(:status, _from, state) do
@@ -151,6 +156,7 @@ defmodule Imp.Tasks do
   @supervisor Imp.TaskSupervisor
   @unlinked_supervisor Imp.UnlinkedTaskSupervisor
   @admission Imp.Tasks.Admission
+  @admission_token_key {__MODULE__, :admission_token}
 
   @async_stream_option_schema [
     max_concurrency: [type: :pos_integer],
@@ -227,7 +233,10 @@ defmodule Imp.Tasks do
 
   Settings are captured when `async_stream/3` is called. Stream-local fan-out
   is capped by the effective `:async_max_workers`; concurrent Imp work waits
-  for capacity instead of turning contention into a prediction failure.
+  for capacity instead of turning contention into a prediction failure. A
+  stream synchronously enumerated inside an admitted Imp task reuses that
+  task's slot serially, so nested optimizer fan-out remains bounded without
+  self-deadlocking when the limit is one.
   """
   def async_stream(enumerable, fun, opts \\ [])
 
@@ -236,10 +245,26 @@ defmodule Imp.Tasks do
     opts = Imp.Options.validate!(opts, @async_stream_option_schema, "Imp.Tasks.async_stream/3")
     snapshot = Imp.Settings.snapshot()
     max_workers = Map.fetch!(snapshot, :async_max_workers)
-    opts = Keyword.update(opts, :max_concurrency, max_workers, &min(&1, max_workers))
+    borrowed = current_admission()
+    enumerator = self()
+    stream_max_workers = if borrowed, do: 1, else: max_workers
+
+    opts =
+      Keyword.update(opts, :max_concurrency, stream_max_workers, &min(&1, stream_max_workers))
 
     wrapped = fn item ->
-      run_admitted(snapshot, max_workers, fn -> fun.(item) end)
+      case borrowed do
+        {token, lease_owner} ->
+          if direct_task_caller?(@supervisor, enumerator) and
+               @admission.owned_by?(token, lease_owner) do
+            run_borrowed(snapshot, token, lease_owner, fn -> fun.(item) end)
+          else
+            run_admitted(snapshot, max_workers, fn -> fun.(item) end)
+          end
+
+        nil ->
+          run_admitted(snapshot, max_workers, fn -> fun.(item) end)
+      end
     end
 
     ensure_runtime!()
@@ -266,7 +291,7 @@ defmodule Imp.Tasks do
           Process.demonitor(owner_monitor, [:flush])
 
           try do
-            Imp.Settings.with_snapshot(snapshot, fun)
+            with_admission(token, self(), fn -> Imp.Settings.with_snapshot(snapshot, fun) end)
           after
             @admission.release(token)
           end
@@ -308,9 +333,39 @@ defmodule Imp.Tasks do
     :ok = @admission.transfer(token, self())
 
     try do
-      Imp.Settings.with_snapshot(snapshot, fun)
+      with_admission(token, self(), fn -> Imp.Settings.with_snapshot(snapshot, fun) end)
     after
       @admission.release(token)
+    end
+  end
+
+  defp run_borrowed(snapshot, token, owner, fun) do
+    with_admission(token, owner, fn -> Imp.Settings.with_snapshot(snapshot, fun) end)
+  end
+
+  defp current_admission, do: Process.get(@admission_token_key)
+
+  # Task.Supervisor records the process that directly enumerates async_stream in
+  # the child task's standard $callers chain. Only that direct caller may lend
+  # its lease. An escaped stream or a stream enumerated by another process goes
+  # through ordinary admission instead of bypassing the global bound.
+  defp direct_task_caller?(supervisor, owner) do
+    Process.get(:"$callers", []) |> List.first() == owner and
+      self() in Task.Supervisor.children(supervisor)
+  end
+
+  defp with_admission(token, owner, fun) do
+    previous = Process.get(@admission_token_key)
+    Process.put(@admission_token_key, {token, owner})
+
+    try do
+      fun.()
+    after
+      if previous do
+        Process.put(@admission_token_key, previous)
+      else
+        Process.delete(@admission_token_key)
+      end
     end
   end
 

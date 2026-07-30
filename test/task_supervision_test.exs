@@ -184,6 +184,89 @@ defmodule TaskSupervisionTest do
     assert Task.await(runner) == [ok: :item]
   end
 
+  test "directly nested async_stream reuses one admission slot without deadlocking" do
+    Imp.configure(async_max_workers: 1)
+
+    runner =
+      Task.async(fn ->
+        Imp.Tasks.async_stream(
+          [:outer],
+          fn :outer ->
+            before_inner = Imp.Tasks.admission_status()
+
+            inner =
+              Imp.Tasks.async_stream([1, 2], &{&1, Imp.Tasks.admission_status()}, ordered: true)
+              |> Enum.to_list()
+
+            {before_inner, inner}
+          end,
+          ordered: true
+        )
+        |> Enum.to_list()
+      end)
+
+    assert Task.await(runner, 1_000) == [
+             ok:
+               {%{active: 1, queued: 0},
+                [ok: {1, %{active: 1, queued: 0}}, ok: {2, %{active: 1, queued: 0}}]}
+           ]
+
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
+  test "async task may synchronously enumerate a nested stream with one worker" do
+    Imp.configure(async_max_workers: 1)
+
+    task =
+      Imp.Tasks.async(fn ->
+        Imp.Tasks.async_stream([1, 2], &{&1, Imp.Tasks.admission_status()}, ordered: true)
+        |> Enum.to_list()
+      end)
+
+    assert Task.await(task, 1_000) == [
+             ok: {1, %{active: 1, queued: 0}},
+             ok: {2, %{active: 1, queued: 0}}
+           ]
+
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
+  test "nested stream admission remains reentrant at deeper levels" do
+    Imp.configure(async_max_workers: 1)
+
+    task =
+      Imp.Tasks.async(fn ->
+        Imp.Tasks.async_stream([:middle], fn :middle ->
+          Imp.Tasks.async_stream([:inner], &{&1, Imp.Tasks.admission_status()})
+          |> Enum.to_list()
+        end)
+        |> Enum.to_list()
+      end)
+
+    assert Task.await(task, 1_000) == [
+             ok: [ok: {:inner, %{active: 1, queued: 0}}]
+           ]
+
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
+  test "a nested stream enumerated outside its lease uses ordinary admission" do
+    Imp.configure(async_max_workers: 1)
+
+    escaped =
+      Imp.Tasks.async_stream(
+        [:outer],
+        fn :outer -> Imp.Tasks.async_stream([:inner], & &1) end,
+        ordered: true
+      )
+      |> Enum.to_list()
+
+    assert [ok: stream] = escaped
+    assert Imp.Tasks.admission_status() == %{active: 0, queued: 0}
+    assert Enum.to_list(stream) == [ok: :inner]
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
   test "Imp.Tasks reports invalid task boundaries clearly" do
     assert_raise ArgumentError, ~r/Imp.Tasks.async\/1 expects a zero-arity function/, fn ->
       Imp.Tasks.async(fn value -> value end)
