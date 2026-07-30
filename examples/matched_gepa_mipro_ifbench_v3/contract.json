@@ -267,7 +267,7 @@
     "source_path": "equivalence_gate.py",
     "source_sha256": "017ead15c3a4f416ad8c52fa24e4f21bb2d7ab9fdaebe384a58ed79908e42d5b",
     "result_path": "provider-free-review.json",
-    "result_sha256": "c97a52338b9ee6ce97b118f5dc2e27af61ab6203d07e916fdfffc9b8353701ea",
+    "result_sha256": "04ba3a7d42c01b04008c735b2d170aacf6a9074947b3ddd274b14deada843f09",
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },

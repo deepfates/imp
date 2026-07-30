@@ -236,6 +236,7 @@
       "gepa": "ifbench_stock_module.IFBenchCoT2StageModule",
       "mipro_v2": "ifbench_stock_module.IFBenchCoT2StageModule"
     },
+    "authenticated_optional_import": true,
     "manifest": "contract.json",
     "output_isolated": true,
     "program_factory_rebound": true
