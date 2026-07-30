@@ -88,5 +88,22 @@ defmodule Imp.DspyOptimizerPublicWorkflowGateTest do
              "contained_as_zero_score_by_mipro_eval_candidate_program"
 
     assert result["mipro_v2"]["evaluator_failure_calls"] > 0
+
+    assert result["mipro_v2"]["operational_failure"] == %{
+             "calls" => 1,
+             "contained" => false,
+             "type" => "OperationalSafetyAbort"
+           }
+
+    options = Map.new(result["mipro_v2"]["option_matrix"], &{&1["option"], &1})
+    assert options["num_candidates"]["effective"]["bootstrap"] == 4
+    assert options["num_candidates"]["effective"]["proposal"] == 4
+    assert options["trials"]["effective"]["optimizer_input"] == 8
+    assert options["trials"]["effective"]["optuna_trials"] == 8
+    assert options["trials"]["effective"]["trial_log_slots_including_default"] == 9
+    refute options["minibatch"]["effective"]
+
+    assert options["operational_safety_exception"]["status"] ==
+             "fatal_guard_bypass_exercised"
   end
 end

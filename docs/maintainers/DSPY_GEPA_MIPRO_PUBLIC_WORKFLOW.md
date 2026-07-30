@@ -78,16 +78,16 @@ including proposal setup and the complete Optuna search rather than replacing
 | Intended option | Public route | Effective behavior |
 | --- | --- | --- |
 | `auto: nil` | constructor | honored |
-| four instruction candidates | constructor | baseline plus three proposals per predictor |
-| eight trials | `compile.num_trials` | eight Optuna trials after the separately evaluated default program |
-| no minibatching | compile | honored |
-| zero selected bootstrapped/labeled demos | constructor + compile | selected program is zero-shot; DSPy still makes its documented bootstrap calls to inform proposal |
-| program-aware proposer false | compile | honored |
-| data-aware / tip-aware true | compile | honored |
-| few-shot-aware false | compile | honored |
-| data view batch 10 | compile | honored |
-| one thread | constructor/Evaluate | honored |
-| `max_errors: 0` | constructor/Evaluate | aborts each failing `Evaluate`, but outer MIPRO contains that abort as score zero |
+| four instruction candidates | constructor -> observed bootstrap/proposal phase inputs | four candidates per predictor |
+| eight trials | `compile.num_trials` -> observed optimizer input and trial log | eight Optuna trials after the separately evaluated default program |
+| no minibatching | observed optimizer phase input | false; every trial uses the full selection set |
+| zero selected bootstrapped/labeled demos | observed bootstrap phase inputs and selected program | selected program is zero-shot; DSPy still makes its documented bootstrap calls to inform proposal, then discards those demos before search |
+| program-aware proposer false | observed proposal phase input | false |
+| data-aware / tip-aware true | observed proposal phase inputs | true / true |
+| few-shot-aware false | observed proposal phase input | false |
+| data view batch 10 | observed proposal phase input | 10 |
+| one thread | observed live `Evaluate` | 1 |
+| `max_errors: 0` | observed live `Evaluate` | aborts each failing `Evaluate`, but outer MIPRO contains that ordinary abort as score zero |
 | seed | constructor + compile + Optuna | 2026072705 |
 | startup trials 10 | Optuna `TPESampler` default | effective but implicit external default |
 | callbacks / stopper | MIPRO public API | unsupported and not part of the sealed MIPRO configuration |
@@ -96,13 +96,21 @@ including proposal setup and the complete Optuna search rather than replacing
 The complete deterministic run made 11 prompt-model calls and 590 task-model
 calls, completed all eight Optuna trials, saved the selected JSON state, loaded
 it into a fresh trusted two-stage program, and cleaned its temporary artifact.
-A malformed typed task output raises `AdapterParseError`. A metric exception is
-different: `max_errors: 0` cancels the inner evaluation, but DSPy's MIPRO
-`eval_candidate_program` catches that exception and returns score zero; the
-gate observes this three times across default and trial evaluations. A future
-matched runner must either preserve that pinned behavior in both arms or name a
-fail-closed experimental deviation. It must not assume `max_errors: 0` makes
-the whole MIPRO compile fatal.
+A malformed typed task output raises `AdapterParseError`. An ordinary metric
+exception is different: `max_errors: 0` cancels the inner evaluation, but
+DSPy's MIPRO `eval_candidate_program` catches that `Exception` and returns
+score zero; the gate observes this across default and trial evaluations. The
+matched DSPy 3.2.1 treatment preserves this candidate-local containment
+exactly. This is not Imp's general error default.
+
+Operational safety is deliberately outside that containment boundary. The
+production treatment's typed route, model identity, privacy, transport,
+attempt, token, cost, and budget guards raise `OperationalSafetyAbort`, which
+inherits directly from `BaseException`. The aggregate gate loads that actual
+type and drives it through the public MIPRO compile path: it escapes on the
+first guarded metric call and is never converted to candidate score zero. Such
+operational failures remain fatal and make a treatment incomplete rather than
+scored.
 
 Run the complete gate with:
 

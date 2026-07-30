@@ -12,13 +12,14 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
-import inspect
+import importlib.util
 import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import types
 from typing import Any
 
 from dspy_gepa_version_bridge import (
@@ -148,7 +149,9 @@ def main() -> None:
             improved = "improved" in predictor.signature.instructions
             return dspy.Prediction(
                 score=1.0 if improved else 0.0,
-                feedback="component improved" if improved else "component needs improvement",
+                feedback="component improved"
+                if improved
+                else "component needs improvement",
             )
         return float(getattr(pred, "quality", 0.0))
 
@@ -159,9 +162,15 @@ def main() -> None:
     failure_program = TwoStage(failure_lm)
     failure_rows = examples(5)
     failure_rows[0] = dspy.Example(prompt="ok-00", kind="ok").with_inputs("prompt")
-    failure_rows[1] = dspy.Example(prompt="parse_failure-01", kind="parse_failure").with_inputs("prompt")
-    failure_rows[2] = dspy.Example(prompt="program_failure-02", kind="program_failure").with_inputs("prompt")
-    failure_rows[3] = dspy.Example(prompt="metric_failure-03", kind="metric_failure").with_inputs("prompt")
+    failure_rows[1] = dspy.Example(
+        prompt="parse_failure-01", kind="parse_failure"
+    ).with_inputs("prompt")
+    failure_rows[2] = dspy.Example(
+        prompt="program_failure-02", kind="program_failure"
+    ).with_inputs("prompt")
+    failure_rows[3] = dspy.Example(
+        prompt="metric_failure-03", kind="metric_failure"
+    ).with_inputs("prompt")
     failure_rows[4] = dspy.Example(prompt="ok-04", kind="ok").with_inputs("prompt")
     failure_adapter = FailurePreservingDspyAdapter(
         student_module=failure_program,
@@ -226,7 +235,10 @@ def main() -> None:
     selection = AllImprovements()
     task_lm = SharedDummyLM(task_answers())
     reflection_lm = SharedDummyLM(
-        [{"improved_instruction": f"improved instruction {index}"} for index in range(100)]
+        [
+            {"improved_instruction": f"improved instruction {index}"}
+            for index in range(100)
+        ]
     )
     train = examples(16, failures=True)
     validation = examples(32)
@@ -311,30 +323,150 @@ def main() -> None:
             "selection_strategy",
         }
     }
-    effective_gepa["callbacks"] = [type(item).__name__ for item in captured_gepa_kwargs["callbacks"]]
-    effective_gepa["stop_callbacks"] = type(captured_gepa_kwargs["stop_callbacks"]).__name__
-    effective_gepa["selection_strategy"] = type(captured_gepa_kwargs["selection_strategy"]).__name__
-    effective_gepa["reflection_lm"] = type(captured_gepa_kwargs["reflection_lm"]).__name__
+    effective_gepa["callbacks"] = [
+        type(item).__name__ for item in captured_gepa_kwargs["callbacks"]
+    ]
+    effective_gepa["stop_callbacks"] = type(
+        captured_gepa_kwargs["stop_callbacks"]
+    ).__name__
+    effective_gepa["selection_strategy"] = type(
+        captured_gepa_kwargs["selection_strategy"]
+    ).__name__
+    effective_gepa["reflection_lm"] = type(
+        captured_gepa_kwargs["reflection_lm"]
+    ).__name__
 
     gepa_matrix = [
-        {"option": "iterations", "intended": 1, "route": "semantic max_metric_calls envelope", "effective": 80, "status": "translated_explicitly"},
-        {"option": "minibatch_size", "intended": 8, "route": "GEPA.reflection_minibatch_size", "effective": captured_gepa_kwargs["reflection_minibatch_size"], "status": "honored"},
-        {"option": "candidate_selection", "intended": "pareto", "route": "GEPA.candidate_selection_strategy", "effective": captured_gepa_kwargs["candidate_selection_strategy"], "status": "honored"},
-        {"option": "module_selection", "intended": "round_robin", "route": "GEPA.component_selector -> optimize.module_selector", "effective": captured_gepa_kwargs["module_selector"], "status": "honored"},
-        {"option": "acceptance", "intended": "strict_improvement", "route": "gepa_kwargs.acceptance_criterion", "effective": captured_gepa_kwargs["acceptance_criterion"], "status": "honored_by_0.1.4"},
-        {"option": "selection", "intended": "all_improvements", "route": "gepa_kwargs.selection_strategy", "effective": type(captured_gepa_kwargs["selection_strategy"]).__name__, "status": "honored_explicitly"},
-        {"option": "use_merge", "intended": False, "route": "GEPA.use_merge", "effective": captured_gepa_kwargs["use_merge"], "status": "honored"},
-        {"option": "reflection_lm", "intended": "optimizer LM", "route": "DSPy adapter stripped_lm_call wrapper", "effective": type(captured_gepa_kwargs["reflection_lm"]).__name__, "status": "honored"},
-        {"option": "skip_perfect_score", "intended": True, "route": "GEPA default/direct optimize", "effective": captured_gepa_kwargs["skip_perfect_score"], "status": "honored"},
-        {"option": "perfect_score", "intended": 1.0, "route": "GEPA.perfect_score", "effective": captured_gepa_kwargs["perfect_score"], "status": "honored"},
-        {"option": "num_threads", "intended": 1, "route": "DSPy DspyAdapter", "effective": ConstructionProbeAdapter.constructed_kwargs["num_threads"], "status": "honored"},
-        {"option": "failure_score", "intended": 0.0, "route": "DSPy DspyAdapter", "effective": ConstructionProbeAdapter.constructed_kwargs["failure_score"], "status": "honored"},
-        {"option": "track_stats", "intended": True, "route": "DSPy result projection", "effective": hasattr(gepa_program, "detailed_results"), "status": "honored"},
-        {"option": "seed", "intended": 2026072705, "route": "GEPA.seed -> optimize.seed", "effective": captured_gepa_kwargs["seed"], "status": "honored"},
-        {"option": "log_dir", "intended": "owned temporary run directory", "route": "GEPA.log_dir -> optimize.run_dir", "effective": run_dir_created, "status": "honored_and_cleaned"},
-        {"option": "callbacks", "intended": "lifecycle callbacks", "route": "gepa_kwargs.callbacks", "effective": sorted(set(recorder.events)), "status": "exercised"},
-        {"option": "stopper", "intended": "semantic stopper callback", "route": "gepa_kwargs.stop_callbacks", "effective": stopper.calls, "status": "exercised"},
-        {"option": "dataset_shape", "intended": {"train": 16, "selection": 32, "predictors": 2}, "route": "GEPA.compile", "effective": {"train": len(train), "selection": len(validation), "predictors": len(gepa_program.named_predictors())}, "status": "honored"},
+        {
+            "option": "iterations",
+            "intended": 1,
+            "route": "semantic max_metric_calls envelope",
+            "effective": 80,
+            "status": "translated_explicitly",
+        },
+        {
+            "option": "minibatch_size",
+            "intended": 8,
+            "route": "GEPA.reflection_minibatch_size",
+            "effective": captured_gepa_kwargs["reflection_minibatch_size"],
+            "status": "honored",
+        },
+        {
+            "option": "candidate_selection",
+            "intended": "pareto",
+            "route": "GEPA.candidate_selection_strategy",
+            "effective": captured_gepa_kwargs["candidate_selection_strategy"],
+            "status": "honored",
+        },
+        {
+            "option": "module_selection",
+            "intended": "round_robin",
+            "route": "GEPA.component_selector -> optimize.module_selector",
+            "effective": captured_gepa_kwargs["module_selector"],
+            "status": "honored",
+        },
+        {
+            "option": "acceptance",
+            "intended": "strict_improvement",
+            "route": "gepa_kwargs.acceptance_criterion",
+            "effective": captured_gepa_kwargs["acceptance_criterion"],
+            "status": "honored_by_0.1.4",
+        },
+        {
+            "option": "selection",
+            "intended": "all_improvements",
+            "route": "gepa_kwargs.selection_strategy",
+            "effective": type(captured_gepa_kwargs["selection_strategy"]).__name__,
+            "status": "honored_explicitly",
+        },
+        {
+            "option": "use_merge",
+            "intended": False,
+            "route": "GEPA.use_merge",
+            "effective": captured_gepa_kwargs["use_merge"],
+            "status": "honored",
+        },
+        {
+            "option": "reflection_lm",
+            "intended": "optimizer LM",
+            "route": "DSPy adapter stripped_lm_call wrapper",
+            "effective": type(captured_gepa_kwargs["reflection_lm"]).__name__,
+            "status": "honored",
+        },
+        {
+            "option": "skip_perfect_score",
+            "intended": True,
+            "route": "GEPA default/direct optimize",
+            "effective": captured_gepa_kwargs["skip_perfect_score"],
+            "status": "honored",
+        },
+        {
+            "option": "perfect_score",
+            "intended": 1.0,
+            "route": "GEPA.perfect_score",
+            "effective": captured_gepa_kwargs["perfect_score"],
+            "status": "honored",
+        },
+        {
+            "option": "num_threads",
+            "intended": 1,
+            "route": "DSPy DspyAdapter",
+            "effective": ConstructionProbeAdapter.constructed_kwargs["num_threads"],
+            "status": "honored",
+        },
+        {
+            "option": "failure_score",
+            "intended": 0.0,
+            "route": "DSPy DspyAdapter",
+            "effective": ConstructionProbeAdapter.constructed_kwargs["failure_score"],
+            "status": "honored",
+        },
+        {
+            "option": "track_stats",
+            "intended": True,
+            "route": "DSPy result projection",
+            "effective": hasattr(gepa_program, "detailed_results"),
+            "status": "honored",
+        },
+        {
+            "option": "seed",
+            "intended": 2026072705,
+            "route": "GEPA.seed -> optimize.seed",
+            "effective": captured_gepa_kwargs["seed"],
+            "status": "honored",
+        },
+        {
+            "option": "log_dir",
+            "intended": "owned temporary run directory",
+            "route": "GEPA.log_dir -> optimize.run_dir",
+            "effective": run_dir_created,
+            "status": "honored_and_cleaned",
+        },
+        {
+            "option": "callbacks",
+            "intended": "lifecycle callbacks",
+            "route": "gepa_kwargs.callbacks",
+            "effective": sorted(set(recorder.events)),
+            "status": "exercised",
+        },
+        {
+            "option": "stopper",
+            "intended": "semantic stopper callback",
+            "route": "gepa_kwargs.stop_callbacks",
+            "effective": stopper.calls,
+            "status": "exercised",
+        },
+        {
+            "option": "dataset_shape",
+            "intended": {"train": 16, "selection": 32, "predictors": 2},
+            "route": "GEPA.compile",
+            "effective": {
+                "train": len(train),
+                "selection": len(validation),
+                "predictors": len(gepa_program.named_predictors()),
+            },
+            "status": "honored",
+        },
     ]
 
     # MIPROv2: execute the same future public constructor/compile shape through
@@ -371,6 +503,65 @@ def main() -> None:
             seed=2026072705,
             track_stats=True,
         )
+
+        # Observe the values after MIPRO has resolved constructor/compile
+        # ownership and immediately before each real phase consumes them.  This
+        # is execution evidence, not constructor-signature acceptance.
+        mipro_effective = {}
+        original_bootstrap = mipro._bootstrap_fewshot_examples
+        original_propose = mipro._propose_instructions
+        original_optimize = mipro._optimize_prompt_parameters
+
+        def capture_bootstrap(_self, *phase_args, **phase_kwargs):
+            mipro_effective["bootstrap"] = {
+                "train": len(phase_args[1]),
+                "seed": phase_args[2],
+                **{
+                    key: phase_kwargs[key]
+                    for key in (
+                        "num_fewshot_candidates",
+                        "max_bootstrapped_demos",
+                        "max_labeled_demos",
+                        "max_errors",
+                    )
+                },
+            }
+            return original_bootstrap(*phase_args, **phase_kwargs)
+
+        def capture_propose(_self, *phase_args, **phase_kwargs):
+            proposed = original_propose(*phase_args, **phase_kwargs)
+            mipro_effective["proposal"] = {
+                "train": len(phase_args[1]),
+                "view_data_batch_size": phase_args[3],
+                "program_aware_proposer": phase_args[4],
+                "data_aware_proposer": phase_args[5],
+                "tip_aware_proposer": phase_args[6],
+                "fewshot_aware_proposer": phase_args[7],
+                "num_instruct_candidates": phase_kwargs["num_instruct_candidates"],
+                "candidate_widths": {
+                    str(index): len(candidates)
+                    for index, candidates in proposed.items()
+                },
+            }
+            return proposed
+
+        def capture_optimize(_self, *phase_args, **phase_kwargs):
+            evaluate = phase_args[3]
+            mipro_effective["optimization"] = {
+                "selection": len(phase_args[4]),
+                "num_trials": phase_args[5],
+                "minibatch": phase_args[6],
+                "minibatch_size": phase_args[7],
+                "minibatch_full_eval_steps": phase_args[8],
+                "seed": phase_args[9],
+                "num_threads": evaluate.num_threads,
+                "max_errors": evaluate.max_errors,
+            }
+            return original_optimize(*phase_args, **phase_kwargs)
+
+        mipro._bootstrap_fewshot_examples = types.MethodType(capture_bootstrap, mipro)
+        mipro._propose_instructions = types.MethodType(capture_propose, mipro)
+        mipro._optimize_prompt_parameters = types.MethodType(capture_optimize, mipro)
         with contextlib.redirect_stdout(io.StringIO()):
             mipro_program = mipro.compile(
                 TwoStage(),
@@ -418,7 +609,9 @@ def main() -> None:
             max_errors=0,
             seed=7,
         )
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+            io.StringIO()
+        ):
             failing.compile(
                 TwoStage(),
                 trainset=examples(1),
@@ -437,6 +630,7 @@ def main() -> None:
     evaluator_failure_type = None
     evaluator_calls = 0
     try:
+
         def failing_metric(_gold, _pred, _trace=None):
             nonlocal evaluator_calls
             evaluator_calls += 1
@@ -462,7 +656,9 @@ def main() -> None:
             max_errors=0,
             seed=7,
         )
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+            io.StringIO()
+        ):
             failing.compile(
                 TwoStage(),
                 trainset=examples(1),
@@ -483,28 +679,233 @@ def main() -> None:
         else "contained_as_zero_score_by_mipro_eval_candidate_program"
     )
 
-    constructor_parameters = inspect.signature(dspy.MIPROv2.__init__).parameters
-    compile_parameters = inspect.signature(dspy.MIPROv2.compile).parameters
+    # The matched treatment's operational guards deliberately inherit directly
+    # from BaseException.  Load the actual production type and prove that the
+    # same public MIPRO path cannot turn route/cost/identity/privacy/transport
+    # failure into an ordinary candidate score of zero.
+    operational_runner = (
+        Path(__file__).resolve().parents[1]
+        / "examples"
+        / "matched_gepa_mipro_ifbench"
+        / "run_upstream.py"
+    )
+    sys.path.insert(0, str(operational_runner.parent))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "imp_matched_ifbench_operational_boundary", operational_runner
+        )
+        if spec is None or spec.loader is None:
+            raise RuntimeError("cannot load matched IFBench operational boundary")
+        operational_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(operational_module)
+    finally:
+        sys.path.pop(0)
+
+    operational_failure_type = None
+    operational_failure_contained = None
+    operational_calls = 0
+    try:
+
+        def operational_metric(_gold, _pred, _trace=None):
+            nonlocal operational_calls
+            operational_calls += 1
+            raise operational_module.OperationalSafetyAbort(
+                "deterministic route/cost/identity/privacy/transport guard"
+            )
+
+        guarded = dspy.MIPROv2(
+            metric=operational_metric,
+            prompt_model=SharedDummyLM(
+                [
+                    {"observations": "draft observations"},
+                    {"observations": "review observations"},
+                    {"summary": "summary"},
+                    {"proposed_instruction": "draft candidate"},
+                    {"proposed_instruction": "review candidate"},
+                ]
+            ),
+            task_model=SharedDummyLM(task_answers(100)),
+            auto=None,
+            num_candidates=1,
+            max_bootstrapped_demos=0,
+            max_labeled_demos=0,
+            num_threads=1,
+            max_errors=0,
+            seed=7,
+        )
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+            io.StringIO()
+        ):
+            guarded.compile(
+                TwoStage(),
+                trainset=examples(1),
+                valset=examples(1),
+                num_trials=1,
+                minibatch=False,
+                program_aware_proposer=False,
+                data_aware_proposer=True,
+                tip_aware_proposer=True,
+                fewshot_aware_proposer=False,
+                view_data_batch_size=1,
+            )
+        operational_failure_contained = True
+    except BaseException as error:  # noqa: BLE001 - fatal guard is not Exception
+        operational_failure_type = type(error).__name__
+        operational_failure_contained = False
+
+    bootstrap_effective = mipro_effective["bootstrap"]
+    proposal_effective = mipro_effective["proposal"]
+    optimization_effective = mipro_effective["optimization"]
     mipro_matrix = [
-        {"option": "auto", "effective": None, "route": "constructor", "status": "honored"},
-        {"option": "num_candidates", "route": "constructor", "status": "honored" if "num_candidates" in constructor_parameters else "unsupported"},
-        {"option": "trials", "route": "compile.num_trials", "status": "honored" if "num_trials" in compile_parameters else "unsupported"},
-        {"option": "minibatch", "route": "compile", "status": "honored" if "minibatch" in compile_parameters else "unsupported"},
-        {"option": "max_bootstrapped_demos", "route": "constructor+compile", "status": "honored" if "max_bootstrapped_demos" in constructor_parameters and "max_bootstrapped_demos" in compile_parameters else "unsupported"},
-        {"option": "max_labeled_demos", "route": "constructor+compile", "status": "honored" if "max_labeled_demos" in constructor_parameters and "max_labeled_demos" in compile_parameters else "unsupported"},
-        {"option": "program_aware_proposer", "effective": False, "route": "compile", "status": "honored"},
-        {"option": "data_aware_proposer", "effective": True, "route": "compile", "status": "honored"},
-        {"option": "tip_aware_proposer", "effective": True, "route": "compile", "status": "honored"},
-        {"option": "fewshot_aware_proposer", "effective": False, "route": "compile", "status": "honored"},
-        {"option": "view_data_batch_size", "effective": 10, "route": "compile", "status": "honored"},
-        {"option": "num_threads", "effective": 1, "route": "constructor/Evaluate", "status": "honored"},
-        {"option": "max_errors", "effective": 0, "route": "constructor/Evaluate; outer MIPRO eval_candidate_program catches evaluation abort", "status": "honored_locally_not_optimizer_fatal"},
-        {"option": "evaluator_exception", "effective": evaluator_failure_outcome, "route": "MIPRO eval_candidate_program", "status": "upstream_containment_semantics"},
-        {"option": "seed", "effective": 2026072705, "route": "constructor+compile+Optuna", "status": "honored"},
-        {"option": "startup_trials", "intended": 10, "route": "Optuna TPESampler default", "effective": optuna.samplers.TPESampler()._n_startup_trials, "status": "implicit_external_default"},
+        {
+            "option": "auto",
+            "intended": None,
+            "effective": mipro.auto,
+            "route": "constructor",
+            "status": "honored",
+        },
+        {
+            "option": "num_candidates",
+            "intended": 4,
+            "effective": {
+                "bootstrap": bootstrap_effective["num_fewshot_candidates"],
+                "proposal": proposal_effective["num_instruct_candidates"],
+                "candidate_widths": proposal_effective["candidate_widths"],
+            },
+            "route": "constructor -> bootstrap/proposal phase calls",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "trials",
+            "intended": 8,
+            "effective": {
+                "optimizer_input": optimization_effective["num_trials"],
+                "optuna_trials": len(mipro_program.trial_logs) - 1,
+                "trial_log_slots_including_default": len(mipro_program.trial_logs),
+            },
+            "route": "compile -> _optimize_prompt_parameters -> Optuna",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "minibatch",
+            "intended": False,
+            "effective": optimization_effective["minibatch"],
+            "route": "compile -> _optimize_prompt_parameters",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "max_bootstrapped_demos",
+            "intended": 0,
+            "effective": bootstrap_effective["max_bootstrapped_demos"],
+            "route": "constructor+compile -> bootstrap phase; proposal-only context is discarded before search",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "max_labeled_demos",
+            "intended": 0,
+            "effective": bootstrap_effective["max_labeled_demos"],
+            "route": "constructor+compile -> bootstrap phase; proposal-only context is discarded before search",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "program_aware_proposer",
+            "intended": False,
+            "effective": proposal_effective["program_aware_proposer"],
+            "route": "compile -> proposal phase",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "data_aware_proposer",
+            "intended": True,
+            "effective": proposal_effective["data_aware_proposer"],
+            "route": "compile -> proposal phase",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "tip_aware_proposer",
+            "intended": True,
+            "effective": proposal_effective["tip_aware_proposer"],
+            "route": "compile -> proposal phase",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "fewshot_aware_proposer",
+            "intended": False,
+            "effective": proposal_effective["fewshot_aware_proposer"],
+            "route": "compile -> proposal phase",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "view_data_batch_size",
+            "intended": 10,
+            "effective": proposal_effective["view_data_batch_size"],
+            "route": "compile -> proposal phase",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "num_threads",
+            "intended": 1,
+            "effective": optimization_effective["num_threads"],
+            "route": "constructor -> live Evaluate",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "max_errors",
+            "intended": 0,
+            "effective": optimization_effective["max_errors"],
+            "route": "constructor -> live Evaluate; outer MIPRO eval_candidate_program catches ordinary evaluation abort",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "evaluator_exception",
+            "intended": "candidate-local zero score",
+            "effective": evaluator_failure_outcome,
+            "route": "MIPRO eval_candidate_program catches Exception",
+            "status": "matched_dspy_3_2_1_only",
+        },
+        {
+            "option": "operational_safety_exception",
+            "intended": "fatal; never candidate score zero",
+            "effective": {
+                "type": operational_failure_type,
+                "contained": operational_failure_contained,
+                "calls": operational_calls,
+            },
+            "route": "production OperationalSafetyAbort(BaseException) bypasses Evaluate/MIPRO Exception containment",
+            "status": "fatal_guard_bypass_exercised",
+        },
+        {
+            "option": "seed",
+            "intended": 2026072705,
+            "effective": {
+                "bootstrap": bootstrap_effective["seed"],
+                "optimization": optimization_effective["seed"],
+            },
+            "route": "constructor+compile+Optuna",
+            "status": "observed_in_execution",
+        },
+        {
+            "option": "startup_trials",
+            "intended": 10,
+            "route": "Optuna TPESampler default",
+            "effective": optuna.samplers.TPESampler()._n_startup_trials,
+            "status": "implicit_external_default",
+        },
         {"option": "callbacks", "route": "MIPROv2", "status": "unsupported_not_sealed"},
-        {"option": "stop_callbacks", "route": "MIPROv2", "status": "unsupported_not_sealed"},
-        {"option": "dataset_shape", "effective": {"train": 16, "selection": 32, "predictors": len(mipro_program.named_predictors())}, "status": "honored"},
+        {
+            "option": "stop_callbacks",
+            "route": "MIPROv2",
+            "status": "unsupported_not_sealed",
+        },
+        {
+            "option": "dataset_shape",
+            "effective": {
+                "train": 16,
+                "selection": 32,
+                "predictors": len(mipro_program.named_predictors()),
+            },
+            "status": "honored",
+        },
     ]
 
     with tempfile.TemporaryDirectory(prefix="imp-gepa-trace-gate-") as temp:
@@ -567,11 +968,21 @@ def main() -> None:
                 "arbitrary_failure_reflection": False,
             },
             "stock_adapter_success_compatibility": {
-                "transcript_byte_identical": trace_compatibility["ordinary_success"]["byte_identical"],
-                "messages_byte_identical": trace_compatibility["ordinary_success"]["rendered_messages_byte_identical"],
-                "reflection_byte_identical": trace_compatibility["ordinary_success"]["reflection_byte_identical"],
-                "public_compile_opportunity_identical": trace_compatibility["semantic_boundary"]["public_compile_success_opportunity_identical"],
-                "all_failure_orderings_checked": trace_compatibility["mixed_failures"]["all_failure_orderings_checked"],
+                "transcript_byte_identical": trace_compatibility["ordinary_success"][
+                    "byte_identical"
+                ],
+                "messages_byte_identical": trace_compatibility["ordinary_success"][
+                    "rendered_messages_byte_identical"
+                ],
+                "reflection_byte_identical": trace_compatibility["ordinary_success"][
+                    "reflection_byte_identical"
+                ],
+                "public_compile_opportunity_identical": trace_compatibility[
+                    "semantic_boundary"
+                ]["public_compile_success_opportunity_identical"],
+                "all_failure_orderings_checked": trace_compatibility["mixed_failures"][
+                    "all_failure_orderings_checked"
+                ],
             },
             "effective_configuration": effective_gepa,
             "option_matrix": gepa_matrix,
@@ -589,11 +1000,20 @@ def main() -> None:
             "malformed_task_output_refusal": failure_type,
             "evaluator_failure_outcome": evaluator_failure_outcome,
             "evaluator_failure_calls": evaluator_calls,
+            "operational_failure": {
+                "type": operational_failure_type,
+                "contained": operational_failure_contained,
+                "calls": operational_calls,
+            },
+            "effective_phase_inputs": mipro_effective,
             "option_matrix": mipro_matrix,
         },
     }
 
-    assert result["version_ownership"]["acceptance_first_release"] == ACCEPTANCE_FIRST_RELEASE
+    assert (
+        result["version_ownership"]["acceptance_first_release"]
+        == ACCEPTANCE_FIRST_RELEASE
+    )
     assert failure_stages == [None, "parse", "program", "metric", None], failure_stages
     assert len(failure_batch.outputs) == len(failure_rows)
     assert len(failure_batch.scores) == len(failure_rows)
@@ -605,9 +1025,17 @@ def main() -> None:
     )
     assert ConstructionProbeAdapter.constructed == 1
     assert trace_compatibility["ordinary_success"]["byte_identical"] is True
-    assert trace_compatibility["ordinary_success"]["rendered_messages_byte_identical"] is True
+    assert (
+        trace_compatibility["ordinary_success"]["rendered_messages_byte_identical"]
+        is True
+    )
     assert trace_compatibility["ordinary_success"]["reflection_byte_identical"] is True
-    assert trace_compatibility["semantic_boundary"]["public_compile_success_opportunity_identical"] is True
+    assert (
+        trace_compatibility["semantic_boundary"][
+            "public_compile_success_opportunity_identical"
+        ]
+        is True
+    )
     assert "on_optimization_start" in recorder.events
     assert "on_optimization_end" in recorder.events
     assert stopper.calls > 0
@@ -616,6 +1044,13 @@ def main() -> None:
     assert gepa_cleanup and mipro_cleanup
     assert failure_type is not None
     assert evaluator_calls > 0
+    assert (
+        evaluator_failure_outcome
+        == "contained_as_zero_score_by_mipro_eval_candidate_program"
+    )
+    assert operational_failure_type == "OperationalSafetyAbort"
+    assert operational_failure_contained is False
+    assert operational_calls == 1
     assert all(row["status"] != "unsupported" for row in gepa_matrix)
     assert all(
         row["status"] not in {"unsupported", "dropped"}
