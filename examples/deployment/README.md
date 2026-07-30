@@ -57,12 +57,20 @@ evaluates the baseline on those same untouched rows, stops the parent runtime,
 and serves four concurrent two-stage requests from the selected artifact in a
 fresh OS BEAM process.
 
-The committed config permits one seed, at most 328 task-model transports and
-two optimizer-model transports, disables cache/retries/fallbacks, requires
-`data_collection=deny`, and reserves at most `$2.491392`. Immediately before
-the first model call, the script checks the current OpenRouter catalog for the
-exact first-party routes, structured-output parameters, and sealed prices. Any
-drift stops the run.
+The script permits one seed and its optimizer/evaluation shape has a
+conservative maximum of 328 task-model transports plus two optimizer-model
+transports (`$2.491392` at the pinned prices). It disables
+cache/retries/fallbacks, requires `data_collection=deny`, and checks the current
+catalog for the exact first-party routes and prices before the first model
+call. ReqLLM's provider guard enforces the per-request route and maximum price.
+Imp does not yet expose one shared cumulative call/USD budget spanning
+`Experiment.check`, the separate baseline evaluation, and the fresh service;
+that remains a reusable product gap rather than a private example ledger.
+
+The terminal first attempt is retained separately. It proved that seed `0`
+was rejected by ReqLLM 1.17.1's positive-integer option validator before HTTP;
+the successor uses the predeclared positive seed `1` and the public structured
+`Experiment.check` failure surface now retains future pretransport reasons.
 
 ```sh
 OPENROUTER_API_KEY=... \

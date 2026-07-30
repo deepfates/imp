@@ -39,12 +39,28 @@ defmodule Imp.Experiment do
 
     try do
       provenance = stage!(:bootstrap, fn -> Bootstrap.capture!(data, config, bootstrap_opts) end)
-      baseline = evaluate!(:baseline_selection, program, data.selection, metric, evaluation_opts)
+
+      baseline =
+        evaluate!(
+          :baseline_selection,
+          program,
+          data.selection,
+          data.ids.selection,
+          metric,
+          evaluation_opts
+        )
 
       with {:ok, optimized} <-
              stage!(:optimize, fn -> optimize(program, optimizer, data, optimizer_opts) end) do
         optimized_result =
-          evaluate!(:optimized_selection, optimized, data.selection, metric, evaluation_opts)
+          evaluate!(
+            :optimized_selection,
+            optimized,
+            data.selection,
+            data.ids.selection,
+            metric,
+            evaluation_opts
+          )
 
         selected = select(baseline, optimized_result)
 
@@ -64,7 +80,15 @@ defmodule Imp.Experiment do
         selected_program =
           stage!(:artifact_application, fn -> Artifact.apply(artifact, program) end)
 
-        test = evaluate!(:test, selected_program, data.test, metric, evaluation_opts)
+        test =
+          evaluate!(
+            :test,
+            selected_program,
+            data.test,
+            data.ids.test,
+            metric,
+            evaluation_opts
+          )
 
         {:ok,
          %Result{
@@ -81,6 +105,14 @@ defmodule Imp.Experiment do
         {:error, reason} -> {:error, %{stage: :optimize, reason: reason}}
       end
     rescue
+      error in Imp.Experiment.StageError ->
+        {:error,
+         %{
+           stage: error.stage,
+           reason: public_reason(error.reason),
+           exception: error.__struct__
+         }}
+
       error ->
         {:error,
          %{
@@ -108,7 +140,7 @@ defmodule Imp.Experiment do
     end
   end
 
-  defp evaluate!(stage, program, rows, metric, opts) do
+  defp evaluate!(stage, program, rows, row_ids, metric, opts) do
     stage!(stage, fn ->
       result = Imp.evaluate(program, rows, metric, opts)
 
@@ -122,6 +154,11 @@ defmodule Imp.Experiment do
 
       result
     end)
+  rescue
+    error in Imp.EvaluationCancelledError ->
+      raise Imp.Experiment.StageError,
+        stage: stage,
+        reason: evaluation_cancelled(stage, error, row_ids)
   end
 
   defp select(baseline, optimized_result) do
@@ -219,6 +256,7 @@ defmodule Imp.Experiment do
     fun.()
   rescue
     error in [Imp.Experiment.StageError] -> reraise error, __STACKTRACE__
+    error in [Imp.EvaluationCancelledError] -> reraise error, __STACKTRACE__
     error -> raise Imp.Experiment.StageError, stage: stage, reason: Exception.message(error)
   catch
     kind, reason -> raise Imp.Experiment.StageError, stage: stage, reason: {kind, reason}
@@ -226,6 +264,39 @@ defmodule Imp.Experiment do
 
   defp failure_stage(%Imp.Experiment.StageError{stage: stage}), do: stage
   defp failure_stage(_error), do: :bootstrap
+
+  defp evaluation_cancelled(stage, error, row_ids) do
+    failures =
+      Enum.map(error.errors, fn failure ->
+        index = Map.get(failure, :index, Map.get(failure, "index"))
+        reason = Map.get(failure, :reason, Map.get(failure, "reason", :unknown))
+
+        %{
+          stage: stage,
+          index: index,
+          identity_sha256: row_identity(row_ids, index),
+          reason: public_reason(reason)
+        }
+      end)
+
+    %{
+      kind: :evaluation_cancelled,
+      max_errors: error.max_errors,
+      completed_rows: length(error.rows),
+      failures: failures
+    }
+  end
+
+  defp row_identity(row_ids, index) when is_integer(index) and index >= 0 do
+    case Enum.fetch(row_ids, index) do
+      {:ok, identity} -> Data.digest(identity)
+      :error -> nil
+    end
+  end
+
+  defp row_identity(_row_ids, _index), do: nil
+
+  defp public_reason(reason), do: Imp.Redaction.redact(reason)
 
   defp invalid_options!(opts),
     do:

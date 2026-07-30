@@ -73,6 +73,20 @@ defmodule Imp.ExperimentTest do
     def run(%__MODULE__{}, _program, _opts), do: {:error, :deliberate_failure}
   end
 
+  defmodule PretransportLM do
+    defstruct [:owner]
+
+    def generate(%__MODULE__{owner: owner}, messages, opts) do
+      send(owner, {:pretransport_generate, messages, opts})
+
+      {:error,
+       {:request_validation_failed,
+        %{api_key: "sk-provider-secret-should-not-leak", option: :unsupported_shape}}}
+    end
+
+    def response_format_capability(_lm), do: Imp.LM.Capability.none()
+  end
+
   setup do
     root = Path.join(System.tmp_dir!(), "imp-experiment-#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
@@ -306,6 +320,65 @@ defmodule Imp.ExperimentTest do
     assert_received {:call, "selection", false}
     assert_received {:call, "selection", true}
     refute_received {:call, "test", _selected?}
+  end
+
+  test "public check preserves a redacted structured row failure when evaluation cancels" do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Answer the question.")
+      |> Imp.predict(
+        lm: %PretransportLM{owner: owner},
+        adapter: Imp.Adapter.Chat,
+        config: [cache: false, json_fallback: false]
+      )
+
+    data =
+      Data.new(
+        train: [row("private-train-id", "train")],
+        selection: [row("private-selection-id", "selection")],
+        test: [row("private-test-id", "test")],
+        id: :id
+      )
+
+    assert {:error,
+            %{
+              stage: :baseline_selection,
+              exception: Imp.Experiment.StageError,
+              reason: %{
+                kind: :evaluation_cancelled,
+                max_errors: 0,
+                completed_rows: 1,
+                failures: [failure]
+              }
+            } = returned} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [max_errors: 0]
+             )
+
+    assert failure.stage == :baseline_selection
+    assert failure.index == 0
+    assert is_binary(failure.identity_sha256)
+    assert byte_size(failure.identity_sha256) == 64
+    assert inspect(failure.reason) =~ "request_validation_failed"
+    assert inspect(failure.reason) =~ "unsupported_shape"
+
+    rendered = inspect(returned)
+    refute rendered =~ "sk-provider-secret"
+    refute rendered =~ "private-selection-id"
+    refute rendered =~ "private-test-id"
+
+    assert_received {:pretransport_generate, messages, settings}
+    assert Enum.any?(messages, &(&1.role == :system))
+    assert Enum.any?(messages, &(&1.role == :user))
+    assert settings[:cache] == false
+    refute Keyword.has_key?(settings, :json_fallback)
+    refute_received {:optimizer_opts, _}
   end
 
   test "custom identities remain private while row contents stay content-bound" do

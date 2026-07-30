@@ -1,57 +1,70 @@
 defmodule DeploymentBanking77GEPASmokeTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
-  @example Path.expand("../examples/deployment", __DIR__)
-  @config Path.join(@example, "banking77_gepa_smoke.json")
-  @script Path.join(@example, "banking77_gepa_smoke.exs")
+  @script Path.expand("../examples/deployment/banking77_gepa_smoke.exs", __DIR__)
 
-  test "bounded ordinary smoke contract is internally consistent without credentials or network" do
-    config = @config |> File.read!() |> Jason.decode!()
-    execution = config["execution"]
-    calls = execution["call_ceilings"]
-    usd = execution["reservation_usd"]
-
-    assert config["status"] == "proposed_unrun"
-    assert config["seed"] == 0
-    assert config["dataset"]["splits"] == %{"train" => 72, "selection" => 8, "test" => 40}
-    assert calls["task_total"] == 240 + 80 + 8
-    assert calls["optimizer_total"] == 2
-    assert calls["transport_total"] == 330
-    assert_in_delta usd["new_maximum"], 328 * 0.007104 + 2 * 0.08064, 1.0e-12
-    assert_in_delta usd["aggregate_worst_case"], 7.59315275 + 2.491392, 1.0e-12
-    assert execution["cache"] == false
-    assert execution["retry"] == false
-    assert execution["max_retries"] == 0
-    assert execution["fallbacks"] == false
-    assert execution["data_collection"] == "deny"
-
-    env = [
-      {"IMP_PATH", Path.expand("..", __DIR__)},
-      {"IMP_BANKING77_SMOKE_VALIDATE_ONLY", "1"},
-      {"OPENROUTER_API_KEY", nil}
-    ]
-
-    assert {output, 0} =
-             System.cmd("mix", ["run", "--no-start", Path.basename(@script)],
-               cd: @example,
-               env: env,
-               stderr_to_stdout: true
-             )
-
-    assert output =~ "contract is internally consistent"
-  end
-
-  test "ordinary script uses the public experiment and deployment lifecycle" do
+  test "optional smoke is an ordinary public workflow, not a private runner stack" do
     source = File.read!(@script)
+    assert length(String.split(source, "\n")) < 320
+    Code.string_to_quoted!(source, file: @script)
 
     assert source =~ "Imp.Experiment.check"
+    assert source =~ "Imp.Observability.trace"
     assert source =~ "Result.write!"
     assert source =~ "Artifact.write!"
     assert source =~ "ProgramServer.reload_parameters"
-    assert source =~ "Task.await_many"
-    assert source =~ "IMP_BANKING77_SMOKE_FRESH"
     assert source =~ "allow_fallbacks: false"
     assert source =~ "data_collection: \"deny\""
     assert source =~ "req_http_options: [retry: false, max_retries: 0]"
+
+    refute source =~ "defmodule Banking77GEPASmoke.Ledger"
+    refute source =~ "defmodule Banking77GEPASmoke.GuardedLM"
+    refute File.exists?(Path.rootname(@script) <> ".json")
+  end
+
+  test "pinned ReqLLM reproduces the terminal seed-zero failure before transport" do
+    owner = self()
+
+    adapter = fn request ->
+      send(owner, :transport_reached)
+      {request, %Req.TransportError{reason: :provider_free_stop}}
+    end
+
+    lm =
+      Imp.req_llm("openrouter:openai/gpt-5.4-mini",
+        api_key: "local-provider-free-key",
+        cache: false,
+        max_tokens: 256,
+        max_retries: 0,
+        seed: 0,
+        provider_options: [
+          openrouter_provider: %{
+            only: ["openai"],
+            order: ["openai"],
+            allow_fallbacks: false,
+            require_parameters: true,
+            data_collection: "deny",
+            max_price: %{prompt: 0.75, completion: 4.5, request: 0}
+          }
+        ],
+        req_http_options: [adapter: adapter, retry: false, max_retries: 0]
+      )
+
+    program =
+      Imp.predict(
+        Imp.signature("utterance -> evidence", "Summarize the banking request for routing."),
+        adapter: Imp.Adapter.Chat,
+        config: [cache: false, json_fallback: false]
+      )
+
+    assert {:error, reason} =
+             Imp.context([lm: lm], fn ->
+               Imp.call(program, %{utterance: "A transfer was rejected"})
+             end)
+
+    assert Exception.message(reason) =~
+             "invalid value for :seed option: expected positive integer, got: 0"
+
+    refute_received :transport_reached
   end
 end
