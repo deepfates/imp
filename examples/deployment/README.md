@@ -1,98 +1,77 @@
-# Imp OTP Deployment Reference
+# Serve an optimized Imp program under OTP
 
-This application loads a checksummed Imp artifact during supervised startup,
-rebinds named callbacks from trusted application code, and serves calls through
-bounded supervised tasks. The `ProgramServer` owns the loaded artifact and runtime
-configuration, but provider calls execute concurrently outside its mailbox so a
-slow request does not block unrelated callers. Production uses `IMP_MODEL` and
-`IMP_API_KEY`; smoke tests can set `IMP_STATIC_ANSWER` instead.
+This example is for the point after you have a useful Imp program and want to
+run it as part of an application. It shows how to keep trusted program code in
+your release, load selected parameters from an artifact, and serve concurrent
+calls without turning a slow or failed model request into a blocked GenServer.
 
-## Run The Complete Provider-Free Workflow
+The example program has two stages:
 
-The shortest product walkthrough starts with an ordinary typed support-routing
-program and finishes inside the supervised server. From this directory in a
-source checkout:
+1. `analyze` extracts the signal that matters from a support ticket.
+2. `route` uses the ticket and that analysis to choose a team and urgency.
+
+Both stages are ordinary `Imp.predict/2` programs inside an application-owned
+struct implementing `Imp.Module`. The named predictor callbacks let an
+optimizer update either stage without taking ownership of the surrounding
+application code.
+
+## Run the complete workflow without a provider
+
+From this directory in a source checkout:
 
 ```sh
 IMP_PATH=../.. mix deps.get
 IMP_PATH=../.. mix run --no-start run_workflow.exs
 ```
 
-The script performs one coherent lifecycle:
+The workflow:
 
-1. declares an application-owned two-predictor program: `analyze` produces a
-   typed intermediate value and `route` consumes it to produce validated team
-   and urgency classifications;
-2. passes disjoint train, selection, and untouched-test rows to
-   `Imp.Experiment.check/5`, which compiles four demonstrations per predictor
-   with `LabeledFewShot` and keeps the candidate only when selection improves;
-3. validates and reapplies the selected artifact before evaluating only that
-   program on the untouched split;
-4. prints selected parameter IDs and content digests, including the four
-   reviewable demonstrations;
-5. atomically writes the redacted `Imp.Experiment.Result` and its checksummed
-   parameter artifact, verifies their linkage, reconstructs the trusted
-   application module, starts OTP on the baseline, then hot-reloads both
-   predictors' selected parameters without restarting it;
-6. serves four concurrent calls in bounded supervised tasks; and
-7. forces one worker crash and one timeout, then proves the same server still
-   handles the next request.
+1. constructs the two-stage program;
+2. gives `Imp.Experiment.check/5` separate training, selection, and test rows;
+3. uses `LabeledFewShot` to attach demonstrations to both predictors;
+4. selects between the original and optimized programs on validation data;
+5. builds the selected artifact before reading the test set;
+6. writes the linked `Imp.Experiment.Result` and
+   `Imp.Optimizer.Artifact` with private file permissions;
+7. starts `ImpDeployment.ProgramServer` with trusted application code;
+8. hot-reloads the selected parameters;
+9. serves four calls concurrently; and
+10. contains one crashed call and one timed-out call before serving again.
 
-The expected deterministic teaching-fixture scores are selection `0.25 -> 1.0`
-and untouched `1.0`. The static LM contains planted routing rules that activate
-when demonstrations are rendered. Those scores prove the evaluation,
-compilation, parameter, persistence, hot-reload, concurrency, and containment
-mechanics; they do **not** show that `LabeledFewShot` improves a real model, a
-natural task, or a user's data. Replace `ImpDeployment.Workflow.static_lm/0`
-and the three disjoint datasets before making an effectiveness claim.
+It then starts a second OS process, reads the result and artifact, reconstructs
+the trusted program, reapplies the selected parameters, and makes another
+prediction.
 
-## Optional bounded real-model Banking77 example
+The scripted model has planted routing rules, so the deterministic selection
+score moves from `0.25` to `1.0`. That number proves the application lifecycle,
+not model effectiveness. Replace the scripted model and datasets before using
+this example to make a claim about your own task.
 
-`banking77_gepa.exs` is the corresponding one-seed, real-model product
-example. It uses the same public `Imp.Experiment.check/5`, `Result`, `Artifact`,
-and `ProgramServer` surfaces with the pinned public Banking77 subset. GEPA sees
-72 training rows and eight selection rows; the 40 test rows are evaluated only
-after the selected artifact has been built and validated. The script then
-evaluates the baseline on those same untouched rows, stops the parent runtime,
-and serves four concurrent two-stage requests from the selected artifact in a
-fresh OS BEAM process.
+## The application owns code; the artifact owns selected parameters
 
-The script permits one seed and its optimizer/evaluation shape has a
-conservative maximum of 328 task-model transports plus two optimizer-model
-transports (`$2.491392` at the pinned prices). It disables
-cache/retries/fallbacks, requires `data_collection=deny`, and checks the current
-catalog for the exact first-party routes and prices before the first model
-call. ReqLLM's provider guard enforces the per-request route and maximum price.
-Imp does not yet expose one shared cumulative call/USD budget spanning
-`Experiment.check`, the separate baseline evaluation, and the fresh service;
-that remains a reusable product gap rather than a private example ledger.
+`ImpDeployment.SupportPipeline` remains normal source code in the release. The
+artifact contains the selected instructions, demonstrations, and optimizer
+report for its named predictors. It contains no provider credentials or
+application callbacks.
 
-The terminal first attempt is retained separately. It proved that seed `0`
-was rejected by ReqLLM 1.17.1's positive-integer option validator before HTTP;
-the successor uses the predeclared positive seed `1` and the public structured
-`Experiment.check` failure surface now retains future pretransport reasons.
+At startup the application:
 
-```sh
-OPENROUTER_API_KEY=... \
-IMP_PATH=../.. \
-mix run --no-start banking77_gepa.exs
-```
+1. constructs the trusted program;
+2. reads and verifies the checksummed artifact;
+3. binds live model clients and callbacks from application configuration; and
+4. applies the artifact to the matching named predictors.
 
-Neutral, negative, malformed, or stopped behavior is a valid retained outcome.
-Even a positive result establishes only this bounded product path on the pinned
-four-intent task; it is not general GEPA or Imp effectiveness evidence. The
-provider-free workflow above remains the default package demonstration.
+This division keeps serialized model output from becoming executable
+application code. A corrupt or incompatible artifact returns
+`{:error, {:invalid_artifact, reason}}` and leaves the current program serving.
 
-The one exercised run from clean `9ca0bcc` wrote mode-0600 files; their exact
-bytes are retained as the [`Result`](banking77-gepa-exercised-result.json) and linked
-[`Artifact`](banking77-gepa-selected-artifact.json).
-It is an honest negative optimizer outcome: baseline selection scored `0.25`,
-the GEPA candidate scored `0.125`, and `Experiment.check` retained baseline.
-The selected program scored `0.275` on 40 untouched rows with zero errors, then
-loaded in a fresh OS process and served four concurrent two-stage calls. A
-separate baseline re-evaluation scored `0.225`; because the fixed provider seed
-did not make those two baseline evaluations identical, that difference is not
-optimizer lift.
+## The server does not hold slow calls in its mailbox
+
+`ImpDeployment.ProgramServer` owns the current immutable program value. Each
+request borrows a snapshot and runs in a bounded supervised task, so unrelated
+calls can proceed concurrently.
+
+Configure the live application with environment variables:
 
 ```sh
 IMP_ARTIFACT_PATH=/secure/program.json \
@@ -102,35 +81,48 @@ mix run --no-halt
 ```
 
 `IMP_MAX_CONCURRENCY` defaults to the number of online schedulers. Calls above
-that limit return `{:error, :overloaded}`; timed-out calls return
+the limit return `{:error, :overloaded}`. Timed-out calls return
 `{:error, :timeout}` and their worker is terminated. `IMP_SHUTDOWN_TIMEOUT`
-controls how long application shutdown waits for in-flight workers and defaults
-to 5000 milliseconds.
+controls how long shutdown waits for calls already in flight.
 
-`ImpDeployment.ProgramServer.reload_parameters/1` verifies a checksummed
-optimizer artifact and applies it to the trusted application-owned program
-before swapping server state. Calls already in flight keep the old immutable
-program snapshot; subsequent calls see both selected predictors. A corrupt,
-tampered, or incompatible artifact returns `{:error, {:invalid_artifact, reason}}`
-and leaves the current program serving. `reload/1` remains the corresponding
-whole-program path for built-in portable Imp program shapes.
+`ProgramServer.reload_parameters/1` verifies and applies a new parameter
+artifact before swapping server state. Calls already running keep their old
+program snapshot; later calls see the new one. `reload/1` is the corresponding
+whole-program operation for Imp's built-in portable program shapes.
 
-The package clean-room gate runs this exact `Experiment.check` workflow against
-the unpacked Hex artifact, stops the first OS process, then starts a second
-`mix run` process to verify the retained result/artifact pair and call the
-selected program. That is the cold persistence boundary; the static LM remains
-only a deterministic runtime binding.
+## A real-model run shows why selection matters
 
-During source development, set `IMP_PATH` to the Imp checkout. Published
-applications omit it and resolve the Hex dependency once Imp is published
-to Hex (publication is still pending; until then `IMP_PATH` is the working
-path).
+`banking77_gepa.exs` runs the same public path with a two-stage Banking77
+program, GPT-5.4 Mini for the task, and Claude Sonnet 4.6 for GEPA reflection:
 
-## Prepare An Artifact
+```sh
+OPENROUTER_API_KEY=... \
+IMP_PATH=../.. \
+mix run --no-start banking77_gepa.exs
+```
 
-Create the portable artifact before starting the release. This code belongs in
-an application-owned release task or deployment pipeline, where the quality
-metric and callback registry are reviewed along with the program:
+The retained run is an honest negative result. The baseline scored `0.25` on
+selection and the proposed program scored `0.125`, so
+`Imp.Experiment.check/5` retained the baseline. The selected program then
+scored `0.275` on 40 untouched rows with no parse errors, loaded in a fresh OS
+process, and served four concurrent calls.
+
+The exact [`Result`](banking77-gepa-exercised-result.json) and
+[`Artifact`](banking77-gepa-selected-artifact.json) are retained beside the
+example. This result does not show that GEPA is ineffective in general. It
+shows the behavior an application needs when an optimizer makes the program
+worse: choose on validation data, retain the better program, and deploy the
+selected artifact normally.
+
+The script has fixed data sizes, model routes, optimizer limits, no retries or
+fallbacks, and a conservative maximum of 328 task calls plus two optimizer
+calls. It checks provider identity, privacy, and price before making a call.
+Those checks bound this example; they are not a second deployment framework.
+
+## Build a whole-program artifact when parameters are not enough
+
+Imp can also serialize its built-in portable program shapes. Create that
+artifact in an application-owned release task where callbacks are reviewed:
 
 ```elixir
 metric = fn _example, prediction -> Imp.get(prediction, :answer, "") != "" end
@@ -143,25 +135,10 @@ program =
 :ok = Imp.save!(program, "/secure/program.json", registry: registry)
 ```
 
-Start the application with an artifact and live credentials from the host
-environment. The process never reads credentials from the serialized artifact:
+Use a whole-program artifact for a supported portable Imp shape. Use
+`Imp.Optimizer.Artifact` when the application owns a custom program and only
+its selected predictor parameters should cross the persistence boundary.
 
-```sh
-IMP_ARTIFACT_PATH=/secure/program.json \
-IMP_MODEL=openai:gpt-4.1-mini \
-IMP_API_KEY=... \
-mix run --no-halt
-```
-
-For a source-checkout smoke run, set `IMP_PATH` to this repository and use
-`IMP_STATIC_ANSWER=Paris`. That setting bypasses the provider only for the
-smoke path; it is not a production configuration.
-
-## Optimizer Artifacts
-
-`Imp.Optimizer.Artifact` stores checksummed champion and challenger parameter
-states without runtime credentials or callback functions. Load an artifact and
-apply its champion to an already configured live program with
-`ImpDeployment.OptimizerArtifacts.load_apply_and_preserve/3`. Promotion and
-rollback update the artifact atomically while preserving the previous champion
-in revision history.
+During source development set `IMP_PATH` to the Imp checkout. A published
+application will use the normal package dependency after Imp is released on
+Hex.

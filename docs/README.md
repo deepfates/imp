@@ -1,77 +1,58 @@
 # Imp Manual
 
-Imp turns language-model work into declared, callable, measurable, improvable
-Elixir programs. This manual is organized by what you are trying to do.
+Imp turns language-model work into typed, measurable Elixir programs. The
+manual starts with one program and adds complexity only when the program needs
+it.
 
-## Manual Spine
+## Learn the complete path with one example
 
-Every guide and notebook follows the same product story:
+Start with the [Learning Path](LEARNING_PATH.md). It grows a support-ticket
+router through the sequence most Imp applications follow:
 
-1. **Declare** the task as a typed signature.
-2. **Run** it as an Imp program through `Imp.call/2`.
-3. **Develop** it deterministically with `Imp.LM.Static`.
-4. **Measure** behavior with examples, metrics, and evaluation reports.
-5. **Improve** the program with optimizers.
-6. **Extend** it with tools, retrieval, agents, or RLM only when needed.
-7. **Operate** it with ReqLLM, explicit credentials, redaction, telemetry, and
-   supervision.
+1. **Declare** named inputs and typed outputs.
+2. **Run** the program against a real model.
+3. **Test** the same program without a provider.
+4. **Measure** it with examples and a metric.
+5. **Improve** it with an optimizer.
+6. **Extend** it with tools, retrieval, or a larger program only when needed.
+7. **Operate** the selected program under OTP.
 
-## Start Here
+The [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md) slows down at the
+optimization step. It shows the data split, baseline, optimized result, cost,
+and selected program rather than presenting optimization as a magic button.
 
-- [Learning Path](LEARNING_PATH.md): the canonical route from your first live
-  model call to evaluation, optimization, tools, persistence, and deployment.
-- [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md): build a support-ticket
-  router, measure it on held-out data, and improve it with an optimizer —
-  real scores, real costs.
-- [OTP Deployment Example](../examples/deployment/README.md): run the packaged
-  two-stage experiment from disjoint data through selected artifacts,
-  fresh-process loading, concurrent serving, hot reload, and failure
-  containment. It includes a retained real-model run where validation correctly
-  rejected a worse optimizer candidate.
+## Understand the ideas before choosing advanced features
 
-## Learn The Model
+- [API Guide](API_GUIDE.md) explains signatures, programs, predictions,
+  examples, metrics, optimizers, experiments, and artifacts through normal
+  application code.
+- [Imp for DSPy Users](IMP_FOR_DSPY_USERS.md) maps DSPy concepts to Imp and
+  explains which differences come from the BEAM.
+- [Glossary](GLOSSARY.md) gives short definitions for Imp's vocabulary.
+- [Philosophy](PHILOSOPHY.md) explains why Imp treats prompts and learned
+  parameters as data attached to programs.
+- [Architecture](ARCHITECTURE.md) is for readers who need to understand the
+  library's internal shape.
+- [Prior Art](PRIOR_ART.md) covers DSPy, GEPA, Ax, and Optimize Anything.
 
-- [Imp for DSPy Users](IMP_FOR_DSPY_USERS.md): the concept mapping, what is
-  deliberately different on the BEAM, and the honest conformance state.
+## Build the part your application needs
 
-- [Philosophy](PHILOSOPHY.md): the mental model: signatures, programs,
-  adapters, examples, metrics, and optimizers.
-- [Glossary](GLOSSARY.md): short definitions for Imp vocabulary.
-- [Architecture](ARCHITECTURE.md): how the pieces fit together inside the
-  library.
-- [Prior Art](PRIOR_ART.md): lineage from DSPy, Ax, GEPA, and
-  optimize-anything style systems.
+- [API Guide](API_GUIDE.md) — normal program construction and use.
+- [Advanced Imp](ADVANCED.md) — less common program and optimizer surfaces.
+- [Operations Reference](OPERATIONS_REFERENCE.md) — durable resume, provider
+  training jobs, batches, and protocol-owned lifecycle details.
+- [Observability and Debugging](OBSERVABILITY.md) — traces, redaction,
+  progress events, and inspection.
+- [Production Operations](PRODUCTION_OPERATIONS.md) — credentials,
+  supervision, concurrency, and deployment.
 
-## Check The Claims
+The generated module reference is the exhaustive API inventory. The guides
+teach why and when to use the public surface; they are not meant to repeat
+every function signature.
 
-- [Evidence](EVIDENCE.md): the C0–C5 ladder every Imp claim is graded on,
-  and how to compute the ledger's current state. The ladder grades narrow
-  research claims; it is not the product roadmap.
-- [Conformance Report](CONFORMANCE.md): every tracked upstream surface and
-  its verification status, generated from executable checks.
+## Run the examples
 
-## Build With Imp
-
-- [API Guide](API_GUIDE.md): task-oriented examples for normal application
-  code.
-- [Advanced Imp](ADVANCED.md): artifact optimization, GEPA-style reflection,
-  agents, MCP, schemas, and deterministic test doubles.
-- [Operations Reference](OPERATIONS_REFERENCE.md): the contract-heavy
-  boundaries — durable optimizer resume, provider training-job lifecycle and
-  dispatch journals, Fast-Slow training, resumable provider batches, and
-  advanced MCP transports.
-
-## Learn By Running Code
-
-The notebooks in `livebooks/` follow the manual spine with runnable code. The
-first notebook makes real model calls when `OPENAI_API_KEY` is set and tells
-you exactly what to set when it is not. Open them from anywhere: a notebook
-first resolves the Imp checkout or unpacked package beside its own file, rather
-than mistaking the shell's current Mix project for Imp. Set `IMP_PATH` only
-when you deliberately keep the notebook somewhere else; an invalid explicit
-path is rejected instead of silently installing unrelated code. Source
-checkouts use their lockfile, while unpacked packages resolve their declared
-dependencies without assuming that a release artifact ships `mix.lock`.
+The Livebooks follow the same progression as the written guide:
 
 - [01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)
 - [02 Programming, Not Prompting](../livebooks/02_programming_not_prompting.livemd)
@@ -79,28 +60,25 @@ dependencies without assuming that a release artifact ships `mix.lock`.
 - [04 Tools, Agents, MCP, Recursive Control](../livebooks/04_tools_agents_mcp_rlm.livemd)
 - [05 Operate And Live Checks](../livebooks/05_operate_and_live_checks.livemd)
 
-## Operate It
+The first notebook uses a real provider when `OPENAI_API_KEY` is present and
+explains what to set when it is not. The others include provider-free paths so
+you can inspect the program mechanics without spending money.
 
-- [Observability and Debugging](OBSERVABILITY.md): redacted inspection,
-  normalized status, progress subscriptions, and trace capture.
-- [Production Operations](PRODUCTION_OPERATIONS.md): runtime posture, live
-  credentials, secret handling, telemetry, and deployment.
+The [OTP deployment example](../examples/deployment/README.md) shows the
+application boundary: a two-stage program, disjoint selection and test data,
+a saved parameter artifact, a fresh-process load, concurrent service, hot
+reload, and contained worker failure.
 
-## First Things To Try
+## Read research evidence separately from product guidance
 
-1. Run the first live call in the [Learning Path](LEARNING_PATH.md) — five
-   minutes with an OpenAI API key.
-2. Open [Livebook 01](../livebooks/01_real_lm_front_door.livemd) and extract
-   structured data from an email with a real model.
-3. Build and improve a program end to end with the
-   [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md) — held-out
-   before/after scores for about a cent.
-4. Swap your own task into the same shape: change the signature, keep the
-   program, add a metric and a dev set from
-   [Livebook 03](../livebooks/03_evaluate_and_optimize.livemd).
+Most users do not need the repository's compatibility and research records to
+build an application. When you do need to audit a claim:
 
-Maintainer material — fidelity audits, benchmark evidence, parity programs,
-and release protocols — lives in the repository's `internal` and `maintainers`
-directories under this one. None of it ships in the Hex package, and none of
-it is needed to use Imp; the user-facing summary of that work is the
-[Evidence](EVIDENCE.md) page and the [Conformance Report](CONFORMANCE.md).
+- [Conformance](CONFORMANCE.md) describes the observable upstream behavior
+  currently compared with DSPy and related projects.
+- [Evidence](EVIDENCE.md) links narrowly worded research claims to their
+  retained results.
+
+Maintainer protocols, benchmark machinery, and release procedures live under
+`docs/internal/` and `docs/maintainers/`. They support the user-facing docs;
+they are not part of the learning path.

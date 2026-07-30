@@ -1,85 +1,102 @@
 # API Guide
 
-This guide is organized around the things you build.
+Imp gives language-model code the same basic shape as the rest of an Elixir
+application: declared inputs and outputs, callable modules, explicit data,
+measured behavior, and values you can persist and supervise.
 
-Most examples use the public `Imp` facade. Reach for deeper `Imp.*` modules
-when you need direct control over adapters, optimizer reports, tools, agents, or
-persistence. The canonical path is:
+This guide explains the public concepts and the path most applications use.
+The generated module reference is the exhaustive list of functions and
+options. Advanced provider jobs, resumable batches, and protocol details live
+in [Operations Reference](OPERATIONS_REFERENCE.md).
 
-`signature -> program -> call -> evaluate -> optimize -> tools/agents -> operate`
+## A program turns named inputs into a typed prediction
 
-## Configure An LM
+Four values make up the center of Imp:
 
-For deterministic examples:
+- A **signature** declares the task's inputs, outputs, types, and instructions.
+- A **program** is an Elixir value that knows how to perform that task.
+- A **prediction** is the validated result of one call.
+- An **example** is labeled data used to measure or improve the program.
 
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
-```
-
-Programs built without explicit `:lm` or `:adapter` resolve settings when they
-are called, so a later `Imp.configure/1` or scoped `Imp.context/2` affects
-existing programs. Pass `lm:` or `adapter:` to pin a program to a specific
-runtime dependency.
-
-Explicit `lm:` values are checked when the program is built. Imp accepts
-`nil`, an LM module, an LM struct, a configured `%{module: module, opts:
-keyword}` map, or an arity-2 callback. Explicit `adapter:` values accept `nil`
-or a module exporting `format/3` and `parse/3`. Omit the option when you want
-dynamic settings; pass the option when you want a self-contained program.
-
-For production provider access, use the ReqLLM-backed client:
+Start by connecting a model and building a program:
 
 ```elixir
-model = System.fetch_env!("OPENAI_MODEL")
-api_key = System.fetch_env!("OPENAI_API_KEY")
+lm = Imp.req_llm(
+  "openai:gpt-5.4-mini",
+  api_key: System.fetch_env!("OPENAI_API_KEY"),
+  temperature: 0
+)
 
-lm = Imp.req_llm("openai:#{model}", api_key: api_key, temperature: 0)
-Imp.configure(lm: lm)
-```
-
-This delegates provider/model lookup, Req/Finch transport, streaming, and
-provider option translation to the Elixir `req_llm` ecosystem. Imp still owns
-the signature, adapter, optimizer, evaluation, and trace vocabulary.
-
-For a runnable real-provider walkthrough, open
-`livebooks/01_real_lm_front_door.livemd`. It is the best first stop after this
-guide when you want the "this is actually an LM program" moment.
-
-## Basic Predict
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-program =
-  "question -> answer: short_span"
-  |> Imp.signature(
-    "Answer with the shortest correct span. Do not explain."
+signature =
+  Imp.signature(
+    "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]",
+    "Assign the support ticket to the team that owns it."
   )
-  |> Imp.predict(lm: lm)
 
-{:ok, pred} = Imp.call(program, %{question: "Capital of France?"})
-Imp.get(pred, :answer)
+program = Imp.predict(signature, lm: lm, adapter: Imp.Adapter.JSON)
+
+{:ok, prediction} =
+  Imp.call(program, %{ticket: "Our checkout API has been down for an hour."})
+
+Imp.get(prediction, :team)
+#=> "infrastructure"
 ```
 
-## Handle Failures
+The signature is more than prompt text. The adapter uses it to render the
+request and validate the response. An output outside the declared enum is an
+error, not a string your application discovers later.
 
-Program calls return tagged tuples. Match both branches at application
-boundaries instead of assuming every provider call succeeds:
+Use `Imp.chain_of_thought/2` when a declared reasoning field helps the task:
 
 ```elixir
-require Logger
+program = Imp.chain_of_thought("question -> answer: short_span", lm: lm)
+{:ok, prediction} = Imp.call(program, %{question: "What city is the Eiffel Tower in?"})
 
-question = "What is the capital of France?"
+Imp.get(prediction, :answer)
+#=> "Paris"
+```
 
-case Imp.call(program, %{question: question}) do
+Provider-native reasoning remains prediction metadata. It is separate from a
+reasoning field you deliberately put in a signature.
+
+## Settings let the application choose when dependencies are fixed
+
+Pass `lm:` or `adapter:` while constructing a program when that dependency is
+part of the program's configuration. Omit it when the application should bind
+the dependency later.
+
+`Imp.configure/1` sets supervised node defaults. `Imp.context/2` provides a
+process-local override and restores the previous settings afterward:
+
+```elixir
+program = Imp.predict("question -> answer")
+
+test_lm =
+  Imp.LM.Static.new(
+    handler: fn _messages, _opts -> %{answer: "Paris"} end
+  )
+
+answer =
+  Imp.context([lm: test_lm], fn ->
+    {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
+    Imp.get(prediction, :answer)
+  end)
+
+answer
+#=> "Paris"
+```
+
+This is the normal way to test a dynamically configured program without a
+provider. `Imp.with_lm/2` is different: it explicitly rewrites a program graph
+to use a particular LM.
+
+## Failures remain visible at the application boundary
+
+Calls return `{:ok, prediction}` or `{:error, reason}`. Match both branches
+where a model call enters your application:
+
+```elixir
+case Imp.call(program, %{question: "Capital of France?"}) do
   {:ok, prediction} ->
     {:ok, Imp.get(prediction, :answer)}
 
@@ -89,1568 +106,401 @@ case Imp.call(program, %{question: question}) do
 end
 ```
 
-Missing inputs, provider failures, malformed provider returns, and exhausted
-adapter retries are returned as `{:error, reason}`. Invalid constructor options
-and unsupported program shapes raise `ArgumentError` because they are local
-configuration defects and should fail before serving traffic.
+Missing inputs, transport failures, malformed model responses, validation
+errors, and exhausted retries are returned explicitly. Invalid constructor
+options raise because they are local programming errors that should fail
+before traffic reaches the program.
 
-Evaluation keeps per-example failures visible rather than hiding them:
+## Examples and metrics turn an impression into a measurement
+
+An example contains inputs and expected outputs. `Imp.with_inputs/2` tells Imp
+which fields are given to the program; the remaining fields are labels:
 
 ```elixir
 devset = [
-  Imp.example(question: "Eiffel Tower city?", answer: "Paris") |> Imp.with_inputs(:question)
+  Imp.example(
+    ticket: "The API is unavailable in every region.",
+    team: "infrastructure",
+    urgency: "high"
+  )
+  |> Imp.with_inputs(:ticket),
+  Imp.example(
+    ticket: "How do I export a report?",
+    team: "product",
+    urgency: "normal"
+  )
+  |> Imp.with_inputs(:ticket)
 ]
 
-metric = Imp.exact_match(:answer)
-
-report = Imp.evaluate(program, devset, metric, failure_score: 0.0, max_errors: 5)
-
-Enum.each(report.errors, fn error ->
-  Logger.warning("Imp evaluation row failed", error: inspect(error))
-end)
-```
-
-Use a finite `:max_errors` in production jobs to stop a systematically broken
-campaign. Use `:infinity` only when collecting every failure is intentional.
-
-## Conversation History
-
-Use `Imp.history/1` when a signature should see prior task turns. History is
-signature-shaped data, not provider chat logs: each turn is a field map with the
-same input/output names the program already understands.
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Rome"} end]
-}
-
-program = Imp.predict("question, history -> answer", lm: lm)
-
-history =
-  Imp.history([
-    %{question: "What is the capital of France?", answer: "Paris"},
-    %{question: "What is the capital of Germany?", answer: "Berlin"}
-  ])
-
-{:ok, prediction} =
-  Imp.call(program, %{question: "What is the capital of Italy?", history: history})
-
-Imp.get(prediction, :answer)
-```
-
-The Chat adapter renders history turns before the current request, splitting
-each turn into prior user/assistant messages according to the active signature.
-`Imp.History.dump/1` and `Imp.History.load/1` give a JSON-safe boundary for
-application state, while `Imp.History.redact/1` supports safe inspection.
-Provider-native role messages remain explicit maps with role and content fields.
-
-## The Canonical Path
-
-Start with one typed program, evaluate it, attach examples, then optimize only
-after the metric is meaningful:
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-program = Imp.predict("question -> answer", lm: lm)
-
-trainset = [
-  Imp.example(question: "Capital of France?", answer: "Paris")
-  |> Imp.with_inputs(:question)
-]
-
-devset = [
-  Imp.example(question: "Eiffel Tower city?", answer: "Paris")
-  |> Imp.with_inputs(:question)
-]
-
-metric = Imp.exact_match(:answer)
-
-baseline = Imp.evaluate(program, devset, metric)
-
-compiled =
-  program
-  |> Imp.optimize!(
-    Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1),
-    trainset,
-    devset
-  )
-
-{baseline.score, Imp.Optimizer.Report.fetch(compiled)}
-```
-
-Use deeper modules such as `Imp.Evaluate` or `Imp.Optimizer.RandomSearch`
-directly when you need to hold evaluator structs, inspect optimizer internals,
-or build custom orchestration. `Imp.Evaluate.new/3` accepts
-`max_concurrency:` for bounded parallel row evaluation while preserving row
-order, process-local settings, feedback, metric metadata, and error budgeting.
-
-## Which Program Shape?
-
-| Use this | When |
-| --- | --- |
-| `Imp.predict/2` | One model call maps named inputs to named outputs. |
-| `Imp.chain_of_thought/2` | You want a reasoning field before the final answer. |
-| `Imp.multi_chain_comparison/2` | You already have candidate completions and want a self-consistency chooser. |
-| `Imp.best_of_n/3` | You want to run one program several times and keep the highest-scored result. |
-| `Imp.refine/3` | You want bounded retry with feedback until a metric passes. |
-| `Imp.assert/3` | You want named runtime constraints to produce feedback and self-repair attempts. |
-| `Imp.parallel/3` | You want supervised concurrent batch calls with one result per input. |
-| `Imp.knn/3`, `Imp.nearest/2` | You want nearest-neighbor examples from a local trainset. |
-| `Imp.react/3` | The model should choose tools and then submit a validated answer. |
-| `Imp.react_v2/3` | You need native parallel tool calls with truthful IDs in history, and failed tools recorded as observations instead of aborts. |
-| `Imp.avatar/3` | You want one typed action per turn, with each tool isolated under its own timeout. |
-| `Imp.program_of_thought/2` | The model should write small sandboxed Elixir snippets. |
-| `Imp.code_act/3` | You want interleaved tool/code execution under a policy. |
-| `Imp.rlm/2` | You need a bounded recursive controller for large-context exploration. |
-
-The later sections are there when your program needs more control, not because
-every Imp project should start with agents or recursive controllers.
-
-## Composition Helpers
-
-```elixir
-lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-program = Imp.predict("question -> answer", lm: lm)
-metric = Imp.exact_match(:answer)
-
-{:ok, best} =
-  program
-  |> Imp.best_of_n(metric, n: 2)
-  |> Imp.call(%{question: "2+2?"})
-
-{:ok, refined} =
-  program
-  |> Imp.refine(metric, max_attempts: 1)
-  |> Imp.call(%{question: "sqrt 16?"})
-
-batch =
-  Imp.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
-    max_concurrency: 2
-  )
-
-{Imp.get(best, :answer), Imp.get(refined, :answer), length(batch)}
-```
-
-Use assertion-guided refinement when the constraint is clearer than a full task
-metric:
-
-```elixir
-one_word =
-  Imp.assertion(:one_word, fn prediction ->
-    prediction
-    |> Imp.get(:answer, "")
-    |> to_string()
-    |> String.split()
-    |> length() == 1
-  end, message: "Answer with one word.")
-
-{:ok, constrained} =
-  program
-  |> Imp.assert(one_word, max_attempts: 2)
-  |> Imp.call(%{question: "Capital of France?"})
-
-{Imp.get(constrained, :answer), Imp.get(constrained, :assertion_score)}
-```
-
-For self-consistency workflows — run a program several times, keep the most
-common answer — `Imp.majority/2` votes on a field across predictions.
-Values are trimmed and downcased before grouping (pass `normalize:` for a
-custom grouping function), and ties keep the first value from the winning
-group:
-
-```elixir
-predictions = [
-  Imp.prediction(answer: "4"),
-  Imp.prediction(answer: " 4"),
-  Imp.prediction(answer: "5")
-]
-
-Imp.majority(predictions, field: :answer)
-#=> "4"
-```
-
-`Imp.multi_chain_comparison/2` is useful when candidate completions are
-already available. The comparison step adds a required `rationale` output to
-the signature, so the model (scripted here) must return that field too:
-
-```elixir
-mcc_lm = %{
-  module: Imp.LM.Static,
-  opts: [
-    handler: fn _messages, _opts ->
-      %{rationale: "both candidates compute 2+2 directly", answer: "4"}
-    end
-  ]
-}
-
-chooser = Imp.multi_chain_comparison("question -> answer", lm: mcc_lm, m: 2)
-
-Imp.call(chooser, %{
-  question: "2+2?",
-  completions: [
-    %{reasoning: "addition", answer: "4"},
-    %{reasoning: "counting", answer: "4"}
-  ]
-})
-```
-
-`Imp.knn/3` builds an embedding-based nearest-neighbor predictor over examples
-(the DSPy `KNN` port: the trainset embeds once through the required
-`:vectorizer`, queries score by dot product). It returns retrieved examples
-rather than a model prediction:
-
-```elixir
-trainset = [
-  Imp.example(question: "capital France", answer: "Paris") |> Imp.with_inputs(:question)
-]
-
-knn = Imp.knn(1, trainset, vectorizer: Imp.Embeddings.BagOfWords)
-Imp.nearest(knn, %{question: "France"})
-```
-
-## Request-Local Inference Search
-
-Use `Imp.best_of_n/3` for bounded candidate evaluation and `Imp.refine/3` for
-feedback-guided retries. Both keep candidate state, projected budgets,
-provenance, threshold stopping, and failure isolation within one request. They
-do not register a process or persist search state. The facade returns the
-highest-scoring successful prediction using deterministic tie handling, and
-reports projected accounting separately from provider billing.
-
-Sequential retries preserve ordered history for feedback. Concurrent batches
-are supervised and bounded by `max_concurrency`; speculative work that already
-completed remains visible in the result. Record actual provider usage through
-the provider or telemetry boundary rather than treating projected budgets as
-measured usage.
-
-## Chain Of Thought
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
-}
-
-Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
-
-program = Imp.chain_of_thought("question -> answer")
-{:ok, pred} = Imp.call(program, %{question: "2+2?"})
-
-Imp.get(pred, :reasoning)
-Imp.get(pred, :answer)
-```
-
-Manual reasoning fields are ordinary signature outputs. Provider-native
-reasoning is separate: ReqLLM-backed providers can return thinking/reasoning
-tokens, and Imp preserves them in prediction metadata without pretending they
-are a declared output field:
-
-```elixir
-{:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
-
-prediction.metadata[:native_reasoning]
-prediction.metadata[:reasoning_details]
-```
-
-Streaming provider-native thinking chunks arrive as `%{reasoning: text}` chunks
-with `metadata.type == :reasoning`; ordinary answer text still streams as text.
-Outbound reasoning values become ReqLLM thinking content parts for providers
-that support reasoning continuity.
-
-## Schema-Constrained JSON
-
-```elixir
-signature =
-  Imp.signature(%{
-    inputs: [:text],
-    outputs: [
-      %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
-      %{name: :confidence, type: :number, constraints: %{min: 0.0, max: 1.0}}
-    ]
-  })
-
-program = Imp.predict(signature, adapter: Imp.Adapter.JSON)
-```
-
-For concise local classifiers and other programs with exactly one output, use
-the strict value-only adapter. It validates the returned value against the
-signature but does not guess through labels, brackets, code fences, or prose:
-
-```elixir
-program =
-  Imp.predict(
-    Imp.signature("text -> sentiment: enum[positive,negative]", "Classify sentiment."),
-    adapter: Imp.Adapter.SingleField
-  )
-```
-
-When an LM declares native choice support, an enum-constrained single output
-can become an explicit inference action space. Imp's deployed local TRL runtime
-scores the declared token sequences and chooses greedily. Sampled TRL training
-does not advertise or accept this mode: choice-normalized sampling requires a
-different loss and is not ordinary GRPO. Provider clients that do not declare
-the capability receive the same concise prompt and strict parser, with no
-private option forwarded to them.
-
-For strict local Ollama classification, prefer the ordinary JSON adapter. The
-native ReqLLM Ollama provider declares JSON-schema generation even when a local
-model name is not present in LLMDB, so Imp sends the enum constraint to Ollama
-rather than relying on prompt adherence or result-repair heuristics:
-
-```elixir
-program =
-  Imp.predict(
-    Imp.signature("question -> route: enum[K11,K47]", "Route the question."),
-    lm: Imp.req_llm("ollama:llama3.2:3b", cache: false),
-    adapter: Imp.Adapter.JSON,
-    config: [json_fallback: false]
-  )
-```
-
-`json_fallback: false` makes a malformed response one explicit error and one
-generation. It does not normalize labels, brackets, or out-of-enum values.
-
-The JSON adapter validates output fields and returns retry feedback for schema
-violations.
-
-Answer-shape constraints are useful for extractive tasks:
-
-```elixir
-signature =
-  Imp.signature(
-    "question -> verdict: yes_no, amount: numeric_span, answer: short_span",
-    "Extract only the requested answer fields."
-  )
-```
-
-## Streaming
-
-`Imp.stream/3` returns an Enumerable of chunks from one program
-call, and `Imp.collect/3` joins a stream back into a string —
-returning `{:error, reason}` rather than partial output if any chunk fails.
-
-With a ReqLLM-backed LM and `provider_stream: true`, chunks arrive from the
-provider as it generates: answer text as strings, provider-native thinking as
-`%{reasoning: text}` chunks tagged `metadata.type == :reasoning`, and tool
-calls as `%{tool_calls: [...]}` chunks (see Chain Of Thought above).
-
-```elixir
-lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
-program = Imp.predict("question -> answer", lm: lm)
-
-program
-|> Imp.stream(%{question: "Name the Galilean moons."}, provider_stream: true)
-|> Enum.each(&IO.write(if is_binary(&1), do: &1, else: ""))
-```
-
-In a LiveView, run the stream in a supervised task and send chunks to the
-view — a sketch of the shape:
-
-```elixir
-def handle_event("ask", %{"q" => q}, socket) do
-  view = self()
-
-  Task.Supervisor.start_child(MyApp.TaskSupervisor, fn ->
-    MyApp.Router.program()
-    |> Imp.stream(%{question: q}, provider_stream: true)
-    |> Enum.each(&send(view, {:answer_chunk, &1}))
-
-    send(view, :answer_done)
-  end)
-
-  {:noreply, assign(socket, answer: "")}
+metric = fn example, prediction ->
+  Imp.get(example, :team) == Imp.get(prediction, :team) and
+    Imp.get(example, :urgency) == Imp.get(prediction, :urgency)
 end
 
-def handle_info({:answer_chunk, text}, socket) when is_binary(text) do
-  {:noreply, update(socket, :answer, &(&1 <> text))}
-end
-```
-
-Programs that cannot provider-stream (and any program without
-`provider_stream: true`) degrade honestly: the call runs once and the result
-is chunked locally, so stream consumers keep working. That is also the
-testing story — a scripted model streams through the same interface:
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-program = Imp.predict("question -> answer", lm: lm)
-
-Imp.stream(program, %{question: "q"}) |> Enum.to_list()
-#=> ["P", "a", "r", "i", "s"]
-```
-
-Pass `chunker: fn text -> [...] end` to control local chunking.
-`Imp.Streaming.incremental_fields/2` is the lower-level parser that turns
-delimiter-marked chunk sequences into per-field increments:
-
-```elixir
-Imp.Streaming.incremental_fields(
-  ["[[ ## answer ## ]]Paris", "[[ ## rationale ## ]]lookup"],
-  "question -> answer, rationale"
+report = Imp.evaluate(program, devset, metric,
+  max_concurrency: 4,
+  max_errors: 2,
+  failure_score: 0.0
 )
-#=> [%{field: :answer, value: "Paris"}, %{field: :rationale, value: "lookup"}]
+
+{report.score, report.rows, report.errors}
 ```
 
-## Examples And Demos
+The score summarizes the run. The rows and errors explain it. Use a finite
+`max_errors` when repeated failures indicate that the job is broken; Imp keeps
+the stage and redacted row identity in the cancellation error.
+
+Built-in metrics include `Imp.exact_match/1`, `Imp.extractive_qa/3`, and
+`Imp.classification/3`. A useful metric should distinguish behavior you would
+actually deploy, not merely reward a convenient output shape.
+
+## Keep training, selection, and test data separate
+
+Optimization needs at least two roles for data:
+
+- **Training data** is information the optimizer may use to construct a
+  candidate.
+- **Selection data** chooses between the original and candidate programs.
+- **Test data** measures the selected program after that choice is complete.
+
+`Imp.Experiment.Data` checks that example identities do not overlap across
+those splits. `Imp.Experiment.check/5` owns the complete lifecycle:
 
 ```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
-}
-
-demo =
-  Imp.example(question: "2+2?", answer: "4")
-  |> Imp.with_inputs(:question)
-
-program =
-  "question -> answer"
-  |> Imp.predict(lm: lm)
-  |> Imp.with_demos([demo])
-```
-
-## Evaluate A Program
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-program = Imp.predict("question -> answer", lm: lm)
-
-devset = [
-  Imp.example(question: "Capital of France?", answer: "Paris") |> Imp.with_inputs(:question)
-]
-
-metric = Imp.exact_match(:answer)
-report = Imp.evaluate(program, devset, metric)
-report.score
-```
-
-Metrics may return booleans, numbers, maps with `:score` / `:feedback`, or a
-`Imp.Prediction` carrying score and feedback. Imp normalizes those returns
-into row scores, pass/fail state, feedback, and metric metadata. Arity-3 metrics
-receive the prediction trace as their third argument.
-
-Built-in metric helpers cover common benchmark shapes:
-
-```elixir
-qa = Imp.extractive_qa("since 2000", "2000")
-
-report =
-  Imp.classification_report([
-    {"warm", "warm"},
-    {"warm", "cool"},
-    {"cool", "cool"}
-  ])
-
-{qa.metadata["f1"], report["macro_f1"]}
-```
-
-## Retrieval-Augmented Programs
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-docs = [
-  %{text: "France has capital Paris."},
-  %{text: "Germany has capital Berlin."}
-]
-
-retriever = Imp.memory(docs, k: 1)
-
-program =
-  "question, context -> answer"
-  |> Imp.predict()
-  |> Imp.rag(retriever, k: 1)
-
-{:ok, prediction} =
-  Imp.context([lm: lm], fn ->
-    Imp.call(program, %{question: "capital France"})
-  end)
-
-Imp.get(prediction, :answer)
-prediction.metadata.retrieval
-```
-
-`Imp.rag/3` is intentionally small: it retrieves documents, renders them into
-the configured context field, calls the wrapped program, and records retrieval
-metadata. The wrapped program can be a plain `Predict`, a compiled few-shot
-program, or any other callable Imp module that expects a context input. For
-multi-hop retrieval, pass `hops: 2` or higher; each hop expands the original
-query with previously retrieved passages, deduplicates documents, injects the
-combined context, and records per-hop retrieval metadata.
-RAG programs backed by `Imp.memory/2` can be saved and loaded with
-`Imp.dump/1`, `Imp.load/1`, `Imp.save!/2`, and `Imp.load!/1`; network
-retrievers remain host-owned dependencies. Callback-bearing program graphs are
-persisted through a named `Imp.Saving.Registry` supplied explicitly by the
-host; functions are never written into artifacts.
-
-## Local Embeddings
-
-```elixir
-{:ok, vectors} =
-  Imp.Embeddings.embed(
-    Imp.Embeddings.BagOfWords,
-    ["elixir language model programs", "python prompt scripts"],
-    dims: 8
-  )
-
-length(hd(vectors))
-```
-
-`Imp.Embeddings.BagOfWords` is deterministic and local. It is useful for
-examples, tests, and small retrieval experiments. Production semantic embeddings
-should be injected behind the `Imp.Embeddings` behaviour so credentials,
-network calls, and model choice stay explicit. Any provider must return exactly
-one numeric vector for each input text, in the same order.
-
-## Datasets
-
-`Imp.Datasets` turns records you already have into example lists: 
-`from_records/3` for in-memory data, `jsonl/3` and `csv/3` for files, and
-`split/2` for a shuffled train/dev split. Benchmark-shaped loaders —
-`Imp.Datasets.GSM8K`, `HotPotQA`, `MATH`, `Colors` — read files in those
-datasets' formats from paths you supply; nothing is downloaded for you.
-
-```elixir
-examples =
-  Imp.Datasets.from_records(
-    [%{question: "Capital of France?", answer: "Paris"}],
-    [:question]
-  )
-```
-
-Every loader returns `Imp.Example` values with inputs already marked, ready
-for `Imp.evaluate/4` and the optimizers. `Imp.Datasets.GSM8K.metric/3` is the
-benchmark metric: it compares the canonical final answer (the `#### N` value,
-kept in `:canonical_answer` by the fetcher) with numeric equivalence and a
-normalized text fallback, mirroring DSPy's `gsm8k_metric`, so a prediction of
-`"18"` scores true against a gold rationale ending `#### 18`.
-
-## Optimize A Program
-
-```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
-
-program = Imp.predict("question -> answer", lm: lm)
-
 trainset = [
-  Imp.example(question: "Capital of France?", answer: "Paris") |> Imp.with_inputs(:question)
+  Imp.example(ticket: "Duplicate invoice charge", team: "billing", urgency: "normal")
+  |> Imp.with_inputs(:ticket)
 ]
 
-devset = [
-  Imp.example(question: "Eiffel Tower city?", answer: "Paris") |> Imp.with_inputs(:question)
+selection_set = [
+  Imp.example(ticket: "Refund the annual invoice", team: "billing", urgency: "normal")
+  |> Imp.with_inputs(:ticket)
 ]
 
-metric = Imp.exact_match(:answer)
-optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-compiled = Imp.optimize!(program, optimizer, trainset, devset)
+testset = [
+  Imp.example(ticket: "Explain this subscription charge", team: "billing", urgency: "normal")
+  |> Imp.with_inputs(:ticket)
+]
 
-Imp.Optimizer.Report.fetch(compiled)
-```
-
-The facade dispatches through the `Imp.Optimizer` behaviour. Each optimizer
-implements `__optimizer__/0` and `run/3`; `Imp.optimizer_capabilities/1`
-returns its validated declaration:
-
-- `kind` is `:program`, `:training`, `:constructor`, or `:workflow`.
-- `datasets` maps named splits such as `trainset`, `validation`,
-  `promotionset`, and `auditset` to `:required`, `:optional`, or
-  `:unsupported`.
-- `result` declares the expected result shape; workflows name their concrete
-  result module.
-
-Use `Imp.optimize!/3` when a program optimizer does not require validation,
-`Imp.optimize!/4` when supplying validation, and `Imp.optimize!/5` when also
-passing invocation options such as checkpoint controls. For a trainset-only
-optimizer, a non-empty keyword list in the fourth position carries invocation
-options; for example, `Imp.optimize!(student, bootstrap, trainset, teacher:
-teacher)`. This choice follows the declared split requirements; Imp does not
-infer argument meaning from an optimizer module's exported function arities.
-The behaviour layer checks that required splits are present and unsupported
-splits are absent. Each optimizer remains responsible for validating split
-contents and any optimizer-specific relationship between them.
-
-For a complete train/selection/untouched-test check, use the shared public
-experiment boundary instead of writing selection and artifact plumbing around
-each optimizer:
-
-```elixir
 data =
   Imp.Experiment.Data.new(
     train: trainset,
-    selection: devset,
-    test: [
-      Imp.example(question: "French capital?", answer: "Paris")
-      |> Imp.with_inputs(:question)
-    ]
+    selection: selection_set,
+    test: testset
   )
 
-{:ok, checked} = Imp.Experiment.check(program, optimizer, data, metric)
+optimizer = Imp.Optimizer.LabeledFewShot.new(k: 1, sample: false)
 
-result_path = Path.join(System.tmp_dir!(), "support-router-result.json")
-artifact_path = Path.join(System.tmp_dir!(), "support-router.json")
-:ok = Imp.Experiment.Result.write!(checked, result_path)
-:ok = Imp.Optimizer.Artifact.write!(checked.artifact, artifact_path)
+{:ok, result} =
+  Imp.Experiment.check(program, optimizer, data, metric,
+    artifact_id: "support-router",
+    evaluation_options: [max_concurrency: 4, max_errors: 2]
+  )
+
+{result.baseline_selection.score, result.optimized_selection.score, result.test.score}
 ```
 
-`Imp.Experiment.Data` rejects duplicate identities within or across splits.
-`check/5` evaluates baseline and candidate only on selection, retains baseline
-on a tie, builds and reapplies the selected artifact, and only then touches the
-test split. Evaluation errors, optimizer failure, missing reports, and
-non-numeric scores return a failed stage rather than a partial result. Use
-`optimizer_options:` for optimizer controls and `evaluation_options:` for
-`:max_concurrency`, `:max_errors`, or `:timeout`; neither is forwarded to the
-other boundary. Research callers may additionally declare `config:`,
-`metric_identity:`, and `bootstrap:` provenance, but ordinary callers do not
-need them.
+Imp evaluates the original and optimized programs on selection data, keeps the
+original on a tie, builds and reapplies the selected artifact, and only then
+reads the test split. If optimization, evaluation, artifact construction, or
+artifact application fails, the function returns the failed stage instead of
+a partial success.
 
-The checksummed result stores scores, counts, redacted provenance, and the
-selected artifact by default—not source IDs or row contents. Pass
-`include_rows: true` to `Imp.Experiment.Result.write!/3` only when retaining
-redacted row details is intentional. In a fresh process, reconstruct trusted
-program code and runtime clients and apply the artifact as shown below.
+This is the best default for an application or a bounded experiment. Use
+`Imp.optimize/3..5` directly when you deliberately need an optimizer's native
+return value or lifecycle.
 
-The packaged [OTP deployment example](../examples/deployment/README.md) carries
-this exact boundary through a two-predictor application, `Result` and
-`Artifact` persistence, fresh-process loading, concurrent serving, hot reload,
-and contained failure. Its retained real-model Banking77 run also shows the
-important negative case: an optimizer candidate can lose on selection, in
-which case `check/5` preserves baseline and still produces the deployable
-selected artifact.
+## An optimizer changes a program; it does not replace measurement
 
-Use:
+Public optimizers whose declared kind is `:program` can be called through
+`Imp.optimize/3..5`. Constructor, workflow, and training families use their
+documented entry points because they return a different kind of result. The
+families differ in what they are allowed to change and what information they
+need.
 
-| Optimizer | Use it when |
+| Family | Start here when |
 | --- | --- |
-| `LabeledFewShot` | You already have good examples and want demos quickly. |
-| `BootstrapFewShot` | A teacher program can generate candidate demos. |
-| `RandomSearch` / `BootstrapRS` | You want a small deterministic baseline search over demo sets. |
-| `InstructionSearch` / `InferRules` / `COPRO` | Instructions or signature-level rules are the likely bottleneck. |
-| `MIPROv2` / `SIMBA` | You want broader instruction/demo search with stronger evaluation discipline. |
-| `GEPA` | You want reflective instruction evolution, where the optimizer reads text feedback from your metric and rewrites instructions between candidates. |
-| `Avatar` / `AvatarOptimizer` | You want bounded typed tool use and feedback-driven actor-instruction optimization from positive and negative trajectories. |
-| `BetterTogether` | You want named prompt/weight optimizers applied in a configurable sequence, with every successful prefix evaluated and the best validation candidate retained. |
+| `LabeledFewShot` | You already have good labeled examples and want to attach demonstrations directly. |
+| `BootstrapFewShot`, `RandomSearch`, `KNNFewShot` | You want to generate, sample, search, or retrieve demonstrations. |
+| `COPRO`, `InferRules`, `SignatureOptimizer` | The instruction or rule attached to a predictor is the likely bottleneck. |
+| `MIPROv2`, `SIMBA` | You want a broader search over instructions and demonstrations. |
+| `GEPA` | Your metric can provide useful textual feedback for reflective instruction evolution. |
+| `Ensemble`, `BetterTogether` | You want to combine programs or compose named prompt and weight steps. |
+| `BootstrapFinetune`, `GRPO` | You intend to change model weights through an explicit trainer. |
+| `Imp.Optimize.Anything` | The thing being improved is a text or JSON-safe artifact rather than an Imp program. |
 
-`BootstrapFewShot` accepts `teacher:` through that trainset-only front door.
-`RandomSearch` accepts the pinned DSPy compile controls `teacher:`, `restrict:`,
-and `labeled_sample:` through `Imp.optimize!/5`. Unknown or malformed controls
-are rejected before teacher or task execution rather than being ignored.
+An optimizer that needs a proposal or reflection model requires one
+explicitly. GEPA and COPRO do not fabricate local proposals or silently reuse
+the task program's LM. Training optimizers likewise require an explicit
+trainer; creating a training-shaped report is not a weight update.
 
-Longer RandomSearch runs can pause after any fully built and evaluated
-candidate. Give captured metrics a stable identity, then bound each invocation
-by the number of new candidates it may seal:
+Optimizer reports describe the candidates, scores, selected parameters,
+stopping condition, and failures from that run:
 
 ```elixir
-checkpoint_path = Path.join(System.tmp_dir!(), "random-search.json")
+compiled = Imp.optimize!(program, optimizer, trainset, selection_set)
+report = Imp.Optimizer.Report.fetch(compiled)
 
-persist = fn checkpoint ->
-  temporary_path = checkpoint_path <> ".tmp"
-  File.write!(temporary_path, Jason.encode!(checkpoint))
-  File.rename!(temporary_path, checkpoint_path)
-end
-
-random_search =
-  Imp.Optimizer.RandomSearch.new(metric,
-    candidates: 8,
-    metric_identity: %{
-      "id" => "my_app.exact_answer",
-      "version" => 1,
-      "config" => %{"field" => "answer"}
-    }
-  )
-
-paused =
-  Imp.optimize!(program, random_search, trainset, devset,
-    max_candidates: 2,
-    checkpoint_fn: persist
-  )
-
-resumed =
-  Imp.optimize!(program, random_search, trainset, devset,
-    resume_state: Imp.Optimizer.Report.fetch(paused).metadata.resume_state,
-    checkpoint_fn: persist
-  )
+{report.best_score, report.metadata}
 ```
 
-The checkpoint retains the exact DSPy seed/baseline order and completed
-candidate programs. Resume never repeats a sealed candidate; interruption
-during bootstrap or validation replays that candidate as one unit, and no
-partial score can enter selection. The identity stores only the declared id,
-version, and a digest of its JSON-safe config. Anonymous metrics still support
-complete in-process search, explicitly without a resume state.
+The optimizer modules remain pre-1.0 surfaces. Some have strong task-scoped
+effectiveness results; others currently have lifecycle or mechanism evidence
+without broad positive results. See [Evidence](EVIDENCE.md) when that
+distinction matters to a decision.
 
-`SignatureOptimizer` changes exactly one named predictor instruction. A
-single-predictor program selects its only predictor automatically; a
-multi-predictor program must pass `predictor: :name` so Imp never silently
-rewrites every stage with one instruction. Give it a proposer LM for task-aware
-proposals grounded in the complete program structure, the selected predictor,
-and a bounded view of the training examples:
+## Multi-stage programs are normal Elixir modules
+
+Real applications often need more than one model call. Define a struct that
+implements `Imp.Module.call/2`. To let optimizers address its predictors, also
+implement the paired named-predictor callbacks:
 
 ```elixir
-proposal_lm =
-  Imp.LM.Static.new(
-    handler: fn _messages, _opts -> ~s(["Answer with the requested field."]) end
-  )
-
-signature_optimizer =
-  Imp.Optimizer.SignatureOptimizer.new(metric,
-    proposer_lm: proposal_lm,
-    num_candidates: 4,
-    seed: 17,
-    temperature: 0.7,
-    view_data_batch_size: 8
-  )
-
-selected = Imp.optimize!(program, signature_optimizer, trainset, devset)
-```
-
-The proposal LM is called once per requested slot with a distinct deterministic
-rollout id. Malformed or failed slots use the documented native fallback and
-remain visible in the `:signature_optimizer` report. For a manual search, pass
-`candidates: [...]` instead; configuring both sources is rejected. Validation
-alone selects the returned instruction, and the original program wins ties.
-Multi-predictor instruction mutation remains the job of GEPA, SIMBA, MIPROv2,
-or a consumer program with an explicit named-parameter contract.
-
-Custom multi-stage programs expose that contract through the paired optional
-`Imp.Module` callbacks. Declare the behavior so the compiler checks the public
-surface:
-
-```elixir
-defmodule MyApp.SupportRouter do
+defmodule SupportPipeline do
   @behaviour Imp.Module
+
   defstruct [:analyze, :route]
 
-  @impl true
-  def optimizer_predictors(program),
-    do: [analyze: program.analyze, route: program.route]
-
-  @impl true
-  def update_optimizer_predictor(program, :analyze, update),
-    do: %{program | analyze: update.(program.analyze)}
-
-  def update_optimizer_predictor(program, :route, update),
-    do: %{program | route: update.(program.route)}
-
-  @impl true
-  def call(_program, _inputs), do: {:error, :implement_both_stages}
-end
-```
-
-The two optimizer callbacks are inseparable: Imp refuses a module that exposes
-only discovery or only mutation. Names must be unique atoms or strings, values
-must be `Imp.Predict.Predict` structs, and every update must retain the same
-consumer program struct and named lens. Built-in single-predictor programs keep
-their automatic `:main` lens.
-
-For a consumer-defined multi-predictor program, GEPA can return its selected
-program, report, and safe parameter-only artifact in one operation:
-
-```elixir
-{selected, report, artifact} =
-  Imp.Optimizer.GEPA.compile_with_artifact(
-    gepa,
-    program,
-    trainset,
-    validation,
-    artifact_id: "support-router-v1"
-  )
-
-:ok = Imp.Optimizer.Artifact.write!(artifact, "support-router.json")
-
-# In a fresh process, reconstruct trusted code and runtime clients first.
-fresh = MyApp.SupportRouter.new(runtime_lm)
-deployed =
-  "support-router.json"
-  |> Imp.Optimizer.Artifact.read!()
-  |> Imp.Optimizer.Artifact.apply(fresh)
-```
-
-The artifact contains named predictor signatures, demonstrations, configs, and
-the optimizer report. It does not serialize the consumer module, LMs, adapters,
-callbacks, credentials, or arbitrary state. Train and validation remain GEPA
-inputs; untouched test data is evaluated separately after selection.
-
-The same handoff works after any program optimizer that retains an optimizer
-report, including MIPROv2, SIMBA, InferRules, bootstrap, and random-search
-families:
-
-```elixir
-selected = Imp.optimize!(program, optimizer, trainset, devset)
-artifact =
-  Imp.Optimizer.Artifact.from_optimized_program(selected,
-    artifact_id: "support-router-v1"
-  )
-```
-
-`LabeledFewShot.new/1` follows DSPy 3.2.1's user-visible defaults: `k: 16`,
-deterministic sampling without replacement, and seed zero. Use `sample: false`
-for the ordered first-`k` path, or set `seed:` for another reproducible BEAM
-sample. Imp carries this as explicit serializable optimizer RNG state; equal
-integer seeds are not promised to reproduce Python's incidental subset order.
-
-`InferRules` is rule induction, not a renamed instruction search. Give it a
-separate rule LM when you want the task program and optimizer to use different
-models:
-
-```elixir
-rule_lm =
-  Imp.req_llm("openai:" <> System.fetch_env!("OPENAI_RULE_MODEL"),
-    api_key: System.fetch_env!("OPENAI_API_KEY"),
-    temperature: 1.0
-  )
-
-infer_rules =
-  Imp.Optimizer.InferRules.new(metric,
-    rule_lm: rule_lm,
-    num_candidates: 4,
-    num_rules: 6,
-    max_bootstrapped_demos: 2
-  )
-
-compiled = Imp.optimize!(program, infer_rules, trainset, devset)
-```
-
-Each candidate sees the observed input and output values for each predictor,
-not merely the field names. The selected program carries its induced rules and
-an `:infer_rules` optimizer report. Imp also evaluates the bootstrapped baseline
-and retains it when every induced candidate regresses. For deterministic replay,
-pass already-induced rule strings with `candidates: [...]`; this bypasses rule-LM
-calls but still performs validation selection.
-
-When the rule LM returns a structured `Imp.ContextWindowExceededError` or a
-provider error carrying a recognized context-window error marker, InferRules
-retries after dropping one trailing training example at a time, as DSPy 3.2.1
-does. It does not copy upstream's broader retry of every arbitrary Python
-`ValueError`. The report distinguishes logical `proposal_calls` from actual
-`proposal_attempts`. If even one example does not fit, Imp records that proposal
-error and keeps searching—or returns the evaluated baseline—instead of aborting
-the entire compile as upstream does. Retry attempts reuse the logical proposal's
-sequential rollout ID while the prompt changes; DSPy draws a fresh random
-rollout ID on each attempt.
-
-For a manually sized MIPROv2 run, configure the canonical `Config` options and
-the runtime `startup_trials` setting explicitly:
-
-```elixir
-mipro =
-  Imp.Optimizer.MIPROv2.new(metric,
-    auto: nil,
-    num_candidates: 4,
-    num_trials: 8,
-    max_bootstrapped_demos: 2,
-    max_labeled_demos: 2,
-    minibatch: false,
-    init_temperature: 1.0,
-    proposal_response_format: :auto,
-    metric_identity: %{
-      "id" => "my_app.exact_answer",
-      "version" => 1,
-      "config" => %{"field" => "answer"}
-    },
-    startup_trials: 2
-  )
-```
-
-`init_temperature` controls grounded instruction-proposal sampling, matching
-the pinned DSPy constructor rather than changing task-model calls. Set
-`proposal_response_format: :auto` to request Imp's strict one-instruction JSON
-schema when the proposal LM advertises schema support, or `:required` when a
-known compatible proposal endpoint must use it. The default `:off` preserves
-text-compatible proposal models. The effective mode and temperature are
-retained per predictor in `report.metadata.proposals`.
-
-In the default BEAM-native mode, an explicit compile-time `seed: 0` overrides
-the constructor seed like any other non-negative integer. The narrow
-`proposer_fidelity: :dspy_3_2_1` compatibility mode instead preserves DSPy
-3.2.1's `seed or self.seed` behavior, where a zero compile override retains the
-constructor seed. This Python-truthiness quirk is not imposed on ordinary Imp
-programs.
-
-`minibatch: false` matters at this scale: minibatched evaluation is the
-default, and its `minibatch_size` must not exceed the validation-set size, so
-a small `devset` like the one on this page rejects the run before it starts.
-
-MIPROv2 and SIMBA can pause at durable run boundaries and resume from the
-JSON-safe checkpoint attached to the optimizer report:
-
-```elixir
-checkpoint_path = Path.join(System.tmp_dir!(), "mipro-run.json")
-
-persist = fn checkpoint ->
-  temporary_path = checkpoint_path <> ".tmp"
-  File.write!(temporary_path, Jason.encode!(checkpoint))
-  File.rename!(temporary_path, checkpoint_path)
-end
-
-paused =
-  Imp.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
-    max_trials: 2,
-    checkpoint_fn: persist
-  )
-
-checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
-
-resumed =
-  Imp.Optimizer.MIPROv2.compile(mipro, program, trainset, devset,
-    resume_state: checkpoint,
-    checkpoint_fn: persist
-)
-```
-
-Because `metric` is commonly an anonymous or captured function, durable
-MIPROv2 and SIMBA runs require the constructor's `metric_identity:` map shown above.
-It must contain exactly string-keyed, already JSON-safe `id`, `version`, and
-`config` fields; config numbers must be finite. Imp binds the id and version plus a canonical SHA-256 digest
-of the config into every checkpoint; the config itself is not copied there.
-Changing the declared identity or config refuses resume before proposal or task
-evaluation. A public `&Module.function/2` metric can derive its own stable
-identity. An anonymous metric without an identity remains valid only for a
-complete in-process run with no checkpoint, resume, `max_trials`, or invocation-level
-`max_steps` control;
-that report explicitly has `metadata.durable == false` and no `resume_state`.
-
-For SIMBA, build the optimizer, then use the corresponding five-argument call
-and invocation-level `max_steps:` option:
-
-```elixir
-simba =
-  Imp.Optimizer.SIMBA.new(metric,
-    bsize: 1,
-    num_candidates: 2,
-    max_steps: 1,
-    metric_identity: %{
-      "id" => "my_app.exact_answer",
-      "version" => 1,
-      "config" => %{"field" => "answer"}
+  def new do
+    %__MODULE__{
+      analyze: Imp.predict("ticket -> analysis: string"),
+      route:
+        Imp.predict(
+          "ticket, analysis -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
+        )
     }
-  )
+  end
 
-Imp.Optimizer.SIMBA.compile(simba, program, trainset, devset,
-  max_steps: 1,
-  checkpoint_fn: persist
-)
-```
+  @impl true
+  def optimizer_predictors(program) do
+    [analyze: program.analyze, route: program.route]
+  end
 
-SIMBA reflection receives the declared module identity, named predictor
-signatures and instructions, and captured trajectories. It does not read the
-program module's source file by default. Add consumer-owned public context with
-`reflection_grounding: {:text, "..."}`. The explicit
-`reflection_grounding: :module_source` mode reads at most 20,000 characters
-from the compiled module source and may send them to the prompt LM; use it only
-when that source is intentionally shareable. The grounding mode and content
-digest are bound into durable resume compatibility.
+  @impl true
+  def update_optimizer_predictor(program, :analyze, update) do
+    %{program | analyze: update.(program.analyze)}
+  end
 
-Reports expose `metadata.run_status` as `:paused` or `:complete`. Which
-boundaries replay, the rebinding and trust contract, and the provider
-training-job lifecycle are in [Operations Reference](OPERATIONS_REFERENCE.md).
+  def update_optimizer_predictor(program, :route, update) do
+    %{program | route: update.(program.route)}
+  end
 
-Build an Avatar through the facade, then optimize its actor instruction with
-the dedicated optimizer:
-
-```elixir
-lookup_country = fn
-  %{country: "France"} -> "Paris"
-  _other -> "unknown"
+  @impl true
+  def call(program, %{ticket: ticket}) do
+    with {:ok, first} <- Imp.call(program.analyze, %{ticket: ticket}),
+         analysis <- Imp.get(first, :analysis),
+         {:ok, result} <- Imp.call(program.route, %{ticket: ticket, analysis: analysis}) do
+      {:ok, result}
+    end
+  end
 end
-
-actor_lm = %{
-  module: Imp.LM.Static,
-  opts: [
-    handler: fn messages, _opts ->
-      prompt = Enum.map_join(messages, "\n", & &1.content)
-
-      cond do
-        prompt =~ "Do not request another tool." ->
-          if prompt =~ "Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
-
-        prompt =~ "tool_output:" ->
-          %{action: %{tool_name: "Finish", tool_input_query: %{}}}
-
-        true ->
-          %{action: %{tool_name: "lookup", tool_input_query: %{country: "France"}}}
-      end
-    end
-  ]
-}
-
-feedback_lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{feedback: "Use exact country names."} end]
-}
-
-rewrite_lm = %{
-  module: Imp.LM.Static,
-  opts: [
-    handler: fn _messages, _opts ->
-      %{new_instruction: "Look up the exact country name, then Finish."}
-    end
-  ]
-}
-
-lookup = Imp.tool(:lookup, "Look up a country capital", lookup_country)
-avatar = Imp.avatar("question -> answer", [lookup], lm: actor_lm, max_iters: 3)
-
-avatar_optimizer =
-  Imp.Optimizer.Avatar.new(Imp.exact_match(:answer),
-    comparator_lm: feedback_lm,
-    rewrite_lm: rewrite_lm,
-    max_iters: 2
-  )
-
-compiled_avatar = Imp.optimize!(avatar, avatar_optimizer, trainset)
 ```
 
-Avatar records typed action observations, treats unknown, denied, and failed
-tool calls as recoverable observations, and invokes a typed finalizer on
-`Finish` or iteration exhaustion. AvatarOptimizer keeps a rewritten instruction
-only when its trainset score improves. BetterTogether accepts named optimizers
-and atom, string, or repeated list strategies; with validation it retains the
-highest-scoring baseline/prefix candidate, and without validation it returns
-the latest successful prefix. A typed asynchronous `TrainingJob` is polled
-under the configured deadline, rebound only after terminal success, and given a
-bounded cancellation attempt after timeout or refresh failure.
+The application owns the control flow. The optimizer sees two named predictors
+and may update only the one it targets. Imp validates that both callbacks agree
+before proposal or evaluation work begins.
 
-When no validation set is supplied, the positive `valset_ratio` default keeps
-at least one validation row from trainsets of two or more examples. This makes
-small-dataset prefix selection real instead of silently becoming the
-no-validation/latest-prefix path. A single example remains a training row; pass
-an explicit validation set when selection is required at that size.
+The complete version in the [deployment example](../examples/deployment/README.md)
+adds typed intermediate metadata, persistence, hot reload, concurrent service,
+and failure containment.
 
-To continue a `BetterTogether` workflow from an already-completed weight job,
-use the explicit adoption optimizer. Adoption verifies and binds the exact job,
-artifact contents, incoming program, and base-model identity; it performs no
-trainer dispatch, fusion, or weight update.
+## Artifacts carry selected parameters into trusted code
+
+`Imp.Experiment.check/5` returns an `Imp.Optimizer.Artifact` containing a
+champion and challenger parameter state. Persist the result and artifact:
 
 ```elixir
-job = Imp.Clients.TrainingJob.load!("training-job.json")
+result_path = "/secure/support-router-result.json"
+artifact_path = "/secure/support-router-parameters.json"
 
-weight_step =
-  Imp.Optimizer.TrainingJobAdoption.new(job, base_program)
-
-optimizer =
-  Imp.Optimizer.BetterTogether.new(metric, %{
-    w: weight_step,
-    p: Imp.Optimizer.COPRO.new(metric, proposer_lm: proposer_lm)
-  })
-
-program =
-  Imp.Optimizer.BetterTogether.compile(
-    optimizer,
-    base_program,
-    trainset,
-    validation_set,
-    strategy: [:w, :p]
-  )
+:ok = Imp.Experiment.Result.write!(result, result_path)
+:ok = Imp.Optimizer.Artifact.write!(result.artifact, artifact_path)
 ```
 
-Top-level `max_errors:` and `max_concurrency:` belong to BetterTogether's
-baseline and prefix-selection evaluation. Put child optimizer controls under
-`optimizer_compile_args:`. COPRO's internal trainset evaluation, for example,
-uses its public `num_threads:` and `max_errors:` compile options:
+Both writers use private permissions and atomic replacement. Results contain
+scores, counts, redacted provenance, and artifact linkage by default—not raw
+dataset rows.
+
+In a fresh process, reconstruct the trusted program and live clients, then
+apply the selected parameters:
 
 ```elixir
-Imp.Optimizer.BetterTogether.compile(
-  optimizer,
-  base_program,
-  trainset,
-  validation_set,
-  strategy: [:w, :p],
-  max_concurrency: 1,
-  max_errors: :infinity,
-  optimizer_compile_args: %{p: [num_threads: 1, max_errors: :infinity]}
-)
+artifact = Imp.Optimizer.Artifact.read!(artifact_path)
+
+live_program =
+  SupportPipeline.new()
+  |> Imp.with_lm(lm)
+
+selected_program = Imp.Optimizer.Artifact.apply(artifact, live_program)
 ```
 
-BetterTogether validates declared child options before evaluating the baseline.
-Unknown COPRO options fail loudly and no child option is silently dropped.
-MIPROv2 likewise validates its constructor-compatible config overrides and
-checkpoint controls (`max_trials`, `checkpoint_fn`, and `resume_state`) at this
-boundary, before BetterTogether spends a baseline call.
+Use `Imp.save!/3` and `Imp.load!/2` when the entire program is one of Imp's
+portable built-in shapes. Use `Imp.Optimizer.Artifact` when application code
+owns a custom module and only selected parameters should be serialized.
 
-`TrainingJobAdoption` declares the training-result protocol only because
-`BetterTogether` uses that protocol for weight-bearing steps. Its result
-metadata records `training_performed: false`; it accepts only supported,
-content-verified completed artifacts and fails closed on job, artifact, base,
-or program drift.
+Credentials and executable callbacks belong to runtime configuration, never
+inside either artifact.
 
-Optimizers that use an LM for proposal or reflection, such as COPRO, SIMBA,
-and GEPA-style artifact optimization, use the same explicit LM shapes as
-programs. `proposer_lm:`, `prompt_lm:`, and `reflection_lm:` reject malformed
-values when the optimizer is built or run, before a search loop starts.
-COPRO, MIPROv2, and SignatureOptimizer accept
-`proposal_response_format: :required` to send and locally enforce their exact
-proposal JSON Schema. `:auto` enables it only for LMs that advertise schema
-support, while `:off` keeps the pinned tolerant text parser.
+## Choose a program shape for the failure mode you need to control
 
-Optimizer-specific `compile` functions remain public for advanced workflows
-that need their native return values or split/options layout. The MIPROv2 and
-SIMBA checkpoint examples above use that direct surface. Constructor optimizers
-such as `Ensemble` and `KNNFewShot`, and workflow optimizers such as `Playbook`,
-also use their documented direct APIs; the `Imp.optimize` facade accepts only
-optimizers declaring `kind: :program`, while `Imp.train` accepts only
-`kind: :training`.
+| Program | Use it when |
+| --- | --- |
+| `Imp.predict/2` | One model call maps named inputs to named outputs. |
+| `Imp.chain_of_thought/2` | A declared reasoning field helps produce the final output. |
+| `Imp.best_of_n/3` | You can score several independent attempts and keep the best. |
+| `Imp.refine/3` | A failed attempt can improve from metric feedback. |
+| `Imp.assert/3` | A named constraint can drive bounded self-repair. |
+| `Imp.parallel/3` | Independent calls should run concurrently under a bound. |
+| `Imp.react/3` | The model should choose tools and submit a validated answer. |
+| `Imp.react_v2/3` | Parallel tool calls and truthful call IDs must survive in history. |
+| `Imp.avatar/3` | Each typed action needs its own timeout and failure isolation. |
+| `Imp.program_of_thought/2`, `Imp.code_act/3` | The model should act through sandboxed Elixir code. |
+| `Imp.rlm/2` | A controller needs a bounded recursive sandbox for large inputs. |
 
-Training optimizers (`BootstrapFinetune`, `GRPO`), Fast-Slow training, and
-provider dispatch journals live in
-[Operations Reference](OPERATIONS_REFERENCE.md). Whether any optimizer here has
-been proven effective, and to what rung, is recorded in [Evidence](EVIDENCE.md).
+These are different program shapes, not an escalation ladder every application
+must climb.
 
-## Optimize Arbitrary Artifacts
+## Tools stay typed and policy-controlled
 
-The primary surface accepts a string, a named map of text components, a
-JSON-safe structured map, or `nil` for objective-driven seed generation. With
-no dataset it runs one evaluator call per candidate. A `dataset:` supplies
-proposal/reflection examples; adding a non-empty `valset:` supplies separate
-examples for candidate selection. The validation set is not an untouched test
-set: measure the selected candidate on different examples after optimization.
+Create a tool from a name, description, function, and input schema:
 
 ```elixir
-evaluator = fn candidate, _example ->
-  if candidate.planner =~ "numbered steps", do: 1.0, else: 0.5
-end
-
-training_examples = [
-  %{feedback: "The plan needs explicit numbered steps."},
-  %{feedback: "Number each step of the plan."}
-]
-
-validation_examples = [%{feedback: "Validation: numbered steps still required."}]
-test_examples = [%{feedback: "Test: the plan still needs numbered steps."}]
-
-reflection_lm =
-  Imp.LM.Static.new(
-    handler: fn _messages, _opts -> "Plan with explicit numbered steps." end
-  )
-
-result =
-  Imp.Optimize.Anything.run(
-    %{planner: "Plan directly.", writer: "Answer clearly."},
-    fn candidate, example ->
-      score = evaluator.(candidate, example)
-      {score, %{feedback: example.feedback, scores: %{quality: score}}}
-    end,
-    dataset: training_examples,
-    valset: validation_examples,
-    objective: "Produce correct, concise answers.",
-    config: [
-      engine: [max_candidate_proposals: 4, max_metric_calls: 20],
-      reflection: [reflection_lm: reflection_lm]
-    ]
-  )
-
-best_candidate = Imp.Optimize.Anything.best_candidate(result)
-test_scores = Enum.map(test_examples, &evaluator.(best_candidate, &1))
-```
-
-The result retains candidate lineage, per-example validation scores, Pareto
-frontiers, measured budgets, rejected proposals, history, and a resumable
-engine checkpoint. `test_scores` is the only untouched outcome in this example;
-the optimizer has seen both `training_examples` and validation scores.
-The checkpoint binds the optimization mode, ordered training and validation
-datasets, scalar/batch evaluator implementation, evaluator contract, proposal
-objective/background/template, proposal LM, and custom/fallback proposer
-implementation. For evaluator or proposer semantics that depend on captured
-configuration, pass JSON-safe versioned `evaluator_identity:` or
-`proposal_identity:` data (for example `%{id: "policy-score", version: 2}`);
-those identities are hashed into the checkpoint without serializing executable
-code. Resume rejects dataset, callback, contract, prompt, model, or
-declared-identity drift before evaluator/proposer work. Seedless resume reuses
-the sealed initial candidate rather than asking the proposal LM to generate it
-again.
-Checkpoints created before this run-identity binding fail closed instead of
-being guessed compatible.
-`Imp.Optimize.Anything.run/3` is the sole Optimize Anything execution
-entry point; `best_candidate/1` reads its selected artifact while execution
-records remain implementation data rather than additional supported module
-APIs.
-
-Pinned GEPA v0.1.4 defines candidates as `str | dict[str, str]`. Imp additionally
-supports typed structured maps with seed-derived exact keys, list lengths, and
-value types. Evaluators and proposers see the native artifact, not its internal
-checkpoint encoding. Invalid JSON, missing fields, type drift, and no-op
-proposals are rejected. A configurable native mutation module can be installed
-with `Imp.Optimize.Anything.StructuredStrategy.new/2` and
-`reflection: [structured_strategy: strategy]`. Its `propose/4` callback receives
-the complete native artifact, reflective data, selected top-level components,
-and JSON-native configuration; it returns a complete replacement artifact.
-Imp rejects shape/type drift and changes outside the selected components. The
-stable strategy id, module, and config are persisted and bound into candidate
-checkpoint identity, so resume refuses drift before evaluation. Refiner, merge,
-external tracking, custom callbacks, text reflection strategies, and custom
-selectors remain text-only and are rejected up front in structured mode rather
-than receiving an encoded substitute. The `__imp_type__` key is reserved at
-every depth for Imp's durable wire tags.
-
-For model-backed structured proposals, set
-`reflection: [structured_response_format: :required]` to send a strict,
-component-specific JSON schema on every reflection call. `:auto` sends it only
-when the LM declares JSON-schema capability; the default `:off` preserves the
-pinned text-only reflection transport. The schema uses an exact
-`{"value": component}` envelope because provider structured-output protocols
-require an object root. Imp removes that transport envelope and then applies
-the same exact seed-derived key, list-length, and value-type validation. This
-mode is bound into the structured checkpoint identity, so resume refuses drift
-before evaluation.
-
-Pinned text-map workflows may instead set
-`reflection: [reflection_strategy: MyStrategy]`, where `MyStrategy` exports
-`reflect/3`. This released GEPA surface owns proposal generation and works
-without a reflection LM. Contextual state is stored in the engine checkpoint
-and verified on JSON resume; the strategy remains a trusted runtime binding and
-is not serialized inside the config's durable map projection.
-
-Pinned GEPA v0.1.4's grouped evaluator surface is available through the same
-entry point: pass `nil` as the scalar evaluator and an arity-one
-`batch_evaluator:` receiving ordered `{candidate, example}` pairs, or use
-arity two to also receive aligned optimization states. One result is required
-per pair. The batch callback sees unwrapped string candidates, `nil` examples
-in single-task mode, and native structured artifacts. When both evaluator
-forms are present, grouped stages prefer the batch callback. Legacy
-three-tuples cannot substitute their output for the evaluated candidate.
-Contained per-row and whole-call failures remain aligned for diagnostics, but
-incomplete proposals are not cached, selected, or installed as winners.
-
-`reflection.batch_sampler` accepts `:epoch_shuffled` or a stateful struct that
-implements `Imp.Optimizer.GEPA.BatchSampler`. A custom strategy owns its
-minibatch size, so it cannot be combined with `reflection_minibatch_size`. Its
-callback receives the native training examples plus iteration/call context,
-and returns ordered zero-based indexes, updated strategy state, and RNG state.
-Imp checkpoints the strategy module, stable identity, and dumped state; resume
-requires the same strategy identity and restores it before another evaluator
-call. Runtime strategy structs intentionally make the nested config
-non-persistable, while the optimization checkpoint remains JSON-resumable.
-
-Multi-proposal controls are also engine settings on the nested public config.
-`sampling_strategy` accepts `:single`, `{:same_parent, n}`,
-`{:independent, n}`, or `{:pxn, parents, mutations}`. `selection_strategy`
-accepts `:all_improvements`, `:best_improvement`, `{:top_k, n}`, or the
-documented BEAM callback form. `acceptance_criterion` accepts
-`:strict_improvement`, pinned-name `:improvement_or_equal`, native alias
-`:equal_or_better`, or `Imp.GEPA.Acceptance.callback/1`. These values
-control the real proposal batch, filtering, and admission decisions and are
-bound into resumable checkpoints; changing any of them on resume fails before
-evaluation. Unsupported Python strategy objects are rejected by config
-construction rather than accepted and ignored. `max_candidate_proposals`
-counts proposal rounds as it does upstream; it no longer doubles as a
-reflection-call cap when one round contains multiple proposals.
-
-Pinned Optimize Anything returns an immutable result rather than mutating an
-application object, and Imp preserves that boundary. Install
-`best_candidate/1` explicitly into the consumer program/configuration and then
-run that value; there is no accepted-but-ignored application callback. This
-keeps selection auditable and allows the selected native structured artifact
-to cross into a fresh BEAM process without an internal text wrapper.
-
-## Tools And ReAct
-
-```elixir
-{:ok, actions} =
-  Agent.start_link(fn ->
-    [
-      %{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]},
-      %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
-    ]
-  end)
-
-lm = %{
-  module: Imp.LM.Static,
-  opts: [
-    handler: fn _messages, _opts ->
-      Agent.get_and_update(actions, fn
-        [action | rest] -> {action, rest}
-        [] -> {%{tool_calls: []}, []}
-      end)
-    end
-  ]
-}
-
 lookup =
   Imp.tool(
     :lookup,
-    "lookup facts",
-    fn %{query: "capital-france"} -> "Paris" end,
+    "Look up a city by country",
+    fn %{country: "France"} -> %{city: "Paris"} end,
     schema: %{
       "type" => "object",
-      "properties" => %{"query" => %{"type" => "string"}},
-      "required" => ["query"]
+      "properties" => %{"country" => %{"type" => "string"}},
+      "required" => ["country"]
     }
   )
 
 program = Imp.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
-{:ok, prediction} = Imp.call(program, %{question: "What is the capital of France?"})
-Imp.get(prediction, :answer)
 ```
 
-`ReAct` sends provider-style function definitions when the LM client supports
-them. A reserved `submit` tool validates final outputs against the original
-signature.
+`react/3` is the upstream-shaped fail-fast loop. `react_v2/3` records unknown
+and failed tools as observations and preserves parallel call IDs. `avatar/3`
+runs one typed action per turn with per-tool timeout isolation.
 
-Use `Imp.react_v2/3` when native multi-turn tool history and parallel calls are
-required. ReActV2 preserves call/result IDs in `Imp.History`, records unknown
-and failing tools as observations instead of aborting, and forces one final
-`submit` call when the normal loop ends. Existing `Imp.react/3` retains its
-fail-fast behavior.
+MCP catalogs import into the same `Imp.Tool` values through
+`Imp.MCP.import_tools/1`. Importing a tool does not make it safe; keep
+side-effecting tools behind an explicit policy.
 
-### Tool Call Primitives
+## Retrieval is a program dependency, not hidden prompt state
 
-Use `Imp.Adapter.Types.ToolCall` and `ToolCalls` when you need to inspect,
-persist, or pass provider-native tool-call values outside a full ReAct loop.
-They normalize Imp maps and OpenAI-style nested function calls into the same
-shape:
+Build a retriever and wrap a program explicitly:
 
 ```elixir
-calls =
-  Imp.Adapter.Types.ToolCalls.from_dict_list([
-    %{id: "call_lookup", name: "lookup", arguments: %{query: "beam"}},
-    %{id: "call_translate", function: %{name: "translate", arguments: ~s({"text":"hello"})}}
+memory =
+  Imp.memory([
+    %{id: "billing", text: "Billing owns invoices, charges, and refunds."},
+    %{id: "security", text: "Security owns unauthorized access and leaked credentials."}
   ])
 
-Imp.Adapter.Types.ToolCalls.format(calls)
+program =
+  "ticket, context -> team"
+  |> Imp.predict(lm: lm)
+  |> Imp.rag(memory, query_field: :ticket, context_field: :context, k: 2)
 ```
 
-ReqLLM-backed assistant messages accept the same primitive values through the
-ordinary `%{role: :assistant, tool_calls: calls}` message boundary, and provider
-streaming exposes tool-call chunks as `%{tool_calls: [...]}` stream chunks.
+The retrieved documents are recorded in prediction metadata. Use
+`Imp.retrieve/3` directly when the application—not a wrapper—should decide how
+retrieved context enters the task.
 
-## Agents
+`Imp.knn/3` and `Imp.nearest/2` provide local example retrieval. Dataset
+loaders and embedding providers live under `Imp.Datasets` and
+`Imp.Embeddings`; nothing is downloaded unless the application asks for it.
+`Imp.Embeddings.BagOfWords` is the deterministic local baseline. A production
+semantic embedding provider must return one numeric vector for each input
+text.
 
-Imp has several action patterns because agents fail in several ways, and each
-pattern buys a different safety trade. `Imp.react/3` is the upstream-shaped
-tool loop: provider tool calls, a reserved `submit` that validates the final
-answer, fail-fast on unknown tools. `Imp.react_v2/3` is the native-calling
-loop: parallel tool calls keep their IDs in history, unknown or failing tools
-become observations instead of aborting the run, and a final `submit` is
-forced if the loop ends without output. `Imp.avatar/3` takes one typed action
-per turn and runs each tool in an isolated task under `:tool_timeout_ms`, so
-one hung tool cannot hang the run. `Imp.code_act/3` and
-`Imp.program_of_thought/2` move the action into sandboxed Elixir code, and
-`Imp.rlm/2` gives a controller model a budgeted recursive sandbox. Start with
-`react/3`; move along the spectrum when a failure mode demands it.
+## Streaming sends partial output without changing the program
 
-The packaged surface deliberately stops there. When you want to own the loop
-yourself, compose the same pieces in ordinary Elixir: call `Imp.Tool.call/2`
-from your own process, keep the loop's state in a GenServer you supervise,
-and pass a `tool_policy:` to any react-family program you delegate to. An
-agent loop you wrote is an agent loop you can reason about — that is the BEAM
-story, not a resident framework.
+`Imp.stream/3` asks a capable provider for chunks. `Imp.collect/3` consumes the
+same path and joins the final text:
 
 ```elixir
-double = Imp.tool(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+stream = Imp.stream(program, %{question: "Why is the sky blue?"})
 
-Imp.Tool.call(double, %{x: 4})
-#=> %{y: 8}
+Enum.each(stream, fn chunk ->
+  send(self(), {:model_chunk, chunk})
+end)
 ```
 
-## MCP Import
+Provider-native thinking and tool-call chunks retain their type in metadata.
+When the configured client cannot stream, Imp's fallback is explicit rather
+than pretending a locally split final response arrived from the provider.
 
-Tool schemas use the MCP specification dialect: the input contract key is
-camelCase `"inputSchema"` and `"description"` is optional. In-process Elixir
-catalogs may also use the snake_case `:input_schema` spelling as a back-compat
-fallback; real MCP servers always send `inputSchema`.
+## Conversation history is task-shaped data
+
+History uses the program's own field names rather than exposing provider chat
+objects throughout your application:
 
 ```elixir
-catalog =
-  Imp.MCP.Catalog.new([
-    %{"name" => "lookup", "inputSchema" => %{"required" => ["key"]}, "run" => & &1}
+history =
+  Imp.history([
+    %{question: "Capital of France?", answer: "Paris"},
+    %{question: "Capital of Germany?", answer: "Berlin"}
   ])
 
-[tool] = Imp.MCP.import_tools(catalog)
+program = Imp.predict("question, history -> answer", lm: lm)
+{:ok, prediction} = Imp.call(program, %{question: "Capital of Italy?", history: history})
 ```
 
-For HTTP-backed discovery, configure a real MCP endpoint. This is an external
-service sketch, not a local runnable snippet:
+`Imp.History.dump/1` and `load/1` cross a JSON boundary.
+`Imp.History.redact/1` supports safe inspection.
+
+## Optimize Anything uses the same selection discipline for other artifacts
+
+`Imp.Optimize.Anything.run/3` improves text, named text components, or a
+JSON-safe structured map. The evaluator scores the real artifact; after the
+run, the application explicitly installs `best_candidate/1`:
 
 ```elixir
-client = Imp.MCP.HTTPClient.new("https://mcp.example/tools")
-tools = Imp.MCP.import_tools(client)
-```
-
-Imp treats MCP tools like ordinary `Imp.Tool` values, so use tool policies for
-anything with side effects. Stdio and Streamable HTTP transports are covered in
-[Operations Reference](OPERATIONS_REFERENCE.md).
-
-## Advanced Protocol Clients
-
-The normal provider path for inference is `Imp.req_llm/2`. Imp also ships
-explicit protocol clients for application boundaries that are not ordinary LM
-inference: HTTP retrievers, MCP transports, and provider training jobs. Those
-clients are documented in [Advanced Imp](ADVANCED.md) and
-[Operations Reference](OPERATIONS_REFERENCE.md) because they require explicit
-service ownership, credentials, payload contracts, and protocol-specific tests.
-
-When a collection of independent provider calls must survive process or host
-restarts, `Imp.Clients.ReqLLMBatch` runs them against a resumable checkpoint;
-[Operations Reference](OPERATIONS_REFERENCE.md) covers the batch API.
-
-## RLM
-
-RLM is Imp's recursive language-model controller. It is not a synonym for RAG:
-retrieval fetches context, while RLM runs a bounded loop that can assign state,
-call tools, ask subquestions, recurse, and submit a final answer.
-
-```elixir
-lookup =
-  Imp.tool(:lookup, "lookup a fact", fn
-    %{"key" => "priority"} -> "Prefer concise answers backed by evidence."
-  end)
-
-controller_lm = %{
-  module: Imp.LM.Static,
-  opts: [
-    handler: fn _messages, _opts ->
-      %{
-        reasoning: "The answer is already available in the task context.",
-        code: ~S|submit(%{answer: "Prefer concise answers backed by evidence."})|
-      }
-    end
-  ]
-}
-
-long_context = "priority: concise answers backed by evidence"
-
-rlm =
-  Imp.rlm("context, question -> answer",
-    lm: controller_lm,
-    tools: [lookup],
-    max_iterations: 20,
-    max_llm_calls: 50,
-    max_recursion_depth: 1,
-    max_interpreter_value_bytes: 16_000_000,
-    max_interpreter_effects: 100,
-    max_time_ms: 30_000
+result =
+  Imp.Optimize.Anything.run(
+    "mode=slow",
+    fn candidate -> if candidate =~ "mode=fast", do: 1.0, else: 0.0 end,
+    config: [
+      engine: [max_candidate_proposals: 1, parallel: false],
+      reflection: [
+        custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
+          "mode=fast"
+        end
+      ]
+    ]
   )
 
-Imp.call(rlm, %{context: long_context, question: "What matters?"})
+selected = Imp.Optimize.Anything.best_candidate(result)
 ```
 
-The primary controller response contains reasoning and constrained Elixir code:
+The validation set chooses a candidate; it is not an untouched test set. Test
+the selected artifact separately. In a real run, replace the explicit proposer
+with a reflection model or your own proposal function. A map seed enables
+structured mode, which derives an exact schema from the seed and rejects key,
+type, list-length, or unselected-component drift.
 
-```elixir
-%{
-  reasoning: "Split the context and analyze each chunk semantically.",
-  code: """
-  context = load("large_context")
-  chunks = String.split(context, "\n\n")
-  findings = for chunk <- chunks, do: llm_query(chunk)
-  submit(%{answer: Enum.join(findings, "\n")})
-  """
-}
-```
+## Production code binds credentials and owns concurrency
 
-Assignments persist across controller turns. The safe language includes data
-literals, maps, lists, arithmetic and comparisons, `if`, bounded `for`
-comprehensions, allowlisted `String`/`Enum` transformations, registered tools,
-`llm_query/1`, `llm_query_batched/1`, `recurse/2`, `load/1`, `print/1`, and
-`submit/1`. It cannot import modules, define functions, spawn processes, access
-files or the network, or invoke arbitrary BEAM functions. Generated source is
-never passed to `Code.eval_*`. Calls to LMs, tools, lazy loaders, and recursive
-children are yielded as typed effects and executed by the RLM runtime, not by
-the interpreter. Source, AST steps, generated value size, effect count, output,
-recursion, sub-LM calls, and optional wall time are all bounded explicitly.
+Keep API keys in runtime configuration. Persist parameters or supported
+program values without secrets, then bind live clients after loading.
 
-For large or expensive context, pass a lazy handle and let the controller load
-it explicitly:
+Imp's parallel evaluation and call helpers use bounded supervised tasks and
+preserve result order. Your application still owns admission policy, request
+timeouts, overload behavior, and the process that serves the current program.
+The [deployment example](../examples/deployment/README.md) shows one complete
+GenServer boundary.
 
-```elixir
-context =
-  Imp.rlm_serializable(:large_context, fn ->
-    File.read!("large-report.txt")
-  end,
-    metadata: %{source: "large-report.txt"}
-  )
+Use `Imp.trace/2`, `Imp.inspect_history/2`, optimizer progress subscriptions,
+and telemetry to understand failures. Inspection is redacted by default; turn
+on more detail deliberately where the data policy permits it.
 
-Imp.call(rlm, %{large_context: context, question: "What changed?"})
-```
+Continue with:
 
-The controller initially sees only metadata for the serializable value. The
-`load/1` materializes it into the RLM variable space. `llm_query_batched/1`
-runs sub-LM calls concurrently through supervised BEAM tasks, preserves result
-order, and atomically reserves every item against the shared `max_llm_calls`
-ledger. Per-item failures remain ordered string values beginning with `Error:`.
-The ledger scope is `subcalls_only`: sub-LM calls made inside recursive children
-share it, while root and child controller turns, extraction, and compaction
-generations do not consume it. The optional deadline is shared by the complete
-recursive call tree; omitting `max_time_ms` configures no RLM deadline. If
-controller code submits malformed output, Imp records
-the parse feedback as an observation and gives the controller another turn. If
-the loop exhausts its iteration budget, Imp runs an extract pass over the
-variables, observations, and trace to recover final structured output when
-possible. A zero-iteration RLM still fails immediately without spending a
-provider call.
-
-## Save And Load
-
-```elixir
-program = Imp.predict("question -> answer")
-
-path = Path.join(System.tmp_dir!(), "imp-program.json")
-Imp.save!(program, path)
-loaded = Imp.load!(path)
-File.rm(path)
-```
-
-File artifacts use a versioned, checksummed envelope and atomic same-directory
-replacement. Callback-bearing programs use trusted names:
-
-```elixir
-metric = fn _example, prediction -> Imp.get(prediction, :answer, "") != "" end
-registry = Imp.Saving.Registry.new(quality_metric: metric)
-program = Imp.Predict.BestOfN.new(program, metric)
-
-Imp.save!(program, path, registry: registry)
-loaded = Imp.load!(path, registry: registry)
-```
-
-The deploying application must provide every referenced callback with the
-expected arity. Unknown names and malformed or tampered artifacts fail before a
-program is returned.
-
-DSPy 3.3.0b1 has two persistence modes. `module.save("state.json")` plus
-`module.load("state.json")` applies parameter state to an existing Python
-program; the Imp-native data boundary is `Imp.dump/1` and `Imp.load/1`, or
-their checksummed file equivalents `Imp.save!/2` and `Imp.load!/1`. DSPy's
-`module.save(path, save_program: true)` plus `dspy.load(path, allow_pickle:
-true)` serializes executable Python with `cloudpickle`. Imp intentionally has
-no executable-code artifact mode: its documented artifact boundary is the
-allowlisted JSON program representation. Callback closures are stored only as
-names from `Imp.Saving.Registry`, and runtime credentials are rebound
-explicitly.
-
-Secrets are not persisted. Loaded HTTP LMs do not silently bind ambient
-credentials. Rebind a freshly configured LM explicitly before live use:
-
-```elixir
-lm =
-  Imp.req_llm("openai:" <> System.fetch_env!("OPENAI_MODEL"),
-    api_key: System.fetch_env!("OPENAI_API_KEY"),
-    temperature: 0
-  )
-
-loaded = Imp.with_lm(loaded, lm)
-Imp.call(loaded, %{question: "What changed?"})
-```
-
-Portable saving supports the program types accepted by `Imp.Saving`, including
-compiled few-shot and ensemble graphs, callback wrappers, agents, and RAG
-programs backed by `Imp.memory/2`. External service clients remain host-owned.
-Functions and tool closures must have stable names in a supplied registry; an
-unregistered closure fails during dumping instead of entering the artifact.
+- [Learning Path](LEARNING_PATH.md) for a guided end-to-end build.
+- [Production Operations](PRODUCTION_OPERATIONS.md) for runtime behavior.
+- [Operations Reference](OPERATIONS_REFERENCE.md) for durable jobs, resume,
+  batches, and external protocols.
+- [Imp for DSPy Users](IMP_FOR_DSPY_USERS.md) for the upstream concept map.

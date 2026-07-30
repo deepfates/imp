@@ -302,13 +302,13 @@ defmodule DeploymentReferenceTest do
     assert mix_file =~ ~s(elixir: "~> 1.19")
     assert mix_file =~ ~s({:imp, "~> 0.2"})
     assert mix_file =~ "IMP_PATH"
-    assert readme =~ "supervised startup"
+    assert readme =~ "bounded supervised task"
     assert readme =~ "IMP_MODEL"
     assert readme =~ "IMP_MAX_CONCURRENCY"
-    assert readme =~ "two-predictor program"
+    assert readme =~ "two-stage Banking77"
     assert readme =~ "reload_parameters/1"
-    assert readme =~ "starts a second"
-    assert readme =~ "`mix run` process"
+    assert readme =~ "starts a second OS process"
+    assert readme =~ "fresh OS"
   end
 
   defp start_runtime(executor, opts \\ []) do

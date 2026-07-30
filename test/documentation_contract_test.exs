@@ -196,7 +196,7 @@ defmodule DocumentationContractTest do
     learning = File.read!("docs/LEARNING_PATH.md")
     docs = File.read!("docs/README.md")
 
-    assert readme =~ "two kinds of intelligence"
+    assert readme =~ "typed Elixir program"
     assert readme =~ "Imp.req_llm"
     assert readme =~ "OPENAI_API_KEY"
     assert readme =~ "docs/LEARNING_PATH.md"
@@ -218,13 +218,14 @@ defmodule DocumentationContractTest do
     philosophy = File.read!("docs/PHILOSOPHY.md")
 
     assert readme =~ "Learning Path"
-    assert docs =~ "## Manual Spine"
+    assert docs =~ "## Learn the complete path with one example"
     assert readme =~ "docs/LEARNING_PATH.md"
     assert docs =~ "[01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)"
     assert docs =~ "[05 Operate And Live Checks](../livebooks/05_operate_and_live_checks.livemd)"
 
-    assert api =~
-             "signature -> program -> call -> evaluate -> optimize -> tools/agents -> operate"
+    for concept <- ["signature", "program", "prediction", "example", "metric", "optimizer"] do
+      assert api =~ concept
+    end
 
     assert philosophy =~ "signature, program, call"
 
@@ -235,24 +236,23 @@ defmodule DocumentationContractTest do
   test "canonical API guide teaches the react/rlm spectrum, not a resident agent runtime" do
     body = File.read!("docs/API_GUIDE.md")
 
-    assert body =~ "## Tools And ReAct"
-    assert body =~ "Imp.react"
-    # Imp.Agent is internal (owner ruling 2026-07-17): the packaged agent
-    # story is the react-family spectrum plus user-owned supervised Elixir.
-    assert body =~ "The packaged surface deliberately stops there."
+    assert body =~ "## Tools stay typed and policy-controlled"
+    assert body =~ "`react/3` is the upstream-shaped fail-fast loop"
+    assert body =~ "`react_v2/3` records unknown"
+    assert body =~ "`avatar/3`\nruns one typed action"
     refute body =~ "Imp.Agent"
   end
 
-  test "API guide teaches facade-first composition helpers" do
+  test "API guide explains public program choices without duplicating the reference" do
     body = File.read!("docs/API_GUIDE.md")
 
-    assert body =~ "Imp.multi_chain_comparison/2"
     assert body =~ "Imp.best_of_n/3"
     assert body =~ "Imp.refine/3"
     assert body =~ "Imp.parallel/3"
     assert body =~ "Imp.knn/3"
     assert body =~ "Imp.nearest/2"
-    assert body =~ "## Composition Helpers"
+    assert body =~ "## Choose a program shape for the failure mode you need to control"
+    assert body =~ "generated module reference is the exhaustive"
   end
 
   test "README common workflow snippets compose as one coherent path" do
@@ -328,11 +328,9 @@ defmodule DocumentationContractTest do
     api = File.read!("docs/API_GUIDE.md")
     advanced = File.read!("docs/ADVANCED.md")
 
-    assert api =~ "The normal provider path for inference is `Imp.req_llm/2`"
-    assert api =~ "Advanced Protocol Clients"
-    assert api =~ "Explicit `lm:` values are checked when the program is built"
-    assert api =~ "configured `%{module: module, opts:\nkeyword}` map"
-    assert api =~ "module exporting `format/3` and `parse/3`"
+    assert api =~ "Imp.req_llm"
+    assert api =~ "Advanced provider jobs, resumable batches, and protocol details live"
+    assert api =~ "Operations Reference"
     refute api =~ "OpenAITrainer.new"
     refute api =~ "DatabricksTrainer"
 
@@ -356,11 +354,11 @@ defmodule DocumentationContractTest do
     coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
     parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
-    assert api =~ "## Optimize Arbitrary Artifacts"
-    assert api =~ "is the sole Optimize Anything execution\nentry point"
-    assert api =~ "Imp.Saving.Registry"
-    assert api =~ "proposer_lm:"
-    assert api =~ "reject malformed\nvalues when the optimizer is built or run"
+    assert api =~ "## Optimize Anything uses the same selection discipline for other artifacts"
+    assert api =~ "Imp.Optimize.Anything.run/3"
+    assert api =~ "Imp.Optimize.Anything.best_candidate"
+    assert api =~ "The validation set chooses a candidate"
+    assert api =~ "GEPA and COPRO do not fabricate local proposals"
     assert advanced =~ "public frontend delegates to the production GEPA engine"
     assert advanced =~ "Current implementation fidelity is pinned to GEPA v0.1.4"
     assert advanced =~ "earlier comparisons\nagainst the v0.1.1 checkout are kept as history"
@@ -369,12 +367,7 @@ defmodule DocumentationContractTest do
   end
 
   test "cold learning path distinguishes portable programs from selected parameter artifacts" do
-    readme = File.read!("README.md")
     learning = File.read!("docs/LEARNING_PATH.md")
-
-    assert readme =~ "GEPA, MIPROv2, and SIMBA share one deployment handoff"
-    assert readme =~ "Imp.Optimizer.Artifact.from_optimized_program/2"
-    assert readme =~ "Imp.Optimizer.Artifact.read!/1"
 
     assert learning =~ "## 8. Persist Programs Or Selected Parameters, Not Secrets"
     assert learning =~ "There are two restart paths."
@@ -407,9 +400,8 @@ defmodule DocumentationContractTest do
     api = File.read!("docs/API_GUIDE.md")
     coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
 
-    assert api =~ "BagOfWords` is deterministic and local"
-    assert api =~ "Production semantic embeddings"
-    assert api =~ "one numeric vector for each input text"
+    assert api =~ "Imp.Embeddings.BagOfWords"
+    assert api =~ "Dataset\nloaders and embedding providers"
     assert coverage =~ "deterministic local baseline"
     assert coverage =~ "one numeric vector per input text"
   end
@@ -452,10 +444,9 @@ defmodule DocumentationContractTest do
     api = File.read!("docs/API_GUIDE.md")
     ops = File.read!("docs/OPERATIONS_REFERENCE.md")
 
-    assert api =~ "Path.join(System.tmp_dir!(), \"imp-program.json\")"
+    assert api =~ "artifact_path = \"/secure/support-router-parameters.json\""
     refute api =~ "tmp/program.json"
-
-    assert api =~ "This is an external\nservice sketch"
+    assert api =~ "Operations Reference"
     assert ops =~ "point Imp at trusted services you own"
   end
 

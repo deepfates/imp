@@ -64,9 +64,9 @@ defmodule TutorialParityTest do
     assert livebook =~ "IMP_MODEL"
     assert livebook =~ "IMP_API_KEY"
 
-    assert deployment =~ "## Prepare An Artifact"
+    assert deployment =~ "## The application owns code; the artifact owns selected parameters"
     assert deployment =~ "Imp.save!"
     assert deployment =~ "IMP_ARTIFACT_PATH"
-    assert deployment =~ "IMP_STATIC_ANSWER=Paris"
+    assert deployment =~ "run_workflow.exs"
   end
 end
