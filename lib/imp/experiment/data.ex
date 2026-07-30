@@ -43,7 +43,7 @@ defmodule Imp.Experiment.Data do
 
     reject_duplicates!(ids)
 
-    digests = Map.new(ids, fn {split, values} -> {split, digest(values)} end)
+    digests = Map.new(rows, fn {split, values} -> {split, digest(values)} end)
     struct!(__MODULE__, Map.merge(rows, %{ids: ids, digests: digests}))
   end
 
@@ -59,8 +59,9 @@ defmodule Imp.Experiment.Data do
   def manifest(%__MODULE__{} = data) do
     %{
       "counts" => Map.new(data.ids, fn {split, ids} -> {Atom.to_string(split), length(ids)} end),
-      "digests" => stringify_keys(data.digests),
-      "ids" => stringify_keys(data.ids)
+      "row_sha256" => stringify_keys(data.digests),
+      "identity_sha256" =>
+        Map.new(data.ids, fn {split, ids} -> {Atom.to_string(split), digest(ids)} end)
     }
   end
 

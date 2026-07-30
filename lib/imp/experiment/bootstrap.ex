@@ -87,7 +87,7 @@ defmodule Imp.Experiment.Bootstrap do
   defp digest_files!(_root, value),
     do: raise(ArgumentError, "experiment :locks must be a list, got: #{inspect(value)}")
 
-  defp normalize_map(map) when is_map(map), do: Imp.Optimizer.Report.encode_term(map)
+  defp normalize_map(map) when is_map(map), do: Imp.Optimizer.Report.json_safe(map)
 
   defp normalize_map(value),
     do: raise(ArgumentError, "experiment provenance fields must be maps, got: #{inspect(value)}")

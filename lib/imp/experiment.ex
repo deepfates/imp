@@ -24,12 +24,14 @@ defmodule Imp.Experiment do
       when is_struct(program) and is_struct(optimizer) and is_function(metric) and is_list(opts) do
     unless Keyword.keyword?(opts), do: invalid_options!(opts)
 
-    {optimizer_opts, bootstrap_opts, artifact_id, declared_config, metric_identity} =
+    {optimizer_opts, evaluation_opts, bootstrap_opts, artifact_id, declared_config,
+     metric_identity} =
       split_options!(opts)
 
     config = %{
       optimizer_module: optimizer.__struct__,
       optimizer_options: Imp.Optimizer.Report.json_safe(optimizer_opts),
+      evaluation_options: Imp.Optimizer.Report.json_safe(evaluation_opts),
       artifact_id: artifact_id,
       declared: declared_config,
       metric: metric_identity
@@ -37,15 +39,14 @@ defmodule Imp.Experiment do
 
     try do
       provenance = stage!(:bootstrap, fn -> Bootstrap.capture!(data, config, bootstrap_opts) end)
-      baseline = evaluate!(:baseline_selection, program, data.selection, metric, optimizer_opts)
+      baseline = evaluate!(:baseline_selection, program, data.selection, metric, evaluation_opts)
 
       with {:ok, optimized} <-
              stage!(:optimize, fn -> optimize(program, optimizer, data, optimizer_opts) end) do
         optimized_result =
-          evaluate!(:optimized_selection, optimized, data.selection, metric, optimizer_opts)
+          evaluate!(:optimized_selection, optimized, data.selection, metric, evaluation_opts)
 
-        {selected, selected_program} = select(program, baseline, optimized, optimized_result)
-        test = evaluate!(:test, selected_program, data.test, metric, optimizer_opts)
+        selected = select(baseline, optimized_result)
 
         artifact =
           stage!(:artifact, fn ->
@@ -59,6 +60,11 @@ defmodule Imp.Experiment do
               provenance
             )
           end)
+
+        selected_program =
+          stage!(:artifact_application, fn -> Artifact.apply(artifact, program) end)
+
+        test = evaluate!(:test, selected_program, data.test, metric, evaluation_opts)
 
         {:ok,
          %Result{
@@ -92,10 +98,8 @@ defmodule Imp.Experiment do
           "Imp.Experiment.check/5 requires program, optimizer, Data, metric function, and keyword options; got: #{inspect({program, optimizer, data, metric, opts})}"
   end
 
-  defp optimize(program, optimizer, data, opts) do
+  defp optimize(program, optimizer, data, invocation) do
     with {:ok, capabilities} <- Imp.Optimizer.capabilities(optimizer) do
-      invocation = Keyword.drop(opts, evaluation_keys())
-
       case capabilities.datasets.validation do
         :unsupported when invocation == [] -> Imp.optimize(program, optimizer, data.train)
         :unsupported -> Imp.optimize(program, optimizer, data.train, invocation)
@@ -106,8 +110,7 @@ defmodule Imp.Experiment do
 
   defp evaluate!(stage, program, rows, metric, opts) do
     stage!(stage, fn ->
-      evaluation_opts = Keyword.take(opts, evaluation_keys())
-      result = Imp.evaluate(program, rows, metric, evaluation_opts)
+      result = Imp.evaluate(program, rows, metric, opts)
 
       if result.errors != [] do
         raise Imp.Experiment.StageError, stage: stage, reason: {:evaluation_errors, result.errors}
@@ -121,10 +124,10 @@ defmodule Imp.Experiment do
     end)
   end
 
-  defp select(program, baseline, optimized, optimized_result) do
+  defp select(baseline, optimized_result) do
     if optimized_result.score > baseline.score,
-      do: {:optimized, optimized},
-      else: {:baseline, program}
+      do: :optimized,
+      else: :baseline
   end
 
   defp build_artifact(
@@ -160,20 +163,37 @@ defmodule Imp.Experiment do
   end
 
   defp split_options!(opts) do
-    public = [:artifact_id, :bootstrap, :optimizer_options, :config, :metric_identity]
+    public = [
+      :artifact_id,
+      :bootstrap,
+      :optimizer_options,
+      :evaluation_options,
+      :config,
+      :metric_identity
+    ]
+
     unknown = Keyword.keys(opts) -- public
 
     if unknown != [],
       do: raise(ArgumentError, "unknown Imp.Experiment.check options: #{inspect(unknown)}")
 
     optimizer_opts = Keyword.get(opts, :optimizer_options, [])
+    evaluation_opts = Keyword.get(opts, :evaluation_options, [])
     bootstrap_opts = Keyword.get(opts, :bootstrap, [])
     artifact_id = Keyword.get(opts, :artifact_id, "optimized")
-    declared_config = Keyword.fetch!(opts, :config)
-    metric_identity = Keyword.fetch!(opts, :metric_identity)
+    declared_config = Keyword.get(opts, :config, %{})
+    metric_identity = Keyword.get(opts, :metric_identity)
 
     unless Keyword.keyword?(optimizer_opts),
       do: raise(ArgumentError, ":optimizer_options must be a keyword list")
+
+    unless Keyword.keyword?(evaluation_opts),
+      do: raise(ArgumentError, ":evaluation_options must be a keyword list")
+
+    unknown_evaluation = Keyword.keys(evaluation_opts) -- evaluation_keys()
+
+    if unknown_evaluation != [],
+      do: raise(ArgumentError, "unknown :evaluation_options: #{inspect(unknown_evaluation)}")
 
     unless Keyword.keyword?(bootstrap_opts),
       do: raise(ArgumentError, ":bootstrap must be a keyword list")
@@ -183,12 +203,14 @@ defmodule Imp.Experiment do
 
     unless is_map(declared_config), do: raise(ArgumentError, ":config must be a map")
 
-    unless (is_map(metric_identity) and map_size(metric_identity) > 0) or
+    unless is_nil(metric_identity) or
+             (is_map(metric_identity) and map_size(metric_identity) > 0) or
              (is_binary(metric_identity) and metric_identity != "") do
-      raise ArgumentError, ":metric_identity must be a non-empty map or string"
+      raise ArgumentError, ":metric_identity must be nil, a non-empty map, or a string"
     end
 
-    {optimizer_opts, bootstrap_opts, artifact_id, declared_config, metric_identity}
+    {optimizer_opts, evaluation_opts, bootstrap_opts, artifact_id, declared_config,
+     metric_identity}
   end
 
   defp evaluation_keys, do: [:max_concurrency, :max_errors, :timeout]

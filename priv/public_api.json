@@ -2838,8 +2838,8 @@
       "category": "stable",
       "functions": [
         "read!/1",
-        "to_map/1",
-        "write!/2"
+        "to_map/2",
+        "write!/3"
       ],
       "kind": "struct",
       "macros": [],
@@ -2849,11 +2849,11 @@
           "read!/1": [
             "read!(path)"
           ],
-          "to_map/1": [
-            "to_map(result)"
+          "to_map/2": [
+            "to_map(result, opts \\\\ [])"
           ],
-          "write!/2": [
-            "write!(result, path)"
+          "write!/3": [
+            "write!(result, path, opts \\\\ [])"
           ]
         },
         "types": {

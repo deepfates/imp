@@ -65,7 +65,20 @@ defmodule ImpExperimentReferenceGraph do
     verify_roots!(root)
     migrations = Enum.map(@migrations, &verify_migration!(root, &1))
     claims = active_claim_edges!(root)
-    inbound = Map.new(@roots, &{&1, inbound_refs(root, &1)})
+    dependencies = dependency_edges!(root)
+
+    inbound =
+      Map.new(@roots, fn execution ->
+        sources =
+          dependencies
+          |> Enum.filter(&(&1["target"] == execution))
+          |> Enum.map(& &1["source"])
+          |> Enum.uniq()
+          |> Enum.sort()
+
+        {execution, sources}
+      end)
+
     unavailable = @unavailable_local_records ++ unavailable_trec_records!(root)
 
     %{
@@ -74,6 +87,7 @@ defmodule ImpExperimentReferenceGraph do
       "execution_roots" => @roots,
       "shared_design_data_owner" => @design_owner,
       "claim_edges" => claims,
+      "dependency_edges" => dependencies,
       "inbound_references" => inbound,
       "byte_migrations" => migrations,
       "unavailable_local_records" => unavailable,
@@ -153,20 +167,116 @@ defmodule ImpExperimentReferenceGraph do
     end
   end
 
-  defp inbound_refs(root, execution_root) do
-    {output, status} =
-      System.cmd("rg", ["-l", "--fixed-strings", execution_root, "."],
-        cd: root,
-        stderr_to_stdout: true
-      )
+  defp dependency_edges!(root) do
+    tracked_text_files!(root)
+    |> Enum.flat_map(fn source ->
+      body = File.read!(Path.join(root, source))
 
-    if status not in [0, 1], do: fail!("cannot scan references for #{execution_root}: #{output}")
+      body
+      |> path_candidates(source)
+      |> Enum.map(fn {reference, resolved, kind} ->
+        target = execution_owner(resolved)
+
+        if is_nil(target),
+          do: fail!("matched path does not resolve to an execution: #{source}: #{reference}")
+
+        unless File.exists?(Path.join(root, resolved)) do
+          fail!("matched dependency does not exist: #{source}: #{reference} -> #{resolved}")
+        end
+
+        %{
+          "source" => source,
+          "target" => target,
+          "reference" => reference,
+          "resolved" => resolved,
+          "kind" => kind
+        }
+      end)
+      |> Enum.reject(fn edge ->
+        edge["source"] == @script or
+          edge["source"] == edge["target"] or
+          String.starts_with?(edge["source"], edge["target"] <> "/")
+      end)
+    end)
+    |> Enum.uniq_by(&{&1["source"], &1["target"], &1["resolved"]})
+    |> Enum.sort_by(&{&1["target"], &1["source"], &1["resolved"]})
+  end
+
+  defp tracked_text_files!(root) do
+    {output, 0} = System.cmd("git", ["ls-files", "-z"], cd: root)
 
     output
-    |> String.split("\n", trim: true)
-    |> Enum.map(&String.trim_leading(&1, "./"))
-    |> Enum.reject(&(&1 == @script or String.starts_with?(&1, execution_root <> "/")))
-    |> Enum.sort()
+    |> String.split(<<0>>, trim: true)
+    |> Enum.filter(&String.ends_with?(&1, [".ex", ".exs", ".py", ".json", ".md"]))
+    |> Enum.reject(&(&1 == @script))
+    |> Enum.reject(&String.starts_with?(&1, "benchmarks/evidence/archive/matched_experiments/"))
+  end
+
+  defp path_candidates(body, source) do
+    direct =
+      Enum.flat_map(@roots, fn execution ->
+        pattern =
+          ~r/#{Regex.escape(execution)}(?:\/[A-Za-z0-9_.{}-]+)*(?=$|[^A-Za-z0-9_.{}\/-])/
+
+        Regex.scan(pattern, body)
+        |> Enum.map(fn [reference] -> {reference, reference, "repo_relative"} end)
+      end)
+
+    relative =
+      Enum.flat_map(@roots, fn execution ->
+        basename = Path.basename(execution)
+        pattern = ~r{(?:\.\./)+#{Regex.escape(basename)}(?:/[A-Za-z0-9_.-]+)*}
+
+        Regex.scan(pattern, body)
+        |> Enum.map(fn [reference] ->
+          resolved =
+            source
+            |> Path.dirname()
+            |> Path.join(reference)
+            |> Path.expand("/")
+            |> Path.relative_to("/")
+
+          {reference, resolved, "source_relative"}
+        end)
+      end)
+
+    constructed =
+      Enum.flat_map(@roots, fn execution ->
+        basename = Path.basename(execution)
+        pattern = ~r{["']#{Regex.escape(basename)}["']}
+
+        Regex.scan(pattern, body)
+        |> Enum.map(fn [quoted] ->
+          {quoted, Path.join("examples", basename), "constructed_path"}
+        end)
+      end)
+
+    expanded = template_predecessors(body)
+    Enum.uniq(direct ++ relative ++ constructed ++ expanded)
+  end
+
+  defp template_predecessors(body) do
+    if String.contains?(body, "matched_gepa_mipro_ifbench_{predecessor}") do
+      case Regex.run(~r/for\s+predecessor\s+in\s+\(([^)]+)\)/, body) do
+        [_, values] ->
+          Regex.scan(~r/["'](v[23])["']/, values)
+          |> Enum.map(fn [_, suffix] ->
+            reference = "examples/matched_gepa_mipro_ifbench_#{suffix}"
+            {reference, reference, "expanded_template"}
+          end)
+
+        nil ->
+          fail!("dynamic matched predecessor path has no finite literal domain")
+      end
+    else
+      []
+    end
+  end
+
+  defp execution_owner(path) do
+    @roots
+    |> Enum.sort_by(&String.length/1, :desc)
+    |> Enum.find(&(path == &1 or String.starts_with?(path, &1 <> "/")))
   end
 
   defp unavailable_trec_records!(root) do

@@ -6,7 +6,7 @@ defmodule Imp.ExperimentTest do
 
   defmodule SelectableOptimizer do
     @behaviour Imp.Optimizer
-    defstruct []
+    defstruct [:owner]
 
     @impl true
     def __optimizer__ do
@@ -18,8 +18,9 @@ defmodule Imp.ExperimentTest do
     end
 
     @impl true
-    def run(%__MODULE__{}, program, opts) do
+    def run(%__MODULE__{owner: owner}, program, opts) do
       true = Keyword.has_key?(opts, :trainset)
+      if owner, do: send(owner, {:optimizer_opts, opts})
 
       optimized =
         program
@@ -33,6 +34,25 @@ defmodule Imp.ExperimentTest do
         )
 
       {:ok, optimized}
+    end
+  end
+
+  defmodule MissingReportOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct []
+
+    @impl true
+    def __optimizer__ do
+      %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+    end
+
+    @impl true
+    def run(%__MODULE__{}, program, _opts) do
+      {:ok, Imp.ProgramParameters.put_instruction(program, :main, "Return the selected answer.")}
     end
   end
 
@@ -82,11 +102,10 @@ defmodule Imp.ExperimentTest do
     metric = Imp.exact_match(:answer)
 
     assert {:ok, result} =
-             Imp.Experiment.check(program, %SelectableOptimizer{}, data, metric,
+             Imp.Experiment.check(program, %SelectableOptimizer{owner: owner}, data, metric,
                artifact_id: "selected-v1",
-               config: %{"optimizer" => "selectable-v1"},
-               metric_identity: %{"id" => "exact-answer", "version" => 1},
-               bootstrap: [source_root: root, locks: [], metadata: %{purpose: "feature-test"}]
+               optimizer_options: [custom_optimizer_control: :owned],
+               evaluation_options: [max_concurrency: 1]
              )
 
     assert result.selected == :optimized
@@ -94,6 +113,9 @@ defmodule Imp.ExperimentTest do
     assert result.optimized_selection.score == 1.0
     assert result.test.score == 1.0
     assert Artifact.inspect(result.artifact).champion_id == "selected-v1"
+    assert_received {:optimizer_opts, optimizer_opts}
+    assert optimizer_opts[:custom_optimizer_control] == :owned
+    refute Keyword.has_key?(optimizer_opts, :max_concurrency)
 
     assert_received {:call, "selection", false}
     assert_received {:call, "selection", true}
@@ -108,6 +130,18 @@ defmodule Imp.ExperimentTest do
 
     assert %{"payload" => %{"selected" => "optimized", "status" => "completed"}} =
              Result.read!(result_path)
+
+    persisted = Jason.decode!(File.read!(result_path))
+    encoded = File.read!(result_path)
+    assert Bitwise.band(File.stat!(result_path).mode, 0o777) == 0o600
+    refute encoded =~ "selection-1"
+    refute encoded =~ "test-1"
+    refute encoded =~ ~s("rows")
+    assert persisted["payload"]["selection"]["baseline"]["row_count"] == 1
+
+    detailed = Result.to_map(result, include_rows: true)
+    assert detailed["payload"]["detail"] == "rows"
+    assert length(detailed["payload"]["test"]["rows"]) == 1
 
     receipt_path = Path.join(root, "fresh-receipt.json")
 
@@ -192,14 +226,63 @@ defmodule Imp.ExperimentTest do
       )
 
     assert {:error, %{stage: :optimize, reason: :deliberate_failure}} =
-             Imp.Experiment.check(program, %FailingOptimizer{}, data, Imp.exact_match(:answer),
-               config: %{"optimizer" => "failing-v1"},
-               metric_identity: "exact-answer-v1",
-               bootstrap: [source_root: System.tmp_dir!(), locks: []]
-             )
+             Imp.Experiment.check(program, %FailingOptimizer{}, data, Imp.exact_match(:answer))
 
     assert_received {:call, "selection", false}
     refute_received {:call, "test", _selected?}
+  end
+
+  test "artifact failure occurs before any untouched-test call" do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Return the baseline answer.")
+      |> Imp.predict(lm: lm(owner))
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: [row("selection", "selection")],
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    assert {:error, %{stage: :artifact}} =
+             Imp.Experiment.check(
+               program,
+               %MissingReportOptimizer{},
+               data,
+               Imp.exact_match(:answer)
+             )
+
+    assert_received {:call, "selection", false}
+    assert_received {:call, "selection", true}
+    refute_received {:call, "test", _selected?}
+  end
+
+  test "custom identities remain private while row contents stay content-bound" do
+    first =
+      Data.new(
+        train: [row("source-train", "first train")],
+        selection: [row("source-selection", "first selection")],
+        test: [row("source-test", "first test")],
+        id: :id
+      )
+
+    second =
+      Data.new(
+        train: [row("source-train", "changed train")],
+        selection: [row("source-selection", "first selection")],
+        test: [row("source-test", "first test")],
+        id: :id
+      )
+
+    first_manifest = Data.manifest(first)
+    second_manifest = Data.manifest(second)
+    refute inspect(first_manifest) =~ "source-train"
+    assert first_manifest["identity_sha256"] == second_manifest["identity_sha256"]
+    refute first_manifest["row_sha256"]["train"] == second_manifest["row_sha256"]["train"]
   end
 
   defp row(id, question) do

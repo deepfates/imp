@@ -703,13 +703,7 @@ data =
     ]
   )
 
-{:ok, checked} =
-  Imp.Experiment.check(program, optimizer, data, metric,
-    artifact_id: "support-router-v1",
-    config: %{"optimizer" => "gepa", "generations" => 8},
-    metric_identity: %{"id" => "support-route-exact", "version" => 1},
-    bootstrap: [upstreams: %{"dspy" => "pinned commit"}]
-  )
+{:ok, checked} = Imp.Experiment.check(program, optimizer, data, metric)
 
 result_path = Path.join(System.tmp_dir!(), "support-router-result.json")
 artifact_path = Path.join(System.tmp_dir!(), "support-router.json")
@@ -719,12 +713,20 @@ artifact_path = Path.join(System.tmp_dir!(), "support-router.json")
 
 `Imp.Experiment.Data` rejects duplicate identities within or across splits.
 `check/5` evaluates baseline and candidate only on selection, retains baseline
-on a tie, and touches the test split only after selection. Evaluation errors,
-optimizer failure, missing reports, and non-numeric scores return a failed
-stage rather than a partial result. The checksummed result owns minimal Git,
-lock, data, configuration, and outcome provenance; the separate artifact owns
-the selected parameters. In a fresh process, reconstruct trusted program code
-and runtime clients and apply that artifact as shown below.
+on a tie, builds and reapplies the selected artifact, and only then touches the
+test split. Evaluation errors, optimizer failure, missing reports, and
+non-numeric scores return a failed stage rather than a partial result. Use
+`optimizer_options:` for optimizer controls and `evaluation_options:` for
+`:max_concurrency`, `:max_errors`, or `:timeout`; neither is forwarded to the
+other boundary. Research callers may additionally declare `config:`,
+`metric_identity:`, and `bootstrap:` provenance, but ordinary callers do not
+need them.
+
+The checksummed result stores scores, counts, redacted provenance, and the
+selected artifact by default—not source IDs or row contents. Pass
+`include_rows: true` to `Imp.Experiment.Result.write!/3` only when retaining
+redacted row details is intentional. In a fresh process, reconstruct trusted
+program code and runtime clients and apply the artifact as shown below.
 
 Use:
 
