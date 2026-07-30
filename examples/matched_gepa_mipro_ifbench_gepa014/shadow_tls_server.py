@@ -31,8 +31,11 @@ def main() -> None:
 
     temporary = tempfile.TemporaryDirectory(prefix="imp-ifbench-shadow-tls-")
     root = Path(temporary.name)
-    key = root / "key.pem"
-    cert = root / "cert.pem"
+    ca_key = root / "ca-key.pem"
+    ca_cert = root / "ca-cert.pem"
+    key = root / "server-key.pem"
+    request = root / "server.csr"
+    cert = root / "server-cert.pem"
     subprocess.run(
         [
             "openssl",
@@ -42,15 +45,60 @@ def main() -> None:
             "rsa:2048",
             "-nodes",
             "-keyout",
-            str(key),
+            str(ca_key),
             "-out",
-            str(cert),
+            str(ca_cert),
             "-days",
             "1",
+            "-subj",
+            "/CN=Imp Shadow CA",
+            "-addext",
+            "basicConstraints=critical,CA:TRUE",
+            "-addext",
+            "keyUsage=critical,keyCertSign,cRLSign",
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        [
+            "openssl",
+            "req",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-keyout",
+            str(key),
+            "-out",
+            str(request),
             "-subj",
             "/CN=localhost",
             "-addext",
             "subjectAltName=DNS:localhost,IP:127.0.0.1",
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        [
+            "openssl",
+            "x509",
+            "-req",
+            "-in",
+            str(request),
+            "-CA",
+            str(ca_cert),
+            "-CAkey",
+            str(ca_key),
+            "-CAcreateserial",
+            "-out",
+            str(cert),
+            "-days",
+            "1",
+            "-copy_extensions",
+            "copy",
         ],
         check=True,
         stdout=subprocess.DEVNULL,
@@ -184,7 +232,7 @@ def main() -> None:
         args.ready,
         {
             "base_url": f"https://127.0.0.1:{port}",
-            "ca_cert": str(cert),
+            "ca_cert": str(ca_cert),
             "pid": os.getpid(),
         },
     )
