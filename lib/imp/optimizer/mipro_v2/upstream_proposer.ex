@@ -97,7 +97,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
 
         task_demos = task_demos(predictor, demo_sets, index, fewshot_aware?)
 
-        program_inputs =
+        {program_inputs, program_context_error, program_context_calls} =
           program_inputs!(
             lm,
             predictor,
@@ -129,6 +129,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
           demo_set_index: index,
           grounded_demo_count: grounded_demo_count(demo_sets, index, fewshot_aware?),
           program_aware: program_aware?,
+          program_context_calls: program_context_calls,
+          program_context_error: program_context_error,
           rollout_id: rollout_id,
           tip: tip
         }
@@ -136,12 +138,17 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
         {instructions ++ [instruction], slots ++ [slot], rng}
       end)
 
+    errors =
+      for %{proposal_index: index, program_context_error: error} <- slots,
+          not is_nil(error),
+          do: {:program_context_error, index, error}
+
     {instructions,
      %{
-       status: :ok,
-       calls: count * if(program_aware?, do: 3, else: 1),
+       status: if(errors == [], do: :ok, else: :with_program_context_errors),
+       calls: count + Enum.sum(Enum.map(slots, & &1.program_context_calls)),
        candidate_count: count,
-       errors: [],
+       errors: errors,
        slots: slots,
        program_aware: program_aware?,
        fidelity: :dspy_3_2_1,
@@ -193,46 +200,59 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
          _rollout_id,
          _temperature
        ),
-       do: %{}
+       do: {%{}, nil, 0}
 
   defp program_inputs!(lm, predictor, task_demos, program_code, true, rollout_id, temperature)
        when is_binary(program_code) do
-    program_description =
-      call!(
-        lm,
-        describe_program_signature(),
-        %{program_code: program_code, program_example: task_demos},
-        rollout_id: rollout_id,
-        temperature: temperature
-      )
-      |> Imp.get(:program_description)
-      |> strip_prefix()
-
-    module = module_code(predictor)
-
-    module_description =
-      call!(
-        lm,
-        describe_module_signature(),
-        %{
-          program_code: program_code,
-          program_example: task_demos,
-          program_description: program_description,
-          module: module
-        },
-        rollout_id: rollout_id,
-        temperature: temperature,
-        max_depth: 10
-      )
-      |> Imp.get(:module_description)
-      |> strip_prefix()
-
-    %{
+    defaults = %{
       program_code: program_code,
-      program_description: program_description,
-      module: module,
-      module_description: module_description
+      program_description: "Not available",
+      module: "Not provided",
+      module_description: "Not provided"
     }
+
+    try do
+      program_description =
+        call!(
+          lm,
+          describe_program_signature(),
+          %{program_code: program_code, program_example: task_demos},
+          rollout_id: rollout_id,
+          temperature: temperature
+        )
+        |> Imp.get(:program_description)
+        |> strip_prefix()
+
+      module = module_code(predictor)
+      described = %{defaults | program_description: program_description, module: module}
+
+      try do
+        module_description =
+          call!(
+            lm,
+            describe_module_signature(),
+            %{
+              program_code: program_code,
+              program_example: task_demos,
+              program_description: program_description,
+              module: module
+            },
+            rollout_id: rollout_id,
+            temperature: temperature,
+            max_depth: 10
+          )
+          |> Imp.get(:module_description)
+          |> strip_prefix()
+
+        {%{described | module_description: module_description}, nil, 2}
+      rescue
+        safety in OperationalSafetyError -> reraise safety, __STACKTRACE__
+        error -> {described, Exception.message(error), 2}
+      end
+    rescue
+      safety in OperationalSafetyError -> reraise safety, __STACKTRACE__
+      error -> {defaults, Exception.message(error), 1}
+    end
   end
 
   defp program_inputs!(

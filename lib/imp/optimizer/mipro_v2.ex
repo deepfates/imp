@@ -449,10 +449,7 @@ defmodule Imp.Optimizer.MIPROv2 do
             report =
               Map.merge(report, %{
                 dataset_summary_calls:
-                  if(predictor_index == 0, do: dataset_summary_call_count(config), else: 0),
-                total_setup_calls:
-                  proposal_call_count(config, length(predictors)) +
-                    dataset_summary_call_count(config)
+                  if(predictor_index == 0, do: dataset_summary_call_count(config), else: 0)
               })
 
             {proposed, report, proposal_rng}
@@ -491,6 +488,22 @@ defmodule Imp.Optimizer.MIPROv2 do
           })
 
         {pair, {Map.put(metadata, name, report), proposal_rng}}
+      end)
+
+    total_setup_calls =
+      proposal_metadata
+      |> Map.values()
+      |> Enum.sum_by(&Map.get(&1, :calls, 0))
+      |> Kernel.+(
+        if(config.proposer_fidelity == :dspy_3_2_1,
+          do: dataset_summary_call_count(config),
+          else: 0
+        )
+      )
+
+    proposal_metadata =
+      Map.new(proposal_metadata, fn {name, report} ->
+        {name, Map.put(report, :total_setup_calls, total_setup_calls)}
       end)
 
     instruction_candidates = Map.new(instruction_pairs)
@@ -898,11 +911,6 @@ defmodule Imp.Optimizer.MIPROv2 do
 
   defp dataset_summary_call_count(config) do
     min(10, ceil(length(config.trainset) / config.view_data_batch_size)) + 1
-  end
-
-  defp proposal_call_count(config, predictor_count) do
-    calls_per_candidate = if config.program_aware_proposer, do: 3, else: 1
-    config.num_instruct_candidates * predictor_count * calls_per_candidate
   end
 
   defp config_metadata(config) do

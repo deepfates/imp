@@ -10,6 +10,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   @public_runner "test/support/dspy_3_2_1_mipro_public_compile_tape.py"
   @two_predictor_runner "test/support/dspy_3_2_1_mipro_two_predictor_tape.py"
   @program_aware_runner "test/support/dspy_3_2_1_mipro_program_aware_tape.py"
+  @program_failure_runner "test/support/dspy_3_2_1_mipro_program_failure_tape.py"
+  @describe_program "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work."
   @commit "29448ae12756abdd14bd8796c819247ebb83673c"
 
   defmodule SequenceLM do
@@ -224,6 +226,130 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
       |> MIPROv2.compile(program, trainset, valset,
         max_trials: 0,
         resume_state: report.metadata.resume_state
+      )
+    end
+  end
+
+  @tag :evidence_infrastructure
+  test "program description failures retain DSPy's sentinel proposal opportunity" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@program_failure_runner)],
+        env: [{"PYTHONPATH", Path.expand(@source)}],
+        stderr_to_stdout: false
+      )
+
+    upstream = Jason.decode!(output)
+    assert upstream["commit"] == @commit
+    owner = self()
+
+    task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{route: "K11"} end)
+
+    answers =
+      start_supervised!(
+        {Agent,
+         fn ->
+           [
+             %{observations: "dataset observations"},
+             %{summary: "dataset summary"},
+             %{proposed_instruction: "candidate 0"},
+             %{proposed_instruction: "candidate 1"}
+           ]
+         end}
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(owner, {:program_failure_call, messages, opts})
+
+          if Enum.any?(messages, &String.contains?(&1.content, @describe_program)) do
+            {:error, :description_unavailable}
+          else
+            Agent.get_and_update(answers, fn [answer | rest] -> {answer, rest} end)
+          end
+        end
+      )
+
+    program =
+      "text -> route"
+      |> Imp.signature("Route the request.")
+      |> Imp.predict(lm: task_lm, adapter: Imp.Adapter.Chat)
+
+    trainset =
+      Enum.map(0..3, fn index ->
+        Imp.example(text: "request-#{index}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    valset = [Imp.example(text: "validation", route: "K11") |> Imp.with_inputs(:text)]
+
+    paused =
+      MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 0,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        program_aware_proposer: true,
+        program_grounding: {:text, upstream["program_code"]},
+        fewshot_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        proposer_fidelity: :dspy_3_2_1,
+        seed: 9
+      )
+      |> MIPROv2.compile(program, trainset, valset, max_trials: 0)
+
+    calls = collect_tagged_calls(:program_failure_call, 6, [])
+
+    # DSPy's ChatAdapter retries each failed analysis once through JSONAdapter.
+    # Imp keeps adapter transport policy separate, so compare the six logical
+    # opportunities after removing those two mechanical fallback attempts.
+    assert length(upstream["attempted_messages"]) == 8
+
+    upstream_logical_messages =
+      upstream["attempted_messages"]
+      |> Enum.with_index()
+      |> Enum.reject(fn {_messages, index} -> index in [3, 6] end)
+      |> Enum.map(&elem(&1, 0))
+
+    assert Enum.map(calls, fn {messages, _opts} -> stringify(messages) end) ==
+             upstream_logical_messages
+
+    proposal = Imp.Optimizer.Report.fetch(paused).metadata.proposals.main
+    assert proposal.calls == 4
+    assert proposal.total_setup_calls == 6
+    assert proposal.status == :with_program_context_errors
+    assert length(proposal.errors) == 2
+    assert Enum.all?(proposal.slots, &(&1.program_context_calls == 1))
+    assert Agent.get(answers, & &1) == []
+  end
+
+  test "program analysis never contains an operational safety guard" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :cost,
+        reason: :reservation_exhausted,
+        message: "program analysis cost guard"
+      )
+
+    safety_agent =
+      start_supervised!({Agent, fn -> [{:error, safety}] end},
+        id: :program_analysis_safety_agent
+      )
+
+    lm = %SequenceLM{agent: safety_agent}
+
+    predictor = Imp.predict(Imp.signature("text -> route", "Route the request."))
+
+    assert_raise Imp.OperationalSafetyError, "program analysis cost guard", fn ->
+      UpstreamProposer.propose_with_report!(lm, predictor, "dataset summary",
+        count: 1,
+        seed: 9,
+        temperature: 1.0,
+        program_aware: true,
+        program_code: "Predict(text) -> route"
       )
     end
   end

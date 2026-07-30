@@ -51,3 +51,10 @@ Canonical claims classify every advertised family as stable or distinctly experi
   public DSPy compile matches all eight setup messages and shared rollout IDs
   in the focused fixture. Explicit source text is content-bound but redacted
   from durable reports; resume drift fails before LM activity.
+- Ordinary program/module-description failures in that pinned path now preserve
+  DSPy's ordered sentinel-grounded instruction opportunity instead of aborting
+  the compile. The report retains each diagnostic and the actual logical setup
+  call count. DSPy's mechanical Chat-to-JSON fallback retry remains adapter
+  policy rather than optimizer semantics; Imp's route, cost, budget, transport,
+  and cancellation guards remain fatal rather than being contained as proposal
+  diagnostics.
