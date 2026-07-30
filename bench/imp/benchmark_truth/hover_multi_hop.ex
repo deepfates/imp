@@ -51,11 +51,13 @@ defmodule Imp.BenchmarkTruth.HoverMultiHop do
   end
 
   @doc false
+  @impl true
   def optimizer_predictors(%__MODULE__{} = program) do
     Enum.map(@components, fn name -> {name, Map.fetch!(program, name).predict} end)
   end
 
   @doc false
+  @impl true
   def update_optimizer_predictor(%__MODULE__{} = program, name, update)
       when name in @components and is_function(update, 1) do
     component = Map.fetch!(program, name)

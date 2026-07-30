@@ -3614,6 +3614,14 @@
         {
           "name": "call/2",
           "optional": false
+        },
+        {
+          "name": "optimizer_predictors/1",
+          "optional": true
+        },
+        {
+          "name": "update_optimizer_predictor/3",
+          "optional": true
         }
       ],
       "category": "spi",
@@ -3625,17 +3633,37 @@
       "module": "Imp.Module",
       "signatures": {
         "callbacks": {
-          "call/2": []
+          "call/2": [],
+          "optimizer_predictors/1": [],
+          "update_optimizer_predictor/3": []
         },
         "functions": {
           "call/2": [
             "call(program, inputs)"
           ]
+        },
+        "types": {
+          "optimizer_predictor/0": [],
+          "optimizer_predictor_entry/0": [],
+          "optimizer_predictor_name/0": []
         }
       },
       "source": "lib/imp/module.ex",
       "struct_fields": [],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "optimizer_predictor/0"
+        },
+        {
+          "kind": "type",
+          "name": "optimizer_predictor_entry/0"
+        },
+        {
+          "kind": "type",
+          "name": "optimizer_predictor_name/0"
+        }
+      ]
     },
     {
       "callbacks": [],

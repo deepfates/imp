@@ -55,6 +55,7 @@ defmodule Imp.BenchmarkTruth.Papillon do
     _kind, _reason -> empty_prediction()
   end
 
+  @impl true
   def optimizer_predictors(%__MODULE__{} = program) do
     [
       craft_redacted_request: program.craft_redacted_request.predict,
@@ -62,6 +63,7 @@ defmodule Imp.BenchmarkTruth.Papillon do
     ]
   end
 
+  @impl true
   def update_optimizer_predictor(%__MODULE__{} = program, :craft_redacted_request, update) do
     %{
       program

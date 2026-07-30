@@ -29,6 +29,7 @@ defmodule Imp.BenchmarkTruth.IFBenchTwoStage do
 
   def new(lm, opts) when is_list(opts), do: new(Keyword.put(opts, :lm, lm))
 
+  @impl true
   def optimizer_predictors(%__MODULE__{} = program) do
     [
       generate_response_module: program.generate_response_module.predict,
@@ -36,6 +37,7 @@ defmodule Imp.BenchmarkTruth.IFBenchTwoStage do
     ]
   end
 
+  @impl true
   def update_optimizer_predictor(
         %__MODULE__{} = program,
         :generate_response_module,

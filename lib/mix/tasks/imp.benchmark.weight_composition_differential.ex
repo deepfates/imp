@@ -27,7 +27,10 @@ defmodule Mix.Tasks.Imp.Benchmark.WeightCompositionDifferential do
     @behaviour Imp.Module
     defstruct [:first, :second, metadata: %{}]
 
+    @impl true
     def optimizer_predictors(program), do: [first: program.first, second: program.second]
+
+    @impl true
     def update_optimizer_predictor(program, name, update), do: Map.update!(program, name, update)
 
     @impl true

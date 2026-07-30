@@ -42,27 +42,28 @@ defmodule Imp.ProgramParameters do
 
   @spec predictors(struct()) :: [entry()]
   def predictors(%module{} = program) do
-    cond do
-      callback_exported?(module, :optimizer_predictors, 1) ->
+    case custom_predictor_contract!(module) do
+      :custom ->
         program
         |> module.optimizer_predictors()
         |> normalize_custom_predictors!()
 
-      true ->
+      :builtin ->
         builtin_predictors(program)
     end
   end
 
   @spec update_predictor(struct(), name(), (struct() -> struct())) :: struct()
   def update_predictor(%module{} = program, name, update) when is_function(update, 1) do
-    cond do
-      callback_exported?(module, :update_optimizer_predictor, 3) ->
-        module.update_optimizer_predictor(program, name, update)
+    case custom_predictor_contract!(module) do
+      :custom ->
+        updated = module.update_optimizer_predictor(program, name, update)
+        validate_custom_predictor_update!(module, updated, name)
 
-      name == :main ->
+      :builtin when name == :main ->
         update_builtin_predictor(program, update)
 
-      true ->
+      :builtin ->
         raise ArgumentError,
               "program #{inspect(module)} has no optimizer predictor named #{inspect(name)}"
     end
@@ -292,6 +293,43 @@ defmodule Imp.ProgramParameters do
   # processes, including packaged consumers and clean benchmark captures.
   defp callback_exported?(module, function, arity) do
     Code.ensure_loaded?(module) and function_exported?(module, function, arity)
+  end
+
+  defp custom_predictor_contract!(module) do
+    predictors? = callback_exported?(module, :optimizer_predictors, 1)
+    updater? = callback_exported?(module, :update_optimizer_predictor, 3)
+
+    case {predictors?, updater?} do
+      {true, true} ->
+        :custom
+
+      {false, false} ->
+        :builtin
+
+      {true, false} ->
+        raise ArgumentError,
+              "program #{inspect(module)} implements optimizer_predictors/1 but is missing the paired Imp.Module update_optimizer_predictor/3 callback"
+
+      {false, true} ->
+        raise ArgumentError,
+              "program #{inspect(module)} implements update_optimizer_predictor/3 but is missing the paired Imp.Module optimizer_predictors/1 callback"
+    end
+  end
+
+  defp validate_custom_predictor_update!(module, %module{} = updated, name) do
+    entries = updated |> module.optimizer_predictors() |> normalize_custom_predictors!()
+
+    if Enum.any?(entries, &(&1.name == name)) do
+      updated
+    else
+      raise ArgumentError,
+            "update_optimizer_predictor/3 removed optimizer predictor #{inspect(name)}"
+    end
+  end
+
+  defp validate_custom_predictor_update!(module, updated, _name) do
+    raise ArgumentError,
+          "update_optimizer_predictor/3 for #{inspect(module)} must return the same program struct, got: #{inspect(updated)}"
   end
 
   defp normalize_changes(changes) do

@@ -11,8 +11,10 @@ defmodule BootstrapFinetuneTest do
 
     defstruct [:first, :second, metadata: %{}]
 
+    @impl true
     def optimizer_predictors(program), do: [first: program.first, second: program.second]
 
+    @impl true
     def update_optimizer_predictor(program, name, update),
       do: Map.update!(program, name, update)
 
@@ -33,9 +35,11 @@ defmodule BootstrapFinetuneTest do
 
     defstruct [:first, :second, :third, metadata: %{}]
 
+    @impl true
     def optimizer_predictors(program),
       do: [first: program.first, second: program.second, third: program.third]
 
+    @impl true
     def update_optimizer_predictor(program, name, update),
       do: Map.update!(program, name, update)
 

@@ -8,10 +8,35 @@ defmodule Imp.Module do
   optimizers, and the public `Imp.call/2` facade. It catches callback crashes
   and normalizes malformed callback returns so composed workflows can report
   failures without losing the rest of the run.
+
+  Consumer-defined multi-stage programs may expose named predictors to every
+  program optimizer by implementing the paired optional callbacks
+  `optimizer_predictors/1` and `update_optimizer_predictor/3`. Both callbacks
+  are required together. Predictor names must be unique atoms or strings and
+  each value must be an `Imp.Predict.Predict` struct. The update callback must
+  return the same program struct after applying the supplied function to the
+  named predictor. `Imp.ProgramParameters` validates this contract before an
+  optimizer can use it.
   """
+
+  @type optimizer_predictor_name :: atom() | String.t()
+  @type optimizer_predictor :: %Imp.Predict.Predict{}
+  @type optimizer_predictor_entry ::
+          {optimizer_predictor_name(), optimizer_predictor()}
+          | %{name: optimizer_predictor_name(), predictor: optimizer_predictor()}
 
   @callback call(struct(), map() | keyword()) ::
               {:ok, Imp.Prediction.t()} | {:error, term()}
+
+  @callback optimizer_predictors(struct()) :: [optimizer_predictor_entry()]
+
+  @callback update_optimizer_predictor(
+              struct(),
+              optimizer_predictor_name(),
+              (optimizer_predictor() -> optimizer_predictor())
+            ) :: struct()
+
+  @optional_callbacks optimizer_predictors: 1, update_optimizer_predictor: 3
 
   @doc """
   Calls an Imp executable program and normalizes its result shape.

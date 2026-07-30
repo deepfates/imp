@@ -76,8 +76,10 @@ defmodule GRPOContractTest do
 
     defstruct [:first, :second]
 
+    @impl true
     def optimizer_predictors(program), do: [first: program.first, second: program.second]
 
+    @impl true
     def update_optimizer_predictor(program, :first, update),
       do: %{program | first: update.(program.first)}
 

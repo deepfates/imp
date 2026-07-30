@@ -215,8 +215,10 @@ defmodule BetterTogetherTest do
     @behaviour Imp.Module
     defstruct [:predict, metadata: %{}]
 
+    @impl true
     def optimizer_predictors(program), do: [main: program.predict]
 
+    @impl true
     def update_optimizer_predictor(program, :main, update),
       do: %{program | predict: update.(program.predict)}
 
@@ -228,8 +230,10 @@ defmodule BetterTogetherTest do
     @behaviour Imp.Module
     defstruct [:predict]
 
+    @impl true
     def optimizer_predictors(program), do: [main: program.predict]
 
+    @impl true
     def update_optimizer_predictor(program, :main, update),
       do: %{program | predict: update.(program.predict)}
 
@@ -241,8 +245,10 @@ defmodule BetterTogetherTest do
     @behaviour Imp.Module
     defstruct [:first, :second, metadata: %{}]
 
+    @impl true
     def optimizer_predictors(program), do: [first: program.first, second: program.second]
 
+    @impl true
     def update_optimizer_predictor(program, name, update),
       do: Map.update!(program, name, update)
 
@@ -601,14 +607,23 @@ defmodule BetterTogetherTest do
   end
 
   test "routes COPRO evaluation options through a composed prompt step" do
-    # This contract exercises COPRO's deterministic native proposer. Pin the
-    # process-local LM so prior application-level configuration cannot silently
-    # turn it into a language-model proposal test.
+    # The task and proposal roles stay explicit inside the composed optimizer.
     Imp.Settings.context([lm: nil], fn ->
+      proposer_lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            Jason.encode!(%{
+              "proposed_instruction" => "Answer carefully.",
+              "proposed_prefix_for_output_field" => "Answer:"
+            })
+          end
+        )
+
       copro =
         Imp.Optimizer.COPRO.new(metric(),
           breadth: 2,
           depth: 1,
+          proposer_lm: proposer_lm,
           proposal_max_concurrency: 1
         )
 

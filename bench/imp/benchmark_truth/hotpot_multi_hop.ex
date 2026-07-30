@@ -76,6 +76,7 @@ defmodule Imp.BenchmarkTruth.HotpotMultiHop do
   def upstream_retrieval_source, do: @upstream_source
 
   @doc false
+  @impl true
   def optimizer_predictors(%__MODULE__{} = program) do
     Enum.map(@component_names, fn name ->
       {name, Map.fetch!(program, name).predict}
@@ -83,6 +84,7 @@ defmodule Imp.BenchmarkTruth.HotpotMultiHop do
   end
 
   @doc false
+  @impl true
   def update_optimizer_predictor(%__MODULE__{} = program, name, update)
       when name in @component_names and is_function(update, 1) do
     component = Map.fetch!(program, name)

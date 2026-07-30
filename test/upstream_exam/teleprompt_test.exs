@@ -517,9 +517,11 @@ defmodule UpstreamExam.TelepromptTest do
       }
     end
 
+    @impl true
     def optimizer_predictors(program),
       do: [classifier: program.classifier, generator: program.generator]
 
+    @impl true
     def update_optimizer_predictor(program, :classifier, update),
       do: %{program | classifier: update.(program.classifier)}
 

@@ -27,6 +27,7 @@ defmodule Imp.TestSupport.TwoStageOptimizerProgram do
     }
   end
 
+  @impl true
   def optimizer_predictors(%__MODULE__{} = program) do
     [
       analyze_intent: program.analyze_intent,
@@ -34,6 +35,7 @@ defmodule Imp.TestSupport.TwoStageOptimizerProgram do
     ]
   end
 
+  @impl true
   def update_optimizer_predictor(%__MODULE__{} = program, :analyze_intent, update),
     do: %{program | analyze_intent: update.(program.analyze_intent)}
 

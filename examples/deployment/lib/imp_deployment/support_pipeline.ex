@@ -30,10 +30,12 @@ defmodule ImpDeployment.SupportPipeline do
     }
   end
 
+  @impl true
   def optimizer_predictors(%__MODULE__{} = program) do
     [analyze: program.analyze, route: program.route]
   end
 
+  @impl true
   def update_optimizer_predictor(%__MODULE__{} = program, :analyze, update),
     do: %{program | analyze: update.(program.analyze)}
 

@@ -46,10 +46,12 @@ defmodule Imp.Playbook.WithContext do
   end
 
   @doc false
+  @impl true
   def optimizer_predictors(%__MODULE__{program: program}),
     do: ProgramParameters.predictors(program)
 
   @doc false
+  @impl true
   def update_optimizer_predictor(%__MODULE__{} = wrapper, name, update) do
     %{wrapper | program: ProgramParameters.update_predictor(wrapper.program, name, update)}
   end

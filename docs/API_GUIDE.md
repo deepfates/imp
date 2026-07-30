@@ -830,6 +830,37 @@ alone selects the returned instruction, and the original program wins ties.
 Multi-predictor instruction mutation remains the job of GEPA, SIMBA, MIPROv2,
 or a consumer program with an explicit named-parameter contract.
 
+Custom multi-stage programs expose that contract through the paired optional
+`Imp.Module` callbacks. Declare the behavior so the compiler checks the public
+surface:
+
+```elixir
+defmodule MyApp.SupportRouter do
+  @behaviour Imp.Module
+  defstruct [:analyze, :route]
+
+  @impl true
+  def optimizer_predictors(program),
+    do: [analyze: program.analyze, route: program.route]
+
+  @impl true
+  def update_optimizer_predictor(program, :analyze, update),
+    do: %{program | analyze: update.(program.analyze)}
+
+  def update_optimizer_predictor(program, :route, update),
+    do: %{program | route: update.(program.route)}
+
+  @impl true
+  def call(_program, _inputs), do: {:error, :implement_both_stages}
+end
+```
+
+The two optimizer callbacks are inseparable: Imp refuses a module that exposes
+only discovery or only mutation. Names must be unique atoms or strings, values
+must be `Imp.Predict.Predict` structs, and every update must retain the same
+consumer program struct and named lens. Built-in single-predictor programs keep
+their automatic `:main` lens.
+
 For a consumer-defined multi-predictor program, GEPA can return its selected
 program, report, and safe parameter-only artifact in one operation:
 

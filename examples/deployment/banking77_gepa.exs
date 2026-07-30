@@ -24,9 +24,11 @@ defmodule Banking77GEPA.Router do
     }
   end
 
+  @impl true
   def optimizer_predictors(router),
     do: [analyze_intent: router.analyze_intent, classify_route: router.classify_route]
 
+  @impl true
   def update_optimizer_predictor(router, :analyze_intent, update),
     do: %{router | analyze_intent: update.(router.analyze_intent)}
 
