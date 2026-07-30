@@ -164,4 +164,108 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
       Evaluation.evaluate(adapter, batch, Candidate.from_program(program), capture_traces: true)
     end
   end
+
+  test "keeps program and metric failures ordered and diagnostic-only" do
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          if inspect(messages) =~ "program failure",
+            do: {:error, :program_failure},
+            else: %{answer: "ok"}
+        end
+      ]
+    }
+
+    program = Imp.predict("question -> answer", lm: lm)
+
+    metric = fn example, _prediction ->
+      if Imp.Example.get(example, :question) == "metric failure",
+        do: raise("metric failure"),
+        else: %{score: 1.0, feedback: "ordinary success"}
+    end
+
+    batch =
+      Enum.map(["success", "program failure", "metric failure"], fn question ->
+        Imp.example(question: question) |> Imp.with_inputs(:question)
+      end)
+
+    adapter = ProgramAdapter.new(program, metric)
+    candidate = Candidate.from_program(program)
+    result = Evaluation.evaluate(adapter, batch, candidate, capture_traces: true)
+
+    assert length(result.outputs) == 3
+    assert result.scores == [1.0, 0.0, 0.0]
+    assert Enum.map(result.trajectories.main, &is_nil/1) == [false, true, false]
+
+    assert ["ordinary success", program_diagnostic, metric_diagnostic] =
+             result.side_information.main
+
+    assert program_diagnostic == %{
+             diagnostic_only: true,
+             error: {:invalid_lm_result, {:error, :program_failure}},
+             example_index: 1,
+             score: 0.0
+           }
+
+    assert metric_diagnostic == %{
+             diagnostic_only: true,
+             error: {:metric_error, "metric failure"},
+             example_index: 2,
+             score: 0.0
+           }
+
+    assert %{main: [record]} =
+             Adapter.make_reflective_dataset(adapter, candidate, result, [:main])
+
+    assert record["Feedback"] =~ "ordinary success"
+
+    pinned = %{adapter | reflection_record_mode: :gepa_v0_1_4}
+
+    assert %{main: [pinned_record]} =
+             Adapter.make_reflective_dataset(pinned, candidate, result, [:main])
+
+    assert pinned_record["Feedback"] == "ordinary success"
+
+    all_orders = [
+      ["success", "program failure", "metric failure"],
+      ["success", "metric failure", "program failure"],
+      ["program failure", "success", "metric failure"],
+      ["program failure", "metric failure", "success"],
+      ["metric failure", "success", "program failure"],
+      ["metric failure", "program failure", "success"]
+    ]
+
+    exhaustive_batch =
+      all_orders
+      |> List.flatten()
+      |> Enum.map(fn question ->
+        Imp.example(question: question) |> Imp.with_inputs(:question)
+      end)
+
+    exhaustive =
+      Evaluation.evaluate(adapter, exhaustive_batch, candidate, capture_traces: true)
+
+    assert length(exhaustive.outputs) == 18
+
+    assert Enum.flat_map(exhaustive.trajectories.main, fn
+             nil -> []
+             trajectory -> [trajectory.index]
+           end) ==
+             Enum.reject(0..17, fn index ->
+               exhaustive_batch
+               |> Enum.at(index)
+               |> Imp.Example.get(:question) == "program failure"
+             end)
+
+    assert Enum.count(exhaustive.side_information.main, fn
+             %{diagnostic_only: true} -> true
+             _feedback -> false
+           end) == 12
+
+    assert %{main: records} =
+             Adapter.make_reflective_dataset(adapter, candidate, exhaustive, [:main])
+
+    assert length(records) == 6
+  end
 end

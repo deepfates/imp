@@ -618,6 +618,11 @@ defmodule Imp.Optimizer.GEPA do
     |> Enum.uniq()
   end
 
+  defp diagnostic_text(%{diagnostic_only: true, error: error}), do: diagnostic_text(error)
+
+  defp diagnostic_text(%{"diagnostic_only" => true, "error" => error}),
+    do: diagnostic_text(error)
+
   defp diagnostic_text({:metric_error, message}), do: truncate_text(to_string(message), 240)
   defp diagnostic_text({_kind, message}) when is_binary(message), do: truncate_text(message, 240)
   defp diagnostic_text(value) when is_atom(value), do: Atom.to_string(value)

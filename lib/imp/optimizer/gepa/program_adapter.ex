@@ -108,11 +108,16 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         aligned
         |> Enum.zip(result.side_information |> Map.get(component, []) |> pad(length(aligned)))
         |> Enum.flat_map(fn
+          {%{error: error}, _feedback} when not is_nil(error) ->
+            []
+
           {nil, nil} ->
             []
 
           {nil, feedback} ->
-            feedback_only_records(feedback, adapter.reflection_record_mode)
+            if diagnostic_failure?(feedback),
+              do: [],
+              else: feedback_only_records(feedback, adapter.reflection_record_mode)
 
           {trajectory, feedback} ->
             case reflection_record(
@@ -174,7 +179,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         Enum.map(trajectories, fn trajectory ->
           cond do
             not is_nil(trajectory.error) ->
-              trajectory.error
+              diagnostic_failure(trajectory)
 
             single_component? or component_visited?(trajectory, component) ->
               component_feedback(
@@ -235,6 +240,19 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   defp metric_feedback(%{score: score}) when score > 0, do: :successful
   defp metric_feedback(_trajectory), do: :improve
+
+  defp diagnostic_failure(trajectory) do
+    %{
+      diagnostic_only: true,
+      error: trajectory.error,
+      example_index: trajectory.index,
+      score: trajectory.score
+    }
+  end
+
+  defp diagnostic_failure?(%{diagnostic_only: true}), do: true
+  defp diagnostic_failure?(%{"diagnostic_only" => true}), do: true
+  defp diagnostic_failure?(_feedback), do: false
 
   defp project_objective_scores(trajectories) do
     projected = Enum.map(trajectories, &trajectory_objective_scores/1)

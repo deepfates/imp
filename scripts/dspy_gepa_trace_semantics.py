@@ -10,12 +10,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import sys
-from dataclasses import dataclass, replace
 from pathlib import Path
-from types import MethodType, SimpleNamespace
-from unittest import mock
+from types import SimpleNamespace
 
 
 def main() -> None:
@@ -28,174 +27,18 @@ def main() -> None:
     sys.path.insert(0, str(args.dspy_root.resolve()))
 
     import dspy
-    from dspy.evaluate.evaluate import Evaluate
-    from dspy.teleprompt import bootstrap_trace as bootstrap_trace_module
     from dspy.teleprompt.bootstrap_trace import FailedPrediction
     from dspy.teleprompt.gepa.gepa_utils import DspyAdapter
     from dspy.utils.exceptions import AdapterParseError
     from gepa.core.data_loader import ListDataLoader
     from gepa.core.engine import GEPAEngine
     from gepa.strategies.eval_policy import FullEvaluationPolicy
-
-    @dataclass
-    class FailedExecution:
-        stage: str
-        error_type: str
-        message: str
-
-    class FailureScore(float):
-        def __new__(cls, value, failure):
-            instance = super().__new__(cls, value)
-            instance.failure = failure
-            return instance
-
-    def failure(stage, error):
-        return {
-            "stage": stage,
-            "type": type(error).__name__,
-            "message": str(error),
-        }
-
-    def preserving_bootstrap_trace_data(
-        program,
-        dataset,
-        metric=None,
-        num_threads=None,
-        raise_on_error=True,
-        capture_failed_parses=False,
-        failure_score=0,
-        format_failure_score=-1,
-        log_format_failures=False,
-        callback_metadata=None,
-    ):
-        del log_format_failures
-        evaluator = Evaluate(
-            devset=dataset,
-            num_threads=num_threads,
-            display_progress=False,
-            provide_traceback=False,
-            max_errors=len(dataset) * 10,
-            failure_score=failure_score,
-        )
-
-        def wrapped_metric(example, prediction_and_trace, trace=None):
-            prediction, _captured = prediction_and_trace
-            if isinstance(prediction, FailedPrediction):
-                return (
-                    prediction.format_reward
-                    if prediction.format_reward is not None
-                    else format_failure_score
-                )
-            if isinstance(prediction, FailedExecution):
-                return failure_score
-            try:
-                return metric(example, prediction, trace) if metric else True
-            except Exception as error:
-                return FailureScore(failure_score, failure("metric", error))
-
-        original_forward = object.__getattribute__(program, "forward")
-
-        def patched_forward(program_to_use, **kwargs):
-            with dspy.context(trace=[]):
-                try:
-                    return original_forward(**kwargs), dspy.settings.trace.copy()
-                except AdapterParseError as error:
-                    if not capture_failed_parses:
-                        failed = FailedExecution(
-                            "program", type(error).__name__, str(error)
-                        )
-                        return failed, dspy.settings.trace.copy()
-
-                    present = list(error.parsed_result.keys()) if error.parsed_result else []
-                    expected = list(error.signature.output_fields.keys())
-                    predictor = next(
-                        (
-                            item
-                            for item in program_to_use.predictors()
-                            if item.signature == error.signature
-                        ),
-                        None,
-                    )
-                    if predictor is None:
-                        failed = FailedExecution(
-                            "program", "PredictorNotFound", str(error.signature)
-                        )
-                        return failed, dspy.settings.trace.copy()
-
-                    ratio = len(present) / len(expected) if expected else 0.0
-                    failed_prediction = FailedPrediction(
-                        completion_text=error.lm_response,
-                        format_reward=format_failure_score
-                        + (failure_score - format_failure_score) * ratio,
-                    )
-                    failed_prediction.failure = failure("parse", error)
-                    captured = dspy.settings.trace.copy()
-                    captured.append((predictor, kwargs, failed_prediction))
-                    return failed_prediction, captured
-                except Exception as error:
-                    return (
-                        FailedExecution("program", type(error).__name__, str(error)),
-                        dspy.settings.trace.copy(),
-                    )
-
-        program.forward = MethodType(patched_forward, program)
-        try:
-            results = evaluator(
-                program,
-                metric=wrapped_metric,
-                callback_metadata=callback_metadata,
-            ).results
-        finally:
-            program.forward = original_forward
-
-        traces = []
-        for example_ind, (example, prediction_and_trace, score) in enumerate(results):
-            prediction, captured = prediction_and_trace
-            failure_metadata = getattr(prediction, "failure", None) or getattr(
-                score, "failure", None
-            )
-            if failure_metadata is not None and raise_on_error:
-                raise RuntimeError(
-                    f"{failure_metadata['stage']} failure: {failure_metadata['message']}"
-                )
-            row = {
-                "example_ind": example_ind,
-                "example": example,
-                "prediction": prediction,
-                "trace": captured,
-            }
-            if metric:
-                row["score"] = float(score) if isinstance(score, FailureScore) else score
-            if failure_metadata is not None:
-                row["failure"] = failure_metadata
-            traces.append(row)
-        return traces
-
-    class FailurePreservingDspyAdapter(DspyAdapter):
-        def evaluate(self, batch, candidate, capture_traces=False):
-            if not capture_traces:
-                return super().evaluate(batch, candidate, capture_traces=False)
-            with mock.patch.object(
-                bootstrap_trace_module,
-                "bootstrap_trace_data",
-                preserving_bootstrap_trace_data,
-            ):
-                return super().evaluate(batch, candidate, capture_traces=True)
-
-        def make_reflective_dataset(self, candidate, eval_batch, components_to_update):
-            # Parse failures retain the existing documented, opt-in DSPy feedback
-            # path. Infrastructure/program/metric failures remain visible in the
-            # evaluation but are not turned into invented prompt advice.
-            reflectable = [
-                row
-                for row in (eval_batch.trajectories or [])
-                if row.get("failure", {}).get("stage") in (None, "parse")
-            ]
-            return super().make_reflective_dataset(
-                candidate,
-                replace(eval_batch, trajectories=reflectable),
-                components_to_update,
-            )
+    from dspy_gepa_failure_compat import (
+        FailedExecution,
+        FailurePreservingDspyAdapter,
+        patched_dspy_gepa,
+    )
+    from dspy.teleprompt.gepa import gepa as dspy_gepa_module
 
     class Program(dspy.Module):
         def __init__(self, lm):
@@ -204,6 +47,8 @@ def main() -> None:
             self.set_lm(lm)
 
         def forward(self, kind):
+            if kind == "program_failure":
+                raise RuntimeError("deterministic program failure")
             if kind == "parse_empty":
                 raise AdapterParseError(
                     "deterministic", self.stage.signature, "not structured"
@@ -231,7 +76,7 @@ def main() -> None:
             raise ValueError("deterministic evaluator failure")
         return 1.0
 
-    def adapter(adapter_class, rows, *, format_feedback=False):
+    def adapter(adapter_class, rows, *, format_feedback=False, failure_score=0.0):
         lm = SharedHistoryDummyLM([{"answer": "ok"}] * len(rows))
         program = Program(lm)
         instance = adapter_class(
@@ -243,7 +88,7 @@ def main() -> None:
                     "feedback": "ordinary success",
                 }
             },
-            failure_score=0.0,
+            failure_score=failure_score,
             num_threads=1,
             add_format_failure_as_feedback=format_feedback,
         )
@@ -303,6 +148,18 @@ def main() -> None:
     fixed = fixed_adapter.evaluate(success, fixed_candidate, capture_traces=True)
     original_bytes = transcript_bytes(original.trajectories)
     fixed_bytes = transcript_bytes(fixed.trajectories)
+    original_reflection = original_adapter.make_reflective_dataset(
+        original_candidate, original, ["stage"]
+    )
+    fixed_reflection = fixed_adapter.make_reflective_dataset(
+        fixed_candidate, fixed, ["stage"]
+    )
+    original_reflection_bytes = json.dumps(
+        original_reflection, sort_keys=True, separators=(",", ":")
+    ).encode()
+    fixed_reflection_bytes = json.dumps(
+        fixed_reflection, sort_keys=True, separators=(",", ":")
+    ).encode()
 
     def history_bytes(lm):
         stable = [
@@ -318,7 +175,9 @@ def main() -> None:
     original_messages = history_bytes(original_lm)
     fixed_messages = history_bytes(fixed_lm)
 
-    mixed = examples(["ok", "parse_empty", "parse_partial", "metric_failure"])
+    mixed = examples(
+        ["ok", "parse_empty", "parse_partial", "program_failure", "metric_failure"]
+    )
     mixed_adapter, mixed_candidate, _mixed_lm = adapter(
         FailurePreservingDspyAdapter, mixed, format_feedback=True
     )
@@ -342,12 +201,66 @@ def main() -> None:
         [mixed_candidate], SimpleNamespace(evaluation_cache=None)
     )[0][0]
 
+    # Every ordering of all five outcomes must retain its own aligned slot.
+    # One evaluation keeps the proof fast while covering all 120 permutations.
+    outcome_kinds = [
+        "ok",
+        "parse_empty",
+        "parse_partial",
+        "program_failure",
+        "metric_failure",
+    ]
+    permutations = list(itertools.permutations(outcome_kinds))
+    exhaustive_kinds = [kind for permutation in permutations for kind in permutation]
+    exhaustive_rows = examples(exhaustive_kinds)
+    exhaustive_adapter, exhaustive_candidate, _exhaustive_lm = adapter(
+        FailurePreservingDspyAdapter, exhaustive_rows, format_feedback=True
+    )
+    exhaustive = exhaustive_adapter.evaluate(
+        exhaustive_rows, exhaustive_candidate, capture_traces=True
+    )
+    expected_stage = {
+        "ok": None,
+        "parse_empty": "parse",
+        "parse_partial": "parse",
+        "program_failure": "program",
+        "metric_failure": "metric",
+    }
+    for index, (kind, row, score) in enumerate(
+        zip(exhaustive_kinds, exhaustive.trajectories, exhaustive.scores, strict=True)
+    ):
+        assert row["example_ind"] == index
+        assert row.get("failure", {}).get("stage") == expected_stage[kind], (
+            index,
+            kind,
+            row.get("failure"),
+        )
+        assert score == (1.0 if kind == "ok" else 0.0)
+
+    configured_rows = examples(["program_failure", "metric_failure"])
+    configured_adapter, configured_candidate, _configured_lm = adapter(
+        FailurePreservingDspyAdapter, configured_rows, failure_score=-0.25
+    )
+    configured = configured_adapter.evaluate(
+        configured_rows, configured_candidate, capture_traces=True
+    )
+
+    stock_adapter_class = dspy_gepa_module.DspyAdapter
+    with patched_dspy_gepa():
+        scoped_adapter_installed = (
+            dspy_gepa_module.DspyAdapter is FailurePreservingDspyAdapter
+        )
+    scoped_adapter_restored = dspy_gepa_module.DspyAdapter is stock_adapter_class
+
     result = {
         "ordinary_success": {
             "byte_identical": original_bytes == fixed_bytes,
             "original_sha256": hashlib.sha256(original_bytes).hexdigest(),
             "fixed_sha256": hashlib.sha256(fixed_bytes).hexdigest(),
             "rendered_messages_byte_identical": original_messages == fixed_messages,
+            "reflection_byte_identical": original_reflection_bytes
+            == fixed_reflection_bytes,
+            "reflection_opportunities": len(fixed_reflection["stage"]),
             "original_messages_sha256": hashlib.sha256(original_messages).hexdigest(),
             "fixed_messages_sha256": hashlib.sha256(fixed_messages).hexdigest(),
         },
@@ -362,6 +275,7 @@ def main() -> None:
             "failure_types": [
                 row.get("failure", {}).get("type") for row in mixed_eval.trajectories
             ],
+            "failures": [row.get("failure") for row in mixed_eval.trajectories],
             "candidate_score_sum": sum(mixed_eval.scores),
             "reflection_items": len(reflection["stage"]),
             "reflection_parse_failures": sum(
@@ -373,6 +287,8 @@ def main() -> None:
                 "failed to parse" in str(item["Feedback"]).lower()
                 for item in default_reflection["stage"]
             ),
+            "all_failure_orderings_checked": len(permutations),
+            "configured_failure_scores": configured.scores,
         },
         "gepa_merge": {
             "outputs": len(merged.outputs_by_val_id),
@@ -383,28 +299,56 @@ def main() -> None:
             "parse_failure_reflection": "existing add_format_failure_as_feedback opt-in",
             "program_or_metric_failure_reflection": "diagnostic only; no invented feedback",
             "adapted_program_required_to_reproduce": False,
+            "scoped_adapter_installed": scoped_adapter_installed,
+            "scoped_adapter_restored": scoped_adapter_restored,
         },
     }
     print(json.dumps(result, indent=2, sort_keys=True))
 
     assert result["ordinary_success"]["byte_identical"] is True
     assert result["ordinary_success"]["rendered_messages_byte_identical"] is True
-    assert result["mixed_failures"] == {
-        "requested": 4,
-        "outputs": 4,
-        "scores": [1.0, 0.0, 0.0, 0.0],
-        "trajectory_indices": [0, 1, 2, 3],
-        "failure_stages": [None, "parse", "parse", "metric"],
-        "failure_types": [None, "AdapterParseError", "AdapterParseError", "ValueError"],
+    assert result["ordinary_success"]["reflection_byte_identical"] is True
+    assert result["semantic_boundary"]["scoped_adapter_installed"] is True
+    assert result["semantic_boundary"]["scoped_adapter_restored"] is True
+    failures = result["mixed_failures"]["failures"]
+    assert failures[0] is None
+    assert [failure["stage"] for failure in failures[1:]] == [
+        "parse",
+        "parse",
+        "program",
+        "metric",
+    ]
+    assert failures[3]["message"] == "deterministic program failure"
+    assert failures[4]["message"] == "deterministic evaluator failure"
+
+    assert {
+        key: value
+        for key, value in result["mixed_failures"].items()
+        if key != "failures"
+    } == {
+        "requested": 5,
+        "outputs": 5,
+        "scores": [1.0, 0.0, 0.0, 0.0, 0.0],
+        "trajectory_indices": [0, 1, 2, 3, 4],
+        "failure_stages": [None, "parse", "parse", "program", "metric"],
+        "failure_types": [
+            None,
+            "AdapterParseError",
+            "AdapterParseError",
+            "RuntimeError",
+            "ValueError",
+        ],
         "candidate_score_sum": 1.0,
         "reflection_items": 3,
         "reflection_parse_failures": 2,
         "default_reflection_items": 1,
         "default_reflection_parse_failures": 0,
+        "all_failure_orderings_checked": 120,
+        "configured_failure_scores": [-0.25, -0.25],
     }
     assert result["gepa_merge"] == {
-        "outputs": 4,
-        "scores": [1.0, 0.0, 0.0, 0.0],
+        "outputs": 5,
+        "scores": [1.0, 0.0, 0.0, 0.0, 0.0],
     }
 
 

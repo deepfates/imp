@@ -184,7 +184,7 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.generations == 0
   end
 
-  test "GEPA records program call failures as optimizer feedback instead of crashing" do
+  test "GEPA records program failures diagnostically without using them as instruction advice" do
     broken_program =
       Imp.predict("question -> answer",
         lm: %{module: ErrorLM, opts: []}
@@ -204,6 +204,10 @@ defmodule OptimizerBehavioralCorpusTest do
 
     assert Enum.any?(report.candidates, fn candidate ->
              candidate.mutation =~ "Program call failed"
+           end)
+
+    refute Enum.any?(report.candidates, fn candidate ->
+             candidate.instruction =~ "Program call failed"
            end)
   end
 

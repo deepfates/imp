@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "treatment_id": "matched-gepa-mipro-ifbench-failure-preserving-stock-dspy",
+  "status": "draft_provider_disabled",
+  "provider_authority": "none",
+  "predecessor": {
+    "path": "../matched_gepa_mipro_ifbench_v2/contract.json",
+    "sha256": "eb1629c5b1ef8556207c02895fb000849aba1626b1f8684f9a2c445a3d202a69",
+    "status": "permanently_stopped_incomplete_unscored",
+    "reuse": "none"
+  },
+  "compatibility_boundary": {
+    "dspy": "3.2.1@29448ae12756abdd14bd8796c819247ebb83673c",
+    "gepa": "0.1.4@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+    "task_graph": "stock-DSPy-adapted IFBenchCoT2StageModule",
+    "gepa_adapter": "explicit failure-preserving patched stock-DSPy layer",
+    "baseline_adapter": "stock DSPy 3.2.1",
+    "mipro_v2_adapter": "stock DSPy 3.2.1",
+    "arbitrary_failure_policy": "ordered failure_score plus structured diagnostics; excluded from reflection",
+    "parse_failure_policy": "unchanged DSPy add_format_failure_as_feedback opt-in"
+  },
+  "provider_free_sources": {
+    "compatibility_module": {
+      "path": "../../scripts/dspy_gepa_failure_compat.py",
+      "sha256": "2a5388abc7e19f3939002201e7d4e7ae5f145b322842a12b3aceff79d4fa1718"
+    },
+    "semantic_gate": {
+      "path": "../../scripts/dspy_gepa_trace_semantics.py",
+      "sha256": "bac21a278f94c25666d65c3fce7558ff3f334a8fedaac45121b34a49bbf4762c"
+    },
+    "future_gepa_entry": {
+      "path": "upstream_compat.py",
+      "sha256": "b8c3a0a142fbbb15ef6d9e4912adb9c74d0641a733a1c815a853ce9d81164063"
+    }
+  },
+  "treatment_invariants": {
+    "inherit_from_predecessor": [
+      "dataset rows and disjoint splits",
+      "scorer",
+      "messages and task graph",
+      "models and routes",
+      "three seeds",
+      "GEPA and MIPROv2 opportunity and stopping semantics",
+      "call and token envelopes",
+      "selection sealing and held-out barrier",
+      "paired hypotheses and noninferiority margin"
+    ],
+    "held_out_access": "forbidden before all 18 selection artifacts seal",
+    "result_reuse": "forbidden"
+  },
+  "budget": {
+    "conservative_prior_workshop_spend_lte": 7.36267325,
+    "new_spend_max_if_later_sealed": 74.552832,
+    "combined_workshop_max_if_later_sealed": 81.91550525,
+    "authorized_workshop_ceiling": 100.0
+  },
+  "seal_requirements": [
+    "exact clean launch commit and content hashes",
+    "provider-free compatibility and guard gates",
+    "fresh catalog, privacy, identity, route, and price validation",
+    "independent coordinator review"
+  ]
+}
