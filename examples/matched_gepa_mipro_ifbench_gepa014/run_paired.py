@@ -222,6 +222,48 @@ def shadow_peer_preflight(manifest: dict[str, Any], launch_commit: str) -> dict[
                     f"{runtime} exact-entry shadow failed:\n{completed.stdout}",
                 )
                 reports[runtime] = parse_shadow_report(completed.stdout, runtime)
+            require(
+                reports["imp"].get("applications_started")
+                == {"ssl": True, "req": True, "imp": True},
+                "Imp shadow reached transport before all required applications started",
+            )
+            require(
+                sorted(reports["imp"].get("catalog_roles", []))
+                == ["optimizer", "task"],
+                "Imp shadow did not execute both catalog guards",
+            )
+            effective = manifest["authenticated_gepa_bridge"]["effective_identity"]
+            observed = reports["upstream"].get("effective_gepa_identity", {})
+            require(
+                Path(observed.get("module_path", "")).resolve()
+                == (ROOT / effective["module_path"]).resolve()
+                and observed.get("source_commit") == effective["source_commit"]
+                and observed.get("source_tree") == effective["source_tree"]
+                and observed.get("init_sha256") == effective["init_sha256"]
+                and observed.get("api_sha256") == effective["api_sha256"]
+                and observed.get("optimize_signature_sha256")
+                == effective["optimize_signature_sha256"],
+                "upstream shadow effective GEPA source/API identity drift",
+            )
+            require(
+                sorted(
+                    item.get("version")
+                    for item in observed.get("distribution_metadata", [])
+                )
+                == sorted(
+                    [
+                        effective["installed_distribution_version"],
+                        effective["source_distribution_version"],
+                    ]
+                )
+                and observed.get("module_version") == effective["module_version"],
+                "upstream shadow GEPA distribution diagnostics drift",
+            )
+            require(
+                sorted(reports["upstream"].get("catalog_roles", []))
+                == ["optimizer", "task"],
+                "upstream shadow did not execute both catalog guards",
+            )
         finally:
             if server.poll() is None:
                 server.terminate()
