@@ -156,9 +156,11 @@ defmodule Imp.Experiment do
     end)
   rescue
     error in Imp.EvaluationCancelledError ->
-      raise Imp.Experiment.StageError,
-        stage: stage,
-        reason: evaluation_cancelled(stage, error, row_ids)
+      reraise Imp.Experiment.StageError.exception(
+                stage: stage,
+                reason: evaluation_cancelled(stage, error, row_ids)
+              ),
+              __STACKTRACE__
   end
 
   defp select(baseline, optimized_result) do
