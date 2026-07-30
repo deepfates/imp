@@ -1224,8 +1224,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/mmgrpo_differential/f7eb66096fab79d39f2bdb40d612778a68a569e55baffb82309ac44cb0af6571.json",
-        "artifact_sha256": "f7eb66096fab79d39f2bdb40d612778a68a569e55baffb82309ac44cb0af6571",
+        "artifact": "benchmarks/evidence/admitted/mmgrpo_differential/e05710b743aa9bac3c65ecbfbcb90fa0b24e6957262564f06e917db4527360f3.json",
+        "artifact_sha256": "e05710b743aa9bac3c65ecbfbcb90fa0b24e6957262564f06e917db4527360f3",
         "protocol_id": "mmgrpo_differential"
       }
     },
