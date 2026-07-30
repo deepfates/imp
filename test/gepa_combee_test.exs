@@ -102,36 +102,6 @@ defmodule Imp.Optimizer.GEPA.ComBeeTest do
     assert elem(final, 6) |> Enum.map(& &1["ComBeeGroupIndex"]) == [0, 1, 2, 3]
   end
 
-  test "production fallback retains more than 64 first-level and final aggregation inputs" do
-    records = Enum.map(0..79, &%{"Feedback" => "source-#{&1}"})
-
-    first =
-      Imp.Optimizer.GEPA.fallback_proposal(
-        %{main: "current"},
-        :main,
-        records,
-        1,
-        "",
-        %{phase: :first_level}
-      )
-
-    final_records =
-      Enum.map(0..79, &%{"ComBeeIntermediateUpdate" => "intermediate-#{&1}"})
-
-    final =
-      Imp.Optimizer.GEPA.fallback_proposal(
-        %{main: "current"},
-        :main,
-        final_records,
-        1,
-        "",
-        %{phase: :final}
-      )
-
-    assert Enum.all?(0..79, &String.contains?(first, "source-#{&1}"))
-    assert Enum.all?(0..79, &String.contains?(final, "intermediate-#{&1}"))
-  end
-
   test "one deadline covers queued first-level work and the final level" do
     owner = self()
     records = Enum.map(0..15, &%{id: &1})

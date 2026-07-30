@@ -42,6 +42,17 @@ defmodule Imp.Optimizer.COPROFidelityTest do
     )
   end
 
+  defp proposal_lm do
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        Jason.encode!(%{
+          "proposed_instruction" => "Candidate instruction.",
+          "proposed_prefix_for_output_field" => "Answer:"
+        })
+      end
+    )
+  end
+
   test "stores and compares inert prefix metadata without rendering it" do
     parent = self()
 
@@ -618,6 +629,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
       COPRO.new(Imp.Metrics.exact_match(:answer),
         breadth: 2,
         depth: 1,
+        proposer_lm: proposal_lm(),
         extra_instructions: ["Candidate instruction."]
       )
 

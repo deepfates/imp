@@ -58,6 +58,11 @@ defmodule Imp.Optimizer.GEPA do
   balanced groups concurrently, and performs one ordered final reduction.
   `:proposal_timeout` bounds reflection work and inherits `:timeout` when
   omitted; a finite nested ComBee timeout is an additional upper bound.
+
+  A real proposal source is mandatory for optimization. Set `:reflection_lm`
+  or `:reflection_strategy`; GEPA never fabricates an instruction from the
+  current prompt or diagnostic records. Baseline-only `generations: 0` runs do
+  not require a proposal source.
   """
 
   alias Imp.Optimizer.GEPA.{
@@ -274,6 +279,7 @@ defmodule Imp.Optimizer.GEPA do
   @doc "Compiles a program and returns the optimizer report independently of program metadata support."
   def compile_with_report(%__MODULE__{} = optimizer, program, trainset, devset, opts \\ []) do
     opts = Imp.Options.validate!(opts, @compile_option_schema, "Imp.Optimizer.GEPA.compile/5")
+    ensure_proposal_source!(optimizer)
     trainset = Enum.to_list(trainset)
     devset = Enum.to_list(devset)
     {feedback, feedback_errors} = feedback(optimizer, trainset)
@@ -355,7 +361,6 @@ defmodule Imp.Optimizer.GEPA do
         devset,
         proposer(
           optimizer.reflection_lm,
-          feedback,
           reflection_feedback,
           optimizer.reflection_record_mode,
           reflection_field_orders
@@ -452,23 +457,12 @@ defmodule Imp.Optimizer.GEPA do
 
   defp proposer(
          reflection_lm,
-         fallback_feedback,
          reflection_feedback,
          reflection_record_mode,
          reflection_field_orders
        ) do
     fn candidate, component, records, generation, aggregation ->
       case reflection_lm do
-        nil ->
-          fallback_proposal(
-            candidate,
-            component,
-            records,
-            generation,
-            fallback_feedback,
-            aggregation
-          )
-
         lm ->
           reflection_proposal(
             lm,
@@ -485,29 +479,14 @@ defmodule Imp.Optimizer.GEPA do
     end
   end
 
-  @doc false
-  def fallback_proposal(candidate, component, records, generation, feedback, aggregation) do
-    record_feedback =
-      records
-      |> Enum.with_index()
-      |> Enum.map_join("\n", fn {record, index} ->
-        value =
-          Map.get(record, "ComBeeIntermediateUpdate") || Map.get(record, "Feedback") ||
-            inspect(record)
+  defp ensure_proposal_source!(%__MODULE__{generations: 0}), do: :ok
 
-        "[#{index}] #{value}"
-      end)
-
-    phase = Map.get(aggregation, :phase, :single)
-
-    [
-      Map.fetch!(candidate, component),
-      feedback,
-      "Reflection #{generation} (#{phase}): #{record_feedback}"
-    ]
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join("\n")
+  defp ensure_proposal_source!(%__MODULE__{reflection_lm: nil, reflection_strategy: nil}) do
+    raise ArgumentError,
+          "GEPA optimization requires :reflection_lm or :reflection_strategy; Imp does not synthesize reflection proposals"
   end
+
+  defp ensure_proposal_source!(%__MODULE__{}), do: :ok
 
   defp reflection_proposal(
          lm,

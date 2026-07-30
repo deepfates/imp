@@ -580,9 +580,26 @@ defmodule CompletionSurfaceTest do
 
     metric = Imp.Metrics.exact_match(:answer)
 
+    proposal_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Jason.encode!(%{
+            "proposed_instruction" => "Answer exactly.",
+            "proposed_prefix_for_output_field" => "Answer:"
+          })
+        end
+      )
+
+    reflection_lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{instruction: "Answer exactly."} end)
+
     compiled =
       [
-        Imp.Optimizer.COPRO.new(metric, breadth: 3, depth: 1),
+        Imp.Optimizer.COPRO.new(metric,
+          breadth: 3,
+          depth: 1,
+          proposer_lm: proposal_lm
+        ),
         Imp.Optimizer.MIPROv2.new(metric,
           auto: nil,
           num_candidates: 3,
@@ -592,7 +609,7 @@ defmodule CompletionSurfaceTest do
           minibatch: false
         ),
         Imp.Optimizer.SIMBA.new(metric, bsize: 2, max_steps: 2, max_demos: 1),
-        Imp.Optimizer.GEPA.new(metric, generations: 2),
+        Imp.Optimizer.GEPA.new(metric, generations: 2, reflection_lm: reflection_lm),
         Imp.Optimizer.SignatureOptimizer.new(metric)
       ]
       |> Enum.map(fn optimizer ->

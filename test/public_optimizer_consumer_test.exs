@@ -142,4 +142,31 @@ defmodule Imp.PublicOptimizerConsumerTest do
       end
     end
   end
+
+  test "GEPA and COPRO refuse optimization without a real proposal source" do
+    trainset = rows("train")
+    selection_set = rows("selection")
+
+    assert_raise ArgumentError,
+                 ~r/GEPA optimization requires :reflection_lm or :reflection_strategy/,
+                 fn ->
+                   Imp.optimize!(
+                     program(),
+                     Imp.Optimizer.GEPA.new(metric(), generations: 1),
+                     trainset,
+                     selection_set
+                   )
+                 end
+
+    assert_raise ArgumentError, ~r/COPRO requires :proposer_lm or an Imp settings :lm/, fn ->
+      Imp.context([lm: nil], fn ->
+        Imp.optimize!(
+          program(),
+          Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1),
+          trainset,
+          selection_set
+        )
+      end)
+    end
+  end
 end

@@ -10,9 +10,12 @@ defmodule Imp.Optimizer.COPRO do
 
   A configured proposal LM may return the whole requested JSON batch. If it
   returns one candidate, Imp performs ordered, bounded fan-out with distinct
-  rollout IDs until the requested batch is complete. When no proposal LM exists
-  in the optimizer or Imp settings, deterministic native fallback proposals keep
-  the optimizer executable.
+  rollout IDs until the requested batch is complete. A proposal LM must be set
+  explicitly on the optimizer or in Imp settings. COPRO never substitutes
+  canned suffixes for a missing proposer, including when the task program has
+  its own LM. `:extra_instructions` are explicit candidate seeds; when present,
+  they are evaluated before LM-generated proposals but do not silently replace
+  the required proposal model.
 
   `proposal_response_format: :required` sends an exact JSON Schema and validates
   the returned batch before any candidate evaluation. `:auto` does so when the
@@ -102,6 +105,7 @@ defmodule Imp.Optimizer.COPRO do
   # `devset` remains accepted for the Imp optimizer contract. DSPy's COPRO
   # scores coordinate candidates on `trainset`, so it is not used for selection.
   def compile(%__MODULE__{} = optimizer, program, trainset, _devset \\ [], eval_opts \\ []) do
+    optimizer = %{optimizer | proposer_lm: resolve_proposer_lm!(optimizer)}
     trainset = Enum.to_list(trainset)
     predictors = Imp.ProgramParameters.predictors(program)
 
@@ -337,17 +341,32 @@ defmodule Imp.Optimizer.COPRO do
   end
 
   defp proposal_mode(optimizer) do
-    if optimizer.proposer_lm || Imp.Settings.snapshot() |> Map.fetch!(:lm),
-      do: :language_model,
-      else: :deterministic_native_fallback
+    if optimizer.proposer_lm, do: :language_model, else: :missing
   end
 
   defp proposal_pairs(_predictor, _history, _optimizer, 0), do: []
 
   defp proposal_pairs(predictor, history, optimizer, count) do
+    prefix = output_prefix(predictor)
+    explicit = optimizer.extra_instructions |> Enum.take(count) |> Enum.map(&{&1, prefix})
+    missing = count - length(explicit)
+
+    explicit ++
+      if missing == 0 do
+        []
+      else
+        provider_proposal_pairs!(optimizer.proposer_lm, predictor, history, optimizer, missing)
+      end
+  end
+
+  defp resolve_proposer_lm!(optimizer) do
     case optimizer.proposer_lm || Imp.Settings.snapshot() |> Map.fetch!(:lm) do
-      nil -> fallback_pairs(predictor, optimizer, count)
-      lm -> provider_proposal_pairs!(lm, predictor, history, optimizer, count)
+      nil ->
+        raise ArgumentError,
+              "COPRO requires :proposer_lm or an Imp settings :lm; it does not synthesize proposal suffixes"
+
+      lm ->
+        lm
     end
   end
 
@@ -486,34 +505,6 @@ defmodule Imp.Optimizer.COPRO do
         }
       }
     }
-  end
-
-  defp fallback_pairs(predictor, optimizer, count) do
-    prefix = output_prefix(predictor)
-    instruction = predictor.signature.instructions
-
-    pool =
-      Enum.map(optimizer.extra_instructions, &{&1, prefix}) ++
-        Enum.map(
-          [
-            instruction <> "\nBe concise and exact.",
-            instruction <> "\nUse the demonstrations as ground truth patterns.",
-            instruction <> "\nReturn only the requested output fields."
-          ],
-          &{&1, prefix}
-        )
-
-    pool
-    |> Stream.cycle()
-    |> Stream.with_index()
-    |> Enum.take(count)
-    |> Enum.map(fn {{candidate, candidate_prefix}, index} ->
-      if index < length(pool) do
-        {candidate, candidate_prefix}
-      else
-        {candidate <> "\nAlternative #{index + 1}.", candidate_prefix}
-      end
-    end)
   end
 
   defp proposal_messages(predictor, history, count, candidate_index) do

@@ -10,6 +10,21 @@ defmodule OptimizerBehavioralCorpusTest do
 
   defp metric, do: Imp.Metrics.exact_match(:answer)
 
+  defp reflection_lm(instruction \\ "Always answer Paris when asked about France.") do
+    Imp.LM.Static.new(handler: fn _messages, _opts -> %{instruction: instruction} end)
+  end
+
+  defp copro_proposer_lm(instruction \\ "Always answer Paris when asked about France.") do
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        Jason.encode!(%{
+          "proposed_instruction" => instruction,
+          "proposed_prefix_for_output_field" => "Answer:"
+        })
+      end
+    )
+  end
+
   defp evaluator(program),
     do: Imp.Evaluate.run(Imp.Evaluate.new(devset(), metric()), program)
 
@@ -146,6 +161,7 @@ defmodule OptimizerBehavioralCorpusTest do
     optimizer =
       Imp.Optimizer.GEPA.new(metric(),
         generations: 2,
+        reflection_lm: reflection_lm(),
         max_metric_calls: 20,
         max_full_evaluations: 5,
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
@@ -161,7 +177,7 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.implementation == Imp.Optimizer.GEPA
     assert report.metadata.max_metric_calls == 20
     assert report.metadata.max_full_evaluations == 5
-    assert Enum.any?(report.candidates, &(&1.instruction =~ "Reflection"))
+    assert Enum.any?(report.candidates, &(&1.instruction =~ "Always answer Paris"))
   end
 
   test "GEPA treats zero generations as a baseline-only compile" do
@@ -193,6 +209,7 @@ defmodule OptimizerBehavioralCorpusTest do
     compiled =
       Imp.Optimizer.GEPA.new(metric(),
         generations: 1,
+        reflection_lm: reflection_lm("Recover from malformed candidate outputs."),
         feedback_fn: fn _trainset -> "Recover from malformed candidate outputs." end
       )
       |> Imp.Optimizer.GEPA.compile(broken_program, trainset(), devset())
@@ -220,7 +237,10 @@ defmodule OptimizerBehavioralCorpusTest do
       )
 
     compiled =
-      Imp.Optimizer.GEPA.new(metric(), generations: 1)
+      Imp.Optimizer.GEPA.new(metric(),
+        generations: 1,
+        reflection_lm: reflection_lm("Keep diagnostics UTF-8 safe.")
+      )
       |> Imp.Optimizer.GEPA.compile(broken_program, trainset(), devset())
 
     report = Imp.Optimizer.Report.fetch(compiled)
@@ -234,6 +254,7 @@ defmodule OptimizerBehavioralCorpusTest do
     compiled =
       Imp.Optimizer.GEPA.new(metric(),
         generations: 1,
+        reflection_lm: reflection_lm(),
         feedback_fn: fn _trainset -> raise "feedback service offline" end
       )
       |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
@@ -261,6 +282,7 @@ defmodule OptimizerBehavioralCorpusTest do
     compiled =
       Imp.Optimizer.GEPA.new(exploding_metric,
         generations: 1,
+        reflection_lm: reflection_lm("Try to improve."),
         feedback_fn: fn _trainset -> "Try to improve." end
       )
       |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
@@ -371,6 +393,7 @@ defmodule OptimizerBehavioralCorpusTest do
       Imp.Optimizer.COPRO.new(metric(),
         breadth: 6,
         depth: 2,
+        proposer_lm: copro_proposer_lm(),
         extra_instructions: ["Always answer Paris when asked about France."]
       )
 
@@ -396,12 +419,16 @@ defmodule OptimizerBehavioralCorpusTest do
     end
   end
 
-  test "COPRO uses safe instruction proposal fallback for malformed training rows" do
+  test "COPRO preserves evaluation failures with a real proposer" do
     program = france_program()
 
     compiled =
       Imp.context([lm: nil], fn ->
-        Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1)
+        Imp.Optimizer.COPRO.new(metric(),
+          breadth: 2,
+          depth: 1,
+          proposer_lm: copro_proposer_lm()
+        )
         |> Imp.Optimizer.COPRO.compile(program, [:not_an_example], devset())
       end)
 
