@@ -35,6 +35,10 @@ defmodule Imp.DspyGepaTraceSemanticsTest do
     assert output =~ ~s("adapted_program_required_to_reproduce": false)
     assert output =~ ~s("scoped_adapter_installed": true)
     assert output =~ ~s("scoped_adapter_restored": true)
+    assert output =~ ~s("public_compile_constructed_fixed_adapter": true)
+    assert output =~ ~s("public_compile_success_opportunity_identical": true)
+    assert output =~ ~s("metric_calls": 18)
+    assert output =~ ~s("message_calls": 18)
 
     assert output =~
              ~s("program_or_metric_failure_reflection": "diagnostic only; no invented feedback")

@@ -237,14 +237,20 @@ class FailurePreservingDspyAdapter(DspyAdapter):
 
 
 @contextmanager
-def patched_dspy_gepa() -> Iterator[None]:
+def patched_dspy_gepa(
+    adapter_class=FailurePreservingDspyAdapter,
+) -> Iterator[None]:
     """Scope the compatibility adapter to one stock DSPy GEPA compile."""
 
     from dspy.teleprompt.gepa import gepa as gepa_module
+    from dspy.teleprompt.gepa import gepa_utils
 
-    original = gepa_module.DspyAdapter
-    gepa_module.DspyAdapter = FailurePreservingDspyAdapter
+    original_gepa = gepa_module.DspyAdapter
+    original_utils = gepa_utils.DspyAdapter
+    gepa_module.DspyAdapter = adapter_class
+    gepa_utils.DspyAdapter = adapter_class
     try:
         yield
     finally:
-        gepa_module.DspyAdapter = original
+        gepa_utils.DspyAdapter = original_utils
+        gepa_module.DspyAdapter = original_gepa

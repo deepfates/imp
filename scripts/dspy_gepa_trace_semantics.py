@@ -21,6 +21,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dspy-root", type=Path, required=True)
     parser.add_argument("--gepa-root", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
     sys.path.insert(0, str(args.gepa_root.resolve() / "src"))
@@ -39,6 +40,7 @@ def main() -> None:
         patched_dspy_gepa,
     )
     from dspy.teleprompt.gepa import gepa as dspy_gepa_module
+    from dspy.teleprompt.gepa import gepa_utils as dspy_gepa_utils
 
     class Program(dspy.Module):
         def __init__(self, lm):
@@ -246,13 +248,85 @@ def main() -> None:
     )
 
     stock_adapter_class = dspy_gepa_module.DspyAdapter
+    stock_utils_adapter_class = dspy_gepa_utils.DspyAdapter
     with patched_dspy_gepa():
         scoped_adapter_installed = (
             dspy_gepa_module.DspyAdapter is FailurePreservingDspyAdapter
+            and dspy_gepa_utils.DspyAdapter is FailurePreservingDspyAdapter
         )
-    scoped_adapter_restored = dspy_gepa_module.DspyAdapter is stock_adapter_class
+    scoped_adapter_restored = (
+        dspy_gepa_module.DspyAdapter is stock_adapter_class
+        and dspy_gepa_utils.DspyAdapter is stock_utils_adapter_class
+    )
+
+    class ConstructionProbeAdapter(FailurePreservingDspyAdapter):
+        constructed = 0
+
+        def __init__(self, *args, **kwargs):
+            type(self).constructed += 1
+            super().__init__(*args, **kwargs)
+
+    def compile_success(adapter_class=None):
+        lm = SharedHistoryDummyLM([{"answer": "ok"}] * 100)
+        rows = examples(["compile_a", "compile_b", "compile_c", "compile_d"])
+        proposal_calls = []
+
+        def compile_metric(_gold, _pred, _trace=None, pred_name=None, _pred_trace=None):
+            if pred_name is not None:
+                return dspy.Prediction(score=0.5, feedback="stable success")
+            return 0.5
+
+        def proposer(candidate, reflective_dataset, components_to_update):
+            proposal_calls.append(
+                {
+                    "components": list(components_to_update),
+                    "record_counts": {
+                        name: len(reflective_dataset[name])
+                        for name in components_to_update
+                    },
+                }
+            )
+            return {
+                name: candidate[name] + " next" for name in components_to_update
+            }
+
+        optimizer = dspy.GEPA(
+            metric=compile_metric,
+            max_metric_calls=16,
+            reflection_minibatch_size=2,
+            instruction_proposer=proposer,
+            component_selector="round_robin",
+            use_merge=False,
+            num_threads=1,
+            track_stats=True,
+            seed=7,
+            gepa_kwargs={"acceptance_criterion": "strict_improvement"},
+        )
+        program = Program(lm)
+        if adapter_class is None:
+            compiled = optimizer.compile(
+                program, trainset=rows[:2], valset=rows[2:]
+            )
+        else:
+            with patched_dspy_gepa(adapter_class):
+                compiled = optimizer.compile(
+                    program, trainset=rows[:2], valset=rows[2:]
+                )
+        detailed = compiled.detailed_results
+        return {
+            "messages_sha256": hashlib.sha256(history_bytes(lm)).hexdigest(),
+            "message_calls": len(lm.history),
+            "metric_calls": detailed.total_metric_calls,
+            "candidate_count": len(detailed.candidates),
+            "discovery_eval_counts": detailed.discovery_eval_counts,
+            "proposal_calls": proposal_calls,
+        }
+
+    stock_compile = compile_success()
+    fixed_compile = compile_success(ConstructionProbeAdapter)
 
     result = {
+        "status": "pass",
         "ordinary_success": {
             "byte_identical": original_bytes == fixed_bytes,
             "original_sha256": hashlib.sha256(original_bytes).hexdigest(),
@@ -301,15 +375,27 @@ def main() -> None:
             "adapted_program_required_to_reproduce": False,
             "scoped_adapter_installed": scoped_adapter_installed,
             "scoped_adapter_restored": scoped_adapter_restored,
+            "public_compile_constructed_fixed_adapter": ConstructionProbeAdapter.constructed
+            == 1,
+            "public_compile_success_opportunity_identical": stock_compile
+            == fixed_compile,
+            "public_compile": fixed_compile,
         },
     }
-    print(json.dumps(result, indent=2, sort_keys=True))
+    encoded = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(encoded)
+    else:
+        print(encoded, end="")
 
     assert result["ordinary_success"]["byte_identical"] is True
     assert result["ordinary_success"]["rendered_messages_byte_identical"] is True
     assert result["ordinary_success"]["reflection_byte_identical"] is True
     assert result["semantic_boundary"]["scoped_adapter_installed"] is True
     assert result["semantic_boundary"]["scoped_adapter_restored"] is True
+    assert result["semantic_boundary"]["public_compile_constructed_fixed_adapter"] is True
+    assert result["semantic_boundary"]["public_compile_success_opportunity_identical"] is True
     failures = result["mixed_failures"]["failures"]
     assert failures[0] is None
     assert [failure["stage"] for failure in failures[1:]] == [
