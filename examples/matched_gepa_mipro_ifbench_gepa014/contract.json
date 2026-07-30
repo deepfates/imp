@@ -106,7 +106,7 @@
     "translation_path": "ifbench_stock_module.py",
     "translation_sha256": "d44cc237c51b63c33e174302cf8cfe6df252734fe5161b472c58cef04839d3e8",
     "runner_path": "run_upstream.py",
-    "runner_sha256": "6fb9c439a489ff47ef0152b8bbd5a94f3931a2402d9d91e44c4bdb3160649ca0",
+    "runner_sha256": "1fe5e15b7d8dae3400db2e5dc90f170afa055362be49d41201e8658214945f38",
     "sources": {
       "artifact_commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
       "artifact_program_path": "gepa_artifact/benchmarks/IFBench/ifbench_program.py",
