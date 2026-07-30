@@ -24,6 +24,11 @@ defmodule Imp.Optimizer.MIPROv2 do
   RandomState startup sequence exactly and rejects configurations that would
   enter modeled TPE. Imp's default categorical Parzen search remains a
   BEAM-native algorithm and does not claim Optuna trial-sequence parity.
+
+  An explicit compile-time `seed: 0` is a real seed in the default BEAM-native
+  mode. The pinned `:dspy_3_2_1` proposer mode deliberately mirrors DSPy's
+  Python-truthiness behavior and retains the constructor seed when the compile
+  override is zero.
   """
 
   alias Imp.Optimizer.{

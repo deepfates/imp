@@ -85,8 +85,29 @@ defmodule Imp.Optimizer.MIPROv2.ConfigTest do
     assert resolved.view_data_batch_size == 7
   end
 
-  test "compile seed zero preserves the constructor seed like pinned DSPy" do
+  test "BEAM-native compile honors an explicit zero seed" do
     config = Config.new(auto: nil, num_candidates: 2, num_trials: 1, seed: 9, minibatch: false)
+
+    assert Config.resolve(config, 1, [:train], [:valid], seed: 0).seed == 0
+    assert Config.resolve(config, 1, [:train], [:valid], seed: 3).seed == 3
+  end
+
+  test "pinned DSPy proposer preserves the constructor seed for compile seed zero" do
+    config =
+      Config.new(
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 1,
+        seed: 9,
+        minibatch: false,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        program_aware_proposer: false,
+        fewshot_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        proposer_fidelity: :dspy_3_2_1
+      )
 
     assert Config.resolve(config, 1, [:train], [:valid], seed: 0).seed == 9
     assert Config.resolve(config, 1, [:train], [:valid], seed: 3).seed == 3

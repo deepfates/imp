@@ -978,6 +978,13 @@ known compatible proposal endpoint must use it. The default `:off` preserves
 text-compatible proposal models. The effective mode and temperature are
 retained per predictor in `report.metadata.proposals`.
 
+In the default BEAM-native mode, an explicit compile-time `seed: 0` overrides
+the constructor seed like any other non-negative integer. The narrow
+`proposer_fidelity: :dspy_3_2_1` compatibility mode instead preserves DSPy
+3.2.1's `seed or self.seed` behavior, where a zero compile override retains the
+constructor seed. This Python-truthiness quirk is not imposed on ordinary Imp
+programs.
+
 `minibatch: false` matters at this scale: minibatched evaluation is the
 default, and its `minibatch_size` must not exceed the validation-set size, so
 a small `devset` like the one on this page rejects the run before it starts.

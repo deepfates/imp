@@ -81,8 +81,7 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     valset = Keyword.get(overrides, :valset, valset)
     overrides = Keyword.delete(overrides, :valset)
 
-    overrides =
-      if Keyword.get(overrides, :seed) == 0, do: Keyword.delete(overrides, :seed), else: overrides
+    overrides = preserve_pinned_dspy_seed_zero(config, overrides)
 
     reject_unknown!(overrides, @option_keys)
 
@@ -121,6 +120,20 @@ defmodule Imp.Optimizer.MIPROv2.Config do
       resolve(config, predictor_count, trainset, nil, valset_or_overrides)
     else
       resolve(config, predictor_count, trainset, valset_or_overrides, [])
+    end
+  end
+
+  # DSPy 3.2.1 resolves compile-time seeds with `seed or self.seed`, so Python's
+  # falsey zero keeps the constructor seed. Preserve that observable quirk only
+  # when the caller explicitly selects the pinned DSPy proposer path. Imp's
+  # default BEAM-native path treats zero as an ordinary deterministic seed.
+  defp preserve_pinned_dspy_seed_zero(config, overrides) do
+    proposer_fidelity = Keyword.get(overrides, :proposer_fidelity, config.proposer_fidelity)
+
+    if proposer_fidelity == :dspy_3_2_1 and Keyword.get(overrides, :seed) == 0 do
+      Keyword.delete(overrides, :seed)
+    else
+      overrides
     end
   end
 
