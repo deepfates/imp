@@ -1,0 +1,323 @@
+{
+  "schema_version": 3,
+  "campaign_id": "matched-gepa-mipro-ifbench-dspy321-gepa014-successor-v1",
+  "intent": "sealed_source_disjoint_matched_system_comparison",
+  "claim_boundary": "one source-disjoint IFBench task/model condition for GEPA and MIPROv2 through a stock-DSPy-adapted IFBench task graph, authenticated DSPy 3.2.1 plus GEPA 0.1.4 source composition, and the explicit failure-preserving stock-DSPy adapter correction; not unmodified DSPy 3.2.1 dependency resolution, the unmodified paper artifact, paper reproduction, general instruction-optimizer effectiveness, superiority, or BEAM-native superiority",
+  "accepted_successor_draft": {
+    "path": "contract-draft.json",
+    "sha256": "04ccbb74ad2282cb5c18458695832fb3ce4489f7b5f3136072fc2746c0a970ad",
+    "accepted_commit": "3768548c24bc7c6f8806b37447a6eae2d80f3abb"
+  },
+  "compatibility_boundary": {
+    "imp_commit": "10328114f96975ebccf71f57a052bfe045b99a88",
+    "verdict": "sealed",
+    "scope": "authenticated DSPy+GEPA source binding, complete public GEPA/MIPRO workflow, effective execution options, matched evaluator containment, fatal operational guard bypass"
+  },
+  "immutable_predecessors": {
+    "v2": {
+      "status": "permanently_stopped_incomplete_unscored",
+      "terminal_commit": "f60e648",
+      "tree": "7760be791bb8681c5e9d245d5db0424ad010f53f",
+      "contract_path": "../matched_gepa_mipro_ifbench_v2/contract.json",
+      "contract_sha256": "eb1629c5b1ef8556207c02895fb000849aba1626b1f8684f9a2c445a3d202a69",
+      "imp_result_sha256": "b3db0956cd63bbb755b1f7ec38f7badca15596e9558aaf856a4f4f8c1b0e403f",
+      "upstream_result_sha256": "3c510331bff7a4de0881a570e46bb7931a6acf1b63520a634558d7d935208a7c"
+    },
+    "v3": {
+      "status": "permanently_stopped_incomplete_unscored",
+      "terminal_commit": "53fc20659228b92c388dfd9c4d2b006994b1832f",
+      "tree": "e7be7ea051813fdb6f4029a6f9e135836e0d703d",
+      "contract_path": "../matched_gepa_mipro_ifbench_v3/contract.json",
+      "contract_sha256": "c77a8164cbec3c98afd83b7b24dae10e555c125c150c50b0e491167b84970b7e",
+      "imp_result_sha256": "4a79790465a03fe2839a05fe737e069dc7283c9514a59a3b0ee0ea39d5c1c5f8",
+      "upstream_result_sha256": "6a237000dd1a870569fcda53a5530fb8449431cd645b077010e726215d894b23"
+    },
+    "reuse": "none; no calls, baselines, selections, artifacts, outcomes, or held-out access roll forward"
+  },
+  "execution_base": {
+    "runner_path": "../matched_gepa_mipro_ifbench/run_upstream.py",
+    "runner_sha256": "5ab88e54d55c3e22fc5d71b3da8b66bfc2b8ed5858663b4f04817b5bb94f9535",
+    "role": "content-bound implementation base only; no predecessor state or results"
+  },
+  "authorities": {
+    "dspy": {
+      "repository": "https://github.com/stanfordnlp/dspy",
+      "version": "3.2.1",
+      "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
+      "source_manifest": "../../benchmarks/authority_sources/dspy-3.2.1-29448ae.json"
+    },
+    "gepa": {
+      "repository": "https://github.com/gepa-ai/gepa",
+      "version": "0.1.4",
+      "commit": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+      "source_manifest": "../../benchmarks/authority_sources/gepa-0.1.4-8b0ce6c.json"
+    },
+    "gepa_artifact": {
+      "repository": "https://github.com/gepa-ai/gepa-artifact",
+      "commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
+    },
+    "gepa_artifact_modified_dspy": {
+      "repository": "https://github.com/gepa-ai/dspy",
+      "branch_named_by_artifact_setup": "gepa_study",
+      "resolved_commit": "62dc3b634d7dc0c4889abcf905cb4c391ea6b396"
+    }
+  },
+  "authenticated_gepa_bridge": {
+    "path": "../../scripts/dspy_gepa_version_bridge.py",
+    "sha256": "155ac2beff251445704527ac928f2546a97b0acbd0190e3c451b798a7eb6638c",
+    "admission_order": "exact launch commit, exact DSPy/GEPA source authentication, source bridge installation, then gepa/dspy/compatibility imports",
+    "option_policy": "no option dropping or translation; require complete GEPA 0.1.4 optimize signature"
+  },
+  "public_workflow_compatibility": {
+    "gate_path": "../../scripts/dspy_optimizer_public_workflow_gate.py",
+    "gate_sha256": "80f48254aeee0bf269198e1cae1cd1fe09b4f1042a567909e00ee1d6e8517578",
+    "test_path": "../../test/dspy_optimizer_public_workflow_gate_test.exs",
+    "test_sha256": "7a4b3672748ff5a16cbaf78c8230d88387081d1851ba992f069c87f77b8ddea2",
+    "documentation_path": "../../docs/maintainers/DSPY_GEPA_MIPRO_PUBLIC_WORKFLOW.md",
+    "documentation_sha256": "e5095e75afff52a5c943376b0f45b8ec7b0c950438a77055f38a82a3af1f1ab3",
+    "required_result": {
+      "network_authority": false,
+      "held_out_loaded": false,
+      "gepa_metric_calls": 80,
+      "gepa_candidates": 2,
+      "mipro_trials": 8,
+      "mipro_prompt_calls": 11,
+      "mipro_task_calls": 590,
+      "ordinary_evaluator_failure": "contained_as_zero_score_by_mipro_eval_candidate_program",
+      "operational_failure": {"type": "OperationalSafetyAbort", "contained": false, "calls": 1}
+    }
+  },
+  "compatibility_translation": {
+    "id": "stock-dspy-adapted-ifbench-cot-2stage-v1",
+    "translation_path": "ifbench_stock_module.py",
+    "translation_sha256": "d44cc237c51b63c33e174302cf8cfe6df252734fe5161b472c58cef04839d3e8",
+    "runner_path": "run_upstream.py",
+    "runner_sha256": "6fb9c439a489ff47ef0152b8bbd5a94f3931a2402d9d91e44c4bdb3160649ca0",
+    "sources": {
+      "artifact_commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+      "artifact_program_path": "gepa_artifact/benchmarks/IFBench/ifbench_program.py",
+      "artifact_program_sha256": "204556c6f04a8b5beff92aebc9dece0a67619c5e5a6c3fe223cfa54f84d8c02a",
+      "artifact_setup_path": "setup_gepa_repo.sh",
+      "artifact_setup_sha256": "9a0fa055f70695c38d10bf76ed2e15122c6bb97de69ef9a247f01749b3d2adf1",
+      "artifact_scorer_path": "gepa_artifact/benchmarks/IFBench/ifbench_metric.py",
+      "artifact_scorer_sha256": "96e4d69e9adafb765b535c994e4ee2888c0f9e70fde0fa218b898c16d74b103e",
+      "modified_dspy_fork_commit": "62dc3b634d7dc0c4889abcf905cb4c391ea6b396",
+      "modified_dspy_trace_path": "dspy/teleprompt/gepa/gepa_utils.py",
+      "modified_dspy_trace_sha256": "96bd1872d143fbaf224bbeb260961a48aedb8e2a8c13339406e2fdfaf75a02a5",
+      "stock_dspy_commit": "29448ae12756abdd14bd8796c819247ebb83673c"
+    },
+    "retained": "two ChainOfThought predictors, names/order, signatures, fields, instructions, demos, config, output, messages, dataflow, traces, deepcopy and targeted mutation semantics",
+    "mechanical_variables": [
+      "top-level Python class and serialization identity",
+      "stock Module.__call__ callback instrumentation",
+      "stock caller_modules instrumentation",
+      "stock top-level usage instrumentation"
+    ],
+    "excluded_effects": [
+      "task message content",
+      "RNG consumption",
+      "metric inputs",
+      "provider calls",
+      "optimizer opportunity"
+    ]
+  },
+  "failure_cardinality_compat": {
+    "id": "failure-preserving-stock-dspy-gepa-v1",
+    "scope": "GEPA arm only; baseline and MIPROv2 remain stock DSPy 3.2.1",
+    "module_path": "../../scripts/dspy_gepa_failure_compat.py",
+    "module_sha256": "a1c4f709710a8c85e6446683d91e142edcff1193779100a48cff849e3931b728",
+    "gate_path": "../../scripts/dspy_gepa_trace_semantics.py",
+    "gate_sha256": "8c94b49e0b3856a788fb6c53cbe945bb79643322d8ef65b396d7afbe008a5b49",
+    "result_path": "failure-cardinality-review.json",
+    "result_sha256": "0c9774d43e987260b3fab4092776d93318137d82814cf0e7ce92ab3cb35e3959",
+    "arbitrary_failure_policy": "one ordered output and configured failure_score with structured diagnostic evidence; never reflection advice",
+    "parse_failure_policy": "stock DSPy add_format_failure_as_feedback opt-in unchanged"
+  },
+  "dataset": {
+    "receipt_path": "../matched_instruction_family_ifbench/data/receipt.json",
+    "receipt_sha256": "74282c868dde7c858a67c28218b8687d3b4213185b70c5f400c3d2d71a77e788",
+    "train_path": "../matched_instruction_family_ifbench/data/train.jsonl",
+    "train_sha256": "8d80f329bbab37a44fe2e2ea0ea8c7e69eeb976d8a8e51af5bcd4547b4221197",
+    "selection_path": "../matched_instruction_family_ifbench/data/selection.jsonl",
+    "selection_sha256": "f0c2d8e808e4783e496ecf189ead61fde4a1e80373ff85f3ea801883f68c7468",
+    "held_out_path": "../matched_instruction_family_ifbench/data/held_out.jsonl",
+    "held_out_sha256": "49779533faa842decda93a1221ce7bae615af82403e33e380ab69d2abc84610d",
+    "counts": {"train": 16, "selection": 32, "held_out": 64},
+    "program": "IFBenchCoT2StageModule",
+    "task_graph": "pinned IFBenchCoT2StageProgram two-stage predictor graph",
+    "runtime_classes": {
+      "artifact_modified_dspy": "IFBenchCoT2StageProgram",
+      "stock_dspy_3_2_1": "IFBenchCoT2StageModule",
+      "imp": "Imp.BenchmarkTruth.IFBenchTwoStage"
+    },
+    "metric": "mean executable constraint satisfaction",
+    "selection_derivation": "result-blind constraint-ID round robin from IFBench_train[0:300]",
+    "held_out_derivation": "result-blind constraint-ID round robin from independent IFBench_test"
+  },
+  "models": {
+    "task": {
+      "logical": "openai/gpt-5.4-mini",
+      "imp": "openrouter:openai/gpt-5.4-mini",
+      "upstream": "openrouter/openai/gpt-5.4-mini",
+      "catalog_url": "https://openrouter.ai/api/v1/models",
+      "endpoint_provider": "OpenAI",
+      "catalog_prompt_per_token": "0.00000075",
+      "catalog_completion_per_token": "0.0000045"
+    },
+    "optimizer": {
+      "logical": "anthropic/claude-sonnet-4.6",
+      "imp": "openrouter:anthropic/claude-sonnet-4.6",
+      "upstream": "openrouter/anthropic/claude-sonnet-4.6",
+      "catalog_url": "https://openrouter.ai/api/v1/models",
+      "endpoint_provider": "Anthropic",
+      "catalog_prompt_per_token": "0.000003",
+      "catalog_completion_per_token": "0.000015",
+      "catalog_cache_write_per_token": "0.00000375"
+    }
+  },
+  "seeds": [2026072705, 2026072706, 2026072707],
+  "arms": ["baseline", "gepa", "mipro_v2"],
+  "optimizer": {
+    "gepa": {
+      "iterations": 1,
+      "minibatch_size": 8,
+      "semantic_max_metric_calls": 80,
+      "legal_metric_call_cap": 120,
+      "legal_reflection_call_cap": 12,
+      "candidate_selection": "pareto",
+      "module_selection": "round_robin",
+      "acceptance": "strict_improvement",
+      "selection": "all_improvements",
+      "use_merge": false
+    },
+    "mipro_v2": {
+      "num_candidates": 4,
+      "trials": 8,
+      "minibatch": false,
+      "max_bootstrapped_demos": 0,
+      "max_labeled_demos": 0,
+      "startup_trials": 10,
+      "proposer_fidelity": "dspy_3_2_1",
+      "search_fidelity": "dspy_3_2_1_optuna_4_9_0_startup",
+      "program_aware_proposer": false,
+      "data_aware_proposer": true,
+      "tip_aware_proposer": true,
+      "fewshot_aware_proposer": false,
+      "view_data_batch_size": 10
+    }
+  },
+  "runtime_dependencies": {
+    "upstream": {
+      "python": "3.13.2",
+      "lock_path": "../../benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock",
+      "lock_sha256": "c7e29a1f246afd36adcca2306ad3a11e3d3288a99e43fb54618c9a1b48581bb7",
+      "packages": {"dspy": "3.2.1", "gepa": "0.0.27", "optuna": "4.9.0", "numpy": "2.5.1", "litellm": "1.93.0", "openai": "2.48.0", "pydantic": "2.13.4"},
+      "source_roots": {"dspy": "tmp/dspy-3.2.1", "gepa": "tmp/gepa-v0.1.4"},
+      "effective_gepa": "authenticated source checkout 0.1.4@8b0ce6c overlays the locked 0.0.27 distribution before imports"
+    },
+    "ifbench": {
+      "requirements_path": "../../benchmarks/requirements-ifbench-parity.txt",
+      "requirements_sha256": "2a19ec739a3fe9056cef0e649d7ef7e7f8ee45c1c3c7331d209412bb47efd619",
+      "site_packages_path": "../../tmp/ifbench-parity-venv/lib/python3.13/site-packages",
+      "nltk_data_path": "../../tmp/ifbench-parity-venv/nltk_data",
+      "nltk_data_sha256": "da6e65071925e64f597ba1bfcb5f9f66e1dbcc7b2b3f90c40fb336cf6031016a",
+      "packages": {"emoji": "2.15.0", "immutabledict": "4.3.1", "langdetect": "1.0.9", "nltk": "3.10.0", "packaging": "26.2", "setuptools": "80.10.2", "syllapy": "0.7.2"}
+    },
+    "imp": {
+      "elixir": "1.19.5",
+      "otp": "28",
+      "mix_lock_path": "../../mix.lock",
+      "mix_lock_sha256": "42df3c3a67ef79116c4fbc6f6f8a0dc64c7b28b3226487447e197a016a0fd247",
+      "consumer_mix_lock_path": "mix.lock",
+      "consumer_mix_lock_sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd",
+      "packages": {"req_llm": "1.17.1", "llm_db": "2026.7.3", "req": "0.6.3", "jason": "1.4.5"}
+    }
+  },
+  "execution": {
+    "concurrency": 1,
+    "cache": false,
+    "retry": false,
+    "max_retries": 0,
+    "json_fallback": false,
+    "fallbacks": false,
+    "data_collection": "deny",
+    "route_guard": "exact_model_and_first_party_provider_no_fallback",
+    "cost_guard": "pre_dispatch_role_and_global_usd_reservation",
+    "openrouter": {
+      "allow_fallbacks": false,
+      "require_parameters": true,
+      "usage_include": true,
+      "task_only": ["openai"],
+      "task_order": ["openai"],
+      "optimizer_only": ["anthropic"],
+      "optimizer_order": ["anthropic"],
+      "task_max_price_per_million": {"prompt": 0.75, "completion": 4.5, "request": 0},
+      "optimizer_max_price_per_million": {"prompt": 3, "completion": 15, "request": 0}
+    },
+    "request": {
+      "task": {"temperature": null, "seed": "experiment_seed", "max_tokens": 768, "max_input_tokens": 4096, "reservation_input_tokens": 4864},
+      "optimizer": {"temperature": 1, "max_tokens": 1024, "max_input_tokens": 16384, "reservation_input_tokens": 17408}
+    },
+    "call_ceilings": {
+      "baseline": {"task_logical": 192, "optimizer_logical": 0, "transports": 192, "total_logical": 192},
+      "gepa": {"task_logical": 432, "optimizer_logical": 12, "transports": 444, "total_logical": 444},
+      "mipro_v2": {"task_logical": 864, "optimizer_logical": 11, "transports": 875, "total_logical": 875}
+    }
+  },
+  "output_contract": {
+    "program": "two sequential ChainOfThought predictors",
+    "fields": ["response", "final_response"],
+    "adapter": "DSPy ChatAdapter marker envelope",
+    "normalization": "none"
+  },
+  "metrics": {
+    "primary": "mean_fraction_executable_constraints_satisfied",
+    "paired_hypotheses": ["optimizer_vs_own_baseline", "Imp_vs_DSPy_same_family"],
+    "noninferiority_margin": -0.05,
+    "uncertainty": "source-id clustered bootstrap with Holm correction"
+  },
+  "accounting": {
+    "per_row": ["source_id", "instruction_id_list", "raw_response", "parsed_response", "score", "input_tokens", "output_tokens", "wall_seconds", "error", "actual_model", "actual_route", "gateway", "service_tier", "request_seed", "transport_attempts", "gateway_reported_cost", "adapter_computed_cost"],
+    "fail_closed": ["model", "route", "cost", "transport_attempt", "optimizer_parser", "budget", "held_out_barrier", "artifact"]
+  },
+  "capture": {"messages": true, "responses": true, "transports": true, "costs": true, "selected_parameters": true},
+  "source_commits": {
+    "imp": "resolved exactly from the clean paired coordinator launch; required compatibility ancestor 10328114f96975ebccf71f57a052bfe045b99a88",
+    "dspy": "https://github.com/stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
+    "gepa": "https://github.com/gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
+    "gepa_artifact": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+    "gepa_artifact_modified_dspy": "https://github.com/gepa-ai/dspy@62dc3b634d7dc0c4889abcf905cb4c391ea6b396"
+  },
+  "budget": {
+    "known_workshop_spend_lte": 7.59315275,
+    "new_spend_max": 74.552832,
+    "combined_workshop_max": 82.14598475,
+    "authorized_workshop_ceiling": 100.0
+  },
+  "paired_surface": {
+    "call_budget": {"path": "call_budget.exs", "sha256": "1ea18c97c713a6c16411ef0e00b1bb1dc3cabfe3553fa707d457de82556b01fd"},
+    "consumer_gitignore": {"path": ".gitignore", "sha256": "8304b37aa09dbb085a768a8b036b7dace48049b0865148f257d55e35bf4fc41f"},
+    "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
+    "consumer_project": {"path": "mix.exs", "sha256": "0fbcd8d51feac25aba18c9e4c0d8aca88b64eab80d123c3ca8d880f82df5ab40"},
+    "contract_runtime": {"path": "contract.exs", "sha256": "300bc60a62e5d3cf32beebcd71d37f15ee5984f41ef8d7e75910e041cfe55ed3"},
+    "coordinator": {"path": "run_paired.py", "sha256": "5395fadbc27d1a23d26237dd20733b5135551c11f63824b70c21010c2547f5fb"},
+    "guard_equivalence": {"path": "guard_equivalence.py", "sha256": "1b0dfd6397fcf6e6118d71dff572ece462aa518dd6d52e4c149e49a166ad6630"},
+    "imp_entry": {"path": "run_imp.exs", "sha256": "303c38d7e105c3a06686cc88b7f014c0b8760cc7f43f8f1bfeb17b7ad555d1c6"},
+    "imp_preflight": {"path": "paired_preflight.exs", "sha256": "24b017b5bbb053292e5d80aadfa6f20c985a43bc5a45b4cb50e9cd199886bc99"},
+    "response_evidence": {"path": "response_evidence.exs", "sha256": "a2e627ba31b19511aa8243a45e37074bd108d4bf2b9134b1bc1237814cd1d27a"},
+    "source_identity": {"path": "source_identity.exs", "sha256": "ed5c419009aa9a204e12b406c485efd75c119100aa3c7b822221201325193726"},
+    "stop_accounting": {"path": "stop_accounting.exs", "sha256": "c2acb84373382c2436b602c112c36e93a7ab6797146032a4cfbb6d2b496cdcda"},
+    "two_phase": {"path": "two_phase.exs", "sha256": "d7a92778338cca5e72a51aa8a46d54cce2a371525d22326465fcf30ed92e7e9e"},
+    "upstream_entry": {"path": "run_upstream.py", "sha256": "6fb9c439a489ff47ef0152b8bbd5a94f3931a2402d9d91e44c4bdb3160649ca0"}
+  },
+  "provider_free_gate": {
+    "source_path": "equivalence_gate.py",
+    "source_sha256": "fd95f7530b6eff61ef1b12b792d00f3891888bb31e9abbb8503fb9100aeaf663",
+    "result_path": "provider-free-review.json",
+    "result_sha256": "04ba3a7d42c01b04008c735b2d170aacf6a9074947b3ddd274b14deada843f09",
+    "clean_tree_required": true,
+    "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
+  },
+  "provider_authority": "disabled_pending_final_runnable_surface_seal",
+  "launch_status": "draft_unsealed_pending_surface_review"
+}
