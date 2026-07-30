@@ -47,12 +47,13 @@ The current unreleased candidate's ledger holds **68 claims: 48 asserted, 20 sti
 **Reconciliation — asserted is not proven.** The 48 asserted rows are
 maintainer attestations. In a fresh source checkout, `mix
 benchmark.dashboard --profile v0.1` recomputes claim state from committed
-evidence alone and reports **3 of the 48 proven, 25 blocked, 23
+evidence alone and reports **13 of the 48 proven, 25 blocked, 23
 informational** (profile ready: false): most asserted rows cite lane
 evidence that maintainers generate locally under `tmp/` and that is not
 committed, so a fresh clone cannot replay it. The committed matched GEPA and
-MIPROv2 TREC outcomes and task-specific Optimize Anything result are the three
-current exceptions. The remaining gap is real and tracked:
+MIPROv2 TREC outcomes and task-specific Optimize Anything result are among the
+current committed proofs; ten additional asserted rows now have their required
+committed evidence. The remaining gap is real and tracked:
 CI recomputes this reconciliation from committed evidence on every pull
 request and fails when this paragraph drifts from the computed state
 (`test/evidence_reconciliation_test.exs`). Until the gap closes, treat

@@ -19,6 +19,18 @@ blocks telos completion but does not falsify a narrower proven product claim.
 
 ## Candidate Gates
 
+Current `main` contains breaking changes after `0.2.1` while `mix.exs` still
+uses `0.2.1` as development metadata. Until the owner chooses the next public
+SemVer, an internal candidate is identified only by all three of:
+
+- an exact clean Git commit;
+- the SHA-256 of the unpacked/built Hex artifact produced from that commit;
+- passing candidate gates from that same commit.
+
+Do not call such a build a `0.2.1` release candidate, and do not change the
+package version merely to make the gates green. A public version choice and
+publication remain separate owner actions.
+
 Run from a clean candidate commit:
 
 ```sh
@@ -61,7 +73,9 @@ its declared evidence. It never means complete DSPy or paper parity.
 2. Promote that commit to the default branch.
 3. Verify that a branch-unspecified fresh clone identifies `:imp` and `Imp`.
 4. Build the package from the promoted commit and rerun the clean consumer.
-5. Tag the release (currently `v0.2.0`) and publish through the owner-approved distribution channel.
+5. After the owner chooses the public SemVer, update release metadata coherently,
+   tag that exact version, and publish through the owner-approved distribution
+   channel.
 6. Replace mutable Git installation instructions with the immutable tag or
    package coordinate.
 7. Generate the final dashboard from the tagged source and attach its digest

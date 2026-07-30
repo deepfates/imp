@@ -5,8 +5,18 @@ Versioning once the first public package is released.
 
 ## Unreleased
 
+This section contains breaking changes after `0.2.1`. The source tree still
+uses `0.2.1` as development package metadata, so internal release candidates
+are identified by exact Git commit and built-package digest rather than that
+version string. The next public SemVer remains an owner publication decision;
+these changes must not ship as another `0.2.x` patch.
+
 ### Added
 
+- `Imp.Optimizer.SignatureOptimizer` can target one explicitly named predictor
+  in a multi-stage program with `predictor:`. Proposal grounding sees the full
+  program, only the selected instruction changes, and missing or ambiguous
+  targets fail before proposal or evaluation work.
 - The packaged OTP deployment reference now includes a complete provider-free
   product workflow: typed declaration, disjoint evaluation, deterministic
   few-shot compilation across a real two-predictor pipeline, parameter

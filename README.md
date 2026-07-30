@@ -41,13 +41,17 @@ and retried with the validation error. You never wrote a prompt.
 
 ## Install
 
-Imp is not yet published to Hex — `{:imp, "~> 0.2.0"}` will become the
-install line once the package is published. Until then, install from a
-source checkout:
+Imp is not yet published to Hex. Until then, install from a source checkout:
 
 ```elixir
 {:imp, path: "path/to/imp"}
 ```
+
+The checkout currently reports package metadata `0.2.1`, but `main` contains
+breaking unreleased changes and is not a releasable `0.2.1` artifact. Internal
+release candidates are therefore identified by exact Git commit and package
+digest. The owner will choose the next public SemVer before publication; no
+mutable branch or development version should be used as a release coordinate.
 
 The full manual ships in this repository from the [documentation index](docs/README.md); it will land
 on hexdocs.pm with the Hex release. You will need an API key for a model

@@ -4540,7 +4540,9 @@
         "candidate_instructions/3",
         "compile/6",
         "current_instruction/1",
-        "put_instruction/2"
+        "current_instruction/2",
+        "put_instruction/2",
+        "put_instruction/3"
       ],
       "kind": "module",
       "macros": [],
@@ -4556,8 +4558,14 @@
           "current_instruction/1": [
             "current_instruction(program)"
           ],
+          "current_instruction/2": [
+            "current_instruction(program, predictor_name)"
+          ],
           "put_instruction/2": [
             "put_instruction(program, instruction)"
+          ],
+          "put_instruction/3": [
+            "put_instruction(program, predictor_name, instruction)"
           ]
         }
       },
@@ -5048,6 +5056,7 @@
         "extra_instructions",
         "metric",
         "num_candidates",
+        "predictor",
         "proposal_response_format",
         "proposer_lm",
         "seed",
