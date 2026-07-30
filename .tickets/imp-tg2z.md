@@ -63,3 +63,8 @@ Canonical claims classify every advertised family as stable or distinctly experi
   envelopes. Ordinary proposal/evaluation failures remain visible and
   candidate-local as documented; route, cost, budget, transport, and explicit
   cancellation errors cannot be mistaken for a merely low-scoring rule set.
+- SIMBA now enforces that operational boundary at every defining phase:
+  stochastic rollout sampling, reflective mutation, candidate evaluation, and
+  final validation. Typed safety causes retained inside trajectories, task
+  exits, reflection errors, or final rows are raised; ordinary failed
+  trajectories remain reportable optimizer evidence.

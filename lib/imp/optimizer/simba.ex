@@ -14,6 +14,11 @@ defmodule Imp.Optimizer.SIMBA do
   `:module_source` to opt into reading up to 20,000 characters from the
   program module's compile source. SIMBA never reads ambient source files under
   the default `:structure` mode.
+
+  Ordinary rollout and reflection failures remain visible in the report.
+  Operational route, cost, budget, transport, and cancellation guards are
+  always fatal across sampling, reflection, candidate scoring, and final
+  selection.
   """
 
   alias Imp.Optimizer.{DurableCallbackIdentity, Report, Sampling, SearchPolicy, TrajectoryRunner}
@@ -492,6 +497,8 @@ defmodule Imp.Optimizer.SIMBA do
           }
       end)
 
+    raise_operational_safety!(rows)
+
     {rows, population, trajectory_errors(rows, :trajectory_sampling)}
   end
 
@@ -531,16 +538,22 @@ defmodule Imp.Optimizer.SIMBA do
             end
 
           {:error, reason} ->
-            error = %{stage: :strategy, strategy: strategy, reason: reason}
+            case find_operational_safety(reason) do
+              %Imp.OperationalSafetyError{} = safety ->
+                raise safety
 
-            {:cont,
-             {candidates,
-              %{
-                state
-                | population: population,
-                  poisson_rng: poisson_rng,
-                  errors: state.errors ++ [error]
-              }}}
+              nil ->
+                error = %{stage: :strategy, strategy: strategy, reason: reason}
+
+                {:cont,
+                 {candidates,
+                  %{
+                    state
+                    | population: population,
+                      poisson_rng: poisson_rng,
+                      errors: state.errors ++ [error]
+                  }}}
+            end
 
           {:skip, _reason} ->
             {:cont, {candidates, %{state | population: population, poisson_rng: poisson_rng}}}
@@ -567,6 +580,8 @@ defmodule Imp.Optimizer.SIMBA do
             )
           end
         )
+
+      raise_operational_safety!(trajectories)
 
       scores = Enum.map(trajectories, & &1.score)
       {id, population} = Population.register_with_id(state.population, candidate.program, scores)
@@ -631,11 +646,18 @@ defmodule Imp.Optimizer.SIMBA do
         payload = reflection_payload(program, good, bad, optimizer.reflection_grounding)
 
         case Imp.Optimizer.SIMBA.Reflection.run(prompt_lm, payload) do
-          {:ok, advice, _discussion} -> apply_advice(program, advice)
-          {:error, reason} -> {:error, {:prompt_lm, reason}}
+          {:ok, advice, _discussion} ->
+            apply_advice(program, advice)
+
+          {:error, reason} ->
+            case find_operational_safety(reason) do
+              %Imp.OperationalSafetyError{} = safety -> raise safety
+              nil -> {:error, {:prompt_lm, reason}}
+            end
         end
     end
   rescue
+    safety in Imp.OperationalSafetyError -> reraise safety, __STACKTRACE__
     error -> {:error, Exception.message(error)}
   end
 
@@ -972,6 +994,8 @@ defmodule Imp.Optimizer.SIMBA do
           runtime: :simba
         )
 
+      raise_operational_safety!(trajectories)
+
       errors = trajectory_errors(trajectories, :final_evaluation)
 
       evaluation = %{
@@ -1246,6 +1270,30 @@ defmodule Imp.Optimizer.SIMBA do
 
   defp content_sha256(nil), do: nil
   defp content_sha256(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
+
+  defp raise_operational_safety!(value) do
+    case find_operational_safety(value) do
+      %Imp.OperationalSafetyError{} = safety -> raise safety
+      nil -> :ok
+    end
+  end
+
+  defp find_operational_safety(%Imp.OperationalSafetyError{} = error), do: error
+
+  defp find_operational_safety(%_{} = struct),
+    do: struct |> Map.from_struct() |> find_operational_safety()
+
+  defp find_operational_safety(map) when is_map(map) do
+    Enum.find_value(map, fn {_key, value} -> find_operational_safety(value) end)
+  end
+
+  defp find_operational_safety(list) when is_list(list),
+    do: Enum.find_value(list, &find_operational_safety/1)
+
+  defp find_operational_safety(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.find_value(&find_operational_safety/1)
+
+  defp find_operational_safety(_value), do: nil
 
   defp validate_lm!(lm, key) do
     case Imp.LM.validate_lm(lm) do

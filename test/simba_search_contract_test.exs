@@ -1,6 +1,12 @@
 defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   use ExUnit.Case
 
+  defmodule SafetyLM do
+    defstruct [:error]
+
+    def generate(%__MODULE__{error: error}, _messages, _opts), do: {:error, error}
+  end
+
   test "samples variable trajectories, registers all candidates, and validates finalists" do
     parent = self()
 
@@ -97,6 +103,69 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       assert Enum.any?(task_messages, fn messages ->
                length(messages) >= 4 and Enum.any?(messages, &(&1.role == :assistant))
              end)
+    end
+  end
+
+  test "task rollout keeps operational safety failures fatal" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :budget,
+        reason: :call_limit,
+        message: "SIMBA task budget guard"
+      )
+
+    program = Imp.predict("question -> answer", lm: %SafetyLM{error: safety})
+    row = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
+
+    optimizer =
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
+        bsize: 1,
+        num_candidates: 2,
+        max_steps: 1,
+        max_demos: 0,
+        prompt_lm: Imp.LM.Static.new(handler: fn _, _ -> %{module_advice: %{}} end),
+        max_concurrency: 1,
+        seed: 0
+      )
+
+    assert_raise Imp.OperationalSafetyError, "SIMBA task budget guard", fn ->
+      Imp.Optimizer.SIMBA.compile(optimizer, program, [row], [row])
+    end
+  end
+
+  test "reflection keeps operational safety failures fatal" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        reason: :provider_drift,
+        message: "SIMBA reflection route guard"
+      )
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          if rem(Keyword.get(opts, :rollout_id, 0), 2) == 0,
+            do: %{answer: "yes"},
+            else: %{answer: "no"}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: task_lm)
+    row = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
+
+    optimizer =
+      Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
+        bsize: 1,
+        num_candidates: 2,
+        max_steps: 1,
+        max_demos: 0,
+        prompt_lm: %SafetyLM{error: safety},
+        max_concurrency: 1,
+        seed: 0
+      )
+
+    assert_raise Imp.OperationalSafetyError, "SIMBA reflection route guard", fn ->
+      Imp.Optimizer.SIMBA.compile(optimizer, program, [row], [row])
     end
   end
 
