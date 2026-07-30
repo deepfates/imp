@@ -106,7 +106,7 @@
     "translation_path": "ifbench_stock_module.py",
     "translation_sha256": "d44cc237c51b63c33e174302cf8cfe6df252734fe5161b472c58cef04839d3e8",
     "runner_path": "run_upstream.py",
-    "runner_sha256": "1fe5e15b7d8dae3400db2e5dc90f170afa055362be49d41201e8658214945f38",
+    "runner_sha256": "b2d36938168dde8268a5923125fbf4d0732403405cb20eea8403262fb8b1181a",
     "sources": {
       "artifact_commit": "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
       "artifact_program_path": "gepa_artifact/benchmarks/IFBench/ifbench_program.py",
@@ -322,7 +322,7 @@
     "source_identity": {"path": "source_identity.exs", "sha256": "ed5c419009aa9a204e12b406c485efd75c119100aa3c7b822221201325193726"},
     "stop_accounting": {"path": "stop_accounting.exs", "sha256": "c2acb84373382c2436b602c112c36e93a7ab6797146032a4cfbb6d2b496cdcda"},
     "two_phase": {"path": "two_phase.exs", "sha256": "d7a92778338cca5e72a51aa8a46d54cce2a371525d22326465fcf30ed92e7e9e"},
-    "upstream_entry": {"path": "run_upstream.py", "sha256": "1fe5e15b7d8dae3400db2e5dc90f170afa055362be49d41201e8658214945f38"}
+    "upstream_entry": {"path": "run_upstream.py", "sha256": "b2d36938168dde8268a5923125fbf4d0732403405cb20eea8403262fb8b1181a"}
   },
   "provider_free_gate": {
     "source_path": "equivalence_gate.py",

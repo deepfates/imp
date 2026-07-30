@@ -24,6 +24,14 @@ from pathlib import Path
 from typing import Any
 
 
+# LiteLLM loads .env and a remote cost map during import. In shadow mode an
+# explicit empty key prevents ambient dotenv credential acquisition, while the
+# local bundled cost map prevents any non-owned bootstrap network request.
+if os.environ.get("MATCHED_IFBENCH_GEPA014_SHADOW") == "1":
+    os.environ.setdefault("OPENROUTER_API_KEY", "")
+    os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
+
+
 HERE = Path(__file__).resolve().parent
 V1_RUNNER = HERE.parent / "matched_gepa_mipro_ifbench" / "run_upstream.py"
 SUCCESSOR_MANIFEST = HERE / "contract.json"
@@ -276,7 +284,7 @@ def shadow_preflight(runtime: Any) -> None:
     parser.add_argument("--gepa-artifact-root", type=Path, required=True)
     parser.add_argument("--ifbench-site-packages", type=Path, required=True)
     args = parser.parse_args()
-    if os.environ.get("OPENROUTER_API_KEY") is not None:
+    if os.environ.get("OPENROUTER_API_KEY", "").strip() != "":
         raise RuntimeError("upstream shadow preflight received provider authority")
     base_url = os.environ["MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL"]
     ca_cert = Path(os.environ["MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT"]).resolve()
