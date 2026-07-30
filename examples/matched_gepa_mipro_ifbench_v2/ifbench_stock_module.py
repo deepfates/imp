@@ -24,9 +24,13 @@ class IFBenchCoT2StageModule(dspy.Module):
         super().__init__()
         artifact_program = IFBenchCoT2StageProgram()
         self.generate_response_module = artifact_program.generate_response_module
-        self.ensure_correct_response_module = artifact_program.ensure_correct_response_module
+        self.ensure_correct_response_module = (
+            artifact_program.ensure_correct_response_module
+        )
 
     def forward(self, prompt: str):
         response = self.generate_response_module(query=prompt).response
-        final_response = self.ensure_correct_response_module(query=prompt, response=response)
+        final_response = self.ensure_correct_response_module(
+            query=prompt, response=response
+        )
         return dspy.Prediction(response=final_response.final_response)

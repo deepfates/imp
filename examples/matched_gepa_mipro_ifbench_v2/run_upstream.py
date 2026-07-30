@@ -34,6 +34,28 @@ v1.OUTPUT = Path(
     )
 )
 v1.SELECTION_OUTPUT = Path(str(v1.OUTPUT) + ".selection-sealed.json")
+os.environ["IMP_MATCHED_IFBENCH_IMP_SELECTION"] = os.environ.get(
+    "UPSTREAM_MATCHED_IFBENCH_V2_IMP_SELECTION",
+    str(
+        v1.IMP_ROOT
+        / "tmp"
+        / "matched_gepa_mipro_ifbench_v2"
+        / "imp-result.json.selection-sealed.json"
+    ),
+)
+
+v1_source_commits = v1.source_commits
+
+
+def source_commits(manifest: dict[str, Any]) -> dict[str, str]:
+    commits = v1_source_commits(manifest)
+    expected = os.environ.get("MATCHED_IFBENCH_V2_EXPECTED_COMMIT")
+    if expected is not None and commits["imp"] != expected:
+        raise RuntimeError(f"v2 launch commit drift: {commits['imp']} != {expected}")
+    return commits
+
+
+v1.source_commits = source_commits
 
 
 def build_program(dspy: Any, task_lm: Any):

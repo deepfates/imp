@@ -28,7 +28,9 @@ ANSWERS = [
 
 
 def canonical(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -50,10 +52,23 @@ def git_head(path: Path) -> str:
     ).strip()
 
 
+def git_clean(path: Path) -> bool:
+    return (
+        subprocess.check_output(
+            ["git", "-C", str(path), "status", "--porcelain", "--untracked-files=all"],
+            text=True,
+        ).strip()
+        == ""
+    )
+
+
 def install_runtime(args: argparse.Namespace):
     sys.path.insert(0, str(args.ifbench_site_packages))
     sys.path.insert(0, str(IMP_ROOT / "scripts"))
-    from ifbench_upstream_eval import install_optional_import_stubs, install_spacy_stub_if_needed
+    from ifbench_upstream_eval import (
+        install_optional_import_stubs,
+        install_spacy_stub_if_needed,
+    )
 
     install_spacy_stub_if_needed()
     install_optional_import_stubs()
@@ -188,7 +203,9 @@ def mutate_instruction(program: Any, target: str, instruction: str) -> None:
     require(matched, f"missing mutation target {target}")
 
 
-def mutation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, translated_cls: Any) -> list[dict[str, Any]]:
+def mutation_gate(
+    dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, translated_cls: Any
+) -> list[dict[str, Any]]:
     results = []
     names = [name for name, _ in exact_cls().named_predictors()]
     for index, target in enumerate(names):
@@ -204,8 +221,14 @@ def mutation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, translated
         mutate_instruction(translated_copy, target, instruction)
         after_exact = predictor_surface(exact_copy)
         after_translated = predictor_surface(translated_copy)
-        require(after_exact == after_translated, f"translated mutation state drift for {target}")
-        require(exact_original.dump_state() == original_exact_state, f"exact deepcopy aliased original for {target}")
+        require(
+            after_exact == after_translated,
+            f"translated mutation state drift for {target}",
+        )
+        require(
+            exact_original.dump_state() == original_exact_state,
+            f"exact deepcopy aliased original for {target}",
+        )
         require(
             translated_original.dump_state() == original_translated_state,
             f"translated deepcopy aliased original for {target}",
@@ -218,9 +241,17 @@ def mutation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, translated
         require(changed == [target], f"mutation escaped target {target}: {changed!r}")
 
         exact_run = run_program(dspy, np, dummy_cls, exact_copy, SYNTHETIC_PROMPT)
-        translated_run = run_program(dspy, np, dummy_cls, translated_copy, SYNTHETIC_PROMPT)
-        require(exact_run["messages"] == translated_run["messages"], f"mutated messages drift for {target}")
-        require(exact_run["output"] == translated_run["output"], f"mutated output drift for {target}")
+        translated_run = run_program(
+            dspy, np, dummy_cls, translated_copy, SYNTHETIC_PROMPT
+        )
+        require(
+            exact_run["messages"] == translated_run["messages"],
+            f"mutated messages drift for {target}",
+        )
+        require(
+            exact_run["output"] == translated_run["output"],
+            f"mutated output drift for {target}",
+        )
         baseline = run_program(dspy, np, dummy_cls, exact_cls(), SYNTHETIC_PROMPT)
         changed_stages = [
             stage
@@ -229,8 +260,17 @@ def mutation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, translated
             )
             if current != original
         ]
-        require(changed_stages == [index], f"mutation changed wrong message stages for {target}: {changed_stages!r}")
-        results.append({"target": target, "changed_predictors": changed, "changed_message_stages": changed_stages})
+        require(
+            changed_stages == [index],
+            f"mutation changed wrong message stages for {target}: {changed_stages!r}",
+        )
+        results.append(
+            {
+                "target": target,
+                "changed_predictors": changed,
+                "changed_message_stages": changed_stages,
+            }
+        )
     return results
 
 
@@ -260,13 +300,25 @@ def bootstrap_gate(dspy: Any, dummy_cls: Any, translated_cls: Any) -> dict[str, 
     trace = trace_surface(program, rows[0]["trace"])
     require(
         [entry["predictor"] for entry in trace]
-        == ["generate_response_module.predict", "ensure_correct_response_module.predict"],
+        == [
+            "generate_response_module.predict",
+            "ensure_correct_response_module.predict",
+        ],
         "stock bootstrap trace order drift",
     )
     require(len(metric_inputs) == 1, "metric did not receive exactly one invocation")
-    require(metric_inputs[0]["example"] == example.toDict(), "top-level instrumentation changed metric example")
-    require(metric_inputs[0]["prediction"] == {"response": "FINAL"}, "top-level instrumentation changed metric prediction")
-    require(metric_inputs[0]["trace"] is None, "top-level instrumentation injected metric trace metadata")
+    require(
+        metric_inputs[0]["example"] == example.toDict(),
+        "top-level instrumentation changed metric example",
+    )
+    require(
+        metric_inputs[0]["prediction"] == {"response": "FINAL"},
+        "top-level instrumentation changed metric prediction",
+    )
+    require(
+        metric_inputs[0]["trace"] is None,
+        "top-level instrumentation injected metric trace metadata",
+    )
     return {
         "rows": len(rows),
         "trace": trace,
@@ -275,7 +327,9 @@ def bootstrap_gate(dspy: Any, dummy_cls: Any, translated_cls: Any) -> dict[str, 
     }
 
 
-def instrumentation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, translated_cls: Any) -> dict[str, Any]:
+def instrumentation_gate(
+    dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, translated_cls: Any
+) -> dict[str, Any]:
     from dspy.utils.callback import BaseCallback
 
     class Observer(BaseCallback):
@@ -314,9 +368,18 @@ def instrumentation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, tra
         callbacks=[translated_observer],
         track_usage=True,
     )
-    require(exact["messages"] == translated["messages"], "callback/usage instrumentation changed task messages")
-    require(exact["output"] == translated["output"], "callback/usage instrumentation changed task output")
-    require(exact["dummy_calls"] == translated["dummy_calls"] == 2, "instrumentation changed call opportunity")
+    require(
+        exact["messages"] == translated["messages"],
+        "callback/usage instrumentation changed task messages",
+    )
+    require(
+        exact["output"] == translated["output"],
+        "callback/usage instrumentation changed task output",
+    )
+    require(
+        exact["dummy_calls"] == translated["dummy_calls"] == 2,
+        "instrumentation changed call opportunity",
+    )
     translated_top = [
         event
         for event in translated_observer.starts
@@ -324,7 +387,8 @@ def instrumentation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, tra
     ]
     require(len(translated_top) == 1, "translated top-level callback count drift")
     require(
-        translated_top[0]["inputs"] == {"args": (), "kwargs": {"prompt": SYNTHETIC_PROMPT}},
+        translated_top[0]["inputs"]
+        == {"args": (), "kwargs": {"prompt": SYNTHETIC_PROMPT}},
         f"top-level callback input differs from public task input: {translated_top[0]['inputs']!r}",
     )
     require(
@@ -349,76 +413,167 @@ def instrumentation_gate(dspy: Any, np: Any, dummy_cls: Any, exact_cls: Any, tra
 
 def source_gate(args: argparse.Namespace, contract: dict[str, Any]) -> dict[str, Any]:
     sources = contract["compatibility_translation"]["sources"]
-    require(git_head(args.gepa_artifact_root) == sources["artifact_commit"], "artifact commit drift")
-    require(git_head(args.dspy_root) == sources["stock_dspy_commit"], "stock DSPy commit drift")
+    require(
+        git_head(args.gepa_artifact_root) == sources["artifact_commit"],
+        "artifact commit drift",
+    )
+    require(
+        git_head(args.dspy_root) == sources["stock_dspy_commit"],
+        "stock DSPy commit drift",
+    )
     artifact_program = args.gepa_artifact_root / sources["artifact_program_path"]
-    require(sha256_file(artifact_program) == sources["artifact_program_sha256"], "artifact program source drift")
+    require(
+        sha256_file(artifact_program) == sources["artifact_program_sha256"],
+        "artifact program source drift",
+    )
     setup = args.gepa_artifact_root / sources["artifact_setup_path"]
-    require(sha256_file(setup) == sources["artifact_setup_sha256"], "artifact setup source drift")
+    require(
+        sha256_file(setup) == sources["artifact_setup_sha256"],
+        "artifact setup source drift",
+    )
     scorer = args.gepa_artifact_root / sources["artifact_scorer_path"]
-    require(sha256_file(scorer) == sources["artifact_scorer_sha256"], "artifact scorer source drift")
+    require(
+        sha256_file(scorer) == sources["artifact_scorer_sha256"],
+        "artifact scorer source drift",
+    )
     translation = HERE / contract["compatibility_translation"]["translation_path"]
-    require(sha256_file(translation) == contract["compatibility_translation"]["translation_sha256"], "translation source drift")
+    require(
+        sha256_file(translation)
+        == contract["compatibility_translation"]["translation_sha256"],
+        "translation source drift",
+    )
     runner = HERE / contract["compatibility_translation"]["runner_path"]
-    require(sha256_file(runner) == contract["compatibility_translation"]["runner_sha256"], "v2 runner source drift")
-    if args.modified_dspy_root is not None:
-        require(
-            git_head(args.modified_dspy_root) == sources["modified_dspy_fork_commit"],
-            "modified DSPy fork commit drift",
-        )
-        fork_bootstrap = args.modified_dspy_root / sources["modified_dspy_bootstrap_path"]
-        require(
-            sha256_file(fork_bootstrap) == sources["modified_dspy_bootstrap_sha256"],
-            "modified DSPy fork bootstrap drift",
-        )
+    require(
+        sha256_file(runner) == contract["compatibility_translation"]["runner_sha256"],
+        "v2 runner source drift",
+    )
+    require(
+        git_head(args.modified_dspy_root) == sources["modified_dspy_fork_commit"],
+        "modified DSPy fork commit drift",
+    )
+    fork_trace = args.modified_dspy_root / sources["modified_dspy_trace_path"]
+    require(
+        sha256_file(fork_trace) == sources["modified_dspy_trace_sha256"],
+        "modified DSPy fork GEPA trace source drift",
+    )
     return {
         "artifact_commit": sources["artifact_commit"],
         "stock_dspy_commit": sources["stock_dspy_commit"],
         "modified_dspy_fork_commit": sources["modified_dspy_fork_commit"],
-        "modified_dspy_verified_locally": args.modified_dspy_root is not None,
-        "translation_sha256": contract["compatibility_translation"]["translation_sha256"],
+        "modified_dspy_verified_locally": True,
+        "translation_sha256": contract["compatibility_translation"][
+            "translation_sha256"
+        ],
         "scorer_sha256": sources["artifact_scorer_sha256"],
     }
 
 
 def data_gate(contract: dict[str, Any]) -> dict[str, Any]:
     result = {}
-    for name in ("receipt", "train", "selection", "held_out"):
+    for name in ("receipt", "train", "selection"):
         path = (HERE / contract["dataset"][f"{name}_path"]).resolve()
         actual = sha256_file(path)
         expected = contract["dataset"][f"{name}_sha256"]
         require(actual == expected, f"{name} data digest drift")
         result[name] = actual
+    result["held_out"] = {
+        "status": "sealed_digest_retained_not_read_preselection",
+        "sha256": contract["dataset"]["held_out_sha256"],
+    }
     return result
 
 
 def treatment_preservation_gate(contract: dict[str, Any]) -> dict[str, Any]:
     v1_path = (HERE / contract["predecessor"]["contract_path"]).resolve()
-    require(sha256_file(v1_path) == contract["predecessor"]["contract_sha256"], "stopped v1 contract drift")
+    require(
+        sha256_file(v1_path) == contract["predecessor"]["contract_sha256"],
+        "stopped v1 contract drift",
+    )
     v1_runner = (HERE / contract["predecessor"]["runner_path"]).resolve()
-    require(sha256_file(v1_runner) == contract["predecessor"]["runner_sha256"], "stopped v1 runner drift")
+    require(
+        sha256_file(v1_runner) == contract["predecessor"]["runner_sha256"],
+        "stopped v1 runner drift",
+    )
     v1 = json.loads(v1_path.read_text(encoding="utf-8"))
-    for key in ("dataset", "models", "seeds", "arms", "optimizer", "runtime_dependencies", "execution", "output_contract", "metrics", "accounting", "capture"):
+    for key in (
+        "models",
+        "seeds",
+        "arms",
+        "optimizer",
+        "runtime_dependencies",
+        "execution",
+        "output_contract",
+        "metrics",
+        "accounting",
+        "capture",
+    ):
         require(contract[key] == v1[key], f"v2 changed preserved treatment field {key}")
-    require(contract["launch_status"] == "draft_unsealed_pending_compatibility_review", "v2 unexpectedly launchable")
-    return {"v1_contract_sha256": contract["predecessor"]["contract_sha256"], "preserved_fields": 11}
+    v2_dataset = copy.deepcopy(contract["dataset"])
+    runtime_class = v2_dataset.pop("program")
+    task_graph = v2_dataset.pop("task_graph")
+    runtime_classes = v2_dataset.pop("runtime_classes")
+    v1_dataset = copy.deepcopy(v1["dataset"])
+    artifact_runtime_class = v1_dataset.pop("program")
+    require(
+        v2_dataset == v1_dataset,
+        "v2 changed dataset beyond the runtime-class adaptation",
+    )
+    require(runtime_class == "IFBenchCoT2StageModule", "v2 stock runtime class drift")
+    require(
+        task_graph == "pinned IFBenchCoT2StageProgram two-stage predictor graph",
+        "v2 task graph drift",
+    )
+    require(
+        runtime_classes["artifact_modified_dspy"] == artifact_runtime_class
+        and runtime_classes["stock_dspy_3_2_1"] == runtime_class,
+        "v2 runtime-class mapping drift",
+    )
+    require(
+        contract["launch_status"] == "draft_unsealed_pending_compatibility_review",
+        "v2 unexpectedly launchable",
+    )
+    return {
+        "v1_contract_sha256": contract["predecessor"]["contract_sha256"],
+        "preserved_fields": 10,
+        "sole_semantic_whitelist": "dataset.program IFBenchCoT2StageProgram -> IFBenchCoT2StageModule",
+    }
 
 
-def runner_gate(dspy: Any, dummy_cls: Any, translated_cls: Any, contract: dict[str, Any]) -> dict[str, Any]:
-    spec = importlib.util.spec_from_file_location("matched_ifbench_v2_upstream", HERE / "run_upstream.py")
-    require(spec is not None and spec.loader is not None, "cannot load v2 upstream runner")
+def runner_gate(
+    dspy: Any, dummy_cls: Any, translated_cls: Any, contract: dict[str, Any]
+) -> dict[str, Any]:
+    spec = importlib.util.spec_from_file_location(
+        "matched_ifbench_v2_upstream", HERE / "run_upstream.py"
+    )
+    require(
+        spec is not None and spec.loader is not None, "cannot load v2 upstream runner"
+    )
     runner = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = runner
     spec.loader.exec_module(runner)
-    require(runner.v1.build_program is runner.build_program, "v2 did not replace the sole v1 program factory")
-    require(runner.v1.MANIFEST_PATH == HERE / "contract.json", "v2 runner still points at stopped manifest")
-    require("matched_gepa_mipro_ifbench_v2" in str(runner.v1.OUTPUT), "v2 output aliases stopped treatment")
+    require(
+        runner.v1.build_program is runner.build_program,
+        "v2 did not replace the sole v1 program factory",
+    )
+    require(
+        runner.v1.MANIFEST_PATH == HERE / "contract.json",
+        "v2 runner still points at stopped manifest",
+    )
+    require(
+        "matched_gepa_mipro_ifbench_v2" in str(runner.v1.OUTPUT),
+        "v2 output aliases stopped treatment",
+    )
     classes = {}
     for arm in contract["arms"]:
         lm = dummy_cls()
         program = runner.build_program(dspy, lm)
-        require(isinstance(program, translated_cls), f"{arm} factory did not return translated program")
-        classes[arm] = f"{program.__class__.__module__}.{program.__class__.__qualname__}"
+        require(
+            isinstance(program, translated_cls),
+            f"{arm} factory did not return translated program",
+        )
+        classes[arm] = (
+            f"{program.__class__.__module__}.{program.__class__.__qualname__}"
+        )
     return {
         "program_factory_rebound": True,
         "manifest": str(runner.v1.MANIFEST_PATH),
@@ -432,16 +587,23 @@ def main() -> int:
     parser.add_argument("--dspy-root", type=Path, required=True)
     parser.add_argument("--gepa-root", type=Path, required=True)
     parser.add_argument("--gepa-artifact-root", type=Path, required=True)
-    parser.add_argument("--modified-dspy-root", type=Path)
+    parser.add_argument("--modified-dspy-root", type=Path, required=True)
     parser.add_argument("--ifbench-site-packages", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--require-clean", action="store_true")
     args = parser.parse_args()
-    for name in ("dspy_root", "gepa_root", "gepa_artifact_root", "ifbench_site_packages"):
+    for name in (
+        "dspy_root",
+        "gepa_root",
+        "gepa_artifact_root",
+        "ifbench_site_packages",
+    ):
         setattr(args, name, getattr(args, name).resolve())
-    if args.modified_dspy_root is not None:
-        args.modified_dspy_root = args.modified_dspy_root.resolve()
+    args.modified_dspy_root = args.modified_dspy_root.resolve()
 
     contract = json.loads((HERE / "contract.json").read_text(encoding="utf-8"))
+    clean_tree = git_clean(IMP_ROOT)
+    require(not args.require_clean or clean_tree, "Imp worktree is not clean")
     source_result = source_gate(args, contract)
     preservation_result = treatment_preservation_gate(contract)
     data_result = data_gate(contract)
@@ -450,7 +612,10 @@ def main() -> int:
     exact_surface = predictor_surface(exact_cls())
     translated_surface = predictor_surface(translated_cls())
     require(exact_surface == translated_surface, "initial predictor surface drift")
-    require(exact_cls().dump_state() == translated_cls().dump_state(), "serialized parameter state drift")
+    require(
+        exact_cls().dump_state() == translated_cls().dump_state(),
+        "serialized parameter state drift",
+    )
     require(
         f"{exact_cls.__module__}.{exact_cls.__qualname__}"
         != f"{translated_cls.__module__}.{translated_cls.__qualname__}",
@@ -458,7 +623,10 @@ def main() -> int:
     )
 
     rows = load_rows(contract)
-    require(len(rows) == 49, f"expected synthetic plus 48 optimization rows, got {len(rows)}")
+    require(
+        len(rows) == 49,
+        f"expected synthetic plus 48 optimization rows, got {len(rows)}",
+    )
     exact_transcripts = []
     translated_transcripts = []
     mechanical_caller_differences = []
@@ -466,22 +634,36 @@ def main() -> int:
         exact = run_program(dspy, np, dummy_cls, exact_cls(), row["prompt"])
         translated = run_program(dspy, np, dummy_cls, translated_cls(), row["prompt"])
         for key in ("output", "messages", "trace", "dummy_calls"):
-            require(exact[key] == translated[key], f"{key} drift for {row['source_id']}")
-        require(exact["python_rng_unchanged"] and translated["python_rng_unchanged"], "Python RNG consumption")
-        require(exact["numpy_rng_unchanged"] and translated["numpy_rng_unchanged"], "NumPy RNG consumption")
+            require(
+                exact[key] == translated[key], f"{key} drift for {row['source_id']}"
+            )
+        require(
+            exact["python_rng_unchanged"] and translated["python_rng_unchanged"],
+            "Python RNG consumption",
+        )
+        require(
+            exact["numpy_rng_unchanged"] and translated["numpy_rng_unchanged"],
+            "NumPy RNG consumption",
+        )
         exact_transcripts.append(exact["messages"])
         translated_transcripts.append(translated["messages"])
         if exact["caller_stacks"] != translated["caller_stacks"]:
             mechanical_caller_differences.append(row["source_id"])
-    require(canonical(exact_transcripts) == canonical(translated_transcripts), "aggregate message bytes drift")
+    require(
+        canonical(exact_transcripts) == canonical(translated_transcripts),
+        "aggregate message bytes drift",
+    )
 
     mutations = mutation_gate(dspy, np, dummy_cls, exact_cls, translated_cls)
     bootstrap = bootstrap_gate(dspy, dummy_cls, translated_cls)
-    instrumentation = instrumentation_gate(dspy, np, dummy_cls, exact_cls, translated_cls)
+    instrumentation = instrumentation_gate(
+        dspy, np, dummy_cls, exact_cls, translated_cls
+    )
     runner = runner_gate(dspy, dummy_cls, translated_cls, contract)
     result = {
         "status": "pass",
         "claim_boundary": "stock-DSPy-adapted IFBench task graph; not unmodified artifact or paper reproduction",
+        "clean_tree_gate": {"required": args.require_clean, "passed": clean_tree},
         "source": source_result,
         "predecessor": preservation_result,
         "data": data_result,
@@ -507,7 +689,9 @@ def main() -> int:
             "external_provider_calls": 0,
         },
     }
-    materialized = json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    materialized = (
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    )
     if args.output is not None:
         temporary = args.output.with_suffix(args.output.suffix + ".tmp")
         temporary.write_text(materialized, encoding="utf-8")

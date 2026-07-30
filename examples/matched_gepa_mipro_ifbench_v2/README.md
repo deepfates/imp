@@ -25,6 +25,21 @@ tmp/dspy-parity-venv/bin/python \
   --ifbench-site-packages tmp/ifbench-parity-venv/lib/python3.13/site-packages
 ```
 
+The complete paired entry is `run_paired.py`. Its provider-free review mode
+checks the clean Imp commit, every v2 coordinator/consumer/peer source digest,
+the modified DSPy fork, the translation gate and its committed result without
+passing provider authority or reading held-out bytes:
+
+```sh
+python3 examples/matched_gepa_mipro_ifbench_v2/run_paired.py --compatibility-only
+```
+
+The coordinator is the only launch entry. It captures the exact clean Imp
+commit and passes it to both peers; each peer refuses a mismatch. Selection
+receipts are persisted by both runtimes before either runtime may verify and
+load the held-out split. On failure the coordinator gives both peers a bounded
+graceful-stop window and requires cost-bearing stop artifacts from both.
+
 `contract.json` is a review draft and is intentionally non-launchable. No
 provider runner may receive network authority until the coordinator reviews
 the compatibility contract, source bindings, gate result, and revised cost.
