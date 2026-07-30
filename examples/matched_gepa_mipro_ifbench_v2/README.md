@@ -1,4 +1,4 @@
-# Matched GEPA and MIPROv2 on IFBench v2 (unsealed)
+# Matched GEPA and MIPROv2 on IFBench v2 (stopped)
 
 This proposed treatment translates the pinned GEPA paper artifact's two-stage
 IFBench task graph to stock DSPy 3.2.1's ordinary `Module.forward` contract.
@@ -40,9 +40,20 @@ receipts are persisted by both runtimes before either runtime may verify and
 load the held-out split. On failure the coordinator gives both peers a bounded
 graceful-stop window and requires cost-bearing stop artifacts from both.
 
-`contract.json` is a review draft and is intentionally non-launchable. No
-provider runner may receive network authority until the coordinator reviews
-the compatibility contract, source bindings, gate result, and revised cost.
-The current conservative workshop spend is at most `$6.60236225`; repeating
-the complete treatment from zero has an unchanged `$74.552832` maximum and an
-`$81.15519425 / $100` conservative aggregate maximum.
+The one authorized launch stopped during the first seed's upstream GEPA arm.
+After baseline selection, stock DSPy evaluated a real proposed instruction but
+several parse/evaluator failures left the pinned GEPA engine with fewer outputs
+than examples; GEPA aborted with `IndexError: list index out of range`. The
+coordinator immediately stopped Imp. Neither peer sealed all nine selections,
+no selection receipt exists, and held-out bytes were never opened. The run is
+incomplete and unscored, not an optimizer loss or effectiveness comparison.
+
+The two peers reported exact provider costs of `$0.36730575` and
+`$0.39300525`, totaling `$0.7603110000000001`; adding the prior conservative
+workshop bound gives at most `$7.3626732500000001`. Their full stopped ledgers
+and the two completed baseline artifacts are retained in this directory.
+Upstream's rescue is internally complete. Imp's stopped artifact is fully
+bound to the manifest, gate, and launch commit, but is deliberately not a
+certified rescue: SIGTERM arrived with 194 reserved/transmitted calls, 194
+transport events, and only 191 completed response records. The manifest is now
+permanently non-launchable.

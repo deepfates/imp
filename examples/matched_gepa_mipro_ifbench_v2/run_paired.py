@@ -280,6 +280,7 @@ def compatibility_preflight() -> dict[str, Any]:
             "draft_unsealed_pending_compatibility_review",
             "blocked_live_preflight",
             "sealed",
+            "stopped_incomplete_upstream_gepa_output_alignment",
         ),
         "manifest launch state drift",
     )

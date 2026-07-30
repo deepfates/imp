@@ -236,8 +236,8 @@
     "call_budget": {"path": "call_budget.exs", "sha256": "b4ca95be9d14c229bb26739a749835ecb6d3caa8609d127b33c9854ddbd9bad7"},
     "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
     "consumer_project": {"path": "mix.exs", "sha256": "1e9a3d53b0d374d88d51bc01a28ad8e353109373f245a95e0aa4eaa83116a58d"},
-    "contract_runtime": {"path": "contract.exs", "sha256": "d3e25078331e2beb18f580d7bcc64f05a6cf32f724954da1cabb1bba76ea0e24"},
-    "coordinator": {"path": "run_paired.py", "sha256": "f25ad54f504a271609fad67b5e374c75bbe8fdb19f53c57f2e4069c0506cddc0"},
+    "contract_runtime": {"path": "contract.exs", "sha256": "4699d7b2775a626c7db848284573ba20a33617aaf03f7a8307ee967723b95cb3"},
+    "coordinator": {"path": "run_paired.py", "sha256": "4502eebc5a9e0bf81dd0e47b3a248a722359dca54dd1ade4db0a27be5e73b8fb"},
     "guard_equivalence": {"path": "guard_equivalence.py", "sha256": "ddb169e0865b65a67d0f810af3aee7e11e09e698acfcc036e9466306e078c914"},
     "imp_entry": {"path": "run_imp.exs", "sha256": "ded073fd827c533a181f7e77a60e81a0db15265a847baa8184fa12b23c302f35"},
     "imp_preflight": {"path": "paired_preflight.exs", "sha256": "60a336a2a63592eef4021d7f370f29780f5b2d8baf11087c22edd3ffd1d44eeb"},
@@ -248,12 +248,12 @@
   },
   "provider_free_gate": {
     "source_path": "equivalence_gate.py",
-    "source_sha256": "0cad203c16d3785e4ae372155907de4ef10d774115989cbce345196636559d37",
+    "source_sha256": "d55904f2f76187cb953cd9555187e1ca170aec07b959873e131929a87bc2125d",
     "result_path": "provider-free-review.json",
     "result_sha256": "0eb04ae6b4e9bacca4baf84a4a3e79acacfde3500a2e23890a1e52439efc6537",
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
-  "provider_authority": "authorized_for_exact_sealed_paired_coordinator_launch_only",
-  "launch_status": "sealed"
+  "provider_authority": "closed_after_single_authorized_stopped_execution",
+  "launch_status": "stopped_incomplete_upstream_gepa_output_alignment"
 }
