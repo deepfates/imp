@@ -699,7 +699,7 @@ defmodule Imp.Optimizer.MIPROv2 do
                 %Imp.Evaluate.Result{score: 0.0, rows: [], errors: cancelled.errors}
 
               %OperationalSafetyError{} = safety ->
-                raise safety
+                reraise safety, __STACKTRACE__
             end
           else
             reraise RuntimeError,

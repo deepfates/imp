@@ -1540,7 +1540,7 @@ defmodule Imp.Optimizer.GRPO do
   defp finite_validation_score(score) do
     score = score * 1.0
 
-    if score == score and abs(score) <= 1.7976931348623157e308,
+    if abs(score) <= 1.7976931348623157e308,
       do: {:ok, score},
       else: {:error, {:invalid_grpo_validation_score, score}}
   end

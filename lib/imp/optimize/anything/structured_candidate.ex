@@ -262,8 +262,12 @@ defmodule Imp.Optimize.Anything.StructuredCandidate do
     :ok
   rescue
     error in ArgumentError ->
-      raise ArgumentError,
-            "structured Optimize Anything resume checkpoint is invalid: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message:
+                  "structured Optimize Anything resume checkpoint is invalid: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   def validate_checkpoint!(%__MODULE__{}, checkpoint) do

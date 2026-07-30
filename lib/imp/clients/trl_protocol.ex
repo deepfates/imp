@@ -539,7 +539,7 @@ defmodule Imp.Clients.TRLProtocol do
   defp finite?(value) when is_integer(value), do: true
 
   defp finite?(value) when is_float(value),
-    do: value == value and value <= 1.7976931348623157e308 and value >= -1.7976931348623157e308
+    do: value <= 1.7976931348623157e308 and value >= -1.7976931348623157e308
 
   defp finite?(_value), do: false
 
