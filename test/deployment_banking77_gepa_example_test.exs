@@ -1,9 +1,9 @@
-defmodule DeploymentBanking77GEPASmokeTest do
+defmodule DeploymentBanking77GEPAExampleTest do
   use ExUnit.Case, async: true
 
-  @script Path.expand("../examples/deployment/banking77_gepa_smoke.exs", __DIR__)
+  @script Path.expand("../examples/deployment/banking77_gepa.exs", __DIR__)
 
-  test "optional smoke is an ordinary public workflow, not a private runner stack" do
+  test "Banking77 example is an ordinary public workflow, not a private runner stack" do
     source = File.read!(@script)
     assert length(String.split(source, "\n")) < 320
     Code.string_to_quoted!(source, file: @script)
@@ -17,9 +17,15 @@ defmodule DeploymentBanking77GEPASmokeTest do
     assert source =~ "data_collection: \"deny\""
     assert source =~ "req_http_options: [retry: false, max_retries: 0]"
 
-    refute source =~ "defmodule Banking77GEPASmoke.Ledger"
-    refute source =~ "defmodule Banking77GEPASmoke.GuardedLM"
+    refute source =~ "defmodule Banking77GEPA.Ledger"
+    refute source =~ "defmodule Banking77GEPA.GuardedLM"
     refute File.exists?(Path.rootname(@script) <> ".json")
+  end
+
+  test "the example's readable outer cap is 328 task and two optimizer transports" do
+    source = File.read!(@script)
+    assert source =~ "%{task: 2 * (64 + 8 + 8 + 40 + 40 + 4), optimizer: 2}"
+    assert %{task: 328, optimizer: 2} == %{task: 2 * (64 + 8 + 8 + 40 + 40 + 4), optimizer: 2}
   end
 
   test "pinned ReqLLM reproduces the terminal seed-zero failure before transport" do

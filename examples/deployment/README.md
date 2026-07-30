@@ -46,10 +46,10 @@ mechanics; they do **not** show that `LabeledFewShot` improves a real model, a
 natural task, or a user's data. Replace `ImpDeployment.Workflow.static_lm/0`
 and the three disjoint datasets before making an effectiveness claim.
 
-## Optional bounded real-model smoke
+## Optional bounded real-model Banking77 example
 
-`banking77_gepa_smoke.exs` is the corresponding one-seed, real-model product
-smoke. It uses the same public `Imp.Experiment.check/5`, `Result`, `Artifact`,
+`banking77_gepa.exs` is the corresponding one-seed, real-model product
+example. It uses the same public `Imp.Experiment.check/5`, `Result`, `Artifact`,
 and `ProgramServer` surfaces with the pinned public Banking77 subset. GEPA sees
 72 training rows and eight selection rows; the 40 test rows are evaluated only
 after the selected artifact has been built and validated. The script then
@@ -75,7 +75,7 @@ the successor uses the predeclared positive seed `1` and the public structured
 ```sh
 OPENROUTER_API_KEY=... \
 IMP_PATH=../.. \
-mix run --no-start banking77_gepa_smoke.exs
+mix run --no-start banking77_gepa.exs
 ```
 
 Neutral, negative, malformed, or stopped behavior is a valid retained outcome.

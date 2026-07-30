@@ -1,6 +1,6 @@
 Application.ensure_all_started(:imp)
 
-defmodule Banking77GEPASmoke.Router do
+defmodule Banking77GEPA.Router do
   @behaviour Imp.Module
   defstruct [:analyze_intent, :classify_route]
 
@@ -47,8 +47,8 @@ defmodule Banking77GEPASmoke.Router do
   end
 end
 
-defmodule Banking77GEPASmoke do
-  alias Banking77GEPASmoke.Router
+defmodule Banking77GEPA do
+  alias Banking77GEPA.Router
   alias Imp.Experiment.{Data, Result}
   alias Imp.Optimizer.{Artifact, GEPA}
   alias ImpDeployment.ProgramServer
@@ -57,14 +57,21 @@ defmodule Banking77GEPASmoke do
   @dataset_sha "2dc52c1b06002f44e03986d675cd05f078d4690fe3ee0a41be27c00c7135afb1"
   @task_model "openrouter:openai/gpt-5.4-mini"
   @optimizer_model "openrouter:anthropic/claude-sonnet-4.6"
-  @output "../../benchmarks/results/banking77-gepa-product-smoke-successor"
+  @output "../../benchmarks/results/banking77-gepa-product-example"
 
   def run do
-    if System.get_env("IMP_BANKING77_SMOKE_FRESH") == "1", do: fresh(), else: optimize()
+    if System.get_env("IMP_BANKING77_GEPA_FRESH") == "1", do: fresh(), else: optimize()
+  end
+
+  # Two task calls per program evaluation: 64 GEPA metric calls, two 8-row
+  # selection passes, selected and baseline 40-row tests, then four fresh probes.
+  def transport_caps do
+    %{task: 2 * (64 + 8 + 8 + 40 + 40 + 4), optimizer: 2}
   end
 
   defp optimize do
     data = data!()
+    IO.inspect(transport_caps(), label: "Conservative transport caps")
     catalog!()
     task_lm = lm(:task)
     optimizer_lm = lm(:optimizer)
@@ -126,15 +133,15 @@ defmodule Banking77GEPASmoke do
         untouched: [baseline.score, result.test.score],
         experiment_transport_attempts: attempts
       },
-      label: "Banking77 GEPA smoke"
+      label: "Banking77 GEPA example"
     )
 
     fresh!(result_path, artifact_path)
   end
 
   defp fresh do
-    result_path = System.fetch_env!("IMP_BANKING77_SMOKE_RESULT")
-    artifact_path = System.fetch_env!("IMP_BANKING77_SMOKE_ARTIFACT")
+    result_path = System.fetch_env!("IMP_BANKING77_GEPA_RESULT")
+    artifact_path = System.fetch_env!("IMP_BANKING77_GEPA_ARTIFACT")
     stored = Result.read!(result_path)
     artifact = Artifact.read!(artifact_path)
     true = stored["payload"]["artifact"] == artifact
@@ -174,9 +181,9 @@ defmodule Banking77GEPASmoke do
 
   defp fresh!(result_path, artifact_path) do
     env = [
-      {"IMP_BANKING77_SMOKE_FRESH", "1"},
-      {"IMP_BANKING77_SMOKE_RESULT", result_path},
-      {"IMP_BANKING77_SMOKE_ARTIFACT", artifact_path},
+      {"IMP_BANKING77_GEPA_FRESH", "1"},
+      {"IMP_BANKING77_GEPA_RESULT", result_path},
+      {"IMP_BANKING77_GEPA_ARTIFACT", artifact_path},
       {"OPENROUTER_API_KEY", System.fetch_env!("OPENROUTER_API_KEY")}
     ]
 
@@ -282,4 +289,4 @@ defmodule Banking77GEPASmoke do
     do: path |> File.read!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
 end
 
-Banking77GEPASmoke.run()
+Banking77GEPA.run()
