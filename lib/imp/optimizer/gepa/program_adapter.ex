@@ -10,6 +10,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   defstruct [
     :program,
     :metric,
+    :component_order,
     component_feedback: %{},
     reflection_record_mode: :beam_native,
     max_concurrency: 1,
@@ -19,6 +20,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   @type t :: %__MODULE__{
           program: struct(),
           metric: function(),
+          component_order: [Candidate.component_name()],
           component_feedback: %{optional(atom()) => ComponentFeedback.callback()},
           reflection_record_mode: :beam_native | :gepa_v0_1_4,
           max_concurrency: pos_integer(),
@@ -42,6 +44,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     %__MODULE__{
       program: program,
       metric: metric,
+      component_order: Enum.map(Imp.ProgramParameters.predictors(program), & &1.name),
       component_feedback: component_feedback,
       reflection_record_mode: reflection_record_mode,
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
@@ -128,8 +131,11 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   end
 
   @impl true
-  def get_adapter_state(%__MODULE__{reflection_record_mode: mode}) do
-    %{"reflection_record_mode" => Atom.to_string(mode)}
+  def get_adapter_state(%__MODULE__{reflection_record_mode: mode, component_order: order}) do
+    %{
+      "reflection_record_mode" => Atom.to_string(mode),
+      "component_order" => order
+    }
   end
 
   @impl true
@@ -141,19 +147,22 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     adapter
   end
 
-  def set_adapter_state(%__MODULE__{reflection_record_mode: mode} = adapter, state) do
+  def set_adapter_state(
+        %__MODULE__{reflection_record_mode: mode, component_order: order} = adapter,
+        state
+      ) do
     expected = Atom.to_string(mode)
 
     case state do
-      %{"reflection_record_mode" => ^expected} ->
+      %{"reflection_record_mode" => ^expected, "component_order" => ^order} ->
         adapter
 
-      %{reflection_record_mode: ^mode} ->
+      %{reflection_record_mode: ^mode, component_order: ^order} ->
         adapter
 
       _ ->
         raise ArgumentError,
-              "GEPA resume reflection record mode does not match the runtime adapter"
+              "GEPA resume reflection record mode does not match, or component order differs from the runtime adapter"
     end
   end
 

@@ -11,6 +11,37 @@ defmodule Imp.Optimizer.GEPA.ModuleSelector do
 
   alias Imp.Optimizer.GEPA.{Candidate, Engine}
 
+  defmodule OrderedRoundRobin do
+    @moduledoc false
+    @behaviour Imp.Optimizer.GEPA.ModuleSelector
+
+    @enforce_keys [:components]
+    defstruct [:components]
+
+    @impl true
+    def select_modules(
+          %__MODULE__{components: components},
+          state,
+          _trajectories,
+          _scores,
+          candidate_idx,
+          candidate
+        ) do
+      entry = Enum.find(state.candidates, &(&1.id == candidate_idx))
+
+      if is_nil(entry) do
+        raise ArgumentError,
+              "GEPA module selector received unknown candidate index: #{inspect(candidate_idx)}"
+      end
+
+      unless MapSet.new(components) == MapSet.new(Map.keys(candidate)) do
+        raise ArgumentError, "GEPA ordered module selector does not match candidate components"
+      end
+
+      [Enum.at(components, rem(entry.next_component, length(components)))]
+    end
+  end
+
   @type components :: [Candidate.component_name()]
 
   @callback select_modules(
@@ -73,6 +104,24 @@ defmodule Imp.Optimizer.GEPA.ModuleSelector do
   def component_order(candidate) when is_map(candidate) do
     Enum.sort_by(Map.keys(candidate), &inspect/1)
   end
+
+  @doc false
+  def ordered_round_robin(components) when is_list(components) and components != [] do
+    if length(Enum.uniq(components)) != length(components) do
+      raise ArgumentError, "GEPA ordered module selector contains duplicate components"
+    end
+
+    %OrderedRoundRobin{components: components}
+  end
+
+  @doc false
+  def round_robin?(:round_robin), do: true
+  def round_robin?(%OrderedRoundRobin{}), do: true
+  def round_robin?(_selector), do: false
+
+  @doc false
+  def public_name(%OrderedRoundRobin{}), do: :round_robin
+  def public_name(selector), do: selector
 
   defp invoke(:round_robin, state, _trajectories, _scores, candidate_idx, candidate) do
     entry = Enum.find(state.candidates, &(&1.id == candidate_idx))

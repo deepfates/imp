@@ -4774,13 +4774,13 @@ defmodule Imp.Optimizer.GEPA.Engine do
   end
 
   defp next_component(parent, opts) do
-    if Keyword.get(opts, :module_selector, :round_robin) == :round_robin,
+    if ModuleSelector.round_robin?(Keyword.get(opts, :module_selector, :round_robin)),
       do: parent.next_component + 1,
       else: parent.next_component
   end
 
   defp advance_component_cursor(state, candidate_id, next_component, opts) do
-    if Keyword.get(opts, :module_selector, :round_robin) == :round_robin do
+    if ModuleSelector.round_robin?(Keyword.get(opts, :module_selector, :round_robin)) do
       candidates =
         List.update_at(state.candidates, candidate_id, &%{&1 | next_component: next_component})
 
@@ -5051,7 +5051,10 @@ defmodule Imp.Optimizer.GEPA.Engine do
       use_merge: Keyword.get(opts, :use_merge, false),
       frontier_type: Keyword.get(opts, :frontier_type, :instance),
       candidate_selection_strategy: Keyword.get(opts, :candidate_selection_strategy, :pareto),
-      module_selector: Keyword.get(opts, :module_selector, :round_robin),
+      module_selector:
+        opts
+        |> Keyword.get(:module_selector, :round_robin)
+        |> ModuleSelector.public_name(),
       skip_perfect_score: Keyword.get(opts, :skip_perfect_score, false),
       perfect_score: Keyword.get(opts, :perfect_score),
       track_best_outputs: Keyword.get(opts, :track_best_outputs, false),
@@ -5569,7 +5572,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       unless rng_algorithm == :python_v3 and
                reflection_failure_policy == :gepa_v0_1_4_batch_then_single_retry and
                Keyword.get(opts, :candidate_selection_strategy, :pareto) == :pareto and
-               Keyword.get(opts, :module_selector, :round_robin) == :round_robin and
+               ModuleSelector.round_robin?(Keyword.get(opts, :module_selector, :round_robin)) and
                sampling_strategy == :single and selection_strategy == :all_improvements and
                proposal_concurrency == 1 and not use_merge and not cache_evaluation and
                skip_perfect_score and perfect_score == 1.0 and frontier_type == :instance and

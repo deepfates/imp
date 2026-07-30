@@ -18,7 +18,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   @observation_summarizer "Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence summary which highlights only the most important details."
   @instruction_generator "Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task."
 
-  def summarize!(lm, trainset, signature, batch_size) do
+  def summarize!(lm, trainset, batch_size) do
     batches = trainset |> Enum.chunk_every(batch_size) |> Enum.take(10)
 
     [first | rest] =
@@ -31,7 +31,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
       end
 
     observations =
-      call!(lm, dataset_descriptor_signature(), %{examples: examples_repr(first, signature)},
+      call!(lm, dataset_descriptor_signature(), %{examples: examples_repr(first)},
         temperature: 1.0
       )
       |> Imp.get(:observations)
@@ -43,7 +43,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
             call!(
               lm,
               dataset_descriptor_with_prior_signature(),
-              %{examples: examples_repr(batch, signature), prior_observations: accumulated},
+              %{examples: examples_repr(batch), prior_observations: accumulated},
               temperature: 1.0
             )
             |> Imp.get(:observations)
@@ -84,7 +84,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
       raise ArgumentError, "DSPy 3.2.1 MIPRO proposer count must be a positive integer"
     end
 
-    {instructions, slots, _rng} =
+    {instructions, slots, rng} =
       Enum.reduce(0..(count - 1), {[], [], rng}, fn index, {instructions, slots, rng} ->
         {tip, rng} = PythonRandom.choice(rng, @tips)
         {rollout_id, rng} = PythonRandom.randint(rng, 0, 1_000_000_000)
@@ -218,17 +218,35 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   defp signature(instructions, inputs, outputs),
     do: Imp.signature(%{instructions: instructions, inputs: inputs, outputs: outputs})
 
-  defp examples_repr(examples, signature) do
-    "[" <> Enum.map_join(examples, ", ", &example_repr(&1, signature)) <> "]"
+  defp examples_repr(examples) do
+    "[" <> Enum.map_join(examples, ", ", &example_repr/1) <> "]"
   end
 
-  defp example_repr(%Imp.Example{} = example, signature) do
-    present = MapSet.new(Imp.Example.keys(example))
+  # DSPy summarizes the Example values supplied by the consumer; it does not
+  # require a program-level signature. That distinction matters for ordinary
+  # multi-predictor programs, whose external task contract is not any one
+  # predictor signature. Imp maps do not retain Python insertion order, so the
+  # stable BEAM representation is explicit inputs first, followed by the other
+  # public fields in lexical order. Example.keys/1 deliberately omits `imp_`
+  # fields, keeping recorder identities and metric-owned rows out of proposals.
+  defp example_repr(%Imp.Example{} = example) do
+    public_keys = Imp.Example.keys(example)
+    present = MapSet.new(public_keys)
+
+    input_keys =
+      example.input_keys
+      |> List.wrap()
+      |> Enum.filter(&MapSet.member?(present, &1))
+
+    input_set = MapSet.new(input_keys)
+
+    remaining_keys =
+      public_keys
+      |> Enum.reject(&MapSet.member?(input_set, &1))
+      |> Enum.sort_by(&to_string/1)
 
     fields =
-      (signature.inputs ++ signature.outputs)
-      |> Enum.filter(&MapSet.member?(present, &1.name))
-      |> Enum.map(&{&1.name, Imp.Example.get(example, &1.name)})
+      Enum.map(input_keys ++ remaining_keys, &{&1, Imp.Example.get(example, &1)})
 
     body =
       Enum.map_join(fields, ", ", fn {key, value} ->

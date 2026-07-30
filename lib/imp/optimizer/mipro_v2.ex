@@ -396,7 +396,6 @@ defmodule Imp.Optimizer.MIPROv2 do
         UpstreamProposer.summarize!(
           prompt_lm,
           config.trainset,
-          Imp.ProgramAccess.task_signature(program),
           config.view_data_batch_size
         )
       end

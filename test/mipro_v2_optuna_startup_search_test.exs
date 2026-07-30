@@ -39,6 +39,27 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
            end) == upstream["schedules"]
   end
 
+  @tag :evidence_infrastructure
+  test "two-predictor categorical space and startup stream match Optuna 4.9.0" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@runner)], stderr_to_stdout: false)
+
+    upstream = Jason.decode!(output)
+
+    predictors = [%{name: :first}, %{name: :second}]
+    candidates = %{first: Enum.to_list(0..3), second: Enum.to_list(0..3)}
+
+    assert MIPROv2.categorical_space(predictors, candidates, nil) == %{
+             "atom:first:instruction" => [0, 1, 2, 3],
+             "atom:second:instruction" => [0, 1, 2, 3]
+           }
+
+    Enum.each(@schedules, fn {seed, _one_parameter_schedule} ->
+      expected = upstream["two_parameter_schedules"][Integer.to_string(seed)]
+      assert two_parameter_startup_schedule(seed) == expected
+    end)
+  end
+
   test "policy JSON checkpoint resumes the exact remaining startup stream" do
     policy = new_policy(2_026_072_602)
     {first, policy} = take_suggestions(policy, 4)
@@ -247,6 +268,27 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
   defp startup_schedule(seed) do
     {schedule, _policy} = seed |> new_policy() |> take_suggestions(9)
     schedule
+  end
+
+  defp two_parameter_startup_schedule(seed) do
+    names = ["0_predictor_instruction", "1_predictor_instruction"]
+    space = Map.new(names, &{&1, Enum.to_list(0..3)})
+
+    policy =
+      OptunaStartupPolicy
+      |> SearchPolicy.new(
+        space: space,
+        parameter_order: names,
+        seed: seed,
+        startup_trials: 10
+      )
+      |> SearchPolicy.observe(%{params: Map.new(names, &{&1, 0}), score: 0.0})
+
+    Enum.map_reduce(1..8, policy, fn _index, policy ->
+      {params, policy} = SearchPolicy.suggest(policy, :candidate)
+      {params, SearchPolicy.observe(policy, %{params: params, score: 0.0})}
+    end)
+    |> elem(0)
   end
 
   defp new_policy(seed) do

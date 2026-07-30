@@ -120,13 +120,22 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
            }
 
     state = Adapter.snapshot_state(adapter)
-    assert state == %{"reflection_record_mode" => "gepa_v0_1_4"}
+
+    assert state == %{
+             "reflection_record_mode" => "gepa_v0_1_4",
+             "component_order" => [:main]
+           }
+
     assert %ProgramAdapter{} = Adapter.restore_state(adapter, state)
 
     assert_raise ArgumentError, ~r/reflection record mode does not match/, fn ->
       adapter
       |> Map.put(:reflection_record_mode, :beam_native)
       |> Adapter.restore_state(state)
+    end
+
+    assert_raise ArgumentError, ~r/component order differs/, fn ->
+      Adapter.restore_state(adapter, Map.put(state, "component_order", [:other]))
     end
 
     assert %ProgramAdapter{reflection_record_mode: :beam_native} =

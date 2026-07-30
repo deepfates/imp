@@ -34,15 +34,17 @@ defmodule Imp.Optimizer.GEPA.InstructionProposal do
         current_instruction,
         reflective_dataset,
         global_feedback \\ nil,
-        mode \\ :beam_native
+        mode \\ :beam_native,
+        field_order \\ %{}
       )
-      when is_binary(current_instruction) and is_list(reflective_dataset) do
+      when is_binary(current_instruction) and is_list(reflective_dataset) and
+             is_map(field_order) do
     reflective_dataset = append_global_feedback(reflective_dataset, global_feedback)
 
     prompt =
       @prompt_template
       |> String.replace("<curr_param>", current_instruction)
-      |> String.replace("<side_info>", format_samples(reflective_dataset, mode))
+      |> String.replace("<side_info>", format_samples(reflective_dataset, mode, field_order))
       |> maybe_trim_upstream_template(mode)
 
     [%{role: :user, content: prompt}]
@@ -100,57 +102,72 @@ defmodule Imp.Optimizer.GEPA.InstructionProposal do
 
   defp append_global_feedback(dataset, _feedback), do: dataset
 
-  defp format_samples(samples, mode) do
+  defp format_samples(samples, mode, field_order) do
     samples
     |> Enum.with_index(1)
     |> Enum.map_join("\n\n", fn {sample, index} ->
-      "# Example #{index}\n" <> render_sample(sample, mode)
+      "# Example #{index}\n" <> render_sample(sample, mode, field_order)
     end)
   end
 
-  defp render_sample(sample, :gepa_v0_1_4) when is_map(sample) do
+  defp render_sample(sample, :gepa_v0_1_4, field_order) when is_map(sample) do
     ["Inputs", "Generated Outputs", "Feedback"]
     |> Enum.filter(&Map.has_key?(sample, &1))
     |> Enum.map_join("", fn key ->
-      "## #{key}\n" <> render_value(Map.fetch!(sample, key), 3)
+      "## #{key}\n" <>
+        render_value(Map.fetch!(sample, key), 3, Map.get(field_order, key, []))
     end)
   end
 
-  defp render_sample(sample, _mode) when is_map(sample) do
+  defp render_sample(sample, _mode, _field_order) when is_map(sample) do
     Enum.map_join(sample, "", fn {key, value} ->
-      "## #{key}\n" <> render_value(value, 3)
+      "## #{key}\n" <> render_value(value, 3, [])
     end)
   end
 
-  defp render_sample(sample, _mode), do: "## Value\n" <> render_value(sample, 3)
+  defp render_sample(sample, _mode, _field_order),
+    do: "## Value\n" <> render_value(sample, 3, [])
 
   defp maybe_trim_upstream_template(prompt, :gepa_v0_1_4), do: String.trim_trailing(prompt, "\n")
   defp maybe_trim_upstream_template(prompt, _mode), do: prompt
 
-  defp render_value(value, level) when is_map(value) do
+  defp render_value(value, level, order) when is_map(value) do
     if map_size(value) == 0 do
       "\n"
     else
-      Enum.map_join(value, "", fn {key, nested} ->
-        heading(level, key) <> render_value(nested, min(level + 1, 6))
+      value
+      |> ordered_entries(order)
+      |> Enum.map_join("", fn {key, nested} ->
+        heading(level, key) <> render_value(nested, min(level + 1, 6), [])
       end)
     end
   end
 
-  defp render_value(value, level) when is_list(value) do
+  defp render_value(value, level, _order) when is_list(value) do
     if value == [] do
       "\n"
     else
       value
       |> Enum.with_index(1)
       |> Enum.map_join("", fn {nested, index} ->
-        heading(level, "Item #{index}") <> render_value(nested, min(level + 1, 6))
+        heading(level, "Item #{index}") <> render_value(nested, min(level + 1, 6), [])
       end)
     end
   end
 
-  defp render_value(value, _level) when is_binary(value), do: String.trim(value) <> "\n\n"
-  defp render_value(value, _level), do: String.trim(inspect(value)) <> "\n\n"
+  defp render_value(value, _level, _order) when is_binary(value),
+    do: String.trim(value) <> "\n\n"
+
+  defp render_value(value, _level, _order), do: String.trim(inspect(value)) <> "\n\n"
+
+  defp ordered_entries(map, order) do
+    normalized = Enum.map(order, &to_string/1)
+    by_name = Map.new(map, fn {key, value} -> {to_string(key), {key, value}} end)
+    ordered = Enum.flat_map(normalized, &List.wrap(Map.get(by_name, &1)))
+    used = MapSet.new(normalized)
+    remaining = Enum.reject(map, fn {key, _value} -> MapSet.member?(used, to_string(key)) end)
+    ordered ++ remaining
+  end
 
   defp heading(level, label), do: String.duplicate("#", level) <> " #{label}\n"
 

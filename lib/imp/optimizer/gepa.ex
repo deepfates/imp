@@ -46,8 +46,8 @@ defmodule Imp.Optimizer.GEPA do
   not combine worker proposals or use map-shuffle-reduce voting.
 
   `:module_selector` picks which named components each reflective mutation
-  updates: `:round_robin` (default, one component per mutation in stable
-  order), `:all` (every component per mutation), an arity-five function, or a
+  updates: `:round_robin` (default, one component per mutation in declared
+  program order), `:all` (every component per mutation), an arity-five function, or a
   selector module/struct implementing the `Imp.Optimizer.GEPA.ModuleSelector`
   contract. Custom selectors receive the engine state, captured trajectories,
   minibatch scores, candidate index, and candidate map, and must return a
@@ -67,6 +67,7 @@ defmodule Imp.Optimizer.GEPA do
     ComponentFeedback,
     Engine,
     InstructionProposal,
+    ModuleSelector,
     ProgramAdapter,
     ReflectionStrategy,
     Stopper
@@ -281,6 +282,17 @@ defmodule Imp.Optimizer.GEPA do
       if is_function(optimizer.feedback_fn, 1) and feedback_errors == [], do: feedback
 
     seed_candidate = Candidate.from_program(program)
+    predictors = Imp.ProgramParameters.predictors(program)
+    predictor_order = Enum.map(predictors, & &1.name)
+
+    reflection_field_orders =
+      Map.new(predictors, fn %{name: name, predictor: predictor} ->
+        {name,
+         %{
+           "Inputs" => Enum.map(predictor.signature.inputs, &to_string(&1.name)),
+           "Generated Outputs" => Enum.map(predictor.signature.outputs, &to_string(&1.name))
+         }}
+      end)
 
     adapter =
       ProgramAdapter.new(program, optimizer.metric,
@@ -297,7 +309,11 @@ defmodule Imp.Optimizer.GEPA do
         execution_profile: optimizer.execution_profile,
         max_iterations: envelope.max_iterations,
         candidate_selection_strategy: optimizer.candidate_selection_strategy,
-        module_selector: optimizer.module_selector,
+        module_selector:
+          if(optimizer.module_selector == :round_robin,
+            do: ModuleSelector.ordered_round_robin(predictor_order),
+            else: optimizer.module_selector
+          ),
         combee: optimizer.combee,
         sampling_strategy: optimizer.sampling_strategy,
         selection_strategy: optimizer.selection_strategy,
@@ -341,7 +357,8 @@ defmodule Imp.Optimizer.GEPA do
           optimizer.reflection_lm,
           feedback,
           reflection_feedback,
-          optimizer.reflection_record_mode
+          optimizer.reflection_record_mode,
+          reflection_field_orders
         ),
         engine_opts
       )
@@ -433,7 +450,13 @@ defmodule Imp.Optimizer.GEPA do
     {compiled, report, artifact}
   end
 
-  defp proposer(reflection_lm, fallback_feedback, reflection_feedback, reflection_record_mode) do
+  defp proposer(
+         reflection_lm,
+         fallback_feedback,
+         reflection_feedback,
+         reflection_record_mode,
+         reflection_field_orders
+       ) do
     fn candidate, component, records, generation, aggregation ->
       case reflection_lm do
         nil ->
@@ -455,7 +478,8 @@ defmodule Imp.Optimizer.GEPA do
             generation,
             reflection_feedback,
             aggregation,
-            reflection_record_mode
+            reflection_record_mode,
+            Map.get(reflection_field_orders, component, %{})
           )
       end
     end
@@ -493,14 +517,16 @@ defmodule Imp.Optimizer.GEPA do
          _generation,
          feedback,
          _aggregation,
-         reflection_record_mode
+         reflection_record_mode,
+         reflection_field_order
        ) do
     messages =
       InstructionProposal.messages(
         Map.fetch!(candidate, component),
         records,
         feedback,
-        reflection_record_mode
+        reflection_record_mode,
+        reflection_field_order
       )
 
     case lm |> Imp.LM.generate(messages, []) |> Imp.LM.Result.unwrap() do

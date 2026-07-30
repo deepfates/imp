@@ -28,11 +28,44 @@ def choices(seed):
     return selected
 
 
+def two_parameter_choices(seed):
+    sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True)
+    study = optuna.create_study(direction="maximize", sampler=sampler)
+    distribution = optuna.distributions.CategoricalDistribution(range(4))
+    distributions = {
+        "0_predictor_instruction": distribution,
+        "1_predictor_instruction": distribution,
+    }
+    baseline = optuna.trial.create_trial(
+        params={
+            "0_predictor_instruction": 0,
+            "1_predictor_instruction": 0,
+        },
+        distributions=distributions,
+        value=0.0,
+    )
+    study.add_trial(baseline)
+
+    selected = []
+    for _ in range(8):
+        trial = study.ask()
+        params = {
+            name: trial.suggest_categorical(name, range(4))
+            for name in distributions
+        }
+        selected.append(params)
+        study.tell(trial, 0.0)
+    return selected
+
+
 print(
     json.dumps(
         {
             "optuna": optuna.__version__,
             "schedules": {str(seed): choices(seed) for seed in SEEDS},
+            "two_parameter_schedules": {
+                str(seed): two_parameter_choices(seed) for seed in SEEDS
+            },
         },
         sort_keys=True,
     )

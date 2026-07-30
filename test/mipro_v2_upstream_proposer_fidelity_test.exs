@@ -7,6 +7,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   @source "tmp/dspy-3.2.1"
   @runner "test/support/dspy_3_2_1_mipro_proposer_tape.py"
   @public_runner "test/support/dspy_3_2_1_mipro_public_compile_tape.py"
+  @two_predictor_runner "test/support/dspy_3_2_1_mipro_two_predictor_tape.py"
   @commit "29448ae12756abdd14bd8796c819247ebb83673c"
 
   defmodule SequenceLM do
@@ -155,6 +156,84 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     end
   end
 
+  test "public DSPy-fidelity compile summarizes a custom multi-predictor program without internal metadata" do
+    owner = self()
+
+    agent =
+      start_supervised!(
+        {Agent,
+         fn ->
+           [
+             %{observations: "prompt-only observations"},
+             %{summary: "prompt-only summary"},
+             %{proposed_instruction: "draft proposal"},
+             %{proposed_instruction: "review proposal"}
+           ]
+         end}
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:custom_program_prompt_call, messages})
+          Agent.get_and_update(agent, fn [answer | rest] -> {answer, rest} end)
+        end
+      )
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          flunk("zero-trial custom-program setup must not evaluate the task model")
+        end
+      )
+
+    program =
+      Imp.BenchmarkTruth.IFBenchTwoStage.new(task_lm,
+        adapter: Imp.Adapter.Chat,
+        config: [json_fallback: false]
+      )
+
+    trainset = [
+      Imp.Example.new(%{
+        prompt: "Write exactly BLUE.",
+        imp_metric_row: %{"instruction_id_list" => ["keywords:existence"]}
+      })
+      |> Imp.Example.with_inputs(:prompt)
+    ]
+
+    optimizer =
+      Imp.Optimizer.MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 1,
+        num_trials: 0,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        program_aware_proposer: false,
+        fewshot_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        proposer_fidelity: :dspy_3_2_1,
+        seed: 9
+      )
+
+    paused =
+      Imp.Optimizer.MIPROv2.compile(optimizer, program, trainset, trainset, max_trials: 0)
+
+    assert Imp.Optimizer.Report.fetch(paused).metadata.predictor_names == [
+             :generate_response_module,
+             :ensure_correct_response_module
+           ]
+
+    calls = collect_tagged_calls(:custom_program_prompt_call, 4, [])
+    summary_prompt = calls |> hd() |> List.last() |> Map.fetch!(:content)
+    assert summary_prompt =~ "Write exactly BLUE."
+    refute summary_prompt =~ "imp_metric_row"
+    refute summary_prompt =~ "instruction_id_list"
+    assert Agent.get(agent, & &1) == []
+  end
+
   test "dataset summary skips COMPLETE batches and continues like pinned DSPy" do
     owner = self()
 
@@ -175,14 +254,12 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         end
       )
 
-    signature = Imp.signature("text -> route")
-
     trainset =
       Enum.map(0..29, fn index ->
         Imp.example(text: "request-#{index}", route: "K11") |> Imp.with_inputs(:text)
       end)
 
-    assert UpstreamProposer.summarize!(lm, trainset, signature, 10) == "firstlater"
+    assert UpstreamProposer.summarize!(lm, trainset, 10) == "firstlater"
     assert Agent.get(agent, & &1) == []
 
     calls =
@@ -197,8 +274,6 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   end
 
   test "dataset summary contains an ordinary continuation failure but not an operational guard" do
-    signature = Imp.signature("text -> route")
-
     trainset =
       Enum.map(0..19, fn index ->
         Imp.example(text: "request-#{index}", route: "K11") |> Imp.with_inputs(:text)
@@ -220,7 +295,6 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     assert UpstreamProposer.summarize!(
              %SequenceLM{agent: ordinary_agent},
              trainset,
-             signature,
              10
            ) == "retained summary"
 
@@ -244,7 +318,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
       )
 
     assert_raise Imp.OperationalSafetyError, "provider route drift", fn ->
-      UpstreamProposer.summarize!(%SequenceLM{agent: safety_agent}, trainset, signature, 10)
+      UpstreamProposer.summarize!(%SequenceLM{agent: safety_agent}, trainset, 10)
     end
   end
 
@@ -325,8 +399,13 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     prompt_calls = collect_tagged_calls(:public_prompt_call, 9, [])
     task_calls = collect_tagged_calls(:public_task_call, 10, [])
 
-    assert Enum.map(prompt_calls, fn {messages, _opts} -> stringify(messages) end) ==
-             upstream["prompt_messages"]
+    prompt_messages = Enum.map(prompt_calls, fn {messages, _opts} -> stringify(messages) end)
+
+    Enum.zip(prompt_messages, upstream["prompt_messages"])
+    |> Enum.with_index()
+    |> Enum.each(fn {{actual, expected}, index} ->
+      assert actual == expected, "prompt message mismatch at call #{index}"
+    end)
 
     assert task_calls |> Enum.take(9) |> Enum.map(&stringify/1) == upstream["task_messages"]
 
@@ -347,6 +426,130 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     assert artifacts.search_demos == nil
     assert artifacts.instruction_candidates.main == upstream["instructions"]
+    assert Agent.get(prompt_agent, & &1) == []
+  end
+
+  @tag :evidence_infrastructure
+  test "two-predictor public setup matches bootstrap, proposal messages, and rollout ids" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@two_predictor_runner)],
+        env: [{"PYTHONPATH", Path.expand(@source)}],
+        stderr_to_stdout: false
+      )
+
+    upstream = Jason.decode!(output)
+    assert upstream["commit"] == @commit
+    assert length(upstream["task_messages"]) == 12
+    assert length(upstream["prompt_messages"]) == 11
+    assert length(upstream["rollout_ids"]) == 8
+    assert upstream["demos_discarded"]
+
+    owner = self()
+
+    prompt_answers =
+      [
+        %{observations: "first observations"},
+        %{observations: "second observations"},
+        %{summary: "frozen dataset summary"}
+      ] ++ Enum.map(0..7, &%{proposed_instruction: "predictor candidate #{&1}"})
+
+    prompt_agent = start_supervised!({Agent, fn -> prompt_answers end})
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(owner, {:two_predictor_prompt_call, messages, opts})
+          Agent.get_and_update(prompt_agent, fn [answer | rest] -> {answer, rest} end)
+        end
+      )
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:two_predictor_task_call, messages})
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "final_response",
+            do: %{reasoning: "review reasoning", final_response: "FINAL"},
+            else: %{reasoning: "draft reasoning", response: "DRAFT"}
+        end
+      )
+
+    program =
+      Imp.BenchmarkTruth.IFBenchTwoStage.new(task_lm,
+        adapter: Imp.Adapter.Chat,
+        config: [json_fallback: false]
+      )
+
+    trainset =
+      Enum.map(0..15, fn index ->
+        Imp.Example.new(
+          prompt: "request-#{index |> Integer.to_string() |> String.pad_leading(2, "0")}"
+        )
+        |> Imp.Example.with_inputs(:prompt)
+      end)
+
+    valset = [Imp.Example.new(prompt: "validation") |> Imp.Example.with_inputs(:prompt)]
+
+    optimizer =
+      Imp.Optimizer.MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 4,
+        num_trials: 8,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        task_lm: task_lm,
+        startup_trials: 10,
+        search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup,
+        proposer_fidelity: :dspy_3_2_1,
+        program_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        fewshot_aware_proposer: false,
+        max_concurrency: 1,
+        seed: 9
+      )
+
+    paused = Imp.Optimizer.MIPROv2.compile(optimizer, program, trainset, valset, max_trials: 0)
+    report = Imp.Optimizer.Report.fetch(paused)
+
+    prompt_calls = collect_tagged_calls(:two_predictor_prompt_call, 11, [])
+    task_calls = collect_tagged_calls(:two_predictor_task_call, 12, [])
+
+    prompt_messages = Enum.map(prompt_calls, fn {messages, _opts} -> stringify(messages) end)
+
+    Enum.zip(prompt_messages, upstream["prompt_messages"])
+    |> Enum.with_index()
+    |> Enum.each(fn {{actual, expected}, index} ->
+      assert actual == expected, "two-predictor prompt message mismatch at call #{index}"
+    end)
+
+    assert Enum.map(task_calls, &stringify/1) == upstream["task_messages"]
+
+    assert Enum.map(Enum.drop(prompt_calls, 3), fn {_messages, opts} -> opts[:rollout_id] end) ==
+             upstream["rollout_ids"]
+
+    # DSPy's four zero-shot bootstrap arms are zero-shot, shuffled seed -2,
+    # unshuffled seed -1, and shuffled seed 0. The exact task transcript above
+    # independently fixes both ordering and the six accepted rollouts.
+    assert Enum.map(report.metadata.bootstrap.rounds, & &1.calls) == [0, 1, 3, 2]
+    assert report.metadata.bootstrap.trajectory_count == 6
+
+    artifacts =
+      report.metadata.resume_state["payload"]["artifacts"]
+      |> Imp.Optimizer.Report.decode_term()
+
+    assert artifacts.search_demos == nil
+
+    assert Map.new(artifacts.instruction_candidates, fn {name, instructions} ->
+             {to_string(name), instructions}
+           end) == %{
+             "generate_response_module" => upstream["instructions"]["0"],
+             "ensure_correct_response_module" => upstream["instructions"]["1"]
+           }
+
     assert Agent.get(prompt_agent, & &1) == []
   end
 
@@ -398,7 +601,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         |> Imp.with_inputs(:text)
       end)
 
-    summary = UpstreamProposer.summarize!(lm, trainset, signature, 10)
+    summary = UpstreamProposer.summarize!(lm, trainset, 10)
     predictor = Imp.predict(signature)
 
     {proposed, report} =
