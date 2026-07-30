@@ -143,8 +143,10 @@ defmodule GepaMergeTaskTest do
   defp required_families, do: Imp.BenchmarkTruth.GepaReplicationContract.required_families()
 
   defp tmp_dir do
-    path = Path.join(System.tmp_dir!(), "imp-gepa-merge-#{System.unique_integer([:positive])}")
+    nonce = Base.url_encode64(:crypto.strong_rand_bytes(8), padding: false)
+    path = Path.join(System.tmp_dir!(), "imp-gepa-merge-#{nonce}")
     File.mkdir_p!(path)
+    on_exit(fn -> File.rm_rf!(path) end)
     path
   end
 end
