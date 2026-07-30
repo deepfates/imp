@@ -576,7 +576,7 @@ def runner_gate(
         )
     return {
         "program_factory_rebound": True,
-        "manifest": str(runner.v1.MANIFEST_PATH),
+        "manifest": runner.v1.MANIFEST_PATH.relative_to(HERE).as_posix(),
         "output_isolated": True,
         "arm_program_classes": classes,
     }
