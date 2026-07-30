@@ -26,7 +26,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | BootstrapFewShot | replication | bootstrap_few_shot_differential<br>optimizer_lift<br>instruction_live | T1 | benchmarks/evidence/admitted/bootstrap_few_shot_differential/41ebba40108eb4e45e0f333c2af9ee4238d80718168e4d4e1d3074ebf9bfe290.json |
 | BootstrapRS and RandomSearch | replication | random_search_differential<br>optimizer_lift | T1 | benchmarks/evidence/admitted/random_search_differential/e66d685218f50d7cf2f74cf4e36bb7aa4ab7d5ad347979eadc1d989de6fa3caa.json |
 | KNNFewShot | replication | optimizer_lift | NONE | none |
-| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/ced5027a2bda222f6acd990f922d82041fd6f8a22b34664ad97722810644c5a3.json |
+| COPRO | replication | optimizer_lift<br>copro_isolation<br>instruction_live | T1 | benchmarks/evidence/admitted/copro_isolation/c92bda26185071e7f317a66c314a8d0ff19e5ebfce595b016c34b83c83f235c0.json |
 | InstructionSearch | native_extension | optimizer_lift | NONE | none |
 | InferRules | adaptation | optimizer_lift | NONE | none |
 | SignatureOptimizer | native_extension | optimizer_lift | NONE | none |
