@@ -17,6 +17,8 @@ defmodule PackageContractTest do
     "examples/deployment/lib/imp_deployment/support_pipeline.ex",
     "examples/deployment/lib/imp_deployment/workflow.ex",
     "examples/deployment/banking77_gepa.exs",
+    "examples/deployment/banking77-gepa-exercised-result.json",
+    "examples/deployment/banking77-gepa-selected-artifact.json",
     "examples/deployment/load_workflow.exs",
     "examples/deployment/run_workflow.exs",
     "examples/provider_free_ticket_router/README.md",

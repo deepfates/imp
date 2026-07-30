@@ -2,6 +2,14 @@ defmodule DeploymentBanking77GEPAExampleTest do
   use ExUnit.Case, async: true
 
   @script Path.expand("../examples/deployment/banking77_gepa.exs", __DIR__)
+  @result Path.expand(
+            "../examples/deployment/banking77-gepa-exercised-result.json",
+            __DIR__
+          )
+  @artifact Path.expand(
+              "../examples/deployment/banking77-gepa-selected-artifact.json",
+              __DIR__
+            )
 
   test "Banking77 example is an ordinary public workflow, not a private runner stack" do
     source = File.read!(@script)
@@ -26,6 +34,24 @@ defmodule DeploymentBanking77GEPAExampleTest do
     source = File.read!(@script)
     assert source =~ "%{task: 2 * (64 + 8 + 8 + 40 + 40 + 4), optimizer: 2}"
     assert %{task: 328, optimizer: 2} == %{task: 2 * (64 + 8 + 8 + 40 + 40 + 4), optimizer: 2}
+  end
+
+  test "retained ordinary run records negative selection and a linked reusable artifact" do
+    result = Imp.Experiment.Result.read!(@result)
+    artifact = Imp.Optimizer.Artifact.read!(@artifact)
+
+    assert result["payload"]["selected"] == "baseline"
+    assert result["payload"]["selection"]["baseline"]["score"] == 0.25
+    assert result["payload"]["selection"]["optimized"]["score"] == 0.125
+    assert result["payload"]["test"] == %{
+             "score" => 0.275,
+             "row_count" => 40,
+             "error_count" => 0
+           }
+
+    assert result["payload"]["artifact"] == artifact
+    assert result["payload"]["provenance"]["git"]["commit"] ==
+             "9ca0bccfe1f3fab682eba83f68a0c28e05091082"
   end
 
   test "pinned ReqLLM reproduces the terminal seed-zero failure before transport" do

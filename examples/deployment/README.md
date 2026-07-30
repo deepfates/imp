@@ -83,6 +83,17 @@ Even a positive result establishes only this bounded product path on the pinned
 four-intent task; it is not general GEPA or Imp effectiveness evidence. The
 provider-free workflow above remains the default package demonstration.
 
+The one exercised run from clean `9ca0bcc` wrote mode-0600 files; their exact
+bytes are retained as the [`Result`](banking77-gepa-exercised-result.json) and linked
+[`Artifact`](banking77-gepa-selected-artifact.json).
+It is an honest negative optimizer outcome: baseline selection scored `0.25`,
+the GEPA candidate scored `0.125`, and `Experiment.check` retained baseline.
+The selected program scored `0.275` on 40 untouched rows with zero errors, then
+loaded in a fresh OS process and served four concurrent two-stage calls. A
+separate baseline re-evaluation scored `0.225`; because the fixed provider seed
+did not make those two baseline evaluations identical, that difference is not
+optimizer lift.
+
 ```sh
 IMP_ARTIFACT_PATH=/secure/program.json \
 IMP_MODEL=openai:gpt-4.1-mini \

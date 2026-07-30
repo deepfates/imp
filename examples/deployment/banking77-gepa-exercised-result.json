@@ -1,0 +1,910 @@
+{
+  "payload": {
+    "artifact": {
+      "artifact_type": "imp_optimizer_artifact",
+      "payload": {
+        "candidates": {
+          "banking77-gepa-selected": {
+            "id": "banking77-gepa-selected",
+            "metadata": {},
+            "program": {
+              "predictors": [
+                {
+                  "name": {
+                    "__imp_type__": "atom",
+                    "value": "analyze_intent"
+                  },
+                  "predictor": {
+                    "adapter": "Elixir.Imp.Adapter.Chat",
+                    "config": [
+                      [
+                        "cache",
+                        false
+                      ],
+                      [
+                        "json_fallback",
+                        false
+                      ]
+                    ],
+                    "demos": [],
+                    "dynamic_adapter": true,
+                    "dynamic_lm": true,
+                    "lm": null,
+                    "metadata": {},
+                    "signature": {
+                      "inputs": [
+                        {
+                          "desc": null,
+                          "kind": "input",
+                          "metadata": {},
+                          "name": "utterance",
+                          "prefix": "Utterance:",
+                          "type": "string"
+                        }
+                      ],
+                      "instructions": "Summarize the banking request for routing.",
+                      "metadata": {},
+                      "outputs": [
+                        {
+                          "desc": null,
+                          "kind": "output",
+                          "metadata": {},
+                          "name": "evidence",
+                          "prefix": "Evidence:",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "type": "predict"
+                  }
+                },
+                {
+                  "name": {
+                    "__imp_type__": "atom",
+                    "value": "classify_route"
+                  },
+                  "predictor": {
+                    "adapter": "Elixir.Imp.Adapter.Chat",
+                    "config": [
+                      [
+                        "cache",
+                        false
+                      ],
+                      [
+                        "json_fallback",
+                        false
+                      ]
+                    ],
+                    "demos": [],
+                    "dynamic_adapter": true,
+                    "dynamic_lm": true,
+                    "lm": null,
+                    "metadata": {},
+                    "signature": {
+                      "inputs": [
+                        {
+                          "desc": null,
+                          "kind": "input",
+                          "metadata": {},
+                          "name": "utterance",
+                          "prefix": "Utterance:",
+                          "type": "string"
+                        },
+                        {
+                          "desc": null,
+                          "kind": "input",
+                          "metadata": {},
+                          "name": "evidence",
+                          "prefix": "Evidence:",
+                          "type": "string"
+                        }
+                      ],
+                      "instructions": "Choose exactly one opaque route code.",
+                      "metadata": {},
+                      "outputs": [
+                        {
+                          "desc": null,
+                          "kind": "output",
+                          "metadata": {
+                            "constraints": {
+                              "enum": [
+                                "R17",
+                                "R42",
+                                "R68",
+                                "R93"
+                              ]
+                            }
+                          },
+                          "name": "route",
+                          "prefix": "Route:",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "type": "predict"
+                  }
+                }
+              ],
+              "type": "optimizer_parameter_snapshot"
+            },
+            "program_sha256": "sha256:24ea924ec9ca668111fcb6cc7f9416093e2d802a2535c59a2e45c8d586e09011",
+            "report": {
+              "best_score": 0.25,
+              "candidate_count": 2,
+              "candidates": [
+                {
+                  "__imp_type__": "map",
+                  "entries": [
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "id"
+                      },
+                      "baseline"
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "score"
+                      },
+                      0.25
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "mutation"
+                      },
+                      "baseline"
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "parent_id"
+                      },
+                      {
+                        "__imp_type__": "atom",
+                        "value": "nil"
+                      }
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "parameters"
+                      },
+                      {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "analyze_intent"
+                            },
+                            "Summarize the banking request for routing."
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "classify_route"
+                            },
+                            "Choose exactly one opaque route code."
+                          ]
+                        ]
+                      }
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "diagnostics"
+                      },
+                      []
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "instruction"
+                      },
+                      "Summarize the banking request for routing."
+                    ]
+                  ]
+                },
+                {
+                  "__imp_type__": "map",
+                  "entries": [
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "id"
+                      },
+                      "gepa-1"
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "score"
+                      },
+                      0.5
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "mutation"
+                      },
+                      "Reflection 1"
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "parent_id"
+                      },
+                      "baseline"
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "parameters"
+                      },
+                      {
+                        "__imp_type__": "map",
+                        "entries": [
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "analyze_intent"
+                            },
+                            "Summarize the banking request and classify it into the correct routing code for handling.\n\n## Task Description\nAnalyze the customer's banking-related utterance, identify their intent, and assign the appropriate route code for processing.\n\n## Process\n1. **Analyze Intent**: Carefully examine the utterance to determine the specific banking need (e.g., PIN inquiry, balance check, currency/exchange rate question, account services, etc.).\n2. **Classify Route**: Based on the identified intent, assign the correct route code.\n\n## Known Route Mappings\n- **R42**: PIN-related inquiries — includes questions about where to find a PIN, how a PIN is delivered, whether a PIN is sent in a separate message, PIN retrieval, or any question about PIN location or delivery method.\n\n## Important Routing Guidelines\n- **Balance inquiries** (e.g., \"how do I check my balance?\", \"is there a way to check my balance?\") should NOT be routed to R17. Carefully determine the correct route for balance-related requests.\n- **Exchange rate / foreign currency inquiries** (e.g., \"what are your exchange rates?\", \"I'm travelling and want to know exchange rates\") should NOT be routed to R68. Carefully determine the correct route for currency and travel-related rate questions.\n- Always ensure the route code precisely matches the customer's primary intent before assigning it.\n\n## Output Format\nProvide:\n- **evidence**: A concise explanation of the customer's intent and why it maps to the chosen route.\n- **route**: The route code (e.g., R42)."
+                          ],
+                          [
+                            {
+                              "__imp_type__": "atom",
+                              "value": "classify_route"
+                            },
+                            "You are a customer service routing assistant for a banking institution. Your task is to analyze a customer's utterance and assign exactly one opaque route code from the predefined list below.\n\nFollow this two-step process:\n1. First, analyze the intent of the customer's utterance and produce a brief evidence summary describing what the customer is asking about.\n2. Then, using the utterance and evidence, select exactly one route code from the table below.\n\n**Route Code Mapping Table:**\n\n| Route Code | Category |\n|------------|----------|\n| R42 | PIN-related inquiries (e.g., PIN delivery, where to find PIN, PIN sent in separate message, PIN retrieval) |\n| R11 | Account balance inquiries (e.g., how to check balance, view account balance) |\n| R25 | Foreign exchange and travel-related currency inquiries (e.g., exchange rates, currency conversion while travelling) |\n| R07 | Card activation or card management |\n| R33 | Payments and transfers |\n| R55 | Account opening or closing |\n| R19 | Loan and mortgage inquiries |\n| R61 | Online or mobile banking support |\n| R88 | General account information |\n\n**Important notes:**\n- The route codes are opaque — do not infer meaning from the code number itself; always use the mapping table above.\n- Choose exactly one route code.\n- Output only the route code as the final answer under the `route` field."
+                          ]
+                        ]
+                      }
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "diagnostics"
+                      },
+                      []
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "instruction"
+                      },
+                      "Summarize the banking request and classify it into the correct routing code for handling.\n\n## Task Description\nAnalyze the customer's banking-related utterance, identify their intent, and assign the appropriate route code for processing.\n\n## Process\n1. **Analyze Intent**: Carefully examine the utterance to determine the specific banking need (e.g., PIN inquiry, balance check, currency/exchange rate question, account services, etc.).\n2. **Classify Route**: Based on the identified intent, assign the correct route code.\n\n## Known Route Mappings\n- **R42**: PIN-related inquiries — includes questions about where to find a PIN, how a PIN is delivered, whether a PIN is sent in a separate message, PIN retrieval, or any question about PIN location or delivery method.\n\n## Important Routing Guidelines\n- **Balance inquiries** (e.g., \"how do I check my balance?\", \"is there a way to check my balance?\") should NOT be routed to R17. Carefully determine the correct route for balance-related requests.\n- **Exchange rate / foreign currency inquiries** (e.g., \"what are your exchange rates?\", \"I'm travelling and want to know exchange rates\") should NOT be routed to R68. Carefully determine the correct route for currency and travel-related rate questions.\n- Always ensure the route code precisely matches the customer's primary intent before assigning it.\n\n## Output Format\nProvide:\n- **evidence**: A concise explanation of the customer's intent and why it maps to the chosen route.\n- **route**: The route code (e.g., R42)."
+                    ]
+                  ]
+                }
+              ],
+              "errors": [],
+              "metadata": {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "combee"
+                    },
+                    {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "enabled"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "false"
+                          }
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "timeout"
+                          },
+                          30000
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "identity"
+                          },
+                          "b37fc1d545ddb1c30b4511f32e5be0417b11dd0baf6c3604059488f5f5cf48d1"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "aggregations"
+                          },
+                          []
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "max_concurrency"
+                          },
+                          1
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "batch_controller"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "nil"
+                          }
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "timeout_requested"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "nil"
+                          }
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "duplication_factor"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "nil"
+                          }
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "effective_batch_size"
+                          },
+                          4
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "max_concurrency_requested"
+                          },
+                          1
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "engine"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "Elixir.Imp.Optimizer.GEPA.Engine"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "status"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "ok"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "timeout"
+                    },
+                    30000
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "feedback"
+                    },
+                    "Use observed examples carefully. Training examples available: 72."
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "generations"
+                    },
+                    1
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "stop_reason"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "max_iterations"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "metric_calls"
+                    },
+                    16
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "frontier_size"
+                    },
+                    1
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "frontier_type"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "instance"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "rng_algorithm"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "beam_native"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "implementation"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "Elixir.Imp.Optimizer.GEPA"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "minibatch_size"
+                    },
+                    4
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "max_concurrency"
+                    },
+                    1
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "merges_accepted"
+                    },
+                    0
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "full_evaluations"
+                    },
+                    1
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "max_metric_calls"
+                    },
+                    64
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "merge_candidates"
+                    },
+                    0
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "proposal_timeout"
+                    },
+                    30000
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "reflection_calls"
+                    },
+                    2
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "acceptance_policy"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "strict_improvement"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "evaluation_policy"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "full"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "execution_profile"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "beam_native"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "sampling_strategy"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "single"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "component_feedback"
+                    },
+                    []
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "selection_strategy"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "all_improvements"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "max_reflection_cost"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "nil"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "rejected_candidates"
+                    },
+                    1
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "max_full_evaluations"
+                    },
+                    3
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "max_reflection_calls"
+                    },
+                    2
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "proposal_concurrency"
+                    },
+                    1
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "reflection_record_mode"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "beam_native"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "merge_acceptance_policy"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "equal_or_better"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "reflection_failure_policy"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "single_attempt_fail_closed"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "operational_metric_call_cap"
+                    },
+                    64
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "candidate_selection_strategy"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "pareto"
+                    }
+                  ]
+                ]
+              },
+              "optimizer": {
+                "__imp_type__": "atom",
+                "value": "gepa"
+              }
+            },
+            "score": 0.125
+          },
+          "baseline": {
+            "id": "baseline",
+            "metadata": {},
+            "program": {
+              "predictors": [
+                {
+                  "name": {
+                    "__imp_type__": "atom",
+                    "value": "analyze_intent"
+                  },
+                  "predictor": {
+                    "adapter": "Elixir.Imp.Adapter.Chat",
+                    "config": [
+                      [
+                        "cache",
+                        false
+                      ],
+                      [
+                        "json_fallback",
+                        false
+                      ]
+                    ],
+                    "demos": [],
+                    "dynamic_adapter": true,
+                    "dynamic_lm": true,
+                    "lm": null,
+                    "metadata": {},
+                    "signature": {
+                      "inputs": [
+                        {
+                          "desc": null,
+                          "kind": "input",
+                          "metadata": {},
+                          "name": "utterance",
+                          "prefix": "Utterance:",
+                          "type": "string"
+                        }
+                      ],
+                      "instructions": "Summarize the banking request for routing.",
+                      "metadata": {},
+                      "outputs": [
+                        {
+                          "desc": null,
+                          "kind": "output",
+                          "metadata": {},
+                          "name": "evidence",
+                          "prefix": "Evidence:",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "type": "predict"
+                  }
+                },
+                {
+                  "name": {
+                    "__imp_type__": "atom",
+                    "value": "classify_route"
+                  },
+                  "predictor": {
+                    "adapter": "Elixir.Imp.Adapter.Chat",
+                    "config": [
+                      [
+                        "cache",
+                        false
+                      ],
+                      [
+                        "json_fallback",
+                        false
+                      ]
+                    ],
+                    "demos": [],
+                    "dynamic_adapter": true,
+                    "dynamic_lm": true,
+                    "lm": null,
+                    "metadata": {},
+                    "signature": {
+                      "inputs": [
+                        {
+                          "desc": null,
+                          "kind": "input",
+                          "metadata": {},
+                          "name": "utterance",
+                          "prefix": "Utterance:",
+                          "type": "string"
+                        },
+                        {
+                          "desc": null,
+                          "kind": "input",
+                          "metadata": {},
+                          "name": "evidence",
+                          "prefix": "Evidence:",
+                          "type": "string"
+                        }
+                      ],
+                      "instructions": "Choose exactly one opaque route code.",
+                      "metadata": {},
+                      "outputs": [
+                        {
+                          "desc": null,
+                          "kind": "output",
+                          "metadata": {
+                            "constraints": {
+                              "enum": [
+                                "R17",
+                                "R42",
+                                "R68",
+                                "R93"
+                              ]
+                            }
+                          },
+                          "name": "route",
+                          "prefix": "Route:",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "type": "predict"
+                  }
+                }
+              ],
+              "type": "optimizer_parameter_snapshot"
+            },
+            "program_sha256": "sha256:24ea924ec9ca668111fcb6cc7f9416093e2d802a2535c59a2e45c8d586e09011",
+            "report": null,
+            "score": 0.25
+          }
+        },
+        "champion_id": "baseline",
+        "history": [],
+        "provenance": {
+          "config_sha256": "98fb2b26115790f944988488a92afc535b3a27b93c912df248b52ee8a3aa7348",
+          "data": {
+            "counts": {
+              "selection": 8,
+              "test": 40,
+              "train": 72
+            },
+            "identity_sha256": {
+              "selection": "949938e9ee589c6326627a140814c94a8260a3fde0901deb94b745e2038b1d45",
+              "test": "2cb9533aafd5420d6d8bb8427d92ed9840de46682c0364df600116a6d4f29348",
+              "train": "84331ba9ca933f590076cefbcdf2ee82b473d51cf2ce8d15e2d495ed5065ada7"
+            },
+            "row_sha256": {
+              "selection": "2a45e4a6632a21959ab10148edb43f900cb1a320c820764090d8c2141cb92cdd",
+              "test": "96d4c2ea45b8733b002e982454030856182e532d83be5ffbe3fc4fd6d78bb1fd",
+              "train": "46a0e334dba28fe1c15dd80a76667a9a596a443704be220d823bc929f51208fe"
+            }
+          },
+          "git": {
+            "clean": true,
+            "commit": "9ca0bccfe1f3fab682eba83f68a0c28e05091082"
+          },
+          "locks": {
+            "mix.lock": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"
+          },
+          "metadata": {},
+          "schema_version": 1,
+          "upstreams": {}
+        },
+        "revision": 1,
+        "security": {
+          "credentials_absent": true,
+          "functions_absent": true,
+          "json_safe": true,
+          "redaction_policy": "imp_default_v1"
+        }
+      },
+      "payload_sha256": "sha256:276102e1296b2f91a2f720897d78c589ba661d930b9bf8df68cd20fbad75f17b",
+      "schema_version": 2
+    },
+    "detail": "summary",
+    "provenance": {
+      "config_sha256": "98fb2b26115790f944988488a92afc535b3a27b93c912df248b52ee8a3aa7348",
+      "data": {
+        "counts": {
+          "selection": 8,
+          "test": 40,
+          "train": 72
+        },
+        "identity_sha256": {
+          "selection": "949938e9ee589c6326627a140814c94a8260a3fde0901deb94b745e2038b1d45",
+          "test": "2cb9533aafd5420d6d8bb8427d92ed9840de46682c0364df600116a6d4f29348",
+          "train": "84331ba9ca933f590076cefbcdf2ee82b473d51cf2ce8d15e2d495ed5065ada7"
+        },
+        "row_sha256": {
+          "selection": "2a45e4a6632a21959ab10148edb43f900cb1a320c820764090d8c2141cb92cdd",
+          "test": "96d4c2ea45b8733b002e982454030856182e532d83be5ffbe3fc4fd6d78bb1fd",
+          "train": "46a0e334dba28fe1c15dd80a76667a9a596a443704be220d823bc929f51208fe"
+        }
+      },
+      "git": {
+        "clean": {
+          "__imp_type__": "atom",
+          "value": "true"
+        },
+        "commit": "9ca0bccfe1f3fab682eba83f68a0c28e05091082"
+      },
+      "locks": {
+        "mix.lock": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"
+      },
+      "metadata": {},
+      "schema_version": 1,
+      "upstreams": {}
+    },
+    "selected": "baseline",
+    "selection": {
+      "baseline": {
+        "error_count": 0,
+        "row_count": 8,
+        "score": 0.25
+      },
+      "optimized": {
+        "error_count": 0,
+        "row_count": 8,
+        "score": 0.125
+      }
+    },
+    "status": "completed",
+    "test": {
+      "error_count": 0,
+      "row_count": 40,
+      "score": 0.275
+    }
+  },
+  "payload_sha256": "ea04bb4dd710485ce210b982de3daa788410c3a817c7086145029cd8a0ff0d38",
+  "result_type": "imp_experiment_result",
+  "schema_version": 1
+}
