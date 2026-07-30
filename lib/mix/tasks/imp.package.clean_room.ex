@@ -198,10 +198,12 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     run!(executable, ["eval", expression], deployment_dir, release_env)
 
     workflow_artifact = Path.join(output, "selected-workflow-program.json")
+    workflow_result = Path.join(output, "selected-workflow-result.json")
 
     workflow_env =
       [
         {"IMP_WORKFLOW_ARTIFACT_PATH", workflow_artifact},
+        {"IMP_WORKFLOW_RESULT_PATH", workflow_result},
         {"IMP_WORKFLOW_KEEP_ARTIFACT", "1"}
         | env
       ]
@@ -226,7 +228,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
       )
 
     unless fresh_output =~
-             "Imp OTP workflow fresh-process load passed: harbor/high with 2 predictors x 4 demos" do
+             "Imp OTP workflow fresh-process load passed: linked result/artifact, harbor/high with 2 predictors x 4 demos" do
       Mix.raise("packaged deployment workflow did not load in a fresh OS process")
     end
   end

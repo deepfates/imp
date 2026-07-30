@@ -23,13 +23,15 @@ The script performs one coherent lifecycle:
 1. declares an application-owned two-predictor program: `analyze` produces a
    typed intermediate value and `route` consumes it to produce validated team
    and urgency classifications;
-2. measures the baseline on a selection split, compiles four demonstrations
-   per predictor with `LabeledFewShot`, and keeps the candidate only when
-   selection improves;
-3. evaluates the selected program on a separate untouched split;
+2. passes disjoint train, selection, and untouched-test rows to
+   `Imp.Experiment.check/5`, which compiles four demonstrations per predictor
+   with `LabeledFewShot` and keeps the candidate only when selection improves;
+3. validates and reapplies the selected artifact before evaluating only that
+   program on the untouched split;
 4. prints selected parameter IDs and content digests, including the four
    reviewable demonstrations;
-5. writes and reads a checksummed parameter artifact, reconstructs the trusted
+5. atomically writes the redacted `Imp.Experiment.Result` and its checksummed
+   parameter artifact, verifies their linkage, reconstructs the trusted
    application module, starts OTP on the baseline, then hot-reloads both
    predictors' selected parameters without restarting it;
 6. serves four concurrent calls in bounded supervised tasks; and
@@ -65,10 +67,11 @@ tampered, or incompatible artifact returns `{:error, {:invalid_artifact, reason}
 and leaves the current program serving. `reload/1` remains the corresponding
 whole-program path for built-in portable Imp program shapes.
 
-The package clean-room gate runs this workflow against the unpacked Hex
-artifact, stops the first OS process, then starts a second `mix run` process to
-load and call the retained selected program. That is the cold persistence
-boundary; the static LM remains only a deterministic runtime binding.
+The package clean-room gate runs this exact `Experiment.check` workflow against
+the unpacked Hex artifact, stops the first OS process, then starts a second
+`mix run` process to verify the retained result/artifact pair and call the
+selected program. That is the cold persistence boundary; the static LM remains
+only a deterministic runtime binding.
 
 During source development, set `IMP_PATH` to the Imp checkout. Published
 applications omit it and resolve the Hex dependency once Imp is published

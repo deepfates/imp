@@ -48,47 +48,44 @@ defmodule DeploymentReferenceTest do
         "imp-deployment-workflow-#{System.unique_integer([:positive])}.json"
       )
 
+    result_path = artifact <> ".result"
+
     invalid = artifact <> ".invalid"
     incompatible = artifact <> ".incompatible"
 
     on_exit(fn ->
       File.rm(artifact)
+      File.rm(result_path)
       File.rm(invalid)
       File.rm(incompatible)
     end)
 
-    lm = ImpDeployment.Workflow.static_lm()
     base = ImpDeployment.Workflow.program()
-    candidate = ImpDeployment.Workflow.compile(base)
+    assert {:ok, checked} = ImpDeployment.Workflow.check()
+    assert checked.selected == :optimized
+    assert checked.baseline_selection.score == 0.25
+    assert checked.optimized_selection.score == 1.0
+    assert checked.test.score == 1.0
 
-    assert ImpDeployment.Workflow.evaluate(base, ImpDeployment.Workflow.selection_set(), lm).score ==
-             0.25
-
-    assert ImpDeployment.Workflow.evaluate(
-             candidate,
-             ImpDeployment.Workflow.selection_set(),
-             lm
-           ).score == 1.0
-
-    assert ImpDeployment.Workflow.evaluate(candidate, ImpDeployment.Workflow.testset(), lm).score ==
-             1.0
-
-    parameters = ImpDeployment.Workflow.selected_parameters(candidate)
+    parameters = ImpDeployment.Workflow.selected_parameters(checked.program)
     demo_parameters = Enum.filter(parameters, &(&1["kind"] == "demos"))
     assert length(demo_parameters) == 2
     assert Enum.all?(demo_parameters, &(length(&1["value"]) == 4))
     assert Enum.all?(parameters, &is_binary(&1["digest"]))
 
-    server = start_program_runtime(base, lm, max_children: 4)
+    server =
+      start_program_runtime(base, ImpDeployment.Workflow.static_lm(), max_children: 4)
 
     assert {:ok, before_reload} =
              deployment_call(server, %{ticket: "The API is down for every customer"}, 1_000)
 
     assert Imp.get(before_reload, :team) == "atlas"
 
-    selected_artifact = ImpDeployment.Workflow.optimizer_artifact(candidate)
-    :ok = Imp.Optimizer.Artifact.write!(selected_artifact, artifact)
+    :ok = Imp.Experiment.Result.write!(checked, result_path)
+    :ok = Imp.Optimizer.Artifact.write!(checked.artifact, artifact)
+    stored = Imp.Experiment.Result.read!(result_path)
     loaded_artifact = Imp.Optimizer.Artifact.read!(artifact)
+    assert stored["payload"]["artifact"] == loaded_artifact
 
     loaded_selected =
       Imp.Optimizer.Artifact.apply(loaded_artifact, ImpDeployment.Workflow.program())
@@ -310,7 +307,8 @@ defmodule DeploymentReferenceTest do
     assert readme =~ "IMP_MAX_CONCURRENCY"
     assert readme =~ "two-predictor program"
     assert readme =~ "reload_parameters/1"
-    assert readme =~ "second `mix run` process"
+    assert readme =~ "starts a second"
+    assert readme =~ "`mix run` process"
   end
 
   defp start_runtime(executor, opts \\ []) do

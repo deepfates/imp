@@ -9,6 +9,13 @@ artifact_path =
       "imp-deployment-workflow-#{System.unique_integer([:positive])}.json"
     )
 
+result_path =
+  System.get_env("IMP_WORKFLOW_RESULT_PATH") ||
+    Path.join(
+      System.tmp_dir!(),
+      "imp-deployment-workflow-result-#{System.unique_integer([:positive])}.json"
+    )
+
 previous_env =
   for name <- ~w(IMP_ARTIFACT_PATH IMP_WORKFLOW_BASELINE IMP_STATIC_WORKFLOW IMP_MAX_CONCURRENCY),
       into: %{},
@@ -22,28 +29,22 @@ restore_env = fn ->
 end
 
 try do
-  lm = Workflow.static_lm()
-  base = Workflow.program()
-  candidate = Workflow.compile(base)
-
-  base_selection = Workflow.evaluate(base, Workflow.selection_set(), lm)
-  candidate_selection = Workflow.evaluate(candidate, Workflow.selection_set(), lm)
-
-  selected =
-    if candidate_selection.score > base_selection.score,
-      do: candidate,
-      else: base
-
-  selected_prefix = if selected == candidate, do: :labeled_few_shot, else: :baseline
-  untouched = Workflow.evaluate(selected, Workflow.testset(), lm)
+  {:ok, checked} = Workflow.check()
+  selected = checked.program
+  selected_prefix = checked.selected
 
   parameters = Workflow.selected_parameters(selected)
   demo_parameters = Enum.filter(parameters, &(&1["kind"] == "demos"))
 
+  :ok = Imp.Experiment.Result.write!(checked, result_path)
+  :ok = Imp.Optimizer.Artifact.write!(checked.artifact, artifact_path)
+
+  stored = Imp.Experiment.Result.read!(result_path)
+  loaded_artifact = Imp.Optimizer.Artifact.read!(artifact_path)
+  true = stored["payload"]["artifact"] == loaded_artifact
+
   # The application reconstructs its trusted two-stage module, then replaces
-  # only its checksummed selected parameters without restarting supervision.
-  selected_artifact = Workflow.optimizer_artifact(selected)
-  :ok = Imp.Optimizer.Artifact.write!(selected_artifact, artifact_path)
+  # only the selected checksummed parameters without restarting supervision.
   System.put_env("IMP_ARTIFACT_PATH", artifact_path)
   System.put_env("IMP_WORKFLOW_BASELINE", "1")
   System.put_env("IMP_STATIC_WORKFLOW", "1")
@@ -52,7 +53,6 @@ try do
 
   {:ok, before_reload} = ProgramServer.call(%{ticket: "The API is down for every customer"})
 
-  loaded_artifact = Imp.Optimizer.Artifact.read!(artifact_path)
   loaded = Imp.Optimizer.Artifact.apply(loaded_artifact, Workflow.program())
   true = Workflow.selected_parameters(loaded) == parameters
   :ok = ProgramServer.reload_parameters(artifact_path)
@@ -78,9 +78,12 @@ try do
 
   IO.inspect(
     %{
-      selection: %{baseline: base_selection.score, candidate: candidate_selection.score},
+      selection: %{
+        baseline: checked.baseline_selection.score,
+        candidate: checked.optimized_selection.score
+      },
       selected_prefix: selected_prefix,
-      untouched_score: untouched.score,
+      untouched_score: checked.test.score,
       selected_predictors: Enum.map(demo_parameters, & &1["id"]),
       selected_demo_count: Enum.sum(Enum.map(demo_parameters, &length(&1["value"]))),
       selected_parameter_digests: Map.new(parameters, &{&1["id"], &1["digest"]}),
@@ -98,6 +101,7 @@ after
 
   unless System.get_env("IMP_WORKFLOW_KEEP_ARTIFACT") == "1" do
     File.rm(artifact_path)
+    File.rm(result_path)
   end
 
   restore_env.()

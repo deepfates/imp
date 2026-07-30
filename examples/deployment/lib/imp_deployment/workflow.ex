@@ -45,17 +45,26 @@ defmodule ImpDeployment.Workflow do
     ])
   end
 
-  def compile(program) do
-    Imp.optimize!(
-      program,
-      Imp.Optimizer.LabeledFewShot.new(k: 4, sample: false),
-      trainset()
+  def data do
+    Imp.Experiment.Data.new(
+      train: trainset(),
+      selection: selection_set(),
+      test: testset()
     )
   end
 
-  def evaluate(program, rows, lm \\ static_lm()) do
+  def check do
+    lm = static_lm()
+
     Imp.context([lm: lm], fn ->
-      Imp.evaluate(program, rows, &metric/2, max_concurrency: 4)
+      Imp.Experiment.check(
+        program(),
+        Imp.Optimizer.LabeledFewShot.new(k: 4, sample: false),
+        data(),
+        &metric/2,
+        artifact_id: "deployment-support-pipeline-selected",
+        evaluation_options: [max_concurrency: 4]
+      )
     end)
   end
 
@@ -63,23 +72,6 @@ defmodule ImpDeployment.Workflow do
     program
     |> Imp.ProgramParameters.parameters()
     |> Enum.map(&Imp.Optimizer.Parameter.dump/1)
-  end
-
-  def optimizer_artifact(program) do
-    case Imp.Optimizer.Report.fetch(program) do
-      nil ->
-        program
-        |> Imp.Optimizer.Artifact.parameter_candidate("deployment-support-pipeline-baseline")
-        |> Imp.Optimizer.Artifact.new([],
-          provenance: %{workflow: "provider-free-otp-capstone", selection: "baseline"}
-        )
-
-      _report ->
-        Imp.Optimizer.Artifact.from_optimized_program(program,
-          artifact_id: "deployment-support-pipeline-selected",
-          provenance: %{workflow: "provider-free-otp-capstone"}
-        )
-    end
   end
 
   def static_lm do

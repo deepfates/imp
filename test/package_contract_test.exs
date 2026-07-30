@@ -392,8 +392,6 @@ defmodule PackageContractTest do
 
     File.mkdir_p!(consumer_dir)
     File.write!(Path.join(consumer_dir, "mix.exs"), mix_exs)
-    experiment_result_path = Path.join(consumer_dir, "experiment-result.json")
-    experiment_receipt_path = Path.join(consumer_dir, "experiment-fresh-receipt.json")
 
     script = """
     case Application.load(:imp) do
@@ -503,69 +501,6 @@ defmodule PackageContractTest do
     unless Imp.get(loaded_prediction, :answer) == "Paris" do
       raise "saved and loaded program did not remain executable"
     end
-
-    routing_lm =
-      Imp.LM.Static.new(
-        handler: fn messages, _opts ->
-          query =
-            messages
-            |> Enum.filter(&(&1.role == :user))
-            |> List.last()
-            |> Map.fetch!(:content)
-
-          has_demos? = Enum.any?(messages, &(&1.role == :assistant))
-
-          team =
-            if has_demos? and
-                 String.contains?(query, ["latency", "unavailable", "outage", "API", "service"]) do
-              "harbor"
-            else
-              "atlas"
-            end
-
-          %{team: team}
-        end
-      )
-
-    routing_row = fn ticket, team ->
-      Imp.example(ticket: ticket, team: team) |> Imp.with_inputs(:ticket)
-    end
-
-    router =
-      "ticket -> team: enum[atlas,harbor]"
-      |> Imp.signature("Route each support ticket to its owning team.")
-      |> Imp.predict(lm: routing_lm)
-
-    experiment_data =
-      Imp.Experiment.Data.new(
-        train: [
-          routing_row.("Duplicate invoice charge", "atlas"),
-          routing_row.("API outage in Europe", "harbor")
-        ],
-        selection: [
-          routing_row.("Refund the annual invoice", "atlas"),
-          routing_row.("Dashboard latency is spiking", "harbor")
-        ],
-        test: [
-          routing_row.("The monthly bill is wrong", "atlas"),
-          routing_row.("The service is unavailable", "harbor")
-        ]
-      )
-
-    {:ok, experiment} =
-      Imp.Experiment.check(
-        router,
-        Imp.Optimizer.LabeledFewShot.new(k: 2, sample: false),
-        experiment_data,
-        Imp.exact_match(:team)
-      )
-
-    unless experiment.selected == :optimized and experiment.baseline_selection.score == 0.5 and
-             experiment.optimized_selection.score == 1.0 and experiment.test.score == 1.0 do
-      raise "packaged Experiment lifecycle returned unexpected selection: \#{inspect(experiment)}"
-    end
-
-    :ok = Imp.Experiment.Result.write!(experiment, #{inspect(experiment_result_path)})
 
     defmodule ImpConsumer.NativeArtifactStrategy do
       @behaviour Imp.Optimize.Anything.StructuredStrategy
@@ -1068,61 +1003,6 @@ defmodule PackageContractTest do
 
     assert status == 0, output
     refute output =~ ~r/warning: Imp\..* is undefined/, output
-
-    fresh_script = """
-    stored = Imp.Experiment.Result.read!(#{inspect(experiment_result_path)})
-    artifact = stored["payload"]["artifact"]
-
-    lm =
-      Imp.LM.Static.new(
-        handler: fn messages, _opts ->
-          query =
-            messages
-            |> Enum.filter(&(&1.role == :user))
-            |> List.last()
-            |> Map.fetch!(:content)
-
-          has_demos? = Enum.any?(messages, &(&1.role == :assistant))
-
-          team =
-            if has_demos? and String.contains?(query, ["unavailable", "outage", "API"]) do
-              "harbor"
-            else
-              "atlas"
-            end
-
-          %{team: team}
-        end
-      )
-
-    fresh =
-      "ticket -> team: enum[atlas,harbor]"
-      |> Imp.signature("Fresh trusted package consumer.")
-      |> Imp.predict(lm: lm)
-      |> then(&Imp.Optimizer.Artifact.apply(artifact, &1))
-
-    {:ok, prediction} = Imp.call(fresh, %{ticket: "The API is unavailable"})
-
-    File.write!(
-      #{inspect(experiment_receipt_path)},
-      Jason.encode!(%{
-        champion: Imp.Optimizer.Artifact.inspect(artifact).champion_id,
-        team: Imp.get(prediction, :team),
-        demos: length(fresh.demos)
-      })
-    )
-    """
-
-    {fresh_output, fresh_status} =
-      System.cmd("mix", ["run", "--no-compile", "-e", fresh_script],
-        cd: consumer_dir,
-        stderr_to_stdout: true
-      )
-
-    assert fresh_status == 0, fresh_output
-
-    assert %{"champion" => "optimized", "team" => "harbor", "demos" => 2} =
-             experiment_receipt_path |> File.read!() |> Jason.decode!()
   end
 
   defp consumer_tmp_dir do
