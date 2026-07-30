@@ -240,6 +240,7 @@
       "mipro_v2": "ifbench_stock_module.IFBenchCoT2StageModule"
     },
     "authenticated_optional_import": true,
+    "bootstrap_digest": "bffe20e32bb49e7e18c95595c2b8834668dd78b0c6718d660f24585e4ed5c60e",
     "manifest": "contract.json",
     "output_isolated": true,
     "program_factory_rebound": true
