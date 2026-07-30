@@ -431,7 +431,7 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
     if not preflight_only:
         require(manifest["launch_status"] == "sealed", "manifest is not sealed")
     require(
-        "required repair ancestor d88a5f7e415925cd6f7264b88d6f37bc03f01b33"
+        "required provider-free repair ancestor c0d8f6abd95da49b57ceefe6f3bc67989611f33d"
         in manifest["source_commits"]["imp"],
         "Imp source binding drift",
     )
@@ -442,7 +442,7 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
             str(ROOT),
             "merge-base",
             "--is-ancestor",
-            "d88a5f7e415925cd6f7264b88d6f37bc03f01b33",
+            "c0d8f6abd95da49b57ceefe6f3bc67989611f33d",
             "HEAD",
         ]
     )

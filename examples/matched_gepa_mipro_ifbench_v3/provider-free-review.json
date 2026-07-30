@@ -1,8 +1,8 @@
 {
   "claim_boundary": "stock-DSPy-adapted IFBench task graph; not unmodified artifact or paper reproduction",
   "clean_tree_gate": {
-    "passed": false,
-    "required": false
+    "passed": true,
+    "required": true
   },
   "data": {
     "held_out": {
