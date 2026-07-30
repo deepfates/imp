@@ -66,6 +66,11 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     """
     # Imp Executable Upstream Conformance
 
+    This generated report answers whether the selected upstream-conformance
+    profile has unresolved blocking rows. It is not the product release verdict
+    or work queue; see `docs/maintainers/RELEASE.md` for the ordinary consumer
+    finish line and `tk` for unfinished work.
+
     Baseline: DSPy #{report.baseline.version} (`#{report.baseline.git_sha}`)
     Release profile: #{report.release_profile["id"]}
     Total: #{report.summary.total}
@@ -78,8 +83,8 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     Invalid aggregate rows: #{report.summary.invalid_rows}
     Missing manifest surfaces: #{report.summary.manifest_missing}
     Duplicate manifest owners: #{report.summary.manifest_duplicates}
-    Release blockers: #{report.summary.release_blockers}
-    Passing: #{report.summary.passing}
+    Selected-profile blockers: #{report.summary.release_blockers}
+    Conformance profile passing: #{report.summary.passing}
 
     | ID | Category | Status | Product gate | Upstream surfaces |
     | --- | --- | --- | --- | --- |

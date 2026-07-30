@@ -17,6 +17,56 @@ Product readiness and research completion are separate profiles. Publishing
 the product does not authorize a comparative or paper claim. A red telos claim
 blocks telos completion but does not falsify a narrower proven product claim.
 
+## Convergence Standard
+
+The release process exists to help finish the product. It must not become a
+second product.
+
+1. **Exercise the feature at its public boundary.** For a library feature, the
+   strongest normal test installs or calls the public API and inspects its
+   observable result. Private construction, module identity, and call graphs
+   are diagnostics, not substitutes for that test.
+2. **Keep one owner for each fact.** Git owns source identity, lockfiles own
+   resolved dependencies, the claim ledger owns declared claims, `tk` owns
+   unfinished work, and an experiment artifact owns its frozen inputs and
+   result. A generated view may project those facts but must not become another
+   editable registry.
+3. **Separate product, compatibility, research, and external smoke checks.**
+   Product tests cover ordinary use. Compatibility fixtures compare observable
+   behavior with a coherent upstream environment. Research artifacts answer a
+   frozen scientific question. Rare live checks prove the external boundary.
+   Passing one category never stands in for another.
+4. **Prefer reusable data-driven checks.** A new optimizer or task should add a
+   fixture to a shared runner when possible. Do not copy a coordinator,
+   bootstrap, result schema, or admission path for each treatment.
+5. **Record minimal sufficient provenance.** A repository commit, dependency
+   lock or upstream commit, data split digest, experiment configuration, and
+   raw result normally suffice. Add finer-grained hashes only when Git or the
+   lock cannot identify the semantic input.
+6. **Delete superseded active machinery.** Historical results stay immutable,
+   but their runners do not remain release architecture merely because the run
+   once existed. New evidence infrastructure must retire more complexity than
+   it adds.
+
+### Release finish line
+
+A candidate is coherent when a clean consumer can:
+
+- install Imp and define a realistic multi-stage program;
+- evaluate it and run the advertised supported optimizers through consistent
+  public concepts;
+- obtain an honestly selected result on data excluded from selection;
+- write the selected parameter artifact, restart, load it, and reproduce the
+  served behavior;
+- cancel work and observe provider, parsing, metric, budget, and operational
+  failures without leaked processes or credentials; and
+- follow the same path in the canonical tutorial and API documentation.
+
+Each advertised optimizer must be labeled **supported and proven**,
+**supported with limited effectiveness evidence**, or **experimental** from
+actual public behavior. Counts, maturity rungs, package gates, and comparator
+receipts inform that judgment; none can replace it.
+
 ## Candidate Gates
 
 Current `main` contains breaking changes after `0.2.1` while `mix.exs` still
@@ -65,7 +115,9 @@ mix benchmark.dashboard.ready
 ```
 
 `profile_ready: true` means every blocking claim in the selected profile has
-its declared evidence. It never means complete DSPy or paper parity.
+its declared evidence. It never means complete DSPy or paper parity, and it is
+not sufficient by itself for product release: the finish line above must also
+work through the ordinary consumer path.
 
 ## Publication
 
@@ -84,14 +136,15 @@ its declared evidence. It never means complete DSPy or paper parity.
 If any exact-candidate gate fails, the candidate is not ready. Narrow the claim
 only when the product decision genuinely changes, never to obtain a green bit.
 
-## Telos Completion
+## Research Completion
 
 `mix benchmark.dashboard.telos.ready` evaluates the cumulative research
-profile. Each accepted capability has a C0-C5 target in
-`benchmarks/claims.json`. C1 conformance precedes effectiveness spend; C3 uses
-held-out portfolios; C4 requires exact public authority; C5 requires powered
-paired evidence. Unavailable exact authority remains an explicit C4 boundary
-and does not prevent a separately named adapted C3 protocol.
+profile retained for compatibility with existing artifacts. Its C0-C5 terms
+grade narrow claims; they are not product phases, priorities, or a mandate to
+run every possible benchmark. C1 conformance should precede effectiveness
+spend; C3 uses held-out data; C4 requires exact public authority; C5 requires
+powered paired evidence. Unavailable exact authority narrows the research
+claim and does not block a separately named useful product demonstration.
 
 All unfinished work and dependencies live in `tk`. Markdown must not carry a
 parallel roadmap or progress table.

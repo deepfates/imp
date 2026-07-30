@@ -32,46 +32,28 @@ actually help* (C3–C5). A faithful port of an optimizer is a different claim
 from that optimizer improving your program, and each is graded on its own
 receipts.
 
-## Where the ledger stands
+## Read the current state
 
-The current unreleased candidate's ledger holds **68 claims: 48 asserted, 20 still targets.**
+This page deliberately does not copy live claim counts from the generated
+dashboard. A prose snapshot creates a second status system and goes stale as
+soon as evidence or claim scope changes.
 
-| Rung | Claims | Asserted |
-| --- | --- | --- |
-| C0 | 9 | 9 |
-| C1 | 25 | 25 |
-| C2 | 10 | 9 |
-| C3 | 21 | 5 |
-| C4 | 3 | 0 |
+From a source checkout, compute the current product-scoped view directly:
 
-**Reconciliation — asserted is not proven.** The 48 asserted rows are
-maintainer attestations. In a fresh source checkout, `mix
-benchmark.dashboard --profile v0.1` recomputes claim state from committed
-evidence alone and reports **13 of the 48 proven, 25 blocked, 23
-informational** (profile ready: false): most asserted rows cite lane
-evidence that maintainers generate locally under `tmp/` and that is not
-committed, so a fresh clone cannot replay it. The committed matched GEPA and
-MIPROv2 TREC outcomes and task-specific Optimize Anything result are among the
-current committed proofs; ten additional asserted rows now have their required
-committed evidence. The remaining gap is real and tracked:
-CI recomputes this reconciliation from committed evidence on every pull
-request and fails when this paragraph drifts from the computed state
-(`test/evidence_reconciliation_test.exs`). Until the gap closes, treat
-"asserted" as "attested by the maintainers," and treat the dashboard's
-proven count as what you can verify yourself today.
+```sh
+mix benchmark.dashboard --profile v0.1
+```
 
-Read the shape honestly: the exists-and-conforms level is asserted with
-differential lanes behind it, but only the committed subset replays from a
-fresh checkout. Most effectiveness claims are still targets — Imp does not
-claim an optimizer helps your task until a held-out score in a committed
-artifact says so. The five asserted C3 rows are the local MLX weight-training
-campaign and the [ticket-routing tutorial](TUTORIAL_TICKET_ROUTING.md)'s
-25–30% → 85% result, plus the task-specific matched TREC outcomes for GEPA and
-MIPROv2, and the task-specific Optimize Anything retry-policy result. Their
-exact scopes and limitations live in the claim rows.
-The broader Optimize Anything portfolio target is still open: its older
-provider campaign selected and scored on the same development set, while the
-asserted C3 row is limited to the later disjoint local retry-policy task.
+Use the result as a claim audit, not as a roadmap or a complete product
+verdict. In a source checkout, `docs/maintainers/RELEASE.md` defines the
+ordinary release finish line: a clean consumer must install, optimize, inspect,
+persist, restart, and serve a real program through the public API. Research
+targets may remain open without making that narrower product behavior false.
+
+Imp does not claim that an optimizer helps a task until a held-out result says
+so. Task-scoped positive, neutral, negative, and stopped results keep their
+exact limitations in the result artifact and linked example; a higher rung on
+one task never becomes general effectiveness.
 
 ## Where the receipts live
 
@@ -85,19 +67,8 @@ asserted C3 row is limited to the later disjoint local retry-policy task.
   recomputes claim state from evidence rather than trusting this page — if
   this page and the dashboard ever disagree, the dashboard wins.
 
-## Why the counts differ
-
-A skeptic reading these docs meets three different numbers, and each counts a
-different thing. **Surfaces** are the grouped upstream capability areas the
-[conformance report](CONFORMANCE.md) totals — 26 of them. **Claims** are the
-graded rows in this ledger — 68, each targeting a rung and each attached to one
-surface. **Requirement ids** are the individual checks nested inside claims, so
-with the 68 claim ids they account for the 138 `id` fields in
-`benchmarks/claims.json`. These numbers describe the current unreleased candidate and are
-asserted nowhere but here — the dashboard is the authority if it disagrees.
-
-The discipline behind the ledger is simple: an unclaimed surface is a place
-a silent bug can live, so every public surface carries a claim, every claim
-carries its evidence state, and the numbers in the docs are required to cite
-committed artifacts. When you catch a page violating that, it is a bug —
-file it.
+The discipline behind the ledger is simple: a public claim should state its
+scope and point to observable evidence. The generated dashboard may group that
+information into surfaces, claims, requirements, and profiles for maintainers;
+users should not need those counts to decide whether the documented workflow
+works for them.

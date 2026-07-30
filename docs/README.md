@@ -40,7 +40,8 @@ Every guide and notebook follows the same product story:
 ## Check The Claims
 
 - [Evidence](EVIDENCE.md): the C0–C5 ladder every Imp claim is graded on,
-  and where the ledger stands today.
+  and how to compute the ledger's current state. The ladder grades narrow
+  research claims; it is not the product roadmap.
 - [Conformance Report](CONFORMANCE.md): every tracked upstream surface and
   its verification status, generated from executable checks.
 

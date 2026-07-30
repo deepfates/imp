@@ -107,15 +107,18 @@ through its pure protocol validator.
 6. Use held-out selection and uncertainty appropriate to the unit of
    independence.
 7. Require powered paired evidence for superiority.
-8. Generate status; never hand-edit it into a registry or Markdown table.
-9. Provider API keys may be used only with public or explicitly cleared data.
-   Before reporting back to the owner, all workshop projects share a hard
-   aggregate ceiling of **$50 USD** in newly authorized provider spend. Every
-   Imp launch must preregister its maximum contribution, retain provider-reported
-   cost, and report that cost to the workshop coordinator so concurrent projects
-   cannot oversubscribe the ceiling. If the shared remaining amount is unknown,
-   fail closed. Do not transmit bulk private corpora, print or persist key values,
-   or treat the ceiling as permission to publish results.
+8. Generate status; never hand-edit current counts into Markdown or maintain a
+   second registry. Documentation explains how to read the generated result.
+9. Keep scientific admission out of normal product architecture. A public
+   feature test should remain useful if its implementation is replaced while
+   preserving behavior. Source-bound receipts belong to the narrow
+   compatibility or research lane that needs them.
+10. Provider API keys may be used only with public or explicitly cleared data.
+    Every paid run must accept an explicit maximum, retain provider-reported
+    cost, and report it to the workshop coordinator. The current workshop
+    ceiling is owner policy outside this repository and must not be copied here
+    as a timeless dollar amount. Do not transmit bulk private corpora, print or
+    persist keys, or treat spend authority as permission to publish results.
 
 Use `mix evidence.check` to validate registries and generated projections. Use
 the profile commands in `docs/maintainers/RELEASE.md` to evaluate product or

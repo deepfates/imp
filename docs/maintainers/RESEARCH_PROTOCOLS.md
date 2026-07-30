@@ -44,15 +44,29 @@ weak nominal reproduction, but it cannot be labeled exact parity.
 
 ## Execution Policy
 
-1. Run the provider-free or bounded preflight first.
-2. Reject semantically inert campaigns before scaling spend.
-3. Preserve manifests, reference revisions, raw row outcomes, traces, usage,
-   cost, and terminal errors in the admitted artifact.
-4. Treat a provider or model change as a new experimental condition.
-5. Report failed and inconclusive campaigns; do not admit them as positive
-   evidence.
-6. Expand a lane only when the existing views leave a material rival
-   explanation unresolved.
+1. Start with the user-visible capacity and the smallest observation that could
+   disprove it. Do not turn a convenient upstream implementation detail into
+   the question unless users depend on it.
+2. Use one reusable data-driven runner for a class of experiments. A fixture
+   names the program, data split, metric, models, budgets, and expected public
+   outputs; the runner owns process startup, transport, cancellation, cost, and
+   result shape.
+3. Use a coherent reference environment for each comparison. Stock DSPy MIPRO
+   and standalone GEPA may require separate reference environments. Do not
+   manufacture a hybrid runtime merely to place both names in one process.
+4. Run the exact cold public commands against controlled local services before
+   paid execution. Shadow and live use one bootstrap; only explicit credentials
+   and endpoints may differ.
+5. Reject semantically inert campaigns before scaling spend. Treat a provider
+   or model change as a new experimental condition.
+6. Preserve minimal sufficient provenance and the raw outcome, including
+   failures and negative results. Git commits, dependency locks or upstream
+   commits, the data digest, experiment fixture, usage/cost, and terminal result
+   are the normal record. Do not duplicate identities already covered by those
+   sources.
+7. Expand a lane only when the existing result leaves a material rival
+   explanation unresolved. A second task is a bounded replication, not general
+   effectiveness, and a stopped harness is not an optimizer result.
 
 This keeps the research program ambitious without making “the whole ecosystem”
 an unbounded collection exercise. New systems enter by stating a useful

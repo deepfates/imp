@@ -31,6 +31,26 @@ Imp.get(prediction, :team)
 #=> "security"
 ```
 
+## What Imp is trying to finish
+
+Imp succeeds when an ordinary Elixir application can declare a real program,
+measure it, improve it through one consistent public optimizer interface, save
+the selected parameters, and load them in a fresh process with failures and
+costs still visible. That install-to-operation path is the product boundary.
+
+DSPy, GEPA, Optimize Anything, and Ax are important references. Imp compares
+observable behavior with them where that comparison protects a user-facing
+contract; it does not reproduce incidental Python machinery or make internal
+call-graph identity a release goal. Research runs support narrowly worded
+claims. They do not define the architecture, the roadmap, or whether the
+package is useful.
+
+Maintainer checks follow the same rule: prefer a small integrated test through
+the public API over several assertions about private wiring. A frozen research
+run keeps only the provenance needed to interpret that run. New manifests,
+registries, or status views must replace an existing source of truth rather
+than creating another one.
+
 For an exact one-output classifier or scalar program, `Imp.Adapter.SingleField`
 uses a concise value-only wire contract while retaining signature validation.
 

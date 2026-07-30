@@ -9,15 +9,32 @@ priority: 0
 assignee: deepfates
 tags: [dspy, parity, optimizers, gepa, optimize-anything, product]
 ---
-# Make Imp's advertised DSPy semantics real
+# Converge Imp into a coherent optimization product
 
-Carry Imp from its large implemented surface and conflicting evidence systems to honest semantic parity with DSPy and the useful surrounding ecosystem, while keeping Elixir-native equivalents where Python mechanics are incidental. Dashboard work is supporting infrastructure, not the endpoint; fix or remove facades by exercising the actual behavior users depend on.
+Carry Imp from its large implemented surface and conflicting evidence systems to a coherent Elixir optimization product. Preserve honest, scoped compatibility with DSPy, GEPA, Optimize Anything, and useful comparators where observable semantics matter, while keeping the BEAM-native runtime focused on ordinary users. Evidence machinery supports this endpoint; it does not define it.
 
 ## Acceptance Criteria
 
-For every public surface advertised in the README and Imp-for-DSPy mapping, the repository identifies the upstream semantic contract and demonstrates either reproducible behavioral/differential parity or an explicit superior BEAM-native equivalent. Core declaration, execution, adapters, modules, evaluation, retrieval/tool/agent composition, persistence/operation, and optimizer families are usable from an ordinary consumer project. GEPA, Optimize Anything, MIPROv2/SIMBA/COPRO, bootstrap/random-search families, and any other advertised optimizer have meaningful held-out task outcomes rather than structural smoke alone; matched comparisons state model/provider/cost/seed/splits and disagreements. One killer end-to-end optimization example shows material improvement on unseen data and leaves an inspectable reusable program artifact. Generated conformance, claims, docs, and executable dashboards agree from a clean checkout. Missing upstream features stay visibly open; package or release readiness alone cannot close this epic.
+Imp reaches this finish line when:
+
+- a clean consumer installs the package, defines a realistic multi-stage program, evaluates it, improves it through the public optimizer API, saves the selected parameters, restarts, and reproduces served behavior;
+- the public program, metric, dataset, optimizer, budget, report, and artifact concepts remain coherent across supported optimizer families;
+- every advertised optimizer is classified from exercised public behavior as supported and proven, supported with limited effectiveness evidence, or experimental, with misleading facades removed;
+- at least one release-defining example materially improves data excluded from selection and leaves an inspectable reusable artifact, while negative results remain visible and scoped;
+- compatibility tests compare observable behavior with coherent upstream environments and document meaningful BEAM-native differences without requiring private call-graph identity;
+- product tests, compatibility fixtures, scientific artifacts, and rare external smokes each have one clear job and one reusable execution path;
+- one generated capability view summarizes claims, while Git owns source, locks own dependencies, `tk` owns unfinished work, and historical results remain immutable without keeping every old runner active; and
+- the canonical README, learning path, API docs, package, and release procedure teach and exercise the same ordinary path from a clean checkout.
+
+Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
 ## Notes
+
+**2026-07-30T16:00:00Z**
+
+Owner-directed convergence correction. Repeated IFBench treatments remained scientifically protected but exposed that Imp had accumulated several coordinator generations, overlapping manifests and guards, hand-synchronized evidence prose, and tests of private wiring that did not reliably predict the ordinary cold process. The accepted generic repair at `af04cc1` gives shadow and live one authenticated bootstrap and is retained. No automatic successor treatment follows from that checkpoint.
+
+The active standard is now the product finish line above and `docs/maintainers/RELEASE.md`: public feature behavior first; one reusable data-driven runner per problem class; coherent upstream environments rather than hybrid version assemblies; minimal provenance using Git, locks, data/config, and raw results; and explicit retirement of superseded active machinery. Historical stopped results stay immutable. Next work is consolidation, an honest optimizer support audit, and the smallest install-to-optimize-to-fresh-load release demonstration—not another evidence taxonomy or paid IFBench successor.
 
 **2026-07-25T16:27:40Z**
 

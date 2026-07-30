@@ -6,7 +6,7 @@ done. Imp follows DSPy 3.2.1 — not loosely. The few-shot and weight
 optimizer families and the adapters carry executable differential tests that
 run real DSPy 3.2.1 in a sidecar and compare arm to arm; other surfaces are
 held by behavioral conformance tests or are deliberate Elixir-native
-equivalents, and two surface groups are marked as honest gaps (missing
+equivalents, and some surface groups are marked as honest gaps (missing
 exact-reproduction evidence or declared algorithmic deviations). A shared DSPy
 name means that Imp implements the same user capability and identifies the
 pinned upstream mechanism; it does **not** by itself promise identical Python
@@ -74,25 +74,21 @@ or comparative superiority.
 
 ## What is not identical
 
-Imp's conformance program tracks 26 upstream surface groups against DSPy
-3.2.1:
+Imp's conformance program groups the upstream surface into conformant,
+deliberately BEAM-native, tracking, and gap rows. The generated
+[conformance report](CONFORMANCE.md) is the current per-surface view; this guide
+does not copy its counts. A passing selected conformance profile means that its
+declared blocking rows are satisfied. It is not the product release verdict or
+a statement that every optimizer is effective.
 
-| Status | Count | Meaning |
-| --- | --- | --- |
-| Conformant | 12 | Matches the pinned reference on the evidence cited by each surface; a family-level status does not imply that every upstream code path or optimizer outcome has been reproduced |
-| Elixir-native equivalent | 3 | Same capability, deliberately different mechanics with no remaining obligation recorded for that grouped surface |
-| Tracking | 1 | Following DSPy's unreleased 3.3 normalized-runtime changes |
-| Gap | 10 | A named behavior or evidence obligation remains open. Advertised gaps block full ecosystem closure even when the implemented runtime is substantive. |
-
-The per-surface table is the [conformance report](CONFORMANCE.md). Behind
+Behind
 the differential rows, the `scripts/` sidecars and `mix imp.benchmark.*_differential`
 tasks run real pinned DSPy 3.2.1 and compare arm to arm — a capture raises
 unless Imp's output matches upstream, so you can run them yourself and see
 the match. MIPROv2 and SIMBA structural cases additionally name their pinned
 DSPy 3.3.0b1 reference. The matched TREC result establishes one task-specific
 GEPA and MIPROv2 C3 outcome; it does not close the cross-task, paper, or other
-instruction-family gaps. If this page and the generated report disagree, the
-report wins.
+instruction-family gaps.
 
 Ecosystem breadth is the real gap: DSPy has years of retriever integrations,
 observability partners, and community. Imp's seams for that are behaviours

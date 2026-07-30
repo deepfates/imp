@@ -1,5 +1,10 @@
 # Imp Executable Upstream Conformance
 
+This generated report answers whether the selected upstream-conformance
+profile has unresolved blocking rows. It is not the product release verdict
+or work queue; see `docs/maintainers/RELEASE.md` for the ordinary consumer
+finish line and `tk` for unfinished work.
+
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Release profile: v0.1
 Total: 26
@@ -12,8 +17,8 @@ Invalid evidence: 0
 Invalid aggregate rows: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Release blockers: 0
-Passing: true
+Selected-profile blockers: 0
+Conformance profile passing: true
 
 | ID | Category | Status | Product gate | Upstream surfaces |
 | --- | --- | --- | --- | --- |
