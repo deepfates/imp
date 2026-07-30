@@ -100,12 +100,14 @@ pipeline, dynamic ChatAdapter signatures, five non-empty released tips plus the
 released no-tip choice, CPython MT19937 tip/rollout draws, one call per
 instruction candidate, marker parsing, and candidate-zero baseline overwrite.
 When few-shot awareness is enabled, each proposal consumes the same ordered
-demo arm searched later by Optuna; an independently executed DSPy public compile
-matches the complete proposal message tape and rollout IDs for the provider-free
-fixture. The mode still rejects program awareness and structured-response
-substitution rather than silently claiming parity. Its selected mode is part of
-durable checkpoint compatibility, so a resumed study cannot drift between
-proposer algorithms.
+demo arm searched later by Optuna. When program awareness is enabled, the
+consumer must provide bounded explicit program text; Imp then performs DSPy's
+program-description and module-description calls before each instruction call.
+Independent DSPy public compiles match the complete message tapes and rollout
+IDs for both provider-free fixtures. Imp stores only the text digest and byte
+count in reports/checkpoint compatibility, so source text cannot leak into
+durable metadata and drift is rejected before LM calls. Structured-response
+substitution remains rejected rather than silently claimed as parity.
 
 The public compile path reproduces DSPy's ordered few-shot arm construction.
 In a real few-shot run it retains zero-shot, labels-only, unshuffled-bootstrap,

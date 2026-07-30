@@ -18,11 +18,12 @@ defmodule Imp.Optimizer.MIPROv2 do
   or `program_grounding: {:text, context}` opt-in.
 
   `:proposer_fidelity` defaults to Imp's documented `:beam_native` grounded
-  proposer. Set it to `:dspy_3_2_1` for the matched-comparison path with
-  `program_aware_proposer: false` with data/tip awareness enabled. Few-shot-aware
-  proposals use the same ordered demo arms searched by the optimizer. Both
-  zero-shot and joint instruction/demonstration search are supported;
-  unsupported proposer combinations fail before any LM call.
+  proposer. Set it to `:dspy_3_2_1` for the matched-comparison path with data/tip
+  awareness enabled. Program awareness requires explicit text grounding and
+  performs DSPy's program-description and module-description calls before each
+  candidate; few-shot awareness uses the same ordered demo arms searched by the
+  optimizer. Both zero-shot and joint instruction/demonstration search are
+  supported; unsupported proposer combinations fail before any LM call.
 
   `:search_fidelity` separately controls parameter search. The legacy narrow
   `:dspy_3_2_1_optuna_4_9_0_startup` mode reproduces Optuna 4.9.0's NumPy
@@ -440,7 +441,9 @@ defmodule Imp.Optimizer.MIPROv2 do
                 temperature: optimizer.init_temperature,
                 seed: config.seed,
                 demo_sets: demo_sets,
-                fewshot_aware: config.fewshot_aware_proposer
+                fewshot_aware: config.fewshot_aware_proposer,
+                program_aware: config.program_aware_proposer,
+                program_code: explicit_program_text(config.program_grounding)
               )
 
             report =
@@ -448,7 +451,7 @@ defmodule Imp.Optimizer.MIPROv2 do
                 dataset_summary_calls:
                   if(predictor_index == 0, do: dataset_summary_call_count(config), else: 0),
                 total_setup_calls:
-                  config.num_instruct_candidates * length(predictors) +
+                  proposal_call_count(config, length(predictors)) +
                     dataset_summary_call_count(config)
               })
 
@@ -788,6 +791,9 @@ defmodule Imp.Optimizer.MIPROv2 do
   defp replace_first([_generated | rest], original, count),
     do: Enum.take([original | rest], count)
 
+  defp explicit_program_text({:text, context}), do: context
+  defp explicit_program_text(_grounding), do: nil
+
   defp params_key(params),
     do: params |> Enum.sort() |> :erlang.term_to_binary() |> Base.encode16()
 
@@ -894,12 +900,29 @@ defmodule Imp.Optimizer.MIPROv2 do
     min(10, ceil(length(config.trainset) / config.view_data_batch_size)) + 1
   end
 
+  defp proposal_call_count(config, predictor_count) do
+    calls_per_candidate = if config.program_aware_proposer, do: 3, else: 1
+    config.num_instruct_candidates * predictor_count * calls_per_candidate
+  end
+
   defp config_metadata(config) do
     config
     |> Map.from_struct()
     |> Map.drop([:trainset, :valset])
+    |> Map.update!(:program_grounding, &program_grounding_identity/1)
     |> Map.put(:trainset_size, length(config.trainset))
     |> Map.put(:valset_size, length(config.valset))
+  end
+
+  defp program_grounding_identity(:structure), do: %{mode: :structure}
+  defp program_grounding_identity(:module_source), do: %{mode: :module_source}
+
+  defp program_grounding_identity({:text, context}) do
+    %{
+      mode: :text,
+      bytes: byte_size(context),
+      sha256: :crypto.hash(:sha256, context) |> Base.encode16(case: :lower)
+    }
   end
 
   defp validate_search_fidelity!(optimizer, config) do

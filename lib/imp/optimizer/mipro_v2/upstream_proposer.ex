@@ -16,6 +16,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   @dataset_descriptor "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. Some areas you may consider in your observations: topics, content, syntax, conciseness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
   @dataset_descriptor_with_prior "Given several examples from a dataset please write observations about trends that hold for most or all of the samples. I will also provide you with a few observations I have already made.  Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE' Some areas you may consider in your observations: topics, content, syntax, conciceness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative"
   @observation_summarizer "Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence summary which highlights only the most important details."
+  @describe_program "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work."
+  @describe_module "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe the purpose of one of the specified module in this pipeline."
   @instruction_generator "Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task."
 
   def summarize!(lm, trainset, batch_size) do
@@ -81,6 +83,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
     count = Keyword.fetch!(opts, :count)
     demo_sets = Keyword.get(opts, :demo_sets, [])
     fewshot_aware? = Keyword.get(opts, :fewshot_aware, false)
+    program_aware? = Keyword.get(opts, :program_aware, false)
+    program_code = Keyword.get(opts, :program_code)
 
     unless is_integer(count) and count > 0 do
       raise ArgumentError, "DSPy 3.2.1 MIPRO proposer count must be a positive integer"
@@ -91,16 +95,29 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
         {tip, rng} = PythonRandom.choice(rng, @tips)
         {rollout_id, rng} = PythonRandom.randint(rng, 0, 1_000_000_000)
 
+        task_demos = task_demos(predictor, demo_sets, index, fewshot_aware?)
+
+        program_inputs =
+          program_inputs!(
+            lm,
+            predictor,
+            task_demos,
+            program_code,
+            program_aware?,
+            rollout_id,
+            Keyword.fetch!(opts, :temperature)
+          )
+
         prediction =
           call!(
             lm,
-            instruction_generator_signature(tip != ""),
-            %{
+            instruction_generator_signature(tip != "", program_aware?),
+            Map.merge(program_inputs, %{
               dataset_description: dataset_summary,
-              task_demos: task_demos(predictor, demo_sets, index, fewshot_aware?),
+              task_demos: task_demos,
               basic_instruction: predictor.signature.instructions,
               tip: tip
-            },
+            }),
             rollout_id: rollout_id,
             temperature: Keyword.fetch!(opts, :temperature)
           )
@@ -111,6 +128,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
           proposal_index: index,
           demo_set_index: index,
           grounded_demo_count: grounded_demo_count(demo_sets, index, fewshot_aware?),
+          program_aware: program_aware?,
           rollout_id: rollout_id,
           tip: tip
         }
@@ -121,9 +139,11 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
     {instructions,
      %{
        status: :ok,
-       calls: count,
+       calls: count * if(program_aware?, do: 3, else: 1),
+       candidate_count: count,
        errors: [],
        slots: slots,
+       program_aware: program_aware?,
        fidelity: :dspy_3_2_1,
        upstream_release: "DSPy 3.2.1",
        upstream_commit: "29448ae12756abdd14bd8796c819247ebb83673c"
@@ -163,6 +183,76 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   defp python_str(value) when is_binary(value), do: value
   defp python_str(value) when is_number(value), do: to_string(value)
   defp python_str(value), do: inspect(value)
+
+  defp program_inputs!(
+         _lm,
+         _predictor,
+         _task_demos,
+         _program_code,
+         false,
+         _rollout_id,
+         _temperature
+       ),
+       do: %{}
+
+  defp program_inputs!(lm, predictor, task_demos, program_code, true, rollout_id, temperature)
+       when is_binary(program_code) do
+    program_description =
+      call!(
+        lm,
+        describe_program_signature(),
+        %{program_code: program_code, program_example: task_demos},
+        rollout_id: rollout_id,
+        temperature: temperature
+      )
+      |> Imp.get(:program_description)
+      |> strip_prefix()
+
+    module = module_code(predictor)
+
+    module_description =
+      call!(
+        lm,
+        describe_module_signature(),
+        %{
+          program_code: program_code,
+          program_example: task_demos,
+          program_description: program_description,
+          module: module
+        },
+        rollout_id: rollout_id,
+        temperature: temperature,
+        max_depth: 10
+      )
+      |> Imp.get(:module_description)
+      |> strip_prefix()
+
+    %{
+      program_code: program_code,
+      program_description: program_description,
+      module: module,
+      module_description: module_description
+    }
+  end
+
+  defp program_inputs!(
+         _lm,
+         _predictor,
+         _task_demos,
+         _program_code,
+         true,
+         _rollout_id,
+         _temperature
+       ) do
+    raise ArgumentError,
+          "DSPy 3.2.1 program-aware MIPRO proposals require explicit program source text"
+  end
+
+  defp module_code(predictor) do
+    inputs = Enum.map_join(predictor.signature.inputs, ", ", &to_string(&1.name))
+    outputs = Enum.map_join(predictor.signature.outputs, ", ", &to_string(&1.name))
+    "Predict(#{inputs}) -> #{outputs}"
+  end
 
   defp call!(lm, signature, inputs, opts) do
     messages = Imp.Adapter.Chat.format(signature, inputs, response_instruction: true)
@@ -227,12 +317,85 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
     )
   end
 
-  defp instruction_generator_signature(use_tip?) do
+  defp describe_program_signature do
+    signature(
+      @describe_program,
+      [
+        %{
+          name: :program_code,
+          desc: "Pseudocode for a language model program designed to solve a particular task."
+        },
+        %{name: :program_example, desc: "An example of the program in use."}
+      ],
+      [
+        %{
+          name: :program_description,
+          desc:
+            "Describe what task the program is designed to solve, and how it goes about solving this task."
+        }
+      ]
+    )
+  end
+
+  defp describe_module_signature do
+    signature(
+      @describe_module,
+      [
+        %{
+          name: :program_code,
+          desc: "Pseudocode for a language model program designed to solve a particular task."
+        },
+        %{name: :program_example, desc: "An example of the program in use."},
+        %{
+          name: :program_description,
+          desc:
+            "Summary of the task the program is designed to solve, and how it goes about solving it."
+        },
+        %{name: :module, desc: "The module in the program that we want to describe."}
+      ],
+      [
+        %{
+          name: :module_description,
+          desc: "Description of the module's role in the broader program."
+        }
+      ]
+    )
+  end
+
+  defp instruction_generator_signature(use_tip?, program_aware?) do
     inputs = [
-      %{name: :dataset_description, desc: "A description of the dataset that we are using."},
-      %{name: :task_demos, desc: "Example inputs/outputs of our module."},
-      %{name: :basic_instruction, desc: "Basic instruction."}
+      %{name: :dataset_description, desc: "A description of the dataset that we are using."}
     ]
+
+    inputs =
+      if program_aware? do
+        inputs ++
+          [
+            %{
+              name: :program_code,
+              desc: "Language model program designed to solve a particular task."
+            },
+            %{
+              name: :program_description,
+              desc:
+                "Summary of the task the program is designed to solve, and how it goes about solving it."
+            },
+            %{name: :module, desc: "The module to create an instruction for."},
+            %{
+              name: :module_description,
+              desc: "Description of the module to create an instruction for."
+            }
+          ]
+      else
+        inputs
+      end
+
+    inputs =
+      inputs ++
+        [
+          %{name: :task_demos, desc: "Example inputs/outputs of our module."},
+          %{name: :basic_instruction, desc: "Basic instruction."}
+        ]
 
     inputs =
       if use_tip?,

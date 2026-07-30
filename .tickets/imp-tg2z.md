@@ -45,3 +45,9 @@ Canonical claims classify every advertised family as stable or distinctly experi
   and the chosen mode is part of the effective optimizer configuration. This
   is an intentional privacy-oriented product deviation from DSPy's automatic
   source inspection.
+- The pinned DSPy 3.2.1 path now executes program-aware proposal rather than
+  rejecting it: each candidate receives the real program-description,
+  module-description, and instruction-generation call sequence. An independent
+  public DSPy compile matches all eight setup messages and shared rollout IDs
+  in the focused fixture. Explicit source text is content-bound but redacted
+  from durable reports; resume drift fails before LM activity.

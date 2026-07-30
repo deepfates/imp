@@ -272,11 +272,17 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     end
 
     if config.proposer_fidelity == :dspy_3_2_1 and
-         (config.program_aware_proposer or not config.data_aware_proposer or
-            not config.tip_aware_proposer) do
+         (not config.data_aware_proposer or not config.tip_aware_proposer) do
       raise ArgumentError,
-            ":dspy_3_2_1 proposer fidelity currently requires program_aware_proposer: false, " <>
-              "data_aware_proposer: true, and tip_aware_proposer: true"
+            ":dspy_3_2_1 proposer fidelity currently requires " <>
+              "data_aware_proposer: true and tip_aware_proposer: true"
+    end
+
+    if config.proposer_fidelity == :dspy_3_2_1 and config.program_aware_proposer and
+         not match?({:text, _context}, config.program_grounding) do
+      raise ArgumentError,
+            ":dspy_3_2_1 program-aware proposer fidelity requires explicit " <>
+              "program_grounding: {:text, context}"
     end
 
     if config.proposer_fidelity == :dspy_3_2_1 and config.max_bootstrapped_demos == 0 and

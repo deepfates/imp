@@ -1,6 +1,7 @@
 defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   use ExUnit.Case, async: false
 
+  alias Imp.Optimizer.MIPROv2
   alias Imp.Optimizer.MIPROv2.{Config, UpstreamProposer}
 
   @python "tmp/dspy-parity-venv/bin/python"
@@ -8,6 +9,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   @runner "test/support/dspy_3_2_1_mipro_proposer_tape.py"
   @public_runner "test/support/dspy_3_2_1_mipro_public_compile_tape.py"
   @two_predictor_runner "test/support/dspy_3_2_1_mipro_two_predictor_tape.py"
+  @program_aware_runner "test/support/dspy_3_2_1_mipro_program_aware_tape.py"
   @commit "29448ae12756abdd14bd8796c819247ebb83673c"
 
   defmodule SequenceLM do
@@ -41,7 +43,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     assert config.proposer_fidelity == :dspy_3_2_1
 
-    assert_raise ArgumentError, ~r/currently requires/, fn ->
+    assert_raise ArgumentError, ~r/requires/, fn ->
       Config.new(proposer_fidelity: :dspy_3_2_1)
     end
 
@@ -68,6 +70,21 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     assert grounded_fewshot.fewshot_aware_proposer
 
+    assert_raise ArgumentError, ~r/requires explicit program_grounding/, fn ->
+      Config.new(
+        proposer_fidelity: :dspy_3_2_1,
+        program_aware_proposer: true,
+        fewshot_aware_proposer: false
+      )
+    end
+
+    assert Config.new(
+             proposer_fidelity: :dspy_3_2_1,
+             program_aware_proposer: true,
+             program_grounding: {:text, "Public task graph."},
+             fewshot_aware_proposer: false
+           ).program_aware_proposer
+
     assert_raise ArgumentError, ~r/requires max_bootstrapped_demos > 0/, fn ->
       Config.new(
         proposer_fidelity: :dspy_3_2_1,
@@ -90,6 +107,123 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         max_labeled_demos: 0,
         proposer_fidelity: :dspy_3_2_1,
         proposal_response_format: :required
+      )
+    end
+  end
+
+  @tag :evidence_infrastructure
+  test "public program-aware proposal messages match DSPy 3.2.1 with explicit source text" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@program_aware_runner)],
+        env: [{"PYTHONPATH", Path.expand(@source)}],
+        stderr_to_stdout: false
+      )
+
+    upstream = Jason.decode!(output)
+    assert upstream["commit"] == @commit
+    owner = self()
+
+    task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{route: "K11"} end)
+
+    answers =
+      start_supervised!(
+        {Agent,
+         fn ->
+           [
+             %{observations: "dataset observations"},
+             %{summary: "dataset summary"},
+             %{program_description: "program description 0"},
+             %{module_description: "module description 0"},
+             %{proposed_instruction: "candidate 0"},
+             %{program_description: "program description 1"},
+             %{module_description: "module description 1"},
+             %{proposed_instruction: "candidate 1"}
+           ]
+         end}
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(owner, {:program_aware_call, messages, opts})
+          Agent.get_and_update(answers, fn [answer | rest] -> {answer, rest} end)
+        end
+      )
+
+    program =
+      "text -> route"
+      |> Imp.signature("Route the request.")
+      |> Imp.predict(lm: task_lm, adapter: Imp.Adapter.Chat)
+
+    trainset =
+      Enum.map(0..3, fn index ->
+        Imp.example(text: "request-#{index}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    valset = [Imp.example(text: "validation", route: "K11") |> Imp.with_inputs(:text)]
+
+    paused =
+      MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 0,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        program_aware_proposer: true,
+        program_grounding: {:text, upstream["program_code"]},
+        fewshot_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        proposer_fidelity: :dspy_3_2_1,
+        seed: 9
+      )
+      |> MIPROv2.compile(program, trainset, valset, max_trials: 0)
+
+    calls = collect_tagged_calls(:program_aware_call, 8, [])
+
+    assert Enum.map(calls, fn {messages, _opts} -> stringify(messages) end) ==
+             upstream["prompt_messages"]
+
+    proposal_calls = Enum.drop(calls, 2)
+
+    assert Enum.map(proposal_calls, fn {_messages, opts} -> opts[:rollout_id] end) ==
+             Enum.flat_map(upstream["rollout_ids"], &List.duplicate(&1, 3))
+
+    report = Imp.Optimizer.Report.fetch(paused)
+    assert report.metadata.proposals.main.program_aware
+    assert report.metadata.proposals.main.calls == 6
+    assert report.metadata.proposals.main.candidate_count == 2
+    assert report.metadata.proposals.main.total_setup_calls == 8
+    assert report.metadata.effective_config.program_grounding.mode == :text
+
+    assert report.metadata.effective_config.program_grounding.bytes ==
+             byte_size(upstream["program_code"])
+
+    refute inspect(report.metadata) =~ upstream["program_code"]
+    assert Agent.get(answers, & &1) == []
+
+    assert_raise ArgumentError, ~r/resume state does not match/, fn ->
+      MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 0,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        program_aware_proposer: true,
+        program_grounding: {:text, upstream["program_code"] <> "\n# drift"},
+        fewshot_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        proposer_fidelity: :dspy_3_2_1,
+        seed: 9
+      )
+      |> MIPROv2.compile(program, trainset, valset,
+        max_trials: 0,
+        resume_state: report.metadata.resume_state
       )
     end
   end
