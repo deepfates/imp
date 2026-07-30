@@ -43,6 +43,7 @@ defmodule DeploymentBanking77GEPAExampleTest do
     assert result["payload"]["selected"] == "baseline"
     assert result["payload"]["selection"]["baseline"]["score"] == 0.25
     assert result["payload"]["selection"]["optimized"]["score"] == 0.125
+
     assert result["payload"]["test"] == %{
              "score" => 0.275,
              "row_count" => 40,
@@ -50,6 +51,7 @@ defmodule DeploymentBanking77GEPAExampleTest do
            }
 
     assert result["payload"]["artifact"] == artifact
+
     assert result["payload"]["provenance"]["git"]["commit"] ==
              "9ca0bccfe1f3fab682eba83f68a0c28e05091082"
   end
