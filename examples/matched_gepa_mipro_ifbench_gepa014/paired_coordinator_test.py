@@ -35,6 +35,7 @@ class PairedCoordinatorTest(unittest.TestCase):
             "held_out_loaded": False,
             "transport_roles": ["task", "optimizer"],
             "transport_count": 2,
+            "bootstrap_digest": "a" * 64,
         }
         parsed = paired.parse_shadow_report(
             "PAIRED_SHADOW_JSON=" + json.dumps(valid), "upstream"
@@ -402,9 +403,10 @@ class PairedCoordinatorTest(unittest.TestCase):
         actual = subprocess.check_output(
             ["git", "-C", str(HERE.parents[1]), "rev-parse", "HEAD"], text=True
         ).strip()
-        env = dict(os.environ)
-        env["MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT"] = actual
-        env.pop("OPENROUTER_API_KEY", None)
+        env = paired.peer_environment(
+            paired.shadow_mode("https://127.0.0.1:1", "/owned-shadow-ca.pem"),
+            actual,
+        )
         completed = subprocess.run(
             [
                 str(python),
@@ -425,6 +427,72 @@ class PairedCoordinatorTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stdout)
         self.assertIn("matched_ifbench_v1_upstream", completed.stdout)
         self.assertNotIn("OPENROUTER_API_KEY", completed.stdout)
+
+    def test_shadow_and_live_environments_differ_only_by_declared_mode_values(self) -> None:
+        actual = subprocess.check_output(
+            ["git", "-C", str(HERE.parents[1]), "rev-parse", "HEAD"], text=True
+        ).strip()
+        with mock.patch.dict(
+            os.environ,
+            {
+                "OPENROUTER_API_KEY": "live-secret",
+                "OPENAI_API_KEY": "ambient-openai",
+                "ANTHROPIC_API_KEY": "ambient-anthropic",
+                "LITELLM_LOCAL_MODEL_COST_MAP": "False",
+            },
+        ):
+            shadow = paired.peer_environment(
+                paired.shadow_mode("https://127.0.0.1:4443", "/owned-shadow-ca.pem"),
+                actual,
+            )
+            live = paired.peer_environment(
+                paired.live_mode(os.environ, paired.system_ca_file()), actual
+            )
+        differences = paired.require_mode_equivalence(shadow, live)
+        self.assertEqual(set(differences), paired.MODE_SUBSTITUTION_KEYS)
+        self.assertEqual(shadow["LITELLM_LOCAL_MODEL_COST_MAP"], "True")
+        self.assertEqual(live["LITELLM_LOCAL_MODEL_COST_MAP"], "True")
+        self.assertEqual(shadow["OPENAI_API_KEY"], "")
+        self.assertEqual(live["OPENAI_API_KEY"], "")
+        self.assertEqual(shadow["ANTHROPIC_API_KEY"], "")
+        self.assertEqual(live["ANTHROPIC_API_KEY"], "")
+        self.assertEqual(
+            shadow["MATCHED_IFBENCH_GEPA014_BOOTSTRAP_DIGEST"],
+            live["MATCHED_IFBENCH_GEPA014_BOOTSTRAP_DIGEST"],
+        )
+
+    def test_upstream_optional_imports_cannot_reach_remote_cost_map_in_either_mode(self) -> None:
+        python = HERE.parents[1] / "tmp" / "dspy-parity-venv" / "bin" / "python"
+        actual = subprocess.check_output(
+            ["git", "-C", str(HERE.parents[1]), "rev-parse", "HEAD"], text=True
+        ).strip()
+        probe = (
+            "import importlib.util,socket,sys; from pathlib import Path; "
+            "socket.socket.connect=lambda *a,**k: (_ for _ in ()).throw(RuntimeError('NETWORK_SENTINEL')); "
+            "p=Path(sys.argv[1]); s=importlib.util.spec_from_file_location('bootstrap_network_probe',p); "
+            "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+            "m.load_authenticated_runtime(); print('IMPORT_OK')"
+        )
+        modes = [
+            paired.shadow_mode("https://127.0.0.1:4443", "/owned-shadow-ca.pem"),
+            paired.live_mode(
+                {"OPENROUTER_API_KEY": "provider-sentinel"}, paired.system_ca_file()
+            ),
+        ]
+        for mode in modes:
+            with self.subTest(provider_authority=mode.provider_api_key != ""):
+                completed = subprocess.run(
+                    [str(python), "-c", probe, str(HERE / "run_upstream.py")],
+                    cwd=HERE.parents[1],
+                    env=paired.peer_environment(mode, actual),
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stdout)
+                self.assertIn("IMPORT_OK", completed.stdout)
+                self.assertNotIn("NETWORK_SENTINEL", completed.stdout)
 
     def test_upstream_stop_writer_binds_context_and_normalizes_ledgers(self) -> None:
         spec = importlib.util.spec_from_file_location(
@@ -558,6 +626,7 @@ class PairedCoordinatorTest(unittest.TestCase):
     def test_paired_surface_is_explicit_and_successor_only(self) -> None:
         manifest = json.loads((HERE / "contract.json").read_text())
         expected = {
+            "bootstrap_environment",
             "call_budget",
             "consumer_lock",
             "consumer_gitignore",

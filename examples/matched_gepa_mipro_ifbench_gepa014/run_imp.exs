@@ -295,6 +295,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
   @selection_output @output <> ".selection-sealed.json"
 
   def run do
+    bootstrap_digest = authenticate_bootstrap_environment!()
     ensure_transport_runtime_started!()
     manifest = MatchedGepaMiproIFBenchGepa014.Contract.load_optimization!(@manifest)
     launch_commit = require_expected_launch_commit!()
@@ -372,6 +373,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
         transport_events: Report.encode_term(Observer.snapshot(observer).transports),
         call_budgets: Report.encode_term(Observer.snapshot(observer).call_budgets),
         catalog_snapshot: catalog_snapshot,
+        bootstrap_digest: bootstrap_digest,
         claim_boundary:
           "stock-DSPy-adapted IFBench task graph comparison; not the unmodified artifact or paper reproduction"
       }
@@ -406,9 +408,10 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
   end
 
   def shadow_preflight do
+    bootstrap_digest = authenticate_bootstrap_environment!()
     ensure_transport_runtime_started!()
 
-    if System.get_env("OPENROUTER_API_KEY"),
+    if String.trim(System.get_env("OPENROUTER_API_KEY", "")) != "",
       do: raise("Imp shadow preflight received provider authority")
 
     manifest = MatchedGepaMiproIFBenchGepa014.Contract.load_optimization!(@manifest)
@@ -417,12 +420,14 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     source_commits = source_commits!(manifest, true, launch_commit)
     verify_runtime_dependencies!(manifest)
 
-    base_url = System.fetch_env!("MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL")
-    ca_cert = System.fetch_env!("MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT")
+    api_base_url = System.fetch_env!("MATCHED_IFBENCH_GEPA014_API_BASE_URL")
+    catalog_base_url = System.fetch_env!("MATCHED_IFBENCH_GEPA014_CATALOG_BASE_URL")
+    health_url = System.fetch_env!("MATCHED_IFBENCH_GEPA014_HEALTH_URL")
+    ca_cert = System.fetch_env!("MATCHED_IFBENCH_GEPA014_TLS_CA_CERT")
     connect_options = [transport_opts: [cacertfile: String.to_charlist(ca_cert)]]
 
     %{status: 200, body: %{"status" => "ready"}} =
-      Req.get!(base_url <> "/health",
+      Req.get!(health_url,
         retry: false,
         max_retries: 0,
         connect_options: connect_options
@@ -430,7 +435,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
 
     catalog =
       verify_models!(manifest,
-        catalog_base_url: base_url <> "/api/v1",
+        catalog_base_url: catalog_base_url,
         connect_options: connect_options
       )
 
@@ -474,7 +479,8 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       transport_roles: Enum.map(results, & &1.role),
       transport_count: length(results),
       catalog_roles: catalog |> Map.keys() |> Enum.sort(),
-      tls_ca_sha256: sha256_file(ca_cert)
+      tls_ca_sha256: sha256_file(ca_cert),
+      bootstrap_digest: bootstrap_digest
     }
 
     IO.puts("PAIRED_SHADOW_JSON=" <> Jason.encode!(report))
@@ -947,16 +953,16 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     model = manifest["models"][role]
     request = manifest["execution"]["request"][role]
     guard = openrouter_guard(manifest, role)
-    shadow_base_url = System.get_env("MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL")
-    shadow_ca = System.get_env("MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT")
+    api_base_url = System.fetch_env!("MATCHED_IFBENCH_GEPA014_API_BASE_URL")
+    shadow? = String.trim(System.get_env("OPENROUTER_API_KEY", "")) == ""
 
     api_key =
-      if shadow_base_url, do: "local-shadow-only", else: System.fetch_env!("OPENROUTER_API_KEY")
+      if shadow?, do: "local-shadow-only", else: System.fetch_env!("OPENROUTER_API_KEY")
 
     req_http_options = [retry: false, max_retries: 0]
 
     req_http_options =
-      if shadow_ca,
+      if shadow?,
         do:
           Keyword.put(
             req_http_options,
@@ -976,9 +982,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     ]
 
     opts =
-      if shadow_base_url,
-        do: Keyword.put(opts, :base_url, shadow_base_url <> "/v1"),
-        else: opts
+      Keyword.put(opts, :base_url, api_base_url)
 
     opts =
       if is_nil(request["temperature"]),
@@ -1311,6 +1315,29 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     end
   end
 
+  defp authenticate_bootstrap_environment! do
+    materialized = System.fetch_env!("MATCHED_IFBENCH_GEPA014_BOOTSTRAP_SPEC")
+    expected_digest = System.fetch_env!("MATCHED_IFBENCH_GEPA014_BOOTSTRAP_DIGEST")
+    actual_digest = :crypto.hash(:sha256, materialized) |> Base.encode16(case: :lower)
+
+    if actual_digest != expected_digest, do: raise("peer bootstrap digest mismatch")
+
+    spec = Jason.decode!(materialized)
+
+    Enum.each(spec["common_environment"], fn {key, expected} ->
+      if System.get_env(key) != expected,
+        do: raise("peer fixed bootstrap environment drift: #{key}")
+    end)
+
+    if System.get_env("LITELLM_LOCAL_MODEL_COST_MAP") != "True",
+      do: raise("peer bootstrap may reach the remote LiteLLM cost map")
+
+    if System.get_env("OPENAI_API_KEY") != "" or System.get_env("ANTHROPIC_API_KEY") != "",
+      do: raise("ambient provider credentials escaped canonical bootstrap")
+
+    expected_digest
+  end
+
   defp stopped_binding_fields(
          launch_commit \\ System.get_env("MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT") ||
            "unavailable"
@@ -1322,7 +1349,8 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       provider_free_gate_result_sha256: manifest["provider_free_gate"]["result_sha256"],
       failure_cardinality_gate_result_sha256:
         manifest["failure_cardinality_compat"]["result_sha256"],
-      launch_commit: launch_commit
+      launch_commit: launch_commit,
+      bootstrap_digest: System.get_env("MATCHED_IFBENCH_GEPA014_BOOTSTRAP_DIGEST", "unavailable")
     }
   rescue
     _error ->
@@ -1330,7 +1358,9 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
         manifest_sha256: "unavailable",
         provider_free_gate_result_sha256: "unavailable",
         failure_cardinality_gate_result_sha256: "unavailable",
-        launch_commit: launch_commit
+        launch_commit: launch_commit,
+        bootstrap_digest:
+          System.get_env("MATCHED_IFBENCH_GEPA014_BOOTSTRAP_DIGEST", "unavailable")
       }
   end
 
@@ -1385,7 +1415,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
 end
 
 unless System.get_env("IMP_MATCHED_IFBENCH_GEPA014_LOAD_ONLY") == "1" do
-  if System.get_env("MATCHED_IFBENCH_GEPA014_SHADOW") == "1",
+  if String.trim(System.get_env("OPENROUTER_API_KEY", "")) == "",
     do: MatchedIFBenchGepa014Imp.Runner.shadow_preflight(),
     else: MatchedIFBenchGepa014Imp.Runner.run()
 end

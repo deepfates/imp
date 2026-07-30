@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import signal
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -35,6 +36,18 @@ IFBENCH_PYTHON = ROOT / "tmp" / "ifbench-parity-venv" / "bin" / "python"
 PRIOR_SPEND_BOUND = Decimal("7.59315275")
 WORKSHOP_CEILING = Decimal("100.00")
 SHADOW_PREFIX = "PAIRED_SHADOW_JSON="
+
+sys.path.insert(0, str(HERE))
+from peer_bootstrap import (  # noqa: E402
+    MODE_SUBSTITUTION_KEYS,
+    build_environment,
+    canonical_digest,
+    canonical_spec,
+    live_mode,
+    peer_commands,
+    require_mode_equivalence,
+    shadow_mode,
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -110,8 +123,45 @@ def worst_case_usd(manifest: dict[str, Any]) -> Decimal:
 
 def preflight_environment() -> dict[str, str]:
     env = dict(os.environ)
-    env.pop("OPENROUTER_API_KEY", None)
+    for key in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        env.pop(key, None)
+    env["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
     return env
+
+
+def commands() -> dict[str, tuple[list[str], Path]]:
+    return peer_commands(
+        ROOT,
+        HERE,
+        UPSTREAM_PYTHON,
+        DSPY_ROOT,
+        GEPA_ROOT,
+        GEPA_ARTIFACT_ROOT,
+        IFBENCH_SITE_PACKAGES,
+    )
+
+
+def bootstrap_spec(launch_commit: str) -> dict[str, object]:
+    return canonical_spec(
+        ROOT,
+        HERE,
+        launch_commit,
+        commands(),
+        TMP,
+        GEPA_ARTIFACT_ROOT,
+        IFBENCH_PYTHON,
+        IFBENCH_NLTK_DATA,
+    )
+
+
+def peer_environment(mode: Any, launch_commit: str) -> dict[str, str]:
+    return build_environment(os.environ, bootstrap_spec(launch_commit), mode)
+
+
+def system_ca_file() -> str:
+    cafile = ssl.get_default_verify_paths().cafile
+    require(cafile is not None and Path(cafile).is_file(), "system TLS CA file is absent")
+    return str(Path(cafile).resolve())
 
 
 def parse_shadow_report(output: str, runtime: str) -> dict[str, Any]:
@@ -136,6 +186,10 @@ def parse_shadow_report(output: str, runtime: str) -> dict[str, Any]:
         report.get("transport_roles") == ["task", "optimizer"]
         and report.get("transport_count") == 2,
         f"{runtime} shadow did not complete exactly one transport per role",
+    )
+    require(
+        report.get("bootstrap_digest") is not None,
+        f"{runtime} shadow omitted canonical bootstrap identity",
     )
     return report
 
@@ -172,40 +226,18 @@ def shadow_peer_preflight(manifest: dict[str, Any], launch_commit: str) -> dict[
                 time.sleep(0.05)
             readiness = json.loads(ready.read_text())
             ca_cert = str(Path(readiness["ca_cert"]).resolve())
-            env = preflight_environment()
-            env.update(
-                {
-                    "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT": launch_commit,
-                    "MATCHED_IFBENCH_GEPA014_SHADOW": "1",
-                    "MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL": readiness["base_url"],
-                    "MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT": ca_cert,
-                    "SSL_CERT_FILE": ca_cert,
-                }
+            env = peer_environment(shadow_mode(readiness["base_url"], ca_cert), launch_commit)
+            require(env["OPENROUTER_API_KEY"] == "", "shadow environment retained provider authority")
+            expected_digest = canonical_digest(bootstrap_spec(launch_commit))
+            # Constructing live authority is deliberately in-memory only here. No
+            # peer or network receives it until this exact equivalence gate passes.
+            live_env = peer_environment(
+                live_mode({"OPENROUTER_API_KEY": "<provider-authority>"}, system_ca_file()),
+                launch_commit,
             )
-            require("OPENROUTER_API_KEY" not in env, "shadow environment retained provider authority")
-            commands = {
-                "imp": (
-                    ["mix", "run", "run_imp.exs"],
-                    HERE,
-                ),
-                "upstream": (
-                    [
-                        str(UPSTREAM_PYTHON),
-                        str(HERE / "run_upstream.py"),
-                        "--dspy-root",
-                        str(DSPY_ROOT),
-                        "--gepa-root",
-                        str(GEPA_ROOT),
-                        "--gepa-artifact-root",
-                        str(GEPA_ARTIFACT_ROOT),
-                        "--ifbench-site-packages",
-                        str(IFBENCH_SITE_PACKAGES),
-                    ],
-                    ROOT,
-                ),
-            }
+            require_mode_equivalence(env, live_env)
             reports: dict[str, Any] = {}
-            for runtime, (command, cwd) in commands.items():
+            for runtime, (command, cwd) in commands().items():
                 completed = subprocess.run(
                     command,
                     cwd=cwd,
@@ -222,6 +254,10 @@ def shadow_peer_preflight(manifest: dict[str, Any], launch_commit: str) -> dict[
                     f"{runtime} exact-entry shadow failed:\n{completed.stdout}",
                 )
                 reports[runtime] = parse_shadow_report(completed.stdout, runtime)
+                require(
+                    reports[runtime]["bootstrap_digest"] == expected_digest,
+                    f"{runtime} shadow bootstrap digest drift",
+                )
             require(
                 reports["imp"].get("applications_started")
                 == {"ssl": True, "req": True, "imp": True},
@@ -301,6 +337,8 @@ def shadow_peer_preflight(manifest: dict[str, Any], launch_commit: str) -> dict[
             "readiness_and_catalog_requests": len(gets),
             "transport_requests": len(posts),
             "ledger_sha256": hashlib.sha256(ledger.read_bytes()).hexdigest(),
+            "bootstrap_digest": expected_digest,
+            "mode_difference_keys": sorted(require_mode_equivalence(env, live_env)),
         }
 
 
@@ -965,48 +1003,23 @@ def require_rescued_stop_artifacts(
 
 def run_peers(launch_commit: str) -> int:
     manifest = json.loads(MANIFEST.read_text())
-    env = dict(os.environ)
-    env["MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT"] = launch_commit
-    env["IMP_MATCHED_IFBENCH_GEPA014_OUTPUT"] = str(TMP / "imp-result.json")
-    env["UPSTREAM_MATCHED_IFBENCH_GEPA014_OUTPUT"] = str(TMP / "upstream-result.json")
-    env["IMP_MATCHED_IFBENCH_GEPA014_UPSTREAM_SELECTION"] = str(
-        TMP / "upstream-result.json.selection-sealed.json"
+    env = peer_environment(live_mode(os.environ, system_ca_file()), launch_commit)
+    require_mode_equivalence(
+        peer_environment(
+            shadow_mode("https://127.0.0.1:1", "/owned-shadow-ca.pem"), launch_commit
+        ),
+        env,
     )
-    env["UPSTREAM_MATCHED_IFBENCH_GEPA014_IMP_SELECTION"] = str(
-        TMP / "imp-result.json.selection-sealed.json"
-    )
-    env["IMP_GEPA_ARTIFACT_ROOT"] = str(GEPA_ARTIFACT_ROOT)
-    env["IMP_GEPA_PYTHON"] = str(IFBENCH_PYTHON)
-    env["IMP_IFBENCH_NLP_BRIDGE"] = str(ROOT / "scripts" / "ifbench_nlp_check.py")
-    env["IMP_IFBENCH_NLP_PYTHON"] = str(IFBENCH_PYTHON)
-    env["NLTK_DATA"] = str(IFBENCH_NLTK_DATA)
     (TMP / "sealed").mkdir(parents=True, exist_ok=False)
     peers = [
         subprocess.Popen(
-            ["mix", "run", "run_imp.exs"],
-            cwd=HERE,
+            command,
+            cwd=cwd,
             env=env,
             stdin=subprocess.DEVNULL,
             start_new_session=True,
-        ),
-        subprocess.Popen(
-            [
-                str(UPSTREAM_PYTHON),
-                str(HERE / "run_upstream.py"),
-                "--dspy-root",
-                str(DSPY_ROOT),
-                "--gepa-root",
-                str(GEPA_ROOT),
-                "--gepa-artifact-root",
-                str(GEPA_ARTIFACT_ROOT),
-                "--ifbench-site-packages",
-                str(IFBENCH_SITE_PACKAGES),
-            ],
-            cwd=ROOT,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-        ),
+        )
+        for command, cwd in commands().values()
     ]
     failure: int | None = None
     try:

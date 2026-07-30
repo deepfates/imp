@@ -24,14 +24,6 @@ from pathlib import Path
 from typing import Any
 
 
-# LiteLLM loads .env and a remote cost map during import. In shadow mode an
-# explicit empty key prevents ambient dotenv credential acquisition, while the
-# local bundled cost map prevents any non-owned bootstrap network request.
-if os.environ.get("MATCHED_IFBENCH_GEPA014_SHADOW") == "1":
-    os.environ.setdefault("OPENROUTER_API_KEY", "")
-    os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
-
-
 HERE = Path(__file__).resolve().parent
 V1_RUNNER = HERE.parent / "matched_gepa_mipro_ifbench" / "run_upstream.py"
 SUCCESSOR_MANIFEST = HERE / "contract.json"
@@ -53,6 +45,44 @@ _v1_source_commits: Any | None = None
 _v1_atomic_write: Any | None = None
 _v1_compile_arm: Any | None = None
 _effective_gepa_identity: dict[str, Any] | None = None
+_bootstrap_digest: str | None = None
+
+
+sys.path.insert(0, str(HERE))
+from peer_bootstrap import (  # noqa: E402
+    canonical_spec,
+    peer_commands,
+    require_runtime_environment,
+)
+
+
+def authenticate_bootstrap_environment() -> str:
+    expected = require_expected_launch_commit()
+    commands = peer_commands(
+        IMP_ROOT,
+        HERE,
+        IMP_ROOT / "tmp" / "dspy-parity-venv" / "bin" / "python",
+        IMP_ROOT / "tmp" / "dspy-3.2.1",
+        IMP_ROOT / "tmp" / "gepa-v0.1.4",
+        IMP_ROOT / "tmp" / "gepa-artifact",
+        IMP_ROOT
+        / "tmp"
+        / "ifbench-parity-venv"
+        / "lib"
+        / "python3.13"
+        / "site-packages",
+    )
+    spec = canonical_spec(
+        IMP_ROOT,
+        HERE,
+        expected,
+        commands,
+        IMP_ROOT / "tmp" / "matched_gepa_mipro_ifbench_gepa014",
+        IMP_ROOT / "tmp" / "gepa-artifact",
+        IMP_ROOT / "tmp" / "ifbench-parity-venv" / "bin" / "python",
+        IMP_ROOT / "tmp" / "ifbench-parity-venv" / "nltk_data",
+    )
+    return require_runtime_environment(os.environ, spec)
 
 
 class LaunchAdmissionError(RuntimeError):
@@ -92,7 +122,9 @@ def load_authenticated_runtime() -> Any:
 
     global v1, _source_bridge, _patched_dspy_gepa, _v1_source_commits
     global _v1_atomic_write, _v1_compile_arm, _effective_gepa_identity
+    global _bootstrap_digest
     require_expected_launch_commit()
+    _bootstrap_digest = authenticate_bootstrap_environment()
     if v1 is not None:
         return v1
     if sha256_file(V1_RUNNER) != manifest_contract["execution_base"]["runner_sha256"]:
@@ -286,13 +318,15 @@ def shadow_preflight(runtime: Any) -> None:
     args = parser.parse_args()
     if os.environ.get("OPENROUTER_API_KEY", "").strip() != "":
         raise RuntimeError("upstream shadow preflight received provider authority")
-    base_url = os.environ["MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL"]
-    ca_cert = Path(os.environ["MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT"]).resolve()
+    api_base_url = os.environ["MATCHED_IFBENCH_GEPA014_API_BASE_URL"]
+    catalog_base_url = os.environ["MATCHED_IFBENCH_GEPA014_CATALOG_BASE_URL"]
+    health_url = os.environ["MATCHED_IFBENCH_GEPA014_HEALTH_URL"]
+    ca_cert = Path(os.environ["MATCHED_IFBENCH_GEPA014_TLS_CA_CERT"]).resolve()
     if os.environ.get("SSL_CERT_FILE") != str(ca_cert):
         raise RuntimeError("upstream shadow TLS trust does not match the owned CA")
 
     tls_context = __import__("ssl").create_default_context(cafile=str(ca_cert))
-    with urllib.request.urlopen(base_url + "/health", context=tls_context, timeout=5) as response:
+    with urllib.request.urlopen(health_url, context=tls_context, timeout=5) as response:
         readiness = json.load(response)
     if readiness != {"status": "ready"}:
         raise RuntimeError("upstream shadow TLS readiness response drift")
@@ -306,7 +340,7 @@ def shadow_preflight(runtime: Any) -> None:
     for role in ("task", "optimizer"):
         expected = manifest["models"][role]
         with urllib.request.urlopen(
-            base_url + f"/api/v1/models/{expected['logical']}/endpoints",
+            catalog_base_url + f"/models/{expected['logical']}/endpoints",
             context=tls_context,
             timeout=5,
         ) as response:
@@ -335,7 +369,7 @@ def shadow_preflight(runtime: Any) -> None:
     capture.set_phase(0, "shadow", "task")
     task = RecordingLM(
         manifest["models"]["task"]["upstream"],
-        api_base=base_url + "/v1",
+        api_base=api_base_url,
         api_key="local-shadow-only",
         cache=False,
         num_retries=0,
@@ -349,7 +383,7 @@ def shadow_preflight(runtime: Any) -> None:
     capture.set_phase(0, "shadow", "optimizer")
     optimizer = RecordingLM(
         manifest["models"]["optimizer"]["upstream"],
-        api_base=base_url + "/v1",
+        api_base=api_base_url,
         api_key="local-shadow-only",
         cache=False,
         num_retries=0,
@@ -378,6 +412,7 @@ def shadow_preflight(runtime: Any) -> None:
                 "catalog_roles": catalog_roles,
                 "effective_gepa_identity": _effective_gepa_identity,
                 "tls_ca_sha256": sha256_file(ca_cert),
+                "bootstrap_digest": _bootstrap_digest,
             },
             sort_keys=True,
         ),
@@ -421,8 +456,10 @@ def rescue_accounting(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def atomic_write(path: Path, value: Any) -> None:
-    if isinstance(value, dict) and value.get("status") == "stopped":
+    if isinstance(value, dict):
         value = dict(value)
+        value["bootstrap_digest"] = _bootstrap_digest
+    if isinstance(value, dict) and value.get("status") == "stopped":
         value.update(
             {
                 "manifest_sha256": sha256_file(SUCCESSOR_MANIFEST),
@@ -472,7 +509,7 @@ def compile_arm(*args: Any, **kwargs: Any):
 
 if __name__ == "__main__":
     authenticated_runtime = load_authenticated_runtime()
-    if os.environ.get("MATCHED_IFBENCH_GEPA014_SHADOW") == "1":
+    if os.environ.get("OPENROUTER_API_KEY", "").strip() == "":
         shadow_preflight(authenticated_runtime)
     else:
         authenticated_runtime.main()
