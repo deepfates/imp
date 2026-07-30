@@ -538,20 +538,21 @@ def runner_gate(
     runner = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = runner
     spec.loader.exec_module(runner)
+    runtime = runner.load_authenticated_runtime()
     require(
-        runner.v1.build_program is runner.build_program,
+        runtime.build_program is runner.build_program,
         "v3 did not replace the sole v1 program factory",
     )
     require(
-        runner.v1.compile_arm is runner.compile_arm,
+        runtime.compile_arm is runner.compile_arm,
         "v3 did not replace the sole compile dispatcher",
     )
     require(
-        runner.v1.MANIFEST_PATH == HERE / "contract.json",
+        runtime.MANIFEST_PATH == HERE / "contract.json",
         "v3 runner still points at stopped manifest",
     )
     require(
-        "matched_gepa_mipro_ifbench_v3" in str(runner.v1.OUTPUT),
+        "matched_gepa_mipro_ifbench_v3" in str(runtime.OUTPUT),
         "v3 output aliases stopped treatment",
     )
     classes = {}
@@ -567,7 +568,8 @@ def runner_gate(
         )
     return {
         "program_factory_rebound": True,
-        "manifest": runner.v1.MANIFEST_PATH.relative_to(HERE).as_posix(),
+        "authenticated_optional_import": True,
+        "manifest": runtime.MANIFEST_PATH.relative_to(HERE).as_posix(),
         "output_isolated": True,
         "arm_program_classes": classes,
     }

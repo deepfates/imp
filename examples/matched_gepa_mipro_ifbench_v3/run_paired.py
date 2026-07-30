@@ -305,6 +305,11 @@ def compatibility_preflight() -> dict[str, Any]:
     )
     with tempfile.TemporaryDirectory(prefix="imp-ifbench-v3-gate-") as temporary:
         output = Path(temporary) / "result.json"
+        gate_env = {
+            **preflight_environment(),
+            "NLTK_DATA": str(IFBENCH_NLTK_DATA),
+            "MATCHED_IFBENCH_V3_EXPECTED_COMMIT": git(ROOT, "rev-parse", "HEAD"),
+        }
         completed = subprocess.run(
             [
                 str(UPSTREAM_PYTHON),
@@ -324,7 +329,7 @@ def compatibility_preflight() -> dict[str, Any]:
                 str(output),
             ],
             cwd=ROOT,
-            env={**preflight_environment(), "NLTK_DATA": str(IFBENCH_NLTK_DATA)},
+            env=gate_env,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

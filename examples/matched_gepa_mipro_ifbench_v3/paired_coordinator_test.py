@@ -341,6 +341,55 @@ class PairedCoordinatorTest(unittest.TestCase):
             "MATCHED_IFBENCH_V3_EXPECTED_COMMIT is required", completed.stdout
         )
         self.assertNotIn("OPENROUTER_API_KEY", completed.stdout)
+        self.assertIn("LaunchAdmissionError", completed.stdout)
+        self.assertNotIn("ModuleNotFoundError", completed.stdout)
+
+    def test_wrong_launch_commit_refuses_before_optional_import(self) -> None:
+        env = dict(os.environ)
+        env["MATCHED_IFBENCH_V3_EXPECTED_COMMIT"] = "0" * 40
+        env.pop("OPENROUTER_API_KEY", None)
+        completed = subprocess.run(
+            [sys.executable, str(HERE / "run_upstream.py")],
+            cwd=HERE.parents[1],
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("LaunchAdmissionError", completed.stdout)
+        self.assertIn("v3 launch commit drift", completed.stdout)
+        self.assertNotIn("ModuleNotFoundError", completed.stdout)
+
+    def test_authenticated_entry_imports_pinned_runtime(self) -> None:
+        python = HERE.parents[1] / "tmp" / "dspy-parity-venv" / "bin" / "python"
+        actual = subprocess.check_output(
+            ["git", "-C", str(HERE.parents[1]), "rev-parse", "HEAD"], text=True
+        ).strip()
+        env = dict(os.environ)
+        env["MATCHED_IFBENCH_V3_EXPECTED_COMMIT"] = actual
+        env.pop("OPENROUTER_API_KEY", None)
+        completed = subprocess.run(
+            [
+                str(python),
+                "-c",
+                "import importlib.util,sys; from pathlib import Path; "
+                "p=Path(sys.argv[1]); s=importlib.util.spec_from_file_location('v3_auth_probe',p); "
+                "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+                "r=m.load_authenticated_runtime(); print(r.__name__)",
+                str(HERE / "run_upstream.py"),
+            ],
+            cwd=HERE.parents[1],
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout)
+        self.assertIn("matched_ifbench_v1_upstream", completed.stdout)
+        self.assertNotIn("OPENROUTER_API_KEY", completed.stdout)
 
     def test_upstream_stop_writer_binds_context_and_normalizes_ledgers(self) -> None:
         spec = importlib.util.spec_from_file_location(
