@@ -431,6 +431,10 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
         manifest["execution"]["openrouter"]["allow_fallbacks"] is False,
         "fallback routing enabled",
     )
+    require(
+        manifest["execution"]["data_collection"] == "deny",
+        "privacy routing drift",
+    )
 
     active = [
         TMP / "imp-result.json",
@@ -480,6 +484,11 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
         "wait_for_peer_selection" in upstream_source
         and "held_out_path" in upstream_source,
         "upstream held-out barrier drift",
+    )
+    require(
+        'data_collection: "deny"' in imp_source
+        and '"data_collection": "deny"' in upstream_source,
+        "peer privacy routing drift",
     )
     catalog = live_catalog_snapshot(manifest)
 
