@@ -172,5 +172,13 @@
     "combined_workshop_max": 80.774807,
     "authorized_workshop_ceiling": 100.0
   },
-  "launch_status": "blocked_live_preflight"
+  "live_preflight": {
+    "date": "2026-07-30",
+    "runner_commit": "1bc22436addd40bc0aa1d7fc872b0c9fa250644b",
+    "task_catalog_sha256": "d6ef7fb687beaa20592dd31d39e63121388d4f024a3f873b53819a6551492d30",
+    "optimizer_catalog_sha256": "7a21d43dfd6d7b79bce2433c7abc446e6e79846e2274772a1acfe97b08254ac9",
+    "privacy_guard": "per-request provider.data_collection=deny; exact provider-only route; no fallback",
+    "transport_guard": "retry=false; max_retries=0; one adapter dispatch per logical call"
+  },
+  "launch_status": "sealed"
 }
