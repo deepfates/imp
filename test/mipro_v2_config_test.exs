@@ -85,6 +85,20 @@ defmodule Imp.Optimizer.MIPROv2.ConfigTest do
     assert resolved.view_data_batch_size == 7
   end
 
+  test "program grounding defaults to structure and validates explicit source opt-in" do
+    assert Config.new().program_grounding == :structure
+    assert Config.new(program_grounding: :module_source).program_grounding == :module_source
+
+    assert Config.new(program_grounding: {:text, "Public program context."}).program_grounding ==
+             {:text, "Public program context."}
+
+    for invalid <- [{:text, ""}, {:text, String.duplicate("x", 20_001)}, :ambient_source] do
+      assert_raise ArgumentError, ~r/program_grounding must be/, fn ->
+        Config.new(program_grounding: invalid)
+      end
+    end
+  end
+
   test "BEAM-native compile honors an explicit zero seed" do
     config = Config.new(auto: nil, num_candidates: 2, num_trials: 1, seed: 9, minibatch: false)
 

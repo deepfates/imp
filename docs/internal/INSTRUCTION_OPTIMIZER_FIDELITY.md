@@ -67,6 +67,13 @@ The implementation performs:
 Reports preserve effective configuration, parameter assignments, trial kind,
 full-evaluation history, call accounting, seed, upstream release, and commit.
 
+Imp's BEAM-native program-aware proposer sends structural module, predictor, and
+signature metadata by default. It does not read a compiled module's source file
+implicitly. Consumers may explicitly opt into bounded module-source grounding or
+supply bounded public text; the selected grounding mode is retained in effective
+configuration. This is a privacy-preserving product deviation from DSPy's
+automatic `inspect.getsource` behavior.
+
 Grounded instruction proposals follow the released predictor-major decision
 order. Proposal slot `j` for each named predictor starts from that predictor's
 demo set `j`, then visits later and earlier sets cyclically, admitting only

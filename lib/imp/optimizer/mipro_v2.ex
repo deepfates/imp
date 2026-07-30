@@ -13,6 +13,10 @@ defmodule Imp.Optimizer.MIPROv2 do
   `:proposal_response_format` optionally binds each proposal to Imp's strict
   one-instruction JSON schema (`:off`, `:auto`, or `:required`).
 
+  Program-aware proposals use structural program metadata by default. Source
+  text is included only through the explicit `program_grounding: :module_source`
+  or `program_grounding: {:text, context}` opt-in.
+
   `:proposer_fidelity` defaults to Imp's documented `:beam_native` grounded
   proposer. Set it to `:dspy_3_2_1` for the matched-comparison path with
   `program_aware_proposer: false` with data/tip awareness enabled. Few-shot-aware
@@ -457,6 +461,7 @@ defmodule Imp.Optimizer.MIPROv2 do
                 demo_sets: demo_sets,
                 preserve_slots: true,
                 program_context: program,
+                program_grounding: config.program_grounding,
                 predictor_name: name,
                 predictor_index: predictor_index,
                 rollout_id_offset: predictor_index * config.num_instruct_candidates,

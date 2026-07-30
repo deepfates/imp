@@ -212,7 +212,10 @@ defmodule Imp.Optimizer.InstructionProposer do
     |> maybe_put(
       :program,
       Keyword.get(opts, :program_aware, true),
-      program_context(Keyword.get(opts, :program_context, program))
+      program_context(
+        Keyword.get(opts, :program_context, program),
+        Keyword.get(opts, :program_grounding, :structure)
+      )
     )
     |> maybe_put(
       :train_examples,
@@ -227,12 +230,11 @@ defmodule Imp.Optimizer.InstructionProposer do
     |> maybe_put(:prompting_tip, Keyword.get(opts, :tip_aware, true), tip(opts))
   end
 
-  defp program_context(program) do
+  defp program_context(program, grounding) do
     module = Map.get(program, :__struct__)
 
-    %{
+    context = %{
       module: inspect(module),
-      source: module_source(module),
       structure: program |> Map.from_struct() |> Map.keys() |> Enum.sort(),
       predictors:
         Enum.map(Imp.ProgramParameters.predictors(program), fn entry ->
@@ -245,6 +247,12 @@ defmodule Imp.Optimizer.InstructionProposer do
       signature: signature_spec(Imp.ProgramAccess.task_signature(program)),
       lm_signature: signature_spec(Imp.ProgramAccess.lm_signature(program))
     }
+
+    case grounding do
+      :structure -> context
+      :module_source -> Map.put(context, :source, module_source(module))
+      {:text, text} -> Map.put(context, :source, text)
+    end
   end
 
   defp module_source(module) when is_atom(module) do

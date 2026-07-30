@@ -39,3 +39,9 @@ Canonical claims classify every advertised family as stable or distinctly experi
   ordinary Imp report records which ordered demo arm grounded each candidate.
   Program-aware proposal remains an explicit unsupported boundary rather than
   silently substituting a different information flow.
+- BEAM-native program-aware instruction proposal now grounds on public program
+  structure by default instead of reading and transmitting ambient module
+  source. Bounded module source or caller-owned text requires explicit opt-in,
+  and the chosen mode is part of the effective optimizer configuration. This
+  is an intentional privacy-oriented product deviation from DSPy's automatic
+  source inspection.

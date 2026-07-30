@@ -19,6 +19,7 @@ defmodule Imp.Optimizer.MIPROv2.Config do
             minibatch_size: 35,
             minibatch_full_eval_steps: 5,
             program_aware_proposer: true,
+            program_grounding: :structure,
             data_aware_proposer: true,
             view_data_batch_size: 10,
             tip_aware_proposer: true,
@@ -45,6 +46,7 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     :minibatch_size,
     :minibatch_full_eval_steps,
     :program_aware_proposer,
+    :program_grounding,
     :data_aware_proposer,
     :view_data_batch_size,
     :tip_aware_proposer,
@@ -254,6 +256,8 @@ defmodule Imp.Optimizer.MIPROv2.Config do
         do: raise(ArgumentError, "#{key} must be a boolean")
     end
 
+    validate_program_grounding!(config.program_grounding)
+
     unless config.proposer_fidelity in [:beam_native, :dspy_3_2_1],
       do: raise(ArgumentError, "proposer_fidelity must be :beam_native or :dspy_3_2_1")
 
@@ -293,6 +297,19 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     end
 
     config
+  end
+
+  defp validate_program_grounding!(:structure), do: :ok
+  defp validate_program_grounding!(:module_source), do: :ok
+
+  defp validate_program_grounding!({:text, context})
+       when is_binary(context) and byte_size(context) > 0 and byte_size(context) <= 20_000,
+       do: :ok
+
+  defp validate_program_grounding!(value) do
+    raise ArgumentError,
+          "program_grounding must be :structure, :module_source, or " <>
+            "{:text, nonempty_context_up_to_20000_bytes}; got: #{inspect(value)}"
   end
 
   defp validate_minibatch!(%{minibatch: true, minibatch_size: size, valset: valset} = config) do

@@ -30,6 +30,7 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
 
     assert_receive {:proposal_payload, payload}
     assert is_map(payload["program"])
+    refute Map.has_key?(payload["program"], "source")
     assert payload["train_examples"] == [%{"answer" => "a", "question" => "q"}]
     assert payload["demonstrations"] == [%{"answer" => "a", "question" => "q"}]
     assert is_binary(payload["prompting_tip"])
@@ -48,6 +49,31 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
     refute Map.has_key?(sparse, "train_examples")
     refute Map.has_key?(sparse, "demonstrations")
     refute Map.has_key?(sparse, "prompting_tip")
+  end
+
+  test "program source grounding is explicit and bounded" do
+    parent = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
+          send(parent, {:program_context, payload["program"]})
+          %{"instructions" => ["Candidate instruction"]}
+        end
+      )
+
+    program = Imp.predict("question -> answer")
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
+
+    assert ["Candidate instruction"] =
+             InstructionProposer.propose(program, [example],
+               lm: lm,
+               count: 1,
+               program_grounding: {:text, "Public program context."}
+             )
+
+    assert_receive {:program_context, %{"source" => "Public program context."}}
   end
 
   test "proposal reports preserve distinct rollout ids and fallback failures" do
