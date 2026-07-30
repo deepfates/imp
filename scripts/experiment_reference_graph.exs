@@ -65,7 +65,7 @@ defmodule ImpExperimentReferenceGraph do
     verify_roots!(root)
     migrations = Enum.map(@migrations, &verify_migration!(root, &1))
     claims = active_claim_edges!(root)
-    dependencies = dependency_edges!(root)
+    dependencies = dependency_edges!(root, claims)
 
     inbound =
       Map.new(@roots, fn execution ->
@@ -167,8 +167,8 @@ defmodule ImpExperimentReferenceGraph do
     end
   end
 
-  defp dependency_edges!(root) do
-    tracked_text_files!(root)
+  defp dependency_edges!(root, claims) do
+    tracked_text_files!(root, claims)
     |> Enum.flat_map(fn source ->
       body = File.read!(Path.join(root, source))
 
@@ -202,14 +202,25 @@ defmodule ImpExperimentReferenceGraph do
     |> Enum.sort_by(&{&1["target"], &1["source"], &1["resolved"]})
   end
 
-  defp tracked_text_files!(root) do
+  defp tracked_text_files!(root, claims) do
     {output, 0} = System.cmd("git", ["ls-files", "-z"], cd: root)
 
-    output
-    |> String.split(<<0>>, trim: true)
-    |> Enum.filter(&String.ends_with?(&1, [".ex", ".exs", ".py", ".json", ".md"]))
-    |> Enum.reject(&(&1 == @script))
-    |> Enum.reject(&String.starts_with?(&1, "benchmarks/evidence/archive/matched_experiments/"))
+    tracked =
+      output
+      |> String.split(<<0>>, trim: true)
+      |> Enum.filter(&String.ends_with?(&1, [".ex", ".exs", ".py", ".json", ".md"]))
+      |> Enum.reject(&(&1 == @script))
+
+    active_archives =
+      claims
+      |> Enum.map(& &1["source"])
+      |> Enum.filter(&String.starts_with?(&1, "benchmarks/evidence/archive/"))
+
+    tracked
+    |> Enum.reject(&String.starts_with?(&1, "benchmarks/evidence/archive/"))
+    |> Kernel.++(active_archives)
+    |> Enum.uniq()
+    |> Enum.sort()
   end
 
   defp path_candidates(body, source) do
@@ -225,7 +236,9 @@ defmodule ImpExperimentReferenceGraph do
     relative =
       Enum.flat_map(@roots, fn execution ->
         basename = Path.basename(execution)
-        pattern = ~r{(?:\.\./)+#{Regex.escape(basename)}(?:/[A-Za-z0-9_.-]+)*}
+
+        pattern =
+          ~r/(?:\.\.\/)+#{Regex.escape(basename)}(?:\/[A-Za-z0-9_.-]+)*(?=$|[^A-Za-z0-9_.{}\/-])/
 
         Regex.scan(pattern, body)
         |> Enum.map(fn [reference] ->

@@ -74,9 +74,43 @@ defmodule Imp.ExperimentReferenceGraphTest do
              "examples/matched_gepa_mipro_ifbench_v3/mix.exs",
              "examples/matched_gepa_mipro_ifbench"
            )
+
+    refute edge?(
+             edges,
+             "examples/matched_gepa_mipro_ifbench_v3/README.md",
+             "examples/matched_gepa_mipro_ifbench"
+           )
+
+    v1 = "examples/matched_gepa_mipro_ifbench"
+    expected_reference = "../" <> Path.basename(v1) <> "/run_upstream.py"
+    expected_resolved = v1 <> "/run_upstream.py"
+
+    assert [
+             %{
+               "kind" => "source_relative",
+               "reference" => ^expected_reference,
+               "resolved" => ^expected_resolved
+             }
+           ] =
+             edges_for(
+               edges,
+               "examples/matched_gepa_mipro_ifbench_gepa014/contract.json",
+               v1
+             )
+
+    assert edge?(
+             edges,
+             "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json",
+             "examples/matched_instruction_optimizers_trec"
+           )
   end
 
   defp edge?(edges, source, target) do
     Enum.any?(edges, &(&1["source"] == source and &1["target"] == target))
+  end
+
+  defp edges_for(edges, source, target) do
+    Enum.filter(edges, &(&1["source"] == source and &1["target"] == target))
+    |> Enum.map(&Map.drop(&1, ["source", "target"]))
   end
 end

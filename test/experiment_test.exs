@@ -201,6 +201,53 @@ defmodule Imp.ExperimentTest do
     end
   end
 
+  test "ordinary LabeledFewShot optimizer completes the public experiment lifecycle" do
+    program =
+      "ticket -> team: enum[atlas,harbor]"
+      |> Imp.signature("Route each support ticket to its owning team.")
+      |> Imp.predict(lm: routing_lm())
+
+    data =
+      Data.new(
+        train: [
+          routing_row("Duplicate invoice charge", "atlas"),
+          routing_row("API outage in Europe", "harbor")
+        ],
+        selection: [
+          routing_row("Refund the annual invoice", "atlas"),
+          routing_row("Dashboard latency is spiking", "harbor")
+        ],
+        test: [
+          routing_row("The monthly bill is wrong", "atlas"),
+          routing_row("The service is unavailable", "harbor")
+        ]
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(
+               program,
+               Imp.Optimizer.LabeledFewShot.new(k: 2, sample: false),
+               data,
+               Imp.exact_match(:team)
+             )
+
+    assert result.selected == :optimized
+    assert result.baseline_selection.score == 0.5
+    assert result.optimized_selection.score == 1.0
+    assert result.test.score == 1.0
+    assert %Report{optimizer: :labeled_few_shot} = Report.fetch(result.program)
+    assert Artifact.inspect(result.artifact).champion_id == "optimized"
+
+    fresh =
+      "ticket -> team: enum[atlas,harbor]"
+      |> Imp.signature("Fresh trusted router.")
+      |> Imp.predict(lm: routing_lm())
+      |> then(&Artifact.apply(result.artifact, &1))
+
+    assert {:ok, prediction} = Imp.call(fresh, %{ticket: "The API is down"})
+    assert Imp.get(prediction, :team) == "harbor"
+  end
+
   test "split overlap fails before any optimizer or model call" do
     owner = self()
     row = row("same-source", "selection")
@@ -287,6 +334,34 @@ defmodule Imp.ExperimentTest do
 
   defp row(id, question) do
     Imp.example(id: id, question: question, answer: "yes") |> Imp.with_inputs(:question)
+  end
+
+  defp routing_row(ticket, team) do
+    Imp.example(ticket: ticket, team: team) |> Imp.with_inputs(:ticket)
+  end
+
+  defp routing_lm do
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        query =
+          messages
+          |> Enum.filter(&(&1.role == :user))
+          |> List.last()
+          |> Map.fetch!(:content)
+
+        has_demos? = Enum.any?(messages, &(&1.role == :assistant))
+
+        team =
+          if has_demos? and
+               String.contains?(query, ["latency", "unavailable", "outage", "API", "service"]) do
+            "harbor"
+          else
+            "atlas"
+          end
+
+        %{team: team}
+      end
+    )
   end
 
   defp lm(owner) do

@@ -58,10 +58,17 @@ defmodule Imp.Experiment.Result do
     payload = Jason.encode!(to_map(result, opts), pretty: true) <> "\n"
     File.mkdir_p!(Path.dirname(path))
     temporary = path <> ".tmp-#{System.unique_integer([:positive])}"
+    io = File.open!(temporary, [:write, :binary, :exclusive])
 
     try do
-      File.write!(temporary, payload, [:sync])
       File.chmod!(temporary, 0o600)
+      :ok = IO.binwrite(io, payload)
+      :ok = :file.sync(io)
+    after
+      File.close(io)
+    end
+
+    try do
       File.rename!(temporary, path)
       :ok
     after
