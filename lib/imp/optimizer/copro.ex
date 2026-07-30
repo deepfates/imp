@@ -24,6 +24,10 @@ defmodule Imp.Optimizer.COPRO do
 
   For statistics fidelity, `results_latest` preserves 3.2.1's cumulative
   `latest_scores` behavior across predictors within each depth.
+
+  Ordinary proposal and task failures follow COPRO's bounded error behavior.
+  Operational route, cost, budget, transport, and cancellation guards remain
+  fatal through both proposal fan-out and candidate evaluation.
   """
 
   defstruct [
@@ -441,17 +445,23 @@ defmodule Imp.Optimizer.COPRO do
         pair
 
       {:ok, {:error, reason}} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         raise RuntimeError, "COPRO proposal fan-out failed: #{inspect(reason)}"
 
       {:exit, reason} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         raise RuntimeError, "COPRO proposal fan-out exited: #{inspect(reason)}"
     end)
   end
 
   defp request_proposals!(lm, predictor, history, optimizer, count, opts) do
     case request_proposals(lm, predictor, history, optimizer, count, opts) do
-      {:ok, raw} -> raw
-      {:error, reason} -> raise RuntimeError, "COPRO proposal LM failed: #{inspect(reason)}"
+      {:ok, raw} ->
+        raw
+
+      {:error, reason} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
+        raise RuntimeError, "COPRO proposal LM failed: #{inspect(reason)}"
     end
   end
 

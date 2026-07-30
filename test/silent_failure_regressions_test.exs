@@ -174,6 +174,43 @@ defmodule SilentFailureRegressionsTest do
     assert log =~ "killed row 0"
   end
 
+  test "Evaluate never scores an operational program failure in sequential or task execution" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :cost,
+        reason: :reservation_exhausted,
+        message: "evaluation cost guard"
+      )
+
+    program = %Program{handler: fn _inputs -> {:error, safety} end}
+    rows = [example("guarded?", "yes")]
+    metric = fn _example, _prediction -> true end
+
+    for opts <- [[timeout: :infinity], [timeout: 1_000, max_concurrency: 1]] do
+      assert_raise Imp.OperationalSafetyError, "evaluation cost guard", fn ->
+        rows |> Imp.Evaluate.new(metric, opts) |> Imp.Evaluate.run(program)
+      end
+    end
+  end
+
+  test "Evaluate never converts an operational metric guard into score zero" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :budget,
+        reason: :metric_budget,
+        message: "metric budget guard"
+      )
+
+    program = %Program{handler: fn _inputs -> {:ok, Imp.prediction(answer: "yes")} end}
+    metric = fn _example, _prediction -> raise safety end
+
+    assert_raise Imp.OperationalSafetyError, "metric budget guard", fn ->
+      [example("guarded metric?", "yes")]
+      |> Imp.Evaluate.new(metric)
+      |> Imp.Evaluate.run(program)
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # P07 (dee-pac8): Refine and BestOfN reward functions must receive the
   # call's ACTUAL inputs, matching DSPy's `reward_fn(kwargs, outputs)`

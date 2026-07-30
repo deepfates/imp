@@ -26,6 +26,12 @@ defmodule Imp.Optimizer.TrajectoryTest do
     end
   end
 
+  defmodule GuardLM do
+    defstruct [:error]
+
+    def generate(%__MODULE__{error: error}, _messages, _opts), do: {:error, error}
+  end
+
   test "captures ordered named predictor calls" do
     program = program(false)
     example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
@@ -93,6 +99,34 @@ defmodule Imp.Optimizer.TrajectoryTest do
     assert trajectory.feedback == {:metric_error, "metric exploded"}
     assert trajectory.metric_metadata == %{imp_metric_error: "metric exploded"}
     assert Enum.map(trajectory.trace, & &1.predictor) == [:hint, :answer]
+  end
+
+  test "operational program and metric guards escape trajectory capture" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        reason: :provider_drift,
+        message: "trajectory route guard"
+      )
+
+    guarded = %TwoStage{program(false) | fail_after_first: false}
+
+    guarded_program =
+      %{guarded | second: %{guarded.second | lm: %GuardLM{error: safety}}}
+
+    example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
+
+    assert_raise Imp.OperationalSafetyError, "trajectory route guard", fn ->
+      Imp.Optimizer.TrajectoryRunner.run(
+        guarded_program,
+        [example],
+        Imp.Metrics.exact_match(:answer)
+      )
+    end
+
+    assert_raise Imp.OperationalSafetyError, "trajectory route guard", fn ->
+      Imp.Optimizer.TrajectoryRunner.run(program(false), [example], fn _, _ -> raise safety end)
+    end
   end
 
   defp program(fail_after_first) do

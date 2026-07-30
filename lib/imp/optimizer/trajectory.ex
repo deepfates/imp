@@ -1154,12 +1154,15 @@ defmodule Imp.Optimizer.TrajectoryRunner do
   defp to_trajectories(results, opts) do
     Enum.map(results, fn
       {:ok, trajectory} ->
+        Imp.OperationalSafetyError.raise_if_present!(trajectory)
         trajectory
 
       {:exit, {{example, index}, reason}} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         failed(index, normalize_example(example), [], {:task_exit, reason}, opts)
 
       {:exit, reason} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         failed(-1, nil, [], {:task_exit, reason}, opts)
     end)
   end
@@ -1205,11 +1208,20 @@ defmodule Imp.Optimizer.TrajectoryRunner do
         failed(index, example, trace, reason, opts)
     end
   rescue
+    safety in Imp.OperationalSafetyError ->
+      failed(index, normalize_example(example), Trace.finish(), safety, opts)
+
     error ->
       failed(index, normalize_example(example), Trace.finish(), Exception.message(error), opts)
   catch
     kind, reason ->
-      failed(index, normalize_example(example), Trace.finish(), {kind, reason}, opts)
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          failed(index, normalize_example(example), Trace.finish(), safety, opts)
+
+        nil ->
+          failed(index, normalize_example(example), Trace.finish(), {kind, reason}, opts)
+      end
   end
 
   defp annotate_predictors(program) do
@@ -1228,9 +1240,14 @@ defmodule Imp.Optimizer.TrajectoryRunner do
       other -> {:error, {:invalid_program_result, other}}
     end
   rescue
+    safety in Imp.OperationalSafetyError -> {:error, safety}
     error -> {:error, Exception.message(error)}
   catch
-    kind, reason -> {:error, {kind, reason}}
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> {:error, safety}
+        nil -> {:error, {kind, reason}}
+      end
   end
 
   defp safe_metric(metric, example, prediction, trace) do
@@ -1239,6 +1256,13 @@ defmodule Imp.Optimizer.TrajectoryRunner do
 
     metric |> apply(args) |> Imp.Metrics.normalize_result()
   rescue
+    safety in Imp.OperationalSafetyError ->
+      Imp.Metrics.normalize_result(%{
+        score: 0.0,
+        feedback: nil,
+        metadata: %{imp_operational_safety: safety}
+      })
+
     error ->
       Imp.Metrics.normalize_result(%{
         score: 0.0,
@@ -1247,12 +1271,25 @@ defmodule Imp.Optimizer.TrajectoryRunner do
       })
   catch
     kind, reason ->
-      Imp.Metrics.normalize_result(%{
-        score: 0.0,
-        feedback: {:metric_error, {kind, reason}},
-        metadata: %{imp_metric_error: {kind, reason}}
-      })
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          Imp.Metrics.normalize_result(%{
+            score: 0.0,
+            feedback: nil,
+            metadata: %{imp_operational_safety: safety}
+          })
+
+        nil ->
+          Imp.Metrics.normalize_result(%{
+            score: 0.0,
+            feedback: {:metric_error, {kind, reason}},
+            metadata: %{imp_metric_error: {kind, reason}}
+          })
+      end
   end
+
+  defp metric_error(%Imp.Metrics.Result{metadata: %{imp_operational_safety: safety}}),
+    do: safety
 
   defp metric_error(%Imp.Metrics.Result{metadata: %{imp_metric_error: reason}}),
     do: {:metric_error, reason}

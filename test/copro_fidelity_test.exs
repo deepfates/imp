@@ -29,6 +29,12 @@ defmodule Imp.Optimizer.COPROFidelityTest do
     end
   end
 
+  defmodule SafetyLM do
+    defstruct [:error]
+
+    def generate(%__MODULE__{error: error}, _messages, _opts), do: {:error, error}
+  end
+
   defp trainset do
     [Imp.example(question: "Where?", answer: "Paris") |> Imp.with_inputs(:question)]
   end
@@ -51,6 +57,43 @@ defmodule Imp.Optimizer.COPROFidelityTest do
         })
       end
     )
+  end
+
+  test "proposal and evaluation preserve operational safety guards" do
+    proposal_safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        reason: :provider_drift,
+        message: "COPRO proposal route guard"
+      )
+
+    assert_raise Imp.OperationalSafetyError, "COPRO proposal route guard", fn ->
+      COPRO.new(Imp.Metrics.exact_match(:answer),
+        proposer_lm: %SafetyLM{error: proposal_safety},
+        breadth: 2,
+        depth: 1
+      )
+      |> COPRO.compile(constant_program(), trainset(), [])
+    end
+
+    evaluation_safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :cost,
+        reason: :reservation_exhausted,
+        message: "COPRO evaluation cost guard"
+      )
+
+    guarded_program =
+      Imp.predict("question -> answer", lm: %SafetyLM{error: evaluation_safety})
+
+    assert_raise Imp.OperationalSafetyError, "COPRO evaluation cost guard", fn ->
+      COPRO.new(Imp.Metrics.exact_match(:answer),
+        proposer_lm: proposal_lm(),
+        breadth: 2,
+        depth: 1
+      )
+      |> COPRO.compile(guarded_program, trainset(), [])
+    end
   end
 
   test "stores and compares inert prefix metadata without rendering it" do

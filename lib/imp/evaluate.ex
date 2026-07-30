@@ -312,6 +312,7 @@ defmodule Imp.Evaluate do
     |> Enum.with_index()
     |> Enum.reduce_while({:completed, [], []}, fn {example, index}, {_tag, rows, errors} ->
       {row, error} = evaluate_with_deadline(evaluator, program, example, index)
+      Imp.OperationalSafetyError.raise_if_present!(error)
       errors = add_error(errors, error)
 
       if too_many_errors?(errors, evaluator.max_errors) do
@@ -327,6 +328,7 @@ defmodule Imp.Evaluate do
     |> evaluation_stream(program)
     |> Enum.reduce_while({:completed, [], []}, fn
       {:ok, {row, error}}, {_tag, rows, errors} ->
+        Imp.OperationalSafetyError.raise_if_present!(error)
         errors = add_error(errors, error)
 
         if too_many_errors?(errors, evaluator.max_errors) do
@@ -336,6 +338,7 @@ defmodule Imp.Evaluate do
         end
 
       {:exit, reason}, {_tag, rows, errors} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         index = length(rows)
         error = %{index: index, reason: {:evaluation_task_exit, reason}}
 
@@ -494,6 +497,13 @@ defmodule Imp.Evaluate do
   defp apply_metric(metric, args) do
     apply(metric, args)
   rescue
+    safety in Imp.OperationalSafetyError ->
+      %{
+        score: 0.0,
+        feedback: nil,
+        metadata: %{imp_operational_safety: safety}
+      }
+
     error ->
       %{
         score: 0.0,
@@ -502,15 +512,30 @@ defmodule Imp.Evaluate do
       }
   catch
     kind, reason ->
-      %{
-        score: 0.0,
-        feedback: {:metric_error, error_message({kind, reason})},
-        metadata: %{imp_metric_error: error_message({kind, reason})}
-      }
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          %{
+            score: 0.0,
+            feedback: nil,
+            metadata: %{imp_operational_safety: safety}
+          }
+
+        nil ->
+          %{
+            score: 0.0,
+            feedback: {:metric_error, error_message({kind, reason})},
+            metadata: %{imp_metric_error: error_message({kind, reason})}
+          }
+      end
   end
 
   defp trace(%Imp.Prediction{metadata: metadata}), do: Map.get(metadata, :trace)
   defp trace(_prediction), do: nil
+
+  defp metric_error(_index, %Imp.Metrics.Result{
+         metadata: %{imp_operational_safety: safety}
+       }),
+       do: safety
 
   defp metric_error(index, %Imp.Metrics.Result{metadata: %{imp_metric_error: reason}}),
     do: %{index: index, stage: :metric, reason: reason}

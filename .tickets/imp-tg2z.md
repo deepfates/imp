@@ -68,3 +68,9 @@ Canonical claims classify every advertised family as stable or distinctly experi
   final validation. Typed safety causes retained inside trajectories, task
   exits, reflection errors, or final rows are raised; ordinary failed
   trajectories remain reportable optimizer evidence.
+- The fail-closed distinction now lives at the shared `Imp.Module`,
+  `Imp.Evaluate`, and `TrajectoryRunner` boundaries instead of depending on
+  optimizer-specific inspection. Typed causes survive sequential and task
+  execution plus metric callbacks. COPRO also preserves them through proposal
+  fan-out and coordinate evaluation, so its normal error budget cannot absorb
+  a hard operational guard.

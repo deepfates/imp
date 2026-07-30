@@ -80,9 +80,14 @@ defmodule Imp.Module do
         {:error, {:invalid_module_result, module, inspect(other)}}
     end
   rescue
+    safety in Imp.OperationalSafetyError -> {:error, safety}
     error -> {:error, {:module_call_failed, module, error_message(error)}}
   catch
-    kind, reason -> {:error, {:module_call_failed, module, error_message({kind, reason})}}
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> {:error, safety}
+        nil -> {:error, {:module_call_failed, module, error_message({kind, reason})}}
+      end
   end
 
   defp error_message(%_{} = exception), do: Exception.message(exception)

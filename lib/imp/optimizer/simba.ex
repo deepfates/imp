@@ -467,16 +467,20 @@ defmodule Imp.Optimizer.SIMBA do
       jobs
       |> Imp.Tasks.async_stream(
         fn job ->
-          [trajectory] =
-            TrajectoryRunner.run(job.program, [job.example], optimizer.metric,
-              max_concurrency: 1,
-              timeout: optimizer.timeout,
-              runtime: :simba,
-              program_id: job.source_id,
-              rollout_id: job.rollout_id
-            )
+          try do
+            [trajectory] =
+              TrajectoryRunner.run(job.program, [job.example], optimizer.metric,
+                max_concurrency: 1,
+                timeout: optimizer.timeout,
+                runtime: :simba,
+                program_id: job.source_id,
+                rollout_id: job.rollout_id
+              )
 
-          trajectory
+            trajectory
+          rescue
+            safety in Imp.OperationalSafetyError -> {:operational_safety, safety}
+          end
         end,
         ordered: true,
         max_concurrency: optimizer.max_concurrency,
@@ -484,6 +488,9 @@ defmodule Imp.Optimizer.SIMBA do
         on_timeout: :kill_task
       )
       |> Enum.map(fn
+        {:ok, {:operational_safety, safety}} ->
+          raise safety
+
         {:ok, trajectory} ->
           trajectory
 
