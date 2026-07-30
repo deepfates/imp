@@ -62,6 +62,13 @@ class PairedCoordinatorTest(unittest.TestCase):
             child.wait(timeout=3)
             self.assertEqual(json.loads(artifact.read_text())["status"], "stopped")
 
+        imp_source = (HERE / "run_imp.exs").read_text()
+        self.assertIn("System.stop(1)", imp_source)
+        self.assertLess(
+            imp_source.index("atomic_write!(\n          @output"),
+            imp_source.index("System.stop(1)"),
+        )
+
     def test_failure_requires_both_cost_preserving_stop_artifacts(self) -> None:
         manifest = json.loads((HERE / "contract.json").read_text())
         launch_commit = "a" * 40
@@ -101,7 +108,14 @@ class PairedCoordinatorTest(unittest.TestCase):
                             "refusal_count": 0,
                         }
                     ],
-                    "ledger": {"responses": 2, "transports": 2},
+                    "ledger": {
+                        "reserved": 2,
+                        "transmitted": 2,
+                        "completed": 2,
+                        "in_flight": 0,
+                        "reserved_not_transmitted": 0,
+                        "transmission_observation": "completion_bound",
+                    },
                 },
                 **binding,
             }
@@ -135,7 +149,14 @@ class PairedCoordinatorTest(unittest.TestCase):
                 "usd_reserved": 0.01,
                 "rescue_accounting": {
                     "call_budgets": [],
-                    "ledger": {"responses": 0, "transports": 0},
+                    "ledger": {
+                        "reserved": 0,
+                        "transmitted": 0,
+                        "completed": 0,
+                        "in_flight": 0,
+                        "reserved_not_transmitted": 0,
+                        "transmission_observation": "completion_bound",
+                    },
                 },
                 "calls": [],
             }
@@ -165,11 +186,82 @@ class PairedCoordinatorTest(unittest.TestCase):
                     "refusal_count": 0,
                 }
             ],
-            "ledger": {"responses": 0, "transports": 0},
+            "ledger": {
+                "reserved": 1,
+                "transmitted": 0,
+                "completed": 0,
+                "in_flight": 0,
+                "reserved_not_transmitted": 1,
+                "transmission_observation": "completion_bound",
+            },
         }
-        with self.assertRaisesRegex(RuntimeError, "ledgers diverge"):
+        with self.assertRaisesRegex(RuntimeError, "cannot certify"):
             paired.validate_rescue_accounting(
                 "upstream", {"rescue_accounting": accounting, "calls": []}, manifest
+            )
+
+    def test_imp_rescue_certifies_transmitted_but_incomplete_calls(self) -> None:
+        manifest = json.loads((HERE / "contract.json").read_text())
+        accounting = {
+            "call_budgets": [
+                {
+                    "seed": manifest["seeds"][0],
+                    "arm": "baseline",
+                    "ceiling": manifest["execution"]["call_ceilings"]["baseline"],
+                    "counts": {
+                        "task_logical": 2,
+                        "optimizer_logical": 0,
+                        "total_logical": 2,
+                        "transports": 2,
+                    },
+                    "refusal_count": 0,
+                }
+            ],
+            "ledger": {
+                "reserved": 2,
+                "transmitted": 2,
+                "completed": 1,
+                "in_flight": 1,
+                "reserved_not_transmitted": 0,
+            },
+        }
+        counts = paired.validate_rescue_accounting(
+            "imp",
+            {
+                "rescue_accounting": accounting,
+                "lm_results": [{}],
+                "transport_events": [{}, {}],
+            },
+            manifest,
+        )
+        self.assertEqual(counts["total_logical"], 2)
+
+        fabricated = json.loads(json.dumps(accounting))
+        fabricated["ledger"].update(
+            {"completed": 2, "in_flight": 0}
+        )
+        with self.assertRaisesRegex(RuntimeError, "response ledger was not retained"):
+            paired.validate_rescue_accounting(
+                "imp",
+                {
+                    "rescue_accounting": fabricated,
+                    "lm_results": [{}],
+                    "transport_events": [{}, {}],
+                },
+                manifest,
+            )
+
+        misclassified = json.loads(json.dumps(accounting))
+        misclassified["ledger"]["in_flight"] = 0
+        with self.assertRaisesRegex(RuntimeError, "lifecycle ledger diverges"):
+            paired.validate_rescue_accounting(
+                "imp",
+                {
+                    "rescue_accounting": misclassified,
+                    "lm_results": [{}],
+                    "transport_events": [{}, {}],
+                },
+                manifest,
             )
 
     def test_barrier_validation_uses_content_bound_delegated_implementation(
@@ -256,7 +348,14 @@ class PairedCoordinatorTest(unittest.TestCase):
         )
         self.assertEqual(
             stopped["rescue_accounting"]["ledger"],
-            {"responses": 1, "transports": 1},
+            {
+                "reserved": 1,
+                "transmitted": 1,
+                "completed": 1,
+                "in_flight": 0,
+                "reserved_not_transmitted": 0,
+                "transmission_observation": "completion_bound",
+            },
         )
         paired.validate_rescue_accounting(
             "upstream", stopped, upstream.manifest_contract

@@ -3,6 +3,7 @@ Code.require_file("two_phase.exs", __DIR__)
 Code.require_file("source_identity.exs", __DIR__)
 Code.require_file("response_evidence.exs", __DIR__)
 Code.require_file("call_budget.exs", __DIR__)
+Code.require_file("stop_accounting.exs", __DIR__)
 Code.require_file(Path.expand("../../bench/imp/benchmark_truth/ifbench_two_stage.ex", __DIR__))
 Code.require_file(Path.expand("../../bench/imp/benchmark_truth/gepa_metrics.ex", __DIR__))
 Code.require_file(Path.expand("../../bench/imp/benchmark_truth/ifbench_feedback.ex", __DIR__))
@@ -328,7 +329,10 @@ defmodule MatchedIFBenchImp.Runner do
           )
         )
 
-        :ok
+        # The signal callback runs outside the blocked request process. Stop the
+        # VM after the durable snapshot so the interrupted run cannot continue
+        # and later overwrite the stopped artifact.
+        System.stop(1)
       end)
 
     try do
@@ -1192,30 +1196,14 @@ defmodule MatchedIFBenchImp.Runner do
   end
 
   defp rescue_accounting(snapshot) do
-    budgets =
-      snapshot.call_budgets
-      |> Enum.map(fn {{seed, arm}, budget} ->
-        %{
-          seed: seed,
-          arm: arm,
-          ceiling: budget.ceiling,
-          counts: budget.counts,
-          refusal_count: length(budget.refusals)
-        }
-      end)
-      |> Enum.sort_by(&{&1.seed, &1.arm})
-
-    %{
-      call_budgets: budgets,
-      ledger: %{
-        responses: length(snapshot.responses),
-        transports: length(snapshot.transports)
-      }
-    }
+    MatchedIFBenchImp.StopAccounting.normalize(
+      snapshot.call_budgets,
+      snapshot.responses,
+      snapshot.transports
+    )
   end
 
-  defp empty_rescue_accounting,
-    do: %{call_budgets: [], ledger: %{responses: 0, transports: 0}}
+  defp empty_rescue_accounting, do: MatchedIFBenchImp.StopAccounting.empty()
 
   defp map_get(value, key) when is_map(value) do
     case Map.fetch(value, key) do

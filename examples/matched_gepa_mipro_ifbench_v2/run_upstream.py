@@ -101,9 +101,22 @@ def rescue_accounting(value: dict[str, Any]) -> dict[str, Any]:
             }
         )
     calls = value.get("calls", [])
+    reserved = sum(budget["counts"]["total_logical"] for budget in budgets)
+    completed = len(calls)
     return {
         "call_budgets": budgets,
-        "ledger": {"responses": len(calls), "transports": len(calls)},
+        # The pinned Python wrapper records a call in ``finally``. It therefore
+        # cannot distinguish a reservation interrupted before HTTP dispatch from
+        # an HTTP call interrupted before completion. Keep that uncertainty
+        # explicit instead of calling either state a completed response.
+        "ledger": {
+            "reserved": reserved,
+            "transmitted": completed,
+            "completed": completed,
+            "in_flight": 0,
+            "reserved_not_transmitted": reserved - completed,
+            "transmission_observation": "completion_bound",
+        },
     }
 
 

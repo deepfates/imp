@@ -585,13 +585,22 @@ def validate_rescue_accounting(
 
     ledger = accounting.get("ledger")
     require(isinstance(ledger, dict), f"{runtime} rescue lacks ledger summary")
-    response_count = ledger.get("responses")
-    transport_count = ledger.get("transports")
+    reserved_count = ledger.get("reserved")
+    transmitted_count = ledger.get("transmitted")
+    completed_count = ledger.get("completed")
+    in_flight_count = ledger.get("in_flight")
+    reserved_not_transmitted = ledger.get("reserved_not_transmitted")
     require(
-        isinstance(response_count, int)
-        and response_count >= 0
-        and isinstance(transport_count, int)
-        and transport_count >= 0,
+        all(
+            isinstance(count, int) and not isinstance(count, bool) and count >= 0
+            for count in (
+                reserved_count,
+                transmitted_count,
+                completed_count,
+                in_flight_count,
+                reserved_not_transmitted,
+            )
+        ),
         f"{runtime} rescue ledger counts are malformed",
     )
     raw_responses = (
@@ -601,17 +610,29 @@ def validate_rescue_accounting(
         result.get("transport_events") if runtime == "imp" else result.get("calls")
     )
     require(
-        isinstance(raw_responses, list) and len(raw_responses) == response_count,
+        isinstance(raw_responses, list) and len(raw_responses) == completed_count,
         f"{runtime} rescue response ledger was not retained",
     )
     require(
-        isinstance(raw_transports, list) and len(raw_transports) == transport_count,
+        isinstance(raw_transports, list) and len(raw_transports) == transmitted_count,
         f"{runtime} rescue transport ledger was not retained",
     )
     require(
-        response_count == transport_count == total == transports,
-        f"{runtime} rescue budget/response/transport ledgers diverge",
+        reserved_count == total == transports,
+        f"{runtime} rescue reservation ledger diverges from its bound budgets",
     )
+    require(
+        completed_count <= transmitted_count <= reserved_count
+        and in_flight_count == transmitted_count - completed_count
+        and reserved_not_transmitted == reserved_count - transmitted_count,
+        f"{runtime} rescue lifecycle ledger diverges",
+    )
+    if runtime == "upstream":
+        require(
+            ledger.get("transmission_observation") == "completion_bound"
+            and reserved_not_transmitted == 0,
+            "upstream rescue cannot certify reservations lacking transmission evidence",
+        )
     return {
         "task_logical": task_logical,
         "optimizer_logical": optimizer_logical,
