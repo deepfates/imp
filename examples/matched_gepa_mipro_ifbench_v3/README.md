@@ -1,6 +1,7 @@
-# Matched IFBench v3: provider-disabled runnable boundary
+# Matched IFBench v3 (stopped)
 
-This is a complete provider-disabled runnable surface, not a sealed experiment.
+This was a separately sealed matched treatment. Its single authorized launch is
+permanently stopped, incomplete, and unscored.
 The terminal v2 treatment at `../matched_gepa_mipro_ifbench_v2` remains
 permanently stopped, incomplete, and unscored. No calls, baselines, selections,
 or outcomes roll forward.
@@ -24,7 +25,22 @@ peers reject a missing or mismatched exact commit before provider work.
 
 `python3 examples/matched_gepa_mipro_ifbench_v3/run_paired.py --compatibility-only`
 reruns both content-bound provider-free gates from a clean checkout. It never
-receives provider authority and does not read held-out bytes. Provider launch
-remains forbidden until the manifest binds an exact clean commit, all runner
-and gate hashes, current catalog/privacy/cost truth, and receives a new
-independent seal review.
+receives provider authority and does not read held-out bytes.
+
+The one authorized launch stopped during the first seed's upstream GEPA arm.
+Both peers completed and sealed the baseline selection stage. The upstream
+public `dspy.GEPA.compile` path then passed `acceptance_criterion` to the pinned
+GEPA optimizer, whose `optimize` entry does not accept that keyword, and raised
+`TypeError` before its first GEPA model call. The coordinator gracefully stopped
+Imp. Neither peer sealed all nine selections, held-out bytes were never opened,
+and no arm is scored; this is a public-workflow compatibility failure, not an
+optimizer loss or effectiveness result.
+
+The peers report completed-response costs of `$0.11817375` for Imp and
+`$0.10520175000000005` upstream, totaling `$0.22337550000000005`. Imp was
+stopped with one transmitted request still in flight, retained separately from
+68 completed responses; the full 69-call reservation was `$0.490176`.
+Upstream retained 63 transmitted/completed responses and a `$0.447552`
+reservation. The full stopped ledgers and sealed baseline artifacts are kept in
+this directory. Provider authority is closed and this treatment must not be
+resumed or rerun.

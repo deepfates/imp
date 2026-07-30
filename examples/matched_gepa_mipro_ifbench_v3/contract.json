@@ -271,6 +271,6 @@
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
-  "provider_authority": "authorized_for_exact_sealed_paired_coordinator_launch_only",
-  "launch_status": "sealed"
+  "provider_authority": "closed_after_single_authorized_stopped_execution",
+  "launch_status": "permanently_stopped_incomplete_unscored_public_gepa_acceptance_criterion_mismatch"
 }
