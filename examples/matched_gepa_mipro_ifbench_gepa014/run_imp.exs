@@ -434,19 +434,31 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
         connect_options: connect_options
       )
 
-    results =
-      Enum.map([task: 17, optimizer: nil], fn {role, seed} ->
-        lm = remote_lm(manifest, Atom.to_string(role), seed)
+    {:ok, shadow_finch} =
+      Finch.start_link(
+        name: MatchedIFBenchGepa014Imp.ShadowFinch,
+        pools: %{
+          default: [conn_opts: [transport_opts: [cacertfile: String.to_charlist(ca_cert)]]]
+        }
+      )
 
-        case Imp.Clients.ReqLLM.generate(
-               lm,
-               [%{role: :user, content: "shadow #{role}"}],
-               cache: false
-             ) do
-          {:ok, result} -> %{role: role, result: Report.encode_term(result)}
-          {:error, reason} -> raise "Imp shadow #{role} transport failed: #{inspect(reason)}"
-        end
-      end)
+    results =
+      try do
+        Enum.map([task: 17, optimizer: nil], fn {role, seed} ->
+          lm = remote_lm(manifest, Atom.to_string(role), seed)
+
+          case Imp.Clients.ReqLLM.generate(
+                 lm,
+                 [%{role: :user, content: "shadow #{role}"}],
+                 cache: false
+               ) do
+            {:ok, result} -> %{role: role, result: Report.encode_term(result)}
+            {:error, reason} -> raise "Imp shadow #{role} transport failed: #{inspect(reason)}"
+          end
+        end)
+      after
+        Supervisor.stop(shadow_finch)
+      end
 
     report = %{
       status: "pass",
@@ -946,8 +958,10 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     req_http_options =
       if shadow_ca,
         do:
-          Keyword.put(req_http_options, :connect_options,
-            transport_opts: [cacertfile: String.to_charlist(shadow_ca)]
+          Keyword.put(
+            req_http_options,
+            :finch,
+            MatchedIFBenchGepa014Imp.ShadowFinch
           ),
         else: req_http_options
 
