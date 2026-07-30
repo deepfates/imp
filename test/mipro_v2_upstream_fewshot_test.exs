@@ -7,6 +7,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamFewshotTest do
   @python "tmp/dspy-parity-venv/bin/python"
   @source "tmp/dspy-3.2.1"
   @runner "test/support/dspy_3_2_1_mipro_fewshot_tape.py"
+  @proposer_runner "test/support/dspy_3_2_1_mipro_fewshot_proposer_tape.py"
   @optuna_runner "test/support/dspy_3_2_1_optuna_startup_tape.py"
   @commit "29448ae12756abdd14bd8796c819247ebb83673c"
 
@@ -101,6 +102,86 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamFewshotTest do
              "atom:second:instruction" => [0, 1],
              "atom:second:demos" => [0, 1]
            }
+  end
+
+  @tag :evidence_infrastructure
+  test "few-shot-aware proposal messages match DSPy 3.2.1 through public compile" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@proposer_runner)],
+        env: [{"PYTHONPATH", Path.expand(@source)}],
+        stderr_to_stdout: false
+      )
+
+    upstream = Jason.decode!(output)
+    assert upstream["commit"] == @commit
+    owner = self()
+
+    task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{route: "K11"} end)
+
+    prompt_answers =
+      start_supervised!(
+        {Agent,
+         fn ->
+           [
+             %{observations: "dataset observations"},
+             %{summary: "dataset summary"},
+             %{proposed_instruction: "candidate 0"},
+             %{proposed_instruction: "candidate 1"},
+             %{proposed_instruction: "candidate 2"},
+             %{proposed_instruction: "candidate 3"}
+           ]
+         end}
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(owner, {:fewshot_proposal_call, messages, opts})
+          Agent.get_and_update(prompt_answers, fn [answer | rest] -> {answer, rest} end)
+        end
+      )
+
+    program =
+      "text -> route"
+      |> Imp.signature("Route the request.")
+      |> Imp.predict(lm: task_lm, adapter: Imp.Adapter.Chat)
+
+    trainset =
+      Enum.map(0..3, fn index ->
+        Imp.example(text: "request-#{index}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    valset = [Imp.example(text: "validation", route: "K11") |> Imp.with_inputs(:text)]
+
+    paused =
+      MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 4,
+        num_trials: 0,
+        max_bootstrapped_demos: 2,
+        max_labeled_demos: 1,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        program_aware_proposer: false,
+        fewshot_aware_proposer: true,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        proposer_fidelity: :dspy_3_2_1,
+        seed: 9
+      )
+      |> MIPROv2.compile(program, trainset, valset, max_trials: 0)
+
+    calls = collect_calls(6, [])
+
+    assert Enum.map(calls, fn {messages, _opts} -> stringify(messages) end) ==
+             upstream["prompt_messages"]
+
+    assert Enum.map(Enum.drop(calls, 2), fn {_messages, opts} -> opts[:rollout_id] end) ==
+             upstream["rollout_ids"]
+
+    slots = Report.fetch(paused).metadata.proposals.main.slots
+    assert Enum.map(slots, & &1.grounded_demo_count) == [0, 3, 3, 3]
+    assert Agent.get(prompt_answers, & &1) == []
   end
 
   test "pinned few-shot path rejects an incompatible teacher before task or proposal calls" do
@@ -256,4 +337,22 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamFewshotTest do
       "augmented" => values["imp_augmented"] == true
     }
   end
+
+  defp collect_calls(0, calls), do: Enum.reverse(calls)
+
+  defp collect_calls(count, calls) do
+    receive do
+      {:fewshot_proposal_call, messages, opts} ->
+        collect_calls(count - 1, [{messages, opts} | calls])
+    after
+      1_000 -> flunk("missing #{count} few-shot proposal calls")
+    end
+  end
+
+  defp stringify(value) when is_map(value),
+    do: Map.new(value, fn {key, value} -> {to_string(key), stringify(value)} end)
+
+  defp stringify(value) when is_list(value), do: Enum.map(value, &stringify/1)
+  defp stringify(value) when is_atom(value), do: Atom.to_string(value)
+  defp stringify(value), do: value
 end

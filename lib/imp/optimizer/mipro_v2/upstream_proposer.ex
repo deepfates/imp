@@ -79,6 +79,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
 
   def propose_with_report_and_rng!(lm, predictor, dataset_summary, rng, opts) do
     count = Keyword.fetch!(opts, :count)
+    demo_sets = Keyword.get(opts, :demo_sets, [])
+    fewshot_aware? = Keyword.get(opts, :fewshot_aware, false)
 
     unless is_integer(count) and count > 0 do
       raise ArgumentError, "DSPy 3.2.1 MIPRO proposer count must be a positive integer"
@@ -95,7 +97,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
             instruction_generator_signature(tip != ""),
             %{
               dataset_description: dataset_summary,
-              task_demos: "No task demos provided.",
+              task_demos: task_demos(predictor, demo_sets, index, fewshot_aware?),
               basic_instruction: predictor.signature.instructions,
               tip: tip
             },
@@ -104,7 +106,15 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
           )
 
         instruction = prediction |> Imp.get(:proposed_instruction) |> strip_prefix()
-        slot = %{proposal_index: index, rollout_id: rollout_id, tip: tip}
+
+        slot = %{
+          proposal_index: index,
+          demo_set_index: index,
+          grounded_demo_count: grounded_demo_count(demo_sets, index, fewshot_aware?),
+          rollout_id: rollout_id,
+          tip: tip
+        }
+
         {instructions ++ [instruction], slots ++ [slot], rng}
       end)
 
@@ -119,6 +129,40 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
        upstream_commit: "29448ae12756abdd14bd8796c819247ebb83673c"
      }, rng}
   end
+
+  defp task_demos(_predictor, _demo_sets, _index, false), do: "No task demos provided."
+  defp task_demos(_predictor, _demo_sets, 0, true), do: "No task demos provided."
+
+  defp task_demos(predictor, demo_sets, index, true) do
+    case grounded_demos(demo_sets, index) do
+      [] ->
+        "No task demos provided."
+
+      demos ->
+        Enum.map_join(demos, "\n\n", &example_string(predictor.signature, &1)) <> "\n\n"
+    end
+  end
+
+  defp grounded_demo_count(_demo_sets, _index, false), do: 0
+  defp grounded_demo_count(demo_sets, index, true), do: length(grounded_demos(demo_sets, index))
+
+  defp grounded_demos(demo_sets, index) do
+    Imp.Optimizer.InstructionProposer.grounded_augmented_demos(demo_sets, index, 3)
+  end
+
+  defp example_string(signature, example) do
+    (signature.inputs ++ signature.outputs)
+    |> Enum.map_join("\n", fn field ->
+      "#{field.prefix} #{python_str(Imp.Example.get(example, field.name))}"
+    end)
+  end
+
+  defp python_str(nil), do: "None"
+  defp python_str(true), do: "True"
+  defp python_str(false), do: "False"
+  defp python_str(value) when is_binary(value), do: value
+  defp python_str(value) when is_number(value), do: to_string(value)
+  defp python_str(value), do: inspect(value)
 
   defp call!(lm, signature, inputs, opts) do
     messages = Imp.Adapter.Chat.format(signature, inputs, response_instruction: true)

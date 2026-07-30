@@ -24,7 +24,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   def metric(expected, prediction),
     do: Imp.get(expected, :route) == Imp.get(prediction, :route)
 
-  test "explicit 3.2.1 mode accepts only its implemented grounded-proposer shape" do
+  test "explicit 3.2.1 mode accepts implemented grounded-proposer shapes" do
     config =
       Config.new(
         auto: nil,
@@ -56,6 +56,17 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     assert fewshot.max_bootstrapped_demos == 2
     assert fewshot.max_labeled_demos == 1
+
+    grounded_fewshot =
+      Config.new(
+        proposer_fidelity: :dspy_3_2_1,
+        program_aware_proposer: false,
+        fewshot_aware_proposer: true,
+        max_bootstrapped_demos: 2,
+        max_labeled_demos: 1
+      )
+
+    assert grounded_fewshot.fewshot_aware_proposer
 
     assert_raise ArgumentError, ~r/requires max_bootstrapped_demos > 0/, fn ->
       Config.new(

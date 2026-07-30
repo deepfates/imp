@@ -15,9 +15,10 @@ defmodule Imp.Optimizer.MIPROv2 do
 
   `:proposer_fidelity` defaults to Imp's documented `:beam_native` grounded
   proposer. Set it to `:dspy_3_2_1` for the matched-comparison path with
-  `program_aware_proposer: false`, `fewshot_aware_proposer: false`, and data/tip
-  awareness enabled. Both zero-shot and joint instruction/demonstration search
-  are supported; unsupported proposer combinations fail before any LM call.
+  `program_aware_proposer: false` with data/tip awareness enabled. Few-shot-aware
+  proposals use the same ordered demo arms searched by the optimizer. Both
+  zero-shot and joint instruction/demonstration search are supported;
+  unsupported proposer combinations fail before any LM call.
 
   `:search_fidelity` separately controls parameter search. The legacy narrow
   `:dspy_3_2_1_optuna_4_9_0_startup` mode reproduces Optuna 4.9.0's NumPy
@@ -433,7 +434,9 @@ defmodule Imp.Optimizer.MIPROv2 do
                 proposal_rng,
                 count: config.num_instruct_candidates,
                 temperature: optimizer.init_temperature,
-                seed: config.seed
+                seed: config.seed,
+                demo_sets: demo_sets,
+                fewshot_aware: config.fewshot_aware_proposer
               )
 
             report =

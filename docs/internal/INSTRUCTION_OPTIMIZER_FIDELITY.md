@@ -87,15 +87,18 @@ topology, rather than incidental integer identity, are the shared contract.
 
 For matched upstream comparisons, MIPROv2 also exposes an explicit
 `proposer_fidelity: :dspy_3_2_1` path. It is intentionally narrower than the
-default BEAM-native proposer: with program and few-shot awareness disabled and
-data/tip awareness enabled, it reproduces DSPy 3.2.1's three-call, 20-row
-dataset-summary pipeline, dynamic ChatAdapter signatures, five non-empty
-released tips plus the released no-tip choice, CPython MT19937 tip/rollout
-draws, one call per instruction candidate, marker parsing, and candidate-zero
-baseline overwrite. The mode rejects unsupported awareness combinations and
-structured-response substitution rather than silently claiming parity. Its
-selected mode is part of durable checkpoint compatibility, so a resumed study
-cannot drift between proposer algorithms.
+default BEAM-native proposer: with program awareness disabled and data/tip
+awareness enabled, it reproduces DSPy 3.2.1's three-call, 20-row dataset-summary
+pipeline, dynamic ChatAdapter signatures, five non-empty released tips plus the
+released no-tip choice, CPython MT19937 tip/rollout draws, one call per
+instruction candidate, marker parsing, and candidate-zero baseline overwrite.
+When few-shot awareness is enabled, each proposal consumes the same ordered
+demo arm searched later by Optuna; an independently executed DSPy public compile
+matches the complete proposal message tape and rollout IDs for the provider-free
+fixture. The mode still rejects program awareness and structured-response
+substitution rather than silently claiming parity. Its selected mode is part of
+durable checkpoint compatibility, so a resumed study cannot drift between
+proposer algorithms.
 
 The public compile path reproduces DSPy's ordered few-shot arm construction.
 In a real few-shot run it retains zero-shot, labels-only, unshuffled-bootstrap,

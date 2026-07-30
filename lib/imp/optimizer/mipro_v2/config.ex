@@ -268,11 +268,11 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     end
 
     if config.proposer_fidelity == :dspy_3_2_1 and
-         (config.program_aware_proposer or config.fewshot_aware_proposer or
-            not config.data_aware_proposer or not config.tip_aware_proposer) do
+         (config.program_aware_proposer or not config.data_aware_proposer or
+            not config.tip_aware_proposer) do
       raise ArgumentError,
             ":dspy_3_2_1 proposer fidelity currently requires program_aware_proposer: false, " <>
-              "fewshot_aware_proposer: false, data_aware_proposer: true, and tip_aware_proposer: true"
+              "data_aware_proposer: true, and tip_aware_proposer: true"
     end
 
     if config.proposer_fidelity == :dspy_3_2_1 and config.max_bootstrapped_demos == 0 and

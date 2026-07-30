@@ -33,3 +33,9 @@ Canonical claims classify every advertised family as stable or distinctly experi
   candidate contents and startup parameter order; checkpoints resume the joint
   search without replay. Python hash-based repeated-call trace choice remains
   an explicit BEAM SHA-256 deviation rather than an exact sequence claim.
+- MIPROv2's pinned proposer can now use those few-shot arms as proposal
+  evidence. Independent DSPy 3.2.1 public compilation matches every summary
+  and proposal message plus the shared CPython rollout-ID stream, while the
+  ordinary Imp report records which ordered demo arm grounded each candidate.
+  Program-aware proposal remains an explicit unsupported boundary rather than
+  silently substituting a different information flow.
