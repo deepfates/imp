@@ -545,6 +545,7 @@ def treatment_preservation_gate(contract: dict[str, Any]) -> dict[str, Any]:
             "draft_unsealed_pending_surface_review",
             "blocked_live_preflight",
             "sealed",
+            "terminal_zero_call_stopped",
         ),
         "successor launch state drift",
     )
