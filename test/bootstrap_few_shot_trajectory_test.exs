@@ -376,8 +376,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
   test "retries a failed row by round and honors a numeric metric threshold" do
     parent = self()
-    {:ok, cache} = Agent.start_link(fn -> %{} end)
-    on_exit(fn -> if Process.alive?(cache), do: Agent.stop(cache) end)
+    cache = start_supervised!({Agent, fn -> %{} end})
 
     lm = %{
       module: Imp.LM.Static,
@@ -703,8 +702,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
   test "a teacher-call failure preserves 3.2.1's unrestored self-demo removal" do
     parent = self()
-    {:ok, calls} = Agent.start_link(fn -> 0 end)
-    on_exit(fn -> if Process.alive?(calls), do: Agent.stop(calls) end)
+    calls = start_supervised!({Agent, fn -> 0 end})
 
     teacher =
       Imp.predict("question -> answer",
