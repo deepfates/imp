@@ -123,6 +123,7 @@ class PairedCoordinatorTest(unittest.TestCase):
             ]["result_sha256"],
             "launch_commit": launch_commit,
             "source_commits": source_commits,
+            "bootstrap_digest": manifest["bootstrap_contract"]["digest"],
         }
         with tempfile.TemporaryDirectory() as root, mock.patch.object(
             paired, "TMP", Path(root)
@@ -493,6 +494,58 @@ class PairedCoordinatorTest(unittest.TestCase):
                 self.assertEqual(completed.returncode, 0, completed.stdout)
                 self.assertIn("IMPORT_OK", completed.stdout)
                 self.assertNotIn("NETWORK_SENTINEL", completed.stdout)
+
+    def test_imp_reconstructs_bootstrap_contract_instead_of_trusting_caller_json(self) -> None:
+        actual = subprocess.check_output(
+            ["git", "-C", str(HERE.parents[1]), "rev-parse", "HEAD"], text=True
+        ).strip()
+        env = paired.peer_environment(
+            paired.shadow_mode("https://127.0.0.1:1", "/owned-shadow-ca.pem"), actual
+        )
+        forged = json.loads(env["MATCHED_IFBENCH_GEPA014_BOOTSTRAP_SPEC"])
+        forged["common_environment"]["IMP_MATCHED_IFBENCH_GEPA014_OUTPUT"] = (
+            "/tmp/forged-output.json"
+        )
+        materialized = json.dumps(forged, sort_keys=True, separators=(",", ":"))
+        env["MATCHED_IFBENCH_GEPA014_BOOTSTRAP_SPEC"] = materialized
+        env["MATCHED_IFBENCH_GEPA014_BOOTSTRAP_DIGEST"] = paired.hashlib.sha256(
+            materialized.encode()
+        ).hexdigest()
+        env["IMP_MATCHED_IFBENCH_GEPA014_OUTPUT"] = "/tmp/forged-output.json"
+        completed = subprocess.run(
+            ["mix", "run", "run_imp.exs"],
+            cwd=HERE,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("peer bootstrap digest mismatch", completed.stdout)
+        self.assertNotIn("Req.TransportError", completed.stdout)
+
+    def test_completed_results_are_bound_to_canonical_bootstrap(self) -> None:
+        manifest = json.loads((HERE / "contract.json").read_text())
+        launch_commit = "c" * 40
+        digest = manifest["bootstrap_contract"]["digest"]
+        common = {
+            "status": "complete",
+            "manifest_sha256": paired.sha256_file(HERE / "contract.json"),
+            "source_commits": {"imp": launch_commit},
+            "bootstrap_digest": digest,
+        }
+        with tempfile.TemporaryDirectory() as root, mock.patch.object(
+            paired, "TMP", Path(root)
+        ):
+            for runtime in ("imp", "upstream"):
+                (Path(root) / f"{runtime}-result.json").write_text(json.dumps(common))
+            paired.require_completed_peer_artifacts(manifest, launch_commit, digest)
+            (Path(root) / "upstream-result.json").write_text(
+                json.dumps({**common, "bootstrap_digest": "0" * 64})
+            )
+            with self.assertRaisesRegex(RuntimeError, "completed bootstrap binding"):
+                paired.require_completed_peer_artifacts(manifest, launch_commit, digest)
 
     def test_upstream_stop_writer_binds_context_and_normalizes_ledgers(self) -> None:
         spec = importlib.util.spec_from_file_location(

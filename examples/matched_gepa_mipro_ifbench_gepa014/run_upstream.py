@@ -82,7 +82,10 @@ def authenticate_bootstrap_environment() -> str:
         IMP_ROOT / "tmp" / "ifbench-parity-venv" / "bin" / "python",
         IMP_ROOT / "tmp" / "ifbench-parity-venv" / "nltk_data",
     )
-    return require_runtime_environment(os.environ, spec)
+    digest = require_runtime_environment(os.environ, spec)
+    if digest != manifest_contract["bootstrap_contract"]["digest"]:
+        raise RuntimeError("peer bootstrap digest differs from manifest binding")
+    return digest
 
 
 class LaunchAdmissionError(RuntimeError):

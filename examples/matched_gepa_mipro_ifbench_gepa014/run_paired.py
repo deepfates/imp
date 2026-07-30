@@ -22,7 +22,8 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 MANIFEST = HERE / "contract.json"
-TMP = ROOT / "tmp" / "matched_gepa_mipro_ifbench_gepa014"
+CANONICAL_TMP = ROOT / "tmp" / "matched_gepa_mipro_ifbench_gepa014"
+TMP = CANONICAL_TMP
 DSPY_ROOT = ROOT / "tmp" / "dspy-3.2.1"
 GEPA_ROOT = ROOT / "tmp" / "gepa-v0.1.4"
 GEPA_ARTIFACT_ROOT = ROOT / "tmp" / "gepa-artifact"
@@ -147,11 +148,25 @@ def bootstrap_spec(launch_commit: str) -> dict[str, object]:
         HERE,
         launch_commit,
         commands(),
-        TMP,
+        CANONICAL_TMP,
         GEPA_ARTIFACT_ROOT,
         IFBENCH_PYTHON,
         IFBENCH_NLTK_DATA,
     )
+
+
+def require_bootstrap_contract(manifest: dict[str, Any], launch_commit: str) -> str:
+    digest = canonical_digest(bootstrap_spec(launch_commit))
+    require(
+        manifest.get("bootstrap_contract")
+        == {
+            "schema_version": 1,
+            "digest": digest,
+            "identity": "canonical commands, working directories, fixed environment, and explicit credential/endpoint/trust substitutions",
+        },
+        "manifest bootstrap contract drift",
+    )
+    return digest
 
 
 def peer_environment(mode: Any, launch_commit: str) -> dict[str, str]:
@@ -228,7 +243,7 @@ def shadow_peer_preflight(manifest: dict[str, Any], launch_commit: str) -> dict[
             ca_cert = str(Path(readiness["ca_cert"]).resolve())
             env = peer_environment(shadow_mode(readiness["base_url"], ca_cert), launch_commit)
             require(env["OPENROUTER_API_KEY"] == "", "shadow environment retained provider authority")
-            expected_digest = canonical_digest(bootstrap_spec(launch_commit))
+            expected_digest = require_bootstrap_contract(manifest, launch_commit)
             # Constructing live authority is deliberately in-memory only here. No
             # peer or network receives it until this exact equivalence gate passes.
             live_env = peer_environment(
@@ -390,6 +405,9 @@ def compatibility_preflight() -> dict[str, Any]:
     )
     manifest = json.loads(MANIFEST.read_text())
     manifest_sha = sha256_file(MANIFEST)
+    bootstrap_digest = require_bootstrap_contract(
+        manifest, git(ROOT, "rev-parse", "HEAD")
+    )
     accepted_draft = manifest["accepted_successor_draft"]
     accepted_draft_path = resolve(accepted_draft["path"])
     require(
@@ -609,6 +627,7 @@ def compatibility_preflight() -> dict[str, Any]:
         "status": "pass",
         "manifest_sha256": manifest_sha,
         "launch_commit": git(ROOT, "rev-parse", "HEAD"),
+        "bootstrap_digest": bootstrap_digest,
         "gate_source_sha256": gate_contract["source_sha256"],
         "gate_result_sha256": result_sha,
         "failure_cardinality_module_sha256": failure_contract["module_sha256"],
@@ -964,6 +983,11 @@ def require_rescued_stop_artifacts(
             f"{runtime} launch binding drift",
         )
         require(
+            result.get("bootstrap_digest")
+            == require_bootstrap_contract(manifest, launch_commit),
+            f"{runtime} stopped bootstrap binding drift",
+        )
+        require(
             result.get("source_commits") == expected_sources,
             f"{runtime} source commit binding drift",
         )
@@ -1003,6 +1027,7 @@ def require_rescued_stop_artifacts(
 
 def run_peers(launch_commit: str) -> int:
     manifest = json.loads(MANIFEST.read_text())
+    expected_bootstrap_digest = require_bootstrap_contract(manifest, launch_commit)
     env = peer_environment(live_mode(os.environ, system_ca_file()), launch_commit)
     require_mode_equivalence(
         peer_environment(
@@ -1048,7 +1073,30 @@ def run_peers(launch_commit: str) -> int:
     if failure is not None:
         require_rescued_stop_artifacts(manifest, launch_commit)
         return failure
+    require_completed_peer_artifacts(manifest, launch_commit, expected_bootstrap_digest)
     return 0
+
+
+def require_completed_peer_artifacts(
+    manifest: dict[str, Any], launch_commit: str, expected_bootstrap_digest: str
+) -> None:
+    for runtime in ("imp", "upstream"):
+        path = TMP / f"{runtime}-result.json"
+        require(path.is_file(), f"{runtime} completed result artifact is absent")
+        result = json.loads(path.read_text())
+        require(result.get("status") == "complete", f"{runtime} result is not complete")
+        require(
+            result.get("manifest_sha256") == sha256_file(MANIFEST),
+            f"{runtime} completed manifest binding drift",
+        )
+        require(
+            result.get("source_commits", {}).get("imp") == launch_commit,
+            f"{runtime} completed launch binding drift",
+        )
+        require(
+            result.get("bootstrap_digest") == expected_bootstrap_digest,
+            f"{runtime} completed bootstrap binding drift",
+        )
 
 
 def coordinate(

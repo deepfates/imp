@@ -1319,10 +1319,16 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     materialized = System.fetch_env!("MATCHED_IFBENCH_GEPA014_BOOTSTRAP_SPEC")
     expected_digest = System.fetch_env!("MATCHED_IFBENCH_GEPA014_BOOTSTRAP_DIGEST")
     actual_digest = :crypto.hash(:sha256, materialized) |> Base.encode16(case: :lower)
+    manifest = @manifest |> File.read!() |> Jason.decode!()
+    bound_digest = manifest["bootstrap_contract"]["digest"]
 
-    if actual_digest != expected_digest, do: raise("peer bootstrap digest mismatch")
+    if actual_digest != expected_digest or expected_digest != bound_digest,
+      do: raise("peer bootstrap digest mismatch")
 
     spec = Jason.decode!(materialized)
+
+    if spec != expected_bootstrap_spec!(),
+      do: raise("peer canonical bootstrap specification mismatch")
 
     Enum.each(spec["common_environment"], fn {key, expected} ->
       if key == "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT" do
@@ -1341,6 +1347,70 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       do: raise("ambient provider credentials escaped canonical bootstrap")
 
     expected_digest
+  end
+
+  defp expected_bootstrap_spec! do
+    root = Path.expand("../..", __DIR__)
+    tmp = Path.join(root, "tmp")
+    ifbench = Path.join(tmp, "ifbench-parity-venv")
+    treatment_tmp = Path.join(tmp, "matched_gepa_mipro_ifbench_gepa014")
+    upstream_python = Path.join([tmp, "dspy-parity-venv", "bin", "python"])
+
+    %{
+      "schema_version" => 1,
+      "commands" => %{
+        "imp" => %{
+          "argv" => ["mix", "run", "run_imp.exs"],
+          "cwd" => __DIR__
+        },
+        "upstream" => %{
+          "argv" => [
+            upstream_python,
+            Path.join(__DIR__, "run_upstream.py"),
+            "--dspy-root",
+            Path.join(tmp, "dspy-3.2.1"),
+            "--gepa-root",
+            Path.join(tmp, "gepa-v0.1.4"),
+            "--gepa-artifact-root",
+            Path.join(tmp, "gepa-artifact"),
+            "--ifbench-site-packages",
+            Path.join([ifbench, "lib", "python3.13", "site-packages"])
+          ],
+          "cwd" => root
+        }
+      },
+      "common_environment" => %{
+        "ANTHROPIC_API_KEY" => "",
+        "IMP_GEPA_ARTIFACT_ROOT" => Path.join(tmp, "gepa-artifact"),
+        "IMP_GEPA_PYTHON" => Path.join([ifbench, "bin", "python"]),
+        "IMP_IFBENCH_NLP_BRIDGE" => Path.join([root, "scripts", "ifbench_nlp_check.py"]),
+        "IMP_IFBENCH_NLP_PYTHON" => Path.join([ifbench, "bin", "python"]),
+        "IMP_MATCHED_IFBENCH_GEPA014_OUTPUT" => Path.join(treatment_tmp, "imp-result.json"),
+        "IMP_MATCHED_IFBENCH_GEPA014_UPSTREAM_SELECTION" =>
+          Path.join(treatment_tmp, "upstream-result.json.selection-sealed.json"),
+        "LITELLM_LOCAL_MODEL_COST_MAP" => "True",
+        "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT" => "$LAUNCH_COMMIT",
+        "NLTK_DATA" => Path.join(ifbench, "nltk_data"),
+        "OPENAI_API_KEY" => "",
+        "UPSTREAM_MATCHED_IFBENCH_GEPA014_IMP_SELECTION" =>
+          Path.join(treatment_tmp, "imp-result.json.selection-sealed.json"),
+        "UPSTREAM_MATCHED_IFBENCH_GEPA014_OUTPUT" =>
+          Path.join(treatment_tmp, "upstream-result.json")
+      },
+      "mode_substitutions" => %{
+        "MATCHED_IFBENCH_GEPA014_API_BASE_URL" => "endpoint_url",
+        "MATCHED_IFBENCH_GEPA014_CATALOG_BASE_URL" => "endpoint_url",
+        "MATCHED_IFBENCH_GEPA014_HEALTH_URL" => "endpoint_url",
+        "MATCHED_IFBENCH_GEPA014_TLS_CA_CERT" => "endpoint_trust",
+        "OPENROUTER_API_KEY" => "provider_credential",
+        "SSL_CERT_FILE" => "endpoint_trust"
+      },
+      "bootstrap_invariants" => %{
+        "dotenv_provider_keys_blocked" => ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"],
+        "local_cost_map" => true,
+        "provider_authority_owned_only_by_openrouter_substitution" => true
+      }
+    }
   end
 
   defp stopped_binding_fields(
