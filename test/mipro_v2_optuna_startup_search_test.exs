@@ -4,6 +4,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
   alias Imp.Optimizer.MIPROv2
   alias Imp.OperationalSafetyError
   alias Imp.Optimizer.MIPROv2.{OptunaStartupPolicy, OptunaTPEPolicy}
+  alias Imp.Optimizer.MIPROv2.PythonRandom
   alias Imp.Optimizer.{Report, SearchPolicy}
 
   @python "tmp/dspy-parity-venv/bin/python"
@@ -21,6 +22,18 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
     Enum.each(@schedules, fn {seed, expected} ->
       assert startup_schedule(seed) == expected
     end)
+  end
+
+  test "Python-compatible sampling reproduces CPython Random.sample" do
+    for {seed, count, expected} <- [
+          {0, 3, [6, 9, 0]},
+          {0, 8, [6, 9, 0, 2, 4, 3, 5, 1]},
+          {9, 3, [7, 5, 4]},
+          {31, 8, [0, 7, 1, 6, 3, 8, 9, 5]}
+        ] do
+      assert {^expected, %PythonRandom{}} =
+               PythonRandom.sample(PythonRandom.new(seed), Enum.to_list(0..9), count)
+    end
   end
 
   @tag :evidence_infrastructure

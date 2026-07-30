@@ -269,24 +269,27 @@ defmodule Imp.Optimizer.MIPROv2.Config do
 
     if config.proposer_fidelity == :dspy_3_2_1 and
          (config.program_aware_proposer or config.fewshot_aware_proposer or
-            not config.data_aware_proposer or not config.tip_aware_proposer or
-            config.max_bootstrapped_demos != 0 or config.max_labeled_demos != 0) do
+            not config.data_aware_proposer or not config.tip_aware_proposer) do
       raise ArgumentError,
             ":dspy_3_2_1 proposer fidelity currently requires program_aware_proposer: false, " <>
-              "fewshot_aware_proposer: false, data_aware_proposer: true, tip_aware_proposer: true, " <>
-              "max_bootstrapped_demos: 0, and max_labeled_demos: 0"
+              "fewshot_aware_proposer: false, data_aware_proposer: true, and tip_aware_proposer: true"
+    end
+
+    if config.proposer_fidelity == :dspy_3_2_1 and config.max_bootstrapped_demos == 0 and
+         config.max_labeled_demos > 0 do
+      raise ArgumentError,
+            ":dspy_3_2_1 few-shot fidelity requires max_bootstrapped_demos > 0 because " <>
+              "DSPy 3.2.1 constructs shuffled bootstrap arms with randint(1, max_bootstrapped_demos)"
     end
 
     if config.search_fidelity in [
          :dspy_3_2_1_optuna_4_9_0_startup,
          :dspy_3_2_1_optuna_4_9_0
        ] and
-         (config.proposer_fidelity != :dspy_3_2_1 or config.minibatch or
-            config.max_bootstrapped_demos != 0 or config.max_labeled_demos != 0) do
+         (config.proposer_fidelity != :dspy_3_2_1 or config.minibatch) do
       raise ArgumentError,
             "pinned DSPy 3.2.1/Optuna 4.9.0 search fidelity requires " <>
-              "proposer_fidelity: :dspy_3_2_1, minibatch: false, " <>
-              "max_bootstrapped_demos: 0, and max_labeled_demos: 0"
+              "proposer_fidelity: :dspy_3_2_1 and minibatch: false"
     end
 
     config

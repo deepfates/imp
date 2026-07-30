@@ -54,6 +54,62 @@ defmodule Imp.Optimizer.MIPROv2.PythonRandom do
     {:array.to_list(array), rng}
   end
 
+  @spec sample(%__MODULE__{}, list(term()), non_neg_integer()) :: {list(term()), %__MODULE__{}}
+  def sample(%__MODULE__{} = rng, values, count)
+      when is_list(values) and is_integer(count) and count >= 0 and count <= length(values) do
+    population_size = length(values)
+
+    set_size =
+      if count > 5, do: 21 + Integer.pow(4, ceil(:math.log(count * 3) / :math.log(4))), else: 21
+
+    if population_size <= set_size do
+      sample_from_pool(rng, :array.from_list(values), population_size, count, [])
+    else
+      sample_from_indices(rng, values, population_size, count, MapSet.new(), [])
+    end
+  end
+
+  def sample(%__MODULE__{}, values, count) when is_list(values) and is_integer(count) do
+    raise ArgumentError,
+          "sample count must be between zero and the population size (#{length(values)}), got: #{count}"
+  end
+
+  defp sample_from_pool(rng, _pool, _population_size, 0, result),
+    do: {Enum.reverse(result), rng}
+
+  defp sample_from_pool(rng, pool, population_size, remaining, result) do
+    selected_count = length(result)
+    {index, rng} = randbelow(rng, population_size - selected_count)
+    value = :array.get(index, pool)
+    last = :array.get(population_size - selected_count - 1, pool)
+    pool = :array.set(index, last, pool)
+    sample_from_pool(rng, pool, population_size, remaining - 1, [value | result])
+  end
+
+  defp sample_from_indices(rng, _values, _population_size, 0, _selected, result),
+    do: {Enum.reverse(result), rng}
+
+  defp sample_from_indices(rng, values, population_size, remaining, selected, result) do
+    {index, rng} = unique_index(rng, population_size, selected)
+
+    sample_from_indices(
+      rng,
+      values,
+      population_size,
+      remaining - 1,
+      MapSet.put(selected, index),
+      [Enum.fetch!(values, index) | result]
+    )
+  end
+
+  defp unique_index(rng, population_size, selected) do
+    {index, rng} = randbelow(rng, population_size)
+
+    if MapSet.member?(selected, index),
+      do: unique_index(rng, population_size, selected),
+      else: {index, rng}
+  end
+
   defp randbelow(rng, n) when n > 0 do
     bits = bit_length(n)
     {value, rng} = getrandbits(rng, bits)

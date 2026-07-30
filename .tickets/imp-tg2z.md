@@ -26,3 +26,10 @@ Canonical claims classify every advertised family as stable or distinctly experi
   Optuna 4.9.0 execution binds startup and first modeled opportunity; longer
   algebraic acquisition ties retain an explicit BEAM floating-point
   tie-breaking deviation rather than an exact trial-tape claim.
+- MIPROv2's pinned path no longer forces a zero-shot substitute: it constructs
+  and retains DSPy 3.2.1's ordered zero-shot, labels-only, unshuffled, and
+  shuffled bootstrap arms, then jointly searches instruction and demo
+  variables through the public API. Independent DSPy/Optuna execution binds
+  candidate contents and startup parameter order; checkpoints resume the joint
+  search without replay. Python hash-based repeated-call trace choice remains
+  an explicit BEAM SHA-256 deviation rather than an exact sequence claim.

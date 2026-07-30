@@ -45,11 +45,25 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
       Config.new(proposer_fidelity: :dspy_3_2_1)
     end
 
-    assert_raise ArgumentError, ~r/max_bootstrapped_demos: 0/, fn ->
+    fewshot =
       Config.new(
         proposer_fidelity: :dspy_3_2_1,
         program_aware_proposer: false,
-        fewshot_aware_proposer: false
+        fewshot_aware_proposer: false,
+        max_bootstrapped_demos: 2,
+        max_labeled_demos: 1
+      )
+
+    assert fewshot.max_bootstrapped_demos == 2
+    assert fewshot.max_labeled_demos == 1
+
+    assert_raise ArgumentError, ~r/requires max_bootstrapped_demos > 0/, fn ->
+      Config.new(
+        proposer_fidelity: :dspy_3_2_1,
+        program_aware_proposer: false,
+        fewshot_aware_proposer: false,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 1
       )
     end
 

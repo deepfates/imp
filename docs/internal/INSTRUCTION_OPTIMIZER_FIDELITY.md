@@ -97,17 +97,25 @@ structured-response substitution rather than silently claiming parity. Its
 selected mode is part of durable checkpoint compatibility, so a resumed study
 cannot drift between proposer algorithms.
 
-The public compile path also reproduces DSPy's otherwise surprising zero-shot
-bootstrap before proposal. For six candidates over 20 rows it constructs the
-zero arm plus five bootstrap rounds, advances the same CPython RNG through four
-shuffle/size decisions, and stops each round when its accepted-demo target is
-met. With an always-accepting metric this is nine task calls before nine prompt
-calls (three summary plus six proposal); with no accepted examples the bounded
-bootstrap maximum is 100 task calls. Because `fewshot_aware_proposer: false`
-and zero-shot search discard every resulting demo, bootstrap content and scores
-do not enter proposal messages or the search space. Calls, failures, budgets,
-cache effects, and RNG advancement remain observable and are therefore still
-matched rather than optimized away.
+The public compile path reproduces DSPy's ordered few-shot arm construction.
+In a real few-shot run it retains zero-shot, labels-only, unshuffled-bootstrap,
+and shuffled-bootstrap candidates; uses CPython-compatible shuffle, `randint`,
+and `sample` streams; and adds one demo categorical variable after each named
+predictor's instruction variable. An independently executed DSPy 3.2.1 public
+compile matches the complete ordered demo contents for the provider-free
+fixture, and an independent Optuna 4.9.0 run matches the resulting joint
+instruction/demo startup schedule. Trial-atomic checkpoints retain those demo
+candidates and resume without proposal or bootstrap replay.
+
+DSPy's zero-shot mode still performs its otherwise surprising bootstrap before
+proposal and then discards the demos. For six candidates over 20 rows it
+constructs the zero arm plus five bootstrap rounds, advances the same CPython
+RNG through four shuffle/size decisions, and stops each round when its accepted
+demo target is met. With an always-accepting metric this is nine task calls
+before nine prompt calls (three summary plus six proposal); with no accepted
+examples the bounded bootstrap maximum is 100 task calls. Calls, failures,
+budgets, cache effects, and RNG advancement remain observable and are therefore
+still matched rather than optimized away.
 
 The fidelity path matches DSPy when an ordinary later summary-batch call fails:
 it stops extending the observations and asks the summarizer to use the prefix

@@ -14,10 +14,10 @@ defmodule Imp.Optimizer.MIPROv2 do
   one-instruction JSON schema (`:off`, `:auto`, or `:required`).
 
   `:proposer_fidelity` defaults to Imp's documented `:beam_native` grounded
-  proposer. Set it to `:dspy_3_2_1` for the narrow matched-comparison path with
+  proposer. Set it to `:dspy_3_2_1` for the matched-comparison path with
   `program_aware_proposer: false`, `fewshot_aware_proposer: false`, and data/tip
-  awareness enabled in zero-shot mode; unsupported combinations fail before
-  any LM call.
+  awareness enabled. Both zero-shot and joint instruction/demonstration search
+  are supported; unsupported proposer combinations fail before any LM call.
 
   `:search_fidelity` separately controls parameter search. The legacy narrow
   `:dspy_3_2_1_optuna_4_9_0_startup` mode reproduces Optuna 4.9.0's NumPy
@@ -375,8 +375,15 @@ defmodule Imp.Optimizer.MIPROv2 do
 
     {demo_candidates, bootstrap_metadata, proposal_rng} =
       if config.proposer_fidelity == :dspy_3_2_1 do
-        UpstreamBootstrap.build!(teacher, config.trainset, optimizer.metric, proposal_rng,
+        UpstreamBootstrap.build!(
+          program,
+          teacher,
+          config.trainset,
+          optimizer.metric,
+          proposal_rng,
           candidate_count: config.num_fewshot_candidates,
+          max_bootstrapped_demos: config.max_bootstrapped_demos,
+          max_labeled_demos: config.max_labeled_demos,
           metric_threshold: optimizer.metric_threshold,
           timeout: optimizer.timeout,
           max_errors: optimizer.max_errors
@@ -491,7 +498,7 @@ defmodule Imp.Optimizer.MIPROv2 do
 
     policy =
       config
-      |> search_policy(predictors)
+      |> search_policy(predictors, search_demos)
       |> then(fn {module, extra_opts} ->
         SearchPolicy.new(
           module,
@@ -915,21 +922,29 @@ defmodule Imp.Optimizer.MIPROv2 do
     end
   end
 
-  defp search_policy(%{search_fidelity: :beam_native}, _predictors),
+  defp search_policy(%{search_fidelity: :beam_native}, _predictors, _demos),
     do: {CategoricalPolicy, []}
 
-  defp search_policy(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup}, predictors) do
-    parameter_order =
-      Enum.flat_map(predictors, fn %{name: name} -> [param_key(name, :instruction)] end)
+  defp search_policy(
+         %{search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup},
+         predictors,
+         demos
+       ) do
+    parameter_order = pinned_parameter_order(predictors, demos)
 
     {OptunaStartupPolicy, [parameter_order: parameter_order]}
   end
 
-  defp search_policy(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0}, predictors) do
-    parameter_order =
-      Enum.flat_map(predictors, fn %{name: name} -> [param_key(name, :instruction)] end)
+  defp search_policy(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0}, predictors, demos) do
+    parameter_order = pinned_parameter_order(predictors, demos)
 
     {OptunaTPEPolicy, [parameter_order: parameter_order]}
+  end
+
+  defp pinned_parameter_order(predictors, demos) do
+    Enum.flat_map(predictors, fn %{name: name} ->
+      [param_key(name, :instruction)] ++ if(demos, do: [param_key(name, :demos)], else: [])
+    end)
   end
 
   defp exact_search_fidelity?(%{search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup}),
