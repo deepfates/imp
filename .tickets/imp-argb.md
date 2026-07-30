@@ -1,6 +1,6 @@
 ---
 id: imp-argb
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-07-30T22:14:07Z
