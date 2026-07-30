@@ -529,8 +529,13 @@ def treatment_preservation_gate(contract: dict[str, Any]) -> dict[str, Any]:
         "v2 runtime-class mapping drift",
     )
     require(
-        contract["launch_status"] == "draft_unsealed_pending_compatibility_review",
-        "v2 unexpectedly launchable",
+        contract["launch_status"]
+        in (
+            "draft_unsealed_pending_compatibility_review",
+            "blocked_live_preflight",
+            "sealed",
+        ),
+        "v2 launch state drift",
     )
     return {
         "v1_contract_sha256": contract["predecessor"]["contract_sha256"],

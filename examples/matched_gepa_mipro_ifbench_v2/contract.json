@@ -220,7 +220,7 @@
   },
   "capture": {"messages": true, "responses": true, "transports": true, "costs": true, "selected_parameters": true},
   "source_commits": {
-    "imp": "resolved exactly from the clean paired coordinator launch with required ancestor a1b37ab785d7ab200bd1d8c6b18ee4e89a6c9ff0",
+    "imp": "resolved exactly from the clean paired coordinator launch with required ancestor 9998361c5ec2896f3a640a89ee3c43a7d0595d56",
     "dspy": "https://github.com/stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
     "gepa": "https://github.com/gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
     "gepa_artifact": "https://github.com/gepa-ai/gepa-artifact@cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
@@ -237,7 +237,7 @@
     "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
     "consumer_project": {"path": "mix.exs", "sha256": "1e9a3d53b0d374d88d51bc01a28ad8e353109373f245a95e0aa4eaa83116a58d"},
     "contract_runtime": {"path": "contract.exs", "sha256": "d3e25078331e2beb18f580d7bcc64f05a6cf32f724954da1cabb1bba76ea0e24"},
-    "coordinator": {"path": "run_paired.py", "sha256": "edb18bc1944cf07655253c046b47c2c1e5c2e6afd9660db1e98e11fb5f2637b7"},
+    "coordinator": {"path": "run_paired.py", "sha256": "4e8dec038183eecb839fa157c97823bf817c767751968ffee305088cc63e1a22"},
     "guard_equivalence": {"path": "guard_equivalence.py", "sha256": "ddb169e0865b65a67d0f810af3aee7e11e09e698acfcc036e9466306e078c914"},
     "imp_entry": {"path": "run_imp.exs", "sha256": "ded073fd827c533a181f7e77a60e81a0db15265a847baa8184fa12b23c302f35"},
     "imp_preflight": {"path": "paired_preflight.exs", "sha256": "60a336a2a63592eef4021d7f370f29780f5b2d8baf11087c22edd3ffd1d44eeb"},
@@ -248,12 +248,12 @@
   },
   "provider_free_gate": {
     "source_path": "equivalence_gate.py",
-    "source_sha256": "ece9e073f02a15a2b23fca47a1b2d35dad681a80c0d007aa8ecc333f50c7e0fa",
+    "source_sha256": "0cad203c16d3785e4ae372155907de4ef10d774115989cbce345196636559d37",
     "result_path": "provider-free-review.json",
     "result_sha256": "0eb04ae6b4e9bacca4baf84a4a3e79acacfde3500a2e23890a1e52439efc6537",
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
   "provider_authority": "blocked_pending_final_coordinator_review",
-  "launch_status": "draft_unsealed_pending_compatibility_review"
+  "launch_status": "blocked_live_preflight"
 }
