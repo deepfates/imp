@@ -455,6 +455,7 @@ class PairedCoordinatorTest(unittest.TestCase):
         expected = {
             "call_budget",
             "consumer_lock",
+            "consumer_gitignore",
             "consumer_project",
             "contract_runtime",
             "guard_equivalence",

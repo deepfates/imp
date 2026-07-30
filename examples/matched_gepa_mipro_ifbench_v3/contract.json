@@ -249,6 +249,7 @@
   },
   "paired_surface": {
     "call_budget": {"path": "call_budget.exs", "sha256": "11d6ec5522c5575cd2cf9a58747365e8907257a9a61643b450682bdff7543751"},
+    "consumer_gitignore": {"path": ".gitignore", "sha256": "8304b37aa09dbb085a768a8b036b7dace48049b0865148f257d55e35bf4fc41f"},
     "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
     "consumer_project": {"path": "mix.exs", "sha256": "48ca06e0b585ad08c4b4a68b52459653c77ff0e98e088f3c7337e628e0dbcb24"},
     "contract_runtime": {"path": "contract.exs", "sha256": "62783edcd6b58465c87f0c166a0d448cc25ad094c8a69f9e17236d49af9891f7"},
