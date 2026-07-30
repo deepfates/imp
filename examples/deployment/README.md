@@ -46,6 +46,35 @@ mechanics; they do **not** show that `LabeledFewShot` improves a real model, a
 natural task, or a user's data. Replace `ImpDeployment.Workflow.static_lm/0`
 and the three disjoint datasets before making an effectiveness claim.
 
+## Optional bounded real-model smoke
+
+`banking77_gepa_smoke.exs` is the corresponding one-seed, real-model product
+smoke. It uses the same public `Imp.Experiment.check/5`, `Result`, `Artifact`,
+and `ProgramServer` surfaces with the pinned public Banking77 subset. GEPA sees
+72 training rows and eight selection rows; the 40 test rows are evaluated only
+after the selected artifact has been built and validated. The script then
+evaluates the baseline on those same untouched rows, stops the parent runtime,
+and serves four concurrent two-stage requests from the selected artifact in a
+fresh OS BEAM process.
+
+The committed config permits one seed, at most 328 task-model transports and
+two optimizer-model transports, disables cache/retries/fallbacks, requires
+`data_collection=deny`, and reserves at most `$2.491392`. Immediately before
+the first model call, the script checks the current OpenRouter catalog for the
+exact first-party routes, structured-output parameters, and sealed prices. Any
+drift stops the run.
+
+```sh
+OPENROUTER_API_KEY=... \
+IMP_PATH=../.. \
+mix run --no-start banking77_gepa_smoke.exs
+```
+
+Neutral, negative, malformed, or stopped behavior is a valid retained outcome.
+Even a positive result establishes only this bounded product path on the pinned
+four-intent task; it is not general GEPA or Imp effectiveness evidence. The
+provider-free workflow above remains the default package demonstration.
+
 ```sh
 IMP_ARTIFACT_PATH=/secure/program.json \
 IMP_MODEL=openai:gpt-4.1-mini \
