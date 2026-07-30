@@ -30,7 +30,8 @@ own baseline by `+0.1458`, with interval `[0.0458, 0.2458]` and Holm-adjusted
 winner.
 
 The committed compact result is
-`benchmarks/results/matched-instruction-optimizers-trec-20260726.json`. It binds
+`benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json`.
+It binds
 the full retained Imp, upstream, and aggregate artifacts by SHA-256; those raw
 artifacts remain local because they contain 181 MB of per-call evidence.
 The treatment used 6,491 calls and `$3.13862325` in provider-reported cost.

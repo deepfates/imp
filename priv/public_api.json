@@ -2750,6 +2750,138 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
+        "check/5"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Experiment",
+      "signatures": {
+        "functions": {
+          "check/5": [
+            "check(program, optimizer, data, metric, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/experiment.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "capture!/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Experiment.Bootstrap",
+      "signatures": {
+        "functions": {
+          "capture!/3": [
+            "capture!(data, config, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/experiment/bootstrap.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "manifest/1",
+        "new/1",
+        "split/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Experiment.Data",
+      "signatures": {
+        "functions": {
+          "manifest/1": [
+            "manifest(data)"
+          ],
+          "new/1": [
+            "new(opts)"
+          ],
+          "split/2": [
+            "split(data, split)"
+          ]
+        },
+        "types": {
+          "split/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/experiment/data.ex",
+      "struct_fields": [
+        "digests",
+        "ids",
+        "selection",
+        "test",
+        "train"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "split/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "read!/1",
+        "to_map/1",
+        "write!/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Experiment.Result",
+      "signatures": {
+        "functions": {
+          "read!/1": [
+            "read!(path)"
+          ],
+          "to_map/1": [
+            "to_map(result)"
+          ],
+          "write!/2": [
+            "write!(result, path)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/experiment/result.ex",
+      "struct_fields": [
+        "artifact",
+        "baseline_selection",
+        "optimized_selection",
+        "program",
+        "provenance",
+        "selected",
+        "status",
+        "test"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
         "run/3",
         "start/3",
         "stop/2"

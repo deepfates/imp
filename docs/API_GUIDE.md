@@ -688,6 +688,44 @@ The behaviour layer checks that required splits are present and unsupported
 splits are absent. Each optimizer remains responsible for validating split
 contents and any optimizer-specific relationship between them.
 
+For a complete train/selection/untouched-test check, use the shared public
+experiment boundary instead of writing selection and artifact plumbing around
+each optimizer:
+
+```elixir
+data =
+  Imp.Experiment.Data.new(
+    train: trainset,
+    selection: devset,
+    test: [
+      Imp.example(question: "French capital?", answer: "Paris")
+      |> Imp.with_inputs(:question)
+    ]
+  )
+
+{:ok, checked} =
+  Imp.Experiment.check(program, optimizer, data, metric,
+    artifact_id: "support-router-v1",
+    config: %{"optimizer" => "gepa", "generations" => 8},
+    metric_identity: %{"id" => "support-route-exact", "version" => 1},
+    bootstrap: [upstreams: %{"dspy" => "pinned commit"}]
+  )
+
+result_path = Path.join(System.tmp_dir!(), "support-router-result.json")
+artifact_path = Path.join(System.tmp_dir!(), "support-router.json")
+:ok = Imp.Experiment.Result.write!(checked, result_path)
+:ok = Imp.Optimizer.Artifact.write!(checked.artifact, artifact_path)
+```
+
+`Imp.Experiment.Data` rejects duplicate identities within or across splits.
+`check/5` evaluates baseline and candidate only on selection, retains baseline
+on a tie, and touches the test split only after selection. Evaluation errors,
+optimizer failure, missing reports, and non-numeric scores return a failed
+stage rather than a partial result. The checksummed result owns minimal Git,
+lock, data, configuration, and outcome provenance; the separate artifact owns
+the selected parameters. In a fresh process, reconstruct trusted program code
+and runtime clients and apply that artifact as shown below.
+
 Use:
 
 | Optimizer | Use it when |

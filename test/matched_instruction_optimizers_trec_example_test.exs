@@ -38,7 +38,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
   alias MatchedInstructionOptimizersTREC.Aggregator
 
   @manifest "examples/matched_instruction_optimizers_trec/contract.json"
-  @result "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
+  @result "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json"
 
   test "freezes exact authorities, dataset IDs, models, and runtime request controls" do
     manifest = Contract.load!(@manifest)

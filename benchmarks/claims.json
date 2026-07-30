@@ -447,7 +447,7 @@
       "comparison": "dspy_gepa_and_imp_baseline",
       "gate_policy": "informational",
       "sources": [
-        "benchmarks/results/matched-instruction-optimizers-trec-20260726.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json",
         "examples/matched_instruction_optimizers_trec/README.md",
         "test/matched_instruction_optimizers_trec_example_test.exs"
       ],
@@ -477,7 +477,7 @@
       "comparison": "imp_baseline",
       "gate_policy": "informational",
       "sources": [
-        "benchmarks/results/matched-instruction-optimizers-trec-20260726.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json",
         "examples/matched_instruction_optimizers_trec/README.md",
         "test/matched_instruction_optimizers_trec_example_test.exs"
       ],

@@ -1535,7 +1535,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp matched_instruction_optimizers_lane(max_age_hours) do
-    path = "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
+    path =
+      "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json"
 
     with {:ok, artifact} <- read_artifact(path),
          true <- valid_matched_instruction_optimizer_result?(artifact) do

@@ -68,8 +68,8 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
 
     This generated report answers whether the selected upstream-conformance
     profile has unresolved blocking rows. It is not the product release verdict
-    or work queue; see `docs/maintainers/RELEASE.md` for the ordinary consumer
-    finish line and `tk` for unfinished work.
+    or work queue; the source repository's maintainer release procedure owns
+    the ordinary consumer finish line and `tk` owns unfinished work.
 
     Baseline: DSPy #{report.baseline.version} (`#{report.baseline.git_sha}`)
     Release profile: #{report.release_profile["id"]}

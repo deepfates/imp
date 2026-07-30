@@ -108,6 +108,7 @@
         "Imp.Error",
         "Imp.Errors",
         "Imp.Evaluate",
+        "Imp.Experiment",
         "Imp.Example",
         "Imp.ExternalCommand",
         "Imp.History",

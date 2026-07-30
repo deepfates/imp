@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "artifact_type": "imp_dspy_matched_instruction_optimizer_outcome",
+  "status": "complete",
+  "generated_at": "2026-07-27T04:02:19Z",
+  "campaign_id": "matched-strong-instruction-optimizers-trec-v1",
+  "manifest": {
+    "path": "examples/matched_instruction_optimizers_trec/contract.json",
+    "sha256": "0253960b8c570f0e0dd3a2a84450327f3244338fdff002f40ffed44bd9f15e94"
+  },
+  "source_commits": {
+    "imp_treatment": "c2205ba1e60fef09701e0f5d7915a2b9f247d51b",
+    "imp_aggregator": "a1cbd80",
+    "dspy": "29448ae12756abdd14bd8796c819247ebb83673c",
+    "gepa": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
+  },
+  "models": {
+    "task": "openai/gpt-5.4-mini",
+    "optimizer": "anthropic/claude-sonnet-4.6",
+    "endpoint": "OpenRouter",
+    "task_provider": "OpenAI",
+    "optimizer_provider": "Anthropic"
+  },
+  "dataset": {
+    "name": "TREC fine-label binary routing subset",
+    "train_rows": 20,
+    "selection_rows": 40,
+    "untouched_test_rows": 80,
+    "seeds": [
+      2026072602,
+      2026072603,
+      2026072604
+    ],
+    "test_visible_to_optimization_or_selection": false
+  },
+  "controls": {
+    "cache": false,
+    "retry": false,
+    "max_retries": 0,
+    "fallbacks": false,
+    "data_collection": "deny",
+    "task_transport_attempts_per_call": 1,
+    "optimizer_transport_attempts_per_call": 1,
+    "paired_runtime_guard_equivalence": true,
+    "semantic_gepa_stop": "max_metric_calls with legal completion of the current pinned iteration"
+  },
+  "held_out_accuracy_by_seed": {
+    "imp": {
+      "baseline": [
+        0.5375,
+        0.5,
+        0.55
+      ],
+      "gepa": [
+        0.9625,
+        0.9,
+        0.925
+      ],
+      "mipro_v2": [
+        0.6125,
+        0.9,
+        0.5125
+      ]
+    },
+    "upstream": {
+      "baseline": [
+        0.5625,
+        0.5125,
+        0.55
+      ],
+      "gepa": [
+        0.925,
+        0.9375,
+        0.95
+      ],
+      "mipro_v2": [
+        0.8375,
+        0.6625,
+        0.625
+      ]
+    }
+  },
+  "mean_held_out": {
+    "imp": {
+      "baseline_accuracy": 0.5291666666666667,
+      "baseline_macro_f1": 0.4327429948859416,
+      "gepa_accuracy": 0.9291666666666667,
+      "gepa_macro_f1": 0.9287653562581388,
+      "mipro_v2_accuracy": 0.6750000000000002,
+      "mipro_v2_macro_f1": 0.6404725051524558
+    },
+    "upstream": {
+      "baseline_accuracy": 0.5416666666666666,
+      "baseline_macro_f1": 0.4703756495445648,
+      "gepa_accuracy": 0.9375,
+      "gepa_macro_f1": 0.93745502709652,
+      "mipro_v2_accuracy": 0.7083333333333334,
+      "mipro_v2_macro_f1": 0.6840691320258151
+    }
+  },
+  "paired_acceptance": {
+    "headline_passed": true,
+    "winning_optimizer": "gepa",
+    "imp_gepa_minus_imp_baseline": {
+      "mean": 0.4,
+      "confidence_interval_95": [
+        0.29583333333333334,
+        0.5041666666666668
+      ],
+      "p_one_sided": 0.00009999000099990002,
+      "holm_adjusted_p": 0.00019998000199980003
+    },
+    "imp_mipro_v2_minus_imp_baseline": {
+      "mean": 0.14583333333333331,
+      "confidence_interval_95": [
+        0.04583333333333331,
+        0.2458333333333334
+      ],
+      "p_one_sided": 0.0026997300269973002,
+      "holm_adjusted_p": 0.0026997300269973002
+    },
+    "imp_gepa_minus_upstream_gepa": {
+      "mean": -0.008333333333333331,
+      "confidence_interval_95": [
+        -0.04583333333333334,
+        0.029166666666666667
+      ],
+      "noninferiority_margin": -0.05,
+      "noninferiority_passed": true
+    },
+    "uncertainty": "10,000 source-ID-clustered bootstrap resamples across all three optimizer seeds; three seeds still provide limited model-sampling uncertainty"
+  },
+  "execution": {
+    "imp": {
+      "calls": 3254,
+      "task_calls": 3214,
+      "optimizer_calls": 40,
+      "provider_reported_cost_usd": 1.49463525,
+      "held_out_parse_errors_after_typed_nil_normalization": 0
+    },
+    "upstream": {
+      "calls": 3237,
+      "task_calls": 3198,
+      "optimizer_calls": 39,
+      "provider_reported_cost_usd": 1.643988,
+      "held_out_parse_errors": 0
+    },
+    "treatment_cost_usd": 3.13862325,
+    "conservative_workshop_aggregate_after_treatment_usd_lte": 6.221975,
+    "authorized_workshop_ceiling_usd": 100.0
+  },
+  "raw_retained_artifacts": {
+    "imp": {
+      "path": "tmp/matched_instruction_optimizers_trec/imp-result.json",
+      "bytes": 139552428,
+      "sha256": "fdc225948555f110f5391954611ffef83672c30835ff533dd3a5fa9d6fa41434"
+    },
+    "upstream": {
+      "path": "tmp/matched_instruction_optimizers_trec/upstream-result.json",
+      "bytes": 41797465,
+      "sha256": "a167f56e1f56a5da053bbbdea419a748f3b2b6bbfda41d66c4fc50481bd94974"
+    },
+    "aggregate": {
+      "path": "tmp/matched_instruction_optimizers_trec/aggregate.json",
+      "bytes": 18261,
+      "sha256": "a7d67cca0b3d44f6803ca421ecab6a094f491666ebd8e57295195893b38b284f"
+    }
+  },
+  "claim_boundary": {
+    "establishes": "On this frozen TREC task, these exact models, messages, splits, seeds, and budgets, Imp GEPA materially improved its baseline and was non-inferior to pinned DSPy GEPA under the preregistered margin. Imp MIPROv2 also improved its own baseline.",
+    "excludes": [
+      "general GEPA or MIPROv2 effectiveness",
+      "paper-family replication",
+      "algorithmic identity beyond the pinned semantic opportunity and declared deviations",
+      "superiority over DSPy",
+      "BEAM-native superiority",
+      "SIMBA, COPRO, InferRules, or other optimizer-family effectiveness"
+    ]
+  }
+}

@@ -45,7 +45,7 @@ mix benchmark.dashboard --profile v0.1
 ```
 
 Use the result as a claim audit, not as a roadmap or a complete product
-verdict. In a source checkout, `docs/maintainers/RELEASE.md` defines the
+verdict. In a source checkout, the maintainer release procedure defines the
 ordinary release finish line: a clean consumer must install, optimize, inspect,
 persist, restart, and serve a real program through the public API. Research
 targets may remain open without making that narrower product behavior false.

@@ -509,7 +509,7 @@ defmodule Imp.UpstreamFidelity do
         artifacts: [
           "benchmarks/evidence/admitted/instruction_contract/0d032ab3266c2eb8aef9ea021a1a445688cbdc4e208d9bde9d57037b1f302a49.json",
           "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json",
-          "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
+          "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json"
         ],
         missing: [
           "whole-optimizer and held-out effectiveness evidence for InferRules, plus any upstream parity authority for the native SignatureOptimizer extension",
@@ -561,7 +561,7 @@ defmodule Imp.UpstreamFidelity do
         ],
         artifacts: [
           "benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json",
-          "benchmarks/results/matched-instruction-optimizers-trec-20260726.json"
+          "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json"
         ],
         missing: [
           "cross-task matched effectiveness beyond the frozen TREC contract",

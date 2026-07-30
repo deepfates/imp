@@ -1,0 +1,228 @@
+defmodule Imp.ExperimentTest do
+  use ExUnit.Case, async: false
+
+  alias Imp.Experiment.{Data, Result}
+  alias Imp.Optimizer.{Artifact, Report}
+
+  defmodule SelectableOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct []
+
+    @impl true
+    def __optimizer__ do
+      %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+    end
+
+    @impl true
+    def run(%__MODULE__{}, program, opts) do
+      true = Keyword.has_key?(opts, :trainset)
+
+      optimized =
+        program
+        |> Imp.ProgramParameters.put_instruction(:main, "Return the selected answer.")
+        |> Report.attach(
+          Report.new(
+            optimizer: :instruction_search,
+            best_score: 1.0,
+            candidate_count: 2
+          )
+        )
+
+      {:ok, optimized}
+    end
+  end
+
+  defmodule FailingOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct []
+
+    @impl true
+    def __optimizer__ do
+      %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+    end
+
+    @impl true
+    def run(%__MODULE__{}, _program, _opts), do: {:error, :deliberate_failure}
+  end
+
+  setup do
+    root = Path.join(System.tmp_dir!(), "imp-experiment-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf!(root) end)
+    %{root: root}
+  end
+
+  test "public lifecycle selects on validation, tests only the champion, and reloads the artifact",
+       %{
+         root: root
+       } do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Return the baseline answer.")
+      |> Imp.predict(lm: lm(owner))
+
+    data =
+      Data.new(
+        train: [row("train-1", "train")],
+        selection: [row("selection-1", "selection")],
+        test: [row("test-1", "test")],
+        id: :id
+      )
+
+    metric = Imp.exact_match(:answer)
+
+    assert {:ok, result} =
+             Imp.Experiment.check(program, %SelectableOptimizer{}, data, metric,
+               artifact_id: "selected-v1",
+               config: %{"optimizer" => "selectable-v1"},
+               metric_identity: %{"id" => "exact-answer", "version" => 1},
+               bootstrap: [source_root: root, locks: [], metadata: %{purpose: "feature-test"}]
+             )
+
+    assert result.selected == :optimized
+    assert result.baseline_selection.score == 0.0
+    assert result.optimized_selection.score == 1.0
+    assert result.test.score == 1.0
+    assert Artifact.inspect(result.artifact).champion_id == "selected-v1"
+
+    assert_received {:call, "selection", false}
+    assert_received {:call, "selection", true}
+    assert_received {:call, "test", true}
+    refute_received {:call, "test", false}
+    refute_received {:call, "train", _selected?}
+
+    result_path = Path.join(root, "result.json")
+    artifact_path = Path.join(root, "artifact.json")
+    :ok = Result.write!(result, result_path)
+    :ok = Artifact.write!(result.artifact, artifact_path)
+
+    assert %{"payload" => %{"selected" => "optimized", "status" => "completed"}} =
+             Result.read!(result_path)
+
+    receipt_path = Path.join(root, "fresh-receipt.json")
+
+    code = """
+    stored = Imp.Experiment.Result.read!(#{inspect(result_path)})
+    artifact = stored["payload"]["artifact"]
+    lm = Imp.LM.Static.new(handler: fn messages, _opts ->
+      rendered = Enum.map_join(messages, "\\n", & &1.content)
+      %{answer: if(String.contains?(rendered, "Return the selected answer."), do: "yes", else: "no")}
+    end)
+    fresh = "question -> answer" |> Imp.signature("Fresh baseline.") |> Imp.predict(lm: lm)
+    applied = Imp.Optimizer.Artifact.apply(artifact, fresh)
+    {:ok, prediction} = Imp.call(applied, %{question: "fresh"})
+    File.write!(#{inspect(receipt_path)}, Jason.encode!(%{
+      answer: Imp.get(prediction, :answer),
+      champion: Imp.Optimizer.Artifact.inspect(artifact).champion_id
+    }))
+    """
+
+    assert {"", 0} =
+             System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+               cd: File.cwd!(),
+               env: [{"MIX_ENV", "test"}],
+               stderr_to_stdout: true
+             )
+
+    assert %{"answer" => "yes", "champion" => "selected-v1"} =
+             receipt_path |> File.read!() |> Jason.decode!()
+
+    tampered_path = Path.join(root, "tampered-result.json")
+
+    tampered =
+      result_path
+      |> File.read!()
+      |> Jason.decode!()
+      |> put_in(["payload", "selected"], "baseline")
+
+    File.write!(tampered_path, Jason.encode!(tampered))
+
+    assert_raise ArgumentError, ~r/invalid Imp experiment result envelope/, fn ->
+      Result.read!(tampered_path)
+    end
+
+    unknown_path = Path.join(root, "unknown-result.json")
+    unknown = result_path |> File.read!() |> Jason.decode!()
+    unknown_payload = Map.put(unknown["payload"], "untrusted", true)
+
+    unknown =
+      unknown
+      |> Map.put("payload", unknown_payload)
+      |> Map.put("payload_sha256", Data.digest(unknown_payload))
+
+    File.write!(unknown_path, Jason.encode!(unknown))
+
+    assert_raise ArgumentError, ~r/invalid Imp experiment result payload/, fn ->
+      Result.read!(unknown_path)
+    end
+  end
+
+  test "split overlap fails before any optimizer or model call" do
+    owner = self()
+    row = row("same-source", "selection")
+
+    assert_raise ArgumentError, ~r/identity-disjoint/, fn ->
+      Data.new(train: [row], selection: [row], test: [row("test", "test")], id: :id)
+    end
+
+    refute_received _
+    _program = Imp.predict("question -> answer", lm: lm(owner))
+  end
+
+  test "optimizer failure returns its stage without touching untouched test" do
+    owner = self()
+    program = Imp.predict("question -> answer", lm: lm(owner))
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: [row("selection", "selection")],
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    assert {:error, %{stage: :optimize, reason: :deliberate_failure}} =
+             Imp.Experiment.check(program, %FailingOptimizer{}, data, Imp.exact_match(:answer),
+               config: %{"optimizer" => "failing-v1"},
+               metric_identity: "exact-answer-v1",
+               bootstrap: [source_root: System.tmp_dir!(), locks: []]
+             )
+
+    assert_received {:call, "selection", false}
+    refute_received {:call, "test", _selected?}
+  end
+
+  defp row(id, question) do
+    Imp.example(id: id, question: question, answer: "yes") |> Imp.with_inputs(:question)
+  end
+
+  defp lm(owner) do
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        rendered = Enum.map_join(messages, "\n", & &1.content)
+        selected? = String.contains?(rendered, "Return the selected answer.")
+
+        phase =
+          cond do
+            String.contains?(rendered, "selection") -> "selection"
+            String.contains?(rendered, "test") -> "test"
+            String.contains?(rendered, "train") -> "train"
+            true -> "fresh"
+          end
+
+        send(owner, {:call, phase, selected?})
+        %{answer: if(selected?, do: "yes", else: "no")}
+      end
+    )
+  end
+end
