@@ -560,7 +560,11 @@ def treatment_preservation_gate(contract: dict[str, Any]) -> dict[str, Any]:
 
 
 def runner_gate(
-    dspy: Any, dummy_cls: Any, translated_cls: Any, contract: dict[str, Any]
+    dspy: Any,
+    dummy_cls: Any,
+    translated_cls: Any,
+    contract: dict[str, Any],
+    args: argparse.Namespace,
 ) -> dict[str, Any]:
     spec = importlib.util.spec_from_file_location(
         "matched_ifbench_gepa014_upstream", HERE / "run_upstream.py"
@@ -572,7 +576,41 @@ def runner_gate(
     runner = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = runner
     spec.loader.exec_module(runner)
-    runtime = runner.load_authenticated_runtime()
+    from peer_bootstrap import build_environment, canonical_spec, peer_commands, shadow_mode
+
+    launch_commit = git_head(IMP_ROOT)
+    commands = peer_commands(
+        IMP_ROOT,
+        HERE,
+        Path(sys.executable),
+        args.dspy_root,
+        args.gepa_root,
+        args.gepa_artifact_root,
+        args.ifbench_site_packages,
+    )
+    bootstrap = canonical_spec(
+        IMP_ROOT,
+        HERE,
+        launch_commit,
+        commands,
+        IMP_ROOT / "tmp" / "matched_gepa_mipro_ifbench_gepa014",
+        args.gepa_artifact_root,
+        IMP_ROOT / "tmp" / "ifbench-parity-venv" / "bin" / "python",
+        IMP_ROOT / "tmp" / "ifbench-parity-venv" / "nltk_data",
+    )
+    canonical_env = build_environment(
+        os.environ,
+        bootstrap,
+        shadow_mode("https://127.0.0.1:1", "/owned-shadow-ca.pem"),
+    )
+    previous = dict(os.environ)
+    os.environ.clear()
+    os.environ.update(canonical_env)
+    try:
+        runtime = runner.load_authenticated_runtime()
+    finally:
+        os.environ.clear()
+        os.environ.update(previous)
     require(
         runtime.build_program is runner.build_program,
         "successor did not replace the sole v1 program factory",
@@ -603,6 +641,7 @@ def runner_gate(
     return {
         "program_factory_rebound": True,
         "authenticated_optional_import": True,
+        "bootstrap_digest": runner._bootstrap_digest,
         "manifest": runtime.MANIFEST_PATH.relative_to(HERE).as_posix(),
         "output_isolated": True,
         "arm_program_classes": classes,
@@ -688,7 +727,7 @@ def main() -> int:
     )
     os.environ["MATCHED_IFBENCH_GEPA014_COMPATIBILITY_GATE"] = "1"
     try:
-        runner = runner_gate(dspy, dummy_cls, translated_cls, contract)
+        runner = runner_gate(dspy, dummy_cls, translated_cls, contract, args)
     finally:
         os.environ.pop("MATCHED_IFBENCH_GEPA014_COMPATIBILITY_GATE", None)
     result = {
