@@ -171,14 +171,15 @@ def shadow_peer_preflight(manifest: dict[str, Any], launch_commit: str) -> dict[
                 require(time.monotonic() < deadline, "local TLS shadow server readiness timed out")
                 time.sleep(0.05)
             readiness = json.loads(ready.read_text())
+            ca_cert = str(Path(readiness["ca_cert"]).resolve())
             env = preflight_environment()
             env.update(
                 {
                     "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT": launch_commit,
                     "MATCHED_IFBENCH_GEPA014_SHADOW": "1",
                     "MATCHED_IFBENCH_GEPA014_SHADOW_BASE_URL": readiness["base_url"],
-                    "MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT": readiness["ca_cert"],
-                    "SSL_CERT_FILE": readiness["ca_cert"],
+                    "MATCHED_IFBENCH_GEPA014_SHADOW_CA_CERT": ca_cert,
+                    "SSL_CERT_FILE": ca_cert,
                 }
             )
             require("OPENROUTER_API_KEY" not in env, "shadow environment retained provider authority")

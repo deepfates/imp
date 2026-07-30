@@ -314,7 +314,7 @@
     "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
     "consumer_project": {"path": "mix.exs", "sha256": "0fbcd8d51feac25aba18c9e4c0d8aca88b64eab80d123c3ca8d880f82df5ab40"},
     "contract_runtime": {"path": "contract.exs", "sha256": "daf2f127b2a9fddf581f17ad7a2a2b36335e3d3dd94de32e1eaa0d4a5c3ab28b"},
-    "coordinator": {"path": "run_paired.py", "sha256": "14d3db3c0fd5025934de4dd7de910e5ef0e167576de42f12341234b9567845eb"},
+    "coordinator": {"path": "run_paired.py", "sha256": "f97f97b0ab55d8b54d5abe5d33c98beabfae06d775580fa1e77617f5e4ab6e94"},
     "guard_equivalence": {"path": "guard_equivalence.py", "sha256": "1b0dfd6397fcf6e6118d71dff572ece462aa518dd6d52e4c149e49a166ad6630"},
     "imp_entry": {"path": "run_imp.exs", "sha256": "2db05f7d2ca5204f21b356a39c2ea82755c8c0a6888b8415ba87559d04f43768"},
     "shadow_tls_server": {"path": "shadow_tls_server.py", "sha256": "1503dc503fa9cb1b030954f732d3d2759621a46eb68b612e3cc91f3c650a3ced"},
