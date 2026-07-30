@@ -17,6 +17,29 @@ defmodule Imp.Optimizer.SignatureOptimizerTest do
     )
   end
 
+  defp two_stage_program(owner \\ nil) do
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          text = Enum.map_join(messages, "\n", &to_string(&1.content))
+          if owner, do: send(owner, {:task_call, text})
+
+          if text =~ "[[ ## route ## ]]" do
+            %{route: if(text =~ "Always choose R17", do: "R17", else: "R42")}
+          else
+            %{evidence: "customer intent"}
+          end
+        end
+      )
+
+    Imp.TestSupport.TwoStageOptimizerProgram.new(lm)
+  end
+
+  defp two_stage_example do
+    Imp.example(utterance: "Card retained", route: "R17")
+    |> Imp.with_inputs(:utterance)
+  end
+
   test "configured proposal LM executes through the public optimizer and owns the report" do
     owner = self()
 
@@ -136,6 +159,75 @@ defmodule Imp.Optimizer.SignatureOptimizerTest do
 
     assert InstructionSearch.current_instruction(compiled) == baseline
     assert Report.fetch(compiled).metadata.baseline_score == 1.0
+  end
+
+  test "an explicitly named predictor is optimized without mutating its sibling" do
+    program = two_stage_program()
+    owner = self()
+
+    proposer =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:targeted_proposal, messages})
+          ~s(["Always choose R17"])
+        end
+      )
+
+    compiled =
+      SignatureOptimizer.new(Imp.Metrics.exact_match(:route),
+        predictor: :classify_route,
+        proposer_lm: proposer,
+        num_candidates: 1
+      )
+      |> SignatureOptimizer.compile(
+        program,
+        [two_stage_example()],
+        [two_stage_example()]
+      )
+
+    assert InstructionSearch.current_instruction(compiled, :classify_route) ==
+             "Always choose R17"
+
+    assert InstructionSearch.current_instruction(compiled, :analyze_intent) ==
+             InstructionSearch.current_instruction(program, :analyze_intent)
+
+    assert_receive {:targeted_proposal, [%{role: :system}, %{role: :user, content: payload}]}
+    proposal = Jason.decode!(payload)
+    assert proposal["predictor_name"] == "classify_route"
+
+    assert proposal["current_instruction"] ==
+             InstructionSearch.current_instruction(program, :classify_route)
+
+    assert Enum.map(proposal["program"]["predictors"], & &1["name"]) == [
+             "analyze_intent",
+             "classify_route"
+           ]
+
+    report = Report.fetch(compiled)
+    assert report.best_score == 1.0
+    assert report.metadata.predictor == :classify_route
+    assert report.metadata.selected_instruction == "Always choose R17"
+
+    assert Enum.all?(report.candidates, fn candidate ->
+             candidate.predictor == :classify_route
+           end)
+  end
+
+  test "multi-predictor programs reject an absent or unknown target before any call" do
+    program = two_stage_program(self())
+    metric = Imp.Metrics.exact_match(:route)
+
+    assert_raise ArgumentError, ~r/requires :predictor.*multi-predictor/s, fn ->
+      SignatureOptimizer.new(metric, candidates: ["Never reached"])
+      |> SignatureOptimizer.compile(program, [two_stage_example()], [two_stage_example()])
+    end
+
+    assert_raise ArgumentError, ~r/predictor :missing is not exposed/, fn ->
+      SignatureOptimizer.new(metric, predictor: :missing, candidates: ["Never reached"])
+      |> SignatureOptimizer.compile(program, [two_stage_example()], [two_stage_example()])
+    end
+
+    refute_received {:task_call, _messages}
   end
 
   @tag :tmp_dir

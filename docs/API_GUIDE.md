@@ -749,9 +749,12 @@ partial score can enter selection. The identity stores only the declared id,
 version, and a digest of its JSON-safe config. Anonymous metrics still support
 complete in-process search, explicitly without a resume state.
 
-`SignatureOptimizer` is Imp's narrow one-predictor instruction optimizer. Give
-it a proposer LM for task-aware proposals grounded in the program signature and
-a bounded view of the training examples:
+`SignatureOptimizer` changes exactly one named predictor instruction. A
+single-predictor program selects its only predictor automatically; a
+multi-predictor program must pass `predictor: :name` so Imp never silently
+rewrites every stage with one instruction. Give it a proposer LM for task-aware
+proposals grounded in the complete program structure, the selected predictor,
+and a bounded view of the training examples:
 
 ```elixir
 proposal_lm =

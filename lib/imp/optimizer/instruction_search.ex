@@ -16,6 +16,7 @@ defmodule Imp.Optimizer.InstructionSearch do
 
   def compile(program, metric, trainset, devset, candidates, opts \\ []) do
     demos = Keyword.get(opts, :demos, [])
+    predictor_name = resolve_predictor_name!(program, Keyword.get(opts, :predictor))
     candidate_instructions = unique_candidates(candidates)
 
     {candidate_results, baseline_result} =
@@ -26,24 +27,34 @@ defmodule Imp.Optimizer.InstructionSearch do
             |> Enum.map(fn instruction ->
               candidate =
                 program
-                |> put_instruction(instruction)
+                |> put_instruction(predictor_name, instruction)
                 |> maybe_put_demos(demos)
 
-              evaluate_candidate(evaluator, candidate, instruction, %{baseline: false})
+              evaluate_candidate(evaluator, candidate, instruction, %{
+                baseline: false,
+                predictor: predictor_name
+              })
             end)
 
           baseline_result =
-            evaluate_candidate(evaluator, program, current_instruction(program), %{baseline: true})
+            evaluate_candidate(
+              evaluator,
+              program,
+              current_instruction(program, predictor_name),
+              %{baseline: true, predictor: predictor_name}
+            )
 
           {candidate_results, baseline_result}
 
         {:error, error} ->
           candidate_results =
             Enum.map(candidate_instructions, fn instruction ->
-              {:error, error, instruction, %{baseline: false}}
+              {:error, error, instruction, %{baseline: false, predictor: predictor_name}}
             end)
 
-          {candidate_results, {:error, error, current_instruction(program), %{baseline: true}}}
+          {candidate_results,
+           {:error, error, current_instruction(program, predictor_name),
+            %{baseline: true, predictor: predictor_name}}}
       end
 
     {best_score, best, report_candidates, errors, report_metadata} =
@@ -64,10 +75,17 @@ defmodule Imp.Optimizer.InstructionSearch do
         metadata:
           Map.merge(report_metadata, %{
             requested_candidates: length(candidate_instructions),
-            trainset_size: safe_count(trainset)
+            trainset_size: safe_count(trainset),
+            predictor: predictor_name
           })
       })
     )
+  end
+
+  @doc "Replaces the instruction of one explicitly named optimizer predictor."
+  def put_instruction(program, predictor_name, instruction) when is_binary(instruction) do
+    predictor_name = resolve_predictor_name!(program, predictor_name)
+    Imp.ProgramParameters.put_instruction(program, predictor_name, instruction)
   end
 
   defp new_evaluator(devset, metric) do
@@ -142,6 +160,18 @@ defmodule Imp.Optimizer.InstructionSearch do
           "instruction search expects an Imp program struct, got: #{inspect(program)}"
   end
 
+  @doc "Returns the instruction of one explicitly named optimizer predictor."
+  def current_instruction(program, predictor_name) do
+    predictor_name = resolve_predictor_name!(program, predictor_name)
+
+    program
+    |> Imp.ProgramParameters.predictors()
+    |> Enum.find_value(fn
+      %{name: ^predictor_name, predictor: predictor} -> predictor.signature.instructions
+      _entry -> nil
+    end)
+  end
+
   def candidate_instructions(program, trainset, opts \\ []) do
     Imp.Optimizer.InstructionProposer.propose(program, trainset, opts)
   end
@@ -177,7 +207,7 @@ defmodule Imp.Optimizer.InstructionSearch do
     report_candidates =
       Enum.map(successes, fn {score, _candidate, instruction, metadata} ->
         metadata
-        |> Map.take([:baseline])
+        |> Map.take([:baseline, :predictor])
         |> Map.merge(%{score: score, instruction: instruction})
       end)
 
@@ -228,6 +258,35 @@ defmodule Imp.Optimizer.InstructionSearch do
       [%{predictor: predictor}] -> predictor.signature.instructions
       [] -> unsupported_program!(program)
       predictors -> ambiguous_program!(program, predictors)
+    end
+  end
+
+  defp resolve_predictor_name!(program, requested) do
+    predictors = Imp.ProgramParameters.predictors(program)
+
+    case {requested, predictors} do
+      {nil, [%{name: name}]} ->
+        name
+
+      {nil, []} ->
+        unsupported_program!(program)
+
+      {nil, predictors} ->
+        ambiguous_program!(program, predictors)
+
+      {name, predictors} when is_atom(name) or is_binary(name) ->
+        if Enum.any?(predictors, &(&1.name == name)) do
+          name
+        else
+          available = Enum.map(predictors, & &1.name)
+
+          raise ArgumentError,
+                "instruction search predictor #{inspect(name)} is not exposed by #{inspect(program.__struct__)}; available predictors: #{inspect(available)}"
+        end
+
+      {name, _predictors} ->
+        raise ArgumentError,
+              "instruction search predictor must be an atom or string, got: #{inspect(name)}"
     end
   end
 

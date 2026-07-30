@@ -3,6 +3,11 @@ defmodule Imp.Optimizer.SignatureOptimizer do
   @moduledoc """
   Optimizes one program signature instruction while leaving demonstrations unchanged.
 
+  A program with multiple named predictors must select one explicitly with
+  `predictor:`. The proposal sees the complete program structure, but candidate
+  application changes only that predictor. This keeps the search opportunity
+  explicit instead of silently rewriting every stage with one instruction.
+
   Pass `proposer_lm:` for task-aware proposals grounded in the program and
   training examples. Pass `candidates:` for explicit manual search. Supplying
   both is rejected rather than silently ignoring one source. With neither,
@@ -22,6 +27,7 @@ defmodule Imp.Optimizer.SignatureOptimizer do
   defstruct [
     :metric,
     :proposer_lm,
+    :predictor,
     candidates: [],
     num_candidates: 5,
     seed: 0,
@@ -34,6 +40,7 @@ defmodule Imp.Optimizer.SignatureOptimizer do
   @option_schema [
     candidates: [type: {:list, :string}, default: []],
     proposer_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
+    predictor: [type: {:custom, __MODULE__, :validate_predictor, []}, default: nil],
     num_candidates: [type: :pos_integer, default: 5],
     seed: [type: :integer, default: 0],
     temperature: [
@@ -70,6 +77,11 @@ defmodule Imp.Optimizer.SignatureOptimizer do
   def validate_temperature(value) when is_number(value) and value >= 0, do: {:ok, value}
   def validate_temperature(_value), do: {:error, "expected a non-negative number"}
 
+  @doc false
+  def validate_predictor(nil), do: {:ok, nil}
+  def validate_predictor(value) when is_atom(value) or is_binary(value), do: {:ok, value}
+  def validate_predictor(_value), do: {:error, "expected nil, an atom, or a string"}
+
   @impl true
   def __optimizer__,
     do: %{
@@ -92,7 +104,8 @@ defmodule Imp.Optimizer.SignatureOptimizer do
   end
 
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
-    {candidates, proposal} = proposals(optimizer, program, trainset)
+    predictor = selected_predictor!(program, optimizer.predictor)
+    {candidates, proposal} = proposals(optimizer, program, trainset, predictor)
 
     compiled =
       Imp.Optimizer.InstructionSearch.compile(
@@ -100,7 +113,8 @@ defmodule Imp.Optimizer.SignatureOptimizer do
         optimizer.metric,
         trainset,
         devset,
-        candidates
+        candidates,
+        predictor: predictor
       )
 
     search = Imp.Optimizer.Report.fetch(compiled)
@@ -123,7 +137,9 @@ defmodule Imp.Optimizer.SignatureOptimizer do
           proposal_response_format: optimizer.proposal_response_format,
           requested_candidates: length(candidates),
           baseline_score: search.metadata[:baseline_score],
-          selected_instruction: Imp.Optimizer.InstructionSearch.current_instruction(compiled),
+          predictor: predictor,
+          selected_instruction:
+            Imp.Optimizer.InstructionSearch.current_instruction(compiled, predictor),
           search: %{
             optimizer: search.optimizer,
             status: search.metadata[:status],
@@ -135,11 +151,16 @@ defmodule Imp.Optimizer.SignatureOptimizer do
     Imp.Optimizer.Report.attach(compiled, report)
   end
 
-  defp proposals(%__MODULE__{candidates: [_ | _] = candidates}, _program, _trainset) do
+  defp proposals(
+         %__MODULE__{candidates: [_ | _] = candidates},
+         _program,
+         _trainset,
+         _predictor
+       ) do
     {candidates, %{mode: :manual, status: :ok, calls: 0, errors: []}}
   end
 
-  defp proposals(%__MODULE__{} = optimizer, program, trainset) do
+  defp proposals(%__MODULE__{} = optimizer, program, trainset, predictor) do
     opts = [
       lm: optimizer.proposer_lm,
       count: optimizer.num_candidates,
@@ -148,6 +169,8 @@ defmodule Imp.Optimizer.SignatureOptimizer do
       view_data_batch_size: optimizer.view_data_batch_size,
       proposal_response_format: optimizer.proposal_response_format,
       extra_instructions: optimizer.extra_instructions,
+      instruction_target: predictor,
+      predictor_name: predictor,
       preserve_slots: true
     ]
 
@@ -156,5 +179,34 @@ defmodule Imp.Optimizer.SignatureOptimizer do
 
     mode = if optimizer.proposer_lm, do: :language_model, else: :native_fallback
     {candidates, Map.put(proposal, :mode, mode)}
+  end
+
+  defp selected_predictor!(program, requested) do
+    predictors = Imp.ProgramParameters.predictors(program)
+
+    case {requested, predictors} do
+      {nil, [%{name: name}]} ->
+        name
+
+      {nil, []} ->
+        raise ArgumentError,
+              "SignatureOptimizer requires a program with at least one optimizer predictor"
+
+      {nil, predictors} ->
+        names = Enum.map(predictors, & &1.name)
+
+        raise ArgumentError,
+              "SignatureOptimizer requires :predictor for a multi-predictor program; available predictors: #{inspect(names)}"
+
+      {name, predictors} ->
+        if Enum.any?(predictors, &(&1.name == name)) do
+          name
+        else
+          names = Enum.map(predictors, & &1.name)
+
+          raise ArgumentError,
+                "SignatureOptimizer predictor #{inspect(name)} is not exposed by the program; available predictors: #{inspect(names)}"
+        end
+    end
   end
 end

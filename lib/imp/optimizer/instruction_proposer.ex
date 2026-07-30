@@ -201,7 +201,7 @@ defmodule Imp.Optimizer.InstructionProposer do
 
   defp prompt_payload(program, trainset, scored_examples, opts) do
     payload = %{
-      current_instruction: Imp.Optimizer.InstructionSearch.current_instruction(program),
+      current_instruction: current_instruction(program, opts),
       predictor_name: Keyword.get(opts, :predictor_name, :main),
       predictor_index: Keyword.get(opts, :predictor_index, 0),
       proposal_index: Keyword.get(opts, :proposal_index, 0),
@@ -480,7 +480,7 @@ defmodule Imp.Optimizer.InstructionProposer do
   end
 
   defp fallback_candidates(program, trainset, opts) do
-    base = Imp.Optimizer.InstructionSearch.current_instruction(program) || "Complete the task."
+    base = current_instruction(program, opts) || "Complete the task."
     labels = infer_labels(trainset)
 
     [
@@ -507,7 +507,7 @@ defmodule Imp.Optimizer.InstructionProposer do
   end
 
   defp fallback_without_labels(program, opts) do
-    base = Imp.Optimizer.InstructionSearch.current_instruction(program) || "Complete the task."
+    base = current_instruction(program, opts) || "Complete the task."
 
     [
       base,
@@ -519,4 +519,11 @@ defmodule Imp.Optimizer.InstructionProposer do
 
   defp signature_spec(%Imp.Signature{} = signature), do: Imp.Signature.to_spec(signature)
   defp signature_spec(nil), do: nil
+
+  defp current_instruction(program, opts) do
+    case Keyword.fetch(opts, :instruction_target) do
+      {:ok, name} -> Imp.Optimizer.InstructionSearch.current_instruction(program, name)
+      :error -> Imp.Optimizer.InstructionSearch.current_instruction(program)
+    end
+  end
 end
