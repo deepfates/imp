@@ -1043,6 +1043,15 @@ Imp.Optimizer.SIMBA.compile(simba, program, trainset, devset,
 )
 ```
 
+SIMBA reflection receives the declared module identity, named predictor
+signatures and instructions, and captured trajectories. It does not read the
+program module's source file by default. Add consumer-owned public context with
+`reflection_grounding: {:text, "..."}`. The explicit
+`reflection_grounding: :module_source` mode reads at most 20,000 characters
+from the compiled module source and may send them to the prompt LM; use it only
+when that source is intentionally shareable. The grounding mode and content
+digest are bound into durable resume compatibility.
+
 Reports expose `metadata.run_status` as `:paused` or `:complete`. Which
 boundaries replay, the rebinding and trust contract, and the provider
 training-job lifecycle are in [Operations Reference](OPERATIONS_REFERENCE.md).

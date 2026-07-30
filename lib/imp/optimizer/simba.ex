@@ -7,6 +7,13 @@ defmodule Imp.Optimizer.SIMBA do
   outputs vary most, and creates candidates by appending successful trace demos
   or predictor-specific reflective rules. It maintains an exploratory program
   population and performs final selection on the full validation dataset.
+
+  Reflection is grounded in the declared predictor names, signatures,
+  instructions, and captured trajectories by default. `:reflection_grounding`
+  may be set to `{:text, context}` for explicit consumer-owned context or to
+  `:module_source` to opt into reading up to 20,000 characters from the
+  program module's compile source. SIMBA never reads ambient source files under
+  the default `:structure` mode.
   """
 
   alias Imp.Optimizer.{DurableCallbackIdentity, Report, Sampling, SearchPolicy, TrajectoryRunner}
@@ -17,6 +24,7 @@ defmodule Imp.Optimizer.SIMBA do
     :metric_identity,
     :prompt_lm,
     :teacher_lm,
+    reflection_grounding: :structure,
     bsize: 32,
     num_candidates: 6,
     max_steps: 8,
@@ -37,6 +45,7 @@ defmodule Imp.Optimizer.SIMBA do
     :metric_identity,
     :prompt_lm,
     :teacher_lm,
+    :reflection_grounding,
     :demo_input_field_maxlen,
     :max_concurrency,
     :timeout,
@@ -65,6 +74,7 @@ defmodule Imp.Optimizer.SIMBA do
       max_demos: Keyword.get(opts, :max_demos, 4),
       prompt_lm: opts[:prompt_lm],
       teacher_lm: opts[:teacher_lm],
+      reflection_grounding: Keyword.get(opts, :reflection_grounding, :structure),
       demo_input_field_maxlen: Keyword.get(opts, :demo_input_field_maxlen, 100_000),
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
       timeout: Keyword.get(opts, :timeout, :infinity),
@@ -334,6 +344,7 @@ defmodule Imp.Optimizer.SIMBA do
           upstream_release: "DSPy 3.3.0b1",
           upstream_commit: "b2829b7",
           seed: optimizer.seed,
+          reflection_grounding: grounding_identity(optimizer.reflection_grounding, program),
           trial_logs: state.trial_logs,
           final_candidates: final_candidates,
           baseline_score: if(scored_finalists == [], do: nil, else: hd(scored_finalists).score),
@@ -599,7 +610,7 @@ defmodule Imp.Optimizer.SIMBA do
     end
   end
 
-  defp apply_strategy(:append_rule, program, bucket, analysis, _optimizer, prompt_lm) do
+  defp apply_strategy(:append_rule, program, bucket, analysis, optimizer, prompt_lm) do
     good = hd(bucket.trajectories)
     bad = List.last(bucket.trajectories)
 
@@ -617,7 +628,7 @@ defmodule Imp.Optimizer.SIMBA do
 
       disposition ->
         {good, bad} = suppress_trajectory(good, bad, disposition)
-        payload = reflection_payload(program, good, bad)
+        payload = reflection_payload(program, good, bad, optimizer.reflection_grounding)
 
         case Imp.Optimizer.SIMBA.Reflection.run(prompt_lm, payload) do
           {:ok, advice, _discussion} -> apply_advice(program, advice)
@@ -669,9 +680,9 @@ defmodule Imp.Optimizer.SIMBA do
     end)
   end
 
-  defp reflection_payload(program, good, bad) do
+  defp reflection_payload(program, good, bad, grounding) do
     %{
-      program_code: program_representation(program),
+      program_code: program_representation(program, grounding),
       modules_defn: module_definitions(program),
       module_names: Enum.map(Imp.ProgramParameters.predictors(program), & &1.name),
       program_inputs: example_inputs(good.example),
@@ -724,11 +735,17 @@ defmodule Imp.Optimizer.SIMBA do
 
   defp reflection_trajectory(_trace), do: []
 
-  defp program_representation(%module{} = program) do
+  defp program_representation(%module{} = program, :structure) do
+    "Program module: #{inspect(module)}\nOptimizer predictors: " <>
+      inspect(Enum.map(Imp.ProgramParameters.predictors(program), & &1.name))
+  end
+
+  defp program_representation(_program, {:text, context}), do: context
+
+  defp program_representation(%module{} = program, :module_source) do
     case module_source(module) do
       nil ->
-        "Program module: #{inspect(module)}\nOptimizer predictors: " <>
-          inspect(Enum.map(Imp.ProgramParameters.predictors(program), & &1.name))
+        program_representation(program, :structure)
 
       source ->
         source
@@ -1039,6 +1056,7 @@ defmodule Imp.Optimizer.SIMBA do
         max_steps: optimizer.max_steps,
         max_demos: optimizer.max_demos,
         demo_input_field_maxlen: optimizer.demo_input_field_maxlen,
+        reflection_grounding: grounding_identity(optimizer.reflection_grounding, program),
         max_concurrency: optimizer.max_concurrency,
         timeout: optimizer.timeout,
         sampling_temperature: optimizer.sampling_temperature,
@@ -1199,9 +1217,35 @@ defmodule Imp.Optimizer.SIMBA do
 
     validate_lm!(optimizer.prompt_lm, :prompt_lm)
     validate_lm!(optimizer.teacher_lm, :teacher_lm)
+    validate_reflection_grounding!(optimizer.reflection_grounding)
 
     optimizer
   end
+
+  defp validate_reflection_grounding!(:structure), do: :ok
+  defp validate_reflection_grounding!(:module_source), do: :ok
+
+  defp validate_reflection_grounding!({:text, context})
+       when is_binary(context) and context != "" and byte_size(context) <= 20_000,
+       do: :ok
+
+  defp validate_reflection_grounding!(value) do
+    raise ArgumentError,
+          ":reflection_grounding must be :structure, :module_source, or {:text, nonempty_context_up_to_20000_bytes}; got: #{inspect(value)}"
+  end
+
+  defp grounding_identity(:structure, _program), do: %{mode: :structure}
+
+  defp grounding_identity(:module_source, %module{}) do
+    source = module_source(module)
+    %{mode: :module_source, content_sha256: content_sha256(source)}
+  end
+
+  defp grounding_identity({:text, context}, _program),
+    do: %{mode: :text, content_sha256: content_sha256(context)}
+
+  defp content_sha256(nil), do: nil
+  defp content_sha256(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
 
   defp validate_lm!(lm, key) do
     case Imp.LM.validate_lm(lm) do

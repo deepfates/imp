@@ -75,7 +75,8 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
 
     assert_received {:simba_reflection, reflection_messages}
     reflection_prompt = Enum.map_join(reflection_messages, "\n", & &1.content)
-    assert reflection_prompt =~ "defmodule Imp.Predict.Predict"
+    assert reflection_prompt =~ "Program module: Imp.Predict.Predict"
+    refute reflection_prompt =~ "defmodule Imp.Predict.Predict"
     assert reflection_prompt =~ "Module main"
     assert reflection_prompt =~ "Input Fields"
     assert reflection_prompt =~ "better_program_trajectory"
@@ -96,6 +97,62 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       assert Enum.any?(task_messages, fn messages ->
                length(messages) >= 4 and Enum.any?(messages, &(&1.role == :assistant))
              end)
+    end
+  end
+
+  test "module source grounding is explicit opt-in" do
+    parent = self()
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          if rem(Keyword.get(opts, :rollout_id, 0), 2) == 0,
+            do: %{answer: "Paris"},
+            else: %{answer: "unknown"}
+        end
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(parent, {:source_grounded_reflection, messages})
+          %{discussion: "Use the better result.", module_advice: %{main: "Answer Paris."}}
+        end
+      )
+
+    rows =
+      for question <- ["Capital of France?", "Eiffel Tower city?"] do
+        Imp.example(question: question, answer: "Paris") |> Imp.with_inputs(:question)
+      end
+
+    Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
+      bsize: 2,
+      num_candidates: 2,
+      max_steps: 1,
+      max_demos: 0,
+      prompt_lm: prompt_lm,
+      reflection_grounding: :module_source,
+      seed: 4
+    )
+    |> Imp.Optimizer.SIMBA.compile(Imp.predict("question -> answer", lm: task_lm), rows)
+
+    assert_received {:source_grounded_reflection, messages}
+    prompt = Enum.map_join(messages, "\n", & &1.content)
+    assert prompt =~ "defmodule Imp.Predict.Predict"
+  end
+
+  test "explicit reflection context is bounded and validated at construction" do
+    metric = Imp.Metrics.exact_match(:answer)
+
+    assert %Imp.Optimizer.SIMBA{reflection_grounding: {:text, "Public task context."}} =
+             Imp.Optimizer.SIMBA.new(metric,
+               reflection_grounding: {:text, "Public task context."}
+             )
+
+    for invalid <- [{:text, ""}, {:text, String.duplicate("x", 20_001)}, :ambient_source] do
+      assert_raise ArgumentError, ~r/:reflection_grounding must be/, fn ->
+        Imp.Optimizer.SIMBA.new(metric, reflection_grounding: invalid)
+      end
     end
   end
 
