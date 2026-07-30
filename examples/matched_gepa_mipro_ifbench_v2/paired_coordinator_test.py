@@ -81,25 +81,41 @@ class PairedCoordinatorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root, mock.patch.object(
             paired, "TMP", Path(root)
         ):
+            counts = {
+                "task_logical": 1,
+                "optimizer_logical": 1,
+                "total_logical": 2,
+                "transports": 2,
+            }
             common = {
                 "status": "stopped",
-                "actual_cost": 0.25,
-                "usd_reserved": 1.0,
+                "actual_cost": 0.01,
+                "usd_reserved": 0.087744,
                 "rescue_accounting": {
-                    "call_budgets": [],
-                    "ledger": {"responses": 0, "transports": 0},
+                    "call_budgets": [
+                        {
+                            "seed": manifest["seeds"][0],
+                            "arm": "gepa",
+                            "ceiling": manifest["execution"]["call_ceilings"]["gepa"],
+                            "counts": counts,
+                            "refusal_count": 0,
+                        }
+                    ],
+                    "ledger": {"responses": 2, "transports": 2},
                 },
                 **binding,
             }
             (Path(root) / "imp-result.json").write_text(
-                json.dumps({**common, "lm_results": [], "transport_events": []})
+                json.dumps(
+                    {**common, "lm_results": [{}, {}], "transport_events": [{}, {}]}
+                )
             )
             (Path(root) / "upstream-result.json").write_text(
-                json.dumps({**common, "calls": []})
+                json.dumps({**common, "calls": [{}, {}]})
             )
             paired.require_rescued_stop_artifacts(manifest, launch_commit)
 
-            drifted = {**common, "actual_cost": 1.1, "calls": []}
+            drifted = {**common, "actual_cost": 0.1, "calls": [{}, {}]}
             (Path(root) / "upstream-result.json").write_text(json.dumps(drifted))
             with self.assertRaisesRegex(RuntimeError, "exceeds its reserved"):
                 paired.require_rescued_stop_artifacts(manifest, launch_commit)
@@ -107,10 +123,29 @@ class PairedCoordinatorTest(unittest.TestCase):
             unavailable = {
                 **common,
                 "source_commits": {**source_commits, "imp": "unavailable"},
-                "calls": [],
+                "calls": [{}, {}],
             }
             (Path(root) / "upstream-result.json").write_text(json.dumps(unavailable))
             with self.assertRaisesRegex(RuntimeError, "source commit binding"):
+                paired.require_rescued_stop_artifacts(manifest, launch_commit)
+
+            nonzero_empty = {
+                **common,
+                "actual_cost": 0.01,
+                "usd_reserved": 0.01,
+                "rescue_accounting": {
+                    "call_budgets": [],
+                    "ledger": {"responses": 0, "transports": 0},
+                },
+                "calls": [],
+            }
+            (Path(root) / "upstream-result.json").write_text(json.dumps(nonzero_empty))
+            with self.assertRaisesRegex(RuntimeError, "empty ledgers carry nonzero"):
+                paired.require_rescued_stop_artifacts(manifest, launch_commit)
+
+            inflated = {**common, "usd_reserved": 0.2, "calls": [{}, {}]}
+            (Path(root) / "upstream-result.json").write_text(json.dumps(inflated))
+            with self.assertRaisesRegex(RuntimeError, "does not match manifest-bound"):
                 paired.require_rescued_stop_artifacts(manifest, launch_commit)
 
     def test_rescue_rejects_budget_and_ledger_divergence(self) -> None:
@@ -203,7 +238,7 @@ class PairedCoordinatorTest(unittest.TestCase):
             },
             "calls": [{"adapter_transport_dispatch": 1}],
             "actual_cost": 0.0,
-            "usd_reserved": 1.0,
+            "usd_reserved": 0.007104,
         }
         with tempfile.TemporaryDirectory() as root, mock.patch.dict(
             os.environ, {"MATCHED_IFBENCH_V2_EXPECTED_COMMIT": launch_commit}

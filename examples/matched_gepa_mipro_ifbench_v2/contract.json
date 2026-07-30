@@ -237,7 +237,7 @@
     "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
     "consumer_project": {"path": "mix.exs", "sha256": "1e9a3d53b0d374d88d51bc01a28ad8e353109373f245a95e0aa4eaa83116a58d"},
     "contract_runtime": {"path": "contract.exs", "sha256": "d3e25078331e2beb18f580d7bcc64f05a6cf32f724954da1cabb1bba76ea0e24"},
-    "coordinator": {"path": "run_paired.py", "sha256": "382d98c9b5a95811289a0e4e2b668313960907e2511436f47679922c98f65b2c"},
+    "coordinator": {"path": "run_paired.py", "sha256": "edb18bc1944cf07655253c046b47c2c1e5c2e6afd9660db1e98e11fb5f2637b7"},
     "guard_equivalence": {"path": "guard_equivalence.py", "sha256": "ddb169e0865b65a67d0f810af3aee7e11e09e698acfcc036e9466306e078c914"},
     "imp_entry": {"path": "run_imp.exs", "sha256": "ded073fd827c533a181f7e77a60e81a0db15265a847baa8184fa12b23c302f35"},
     "imp_preflight": {"path": "paired_preflight.exs", "sha256": "60a336a2a63592eef4021d7f370f29780f5b2d8baf11087c22edd3ffd1d44eeb"},

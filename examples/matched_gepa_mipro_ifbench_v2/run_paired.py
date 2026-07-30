@@ -515,7 +515,7 @@ def require_number(value: Any, label: str) -> float:
 
 def validate_rescue_accounting(
     runtime: str, result: dict[str, Any], manifest: dict[str, Any]
-) -> None:
+) -> dict[str, int]:
     accounting = result.get("rescue_accounting")
     require(
         isinstance(accounting, dict), f"{runtime} rescue lacks normalized accounting"
@@ -527,6 +527,8 @@ def validate_rescue_accounting(
     seen: set[tuple[int, str]] = set()
     total = 0
     transports = 0
+    task_logical = 0
+    optimizer_logical = 0
     for budget in budgets:
         require(isinstance(budget, dict), f"{runtime} rescue budget is malformed")
         seed = budget.get("seed")
@@ -568,6 +570,8 @@ def validate_rescue_accounting(
         )
         total += counts["total_logical"]
         transports += counts["transports"]
+        task_logical += counts["task_logical"]
+        optimizer_logical += counts["optimizer_logical"]
 
     ledger = accounting.get("ledger")
     require(isinstance(ledger, dict), f"{runtime} rescue lacks ledger summary")
@@ -598,6 +602,31 @@ def validate_rescue_accounting(
         response_count == transport_count == total == transports,
         f"{runtime} rescue budget/response/transport ledgers diverge",
     )
+    return {
+        "task_logical": task_logical,
+        "optimizer_logical": optimizer_logical,
+        "total_logical": total,
+    }
+
+
+def reservation_rates(manifest: dict[str, Any]) -> dict[str, Decimal]:
+    request = manifest["execution"]["request"]
+    models = manifest["models"]
+    rates = {
+        "task": Decimal(request["task"]["reservation_input_tokens"])
+        * Decimal(models["task"]["catalog_prompt_per_token"])
+        + Decimal(request["task"]["max_tokens"])
+        * Decimal(models["task"]["catalog_completion_per_token"]),
+        "optimizer": Decimal(request["optimizer"]["reservation_input_tokens"])
+        * Decimal(models["optimizer"]["catalog_cache_write_per_token"])
+        + Decimal(request["optimizer"]["max_tokens"])
+        * Decimal(models["optimizer"]["catalog_completion_per_token"]),
+    }
+    require(
+        rates == {"task": Decimal("0.007104"), "optimizer": Decimal("0.08064")},
+        "manifest reservation rates drift",
+    )
+    return rates
 
 
 def require_rescued_stop_artifacts(
@@ -610,6 +639,10 @@ def require_rescued_stop_artifacts(
         "dspy": manifest["authorities"]["dspy"]["commit"],
         "gepa": manifest["authorities"]["gepa"]["commit"],
     }
+    rates = reservation_rates(manifest)
+    runtime_maximum = worst_case_usd(manifest) / Decimal(2)
+    require(runtime_maximum == Decimal("37.27641600"), "runtime reservation cap drift")
+    tolerance = Decimal("0.000000001")
     for runtime in ("imp", "upstream"):
         path = TMP / f"{runtime}-result.json"
         require(path.is_file(), f"{runtime} did not rescue a stopped artifact")
@@ -641,7 +674,30 @@ def require_rescued_stop_artifacts(
             actual <= reserved + 1e-6,
             f"{runtime} actual cost exceeds its reserved cost",
         )
-        validate_rescue_accounting(runtime, result, manifest)
+        counts = validate_rescue_accounting(runtime, result, manifest)
+        expected_reserved = (
+            Decimal(counts["task_logical"]) * rates["task"]
+            + Decimal(counts["optimizer_logical"]) * rates["optimizer"]
+        )
+        reserved_decimal = Decimal(str(reserved))
+        if counts["total_logical"] == 0:
+            require(
+                actual == 0 and reserved == 0,
+                f"{runtime} empty ledgers carry nonzero cost",
+            )
+        else:
+            require(
+                actual > 0 or reserved > 0,
+                f"{runtime} nonempty ledgers lack bound cost accounting",
+            )
+        require(
+            abs(reserved_decimal - expected_reserved) <= tolerance,
+            f"{runtime} reserved cost does not match manifest-bound calls",
+        )
+        require(
+            reserved_decimal <= runtime_maximum + tolerance,
+            f"{runtime} reserved cost exceeds the per-runtime maximum",
+        )
 
 
 def run_peers(launch_commit: str) -> int:
