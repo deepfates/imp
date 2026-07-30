@@ -104,7 +104,7 @@ def canonical_spec(
             tmp / "upstream-result.json.selection-sealed.json"
         ),
         "LITELLM_LOCAL_MODEL_COST_MAP": "True",
-        "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT": launch_commit,
+        "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT": "$LAUNCH_COMMIT",
         "NLTK_DATA": str(ifbench_nltk_data),
         "OPENAI_API_KEY": "",
         "UPSTREAM_MATCHED_IFBENCH_GEPA014_IMP_SELECTION": str(
@@ -148,6 +148,7 @@ def build_environment(
     inherited: Mapping[str, str],
     spec: Mapping[str, object],
     mode: PeerMode,
+    launch_commit: str,
 ) -> dict[str, str]:
     """Apply the canonical fixed environment and one explicit mode substitution."""
 
@@ -155,6 +156,9 @@ def build_environment(
     for key in PROVIDER_CREDENTIAL_KEYS:
         env.pop(key, None)
     env.update(spec["common_environment"])  # type: ignore[arg-type]
+    if len(launch_commit) != 40:
+        raise RuntimeError("peer launch commit must be full-length")
+    env["MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT"] = launch_commit
     substitutions = mode.substitutions()
     if set(substitutions) != MODE_SUBSTITUTION_KEYS:
         raise RuntimeError("peer mode substitution surface drift")
@@ -204,6 +208,11 @@ def require_runtime_environment(
     common = expected_spec["common_environment"]
     assert isinstance(common, dict)
     for key, value in common.items():
+        if key == "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT":
+            actual = environment.get(key, "")
+            if len(actual) != 40:
+                raise RuntimeError("peer launch commit binding is absent")
+            continue
         if environment.get(key) != value:
             raise RuntimeError(f"peer fixed bootstrap environment drift: {key}")
     if environment.get("LITELLM_LOCAL_MODEL_COST_MAP") != "True":

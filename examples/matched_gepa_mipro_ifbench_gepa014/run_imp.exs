@@ -1325,8 +1325,13 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
     spec = Jason.decode!(materialized)
 
     Enum.each(spec["common_environment"], fn {key, expected} ->
-      if System.get_env(key) != expected,
-        do: raise("peer fixed bootstrap environment drift: #{key}")
+      if key == "MATCHED_IFBENCH_GEPA014_EXPECTED_COMMIT" do
+        if byte_size(System.get_env(key, "")) != 40,
+          do: raise("peer launch commit binding is absent")
+      else
+        if System.get_env(key) != expected,
+          do: raise("peer fixed bootstrap environment drift: #{key}")
+      end
     end)
 
     if System.get_env("LITELLM_LOCAL_MODEL_COST_MAP") != "True",

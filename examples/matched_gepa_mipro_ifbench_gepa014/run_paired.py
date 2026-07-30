@@ -155,7 +155,7 @@ def bootstrap_spec(launch_commit: str) -> dict[str, object]:
 
 
 def peer_environment(mode: Any, launch_commit: str) -> dict[str, str]:
-    return build_environment(os.environ, bootstrap_spec(launch_commit), mode)
+    return build_environment(os.environ, bootstrap_spec(launch_commit), mode, launch_commit)
 
 
 def system_ca_file() -> str:

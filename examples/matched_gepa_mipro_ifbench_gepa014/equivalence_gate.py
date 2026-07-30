@@ -602,6 +602,7 @@ def runner_gate(
         os.environ,
         bootstrap,
         shadow_mode("https://127.0.0.1:1", "/owned-shadow-ca.pem"),
+        launch_commit,
     )
     previous = dict(os.environ)
     os.environ.clear()
