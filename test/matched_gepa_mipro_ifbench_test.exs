@@ -35,4 +35,26 @@ defmodule Imp.MatchedGepaMiproIFBenchTest do
     assert report["status"] == "pass"
     assert report["count"] == 14
   end
+
+  test "stopped launch remains unscored and binds every retained artifact" do
+    result = read_json!("stopped-result.json")
+    assert result["status"] == "stopped_incomplete_unscored"
+    refute result["held_out_loaded"]
+    refute result["scored"]
+
+    Enum.each(result["artifacts"], fn {_name, artifact} ->
+      path = Path.join(@root, artifact["path"])
+      assert File.regular?(path)
+      assert sha256(path) == artifact["sha256"]
+    end)
+  end
+
+  defp read_json!(name), do: @root |> Path.join(name) |> File.read!() |> Jason.decode!()
+
+  defp sha256(path) do
+    path
+    |> File.read!()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
 end

@@ -180,5 +180,5 @@
     "privacy_guard": "per-request provider.data_collection=deny; exact provider-only route; no fallback",
     "transport_guard": "retry=false; max_retries=0; one adapter dispatch per logical call"
   },
-  "launch_status": "sealed"
+  "launch_status": "stopped_incomplete_upstream_program_forward_contract"
 }

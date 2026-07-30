@@ -23,5 +23,10 @@ Run the fail-closed preflight from the repository root:
 python3 examples/matched_gepa_mipro_ifbench/run_paired.py --preflight-only
 ```
 
-After the live preflight is retained and the manifest is sealed, the same
-command without `--preflight-only` is the only authorized live entry.
+The one sealed launch stopped after the first seed's baselines, before GEPA
+could propose a candidate. The pinned GEPA-artifact `IFBenchCoT2StageProgram`
+implements `__call__`, while DSPy 3.2.1 GEPA's trace bootstrap requires a
+`forward` method. The coordinator stopped both peers and retained their full
+cost, call, response, and baseline-artifact records. This run is incomplete and
+unscored; it is neither an optimizer loss nor cross-task effectiveness evidence.
+The manifest is now permanently non-launchable.

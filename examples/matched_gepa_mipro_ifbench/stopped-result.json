@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "campaign_id": "matched-gepa-mipro-ifbench-v1",
+  "status": "stopped_incomplete_unscored",
+  "source_commit": "bcdc8c6fc63bd5926863e0fbc228bd0aeafec1ea",
+  "manifest_sha256": "f45f4226bee18a2b38b645842d41fdd571473b645dfe1d1ad705f64907b1d05e",
+  "reason": "Pinned gepa-artifact IFBenchCoT2StageProgram implements __call__ but no forward; DSPy 3.2.1 GEPA trace bootstrap requires forward before constructing the first reflective batch.",
+  "treatment_started": true,
+  "held_out_loaded": false,
+  "scored": false,
+  "completed": {
+    "seed": 2026072705,
+    "arm": "baseline",
+    "split": "selection",
+    "imp_mean_constraint_score": 0.6770833333333333,
+    "upstream_mean_constraint_score": 0.6927083333333334,
+    "upstream_parse_errors": 5
+  },
+  "cost": {
+    "imp_actual_usd": 0.17998124999999995,
+    "upstream_actual_usd": 0.20040600000000003,
+    "total_actual_usd": 0.38038725,
+    "conservative_workshop_bound_after_usd_lte": 6.60236225
+  },
+  "artifacts": {
+    "imp_stopped": {"path": "exercised-stopped-imp.json", "sha256": "19c0b0027d63276b6c713b2d915c3e16cdd2077d7544a36498b30989bfa9f30d"},
+    "upstream_stopped": {"path": "exercised-stopped-upstream.json", "sha256": "f44388690c7c94f8d05bc8d2905b70212da6ec345c013d891ba69c6d668209b6"},
+    "imp_baseline": {"path": "exercised-sealed-imp-baseline.json", "sha256": "949aee0ae1e854571b1360f0c58ed37a3a62243625283ab08c7b5053fb32b2b6"},
+    "upstream_baseline": {"path": "exercised-sealed-upstream-baseline.json", "sha256": "cf870b634462f87feacf7cea29cf6b419dd56b7f71921776546033d122bcdf58"}
+  },
+  "claim_boundary": "The run proves fail-closed paired launch, cost/accounting preservation, and one baseline selection stage in each runtime. It does not score GEPA or MIPROv2, load held-out data, establish cross-task effectiveness, or establish parity or superiority."
+}

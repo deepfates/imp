@@ -98,7 +98,11 @@ defmodule MatchedGepaMiproIFBench.Contract do
     require!(manifest["campaign_id"] == "matched-gepa-mipro-ifbench-v1", "campaign id drift")
 
     require!(
-      manifest["launch_status"] in ["blocked_live_preflight", "sealed"],
+      manifest["launch_status"] in [
+        "blocked_live_preflight",
+        "sealed",
+        "stopped_incomplete_upstream_program_forward_contract"
+      ],
       "launch status drift"
     )
 

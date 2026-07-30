@@ -494,3 +494,18 @@ gate, clean-room consumer, OTP workflow, docs, and public API checks pass.
 Older admitted source-bound optimizer receipts remain stale where their bound
 source hashes no longer match current main; they have not been silently
 recaptured, and the claims dashboard correctly keeps the release profile false.
+
+**2026-07-30T10:12:00Z**
+
+The separately sealed three-seed source-disjoint IFBench comparison stopped
+unscored during seed 2026072705, after both baseline selection artifacts and
+before the first GEPA proposal. The pinned GEPA-artifact
+`IFBenchCoT2StageProgram` exposes `__call__` but not `forward`; DSPy 3.2.1
+GEPA's trace bootstrap requires `forward`, so the upstream arm could not build
+its first reflective batch. The paired coordinator stopped Imp and retained
+both runtimes' full call/cost records plus their baseline artifacts. Actual
+reported spend was `$0.38038725`, bringing the conservative workshop bound to
+`$6.60236225`. Held-out data was never loaded and GEPA/MIPROv2 were not scored;
+this is an upstream workflow compatibility failure, not an optimizer loss or
+cross-task effectiveness evidence. The exact manifest is permanently
+non-launchable and the existing instruction-family/GEPA gaps remain open.
