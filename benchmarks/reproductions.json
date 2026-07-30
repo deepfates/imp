@@ -1171,6 +1171,12 @@
           "artifact": "benchmarks/evidence/admitted/bootstrap_finetune_differential/8a226901c3fc2f02f005a2d6bd3057a80d73ae230205cf13f0ecf1617084ae9d.json",
           "artifact_sha256": "8a226901c3fc2f02f005a2d6bd3057a80d73ae230205cf13f0ecf1617084ae9d",
           "protocol_id": "bootstrap_finetune_differential"
+        },
+        {
+          "tier": "t1",
+          "artifact": "benchmarks/evidence/admitted/bootstrap_finetune_differential/1a908a83c3277472f3866a6ec2e782d12b7ba0b38ea2e8ede595035dfdc3cee8.json",
+          "artifact_sha256": "1a908a83c3277472f3866a6ec2e782d12b7ba0b38ea2e8ede595035dfdc3cee8",
+          "protocol_id": "bootstrap_finetune_differential"
         }
       ],
       "id": "bootstrap_finetune",
