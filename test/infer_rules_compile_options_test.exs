@@ -23,6 +23,12 @@ defmodule Imp.Optimizer.InferRulesCompileOptionsTest do
     end
   end
 
+  defmodule SafetyLM do
+    defstruct [:error]
+
+    def generate(%__MODULE__{error: error}, _messages, _opts), do: {:error, error}
+  end
+
   test "direct compile rejects unsupported options before bootstrap or task activity" do
     owner = self()
 
@@ -111,5 +117,77 @@ defmodule Imp.Optimizer.InferRulesCompileOptionsTest do
     assert report.metadata.proposal_attempts == 3
     assert report.best_score == 1.0
     assert compiled.signature.instructions =~ "Return the exact expected answer."
+  end
+
+  test "rule induction keeps operational safety failures fatal" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        reason: :provider_drift,
+        message: "rule route guard"
+      )
+
+    task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "yes"} end)
+    program = Imp.predict("question -> answer", lm: task_lm)
+    row = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
+
+    optimizer =
+      InferRules.new(Imp.exact_match(:answer),
+        rule_lm: %SafetyLM{error: safety},
+        num_candidates: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0
+      )
+
+    assert_raise Imp.OperationalSafetyError, "rule route guard", fn ->
+      InferRules.compile(optimizer, program, [row], [row])
+    end
+  end
+
+  test "candidate evaluation keeps operational safety failures fatal" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :budget,
+        reason: :call_limit,
+        message: "evaluation budget guard"
+      )
+
+    program = Imp.predict("question -> answer", lm: %SafetyLM{error: safety})
+    row = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
+
+    optimizer =
+      InferRules.new(Imp.exact_match(:answer),
+        candidates: ["Return yes."],
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0
+      )
+
+    assert_raise Imp.OperationalSafetyError, "evaluation budget guard", fn ->
+      InferRules.compile(optimizer, program, [row], [row])
+    end
+  end
+
+  test "cancelled candidate evaluation retains and raises its operational cause" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :transport,
+        reason: :connection_lost,
+        message: "evaluation transport guard"
+      )
+
+    program = Imp.predict("question -> answer", lm: %SafetyLM{error: safety})
+    row = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
+
+    optimizer =
+      InferRules.new(Imp.exact_match(:answer),
+        candidates: ["Return yes."],
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        max_errors: 1
+      )
+
+    assert_raise Imp.OperationalSafetyError, "evaluation transport guard", fn ->
+      InferRules.compile(optimizer, program, [row], [row])
+    end
   end
 end

@@ -58,3 +58,8 @@ Canonical claims classify every advertised family as stable or distinctly experi
   policy rather than optimizer semantics; Imp's route, cost, budget, transport,
   and cancellation guards remain fatal rather than being contained as proposal
   diagnostics.
+- InferRules now preserves the same fail-closed operational boundary through
+  rule induction and candidate evaluation, including `max_errors` cancellation
+  envelopes. Ordinary proposal/evaluation failures remain visible and
+  candidate-local as documented; route, cost, budget, transport, and explicit
+  cancellation errors cannot be mistaken for a merely low-scoring rule set.

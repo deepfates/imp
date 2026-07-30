@@ -22,6 +22,10 @@ defmodule Imp.Optimizer.InferRules do
   Imp also reuses a logical call's sequential rollout ID while its prompt
   shrinks; DSPy draws a fresh random rollout ID for every retry.
 
+  Operational route, cost, budget, transport, and cancellation guards are
+  never candidate-local: they remain fatal through both rule induction and
+  candidate evaluation.
+
   Pass `:rule_lm` (or `:prompt_lm`) to keep rule induction separate from the
   task LM. Without one, the program's bound LM is used. `:candidates` accepts
   already-induced rule strings and is useful for deterministic replay.
@@ -655,18 +659,24 @@ defmodule Imp.Optimizer.InferRules do
         {:ok, rules, attempt}
 
       {:error, reason} ->
-        if context_window_exceeded?(reason) and length(examples) > 1 do
-          do_induce_rules(
-            rule_lm,
-            Enum.drop(examples, -1),
-            signature,
-            num_rules,
-            rollout_id,
-            teacher_settings,
-            attempt + 1
-          )
-        else
-          {:error, reason, attempt}
+        case find_operational_safety(reason) do
+          %Imp.OperationalSafetyError{} = safety ->
+            raise safety
+
+          nil ->
+            if context_window_exceeded?(reason) and length(examples) > 1 do
+              do_induce_rules(
+                rule_lm,
+                Enum.drop(examples, -1),
+                signature,
+                num_rules,
+                rollout_id,
+                teacher_settings,
+                attempt + 1
+              )
+            else
+              {:error, reason, attempt}
+            end
         end
     end
   end
@@ -692,9 +702,14 @@ defmodule Imp.Optimizer.InferRules do
       end
     end)
   rescue
+    safety in Imp.OperationalSafetyError -> reraise safety, __STACKTRACE__
     error -> {:error, error}
   catch
-    kind, reason -> {:error, {kind, reason}}
+    kind, reason ->
+      case find_operational_safety({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> raise safety
+        nil -> {:error, {kind, reason}}
+      end
   end
 
   defp normalize_rules(rules) when is_binary(rules) do
@@ -768,6 +783,7 @@ defmodule Imp.Optimizer.InferRules do
 
   defp evaluate_candidate(evaluator, candidate) do
     result = Imp.Evaluate.run(evaluator, candidate.program)
+    raise_operational_safety!(result.errors)
 
     if result.errors == [] do
       Map.merge(candidate, %{score: result.score, status: :ok})
@@ -775,10 +791,24 @@ defmodule Imp.Optimizer.InferRules do
       Map.merge(candidate, %{score: result.score, status: :with_errors, errors: result.errors})
     end
   rescue
-    error -> Map.merge(candidate, %{score: nil, status: :error, error: error_message(error)})
+    safety in Imp.OperationalSafetyError ->
+      reraise safety, __STACKTRACE__
+
+    error in Imp.EvaluationCancelledError ->
+      raise_operational_safety!(error.errors)
+      Map.merge(candidate, %{score: nil, status: :error, error: error_message(error)})
+
+    error ->
+      Map.merge(candidate, %{score: nil, status: :error, error: error_message(error)})
   catch
     kind, reason ->
-      Map.merge(candidate, %{score: nil, status: :error, error: error_message({kind, reason})})
+      case find_operational_safety({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          raise safety
+
+        nil ->
+          Map.merge(candidate, %{score: nil, status: :error, error: error_message({kind, reason})})
+      end
   end
 
   defp select_best(evaluated, fallback) do
@@ -893,4 +923,28 @@ defmodule Imp.Optimizer.InferRules do
   defp error_message(%_{} = error), do: Exception.message(error)
   defp error_message(error) when is_binary(error), do: error
   defp error_message(error), do: inspect(error)
+
+  defp raise_operational_safety!(value) do
+    case find_operational_safety(value) do
+      %Imp.OperationalSafetyError{} = safety -> raise safety
+      nil -> :ok
+    end
+  end
+
+  defp find_operational_safety(%Imp.OperationalSafetyError{} = error), do: error
+
+  defp find_operational_safety(%_{} = struct),
+    do: struct |> Map.from_struct() |> find_operational_safety()
+
+  defp find_operational_safety(map) when is_map(map) do
+    Enum.find_value(map, fn {_key, value} -> find_operational_safety(value) end)
+  end
+
+  defp find_operational_safety(list) when is_list(list),
+    do: Enum.find_value(list, &find_operational_safety/1)
+
+  defp find_operational_safety(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.find_value(&find_operational_safety/1)
+
+  defp find_operational_safety(_value), do: nil
 end
