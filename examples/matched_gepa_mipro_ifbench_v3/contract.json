@@ -271,6 +271,6 @@
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
-  "provider_authority": "closed_pending_independent_seal",
-  "launch_status": "draft_unsealed_pending_compatibility_review"
+  "provider_authority": "authorized_for_exact_sealed_paired_coordinator_launch_only",
+  "launch_status": "sealed"
 }
