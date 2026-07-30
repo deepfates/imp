@@ -58,6 +58,16 @@ def resolve(path: str) -> Path:
     return (HERE / path).resolve()
 
 
+def delegated_upstream_source(manifest: dict[str, Any]) -> str:
+    wrapper = HERE / "run_upstream.py"
+    delegated = resolve(manifest["predecessor"]["runner_path"])
+    require(
+        sha256_file(delegated) == manifest["predecessor"]["runner_sha256"],
+        "delegated v1 upstream implementation drift",
+    )
+    return wrapper.read_text() + "\n" + delegated.read_text()
+
+
 def git(path: Path, *args: str) -> str:
     return subprocess.check_output(
         ["git", "-C", str(path), *args], text=True, stderr=subprocess.STDOUT
@@ -105,10 +115,12 @@ def preflight_environment() -> dict[str, str]:
 
 
 def preflight_imp(expected_manifest_sha: str, expected_commit: str) -> dict[str, Any]:
+    env = preflight_environment()
+    env["MATCHED_IFBENCH_V2_EXPECTED_COMMIT"] = expected_commit
     completed = subprocess.run(
         ["mix", "run", "--no-start", "paired_preflight.exs"],
         cwd=HERE,
-        env=preflight_environment(),
+        env=env,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -459,7 +471,7 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
     require(symmetry_report.get("status") == "pass", "cross-runtime guard status drift")
 
     imp_source = (HERE / "run_imp.exs").read_text()
-    upstream_source = (HERE / "run_upstream.py").read_text()
+    upstream_source = delegated_upstream_source(manifest)
     require(
         "wait_for_peer_selection!" in imp_source and "held_out_rows!" in imp_source,
         "Imp held-out barrier drift",
@@ -493,7 +505,111 @@ def stop_peer(process: subprocess.Popen[Any]) -> None:
         os.killpg(process.pid, signal.SIGTERM)
 
 
-def require_rescued_stop_artifacts() -> None:
+def require_number(value: Any, label: str) -> float:
+    require(
+        isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0,
+        f"{label} is not a nonnegative number",
+    )
+    return float(value)
+
+
+def validate_rescue_accounting(
+    runtime: str, result: dict[str, Any], manifest: dict[str, Any]
+) -> None:
+    accounting = result.get("rescue_accounting")
+    require(
+        isinstance(accounting, dict), f"{runtime} rescue lacks normalized accounting"
+    )
+    budgets = accounting.get("call_budgets")
+    require(isinstance(budgets, list), f"{runtime} rescue budgets are not a list")
+    expected_ceilings = manifest["execution"]["call_ceilings"]
+    expected_seeds = set(manifest["seeds"])
+    seen: set[tuple[int, str]] = set()
+    total = 0
+    transports = 0
+    for budget in budgets:
+        require(isinstance(budget, dict), f"{runtime} rescue budget is malformed")
+        seed = budget.get("seed")
+        arm = budget.get("arm")
+        require(
+            seed in expected_seeds and arm in expected_ceilings,
+            f"{runtime} rescue budget identity drift",
+        )
+        key = (seed, arm)
+        require(key not in seen, f"{runtime} rescue budget is duplicated: {key!r}")
+        seen.add(key)
+        ceiling = budget.get("ceiling")
+        counts = budget.get("counts")
+        require(
+            ceiling == expected_ceilings[arm],
+            f"{runtime} rescue budget ceiling drift for {key!r}",
+        )
+        require(isinstance(counts, dict), f"{runtime} rescue counts are malformed")
+        require(set(counts) == set(ceiling), f"{runtime} rescue count fields drift")
+        require(
+            all(
+                isinstance(count, int)
+                and not isinstance(count, bool)
+                and 0 <= count <= ceiling[name]
+                for name, count in counts.items()
+            ),
+            f"{runtime} rescue counts exceed the current contract",
+        )
+        require(
+            counts["task_logical"] + counts["optimizer_logical"]
+            == counts["total_logical"]
+            == counts["transports"],
+            f"{runtime} rescue logical/transport counts diverge",
+        )
+        require(
+            isinstance(budget.get("refusal_count"), int)
+            and budget["refusal_count"] >= 0,
+            f"{runtime} rescue refusal count is malformed",
+        )
+        total += counts["total_logical"]
+        transports += counts["transports"]
+
+    ledger = accounting.get("ledger")
+    require(isinstance(ledger, dict), f"{runtime} rescue lacks ledger summary")
+    response_count = ledger.get("responses")
+    transport_count = ledger.get("transports")
+    require(
+        isinstance(response_count, int)
+        and response_count >= 0
+        and isinstance(transport_count, int)
+        and transport_count >= 0,
+        f"{runtime} rescue ledger counts are malformed",
+    )
+    raw_responses = (
+        result.get("lm_results") if runtime == "imp" else result.get("calls")
+    )
+    raw_transports = (
+        result.get("transport_events") if runtime == "imp" else result.get("calls")
+    )
+    require(
+        isinstance(raw_responses, list) and len(raw_responses) == response_count,
+        f"{runtime} rescue response ledger was not retained",
+    )
+    require(
+        isinstance(raw_transports, list) and len(raw_transports) == transport_count,
+        f"{runtime} rescue transport ledger was not retained",
+    )
+    require(
+        response_count == transport_count == total == transports,
+        f"{runtime} rescue budget/response/transport ledgers diverge",
+    )
+
+
+def require_rescued_stop_artifacts(
+    manifest: dict[str, Any], launch_commit: str
+) -> None:
+    manifest_sha = sha256_file(MANIFEST)
+    gate_sha = manifest["provider_free_gate"]["result_sha256"]
+    expected_sources = {
+        "imp": launch_commit,
+        "dspy": manifest["authorities"]["dspy"]["commit"],
+        "gepa": manifest["authorities"]["gepa"]["commit"],
+    }
     for runtime in ("imp", "upstream"):
         path = TMP / f"{runtime}-result.json"
         require(path.is_file(), f"{runtime} did not rescue a stopped artifact")
@@ -502,18 +618,34 @@ def require_rescued_stop_artifacts() -> None:
             result.get("status") == "stopped", f"{runtime} rescue status is not stopped"
         )
         require(
-            isinstance(result.get("actual_cost"), (int, float))
-            and result["actual_cost"] >= 0,
-            f"{runtime} rescue lacks actual cost",
+            result.get("manifest_sha256") == manifest_sha,
+            f"{runtime} manifest binding drift",
         )
         require(
-            isinstance(result.get("usd_reserved"), (int, float))
-            and result["usd_reserved"] >= 0,
-            f"{runtime} rescue lacks reserved cost",
+            result.get("provider_free_gate_result_sha256") == gate_sha,
+            f"{runtime} provider-free gate binding drift",
         )
+        require(
+            result.get("launch_commit") == launch_commit,
+            f"{runtime} launch binding drift",
+        )
+        require(
+            result.get("source_commits") == expected_sources,
+            f"{runtime} source commit binding drift",
+        )
+        actual = require_number(result.get("actual_cost"), f"{runtime} actual cost")
+        reserved = require_number(
+            result.get("usd_reserved"), f"{runtime} reserved cost"
+        )
+        require(
+            actual <= reserved + 1e-6,
+            f"{runtime} actual cost exceeds its reserved cost",
+        )
+        validate_rescue_accounting(runtime, result, manifest)
 
 
 def run_peers(launch_commit: str) -> int:
+    manifest = json.loads(MANIFEST.read_text())
     env = dict(os.environ)
     env["MATCHED_IFBENCH_V2_EXPECTED_COMMIT"] = launch_commit
     env["IMP_MATCHED_IFBENCH_V2_OUTPUT"] = str(TMP / "imp-result.json")
@@ -582,7 +714,7 @@ def run_peers(launch_commit: str) -> int:
                 os.killpg(peer.pid, signal.SIGKILL)
                 peer.wait()
     if failure is not None:
-        require_rescued_stop_artifacts()
+        require_rescued_stop_artifacts(manifest, launch_commit)
         return failure
     return 0
 

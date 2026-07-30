@@ -63,18 +63,169 @@ class PairedCoordinatorTest(unittest.TestCase):
             self.assertEqual(json.loads(artifact.read_text())["status"], "stopped")
 
     def test_failure_requires_both_cost_preserving_stop_artifacts(self) -> None:
+        manifest = json.loads((HERE / "contract.json").read_text())
+        launch_commit = "a" * 40
+        source_commits = {
+            "imp": launch_commit,
+            "dspy": manifest["authorities"]["dspy"]["commit"],
+            "gepa": manifest["authorities"]["gepa"]["commit"],
+        }
+        binding = {
+            "manifest_sha256": paired.sha256_file(HERE / "contract.json"),
+            "provider_free_gate_result_sha256": manifest["provider_free_gate"][
+                "result_sha256"
+            ],
+            "launch_commit": launch_commit,
+            "source_commits": source_commits,
+        }
         with tempfile.TemporaryDirectory() as root, mock.patch.object(
             paired, "TMP", Path(root)
         ):
-            payload = {"status": "stopped", "actual_cost": 0.25, "usd_reserved": 1.0}
-            for runtime in ("imp", "upstream"):
-                (Path(root) / f"{runtime}-result.json").write_text(json.dumps(payload))
-            paired.require_rescued_stop_artifacts()
+            common = {
+                "status": "stopped",
+                "actual_cost": 0.25,
+                "usd_reserved": 1.0,
+                "rescue_accounting": {
+                    "call_budgets": [],
+                    "ledger": {"responses": 0, "transports": 0},
+                },
+                **binding,
+            }
             (Path(root) / "imp-result.json").write_text(
-                json.dumps({"status": "stopped"})
+                json.dumps({**common, "lm_results": [], "transport_events": []})
             )
-            with self.assertRaisesRegex(RuntimeError, "actual cost"):
-                paired.require_rescued_stop_artifacts()
+            (Path(root) / "upstream-result.json").write_text(
+                json.dumps({**common, "calls": []})
+            )
+            paired.require_rescued_stop_artifacts(manifest, launch_commit)
+
+            drifted = {**common, "actual_cost": 1.1, "calls": []}
+            (Path(root) / "upstream-result.json").write_text(json.dumps(drifted))
+            with self.assertRaisesRegex(RuntimeError, "exceeds its reserved"):
+                paired.require_rescued_stop_artifacts(manifest, launch_commit)
+
+            unavailable = {
+                **common,
+                "source_commits": {**source_commits, "imp": "unavailable"},
+                "calls": [],
+            }
+            (Path(root) / "upstream-result.json").write_text(json.dumps(unavailable))
+            with self.assertRaisesRegex(RuntimeError, "source commit binding"):
+                paired.require_rescued_stop_artifacts(manifest, launch_commit)
+
+    def test_rescue_rejects_budget_and_ledger_divergence(self) -> None:
+        manifest = json.loads((HERE / "contract.json").read_text())
+        accounting = {
+            "call_budgets": [
+                {
+                    "seed": manifest["seeds"][0],
+                    "arm": "baseline",
+                    "ceiling": manifest["execution"]["call_ceilings"]["baseline"],
+                    "counts": {
+                        "task_logical": 1,
+                        "optimizer_logical": 0,
+                        "total_logical": 1,
+                        "transports": 1,
+                    },
+                    "refusal_count": 0,
+                }
+            ],
+            "ledger": {"responses": 0, "transports": 0},
+        }
+        with self.assertRaisesRegex(RuntimeError, "ledgers diverge"):
+            paired.validate_rescue_accounting(
+                "upstream", {"rescue_accounting": accounting, "calls": []}, manifest
+            )
+
+    def test_barrier_validation_uses_content_bound_delegated_implementation(
+        self,
+    ) -> None:
+        manifest = json.loads((HERE / "contract.json").read_text())
+        source = paired.delegated_upstream_source(manifest)
+        self.assertIn("wait_for_peer_selection", source)
+        self.assertIn("held_out_path", source)
+        self.assertEqual(
+            paired.sha256_file(
+                (HERE / manifest["predecessor"]["runner_path"]).resolve()
+            ),
+            manifest["predecessor"]["runner_sha256"],
+        )
+
+    def test_upstream_direct_entry_requires_launch_commit_before_argument_parse(
+        self,
+    ) -> None:
+        env = dict(os.environ)
+        env.pop("MATCHED_IFBENCH_V2_EXPECTED_COMMIT", None)
+        env.pop("OPENROUTER_API_KEY", None)
+        completed = subprocess.run(
+            [sys.executable, str(HERE / "run_upstream.py")],
+            cwd=HERE.parents[1],
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn(
+            "MATCHED_IFBENCH_V2_EXPECTED_COMMIT is required", completed.stdout
+        )
+        self.assertNotIn("OPENROUTER_API_KEY", completed.stdout)
+
+    def test_upstream_stop_writer_binds_context_and_normalizes_ledgers(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "matched_upstream_stop_probe", HERE / "run_upstream.py"
+        )
+        assert spec is not None and spec.loader is not None
+        upstream = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(upstream)
+        launch_commit = "b" * 40
+        payload = {
+            "status": "stopped",
+            "source_commits": {
+                "imp": launch_commit,
+                "dspy": upstream.manifest_contract["authorities"]["dspy"]["commit"],
+                "gepa": upstream.manifest_contract["authorities"]["gepa"]["commit"],
+            },
+            "call_budgets": {
+                f"{upstream.manifest_contract['seeds'][0]}:baseline": {
+                    "ceiling": upstream.manifest_contract["execution"]["call_ceilings"][
+                        "baseline"
+                    ],
+                    "counts": {
+                        "task_logical": 1,
+                        "optimizer_logical": 0,
+                        "total_logical": 1,
+                        "transports": 1,
+                    },
+                    "refusals": [],
+                }
+            },
+            "calls": [{"adapter_transport_dispatch": 1}],
+            "actual_cost": 0.0,
+            "usd_reserved": 1.0,
+        }
+        with tempfile.TemporaryDirectory() as root, mock.patch.dict(
+            os.environ, {"MATCHED_IFBENCH_V2_EXPECTED_COMMIT": launch_commit}
+        ):
+            output = Path(root) / "stopped.json"
+            upstream.atomic_write(output, payload)
+            stopped = json.loads(output.read_text())
+        self.assertEqual(stopped["launch_commit"], launch_commit)
+        self.assertEqual(
+            stopped["provider_free_gate_result_sha256"],
+            upstream.manifest_contract["provider_free_gate"]["result_sha256"],
+        )
+        self.assertEqual(
+            stopped["manifest_sha256"], paired.sha256_file(HERE / "contract.json")
+        )
+        self.assertEqual(
+            stopped["rescue_accounting"]["ledger"],
+            {"responses": 1, "transports": 1},
+        )
+        paired.validate_rescue_accounting(
+            "upstream", stopped, upstream.manifest_contract
+        )
 
     def test_any_preflight_failure_starts_neither_peer(self) -> None:
         with (

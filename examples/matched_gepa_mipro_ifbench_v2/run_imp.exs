@@ -292,8 +292,9 @@ defmodule MatchedIFBenchImp.Runner do
 
   def run do
     manifest = MatchedGepaMiproIFBench.Contract.load_optimization!(@manifest)
+    launch_commit = require_expected_launch_commit!()
     require_launch_sealed!(manifest)
-    source_commits = source_commits!(manifest, true)
+    source_commits = source_commits!(manifest, true, launch_commit)
     verify_runtime_dependencies!(manifest)
     catalog_snapshot = verify_models!(manifest)
     # This first pass never decodes held-out lines. Their values cannot be reached by
@@ -319,7 +320,12 @@ defmodule MatchedIFBenchImp.Runner do
       System.trap_signal(:sigterm, signal_id, fn ->
         atomic_write!(
           @output,
-          stopped_payload(observer, source_commits, "coordinator requested graceful stop")
+          stopped_payload(
+            observer,
+            source_commits,
+            launch_commit,
+            "coordinator requested graceful stop"
+          )
         )
 
         :ok
@@ -370,18 +376,23 @@ defmodule MatchedIFBenchImp.Runner do
     end
   rescue
     error ->
-      atomic_write!(@output, %{
-        schema_version: 3,
-        runtime: "imp",
-        status: "stopped",
-        source_commits: source_commits_for_stopped_output(),
-        call_budgets: stopped_observer_field(:call_budgets),
-        actual_cost: stopped_observer_field(:actual_cost),
-        usd_reserved: stopped_observer_field(:usd_reserved),
-        lm_results: stopped_observer_field(:responses),
-        transport_events: stopped_observer_field(:transports),
-        error: Exception.format(:error, error, __STACKTRACE__)
-      })
+      stopped =
+        %{
+          schema_version: 3,
+          runtime: "imp",
+          status: "stopped",
+          source_commits: source_commits_for_stopped_output(),
+          call_budgets: stopped_observer_field(:call_budgets),
+          actual_cost: stopped_observer_field(:actual_cost),
+          usd_reserved: stopped_observer_field(:usd_reserved),
+          lm_results: stopped_observer_field(:responses),
+          transport_events: stopped_observer_field(:transports),
+          rescue_accounting: stopped_rescue_accounting(),
+          error: Exception.format(:error, error, __STACKTRACE__)
+        }
+        |> Map.merge(stopped_binding_fields())
+
+      atomic_write!(@output, stopped)
 
       reraise error, __STACKTRACE__
   end
@@ -1082,7 +1093,7 @@ defmodule MatchedIFBenchImp.Runner do
   defp artifact_path(seed, arm),
     do: Path.join(Path.dirname(@output), "sealed/imp-#{seed}-#{arm}.json")
 
-  defp source_commits!(manifest, clean?) do
+  defp source_commits!(manifest, clean?, expected \\ require_expected_launch_commit!()) do
     pinned = %{
       "dspy" => manifest["authorities"]["dspy"]["commit"],
       "gepa" => manifest["authorities"]["gepa"]["commit"]
@@ -1095,11 +1106,9 @@ defmodule MatchedIFBenchImp.Runner do
         do: MatchedGepaMiproIFBench.SourceIdentity.capture_clean!(root, pinned),
         else: MatchedGepaMiproIFBench.SourceIdentity.current(root, pinned)
 
-    case System.get_env("MATCHED_IFBENCH_V2_EXPECTED_COMMIT") do
-      nil -> commits
-      expected when expected == commits["imp"] -> commits
-      expected -> raise "v2 launch commit drift: #{commits["imp"]} != #{expected}"
-    end
+    if expected == commits["imp"],
+      do: commits,
+      else: raise("v2 launch commit drift: #{commits["imp"]} != #{expected}")
   end
 
   defp source_commits_for_stopped_output do
@@ -1128,7 +1137,7 @@ defmodule MatchedIFBenchImp.Runner do
   defp stopped_observer_default(:call_budgets), do: %{}
   defp stopped_observer_default(field) when field in [:responses, :transports], do: []
 
-  defp stopped_payload(observer, source_commits, error) do
+  defp stopped_payload(observer, source_commits, launch_commit, error) do
     snapshot = Observer.snapshot(observer)
 
     %{
@@ -1141,9 +1150,72 @@ defmodule MatchedIFBenchImp.Runner do
       usd_reserved: snapshot.usd_reserved,
       lm_results: Report.encode_term(snapshot.responses),
       transport_events: Report.encode_term(snapshot.transports),
+      rescue_accounting: rescue_accounting(snapshot),
       error: error
     }
+    |> Map.merge(stopped_binding_fields(launch_commit))
   end
+
+  defp require_expected_launch_commit! do
+    case System.get_env("MATCHED_IFBENCH_V2_EXPECTED_COMMIT") do
+      value when is_binary(value) and byte_size(value) == 40 -> value
+      _ -> raise "MATCHED_IFBENCH_V2_EXPECTED_COMMIT is required as a full commit"
+    end
+  end
+
+  defp stopped_binding_fields(
+         launch_commit \\ System.get_env("MATCHED_IFBENCH_V2_EXPECTED_COMMIT") || "unavailable"
+       ) do
+    manifest = @manifest |> File.read!() |> Jason.decode!()
+
+    %{
+      manifest_sha256: sha256_file(@manifest),
+      provider_free_gate_result_sha256: manifest["provider_free_gate"]["result_sha256"],
+      launch_commit: launch_commit
+    }
+  rescue
+    _error ->
+      %{
+        manifest_sha256: "unavailable",
+        provider_free_gate_result_sha256: "unavailable",
+        launch_commit: launch_commit
+      }
+  end
+
+  defp stopped_rescue_accounting do
+    case Process.get(:matched_ifbench_observer) do
+      pid when is_pid(pid) -> pid |> Observer.snapshot() |> rescue_accounting()
+      _ -> empty_rescue_accounting()
+    end
+  rescue
+    _error -> empty_rescue_accounting()
+  end
+
+  defp rescue_accounting(snapshot) do
+    budgets =
+      snapshot.call_budgets
+      |> Enum.map(fn {{seed, arm}, budget} ->
+        %{
+          seed: seed,
+          arm: arm,
+          ceiling: budget.ceiling,
+          counts: budget.counts,
+          refusal_count: length(budget.refusals)
+        }
+      end)
+      |> Enum.sort_by(&{&1.seed, &1.arm})
+
+    %{
+      call_budgets: budgets,
+      ledger: %{
+        responses: length(snapshot.responses),
+        transports: length(snapshot.transports)
+      }
+    }
+  end
+
+  defp empty_rescue_accounting,
+    do: %{call_budgets: [], ledger: %{responses: 0, transports: 0}}
 
   defp map_get(value, key) when is_map(value) do
     case Map.fetch(value, key) do

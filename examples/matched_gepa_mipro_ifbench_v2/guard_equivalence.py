@@ -34,6 +34,21 @@ CHECKS = [
         "same sealed-launch refusal",
     ),
     (
+        "launch_commit_binding",
+        "identical",
+        [
+            "MATCHED_IFBENCH_V2_EXPECTED_COMMIT",
+            "require_expected_launch_commit!",
+            "v2 launch commit drift",
+        ],
+        [
+            "MATCHED_IFBENCH_V2_EXPECTED_COMMIT",
+            "require_expected_launch_commit",
+            "v2 launch commit drift",
+        ],
+        "both direct peer entries require the coordinator's exact full commit before provider work",
+    ),
+    (
         "predispatch_reservation",
         "identical",
         ["reserve_call!", "CallBudget.reserve!", "usd_reserved"],
@@ -164,19 +179,27 @@ CHECKS = [
         "intentional_difference",
         [
             'status: "stopped"',
+            "manifest_sha256:",
+            "provider_free_gate_result_sha256:",
+            "launch_commit:",
             "actual_cost:",
             "usd_reserved:",
             "lm_results:",
             "transport_events:",
+            "rescue_accounting:",
         ],
         [
             '"status": "stopped"',
+            '"manifest_sha256"',
+            '"provider_free_gate_result_sha256"',
+            '"launch_commit"',
             '"actual_cost"',
             '"usd_reserved"',
             '"calls"',
             '"call_budgets"',
+            '"rescue_accounting"',
         ],
-        "language-native serialization, with the same durable accounting and response/transport evidence",
+        "language-native serialization, with the same manifest/gate/commit binding and durable budget/response/transport evidence",
     ),
 ]
 

@@ -49,4 +49,12 @@ report = %{
     end
 }
 
+expected_commit =
+  System.get_env("MATCHED_IFBENCH_V2_EXPECTED_COMMIT") ||
+    raise "MATCHED_IFBENCH_V2_EXPECTED_COMMIT is required"
+
+unless report.source_commit == expected_commit do
+  raise "v2 launch commit drift: #{report.source_commit} != #{expected_commit}"
+end
+
 IO.puts("PAIRED_PREFLIGHT_JSON=" <> Jason.encode!(report))
