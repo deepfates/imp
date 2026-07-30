@@ -13,6 +13,7 @@
     "verdict": "sealed",
     "scope": "authenticated DSPy+GEPA source binding, complete public GEPA/MIPRO workflow, effective execution options, matched evaluator containment, fatal operational guard bypass"
   },
+  "surface_implementation_commit": "31507c50f70c04889b3b2efd93966cda2cc7eb1f",
   "immutable_predecessors": {
     "v2": {
       "status": "permanently_stopped_incomplete_unscored",
@@ -314,10 +315,10 @@
     "source_path": "equivalence_gate.py",
     "source_sha256": "fd95f7530b6eff61ef1b12b792d00f3891888bb31e9abbb8503fb9100aeaf663",
     "result_path": "provider-free-review.json",
-    "result_sha256": "04ba3a7d42c01b04008c735b2d170aacf6a9074947b3ddd274b14deada843f09",
+    "result_sha256": "8638deb4a173ba066d2c8bf06c8ca6e2bbdb29f9f5ee81be56fb0c3f0e5fe5be",
     "clean_tree_required": true,
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
-  "provider_authority": "disabled_pending_final_runnable_surface_seal",
-  "launch_status": "draft_unsealed_pending_surface_review"
+  "provider_authority": "disabled_pending_live_preflight_and_explicit_sealed_manifest",
+  "launch_status": "blocked_live_preflight"
 }
