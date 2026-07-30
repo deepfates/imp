@@ -31,7 +31,7 @@ Imp.get(prediction, :team)
 #=> "security"
 ```
 
-## What Imp is trying to finish
+## The release boundary
 
 Imp succeeds when an ordinary Elixir application can declare a real program,
 measure it, improve it through one consistent public optimizer interface, save
@@ -50,6 +50,17 @@ the public API over several assertions about private wiring. A frozen research
 run keeps only the provenance needed to interpret that run. New manifests,
 registries, or status views must replace an existing source of truth rather
 than creating another one.
+
+That stable center now runs from an unpacked package through a two-stage typed
+program, disjoint selection and test data, optimizer selection, checksummed
+result and parameter artifacts, fresh-process loading, concurrent OTP serving,
+hot reload, and contained worker failure. The packaged
+[deployment example](examples/deployment/README.md) exercises that path without
+a provider. Its optional retained Banking77 run exercises the same public path
+with real models: GEPA proposed a worse candidate, validation retained the
+baseline, and the selected artifact still loaded and served correctly after an
+OS-process restart. Rejecting a worse optimizer result is successful product
+behavior, not an effectiveness win.
 
 For an exact one-output classifier or scalar program, `Imp.Adapter.SingleField`
 uses a concise value-only wire contract while retaining signature validation.

@@ -23,6 +23,11 @@ Every guide and notebook follows the same product story:
 - [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md): build a support-ticket
   router, measure it on held-out data, and improve it with an optimizer —
   real scores, real costs.
+- [OTP Deployment Example](../examples/deployment/README.md): run the packaged
+  two-stage experiment from disjoint data through selected artifacts,
+  fresh-process loading, concurrent serving, hot reload, and failure
+  containment. It includes a retained real-model run where validation correctly
+  rejected a worse optimizer candidate.
 
 ## Learn The Model
 

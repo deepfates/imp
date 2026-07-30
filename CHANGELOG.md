@@ -13,6 +13,17 @@ these changes must not ship as another `0.2.x` patch.
 
 ### Added
 
+- `Imp.Experiment.check/5` now powers the packaged two-stage OTP deployment
+  workflow end to end: disjoint selection/test evaluation, selected-artifact
+  construction, checksummed `Result`/`Artifact` persistence, fresh-process
+  loading, concurrent serving, hot reload, and failure containment. A retained
+  one-seed Banking77 run records the honest negative case where GEPA regressed
+  on validation, baseline was retained, and the selected artifact still served
+  successfully after restart.
+- Experiment evaluation cancellation at `max_errors` now returns redacted,
+  structured row evidence with the failed stage, row identity/index, and
+  underlying reason instead of collapsing the failure into an opaque optimizer
+  error.
 - `Imp.Optimizer.SignatureOptimizer` can target one explicitly named predictor
   in a multi-stage program with `predictor:`. Proposal grounding sees the full
   program, only the selected instruction changes, and missing or ambiguous

@@ -728,6 +728,14 @@ selected artifact by default—not source IDs or row contents. Pass
 redacted row details is intentional. In a fresh process, reconstruct trusted
 program code and runtime clients and apply the artifact as shown below.
 
+The packaged [OTP deployment example](../examples/deployment/README.md) carries
+this exact boundary through a two-predictor application, `Result` and
+`Artifact` persistence, fresh-process loading, concurrent serving, hot reload,
+and contained failure. Its retained real-model Banking77 run also shows the
+important negative case: an optimizer candidate can lose on selection, in
+which case `check/5` preserves baseline and still produces the deployable
+selected artifact.
+
 Use:
 
 | Optimizer | Use it when |

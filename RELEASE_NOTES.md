@@ -31,18 +31,17 @@ artifact and consumer integrity, not a release-version decision.
 Be precise about what kind of thing this release is, in three layers:
 
 **Proven here, with receipts you can run.** A broad substantive DSPy 3.2.1
-surface, realized natively: the signature DSL, program shapes from `predict` through
-ReAct, CodeAct, and a sandboxed recursive controller, evaluation, fifteen
-optimizers, retrieval, MCP, streaming, and persistence. "Faithful port" is a
-checked claim, not a slogan — and checkable by you. The optimizer and adapter
-families carry executable differential tests that run pinned DSPy 3.2.1 and
-compare outputs, backed by committed, content-addressed evidence artifacts;
-the conformance report tracks all surfaces with per-surface evidence and
-dispositions — differential, Elixir-native equivalent, or honest gap. It is
-not a blanket "everything matches upstream"; it is a per-surface ledger you
-can audit. See [Evidence](docs/EVIDENCE.md) for the C0–C5 ladder this is
-graded on and [Conformance](docs/CONFORMANCE.md) for the per-surface table. One complete
-effectiveness results ship with scoped artifacts: the
+surface, realized natively: the signature DSL, program shapes from `predict`
+through ReAct, CodeAct, and a sandboxed recursive controller, evaluation,
+optimizers, retrieval, MCP, streaming, and persistence. Fidelity is a checked
+per-surface claim, not a blanket promise that everything matches upstream. The
+optimizer and adapter families carry executable differential tests that run
+pinned DSPy 3.2.1 and compare their declared observations, backed by committed,
+content-addressed evidence artifacts. The conformance report records a
+differential, an Elixir-native equivalent, or an honest gap for each tracked
+surface. See [Evidence](docs/EVIDENCE.md) for the C0–C5 ladder this is graded on
+and [Conformance](docs/CONFORMANCE.md) for the per-surface table. Several scoped
+effectiveness results ship with artifacts: the
 [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s router improves
 from 25–30% to 85% on held-out data across three committed live runs, for
 about a cent. On a separately frozen matched TREC contract, Imp GEPA improved
@@ -85,6 +84,16 @@ measures a deterministic 25% baseline, attaches four reviewable demonstrations,
 and measures 100% after compilation. Its scripted LM proves the package and
 program/evaluation/optimizer lifecycle, not real-model effectiveness.
 
+The packaged [OTP deployment example](examples/deployment/README.md) is the
+release front door: an unpacked consumer runs a two-stage typed program through
+disjoint selection and test splits, optimizer selection, checksummed result and
+artifact persistence, fresh-process loading, concurrent serving, hot reload,
+and contained failure. Its retained one-seed Banking77 run is deliberately
+negative: GEPA's candidate regressed on validation, so the public experiment
+boundary retained baseline; the selected artifact then completed untouched
+evaluation and fresh-process concurrent service. That is real-model lifecycle
+evidence, not GEPA effectiveness evidence.
+
 ## Since v0.1.0
 
 - Packaged for Hex, with the full manual in the package (the package ships
@@ -114,6 +123,13 @@ program/evaluation/optimizer lifecycle, not real-model effectiveness.
 APIs may change before 1.0. Known flaky tests are ticketed and public in the
 repository. The evidence ladder is the contract: if a page claims more than
 its receipts support, that is a bug — file it.
+
+The `Imp` facade and modules marked `stable` in `priv/public_api.json` are the
+compatibility center. Optimizer and advanced modules are explicitly
+experimental before 1.0: they are real implementations with public tests, but
+their APIs may still converge with upstream semantics. A callable optimizer is
+not thereby proven effective; the task-scoped results above are the evidence
+boundary.
 
 The last named candidate described by these notes is `v0.2.1`; publication to
 Hex has not occurred.
