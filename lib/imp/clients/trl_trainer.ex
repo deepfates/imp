@@ -285,7 +285,7 @@ defmodule Imp.Clients.TRLTrainer do
   defp finite_kwarg(key, value) do
     value = value * 1.0
 
-    if abs(value) <= 1.7976931348623157e308,
+    if value == value and abs(value) <= 1.7976931348623157e308,
       do: {:ok, value},
       else: {:error, {:invalid_trl_train_kwarg, key, value}}
   end

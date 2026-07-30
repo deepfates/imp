@@ -1,7 +1,3 @@
-# GEPA's public constructor mirrors a wide upstream option surface. Splitting
-# those fields across nested structs would be a breaking persistence/API change,
-# so the release keeps this one deliberate representation exception.
-# credo:disable-for-this-file Credo.Check.Warning.StructFieldAmount
 defmodule Imp.Optimizer.GEPA do
   @behaviour Imp.Optimizer
   @moduledoc """

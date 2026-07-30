@@ -114,9 +114,7 @@ defmodule Imp.Optimize.Anything.StructuredStrategy do
         String.to_existing_atom(module_name)
       rescue
         ArgumentError ->
-          reraise ArgumentError,
-                  [message: "structured strategy module is not already loaded"],
-                  __STACKTRACE__
+          raise ArgumentError, "structured strategy module is not already loaded"
       end
 
     strategy = new(module, id: fetch(map, :id), config: fetch(map, :config))
