@@ -1,0 +1,20 @@
+---
+id: imp-tg2z
+status: open
+deps: []
+links: []
+created: 2026-07-30T22:14:17Z
+type: feature
+priority: 0
+assignee: deepfates
+parent: imp-yme4
+tags: [optimizers, semantics, dspy, gepa, optimize-anything, ax]
+---
+# Make every advertised optimizer family substantive and honest
+
+Obstacle: advertised optimizer names do not yet uniformly guarantee their defining mechanism, and broad labels can hide experimental or narrower behavior. Establish an honest stable center without turning Ax into a wholesale port target.
+
+## Acceptance Criteria
+
+Canonical claims classify every advertised family as stable or distinctly experimental. Every stable family reaches its defining state transition through the ordinary public API: proposal, mutation, search, composition, or weight update as applicable; validation selection; an intelligible report; and reusable application. DSPy, GEPA, and Optimize Anything derived families have pinned comparisons of observable inputs, information and evaluation opportunity, stopping, failures, and outputs. Intentional BEAM-native differences are named and exercised for user value rather than private call-graph identity. Ax is used as a competitive lens for ergonomics, concurrency, and failure visibility. Any stable family that falls back to a different hidden algorithm keeps this ticket open. Positive benchmark lift is not required here.
+

@@ -1,7 +1,7 @@
 ---
 id: imp-yme4
 status: in_progress
-deps: []
+deps: [imp-argb, imp-tg2z, imp-88sn]
 links: []
 created: 2026-07-25T16:21:13Z
 type: epic
@@ -526,3 +526,7 @@ reported spend was `$0.38038725`, bringing the conservative workshop bound to
 this is an upstream workflow compatibility failure, not an optimizer loss or
 cross-task effectiveness evidence. The exact manifest is permanently
 non-launchable and the existing instruction-family/GEPA gaps remain open.
+
+**2026-07-30T22:14:41Z**
+
+2026-07-30 principal strategy correction after owner, Behold-principal, Imp-principal, and adversarial review: retain this epic as the full telos. An early installable release is a milestone, not closure. The graph now has exactly three composition children: imp-argb owns the safe coherent cold-package center; imp-tg2z owns substantive named optimizer semantics and honest stable/experimental boundaries; imp-88sn owns current-source usefulness across a realistic multi-stage LM problem and a non-prompt problem. Tickets are accepted by observable product behavior and must name what would falsify success. Tests protect ordered invariants; a small number of real experiments answer uncertain usefulness questions. Evidence, receipts, generated reports, package gates, and clean commits support these claims but cannot complete them. Do not create family-by-family ticket boards, new campaign coordinators, or scope reductions by profile. Preserve the existing epic criteria verbatim, especially the coherent public concepts, release-defining held-out improvement with reusable artifact, observable upstream comparisons without private call-graph identity, and the warning that supporting gates cannot close the epic.
