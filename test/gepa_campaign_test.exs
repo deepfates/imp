@@ -124,7 +124,8 @@ defmodule GepaCampaignTest do
           "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
-        lm: static_gold_lm()
+        lm: static_gold_lm(),
+        reflection_lm: static_reflection_lm()
       )
 
     assert File.exists?(result.out_path)
@@ -237,7 +238,8 @@ defmodule GepaCampaignTest do
                        "imp" => "deepfates/imp@abcdef2",
                        "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
                      },
-                     lm: static_gold_lm()
+                     lm: static_gold_lm(),
+                     reflection_lm: static_reflection_lm()
                    )
                  end
   end
@@ -264,7 +266,8 @@ defmodule GepaCampaignTest do
           "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
-        lm: static_gold_lm()
+        lm: static_gold_lm(),
+        reflection_lm: static_reflection_lm()
       )
 
     assert %{"summary" => summary, "rows" => [%{"family" => "AIMEBench"}]} =
@@ -384,7 +387,8 @@ defmodule GepaCampaignTest do
           "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
-        lm: static_gold_lm()
+        lm: static_gold_lm(),
+        reflection_lm: static_reflection_lm()
       )
     end
   end
@@ -1076,10 +1080,22 @@ defmodule GepaCampaignTest do
           "imp" => "deepfates/imp@abcdef2",
           "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
         },
-        lm: static_gold_lm()
+        lm: static_gold_lm(),
+        reflection_lm: static_reflection_lm()
       ],
       overrides
     )
+  end
+
+  defp static_reflection_lm do
+    %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, _opts ->
+          %{__imp_lm_output__: %{"instruction" => "Answer exactly."}}
+        end
+      ]
+    }
   end
 
   defp set_family_budget!(dataset_root, family, budget) do

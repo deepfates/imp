@@ -5119,6 +5119,7 @@
         "metric_identity",
         "num_candidates",
         "prompt_lm",
+        "reflection_grounding",
         "sampling_temperature",
         "seed",
         "teacher_lm",

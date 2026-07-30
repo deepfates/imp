@@ -29,17 +29,17 @@ defmodule LearningPathContractTest do
   # eval. If the guide changes, both pins fail loudly and must be re-pinned
   # against the new block inventory — that is the point.
   @api_guide "docs/API_GUIDE.md"
-  @api_guide_blocks 53
+  @api_guide_blocks 54
   @api_guide_skips %{
     1 => {"model = System.fetch_env!(\"OPENAI_MODEL\")", "live provider block (OPENAI_MODEL)"},
     18 => {"lm = Imp.req_llm(\"openai:gpt-5.4-mini\"", "live provider block (OPENAI_API_KEY)"},
     19 => {"def handle_event(\"ask\"", "LiveView module-context sketch, not a script"},
-    32 => {"{selected, report, artifact} =", "application-specific GEPA reconstruction sketch"},
-    34 => {"rule_lm =", "live provider block (OPENAI_API_KEY)"},
-    39 => {"job = Imp.Clients.TrainingJob.load!", "existing trained-artifact adoption sketch"},
-    40 => {"Imp.Optimizer.BetterTogether.compile(", "continuation of adoption sketch"},
-    46 => {"client = Imp.MCP.HTTPClient.new(", "external MCP service sketch"},
-    52 => {"lm =", "live provider block (OPENAI_MODEL)"}
+    33 => {"{selected, report, artifact} =", "application-specific GEPA reconstruction sketch"},
+    35 => {"rule_lm =", "live provider block (OPENAI_API_KEY)"},
+    40 => {"job = Imp.Clients.TrainingJob.load!", "existing trained-artifact adoption sketch"},
+    41 => {"Imp.Optimizer.BetterTogether.compile(", "continuation of adoption sketch"},
+    47 => {"client = Imp.MCP.HTTPClient.new(", "external MCP service sketch"},
+    53 => {"lm =", "live provider block (OPENAI_MODEL)"}
   }
 
   test "API guide block inventory is pinned and every block parses" do

@@ -167,11 +167,19 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
   end
 
   test "public profile seals pinned defaults and derives the 280-call engine ceiling" do
+    reflection_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{__imp_lm_output__: %{"instruction" => "Answer exactly."}}
+        end
+      )
+
     optimizer =
       GEPA.new(fn _example, _prediction -> 1.0 end,
         execution_profile: :gepa_v0_1_4,
         generations: 4,
-        minibatch_size: 10
+        minibatch_size: 10,
+        reflection_lm: reflection_lm
       )
 
     assert optimizer.reflection_record_mode == :gepa_v0_1_4

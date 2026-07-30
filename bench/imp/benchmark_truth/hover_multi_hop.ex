@@ -114,7 +114,7 @@ defmodule Imp.BenchmarkTruth.HoverMultiHop do
     _error -> {:error, {:invalid_hover_inputs, "expected inputs as {key, value} pairs"}}
   end
 
-  defp retrieve(%UpstreamPython{} = retriever, query, k, hop) do
+  defp retrieve(%{__struct__: UpstreamPython} = retriever, query, k, hop) do
     retriever
     |> Map.put(:k, k)
     |> UpstreamPython.search(query)

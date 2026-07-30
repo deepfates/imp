@@ -45,7 +45,7 @@ defmodule Imp.BenchmarkTruth.HotpotMultiHop do
   checksums. The map form accepts the `:python` option used by the existing
   adapter. Construction raises when exact retrieval is unavailable.
   """
-  def integration(lm, %UpstreamPython{} = retriever) do
+  def integration(lm, %{__struct__: UpstreamPython} = retriever) do
     validate_exact_retriever!(retriever)
     %{new(lm, retriever) | retrieval_source: retriever.metadata}
   end
@@ -146,7 +146,7 @@ defmodule Imp.BenchmarkTruth.HotpotMultiHop do
   defp retrieve(program, query, hop) do
     result =
       case program.retriever do
-        %UpstreamPython{} = retriever -> UpstreamPython.search(retriever, query)
+        %{__struct__: UpstreamPython} = retriever -> UpstreamPython.search(retriever, query)
         retriever -> Imp.Retrieve.retrieve(retriever, query, k: program.k)
       end
 
@@ -221,7 +221,8 @@ defmodule Imp.BenchmarkTruth.HotpotMultiHop do
     end
   end
 
-  defp validate_exact_retriever!(%UpstreamPython{
+  defp validate_exact_retriever!(%{
+         __struct__: UpstreamPython,
          k: @k,
          gepa_root: gepa_root,
          python: python,
@@ -244,7 +245,7 @@ defmodule Imp.BenchmarkTruth.HotpotMultiHop do
     :ok
   end
 
-  defp validate_exact_retriever!(%UpstreamPython{}) do
+  defp validate_exact_retriever!(%{__struct__: UpstreamPython}) do
     raise ArgumentError, "HotpotMultiHop source-exact retriever must use k=7"
   end
 
