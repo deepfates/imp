@@ -208,3 +208,109 @@ reference histories retain only a lower bound of 553 task and 6 reflection
 calls costing `$1.31805105`; DSPy deep-copy histories prevent an exact reference
 total. The frozen `$59.346432` reservation remains the conservative portfolio
 upper bound; no exact total dollar claim is made.
+
+## Provider-free IFBench mechanism diagnosis
+
+The common baseline instructions were exactly `Respond to the query` for
+`generate_response_module` (SHA-256 `03d6fa0c...a4314`) and `Ensure the response
+is correct and adheres to the given constraints. Your response will be used as
+the final response.` for `ensure_correct_response_module` (SHA-256
+`9f0bfae5...e0f3`). The exact full optimized strings remain in each retained
+Artifact; the hashes and descriptions below make their identity reviewable
+without duplicating several pages of prompt text here.
+
+| Imp seed | Named-predictor mutation | Selection baseline -> optimized | Test baseline -> selected | Retained failures | GEPA path |
+|---|---|---:|---:|---|---|
+| `2026072705` | generator unchanged; corrector replaced by the detailed seven-step constraint verifier (`7e749879...2c18`) | `0.755208 -> 0.895833` | `0.492188 -> 0.531250` | selection 0/0; baseline test 0; selected test 1 strict parse failure (`missing_output_fields: [:response]`, row index 22); no retained evaluator exception | 96 metric calls, 2 reflections, 2 archive candidates: the first reflected proposal did not enter the archive; the second was accepted and became champion |
+| `2026072706` | neither predictor changed | `0.848958 -> 0.848958` | `0.484375 -> 0.515625` replay of baseline | no retained selection/test failure | 88 metric calls, 1 reflection, 2 archive candidates: one proposal was admitted from its minibatch but lost full-validation selection, so compile returned baseline; an earlier parent batch advanced without reflection, but the retained Result does not preserve its skip reason |
+| `2026072707` | generator replaced by a detailed constraint-following instruction (`cfb3de5e...b87b`); corrector unchanged | `0.807292 -> 0.817708` | `0.484375 -> 0.539063` | selection 0/0; baseline test 1 strict parse failure (`missing_output_fields: [:response]`, row index 45); selected test 0; no retained evaluator exception | 80 metric calls, 1 reflection, 2 archive candidates: the proposal was admitted and became champion |
+
+Only four Imp reflections occurred because the pinned finite
+`max_metric_calls: 80` is the semantic stopper, not a promise of twelve
+reflections. Each seed first spent 32 metric calls on full validation. Every
+iteration then spent an 8-row parent minibatch; perfect sampled work can skip
+reflection, while an admitted child also incurs its 8-row minibatch and a
+32-row full validation. Seed 1 legally completed its second started iteration
+at 96 calls, seed 2 at 88, and seed 3 at 80, then stopped. This is the intended
+GEPA 0.1.4 stopping envelope and explains why the theoretical cap of 12
+reflections was not approached.
+
+The public Experiment result preserves selected programs, final selection/test
+rows, and telemetry, but not the attached optimizer Report. Consequently the
+accepted/non-admitted path above is recoverable from candidate-count and
+progress transitions, while rejected proposal text and optimization-time row
+failure categories are not in the retained Result. That is an observability
+gap; it is not evidence that an evaluator failure changed selection. All final
+Imp selection/test diagnostics that were retained were strict adapter parse
+failures, not scorer exceptions.
+
+The authenticated stock-DSPy/GEPA arm had the same 80-call semantic opportunity
+and made 2, 3, and 1 reflection calls by seed. Its optimizer log shows:
+
+- `2026072705`: a generator proposal lost its minibatch (`6.1667 < 7.0`); a
+  correction-stage proposal won (`5.25 -> 6.75`) and became GEPA's internal
+  best, but fresh outer selection scored it `0.692708` against baseline
+  `0.744792`, so the deployed artifact is baseline.
+- `2026072706`: three proposals (generator, corrector, generator) all lost their
+  minibatches; compile returned baseline. Fresh outer selection was
+  `0.729167` against baseline `0.770833`, also retaining baseline.
+- `2026072707`: a generator proposal won its minibatch (`6.5 -> 6.75`), but full
+  validation kept program index 0 as best. The raw compile return therefore has
+  both baseline instructions. Its fresh selection replay scored `0.848958`
+  against `0.791667`, so the strict outer rule mechanically chooses that return,
+  but selected parameter identity is still baseline and causal lift is zero.
+
+Reference failures were diagnostic score-zero rows: baseline/candidate
+selection parse counts were `2/6`, `2/3`, and `2/0`; baseline/candidate test
+counts were `10/8`, `10/10`, and `11/10`. All were `AdapterParseError` except
+one retained `IndexError` evaluator failure in both seed-2 baseline/candidate
+test replays and one in seed-3 candidate test. Thus all three outer-selected
+reference causal lifts are zero: seeds 1 and 2 select baseline, and seed 3
+selects a parameter-identical return. Raw candidate test improvements are not
+selection-authorized optimizer effects.
+
+### Diagnosis boundary
+
+- **A — expected pinned-GEPA limitation:** with a 32-row validation set and an
+  80-call semantic budget, full evaluations dominate the budget. Imp obtained
+  only one or two actual reflections per seed, each mutating one named
+  component. Stock GEPA showed the same low-opportunity pattern and local
+  minibatch/full-validation reversals. This budget can test lifecycle and a
+  small number of mutations, but it is weak evidence about reflective search.
+- **B — Imp product/algorithm defect:** no retained trace shows the engine
+  mutating the wrong component, violating strict admission, or exceeding the
+  pinned stopper. The concrete product gap is that `Experiment.Result` does not
+  retain the optimizer Report, so proposal rejection reasons and
+  optimization-time diagnostics were lost after an otherwise successful public
+  run. The already-fixed outer-reference selection bug was in the example, not
+  the Imp GEPA engine. Neither gap explains the low causal lift.
+- **C — experiment-design limitation:** task-model nondeterminism is large
+  relative to the measured lift. Imp seed 2 replayed the identical baseline at
+  `+0.03125`; stock GEPA's internal and fresh selection rankings also reversed.
+  Row bootstrap intervals condition on one generated response and therefore do
+  not measure this provider/seed noise. Strict structured parsing was useful
+  but asymmetric failure frequency further reduced matched power. The rows are
+  source-disjoint for this run, not globally unseen.
+
+### One recommended next full-telos move
+
+Run **current-source, matched multi-stage MIPROv2 on a newly frozen IFBench
+slice**, not another GEPA treatment. Derive train/selection/test rows
+result-blind from source indices unused by this portfolio; keep the same
+two-predictor program and deterministic executable scorer. Compare Imp's
+`proposer_fidelity: :dspy_3_2_1` plus pinned Optuna search with stock DSPy 3.2.1
+MIPROv2 over three fixed seeds, four grounded instruction candidates, eight
+categorical trials, no retries/fallbacks, selection-only deployment, and fresh
+Imp Artifact service. Predeclare own-baseline success as mean test lift at least
+`0.05` with at least two positive seeds; report matched noninferiority
+separately and preserve a clean negative.
+
+This asks whether joint grounded instruction search over both predictors, with
+eight Bayesian trials, succeeds where GEPA's one-to-two local reflections did
+not. Using the already-audited opportunity model, the order of magnitude is
+about 5,200 task transports plus 66 proposal transports across both runtimes
+and three seeds, roughly `$78` worst-case at the last routes/prices. Exact rows,
+routes, prices, and a lower cap must be frozen and reviewed before provider
+authority. A positive result would earn only a current-source, task/model/budget
+specific multi-stage MIPRO usefulness and matched-semantics claim; a negative
+would falsify that mechanism on this task without being tuned away.
