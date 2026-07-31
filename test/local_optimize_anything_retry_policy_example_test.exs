@@ -42,4 +42,20 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyExampleTest do
     assert source =~ "cache: false"
     assert source =~ "structured_response_format: :required"
   end
+
+  test "future untouched rows are frozen canonically without evaluating them" do
+    path = "examples/local_optimize_anything_retry_policy/data/untouched-v2.jsonl"
+    bytes = File.read!(path)
+
+    assert :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower) ==
+             "522245b0d7ec8d896c4b88c0475572a6325c2f25986d8b588d633bffa00590ff"
+
+    rows = bytes |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
+    assert length(rows) == 6
+    assert rows |> Enum.map(& &1["id"]) |> Enum.uniq() |> length() == 6
+    assert rows |> Enum.map(& &1["rule"]) |> Enum.uniq() |> length() == 6
+
+    Enum.zip(String.split(bytes, "\n", trim: true), rows)
+    |> Enum.each(fn {line, row} -> assert Jason.encode!(row) == line end)
+  end
 end

@@ -1,0 +1,6 @@
+{"attempt":1,"expected":-1,"id":"test-v2-reject-dominates","jitter_slot":4,"retry_after_ms":350,"retryable":false,"rule":"reject_non_retryable_precedence","urgent":true}
+{"attempt":4,"expected":375,"id":"test-v2-hint-uncapped","jitter_slot":2,"retry_after_ms":375,"retryable":true,"rule":"server_hint_precedence_below_cap","urgent":false}
+{"attempt":2,"expected":8000,"id":"test-v2-hint-capped","jitter_slot":1,"retry_after_ms":12500,"retryable":true,"rule":"server_hint_precedence_above_cap","urgent":true}
+{"attempt":1,"expected":0,"id":"test-v2-urgent-boundary","jitter_slot":3,"retry_after_ms":0,"retryable":true,"rule":"urgent_attempt_limit_inclusive","urgent":true}
+{"attempt":2,"expected":2000,"id":"test-v2-urgent-expired","jitter_slot":4,"retry_after_ms":0,"retryable":true,"rule":"urgent_attempt_limit_expired","urgent":true}
+{"attempt":4,"expected":8000,"id":"test-v2-exponential-cap","jitter_slot":1,"retry_after_ms":0,"retryable":true,"rule":"exponential_backoff_cap","urgent":false}
