@@ -18,7 +18,7 @@ Obstacle: Imp has one narrow historical positive matched result, several honest 
 
 Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
 
-## Current status at `26eb666`
+## Current status at `bbd033c`
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
@@ -38,6 +38,47 @@ budgets, and runnable proposals are not current authority merely because they
 remain preserved. The next decision is a landscape-informed benchmark portfolio
 and an explicit owner-approved scientific question, not an automatic fourth
 task treatment.
+
+The landscape-informed portfolio is now concrete but no provider authority has
+been granted:
+
+- **Primary LM core:** released HoVer (`150/300/300`, four optimized retrieval
+  stages, all-gold-title scorer) and PAPILLON/PUPA (`111/111/221`, trusted
+  rewrite -> untrusted delegation -> trusted response, quality/privacy scorer).
+  Every baseline, Bootstrap Random Search, MIPROv2-Heavy, and GEPA-with-merge
+  arm runs for Imp and its pinned upstream authority regardless of interim Imp
+  results. Historical `gepa-artifact` and current DSPy 3.2.1/GEPA 0.1.4 are
+  separate authorities, not one parity claim. Five fixed seeds, paired rows,
+  seed-level and row-level uncertainty, validation-only selection, immutable
+  artifacts, and fresh service are required. The corrected lower bound is at
+  least `1,710,400` task-shaped transports before reflection/proposal overhead;
+  a result-blind training-only cost pilot and explicit owner budget decision are
+  required before a full run.
+- **Provider-free LM readiness:** complete at `fa9f3b6`. Public GEPA reaches all
+  named HoVer/PAPILLON predictors; task/scorer inputs, ordered diagnostics,
+  candidate identity, scores, and call counts remain reconstructable; selected
+  schema-3 Artifacts rebind retriever/model/judge clients and execute in a fresh
+  BEAM. Generic callback safety repairs at `5475ba0` and `bbd033c` prevent typed
+  route/cost/budget/transport/cancellation failures from becoming ordinary empty
+  predictions, scores, tool failures, or search outcomes.
+- **Optimize Anything:** released Circle Packing `n=26` is a deterministic
+  single-instance mechanism and portable-value-artifact check, not generalization
+  evidence. Its exact retained state is warm-started and must be replayed as such.
+  The released gskill evidence does not pin a dataset revision, ordered task IDs,
+  repository/base commits, or Docker image digests, so its original split cannot
+  be exactly reconstructed. A future run must be labeled a newly pinned
+  current-source replication. “Bleve + Pallets at 600 calls” is not source-exact:
+  retained Bleve and Jinja runs requested 300 calls, while the documented
+  600-call protocol belongs to Pygments. Five seeds would be a new robustness
+  protocol, not released behavior.
+
+The next authorized work remains provider-free and repository-only: replay the
+released Circle Packing retained state through `Optimize.Anything.Result` ->
+schema-3 value Artifact -> fresh trusted evaluator, and fail closed on incomplete
+gskill identity. Do not add benchmark code to `lib` or Hex. Do not create a
+runner framework, coordinator, manifest, dashboard, or custom result format.
+No Circle Packing, gskill, HoVer, PAPILLON, comparator, or cost-pilot provider
+call is authorized by this ticket.
 
 ## Frozen portfolio design (provider authority: none)
 

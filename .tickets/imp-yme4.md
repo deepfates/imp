@@ -28,17 +28,19 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Closure frontier at `26eb666`
+## Closure frontier at `bbd033c`
 
 This is a criterion-by-criterion reading of the finish line above, not a new
 status system.
 
 - **Clean multi-stage consumer lifecycle — operationally satisfied.** The
-  unpacked deployment package and the final real-provider Banking77 condition
-  both run the ordinary typed program -> `Experiment.check` -> private linked
-  Result/Artifact -> fresh-OS concurrent `ProgramServer` path. All three final
-  Banking77 seeds completed that lifecycle. This establishes the product path,
-  not the missing usefulness result.
+  product-only Hex payload at `1dee3f5` contains the runtime, canonical manuals
+  and Livebooks, provider-free tutorial, and explicit two-stage OTP deployment
+  path while leaving research treatments and maintainer evidence in Git. Cold
+  package gates run the ordinary typed program -> `Experiment.check` -> private
+  linked Result/Artifact -> fresh-OS concurrent `ProgramServer` lifecycle. The
+  package remains unpublished. This establishes the product path, not the
+  missing usefulness result.
 - **Coherent public concepts — satisfied for the current supported center.**
   Program experiments use Data, metric, optimizer, explicit evaluation options,
   Result, and parameter Artifact; Optimize Anything keeps its own value-result
@@ -68,34 +70,44 @@ status system.
   IFBench scorer invalidated effectiveness conclusions, not the repaired
   provider-free compatibility regression; Imp IFBench effectiveness remains
   invalid/unverified.
-- **Clear test/evidence jobs and reusable paths — partially satisfied.** Public
-  feature behavior converges on Experiment or the native OA lifecycle and the
-  portable Artifact boundary; compatibility vectors and immutable scientific
-  results are separate. Several historical experiment roots/runners are still
-  retained as active source, so retirement/consolidation is not fully complete.
-- **One generated capability truth and minimal provenance — partially
-  satisfied.** Claims/conformance are generated from the existing canonical
-  authority, while Git, locks, ticket state, and immutable result files own
-  their respective facts. The remaining old runnable roots prevent claiming
-  that every historical runner has been retired.
+- **Clear test/evidence jobs and reusable paths — satisfied at the package
+  boundary, still open for the research portfolio.** Public feature behavior
+  converges on Experiment or the native OA lifecycle and the portable Artifact
+  boundary. Compatibility vectors, historical runners, datasets, and immutable
+  scientific results remain repository-only and are not shipped as product
+  examples. The next portfolio must keep its environments and raw evidence
+  outside Hex without creating another campaign framework.
+- **One generated capability truth and minimal provenance — satisfied for the
+  product, still open for new external evidence.** Claims/conformance are
+  generated from the existing canonical authority, while Git, dependency locks,
+  tickets, and immutable result files own their respective facts. No new
+  manifest, dashboard, or coordinator is required for the next study.
 - **Coherent package and public teaching path — satisfied for the current
   package center.** README, Learning Path, API Guide, deployment example,
   unpacked package, and fresh-process checks teach the same program → measure →
-  select → Artifact → OTP shape. The package is still unpublished, and this
-  exact `26eb666` checkpoint still needs its bounded release reconciliation.
-  Documentation cannot substitute for the open usefulness result.
+  select → Artifact → OTP shape. The package is still unpublished and its
+  SemVer/publication disposition remains an owner decision. Documentation
+  cannot substitute for the open usefulness result.
 
 Current disposition: `imp-argb` and `imp-tg2z` are completed prerequisites, not
-epic closure. No reproduced package or optimizer-mechanism defect is the known
-blocker today. `imp-88sn` and this epic remain open because current source still
-lacks a realistic multi-stage LM result meeting the declared three-seed
-material-lift bar. Stop choosing another paid task mechanically. First reconcile
-this exact checkpoint as an internal release candidate and ratify a
-landscape-grounded benchmark portfolio; only then authorize more science.
-Historical results and stopped runs remain immutable, while active runners are
-retired only when an owning replacement decision exists. Outer fixed
-repetitions are implemented product capability, not retrospective evidence;
-optimizer-internal objectives remain single-pass and explicit.
+epic closure. Subsequent provider-free work fixed credential-rotation-safe
+optimizer resume (`7abefaa`), proved the released HoVer and PAPILLON task graphs
+through public GEPA/Result/Artifact/fresh-BEAM boundaries (`fa9f3b6`), and
+preserved typed operational-safety failures across the exercised public callback
+layers (`5475ba0`, `bbd033c`). Those are real product capabilities, not
+effectiveness evidence.
+
+`imp-88sn` and this epic remain open because current source still lacks a
+realistic multi-stage LM result meeting its predeclared usefulness criterion and
+OA still lacks a reproducible held-out generalization result. The next external
+LM portfolio is HoVer plus PAPILLON with unconditional baseline, BootstrapRS,
+MIPROv2-Heavy, and GEPA-with-merge arms across Imp and pinned upstream. Its
+corrected lower bound is at least 1,710,400 task-shaped transports, so no paid
+pilot or full run is automatic. Circle Packing is only a zero-cost OA
+mechanism/artifact check; the released gskill split is not exactly reconstructable
+and requires a newly pinned current-source replication design before any run.
+Historical outcomes remain immutable. No Banking77, HotPotQA, or IFBench
+successor is authorized.
 
 ## Notes
 

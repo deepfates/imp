@@ -20,6 +20,18 @@ From an unpacked package, a consumer defines a typed two-stage Imp.Module throug
 
 ## Notes
 
+**2026-07-31 product-only Hex follow-up**
+
+Commits `aa20b5a` and `1dee3f5` converged the package artifact on the accepted
+product boundary. Hex now uses an explicit allowlist for runtime code, canonical
+user documentation and Livebooks, the provider-free tutorial, and the two-stage
+OTP deployment example. Banking77/HotPotQA treatments, frozen research data,
+retained scientific artifacts, benchmark runners, and maintainer evidence remain
+unchanged in Git but are not shipped as product paths. Unpacked-package link,
+cold-consumer, deployment, fresh-process, docs, public-surface, reproduction,
+quality, and fast gates passed. This strengthens the closed package milestone;
+it does not close `imp-88sn` or the parent epic.
+
 **2026-07-30 package-safety checkpoint**
 
 The five independently reproduced engine defects are repaired through ordinary
