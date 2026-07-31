@@ -101,7 +101,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Usefulness do
 
   defp fresh_process!(seed, artifact_path, expected_outputs) do
     {output, status} =
-      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", __ENV__.file],
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", Path.join(__DIR__, "run.exs")],
         cd: Path.expand("../..", __DIR__),
         env: [
           {"IMP_88SN_MODE", "fresh"},

@@ -449,9 +449,14 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
       value |> Jason.encode!() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
 end
 
-if System.get_env("IMP_88SN_MODE") do
-  Code.require_file("usefulness.exs", __DIR__)
-  LocalOptimizeAnythingRetryPolicy.Usefulness.run()
-else
-  LocalOptimizeAnythingRetryPolicy.Runner.run()
+cond do
+  System.get_env("IMP_OA_DEFINE_ONLY") == "1" ->
+    :ok
+
+  System.get_env("IMP_88SN_MODE") ->
+    Code.require_file("usefulness.exs", __DIR__)
+    LocalOptimizeAnythingRetryPolicy.Usefulness.run()
+
+  true ->
+    LocalOptimizeAnythingRetryPolicy.Runner.run()
 end

@@ -58,4 +58,11 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyExampleTest do
     Enum.zip(String.split(bytes, "\n", trim: true), rows)
     |> Enum.each(fn {line, row} -> assert Jason.encode!(row) == line end)
   end
+
+  test "portfolio fresh process enters through the ordinary example" do
+    source = File.read!("examples/local_optimize_anything_retry_policy/usefulness.exs")
+
+    assert source =~ ~S|Path.join(__DIR__, "run.exs")|
+    refute source =~ ~S|["run", "--no-compile", "--no-deps-check", __ENV__.file]|
+  end
 end
