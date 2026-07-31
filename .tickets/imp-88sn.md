@@ -1290,3 +1290,137 @@ robustness is a material secondary uncertainty, and breadth remains open.
 mechanism/lifecycle milestone while keeping `imp-88sn` and `imp-yme4` open. Do
 not run another immediate paid MIPRO benchmark; the next usefulness portfolio
 should be predeclared later rather than tuned around this condition.
+
+## Provider-free evaluation-robustness review
+
+This review is grounded in the retained modeled-MIPRO outputs and current public
+source. It makes no provider call and does not revise the terminal result.
+
+### Current behavior and the reproduced gap
+
+`Imp.Evaluate` executes each ordered row once and returns one arithmetic mean,
+one row list, and one error list. `Imp.Experiment.check/5` evaluates baseline
+selection once, runs the optimizer, evaluates optimized selection once, and
+admits the optimized program only when that one score is strictly higher. It
+then builds and successfully applies the selected Artifact before optional
+baseline-test and selected-test evaluation. `Experiment.Result` schema 2 can
+durably retain those rows and diagnostics, while `Optimizer.Report` can retain
+optimizer-specific observations. Artifact and `ProgramServer` preserve and
+serve the selected program; neither is an evaluation policy.
+
+There is no first-class fixed-repetition or noisy-objective contract. Manually
+duplicating examples is not an adequate public substitute: `Experiment.Data`
+correctly rejects duplicate source identities within or across splits, while
+inventing per-repetition identities would hide that the observations are paired
+repeats of the same source row. Optimizer reports are flexible enough to record
+duplicates, but do not provide a common outer selection policy or durable
+paired summary.
+
+The retained evidence makes this product gap material:
+
+- the exact same deployed baseline program moved from `44/48` to `41/48` on a
+  second held-out evaluation, a `3/48 = 0.0625` swing;
+- identical internal MIPRO parameter assignments moved by as much as `2/24 =
+  0.083333` across observations; and
+- seed 3's selected-artifact causal lift was only `2/48 = 0.041667`.
+
+Noise can therefore change an optimizer's observation history and modeled
+acquisition, reverse the outer baseline-versus-optimized selection decision,
+or make a post-selection test difference look larger or smaller than the
+program effect. Strict outer selection protects important but narrower facts:
+test rows cannot choose the Artifact, a selection tie retains baseline, and a
+retained-baseline identity makes causal lift zero even when a replay score
+moves. It does **not** prevent a lucky optimized pass from displacing baseline
+or an unlucky optimized pass from rejecting a better program. Artifact
+integrity, fresh-process serving, and operational-safety propagation are not
+made uncertain by score noise.
+
+### Established comparators
+
+- Pinned DSPy 3.2.1 (`29448ae`) `Evaluate` performs one `ParallelExecutor`
+  pass and returns the mean over that pass. MIPRO gives Optuna one scalar per
+  objective trial. DSPy's AIME tutorial repeats the 30-row AIME 2025 set five
+  times “for statistical stability,” but this is caller-side dataset
+  duplication, not a reusable paired selection/result contract. DSPy also
+  caches LM calls by default; turning cache off exposes the nondeterminism that
+  matters here.
+- Pinned Optuna 4.9.0 accepts one scalar observation per trial. Its TPE sampler
+  models repeated categorical assignments as separate observations; it does
+  not aggregate replicates on the caller's behalf. Fixed repeated evaluation
+  and aggregation therefore belong to the objective owner, not the sampler.
+- Imp's pinned Ax 23 differential covers six other product vectors and provides
+  no authority for noisy-objective behavior. As a non-authoritative current
+  product comparator, Ax checkout `394a16a` now exposes `runsPerTask`, defaults
+  it to one, averages fixed repeats, and multiplies its metric-call budget by
+  the repeat count. That is useful corroboration for the small pattern below,
+  not a claim of pinned Ax parity.
+
+### Recommendation: implement one bounded public robustness slice
+
+Add fixed repetitions to the existing evaluation/Experiment boundary, without
+changing any optimizer algorithm:
+
+```elixir
+Imp.Experiment.check(program, optimizer, data, metric,
+  evaluation_options: [
+    repetitions: 3,
+    aggregation: :mean,
+    max_errors: 10
+  ]
+)
+```
+
+The exact bounded semantics should be:
+
+1. `repetitions` is a positive integer, default `1`; `aggregation` is only
+   `:mean` in this slice, also the default. Each repetition evaluates the exact
+   same ordered row identities. No adaptive racing, early winner stopping, or
+   confidence-threshold policy is added.
+2. Baseline and candidate results are paired by repetition ordinal and row
+   identity. Selection compares their aggregate means and retains baseline on
+   a tie exactly as today. Each completed repetition has identical row
+   cardinality; a cancelled or incomplete repetition fails the stage instead
+   of contributing a biased partial mean. Operational-safety failures remain
+   immediately fatal.
+3. The existing error policy applies independently to each repetition. Calls
+   and legal budgets multiply deterministically by `repetitions`; retry and
+   provider transport behavior do not change.
+4. The public evaluation/result view retains the ordered per-repetition scores,
+   aggregate mean, minimum, maximum, and raw ordered rows/errors when
+   `include_rows: true`. Experiment additionally retains ordered paired
+   candidate-minus-baseline deltas and positive/tie/negative counts so the
+   admission decision is reproducible. This is a descriptive dispersion
+   summary, not a confidence interval or statistics framework.
+5. Existing singular `score` continues to mean the value used for selection.
+   Default one-pass callers preserve their behavior. Durable Result writing
+   will require one backward-compatible schema evolution for the optional
+   repetition summary; readers must continue to accept schemas 1 and 2.
+   Artifacts keep only the aggregate selected score and their existing Result
+   linkage—raw repeats belong in Result, not Artifact.
+
+This composes with every optimizer because `Experiment.check` owns the final
+family-independent baseline/candidate admission. Optimizers continue to own
+their internal search evaluations and reports; this slice does not silently
+change GEPA, MIPRO, SIMBA, COPRO, OA, or training objectives. The same narrow
+fixed-repeat evaluator can be opted into by an optimizer later, but internal
+replication is explicitly outside this first slice. `Artifact.apply`,
+fresh-process loading, and `ProgramServer` need no API change.
+
+One provider-free public feature test should use an ordinary two-stage program
+and shipped optimizer whose deterministic test LM supplies a noisy sequence.
+On the identical ordered validation rows, the first observation favors the
+inferior baseline, while three fixed observations give baseline scores
+`[1, 0, 0]` and optimized scores `[0, 1, 1]`. The default one-pass check must
+retain baseline; `repetitions: 3` must select the optimized program with means
+`1/3` and `2/3`, persist the three paired observations and exact multiplied
+row count, build/apply the selected Artifact, and reproduce its behavior after
+fresh-process load. A separate assertion makes an incomplete repetition fail
+without selection. These assertions test user-visible selection and lifecycle,
+not internal task scheduling.
+
+Migration impact is deliberately small: no existing call changes; one new
+evaluation option, additive result visibility, and a compatible durable-reader
+update. This capability would make outer admission and reported comparisons
+more robust. It would not rehabilitate the terminal Banking77 result, prove an
+optimizer useful, or by itself remove noisy observations inside optimizer
+search. Those remain separate scientific and algorithm-specific questions.
