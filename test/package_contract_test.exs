@@ -109,6 +109,21 @@ defmodule PackageContractTest do
     assert_release_files(files)
   end
 
+  test "the unpublished 0.3.0 candidate surfaces agree" do
+    assert Mix.Project.config()[:version] == "0.3.0"
+
+    assert File.read!("RELEASE_NOTES.md") =~
+             "# Imp v0.3.0 — internal release candidate notes"
+
+    assert File.read!("CHANGELOG.md") =~ "## 0.3.0 — 2026-07-31"
+    assert File.read!("examples/deployment/mix.exs") =~ "{:imp, \"~> 0.3\"}"
+
+    for path <- Path.wildcard("livebooks/*.livemd") do
+      assert File.read!(path) =~ "{:imp, \"~> 0.3.0\"}",
+             "#{path} does not pin the candidate package line"
+    end
+  end
+
   test "clean-room package gate is discoverable from the root Mix project" do
     assert Mix.Task.get("imp.package.clean_room") == Mix.Tasks.Imp.Package.CleanRoom
 

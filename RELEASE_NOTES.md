@@ -1,4 +1,4 @@
-# Imp v0.2.1 — release notes
+# Imp v0.3.0 — internal release candidate notes
 
 Imp is DSPy for the BEAM: declare a language-model task as a typed Elixir
 program, then test, measure, improve, and operate it like any other code.
@@ -9,7 +9,7 @@ artifacts, and run under OTP supervision.
 
 ## Install
 
-Not yet published to Hex — `{:imp, "~> 0.2.0"}` becomes the install line
+Not yet published to Hex — `{:imp, "~> 0.3.0"}` becomes the install line
 once the package is published (an owner action still pending). Until then,
 install from a source checkout:
 
@@ -21,11 +21,18 @@ The product manual, five Livebooks, provider-free tutorial, and deployment
 example are bundled for HexDocs. Research evidence and maintainer procedures
 remain in the source repository.
 
-The `v0.2.1` tag is the last named 0.2.x source candidate. Current `main`
-contains additional unreleased changes, including the breaking changes listed
-under `Unreleased` in `CHANGELOG.md`; it must not be published as a 0.2.x patch
-without an explicit version disposition. Package checks on `main` establish
-artifact and consumer integrity, not a release-version decision.
+This source is an unpublished `0.3.0` internal candidate. It is not tagged and
+does not claim a Hex release; the exact candidate is its clean Git commit plus
+the SHA-256 of the built package. Public tagging and publication remain explicit
+owner actions.
+
+## Breaking changes from 0.2.1
+
+- `Imp.optimize/3`, `/4`, and `/5` return `{:ok, program}` or
+  `{:error, reason}`. Use the corresponding `Imp.optimize!` arity to retain the
+  previous raising behavior.
+- `Imp.Adapters.Types` and its nested structs moved to `Imp.Adapter.Types`.
+  Replace the `Imp.Adapters.` prefix with `Imp.Adapter.`.
 
 ## What you are getting
 
@@ -135,5 +142,5 @@ their APIs may still converge with upstream semantics. A callable optimizer is
 not thereby proven effective; the task-scoped results above are the evidence
 boundary.
 
-The last named candidate described by these notes is `v0.2.1`; publication to
-Hex has not occurred.
+The candidate described by these notes has package version `0.3.0`; its tag and
+Hex publication remain pending owner action.

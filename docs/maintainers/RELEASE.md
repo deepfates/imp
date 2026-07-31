@@ -69,17 +69,16 @@ receipts inform that judgment; none can replace it.
 
 ## Candidate Gates
 
-Current `main` contains breaking changes after `0.2.1` while `mix.exs` still
-uses `0.2.1` as development metadata. Until the owner chooses the next public
-SemVer, an internal candidate is identified only by all three of:
+Current `main` uses `0.3.0` package metadata for an unpublished internal
+candidate because it contains the breaking changes documented since `0.2.1`.
+An internal candidate is identified by all three of:
 
 - an exact clean Git commit;
 - the SHA-256 of the unpacked/built Hex artifact produced from that commit;
 - passing candidate gates from that same commit.
 
-Do not call such a build a `0.2.1` release candidate, and do not change the
-package version merely to make the gates green. A public version choice and
-publication remain separate owner actions.
+Package version alone is not candidate identity. A public tag, confirmation of
+the publication version, and publication remain separate owner actions.
 
 Run from a clean candidate commit:
 

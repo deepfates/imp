@@ -31,7 +31,7 @@ if repo do
 else
   # Standalone notebook: install the Hex release (pending publication;
   # until Imp is published to Hex this fallback cannot resolve).
-  Mix.install([{:imp, "~> 0.2.0"}])
+  Mix.install([{:imp, "~> 0.3.0"}])
 end
 live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```

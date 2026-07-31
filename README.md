@@ -82,9 +82,9 @@ Imp is not yet published to Hex. Use a source checkout for now:
 {:imp, path: "path/to/imp"}
 ```
 
-`main` contains breaking pre-release work, so pin an exact commit when another
-project depends on it. The owner will choose the next public version before
-publication.
+`main` is an unpublished `0.3.0` internal candidate with breaking changes from
+`0.2.1`, so pin an exact commit when another project depends on it. Tagging and
+Hex publication remain explicit owner actions.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. You can run

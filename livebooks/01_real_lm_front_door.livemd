@@ -31,7 +31,7 @@ if repo do
 else
   # Standalone notebook: install the Hex release (pending publication;
   # until Imp is published to Hex this fallback cannot resolve).
-  Mix.install([{:imp, "~> 0.2.0"}])
+  Mix.install([{:imp, "~> 0.3.0"}])
 end
 
 api_key = System.get_env("OPENAI_API_KEY") || System.get_env("LB_OPENAI_API_KEY")

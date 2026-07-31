@@ -5,11 +5,13 @@ Versioning once the first public package is released.
 
 ## Unreleased
 
-This section contains breaking changes after `0.2.1`. The source tree still
-uses `0.2.1` as development package metadata, so internal release candidates
-are identified by exact Git commit and built-package digest rather than that
-version string. The next public SemVer remains an owner publication decision;
-these changes must not ship as another `0.2.x` patch.
+No changes yet.
+
+## 0.3.0 — 2026-07-31
+
+Prepared as an unpublished internal release candidate. The exact candidate is
+identified by its clean Git commit and built-package digest; tagging and Hex
+publication remain owner actions.
 
 ### Added
 
