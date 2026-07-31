@@ -446,7 +446,12 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
     do: Imp.signature(%{instructions: instructions, inputs: inputs, outputs: outputs})
 
   defp examples_repr(examples) do
-    "[" <> Enum.map_join(examples, ", ", &example_repr/1) <> "]"
+    body =
+      examples
+      |> Enum.with_index()
+      |> Enum.map_join(", ", fn {example, index} -> example_repr(example, "$[#{index}]") end)
+
+    "[" <> body <> "]"
   end
 
   # DSPy summarizes the Example values supplied by the consumer; it does not
@@ -456,7 +461,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   # stable BEAM representation is explicit inputs first, followed by the other
   # public fields in lexical order. Example.keys/1 deliberately omits `imp_`
   # fields, keeping recorder identities and metric-owned rows out of proposals.
-  defp example_repr(%Imp.Example{} = example) do
+  defp example_repr(%Imp.Example{} = example, path) do
     public_keys = Imp.Example.keys(example)
     present = MapSet.new(public_keys)
 
@@ -477,29 +482,127 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
 
     body =
       Enum.map_join(fields, ", ", fn {key, value} ->
-        "#{py_repr(to_string(key))}: #{py_repr(value)}"
+        key = to_string(key)
+        "#{py_repr(key, path)}: #{py_repr(value, path <> "." <> key)}"
       end)
 
     inputs =
       example.input_keys
       |> List.wrap()
-      |> Enum.map(&py_repr(to_string(&1)))
+      |> Enum.map(&py_repr(to_string(&1), path <> ".input_keys"))
       |> Enum.sort()
       |> Enum.join(", ")
 
     "Example({#{body}}) (input_keys={#{inputs}})"
   end
 
-  defp py_repr(value) when is_binary(value) do
-    escaped = value |> String.replace("\\", "\\\\") |> String.replace("'", "\\'")
-    "'" <> escaped <> "'"
+  # Python's repr is recursively visible in DSPy 3.2.1's dataset-summary
+  # prompt (`repr(list[Example])`). Jason.OrderedObject is the explicit
+  # insertion-preserving representation for a JSON object on the BEAM; plain
+  # maps retain their observable Enumerable order, because no insertion order
+  # exists to recover after a consumer has constructed a map.
+  defp py_repr(%Jason.OrderedObject{values: values}, path),
+    do: py_dict_repr(values, path)
+
+  defp py_repr(%{__struct__: module}, path),
+    do: unsupported_value!(path, "struct #{inspect(module)}")
+
+  defp py_repr(value, path) when is_map(value),
+    do: py_dict_repr(Enum.to_list(value), path)
+
+  defp py_repr(value, path) when is_list(value) do
+    body =
+      value
+      |> Enum.with_index()
+      |> Enum.map_join(", ", fn {item, index} -> py_repr(item, path <> "[#{index}]") end)
+
+    "[" <> body <> "]"
   end
 
-  defp py_repr(nil), do: "None"
-  defp py_repr(true), do: "True"
-  defp py_repr(false), do: "False"
-  defp py_repr(value) when is_number(value), do: to_string(value)
-  defp py_repr(value), do: value |> to_string() |> py_repr()
+  defp py_repr(value, path) when is_binary(value), do: python_string_repr!(value, path)
+  defp py_repr(nil, _path), do: "None"
+  defp py_repr(true, _path), do: "True"
+  defp py_repr(false, _path), do: "False"
+  defp py_repr(value, _path) when is_integer(value), do: Integer.to_string(value)
+  defp py_repr(value, _path) when is_float(value), do: Imp.PyFloat.repr(value)
+  defp py_repr(value, path), do: unsupported_value!(path, value_type(value))
+
+  defp py_dict_repr(pairs, path) do
+    body =
+      pairs
+      |> Enum.map_join(", ", fn
+        {key, value} when is_binary(key) or is_atom(key) ->
+          key = to_string(key)
+          "#{py_repr(key, path)}: #{py_repr(value, map_value_path(path, key))}"
+
+        {key, _value} ->
+          unsupported_value!(path <> ".<key>", "map key #{inspect(key)}")
+      end)
+
+    "{" <> body <> "}"
+  end
+
+  defp map_value_path(path, key) do
+    if Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, key),
+      do: path <> "." <> key,
+      else: path <> "[" <> python_string_repr!(key, path) <> "]"
+  end
+
+  defp python_string_repr!(value, path) do
+    unless String.valid?(value), do: unsupported_value!(path, "invalid UTF-8 string")
+
+    quote =
+      if String.contains?(value, "'") and not String.contains?(value, "\""), do: ?\", else: ?'
+
+    escaped =
+      value
+      |> String.to_charlist()
+      |> Enum.map_join(&python_char_repr(&1, quote))
+
+    <<quote>> <> escaped <> <<quote>>
+  end
+
+  defp python_char_repr(?\\, _quote), do: "\\\\"
+  defp python_char_repr(?\t, _quote), do: "\\t"
+  defp python_char_repr(?\n, _quote), do: "\\n"
+  defp python_char_repr(?\r, _quote), do: "\\r"
+  defp python_char_repr(char, char), do: "\\" <> <<char>>
+
+  defp python_char_repr(char, _quote) do
+    if python_printable?(char), do: <<char::utf8>>, else: python_unicode_escape(char)
+  end
+
+  defp python_printable?(32), do: true
+
+  defp python_printable?(char) do
+    case :unicode_util.lookup(char) do
+      %{category: {:other, _}} -> false
+      %{category: {:separator, _}} -> false
+      _ -> true
+    end
+  end
+
+  defp python_unicode_escape(char) when char <= 0xFF,
+    do: "\\x" <> (char |> Integer.to_string(16) |> String.pad_leading(2, "0"))
+
+  defp python_unicode_escape(char) when char <= 0xFFFF,
+    do: "\\u" <> (char |> Integer.to_string(16) |> String.pad_leading(4, "0"))
+
+  defp python_unicode_escape(char),
+    do: "\\U" <> (char |> Integer.to_string(16) |> String.pad_leading(8, "0"))
+
+  defp unsupported_value!(path, type) do
+    raise ArgumentError,
+          "DSPy 3.2.1 MIPRO proposer cannot render #{type} at #{path}; " <>
+            "expected a JSON-safe string, finite number, boolean, null, list, map, or Jason.OrderedObject"
+  end
+
+  defp value_type(value) when is_tuple(value), do: "tuple #{inspect(value)}"
+  defp value_type(value) when is_pid(value), do: "pid"
+  defp value_type(value) when is_reference(value), do: "reference"
+  defp value_type(value) when is_function(value), do: "function"
+  defp value_type(value) when is_atom(value), do: "atom #{inspect(value)}"
+  defp value_type(value), do: inspect(value)
 
   defp strip_prefix(text) do
     Regex.replace(~r/^[*\s]*(([\w'\-]+\s+){0,4}[\w'\-]+):\s*/u, text, "")

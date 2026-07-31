@@ -715,7 +715,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   end
 
   @tag :evidence_infrastructure
-  test "two-predictor public setup matches bootstrap, proposal messages, and rollout ids" do
+  test "two-predictor public compile matches nested grounding and enters resumable search" do
     {output, 0} =
       System.cmd(Path.expand(@python), [Path.expand(@two_predictor_runner)],
         env: [{"PYTHONPATH", Path.expand(@source)}],
@@ -766,13 +766,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         config: [json_fallback: false]
       )
 
-    trainset =
-      Enum.map(0..15, fn index ->
-        Imp.Example.new(
-          prompt: "request-#{index |> Integer.to_string() |> String.pad_leading(2, "0")}"
-        )
-        |> Imp.Example.with_inputs(:prompt)
-      end)
+    trainset = Enum.map(0..15, &nested_ifbench_example/1)
 
     valset = [Imp.Example.new(prompt: "validation") |> Imp.Example.with_inputs(:prompt)]
 
@@ -797,7 +791,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         seed: 9
       )
 
-    paused = Imp.Optimizer.MIPROv2.compile(optimizer, program, trainset, valset, max_trials: 0)
+    paused = Imp.Optimizer.MIPROv2.compile(optimizer, program, trainset, valset, max_trials: 1)
     report = Imp.Optimizer.Report.fetch(paused)
 
     prompt_calls = collect_tagged_calls(:two_predictor_prompt_call, 11, [])
@@ -812,6 +806,9 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     end)
 
     assert Enum.map(task_calls, &stringify/1) == upstream["task_messages"]
+
+    first_summary_user = prompt_messages |> hd() |> List.last() |> Map.fetch!("content")
+    assert first_summary_user =~ upstream["first_batch_repr"]
 
     assert Enum.map(Enum.drop(prompt_calls, 3), fn {_messages, opts} -> opts[:rollout_id] end) ==
              upstream["rollout_ids"]
@@ -835,7 +832,48 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
              "ensure_correct_response_module" => upstream["instructions"]["1"]
            }
 
+    assert report.metadata.run_status == :paused
+    assert report.metadata.completed_trials == 1
+
+    checkpoint = report.metadata.resume_state |> Jason.encode!() |> Jason.decode!()
+
+    resumed =
+      optimizer
+      |> Imp.Optimizer.MIPROv2.compile(program, trainset, valset,
+        max_trials: 0,
+        resume_state: checkpoint
+      )
+      |> Imp.Optimizer.Report.fetch()
+
+    assert resumed.metadata.resumed
+    assert resumed.metadata.completed_trials == 1
+
     assert Agent.get(prompt_agent, & &1) == []
+  end
+
+  test "nested grounding rejects unsupported values before proposer transport" do
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          send(owner, :unexpected_proposer_transport)
+          %{observations: "should not run"}
+        end
+      )
+
+    invalid =
+      Imp.Example.new(
+        prompt: "request",
+        kwargs: [Jason.OrderedObject.new([{"safe", 1}, {"callback", {:not, :json}}])]
+      )
+      |> Imp.Example.with_inputs(:prompt)
+
+    assert_raise ArgumentError,
+                 ~r/cannot render tuple .* at \$\[0\]\.kwargs\[0\]\.callback/,
+                 fn -> UpstreamProposer.summarize!(lm, [invalid], 10) end
+
+    refute_received :unexpected_proposer_transport
   end
 
   @tag :evidence_infrastructure
@@ -934,6 +972,29 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     after
       1_000 -> flunk("missing #{count} #{tag} calls")
     end
+  end
+
+  defp nested_ifbench_example(index) do
+    nested =
+      Jason.OrderedObject.new([
+        {"phrase", "can't say \"BLUE\"\nwithout\\escaping"},
+        {"count", index},
+        {"enabled", rem(index, 2) == 0},
+        {"missing", nil},
+        {"ratio", 1.0e-5},
+        {"ordered",
+         Jason.OrderedObject.new([
+           {"z", [1, false, nil]},
+           {"a", Jason.OrderedObject.new([{"line", "café\u2028end"}])}
+         ])}
+      ])
+
+    Imp.Example.new(
+      prompt: "request-#{index |> Integer.to_string() |> String.pad_leading(2, "0")}",
+      instruction_id_list: ["format:quoted", "length:exact"],
+      kwargs: [nested]
+    )
+    |> Imp.Example.with_inputs(:prompt)
   end
 
   defp stringify(value) when is_list(value), do: Enum.map(value, &stringify/1)

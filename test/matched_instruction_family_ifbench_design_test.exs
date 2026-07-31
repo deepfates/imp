@@ -100,8 +100,14 @@ defmodule Imp.MatchedInstructionFamilyIFBenchDesignTest do
   end
 
   test "MIPRO stage one provider-disabled entry binds the three-seed ceiling" do
+    # zsh reserves `status`; use an ordinary non-reserved exit variable in the
+    # same shell shape operators use for the provider-disabled/live entry.
+    command =
+      "mix run --no-compile #{@root}/usefulness.exs; " <>
+        "exit_code=$?; exit $exit_code"
+
     {output, 0} =
-      System.cmd("mix", ["run", "--no-compile", @root <> "/usefulness.exs"],
+      System.cmd("zsh", ["-c", command],
         env: [
           {"IMP_88SN_MODE", "disabled"},
           {"IMP_88SN_CONDITION", "mipro_stage1"}

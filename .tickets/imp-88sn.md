@@ -501,3 +501,39 @@ key usage rather than manufactured per-request precision. The outer zsh wrapper
 subsequently failed to print Mix's exit status because it assigned the reserved
 `status` variable; that happened after Mix returned and did not cause or alter
 the preserved optimizer failure.
+
+### Stage 1 owning product repair
+
+The stopped run above remains terminal and byte-identical. The pinned proposer
+now recursively renders the JSON-safe value domain used by ordinary Examples:
+CPython string and finite-float spelling, integers, booleans/`None`, ordered
+lists, and nested objects. `Jason.OrderedObject` carries source insertion order
+where JSON object order must survive the BEAM; the ordinary IFBench loader now
+uses that representation for nested objects. Unsupported structs, tuples,
+functions, references, and non-string object keys fail with the exact example
+path before any proposer transport.
+
+The provider-free two-predictor public MIPRO compile differential now compares
+all dataset-summary and proposal messages against DSPy 3.2.1 on nested
+IFBench-shaped rows, enters one categorical search trial, JSON-round-trips its
+checkpoint, and resumes without replaying setup. The pinned first-batch repr
+SHA-256 is `beb5d329babc820d5901d25f834748b6ee2e2b4afbb0aad2583734f9cd592a3f`;
+the complete prompt-message transcript SHA-256 is
+`391087e66b3663a659a1e349d2845413e009036f68dea9a0a9af4095ab20202a`.
+Simple scalar-only transcripts remain byte-identical. The repair also corrects
+previously non-crashing but wrong scalar spellings (quotes/control escapes and
+Python float exponent form), so its semantic effect is intentionally not
+limited only to values that formerly raised.
+
+The existing provider-disabled zsh invocation now uses `exit_code` rather than
+zsh's reserved `status` parameter. This is an ordinary shell regression, not a
+new runner.
+
+A read-only key query after the repair reported `$7.794994425` daily and
+`$17.467214985` cumulative usage on the current OpenRouter key; no completion
+endpoint was called. Keeping the earlier conservative treatment of Behold's
+approximately `$0.837644` as separate gives an unknown-inclusive current upper
+of `$18.304858985`. A clean successor under the unchanged `$42.806016` Stage 1
+ceiling would therefore expose at most `$61.110874985`, still below the
+approximately `$100` workshop target. This is headroom arithmetic, not provider
+authority or an exact attribution of historical usage.

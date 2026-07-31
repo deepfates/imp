@@ -24,6 +24,10 @@ defmodule Imp.Optimizer.MIPROv2 do
   candidate; few-shot awareness uses the same ordered demo arms searched by the
   optimizer. Both zero-shot and joint instruction/demonstration search are
   supported; unsupported proposer combinations fail before any LM call.
+  Pinned dataset grounding renders the JSON-safe values in `Imp.Example` with
+  DSPy/Python spelling. Use `Jason.OrderedObject` when nested JSON object order
+  is semantically significant; unsupported values fail before proposer
+  transport with their exact example path.
 
   `:search_fidelity` separately controls parameter search. The legacy narrow
   `:dspy_3_2_1_optuna_4_9_0_startup` mode reproduces Optuna 4.9.0's NumPy

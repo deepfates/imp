@@ -10,6 +10,7 @@ from pathlib import Path
 
 import dspy
 from dspy.teleprompt import MIPROv2
+from dspy.propose.dataset_summary_generator import order_input_keys_in_string
 from dspy.utils.dummies import DummyLM
 
 
@@ -54,6 +55,21 @@ def metric(_example, _prediction, _trace=None):
     return True
 
 
+def nested_example(index):
+    return dspy.Example(
+        prompt=f"request-{index:02d}",
+        instruction_id_list=["format:quoted", "length:exact"],
+        kwargs=[{
+            "phrase": "can't say \"BLUE\"\nwithout\\escaping",
+            "count": index,
+            "enabled": index % 2 == 0,
+            "missing": None,
+            "ratio": 1.0e-5,
+            "ordered": {"z": [1, False, None], "a": {"line": "café\u2028end"}},
+        }],
+    ).with_inputs("prompt")
+
+
 def main():
     prompt_lm = CapturingLM([
         {"observations": "first observations"},
@@ -72,10 +88,7 @@ def main():
         ])
     task_lm = CapturingLM(task_answers)
     program = TwoStage()
-    trainset = [
-        dspy.Example(prompt=f"request-{index:02d}").with_inputs("prompt")
-        for index in range(16)
-    ]
+    trainset = [nested_example(index) for index in range(16)]
     valset = [dspy.Example(prompt="validation").with_inputs("prompt")]
 
     optimizer = MIPROv2(
@@ -120,6 +133,7 @@ def main():
         "rollout_ids": [call["rollout_id"] for call in prompt_lm.copy_calls],
         "instructions": captured["instructions"],
         "demos_discarded": captured["demos_discarded"],
+        "first_batch_repr": order_input_keys_in_string(repr(trainset[:10])),
     }, sort_keys=True))
 
 

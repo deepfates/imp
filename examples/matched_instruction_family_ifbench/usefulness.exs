@@ -270,7 +270,13 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
     path
     |> File.stream!()
     |> Enum.map(fn line ->
-      row = Jason.decode!(line)
+      # DSPy receives these JSON objects through Python's insertion-ordered
+      # dicts. Keep nested object order so pinned MIPRO grounding sees the same
+      # value representation instead of an arbitrary BEAM map enumeration.
+      %Jason.OrderedObject{values: values} =
+        Jason.decode!(line, objects: :ordered_objects)
+
+      row = Map.new(values)
 
       row
       |> Map.take(["source_id", "prompt", "instruction_id_list", "kwargs"])

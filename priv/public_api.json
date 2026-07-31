@@ -2864,6 +2864,7 @@
       "struct_fields": [
         "artifact",
         "baseline_selection",
+        "baseline_test",
         "optimized_selection",
         "program",
         "provenance",
@@ -3805,7 +3806,8 @@
       "category": "experimental",
       "functions": [
         "best_candidate/1",
-        "run/3"
+        "run/3",
+        "to_artifact/2"
       ],
       "kind": "module",
       "macros": [],
@@ -3817,6 +3819,9 @@
           ],
           "run/3": [
             "run(seed_candidate, evaluator, opts \\\\ [])"
+          ],
+          "to_artifact/2": [
+            "to_artifact(result, opts \\\\ [])"
           ]
         }
       },
@@ -3978,6 +3983,8 @@
         "promote/2",
         "read!/1",
         "rollback/1",
+        "value/2",
+        "value_candidate/3",
         "write!/2"
       ],
       "kind": "module",
@@ -4014,6 +4021,12 @@
           ],
           "rollback/1": [
             "rollback(artifact)"
+          ],
+          "value/2": [
+            "value(artifact, selection \\\\ :champion)"
+          ],
+          "value_candidate/3": [
+            "value_candidate(id, value, opts \\\\ [])"
           ],
           "write!/2": [
             "write!(artifact, path)"
