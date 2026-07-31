@@ -1,6 +1,6 @@
 ---
 id: imp-tg2z
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-30T22:14:17Z
@@ -108,3 +108,11 @@ Canonical claims classify every advertised family as stable or distinctly experi
 - Playbook's public compile path now preserves typed operational safety guards
   from raised, thrown, and callback-returned forms. Ordinary proposer and
   evaluator failures keep the optimizer's structured diagnostic contract.
+- Independent package-level review at `fe0ee24` passed this ticket for its
+  exact prerequisite purpose: `mix public_surface.check` passed 44/44,
+  `mix reproduction.check` passed, the canonical policy classifies every
+  optimizer module as `experimental` (with GEPA `BatchSampler` as SPI), and no
+  advertised mechanism retains a reproduced hidden substitute. Explicitly
+  unsupported combinations fail closed. This closure does not establish a
+  stable optimizer portfolio, effectiveness breadth, or the full project
+  telos; `imp-yme4` remains open and `imp-88sn` owns current-source usefulness.
