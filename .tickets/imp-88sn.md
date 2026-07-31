@@ -1904,18 +1904,62 @@ candidate effects are localized and the objective is deterministic.
 
 The evidence does not support lowering or reconsidering the positive-lift
 acceptance. Doing so would promote a Banking signal smaller than observed
-same-program movement and would not rescue HotPot's negative mean. Nor is the
-next move another task/model treatment: the HotPot run exposed a reusable
-algorithm-application weakness first.
+same-program movement and would not rescue HotPot's negative mean.
 
-**Smallest next decision: improve GEPA's BEAM-native all-component admission
-before more usefulness science.** Preserve parallel proposal opportunity, but
-score component-local deltas (or explicit ablations) before an optional merged
-candidate so a helpful stage can survive a harmful co-proposal and prompt
-growth has an attributable owner. Keep the existing strict outer selection and
-input-envelope safety. A provider-free falsifier is one four-stage case where
-one proposed component improves the objective, one degrades it or exceeds the
-envelope, and the admitted Artifact contains only the useful delta. Stop this
-tranche if component-local admission cannot be expressed without replacing
-GEPA's candidate/frontier semantics. This is an algorithm/product improvement,
-not evidence that the current experiment threshold or task labels were wrong.
+**Correction: atomic all-component admission is not a reproduced product
+defect.** `module_selector: :all` is explicitly documented and tested as one
+atomic candidate that updates every selected component. It behaved exactly
+that way. Existing `:round_robin` already supplies component-local credit
+assignment. An independent/ablation selector remains an unratified product
+idea; this result does not make it required work. The owning diagnosis is a
+treatment tradeoff: the condition chose atomic `:all` to force four-component
+opportunity inside a budget too small for round-robin coverage, and accepted
+the resulting coupling risk.
+
+### Provider-free round-robin feasibility bound
+
+A credible future HotPot question would need a selection set large enough that
+the observed one-row winner cannot alone clear the `0.05` bar. Since a HotPot
+row's maximum F1 delta is one, that requires at least 21 rows; 24 is the
+smallest balanced existing shape (`18` bridge, `6` comparison) and matches the
+current test size. It would also need at least two complete round-robin cycles
+to match the terminal condition's two proposal opportunities per component.
+
+With validation 24 and minibatch 4, each rejected component iteration costs 8
+metric examples and each accepted iteration can cost 32 including full
+validation. Initial validation costs 24. Guaranteeing eight ordered iterations
+therefore requires semantic/operational capacity for `24 + 8 * 32 = 280`
+metric examples and 8 reflections per seed; the rejection-only lower trajectory
+is 88 metric examples. This is ordinary BEAM-native round-robin accounting, not
+a pinned-GEPA matched claim. A single four-component cycle would require up to
+152 examples and 4 reflections, but gives each component only one stochastic
+proposal—strictly weaker proposal opportunity than the completed treatment.
+
+Keeping three outer repetitions and the four-stage program, the credible
+two-cycle design would reserve per seed: 288 baseline-selection task
+transports, 1,120 internal-optimizer transports, 288 optimized-selection, 288
+baseline-test, 288 selected-test, and 16 fresh service. Across three seeds that
+is 6,864 task plus 24 reflection transports. At the already established
+enforceable-byte-bound prices, the conservative new ceiling is `$90.058752`;
+even the all-rejected trajectory is about `$63.516672`. Adding the latest
+account snapshot `$26.457331485` yields approximately `$116.516083` maximum or
+`$89.974003` on the rejection-only path, before unrelated usage uncertainty.
+The cheaper one-cycle design still reserves up to `$66.871296` new and an
+approximately `$93.328627` account aggregate while offering less opportunity
+than the terminal run.
+
+No current HotPot row can roll into a result-blind successor. At minimum it
+would need 24 new selection and 24 new test rows; a fully independent condition
+would freeze 8 new train rows as well, for 56 newly exposure-scanned rows from
+the pinned source. It would require a new digest derivation, retained-evidence
+scan, and ordinary example data freeze even though no new scorer or program
+adapter is needed.
+
+**Recommendation: do not build or run the round-robin HotPot successor.** The
+only design with comparable component opportunity is another large data freeze
+whose conservative exposure crosses the workshop target, while the cheaper
+design weakens the algorithm opportunity. Preserve the completed result as
+evidence that atomic `:all` plus an eight-row selector was a poor application
+choice, not that GEPA's advertised selector semantics are broken. Independent
+all-component ablation remains a candidate for future product design, not the
+next required telos step.
