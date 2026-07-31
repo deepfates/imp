@@ -71,6 +71,52 @@ defmodule Imp.MatchedInstructionFamilyIFBenchDesignTest do
     assert MapSet.size(held_out_ids) >= 50
   end
 
+  test "MIPRO stage one rows exclude every prior source coordinate" do
+    prior = read_json!(@root <> "/data/receipt.json")
+    receipt = read_json!(@root <> "/data/mipro_stage1/receipt.json")
+
+    exposed_train =
+      MapSet.new(0..23)
+      |> MapSet.union(MapSet.new(300..315))
+      |> MapSet.union(MapSet.new(prior["selection"]["source_indices"]["train"]))
+      |> MapSet.union(MapSet.new(prior["selection"]["source_indices"]["selection"]))
+
+    exposed_test =
+      MapSet.new(0..47)
+      |> MapSet.union(MapSet.new(prior["selection"]["source_indices"]["held_out"]))
+
+    indices = receipt["selection"]["source_indices"]
+
+    assert MapSet.disjoint?(exposed_train, MapSet.new(indices["train"] ++ indices["selection"]))
+    assert MapSet.disjoint?(exposed_test, MapSet.new(indices["held_out"]))
+    assert receipt["selection"]["prior_exposure"]["train_count"] == 75
+    assert receipt["selection"]["prior_exposure"]["test_count"] == 94
+
+    for split <- ~w(train selection held_out) do
+      path = @root <> "/data/mipro_stage1/#{split}.jsonl"
+      assert sha256(path) == receipt["split_sha256"][split]
+      assert length(read_jsonl!(path)) == receipt["counts"][split]
+    end
+  end
+
+  test "MIPRO stage one provider-disabled entry binds the three-seed ceiling" do
+    {output, 0} =
+      System.cmd("mix", ["run", "--no-compile", @root <> "/usefulness.exs"],
+        env: [
+          {"IMP_88SN_MODE", "disabled"},
+          {"IMP_88SN_CONDITION", "mipro_stage1"}
+        ],
+        stderr_to_stdout: true
+      )
+
+    receipt = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
+    assert receipt["status"] == "provider_disabled"
+    assert receipt["condition"] == "mipro_stage1"
+    assert receipt["provider_authority_used"] == false
+    assert receipt["three_seed_imp_ceiling"] == %{"task" => 2_904, "optimizer" => 33}
+    assert receipt["seeds"] == [2_026_072_705, 2_026_072_706, 2_026_072_707]
+  end
+
   @tag :requires_dspy_capture
   test "pinned DSPy and Imp render byte-identical two-stage task messages" do
     python =

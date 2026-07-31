@@ -62,9 +62,23 @@ def round_robin(rows: list[dict], count: int) -> list[tuple[int, dict]]:
                 break
 
         if not made_progress:
-            raise ValueError(f"only {len(selected)} unique rows available for requested {count}")
+            raise ValueError(
+                f"only {len(selected)} unique rows available for requested {count}"
+            )
 
     return selected
+
+
+def round_robin_absolute(
+    rows: list[dict], start: int, count: int, excluded: set[int]
+) -> list[tuple[int, dict]]:
+    available = [
+        (index, row)
+        for index, row in enumerate(rows, start=start)
+        if index not in excluded
+    ]
+    relative = round_robin([row for _index, row in available], count)
+    return [(available[index][0], row) for index, row in relative]
 
 
 def write_json(path: Path, value: object) -> None:
@@ -80,7 +94,9 @@ def write_jsonl(path: Path, selected: list[tuple[int, dict]], source: str) -> li
             source_id = f"ifbench-{source}-{source_index:06d}"
             value = dict(row)
             value["source_id"] = source_id
-            handle.write(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+            handle.write(
+                json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"
+            )
             ids.append(source_id)
     return ids
 
@@ -88,7 +104,10 @@ def write_jsonl(path: Path, selected: list[tuple[int, dict]], source: str) -> li
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gepa-root", required=True, type=Path)
-    parser.add_argument("--out", default=Path(__file__).resolve().parent / "data", type=Path)
+    parser.add_argument(
+        "--profile", choices=("original", "mipro-stage1"), default="original"
+    )
+    parser.add_argument("--out", type=Path)
     args = parser.parse_args()
 
     source = args.gepa_root.resolve() / "gepa_artifact/benchmarks/IFBench/data"
@@ -102,22 +121,94 @@ def main() -> None:
     if len(all_train) < 600 or len(all_test) != 294:
         raise SystemExit("pinned IFBench split cardinality drift")
 
-    # These are the exact upstream split owners. Selection is result-blind and
-    # performed independently inside each owner before any model execution.
-    splits = {
-        "train": round_robin(all_train[300:600], 16),
-        "selection": round_robin(all_train[0:300], 32),
-        "held_out": round_robin(all_test, 64),
-    }
-    offsets = {"train": 300, "selection": 0, "held_out": 0}
-    output = args.out.resolve()
+    if args.profile == "original":
+        splits = {
+            "train": round_robin_absolute(all_train[300:600], 300, 16, set()),
+            "selection": round_robin_absolute(all_train[0:300], 0, 32, set()),
+            "held_out": round_robin_absolute(all_test, 0, 64, set()),
+        }
+        algorithm = "sorted_instruction_id_round_robin_first_unused_source_order"
+        prior_exposure = None
+        default_out = Path(__file__).resolve().parent / "data"
+    else:
+        example_root = Path(__file__).resolve().parent
+        prior_path = example_root / "data" / "receipt.json"
+        local_manifest_path = (
+            example_root.parent
+            / "local_gepa_ifbench_cross_task"
+            / "data"
+            / "source-manifest.json"
+        )
+        if (
+            sha256(prior_path)
+            != "74282c868dde7c858a67c28218b8687d3b4213185b70c5f400c3d2d71a77e788"
+        ):
+            raise SystemExit("prior IFBench receipt digest drift")
+        if (
+            sha256(local_manifest_path)
+            != "0cd10e44604f8907c176448226f0e17a14bbe91fd373aa2e21ff92f9c7248199"
+        ):
+            raise SystemExit("local IFBench source manifest digest drift")
+
+        prior = json.loads(prior_path.read_text())
+        local_manifest = json.loads(local_manifest_path.read_text())
+        expected_authority = {
+            "gepa_artifact_commit": GEPA_COMMIT,
+            "train_sha256": TRAIN_SHA256,
+            "test_sha256": TEST_SHA256,
+        }
+        if prior["authority"] != expected_authority:
+            raise SystemExit("prior IFBench receipt authority drift")
+        if local_manifest["source_files"] != {
+            "IFBench_train.jsonl": TRAIN_SHA256,
+            "IFBench_test.jsonl": TEST_SHA256,
+        } or local_manifest["selection"] != {
+            "train": {"source": "IFBench_train.jsonl", "indices": [300, 315]},
+            "dev": {"source": "IFBench_train.jsonl", "indices": [0, 23]},
+            "test": {"source": "IFBench_test.jsonl", "indices": [0, 47]},
+        }:
+            raise SystemExit("local IFBench source exposure drift")
+
+        prior_indices = prior["selection"]["source_indices"]
+        exposed_train = (
+            set(range(24))
+            | set(range(300, 316))
+            | set(prior_indices["train"])
+            | set(prior_indices["selection"])
+        )
+        exposed_test = set(range(48)) | set(prior_indices["held_out"])
+
+        splits = {
+            "train": round_robin_absolute(all_train[300:600], 300, 16, exposed_train),
+            "selection": round_robin_absolute(all_train[0:300], 0, 32, exposed_train),
+            "held_out": round_robin_absolute(all_test, 0, 64, exposed_test),
+        }
+        algorithm = "sorted_instruction_id_round_robin_first_unexposed_source_order"
+        prior_exposure = {
+            "coordinate": "source_file_and_zero_based_index",
+            "train_count": len(exposed_train),
+            "test_count": len(exposed_test),
+            "sources": [
+                {
+                    "path": "examples/matched_instruction_family_ifbench/data/receipt.json",
+                    "sha256": "74282c868dde7c858a67c28218b8687d3b4213185b70c5f400c3d2d71a77e788",
+                },
+                {
+                    "path": "examples/local_gepa_ifbench_cross_task/data/source-manifest.json",
+                    "sha256": "0cd10e44604f8907c176448226f0e17a14bbe91fd373aa2e21ff92f9c7248199",
+                },
+            ],
+        }
+        default_out = Path(__file__).resolve().parent / "data" / "mipro_stage1"
+
+    output = (args.out or default_out).resolve()
     split_ids: dict[str, list[str]] = {}
     source_indices: dict[str, list[int]] = {}
 
     for name, selected in splits.items():
-        absolute = [(index + offsets[name], row) for index, row in selected]
-        split_ids[name] = write_jsonl(output / f"{name}.jsonl", absolute, name)
-        source_indices[name] = [index for index, _row in absolute]
+        label = name if args.profile == "original" else f"mipro-stage1-{name}"
+        split_ids[name] = write_jsonl(output / f"{name}.jsonl", selected, label)
+        source_indices[name] = [index for index, _row in selected]
 
     digests = {name: sha256(output / f"{name}.jsonl") for name in splits}
     all_ids = [source_id for ids in split_ids.values() for source_id in ids]
@@ -134,7 +225,7 @@ def main() -> None:
                 "test_sha256": TEST_SHA256,
             },
             "selection": {
-                "algorithm": "sorted_instruction_id_round_robin_first_unused_source_order",
+                "algorithm": algorithm,
                 "result_blind": True,
                 "source_owners": {
                     "train": "IFBench_train.jsonl[300:600]",
@@ -142,6 +233,11 @@ def main() -> None:
                     "held_out": "IFBench_test.jsonl",
                 },
                 "source_indices": source_indices,
+                **(
+                    {"prior_exposure": prior_exposure}
+                    if prior_exposure is not None
+                    else {}
+                ),
             },
             "counts": {name: len(ids) for name, ids in split_ids.items()},
             "split_ids": split_ids,

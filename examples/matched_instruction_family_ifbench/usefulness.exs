@@ -10,52 +10,70 @@ end
 defmodule MatchedInstructionFamilyIFBench.Usefulness do
   alias Imp.BenchmarkTruth.{GepaMetrics, IFBenchFeedback, IFBenchTwoStage}
   alias Imp.Experiment.{Data, Result}
-  alias Imp.Optimizer.{Artifact, GEPA}
+  alias Imp.Optimizer.{Artifact, GEPA, MIPROv2}
 
   @seeds [2_026_072_705, 2_026_072_706, 2_026_072_707]
   @task_model "openrouter:openai/gpt-5.4-mini"
   @optimizer_model "openrouter:anthropic/claude-sonnet-4.6"
   @split_sha %{
-    train: "8d80f329bbab37a44fe2e2ea0ea8c7e69eeb976d8a8e51af5bcd4547b4221197",
-    selection: "f0c2d8e808e4783e496ecf189ead61fde4a1e80373ff85f3ea801883f68c7468",
-    test: "49779533faa842decda93a1221ce7bae615af82403e33e380ab69d2abc84610d"
+    gepa: %{
+      train: "8d80f329bbab37a44fe2e2ea0ea8c7e69eeb976d8a8e51af5bcd4547b4221197",
+      selection: "f0c2d8e808e4783e496ecf189ead61fde4a1e80373ff85f3ea801883f68c7468",
+      test: "49779533faa842decda93a1221ce7bae615af82403e33e380ab69d2abc84610d"
+    },
+    mipro_stage1: %{
+      train: "b13952a222105c4072d4528043ef14079ad616fe8214ad686a94bac490b67d39",
+      selection: "f4cb93127ea64a57202dc1ece29c5aac438c685f3de9a84ac8b653aa24c1123c",
+      test: "9bf6e8ce65e3dcea5f9ae5537884381caaedb68f3f925208e98f98fcfcc77dbb"
+    }
   }
 
   def run do
-    data = data!()
+    condition = condition!()
+    data = data!(condition)
 
     case System.get_env("IMP_88SN_MODE", "disabled") do
-      "disabled" -> disabled!(data)
+      "disabled" -> disabled!(condition, data)
       "preflight" -> catalog!()
-      "live" -> Enum.each(@seeds, &live_seed(&1, data))
+      "live" -> Enum.each(@seeds, &live_seed(&1, condition, data))
       "fresh" -> fresh!()
       mode -> raise "unknown IMP_88SN_MODE #{inspect(mode)}"
     end
   end
 
-  defp disabled!(data) do
-    envelope = GEPA.v014_budget_envelope(length(data.selection), 8, 80)
-    true = envelope == %{max_metric_calls: 120, max_reflection_calls: 12, max_iterations: 6}
-    _optimizer = optimizer(hd(@seeds), disabled_lm(), metric())
+  defp disabled!(condition, data) do
+    if condition == :gepa do
+      envelope = GEPA.v014_budget_envelope(length(data.selection), 8, 80)
+      true = envelope == %{max_metric_calls: 120, max_reflection_calls: 12, max_iterations: 6}
+    end
+
+    lm = disabled_lm()
+    _optimizer = optimizer(condition, hd(@seeds), lm, lm, metric(condition))
     _program = IFBenchTwoStage.new(disabled_lm())
+
+    ceiling =
+      if condition == :mipro_stage1,
+        do: %{task: 2_904, optimizer: 33},
+        else: %{task: 1_896, optimizer: 36}
 
     IO.puts(
       Jason.encode!(%{
         status: "provider_disabled",
+        condition: condition,
         seeds: @seeds,
         split_counts: %{train: 16, selection: 32, test: 64},
-        split_sha256: @split_sha,
-        per_seed_imp_ceiling: %{task: 632, optimizer: 12},
+        split_sha256: @split_sha[condition],
+        three_seed_imp_ceiling: ceiling,
         provider_authority_used: false
       })
     )
   end
 
-  defp live_seed(seed, data) do
+  defp live_seed(seed, condition, data) do
     seed_dir = Path.join(output_root!(), Integer.to_string(seed))
     refuse_existing!(seed_dir)
     File.mkdir_p!(seed_dir)
-    metric = metric()
+    metric = metric(condition)
     task_lm = remote_lm(:task, seed)
     program = IFBenchTwoStage.new(task_lm)
 
@@ -63,10 +81,10 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
       Imp.Observability.trace(fn ->
         Imp.Experiment.check(
           program,
-          optimizer(seed, remote_lm(:optimizer, nil), metric),
+          optimizer(condition, seed, remote_lm(:optimizer, nil), task_lm, metric),
           data,
           metric,
-          artifact_id: "ifbench-gepa-#{seed}",
+          artifact_id: "ifbench-#{condition}-#{seed}",
           compare_baseline_on_test: true,
           evaluation_options: [
             failure_score: 0.0,
@@ -74,14 +92,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
             max_errors: :infinity,
             timeout: 120_000
           ],
-          config: %{
-            condition: "imp-88sn-ifbench",
-            seed: seed,
-            task_model: @task_model,
-            optimizer_model: @optimizer_model,
-            execution_profile: "gepa_v0_1_4",
-            split_sha256: @split_sha
-          },
+          config: experiment_config(condition, seed),
           metric_identity: "IFBench.ifbench_metric.metric"
         )
       end)
@@ -108,7 +119,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
       })
     )
 
-    fresh_process!(seed, artifact_path, result_path)
+    fresh_process!(seed, condition, artifact_path, result_path)
   end
 
   defp fresh! do
@@ -160,12 +171,13 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
     )
   end
 
-  defp fresh_process!(seed, artifact_path, result_path) do
+  defp fresh_process!(seed, condition, artifact_path, result_path) do
     {output, status} =
       System.cmd("mix", ["run", "--no-compile", "--no-deps-check", __ENV__.file],
         cd: Path.expand("../..", __DIR__),
         env: [
           {"IMP_88SN_MODE", "fresh"},
+          {"IMP_88SN_CONDITION", Atom.to_string(condition)},
           {"IMP_88SN_SEED", Integer.to_string(seed)},
           {"IMP_88SN_ARTIFACT", artifact_path},
           {"IMP_88SN_RESULT", result_path}
@@ -177,7 +189,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
     IO.write(output)
   end
 
-  defp optimizer(seed, reflection_lm, metric) do
+  defp optimizer(:gepa, seed, reflection_lm, _task_lm, metric) do
     GEPA.new(metric,
       execution_profile: :gepa_v0_1_4,
       reflection_lm: reflection_lm,
@@ -200,7 +212,32 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
     )
   end
 
-  defp metric do
+  defp optimizer(:mipro_stage1, seed, prompt_lm, task_lm, metric) do
+    MIPROv2.new(metric,
+      auto: nil,
+      num_candidates: 4,
+      num_trials: 8,
+      minibatch: false,
+      max_bootstrapped_demos: 0,
+      max_labeled_demos: 0,
+      startup_trials: 10,
+      search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup,
+      proposer_fidelity: :dspy_3_2_1,
+      program_aware_proposer: false,
+      data_aware_proposer: true,
+      tip_aware_proposer: true,
+      fewshot_aware_proposer: false,
+      view_data_batch_size: 10,
+      prompt_lm: prompt_lm,
+      task_lm: task_lm,
+      max_concurrency: 1,
+      timeout: 120_000,
+      max_errors: 0,
+      seed: seed
+    )
+  end
+
+  defp metric(:gepa) do
     GepaMetrics.metric_with_feedback(%{"upstream_metric" => "IFBench.ifbench_metric.metric"},
       upstream_descriptions: true,
       gepa_root: Path.expand("../../tmp/gepa-artifact", __DIR__),
@@ -208,14 +245,22 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
     )
   end
 
-  defp data! do
+  defp metric(:mipro_stage1),
+    do: GepaMetrics.metric(%{"upstream_metric" => "IFBench.ifbench_metric.metric"})
+
+  defp data!(condition) do
+    data_dir = if condition == :mipro_stage1, do: "data/mipro_stage1", else: "data"
+
     paths = %{
-      train: Path.join(__DIR__, "data/train.jsonl"),
-      selection: Path.join(__DIR__, "data/selection.jsonl"),
-      test: Path.join(__DIR__, "data/held_out.jsonl")
+      train: Path.join(__DIR__, "#{data_dir}/train.jsonl"),
+      selection: Path.join(__DIR__, "#{data_dir}/selection.jsonl"),
+      test: Path.join(__DIR__, "#{data_dir}/held_out.jsonl")
     }
 
-    Enum.each(paths, fn {split, path} -> true = file_sha256(path) == @split_sha[split] end)
+    Enum.each(paths, fn {split, path} ->
+      true = file_sha256(path) == @split_sha[condition][split]
+    end)
+
     rows = Map.new(paths, fn {split, path} -> {split, load_rows(path, split != :test)} end)
     true = Enum.map([:train, :selection, :test], &length(rows[&1])) == [16, 32, 64]
     Data.new(train: rows.train, selection: rows.selection, test: rows.test, id: :source_id)
@@ -307,6 +352,38 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
     do:
       System.get_env("IMP_88SN_OUTPUT", Path.join(System.tmp_dir!(), "imp-88sn-ifbench"))
       |> Path.expand()
+
+  defp condition! do
+    case System.get_env("IMP_88SN_CONDITION", "gepa") do
+      "gepa" -> :gepa
+      "mipro_stage1" -> :mipro_stage1
+      condition -> raise "unknown IMP_88SN_CONDITION #{inspect(condition)}"
+    end
+  end
+
+  defp experiment_config(:gepa, seed) do
+    %{
+      condition: "imp-88sn-ifbench",
+      seed: seed,
+      task_model: @task_model,
+      optimizer_model: @optimizer_model,
+      execution_profile: "gepa_v0_1_4",
+      split_sha256: @split_sha.gepa
+    }
+  end
+
+  defp experiment_config(:mipro_stage1, seed) do
+    %{
+      condition: "imp-88sn-ifbench-mipro-stage1",
+      seed: seed,
+      task_model: @task_model,
+      optimizer_model: @optimizer_model,
+      optimizer: :mipro_v2,
+      num_candidates: 4,
+      num_trials: 8,
+      split_sha256: @split_sha.mipro_stage1
+    }
+  end
 
   defp refuse_existing!(path),
     do: if(File.exists?(path), do: raise("output already exists: #{path}"))

@@ -410,3 +410,62 @@ two positive seeds and produced a reusable fresh-served artifact.* Only a
 completed second stage may add a stock-DSPy matched-semantics/noninferiority
 claim. A clean negative earns no effectiveness claim and remains a decisive
 task/model/budget falsification.
+
+### Stage 1 provider-free checkpoint
+
+The result-blind complement split is now frozen without inspecting a model
+outcome. Its receipt is
+`examples/matched_instruction_family_ifbench/data/mipro_stage1/receipt.json`
+(SHA-256
+`52b1138ccf4b2dbf906b054874a3ff6d394e3b4de9c5fe5aa3466e81a7b45555`).
+It binds both prior-exposure sources by path and digest and records every exact
+zero-based source index. The selected coordinates are disjoint from the full
+75-row train-source and 94-row test-source exposed unions described above.
+Frozen bytes are:
+
+- train 16: `b13952a222105c4072d4528043ef14079ad616fe8214ad686a94bac490b67d39`;
+- selection 32:
+  `f4cb93127ea64a57202dc1ece29c5aac438c685f3de9a84ac8b653aa24c1123c`;
+- held-out 64:
+  `9bf6e8ce65e3dcea5f9ae5537884381caaedb68f3f925208e98f98fcfcc77dbb`.
+
+The existing `matched_instruction_family_ifbench/usefulness.exs` ordinary entry
+now accepts `IMP_88SN_CONDITION=mipro_stage1`. It constructs the real public
+two-predictor `MIPROv2`, calls `Experiment.check` with baseline-on-test enabled,
+writes/reads the linked `Result` and selected `Artifact`, then invokes the same
+fresh-OS `ProgramServer` path. There is no coordinator, manifest, ledger,
+dashboard, or separate result type. Provider-disabled execution binds seeds
+`2026072705/06/07`, four instruction candidates, eight full categorical trials,
+zero demos, selection before held-out, strict baseline-on-tie selection, three
+complete seeds without score-based stopping, and the 2,904 task + 33 optimizer
+Stage 1 ceiling. The criterion remains mean causal held-out lift `>= 0.05` with
+at least two positive seeds. Stage 2 has no runnable change and remains dormant
+unless Stage 1 passes.
+
+Provider accounting was queried read-only at `2026-07-31T06:19:30Z`; no
+completion endpoint was called. The current OpenRouter key reports
+`$7.673042175` daily usage and `$17.345262735` cumulative/monthly usage. Those
+are verified provider usage totals for the key, not exact workshop attribution.
+The account credits endpoint also reports `$1644.044485242` lifetime account
+usage, which plainly includes unrelated history and is excluded from workshop
+arithmetic.
+
+Three spend views are therefore retained separately:
+
+1. **Verified provider usage:** `$7.673042175` today on the current key;
+   `$17.345262735` cumulative on that key.
+2. **Defensible workshop lower bound:** `$4.83706155`, the sum of distinct
+   retained exact amounts `$3.13862325` (TREC), `$0.38038725` (terminal IFBench
+   v1), and `$1.31805105` (completed current IFBench reference lower bound).
+3. **Conservative unknown-inclusive current upper:** `$18.182906735`, current
+   key cumulative usage plus the coordinator's approximately `$0.837644`
+   Behold usage as though it were separate. This may double-count but does not
+   substitute prior call reservations for bills.
+
+At current rates, adding Stage 1's `$42.806016` maximum to that third figure
+gives a realistic aggregate exposure of `<= $60.988922735`, under the
+approximately `$100` target. Exact routes, provider identities, privacy deny,
+prices, no-retry/no-fallback settings, and current key usage still require one
+immediate read-only preflight before provider authority. A contradiction or
+material rise near the target returns for review; it does not change the split,
+seeds, budget, or criterion.
