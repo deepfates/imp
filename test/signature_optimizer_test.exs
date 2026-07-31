@@ -147,6 +147,41 @@ defmodule Imp.Optimizer.SignatureOptimizerTest do
              InstructionSearch.current_instruction(program)
   end
 
+  test "operational proposer guards abort before candidate evaluation" do
+    owner = self()
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          send(owner, :signature_task_call)
+          %{answer: "unused"}
+        end
+      )
+
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :budget,
+        message: "signature proposal budget guard",
+        reason: :call_limit
+      )
+
+    proposer = Imp.LM.Static.new(handler: fn _messages, _opts -> {:error, safety} end)
+
+    assert_raise Imp.OperationalSafetyError, "signature proposal budget guard", fn ->
+      SignatureOptimizer.new(Imp.Metrics.exact_match(:answer),
+        proposer_lm: proposer,
+        num_candidates: 1
+      )
+      |> SignatureOptimizer.compile(
+        Imp.predict("question -> answer", lm: task_lm),
+        [example()],
+        [example()]
+      )
+    end
+
+    refute_received :signature_task_call
+  end
+
   test "equal-score instruction candidates cannot displace the original program" do
     program = Imp.predict("question -> answer", lm: Imp.LM.Static)
     baseline = InstructionSearch.current_instruction(program)

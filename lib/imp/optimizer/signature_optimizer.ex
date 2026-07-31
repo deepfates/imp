@@ -21,7 +21,9 @@ defmodule Imp.Optimizer.SignatureOptimizer do
   one-instruction JSON Schema envelope. `:auto` uses that envelope when the LM
   advertises schema support; `:off` retains the pinned text-compatible parser.
   Invalid structured responses become explicit proposal fallbacks rather than
-  executable explanatory prose.
+  executable explanatory prose. Ordinary proposer failures are likewise
+  retained as fallbacks, while operational route, cost, budget, transport, and
+  cancellation guards abort before candidate evaluation.
   """
 
   defstruct [

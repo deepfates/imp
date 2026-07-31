@@ -1,5 +1,11 @@
 defmodule Imp.Optimizer.InstructionProposer do
-  @moduledoc "LM-backed instruction proposal engine shared by prompt optimizers."
+  @moduledoc """
+  LM-backed instruction proposal engine shared by prompt optimizers.
+
+  Ordinary proposal failures may use the caller-visible fallback candidates.
+  Operational route, cost, budget, transport, and cancellation guards always
+  remain fatal and never become synthetic instructions.
+  """
 
   def propose(program, trainset, opts \\ []) do
     count = Keyword.get(opts, :count, 5)
@@ -63,6 +69,8 @@ defmodule Imp.Optimizer.InstructionProposer do
               )
             )
 
+          Imp.OperationalSafetyError.raise_if_present!(result)
+
           case Imp.LM.Result.unwrap(result) do
             {:ok, raw} ->
               case parse_proposal(
@@ -103,6 +111,8 @@ defmodule Imp.Optimizer.InstructionProposer do
     end
   rescue
     error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
+
       {fallback_slots(
          fallback_candidates(program, trainset, opts),
          Keyword.get(opts, :count, 5),
@@ -116,6 +126,8 @@ defmodule Imp.Optimizer.InstructionProposer do
        }}
   catch
     kind, reason ->
+      Imp.OperationalSafetyError.raise_if_present!({kind, reason})
+
       {fallback_slots(
          fallback_candidates(program, trainset, opts),
          Keyword.get(opts, :count, 5),
@@ -163,17 +175,23 @@ defmodule Imp.Optimizer.InstructionProposer do
   def grounded_augmented_demos(_demo_sets, _proposal_index, _max_examples), do: []
 
   defp propose_with_lm(lm, program, trainset, opts, count, fallback) do
-    lm
-    |> Imp.LM.generate(messages(program, trainset, opts), [])
+    result = Imp.LM.generate(lm, messages(program, trainset, opts), [])
+    Imp.OperationalSafetyError.raise_if_present!(result)
+
+    result
     |> Imp.LM.Result.unwrap()
     |> case do
       {:ok, raw} -> parse(raw, count, fallback)
       {:error, _reason} -> fallback
     end
   rescue
-    _error -> fallback
+    error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
+      fallback
   catch
-    _kind, _reason -> fallback
+    kind, reason ->
+      Imp.OperationalSafetyError.raise_if_present!({kind, reason})
+      fallback
   end
 
   defp messages(program, trainset, opts) do

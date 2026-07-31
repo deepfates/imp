@@ -74,3 +74,8 @@ Canonical claims classify every advertised family as stable or distinctly experi
   execution plus metric callbacks. COPRO also preserves them through proposal
   fan-out and coordinate evaluation, so its normal error budget cannot absorb
   a hard operational guard.
+- The shared `InstructionProposer` and public `SignatureOptimizer` now preserve
+  that same boundary. Ordinary malformed/offline proposals can still yield
+  explicit fallback candidates, but typed route, cost, budget, transport, and
+  cancellation refusals abort before any fallback or task evaluation instead
+  of being laundered into a synthetic instruction.

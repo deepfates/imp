@@ -140,6 +140,27 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
              )
   end
 
+  test "operational safety failures never become fallback proposals" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        message: "proposal route guard",
+        reason: :provider_drift
+      )
+
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> {:error, safety} end)
+    program = Imp.predict("question -> answer")
+    example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
+
+    assert_raise Imp.OperationalSafetyError, "proposal route guard", fn ->
+      InstructionProposer.propose(program, [example], lm: lm, count: 1)
+    end
+
+    assert_raise Imp.OperationalSafetyError, "proposal route guard", fn ->
+      InstructionProposer.propose_with_report(program, [example], lm: lm, count: 1)
+    end
+  end
+
   test "proposal slots rotate only augmented demos and preserve repeated instructions" do
     parent = self()
 
