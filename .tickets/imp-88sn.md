@@ -1172,3 +1172,121 @@ fresh-process two-stage calls. Their SHA-256 pairs (Result, Artifact) are:
 The private retained root is
 `benchmarks/results/banking77-mipro-modeled-v2-f0c34ff`; predecessor roots and
 logs remain unchanged.
+
+### Provider-free modeled-MIPRO postmortem
+
+This postmortem reads only the retained Result/Artifact/log bytes. It makes no
+new model call and does not revise the frozen result.
+
+**Selected programs and paired rows.** Parameter tuples below are ordered as
+`[analyzer instruction, analyzer demos, router instruction, router demos]`.
+
+- Seed `2026072705` deployed startup-random trial 4, tuple `[0,1,1,2]`.
+  Analyzer instruction 0 is the baseline text (SHA-256
+  `1e9aba8fb83a0a8470efe3e30bfee7bc81c184ecccd8d003b80f7ffb3f1c0818`)
+  with labeled demos `banking77-796a-train-4019` and
+  `banking77-796a-train-4074`. Router instruction 1 is
+  proposal SHA-256
+  `cbccc37be34a688a1556eaf523c41e203b30facfb2b9adb57fb6c0f89a43f6d2`
+  with augmented fee examples “How come I was charged an extra fee when paying
+  with the card?” and “When do i get charged a fee for using the card?”. On
+  selection it gained `banking77-796a-train-4046` and
+  `banking77-796a-train-4040`, with no loss. On test it gained
+  `banking77-796a-test-1255`, `banking77-796a-test-1254`,
+  `banking77-796a-test-1258`, and `banking77-796a-test-2012`, with no loss; the
+  last gain replaced a baseline parse failure.
+- Seed `2026072706` deployed **baseline**, not raw optimizer winner
+  startup-random trial 3 (`[1,1,1,0]`), because outer selection tied. The
+  deployed analyzer/router are instruction 0 with no demos, hashes
+  `1e9aba8fb83a0a8470efe3e30bfee7bc81c184ecccd8d003b80f7ffb3f1c0818` and
+  `c22115fb3db42920b18026a57c4c4e634336304b7646fde3a69fd45be79153fa`.
+  Optimized selection gained `banking77-796a-train-4046` and
+  `banking77-796a-train-4040` but lost `banking77-796a-train-2550` and
+  `banking77-796a-train-296` to parse failures: net zero. The two evaluations
+  of the selected baseline on test gained `banking77-796a-test-2100` in the
+  replay but lost `banking77-796a-test-1113`, `banking77-796a-test-1255`,
+  `banking77-796a-test-1258`, and `banking77-796a-test-2090`: net minus three
+  rows.
+  This is same-program replay noise, so causal lift remains exactly zero.
+- Seed `2026072707` deployed startup-random trial 2, tuple `[2,2,1,1]`.
+  Analyzer proposal SHA-256 is
+  `2ba0ab2f2dff993c9d10a180a6f904152e810a56a0ec221a0854adf9c4de410f`
+  with augmented examples “Please tell me why I would have to pay a fee for a
+  recent payment. Thanks.” and “How come I was charged an extra fee when paying
+  with the card?”. Router proposal SHA-256 is
+  `33b18b3fb855a581e941247c125c2f08f172014a17243ae24db77b442614d570`
+  with labeled demos `banking77-796a-train-2606` and
+  `banking77-796a-train-5620`. Selection gained
+  `banking77-796a-train-5591` and `banking77-796a-train-6779` and lost
+  `banking77-796a-train-4040`: net plus one. Test gained
+  `banking77-796a-test-1112`, `banking77-796a-test-1113`,
+  `banking77-796a-test-1278`, and `banking77-796a-test-2108`, and lost
+  `banking77-796a-test-1631` and `banking77-796a-test-2004`: net plus two.
+
+**Diagnostics.** The 7/17/14 optimizer diagnostics are ordinary strict-adapter
+failures, not proposal, route, safety, or optimizer exceptions. Seed 1 has one
+bootstrap missing-`route` failure, then two missing-`evidence` and four
+missing-`route` candidate-evaluation failures. Seeds 2 and 3 have no bootstrap
+failure; candidate evaluation retained respectively 3/14 and 3/11
+missing-`evidence`/missing-`route` failures. Every candidate still evaluated the
+same ordered 24 rows with failures scored zero, all 15 trials completed, and no
+evaluation exhausted `max_errors: 10`. The failures therefore changed
+candidate scores but did not reduce search opportunity or selection-row
+comparability. The report retains stage and row index but not trial/candidate
+identity on non-bootstrap diagnostics, so exact per-candidate attribution is
+not recoverable from the immutable result; that is an observability limitation,
+not evidence of a search failure. Outer selection/test diagnostics remain
+separately attached to their exact rows.
+
+**Modeled opportunity.** The internal baseline was observation 1. Optuna's
+`n_startup_trials: 10` therefore made objective trials 1--9 startup-random and
+10--15 modeled. In tuple order above, the modeled acquisition sequences were:
+
+- seed 1: `t10 [0,1,1,2]/1.0`, `t11 [0,1,1,2]/.9583`,
+  `t12 [1,1,2,2]/.9583`, `t13 [0,1,1,1]/1.0`,
+  `t14 [2,0,1,2]/1.0`, `t15 [0,2,2,2]/.9583`;
+- seed 2: `t10 [1,1,1,0]/1.0`, `t11 [1,1,1,1]/.9167`,
+  `t12 [1,1,1,0]/1.0`, `t13 [2,2,1,0]/.9167`,
+  `t14 [2,1,1,0]/.9583`, `t15 [1,1,0,0]/.9167`;
+- seed 3: `t10 [2,2,1,1]/.9167`, `t11 [2,0,2,0]/.9167`,
+  `t12 [2,1,1,0]/.9583`, `t13 [2,0,1,2]/.9167`,
+  `t14 [2,2,2,0]/1.0`, `t15 [2,0,0,1]/.7083`.
+
+Each modeled phase repeated two startup assignments and tried four new joint
+assignments. Startup plus baseline covered every categorical level for all four
+parameters; modeled acquisition concentrated on the better observed levels but
+still introduced four new combinations per seed. Repeated categorical choices
+are legal Optuna TPE behavior. All 18 modeled suggestions received complete
+24-row objectives, so they had a fair execution opportunity, although six
+modeled trials cover only a compact fraction of the 81-combination space. The
+pinned provider-free Optuna 4.9 differential passes 18/18 and confirms the
+startup boundary and first Bayesian trial. Imp deliberately reports exact
+startup parity but not whole modeled-sequence identity because later equal
+floating acquisition values use documented BEAM tie-breaking. No new mismatch
+was reproduced here.
+
+**Stability and classification.** Outer selection margins were +2 rows, tie,
+and +1 row. The only exact same-program test replay moved by -3/48 (`-0.0625`),
+and duplicate internal assignments varied by up to 1/24 in seed 1 and 2/24 in
+seed 3 (seed 2's duplicates were stable). That noise is material relative to
+the observed mean `+0.041667`; it prevents a stronger magnitude claim, but the
+predeclared identity rule still makes the frozen decision unambiguous. This is
+classification **C**: the intended MIPRO mechanisms executed correctly and the
+best selection-admitted artifacts produced a task-specific two-positive-seed
+signal whose mean stayed below the frozen bar. It is not a reproduced
+product/search defect (A), and neither limited modeled coverage alone (B) nor
+noise (D) can turn the failed primary into a pass.
+
+The result satisfies the three-seed, realistic two-stage, source-disjoint
+selection/test, modeled-search, portable Artifact, and fresh concurrent service
+parts of `imp-88sn`. It does not satisfy that ticket's required material mean
+multi-stage lift; the already-positive non-prompt OA half cannot substitute for
+it. It likewise does not satisfy `imp-yme4`'s release-defining improved example
+or breadth of useful optimizer behavior. The remaining telos gap is primarily
+**algorithm usefulness on a realistic multi-stage LM program**; evaluation
+robustness is a material secondary uncertainty, and breadth remains open.
+
+**Single recommendation:** accept this as an early modeled-MIPRO
+mechanism/lifecycle milestone while keeping `imp-88sn` and `imp-yme4` open. Do
+not run another immediate paid MIPRO benchmark; the next usefulness portfolio
+should be predeclared later rather than tuned around this condition.
