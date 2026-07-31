@@ -1455,3 +1455,71 @@ This closes only outer admission robustness. Optimizer-internal objectives and
 search observations remain single-pass unless that optimizer explicitly owns a
 different policy. The implementation does not alter or rehabilitate the
 terminal Banking77 evidence.
+
+## Closure-frontier disposition at `54d4a9b`
+
+- **Freeze before calls — satisfied for the retained conditions.** OA,
+  IFBench, and Banking77 inputs, splits, seeds, routes, budgets, and criteria
+  were fixed before their calls; stopped and negative outcomes remain
+  immutable. This procedural fact does not make an invalid scorer scientific
+  evidence.
+- **Realistic multi-stage LM lift across at least three seeds — open.** Banking77
+  modeled MIPRO exercised the ordinary two-stage public lifecycle and produced
+  causal lifts `+0.083333`, `0`, and `+0.041667`, mean `+0.041667`; it cleanly
+  failed the frozen `>= 0.05` primary. IFBench Imp effectiveness is
+  invalid/unverified because its scorer representation was wrong. Outer fixed
+  repetitions now protect future final admission but do not change either
+  retained result.
+- **Proposer-generated non-prompt usefulness — satisfied.** The typed OA
+  retry-policy run selected non-seed mutations in two of three seeds, improved
+  genuinely new untouched executable cases by mean `4/3`, and reproduced the
+  portable selected values in fresh OS processes.
+- **Ordinary lifecycle and shared portable consumer boundary — satisfied.**
+  Program conditions use Experiment/Result/Artifact/ProgramServer; OA uses its
+  native run/result/evaluator lifecycle and `to_artifact`; both load through
+  portable Artifact without a fake common optimizer wrapper.
+- **Matched equivalent opportunity — partially satisfied.** Provider-free
+  semantic gates are current, but the IFBench Imp scorer invalidates its matched
+  effectiveness conclusion and Banking77 DSPy Stage 2 correctly remained
+  dormant after Imp failed. A future successful named-algorithm condition still
+  needs its predeclared matched arm when a coherent equivalent exists.
+- **Uncertainty, negatives, and recomputation — partially satisfied.** OA and
+  Banking77 retain per-seed outcomes and raw ordinary results; Banking77 exposes
+  the observed same-program `3/48` replay movement and duplicate-assignment
+  variation up to `2/24`. The new Result repetition summary can retain future
+  paired outer observations. It has not generated new effectiveness evidence,
+  and optimizer-internal noisy objectives remain single-pass.
+
+The minimum closure is therefore one thing: a predeclared current-source
+realistic multi-stage LM condition, at least three fixed seeds, selection-only
+choice using fixed outer repetitions, material mean own-baseline lift with the
+predeclared positive-seed rule, a portable selected Artifact, and fresh
+concurrent service. The already-passing OA half supplies the different
+non-prompt problem class. If the named optimizer has a coherent pinned
+equivalent, its matched arm follows only after Imp passes its own-baseline
+criterion; matched noninferiority cannot replace own-baseline lift.
+
+**Single next tranche: later run a bounded, predeclared multi-problem usefulness
+portfolio through existing ordinary tasks and APIs.** Provider-free preparation
+may inspect at most two existing candidates other than Banking77 and IFBench and
+must choose one only if it already has meaningful work in both named stages, a
+native deterministic metric, auditable source-disjoint unused rows, and enough
+data for three fixed seeds. Freeze rows, optimizer opportunity, fixed outer
+repetitions, error policy, models, routes, costs, and the material-lift rule
+before calls. The executable portfolio is the retained positive OA condition
+plus that one LM condition—no new experiment framework or immediate provider
+authority.
+
+Stop before calls if no existing task meets those constraints without a new
+adapter or previously exposed test reuse. Once launched later, complete all
+three seeds; a clean miss remains negative and ends this tranche without task,
+seed, threshold, or optimizer shopping. A product/safety/artifact failure stops
+the condition for repair and is not an optimizer outcome.
+
+Optimizer-internal repetition is not next because no incorrect defining
+mechanism is currently reproduced, outer admission now handles the release
+decision, and changing internal objectives would broaden algorithms before the
+missing product phenomenon is measured. Release/docs work is not next because
+the clean package and teaching path already pass; prose and runner retirement
+cannot earn the open usefulness criterion. They become a short reconciliation
+only after a valid scientific outcome exists.
