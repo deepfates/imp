@@ -2092,3 +2092,52 @@ least two of three seeds. A parameter-identical selected baseline has causal
 lift zero regardless of replay movement. A clean negative terminates Banking77
 work; it does not authorize a new split or treatment. Stock DSPy remains
 dormant unless Imp passes and then still requires separate disposition.
+
+## Banking77 confirmatory replication terminal result
+
+The condition ran once from exact clean source commit `4285ee56fcbbf1ebafa7bea99f34def2caccc801`
+and is terminal. The private retained root is
+`benchmarks/results/banking77-mipro-confirmatory-v1-4285ee5`; every Result,
+Artifact, and log was written mode `0600`. All three selected artifacts loaded
+in a fresh OS process and passed the required four concurrent two-stage
+ProgramServer calls.
+
+Per-seed outer results were:
+
+- `2026073101`: selection `0.833333 -> 0.916667`; baseline test `0.888889`,
+  selected test `0.930556`; optimized artifact selected; causal lift
+  `+0.041667`.
+- `2026073102`: selection `0.805556 -> 0.916667`; baseline test `0.888889`,
+  selected test `0.909722`; optimized artifact selected; causal lift
+  `+0.020833`.
+- `2026073103`: selection tied `0.819444 -> 0.819444`; strict tie handling
+  retained baseline. Baseline test was `0.847222` and its selected-stage replay
+  was `0.854167`, but the causal optimizer lift is exactly `0` because the
+  selected artifact is baseline. The replay movement is nondeterminism, not
+  optimization evidence.
+
+The causal lifts are therefore `[0.041667, 0.020833, 0]`: two of three are
+positive, but their mean is only `0.020833`. The frozen primary required both
+at least two positive seeds and mean lift `>= 0.05`, so it **failed**. This is a
+clean task/model/budget-specific negative for the confirmatory modeled-MIPRO
+question. It neither erases the two small positive seed effects nor establishes
+general MIPRO ineffectiveness. Per the frozen decision, stock DSPy remains
+dormant and no further Banking77 treatment is authorized.
+
+Retained SHA-256 identities are:
+
+- seed 1 Result `8b6609dd...642b8`, Artifact `e2d910b8...18c38`, log
+  `c228fa8e...5a4ed`;
+- seed 2 Result `176656a2...0491`, Artifact `9b237b80...b856`, log
+  `fc0acf7c...a5d9`;
+- seed 3 Result `cff772dc...44b5`, Artifact `7051b356...812`, log
+  `336f290c...40de`.
+
+The retained optimizer reports contain 15 completed categorical trials and 10
+optimizer setup/proposal calls per seed. Bootstrap trajectories were `2/3/3`,
+with `2/2/2` accepted and `0/1/1` rejected. Optimizer diagnostics were `3/5/9`,
+all strict missing-output-field parse failures retained under the declared
+finite error policy. Account-level usage moved from `$26.457331485` immediately
+before launch to `$29.170792035` afterward, a `$2.71346055` observed delta. It
+is the strongest available cost bound but is not per-call attribution; the
+ordinary path does not persist an exact HTTP transport ledger.
