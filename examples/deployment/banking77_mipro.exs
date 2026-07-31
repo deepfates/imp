@@ -5,7 +5,8 @@ defmodule Banking77MIPRO do
   alias Imp.Optimizer.{Artifact, MIPROv2}
   alias ImpDeployment.{Banking77Pipeline, ProgramServer}
 
-  @condition "imp-88sn-banking77-mipro-v1"
+  @condition "imp-88sn-banking77-mipro-modeled-v2"
+  @dataset_condition "imp-88sn-banking77-mipro-v1"
   @dataset "data/banking77-mipro-stage1.json"
   @dataset_sha "4934ebc54b06614343461c2fe79c7ca4807892c1b645cbb30790e945dcb2c34a"
   @task_model "openrouter:openai/gpt-5.4-mini"
@@ -54,15 +55,15 @@ defmodule Banking77MIPRO do
         baseline_selection: 48,
         bootstrap: 48,
         internal_baseline: 48,
-        categorical_trials: 288,
+        categorical_trials: 720,
         optimized_selection: 48,
         baseline_and_selected_test: 192,
         fresh_service: 8,
-        task: 680,
+        task: 1_112,
         optimizer: 10
       },
-      stage: %{task: 2_040, optimizer: 30},
-      reservation_usd: 16.91136
+      stage: %{task: 3_336, optimizer: 30},
+      reservation_usd: 26.118144
     }
   end
 
@@ -70,12 +71,12 @@ defmodule Banking77MIPRO do
     MIPROv2.new(&metric/2,
       auto: nil,
       num_candidates: 3,
-      num_trials: 6,
+      num_trials: 15,
       max_bootstrapped_demos: 2,
       max_labeled_demos: 2,
       prompt_lm: prompt_lm,
       task_lm: task_lm,
-      startup_trials: 2,
+      startup_trials: 10,
       minibatch: false,
       proposer_fidelity: :dspy_3_2_1,
       search_fidelity: :dspy_3_2_1_optuna_4_9_0,
@@ -96,7 +97,7 @@ defmodule Banking77MIPRO do
     true = sha256(File.read!(path)) == @dataset_sha
     payload = path |> File.read!() |> Jason.decode!()
 
-    true = payload["condition_id"] == @condition
+    true = payload["condition_id"] == @dataset_condition
 
     true =
       payload["digests"] == %{
@@ -131,8 +132,10 @@ defmodule Banking77MIPRO do
       predictors: predictors,
       optimizer: %{
         instruction_candidates: 3,
-        categorical_trials: 6,
-        startup_trials: 2,
+        categorical_trials: 15,
+        startup_trials: 10,
+        startup_random_trials: 9,
+        modeled_trials: 6,
         max_bootstrapped_demos: 2,
         max_labeled_demos: 2,
         max_errors: 10

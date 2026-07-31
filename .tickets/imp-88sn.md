@@ -1081,3 +1081,37 @@ least 0.05 with at least two positive seeds and produced reusable fresh-served
 Artifacts.* A clean negative is valid and leaves the ticket open. A runtime,
 safety, persistence, or fresh-service failure is inconclusive. No provider
 authority was used at this checkpoint.
+
+## Banking77 modeled-MIPRO revision
+
+The two attempted six-trial conditions are terminal, inconclusive product
+failures and remain byte-for-byte preserved. Their configuration combined
+`search_fidelity: :dspy_3_2_1_optuna_4_9_0` with `startup_trials: 2`, which is
+not a valid pinned Optuna-4.9 modeled-search opportunity. Product repair
+`a6e9000` now rejects that known-invalid combination before bootstrap,
+selection, evaluator, or LM work.
+
+The separately named `imp-88sn-banking77-mipro-modeled-v2` revision changes
+only the search opportunity: `startup_trials: 10` and 15 objective trials.
+The internal baseline is Optuna's first completed observation, so objective
+trials 1--9 use startup-random suggestions and trials 10--15 are six modeled
+multivariate categorical-TPE suggestions. Rows, dataset and split hashes,
+seeds, models, routes, three instruction candidates, two bootstrapped plus two
+labeled demo limits, `max_errors: 10`, native exact-label metric, selection
+rule, paired test, Artifact, and fresh concurrent service remain unchanged.
+
+Per seed the legal task ceiling is 1,112: 48 outer baseline selection, up to 48
+bootstrap, 48 internal baseline, 720 across 15 trials, 48 optimized selection,
+192 paired baseline/selected test, and 8 fresh service. Four grounding calls
+plus three proposals for each of two predictors remain 10 optimizer calls.
+Across three seeds the legal ceiling is **3,336 task + 30 optimizer**, or
+`3,336 * $0.007104 + 30 * $0.08064 = $26.118144` at the frozen reservation
+rates. Clean completed task usage is outcome-dependent in the range
+3,204--3,336 because bootstrap may accept two rows after four transports or
+scan all 24 rows.
+
+The primary is unchanged: mean held-out own-baseline accuracy lift `>= 0.05`
+and positive causal lift in at least two of three seeds. Same-program replay
+movement is zero causal lift. Passing can earn only a task/model/budget-specific
+current-source modeled-MIPRO claim; a clean negative is valid. Stock DSPy stays
+dormant pending a separate decision.

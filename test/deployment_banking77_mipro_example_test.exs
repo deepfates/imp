@@ -112,7 +112,7 @@ defmodule DeploymentBanking77MIPROExampleTest do
              [:analyze_intent, :classify_route]
   end
 
-  test "the frozen invalid MIPRO options fail before Banking program or evaluator work" do
+  test "the predecessor invalid MIPRO options fail before Banking program or evaluator work" do
     owner = self()
 
     lm =
@@ -123,9 +123,9 @@ defmodule DeploymentBanking77MIPROExampleTest do
         end
       )
 
-    assert_raise ArgumentError, ~r/requires startup_trials: 10/, fn ->
-      Banking77MIPRO.optimizer(lm, lm, hd(Banking77MIPRO.seeds()))
-    end
+    modeled = Banking77MIPRO.optimizer(lm, lm, hd(Banking77MIPRO.seeds()))
+    assert modeled.config.num_trials == 15
+    assert modeled.startup_trials == 10
 
     valid =
       Imp.Optimizer.MIPROv2.new(&Banking77MIPRO.metric/2,
@@ -167,17 +167,17 @@ defmodule DeploymentBanking77MIPROExampleTest do
     refute_received :unexpected_lm_call
 
     caps = Banking77MIPRO.transport_caps()
-    assert caps.per_seed.task == 48 + 48 + 48 + 6 * 48 + 48 + 2 * 48 * 2 + 4 * 2
+    assert caps.per_seed.task == 48 + 48 + 48 + 15 * 48 + 48 + 2 * 48 * 2 + 4 * 2
     assert caps.per_seed.optimizer == 4 + 2 * 3
-    assert caps.stage == %{task: 2_040, optimizer: 30}
-    assert_in_delta caps.reservation_usd, 2_040 * 0.007104 + 30 * 0.08064, 1.0e-12
+    assert caps.stage == %{task: 3_336, optimizer: 30}
+    assert_in_delta caps.reservation_usd, 3_336 * 0.007104 + 30 * 0.08064, 1.0e-12
 
-    # Outside bootstrap, 632 task transports are fixed per seed. The single
+    # Outside bootstrap, 1,064 task transports are fixed per seed. The single
     # calling bootstrap arm may accept two rows immediately (4 transports) or
     # scan all 24 two-stage rows (48 transports), so expected usage is outcome
-    # dependent while 680 remains the legal maximum.
-    assert 636 == 632 + 4
-    assert 680 == 632 + 48
+    # dependent while 1,112 remains the legal maximum.
+    assert 1_068 == 1_064 + 4
+    assert 1_112 == 1_064 + 48
   end
 
   test "finite diagnostics allow a real two-stage MIPRO artifact to continue into a fresh OS" do
@@ -368,7 +368,11 @@ defmodule DeploymentBanking77MIPROExampleTest do
     assert receipt["status"] == "provider_disabled"
     assert receipt["provider_authority_used"] == false
     assert receipt["uses_ifbench_bridge"] == false
-    assert receipt["call_caps"]["stage"] == %{"task" => 2_040, "optimizer" => 30}
+    assert receipt["condition"] == "imp-88sn-banking77-mipro-modeled-v2"
+    assert receipt["optimizer"]["categorical_trials"] == 15
+    assert receipt["optimizer"]["startup_random_trials"] == 9
+    assert receipt["optimizer"]["modeled_trials"] == 6
+    assert receipt["call_caps"]["stage"] == %{"task" => 3_336, "optimizer" => 30}
   end
 
   defp normalized_digest(text) do
