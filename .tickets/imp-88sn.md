@@ -292,25 +292,121 @@ selection-authorized optimizer effects.
   but asymmetric failure frequency further reduced matched power. The rows are
   source-disjoint for this run, not globally unseen.
 
-### One recommended next full-telos move
+### MIPRO design challenge and disposition
 
-Run **current-source, matched multi-stage MIPROv2 on a newly frozen IFBench
-slice**, not another GEPA treatment. Derive train/selection/test rows
-result-blind from source indices unused by this portfolio; keep the same
-two-predictor program and deterministic executable scorer. Compare Imp's
-`proposer_fidelity: :dspy_3_2_1` plus pinned Optuna search with stock DSPy 3.2.1
-MIPROv2 over three fixed seeds, four grounded instruction candidates, eight
-categorical trials, no retries/fallbacks, selection-only deployment, and fresh
-Imp Artifact service. Predeclare own-baseline success as mean test lift at least
-`0.05` with at least two positive seeds; report matched noninferiority
-separately and preserve a clean negative.
+The earlier MIPRO recommendation was directionally useful but not launchable.
+It had not named or hashed a new split, and its `~5,200` task-call estimate
+counted only the MIPRO arms plus Imp fresh-service probes. It omitted the
+baseline evaluations required to claim improvement over an own baseline.
 
-This asks whether joint grounded instruction search over both predictors, with
-eight Bayesian trials, succeeds where GEPA's one-to-two local reflections did
-not. Using the already-audited opportunity model, the order of magnitude is
-about 5,200 task transports plus 66 proposal transports across both runtimes
-and three seeds, roughly `$78` worst-case at the last routes/prices. Exact rows,
-routes, prices, and a lower cap must be frozen and reviewed before provider
-authority. A positive result would earn only a current-source, task/model/budget
-specific multi-stage MIPRO usefulness and matched-semantics claim; a negative
-would falsify that mechanism on this task without being tuned away.
+#### Source-row lineage
+
+The source authorities remain IFBench train SHA-256
+`a5ec13223a93879b7172da783d54669d5873dc4632b57fd6d961730c9679fc8c`
+(14,971 rows) and test SHA-256
+`11c3d683dcc7f4908a4d3cacd05c9a8bbd5484af2f8fde969e7abe2b8bad3e34`
+(294 rows). Every `matched_gepa_mipro_ifbench*` generation and the completed
+`matched_instruction_family_ifbench` run resolve to the same 16/32/64 receipt;
+they are repeated exposure of one row set, not additional independent sets.
+The only other repository-owned source-derived IFBench execution is
+`local_gepa_ifbench_cross_task`, which used train indices `300..315`, train-file
+development indices `0..23`, and test indices `0..47`. Comparing
+`(source-file, source-index)`, not the examples' locally renamed IDs, gives a
+conservative exposed union of 75 train-file rows and 94 test-file rows. The
+complements contain 14,896 train-file rows and 200 test-file rows. Repository
+reference inspection found no third source-derived IFBench split; synthetic
+compatibility vectors do not add source rows.
+
+This proves that a new disjoint split *can* be constructed, but not that the
+previously proposed split was disjoint: no exact indices, ordered rows, or
+digests were ever frozen. Before any call, a result-blind derivation must select
+only from those complements and bind the ordered bytes. Such a condition tests
+row-level transfer within IFBench and a different optimizer mechanism. It is
+not cross-task MIPRO generalization. The ticket's cross-problem evidence would
+still come from composing that realistic LM condition with the already-positive
+structured Optimize Anything condition.
+
+#### Correct call decomposition
+
+For one runtime and one seed on 16 train / 32 selection / 64 test rows, the
+ordinary public lifecycle requires:
+
+- 64 task transports for baseline selection (32 rows, two predictors);
+- zero task transports for demonstration bootstrap because both demo limits are
+  zero;
+- 11 optimizer transports: three dataset-summary calls for 16 rows at batch
+  size 10, then four grounded instruction proposals for each of two predictors;
+- 64 task transports for MIPRO's internal full-validation baseline;
+- 512 task transports for eight non-minibatch categorical trials over all 32
+  validation rows and both predictors;
+- 64 task transports for the optimized program's outer selection evaluation;
+- 128 task transports for baseline test and 128 for selected test.
+
+That is 960 task plus 11 optimizer transports per runtime/seed, before fresh
+service. Three seeds across Imp and DSPy therefore require 5,760 task and 66
+optimizer transports; Imp's four two-stage fresh-service probes per seed add 24
+task transports. The corrected full ceiling is **5,784 task + 66 optimizer**,
+or `$85.280256` at the last `$0.013824` / `$0.08064` reservation rates. The old
+matched runner's looser 864-call MIPRO ceiling plus its separate 192-call
+baseline arm would instead reserve 6,360 task calls; neither accounting supports
+the earlier 5,208-call claim.
+
+#### What the observations would mean
+
+- **MIPRO mechanism advantage:** at least two Imp seeds select a genuinely
+  changed named-predictor instruction/demo combination, mean causal test lift is
+  at least `0.05`, and the three-seed sign/dispersion report remains favorable.
+  That would show task-specific advantage over the low-opportunity GEPA result,
+  not general MIPRO superiority.
+- **Task-model noise:** parameter-identical selected artifacts replay at
+  materially different scores, or observed score movement is comparable to
+  same-program replay movement without stable mutation/sign evidence. Those
+  replays are noise estimates, never optimizer credit.
+- **General optimizer failure on this condition:** both implementations finish
+  their proposal/search opportunity cleanly yet select baseline or fail the
+  frozen own-baseline criterion across the three seeds. If stock DSPy succeeds
+  while Imp fails under matched opportunity, the result instead points to an
+  Imp semantic/product gap; if Imp succeeds and DSPy fails, it is a scoped
+  algorithm-native outcome requiring mechanism inspection, not automatic
+  superiority.
+
+#### Cheaper predeclared staging
+
+Run all three fixed **Imp** seeds first through `Imp.Experiment.check`, Artifact,
+and `ProgramServer`: 2,904 task transports (including 24 fresh-service calls)
+plus 33 optimizer transports, at most `$42.806016`. Do not stop after a lucky or
+unlucky individual seed. Stop the scientific condition only for an owning
+runtime/safety/artifact defect, or after all three Imp seeds if the frozen
+own-baseline criterion fails; in the latter case the matched arm cannot rescue
+the primary claim and is disproportionate. If and only if Imp passes, run all
+three stock-DSPy seeds unchanged: 2,880 task plus 33 optimizer transports, at
+most another `$42.474240`. No seed, row, threshold, parser, route, or opportunity
+may change between stages.
+
+Spend is not presently exact. The completed portfolio reports 1,614 Imp task
+and four reflection transports, a `$1.31805105` retained upstream lower bound,
+and several explicitly bounded but not exactly metered earlier calls. The last
+conservative workshop aggregate was `<= $71.97920075`, but that figure includes
+the completed portfolio's full reservation and is not an actual bill. Adding
+stage one mechanically would make that deliberately loose upper bound
+`<= $114.78521675`, above the approximately `$100` target; adding the full
+matched condition would make it `<= $157.25945675`. Actual spend is certainly
+lower, but cannot be manufactured from deep-copy-truncated upstream histories.
+Provider authority should therefore require a current account-level usage
+reconciliation sufficient to show stage-one headroom, not another local ledger.
+
+No coordinator, manifest, or harness is needed. The Imp stage is the ordinary
+two-predictor `MIPROv2` -> `Experiment.check` -> `Result`/`Artifact` -> fresh
+`ProgramServer` path. The reference stage is stock DSPy 3.2.1 MIPROv2 with the
+already-authenticated task-graph adaptation and the same outer selection rule.
+
+**Recommendation: RUN A CHEAPER PREDECLARED DESIGN.** Freeze exact complement
+rows and digests, reconcile current provider spend, then run the three-seed Imp
+stage first. If it passes, the exact earned claim is: *on one newly
+source-disjoint IFBench split, under the frozen GPT-5.4 Mini / Claude Sonnet
+4.6, four-candidate/eight-trial condition, current Imp MIPROv2 improved its
+two-stage program over its own baseline by mean at least `0.05` with at least
+two positive seeds and produced a reusable fresh-served artifact.* Only a
+completed second stage may add a stock-DSPy matched-semantics/noninferiority
+claim. A clean negative earns no effectiveness claim and remains a decisive
+task/model/budget falsification.
