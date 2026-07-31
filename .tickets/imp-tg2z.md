@@ -93,3 +93,7 @@ Canonical claims classify every advertised family as stable or distinctly experi
   now preserves hard operational guards from either layer. Composition can no
   longer make a budget, route, cost, transport, or cancellation refusal look
   like one ignorable failed vote.
+- Avatar's defining comparison and instruction-rewrite calls now preserve hard
+  operational guards instead of returning the unchanged actor with a routine
+  stopped-report diagnostic. Ordinary LM failures remain visible as bounded
+  optimizer failures.

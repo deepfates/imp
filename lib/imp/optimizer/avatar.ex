@@ -247,7 +247,10 @@ defmodule Imp.Optimizer.Avatar do
       neg_input_with_metrics: Enum.map(negative, &Map.from_struct/1)
     }
 
-    case Imp.Predict.Predict.call(optimizer.comparator, inputs) do
+    result = Imp.Predict.Predict.call(optimizer.comparator, inputs)
+    Imp.OperationalSafetyError.raise_if_present!(result)
+
+    case result do
       {:ok, prediction} -> {:ok, Imp.Prediction.fetch!(prediction, :feedback)}
       {:error, reason} -> {:error, :comparison, reason}
     end
@@ -259,7 +262,10 @@ defmodule Imp.Optimizer.Avatar do
       feedback: feedback
     }
 
-    case Imp.Predict.Predict.call(optimizer.rewriter, inputs) do
+    result = Imp.Predict.Predict.call(optimizer.rewriter, inputs)
+    Imp.OperationalSafetyError.raise_if_present!(result)
+
+    case result do
       {:ok, prediction} -> {:ok, Imp.Prediction.fetch!(prediction, :new_instruction)}
       {:error, reason} -> {:error, :instruction_rewrite, reason}
     end

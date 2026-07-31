@@ -1,6 +1,12 @@
 defmodule AvatarOptimizerTest do
   use ExUnit.Case, async: true
 
+  defmodule SafetyLM do
+    defstruct [:error]
+
+    def generate(%__MODULE__{error: error}, _messages, _opts), do: {:error, error}
+  end
+
   test "rewrites instructions from positive and negative action trajectories" do
     lookup = Imp.tool(:lookup, "Look up a country capital", &lookup/1)
     student = Imp.avatar("question -> answer", [lookup], lm: avatar_lm(), max_iters: 2)
@@ -70,6 +76,33 @@ defmodule AvatarOptimizerTest do
     assert [%{stage: :classification, reason: :no_negative_examples}] = report.errors
     assert {:ok, prediction} = Imp.call(compiled, %{question: "q"})
     assert Imp.get(prediction, :answer) == "Paris"
+  end
+
+  test "comparison safety guards stay fatal instead of becoming a stopped baseline" do
+    lookup = Imp.tool(:lookup, "Look up a country capital", &lookup/1)
+    student = Imp.avatar("question -> answer", [lookup], lm: avatar_lm(), max_iters: 2)
+
+    trainset = [
+      Imp.example(question: "easy", answer: "Paris") |> Imp.with_inputs(:question),
+      Imp.example(question: "hard", answer: "Paris") |> Imp.with_inputs(:question)
+    ]
+
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        message: "Avatar comparison route guard"
+      )
+
+    optimizer =
+      Imp.Optimizer.Avatar.new(Imp.exact_match(:answer),
+        max_iters: 1,
+        comparator_lm: %SafetyLM{error: safety},
+        rewrite_lm: static_lm(%{new_instruction: "unused"})
+      )
+
+    assert_raise Imp.OperationalSafetyError, "Avatar comparison route guard", fn ->
+      Imp.optimize!(student, optimizer, trainset)
+    end
   end
 
   test "minimization does not promote a candidate whose calls failed" do
