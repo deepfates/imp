@@ -131,6 +131,31 @@ defmodule Imp.OptimizerContractTest do
     def run(%__MODULE__{}, _program, _opts), do: {:ok, %{not: :the_declared_result}}
   end
 
+  defmodule OperationalGuardOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct [:mode]
+
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{mode: :return}, _program, _opts), do: {:error, safety()}
+    def run(%__MODULE__{mode: :raise}, _program, _opts), do: raise(safety())
+
+    defp safety do
+      Imp.OperationalSafetyError.exception(
+        kind: :cost,
+        message: "optimizer cost guard",
+        reason: :reservation_exhausted
+      )
+    end
+  end
+
   @canonical_modules [
     Imp.Optimizer.LabeledFewShot,
     Imp.Optimizer.BootstrapFewShot,
@@ -311,6 +336,26 @@ defmodule Imp.OptimizerContractTest do
 
     assert ^program = Imp.optimize!(program, %FlippingCapabilities{}, [])
     assert Process.get(key) == 1
+  end
+
+  test "canonical optimizer and public facades preserve operational safety errors" do
+    program = Imp.predict("question -> answer")
+
+    for mode <- [:return, :raise] do
+      optimizer = %OperationalGuardOptimizer{mode: mode}
+
+      assert_raise Imp.OperationalSafetyError, "optimizer cost guard", fn ->
+        Imp.Optimizer.run(optimizer, program, trainset: [])
+      end
+
+      assert_raise Imp.OperationalSafetyError, "optimizer cost guard", fn ->
+        Imp.optimize(program, optimizer, [])
+      end
+
+      assert_raise Imp.OperationalSafetyError, "optimizer cost guard", fn ->
+        Imp.optimize!(program, optimizer, [])
+      end
+    end
   end
 
   test "composed execution resolves capabilities exactly once" do

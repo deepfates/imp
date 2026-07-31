@@ -42,7 +42,8 @@ defmodule Imp.Optimizer do
 
   Optimizer modules declare what they produce and which dataset splits they
   consume. `run/3` dispatches only through this behaviour; callback arity is
-  never used to infer argument meaning.
+  never used to infer argument meaning. Operational safety failures remain
+  raised across this boundary instead of becoming generic optimizer errors.
   """
 
   alias Imp.Optimizer.TrainingResult
@@ -80,9 +81,13 @@ defmodule Imp.Optimizer do
         {:error, _reason} = error -> error
       end
     rescue
-      error -> {:error, {:optimizer_capabilities_failed, module, Exception.message(error)}}
+      error ->
+        Imp.OperationalSafetyError.raise_if_present!(error)
+        {:error, {:optimizer_capabilities_failed, module, Exception.message(error)}}
     catch
-      kind, reason -> {:error, {:optimizer_capabilities_failed, module, {kind, reason}}}
+      kind, reason ->
+        Imp.OperationalSafetyError.raise_if_present!({kind, reason})
+        {:error, {:optimizer_capabilities_failed, module, {kind, reason}}}
     end
   end
 
@@ -166,11 +171,17 @@ defmodule Imp.Optimizer do
   end
 
   defp invoke(%module{} = optimizer, program, opts) do
-    module.run(optimizer, program, opts)
+    result = module.run(optimizer, program, opts)
+    Imp.OperationalSafetyError.raise_if_present!(result)
+    result
   rescue
-    error -> {:error, {:optimizer_failed, module, Exception.message(error)}}
+    error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
+      {:error, {:optimizer_failed, module, Exception.message(error)}}
   catch
-    kind, reason -> {:error, {:optimizer_failed, module, {kind, reason}}}
+    kind, reason ->
+      Imp.OperationalSafetyError.raise_if_present!({kind, reason})
+      {:error, {:optimizer_failed, module, {kind, reason}}}
   end
 
   defp execute(optimizer, program, opts, capabilities) do

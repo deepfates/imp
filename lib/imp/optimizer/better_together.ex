@@ -310,6 +310,8 @@ defmodule Imp.Optimizer.BetterTogether do
          |> Map.put(:compile_metadata, compile_metadata)}
       end
 
+    Imp.OperationalSafetyError.raise_if_present!(result)
+
     case result do
       {:ok, candidate} ->
         run_steps(
@@ -447,12 +449,16 @@ defmodule Imp.Optimizer.BetterTogether do
   end
 
   defp safely_compile_step(optimizer, program, trainset, valset, step_opts, execution) do
-    compile_step(optimizer, program, trainset, valset, step_opts, execution)
+    result = compile_step(optimizer, program, trainset, valset, step_opts, execution)
+    Imp.OperationalSafetyError.raise_if_present!(result)
+    result
   rescue
     error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
       {:error, {:optimizer_step_raised, optimizer.__struct__, Exception.message(error)}}
   catch
     kind, reason ->
+      Imp.OperationalSafetyError.raise_if_present!({kind, reason})
       {:error, {:optimizer_step_threw, optimizer.__struct__, kind, reason}}
   end
 
@@ -625,6 +631,7 @@ defmodule Imp.Optimizer.BetterTogether do
         result
 
       {:exit, reason} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         events = drain_bootstrap_lifecycle(reference)
         bootstrap_launch_failure(request, events, {:training_launch_task_exit, reason})
 
@@ -640,6 +647,7 @@ defmodule Imp.Optimizer.BetterTogether do
     end
   rescue
     error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
       {:error, {:training_launch_task_failed, BootstrapFinetune, Exception.message(error)}}
   end
 
@@ -705,15 +713,22 @@ defmodule Imp.Optimizer.BetterTogether do
   end
 
   defp invoke_generic_training_optimizer(%{optimizer: %module{} = optimizer} = request, opts) do
-    case module.run(optimizer, request.program, opts) do
+    result = module.run(optimizer, request.program, opts)
+    Imp.OperationalSafetyError.raise_if_present!(result)
+
+    case result do
       {:ok, %Imp.Optimizer.TrainingResult{} = result} -> {:ok, result}
       {:error, _reason} = error -> error
       other -> {:error, {:invalid_optimizer_result, :training_result, other}}
     end
   rescue
-    error -> {:error, {:optimizer_failed, module, Exception.message(error)}}
+    error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
+      {:error, {:optimizer_failed, module, Exception.message(error)}}
   catch
-    kind, reason -> {:error, {:optimizer_failed, module, {kind, reason}}}
+    kind, reason ->
+      Imp.OperationalSafetyError.raise_if_present!({kind, reason})
+      {:error, {:optimizer_failed, module, {kind, reason}}}
   end
 
   defp validate_generic_training_result(%Imp.Optimizer.TrainingResult{} = result) do

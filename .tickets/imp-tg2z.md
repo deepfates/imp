@@ -79,3 +79,8 @@ Canonical claims classify every advertised family as stable or distinctly experi
   explicit fallback candidates, but typed route, cost, budget, transport, and
   cancellation refusals abort before any fallback or task evaluation instead
   of being laundered into a synthetic instruction.
+- The canonical `Imp.Optimizer.run/3` dispatcher and `Imp.optimize` facades now
+  preserve the typed safety error itself for both raised and returned forms.
+  BetterTogether also refuses to turn a guarded child step into an ordinary
+  failed prefix, so composed optimization cannot continue after a hard route,
+  cost, budget, transport, or cancellation refusal.

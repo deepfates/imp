@@ -77,6 +77,29 @@ defmodule BetterTogetherTest do
     def run(%__MODULE__{}, _program, _opts), do: raise("compile exploded")
   end
 
+  defmodule OperationalGuardOptimizer do
+    @behaviour Imp.Optimizer
+    defstruct []
+
+    @impl true
+    def __optimizer__,
+      do: %{
+        kind: :program,
+        datasets: %{trainset: :required, validation: :unsupported},
+        result: :program
+      }
+
+    @impl true
+    def run(%__MODULE__{}, _program, _opts) do
+      {:error,
+       Imp.OperationalSafetyError.exception(
+         kind: :transport,
+         message: "composition transport guard",
+         reason: :attempt_mismatch
+       )}
+    end
+  end
+
   defmodule SpyOptimizer do
     @behaviour Imp.Optimizer
     defstruct [:owner]
@@ -1376,6 +1399,23 @@ defmodule BetterTogetherTest do
 
     assert [%{error: {:optimizer_failed, RaisingOptimizer, "compile exploded"}}] =
              Imp.Optimizer.Report.fetch(compiled).errors
+  end
+
+  test "operational child guards abort composition instead of becoming failed prefixes" do
+    better =
+      BetterTogether.new(metric(), %{
+        guarded: %OperationalGuardOptimizer{},
+        later: %SpyOptimizer{owner: self()}
+      })
+
+    assert_raise Imp.OperationalSafetyError, "composition transport guard", fn ->
+      BetterTogether.compile(better, program(), examples(), nil,
+        strategy: [:guarded, :later],
+        valset_ratio: 0
+      )
+    end
+
+    refute_receive :unexpected_later_step
   end
 
   test "does not claim provider weight training succeeded when no trainer is available" do

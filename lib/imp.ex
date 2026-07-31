@@ -336,7 +336,9 @@ defmodule Imp do
   validation set and `Imp.optimize/3` for trainset-only optimizers. A non-empty
   keyword list in the fourth position supplies invocation options to a
   trainset-only optimizer; invocation options alongside a validation set belong
-  in `Imp.optimize/5`.
+  in `Imp.optimize/5`. Operational route, cost, budget, transport, and explicit
+  cancellation guards remain raised even through this non-bang facade; they are
+  not ordinary candidate failures.
   """
   def optimize(program, optimizer, trainset),
     do: run_optimizer(program, optimizer, [trainset: trainset], :program)
