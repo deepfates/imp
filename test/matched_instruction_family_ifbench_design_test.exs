@@ -119,8 +119,16 @@ defmodule Imp.MatchedInstructionFamilyIFBenchDesignTest do
     assert receipt["status"] == "provider_disabled"
     assert receipt["condition"] == "mipro_stage1"
     assert receipt["provider_authority_used"] == false
-    assert receipt["three_seed_imp_ceiling"] == %{"task" => 2_904, "optimizer" => 33}
+    assert receipt["three_seed_imp_ceiling"] == %{"task" => 3_192, "optimizer" => 33}
     assert receipt["seeds"] == [2_026_072_705, 2_026_072_706, 2_026_072_707]
+
+    # The pinned zero-demo path still runs three bootstrap arms. Sixteen rows,
+    # three arms, two predictors, and three seeds add a legal 288 transports
+    # to the original estimate. If every trajectory is accepted, the frozen
+    # RNG schedules only 7/8/8 trajectories (14/16/16 task transports); that
+    # clean-path expectation is not the safety ceiling.
+    assert 3_192 == 2_904 + 3 * 3 * 16 * 2
+    assert [14, 16, 16] == Enum.map([7, 8, 8], &(&1 * 2))
   end
 
   @tag :requires_dspy_capture

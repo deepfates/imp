@@ -53,7 +53,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
 
     ceiling =
       if condition == :mipro_stage1,
-        do: %{task: 2_904, optimizer: 33},
+        do: %{task: 3_192, optimizer: 33},
         else: %{task: 1_896, optimizer: 36}
 
     IO.puts(

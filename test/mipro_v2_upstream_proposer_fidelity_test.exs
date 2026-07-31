@@ -11,6 +11,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
   @two_predictor_runner "test/support/dspy_3_2_1_mipro_two_predictor_tape.py"
   @program_aware_runner "test/support/dspy_3_2_1_mipro_program_aware_tape.py"
   @program_failure_runner "test/support/dspy_3_2_1_mipro_program_failure_tape.py"
+  @zero_demo_failure_runner "test/support/dspy_3_2_1_mipro_zero_demo_failure_tape.py"
   @describe_program "Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work."
   @commit "29448ae12756abdd14bd8796c819247ebb83673c"
 
@@ -27,6 +28,145 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
   def metric(expected, prediction),
     do: Imp.get(expected, :route) == Imp.get(prediction, :route)
+
+  @tag :evidence_infrastructure
+  test "pinned zero-demo bootstrap reraises the first program, parse, or metric failure" do
+    {output, 0} =
+      System.cmd(Path.expand(@python), [Path.expand(@zero_demo_failure_runner)],
+        env: [{"PYTHONPATH", Path.expand(@source)}],
+        stderr_to_stdout: false
+      )
+
+    upstream = Jason.decode!(output)
+    assert upstream["commit"] == @commit
+
+    assert upstream["failures"]["program"] == %{
+             "exception_type" => "ValueError",
+             "message" => "program failed for request-00",
+             "prompt_calls" => 0,
+             "task_calls" => 0
+           }
+
+    assert upstream["failures"]["metric"] == %{
+             "exception_type" => "RuntimeError",
+             "message" => "metric failed deliberately",
+             "prompt_calls" => 0,
+             "task_calls" => 1
+           }
+
+    assert upstream["failures"]["parse"]["exception_type"] == "AdapterParseError"
+    assert upstream["failures"]["parse"]["message"] =~ "Expected to find output fields"
+    assert upstream["failures"]["parse"]["prompt_calls"] == 0
+    assert upstream["failures"]["parse"]["task_calls"] == 2
+  end
+
+  test "public zero-demo MIPRO and Experiment retain the first bootstrap failure" do
+    success_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{route: "K11"} end)
+
+    failure_reason =
+      {:adapter_error, %{decoder: :strict, logical_attempts: 1, transport_attempts: 1}}
+
+    failure_agent = start_supervised!({Agent, fn -> [{:error, failure_reason}] end})
+
+    failing_lm = %SequenceLM{agent: failure_agent}
+
+    program =
+      Imp.BenchmarkTruth.IFBenchTwoStage.new(success_lm,
+        adapter: Imp.Adapter.Chat,
+        config: [json_fallback: false]
+      )
+
+    rows =
+      Enum.map(0..2, fn index ->
+        Imp.Example.new(%{
+          prompt: "Route request-0#{index}.",
+          route: "K11",
+          instruction_id_list: ["format:quoted"],
+          kwargs: [%{enabled: true, missing: nil, ordered: %{z: [index, false, nil]}}]
+        })
+        |> Imp.Example.with_inputs(:prompt)
+      end)
+
+    data =
+      Imp.Experiment.Data.new(
+        train: [Enum.at(rows, 0)],
+        selection: [Enum.at(rows, 1)],
+        test: [Enum.at(rows, 2)]
+      )
+
+    optimizer =
+      Imp.Optimizer.MIPROv2.new(&__MODULE__.metric/2,
+        auto: nil,
+        num_candidates: 4,
+        num_trials: 1,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: success_lm,
+        task_lm: failing_lm,
+        program_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        fewshot_aware_proposer: false,
+        proposer_fidelity: :dspy_3_2_1,
+        max_errors: 0,
+        max_concurrency: 1,
+        seed: 9
+      )
+
+    compile_error =
+      assert_raise Imp.EvaluationCancelledError, fn ->
+        Imp.Optimizer.MIPROv2.compile(optimizer, program, data.train, data.selection)
+      end
+
+    assert compile_error.message =~ "adapter_error"
+    assert compile_error.max_errors == 0
+
+    Agent.update(failure_agent, fn _ -> [{:error, failure_reason}] end)
+
+    assert {:error,
+            {:optimizer_failed, Imp.Optimizer.MIPROv2,
+             %Imp.EvaluationCancelledError{} = direct_error}} =
+             Imp.optimize(program, optimizer, data.train, data.selection)
+
+    assert direct_error.message =~ "adapter_error"
+    assert direct_error.max_errors == 0
+
+    assert [failure] = direct_error.errors
+    assert failure.stage == :mipro_bootstrap
+    assert failure.index == 0
+    assert failure.identity_sha256 =~ ~r/^[0-9a-f]{64}$/
+    assert failure.candidate_identity == %{bootstrap_arm: -2, rollout_id: 0}
+    assert failure.reason == failure_reason
+    assert failure.logical_attempts == 1
+    assert failure.transport_attempts == 1
+    assert failure.completed_predictor_calls == 0
+    refute inspect(direct_error.rows) =~ "Route request-00"
+
+    Agent.update(failure_agent, fn _ -> [{:error, failure_reason}] end)
+
+    assert {:error,
+            %{
+              stage: :optimize,
+              reason:
+                {:optimizer_failed, Imp.Optimizer.MIPROv2,
+                 %{
+                   max_errors: 0,
+                   errors: [public_failure]
+                 }}
+            }} =
+             Imp.Experiment.check(program, optimizer, data, &__MODULE__.metric/2,
+               evaluation_options: [max_errors: :infinity, max_concurrency: 1]
+             )
+
+    assert public_failure.stage == :mipro_bootstrap
+    assert public_failure.identity_sha256 == failure.identity_sha256
+    assert public_failure.candidate_identity == %{bootstrap_arm: -2, rollout_id: 0}
+    assert public_failure.reason == failure_reason
+    assert public_failure.logical_attempts == 1
+    assert public_failure.transport_attempts == 1
+    assert Agent.get(failure_agent, & &1) == []
+  end
 
   test "explicit 3.2.1 mode accepts implemented grounded-proposer shapes" do
     config =

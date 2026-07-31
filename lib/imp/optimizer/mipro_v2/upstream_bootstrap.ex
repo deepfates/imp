@@ -193,7 +193,12 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamBootstrap do
 
             trajectory = %{trajectory | index: index}
             trajectories = trajectories ++ [trajectory]
-            enforce_error_budget!(trajectories, Keyword.fetch!(opts, :max_errors))
+
+            enforce_error_budget!(
+              trajectories,
+              Keyword.fetch!(opts, :max_errors),
+              internal_seed
+            )
 
             teacher = if program_call_failed?(trajectory), do: stripped_teacher, else: teacher
 
@@ -336,14 +341,93 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamBootstrap do
   defp accepted?(trajectory, threshold),
     do: is_nil(trajectory.error) and trajectory.score >= threshold
 
-  defp enforce_error_budget!(_trajectories, :infinity), do: :ok
+  defp enforce_error_budget!(_trajectories, :infinity, _internal_seed), do: :ok
 
-  defp enforce_error_budget!(trajectories, maximum) do
-    errors = Enum.count(trajectories, &(!is_nil(&1.error)))
+  defp enforce_error_budget!(trajectories, maximum, internal_seed) do
+    failures = Enum.reject(trajectories, &is_nil(&1.error))
 
-    if errors > 0 and errors >= maximum do
-      raise RuntimeError,
-            "MIPROv2 error budget exhausted during DSPy 3.2.1 bootstrap: #{errors} errors (maximum #{maximum})"
+    if failures != [] and length(failures) >= maximum do
+      first = hd(failures)
+
+      raise Imp.EvaluationCancelledError,
+        message: failure_message(first.error),
+        rows: Enum.map(trajectories, &bootstrap_row(&1, internal_seed)),
+        errors: Enum.map(failures, &bootstrap_failure(&1, internal_seed)),
+        max_errors: maximum
     end
   end
+
+  defp bootstrap_row(trajectory, internal_seed) do
+    %{
+      index: trajectory.index,
+      identity_sha256: example_identity(trajectory.example),
+      candidate_identity: %{bootstrap_arm: internal_seed, rollout_id: trajectory.rollout_id},
+      score: trajectory.score,
+      failed: not is_nil(trajectory.error)
+    }
+  end
+
+  defp bootstrap_failure(trajectory, internal_seed) do
+    %{
+      stage: :mipro_bootstrap,
+      index: trajectory.index,
+      identity_sha256: example_identity(trajectory.example),
+      candidate_identity: %{bootstrap_arm: internal_seed, rollout_id: trajectory.rollout_id},
+      reason: Imp.Redaction.redact(trajectory.error),
+      logical_attempts: known_attempt_count(trajectory, :logical_attempts),
+      transport_attempts: known_attempt_count(trajectory, :transport_attempts),
+      completed_predictor_calls: length(trajectory.trace || [])
+    }
+  end
+
+  defp example_identity(nil), do: nil
+
+  defp example_identity(example) do
+    example
+    |> Imp.Example.to_map()
+    |> Report.encode_term()
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
+  defp known_attempt_count(trajectory, key) do
+    values =
+      [trajectory.error, trajectory.metric_metadata, trajectory.metadata]
+      |> Enum.flat_map(&find_counts(&1, key))
+      |> Enum.filter(&(is_integer(&1) and &1 >= 0))
+
+    case values do
+      [] -> nil
+      _ -> Enum.max(values)
+    end
+  end
+
+  defp find_counts(value, key) when is_struct(value),
+    do: value |> Map.from_struct() |> find_counts(key)
+
+  defp find_counts(value, key) when is_map(value) do
+    own = [Map.get(value, key), Map.get(value, Atom.to_string(key))]
+    nested = value |> Map.values() |> Enum.flat_map(&find_counts(&1, key))
+    own ++ nested
+  end
+
+  defp find_counts([], _key), do: []
+
+  defp find_counts([head | tail], key),
+    do: find_counts(head, key) ++ find_counts(tail, key)
+
+  defp find_counts(value, key) when is_tuple(value),
+    do: value |> Tuple.to_list() |> find_counts(key)
+
+  defp find_counts(_value, _key), do: []
+
+  defp failure_message(%{__exception__: true} = error),
+    do: error |> Exception.message() |> Imp.Redaction.redact()
+
+  defp failure_message({:metric_error, reason}), do: format_reason(reason)
+  defp failure_message(reason), do: format_reason(reason)
+
+  defp format_reason(reason) when is_binary(reason), do: Imp.Redaction.redact(reason)
+  defp format_reason(reason), do: inspect(Imp.Redaction.redact(reason))
 end

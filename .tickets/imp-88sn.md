@@ -577,3 +577,82 @@ For this stop, source order bounds task transports to 32--64 baseline-selection
 transports plus 1--96 bootstrap transports; no optimizer-summary/proposal
 transport occurred because bootstrap precedes dataset grounding. The missing
 underlying trajectory diagnostic and telemetry prevent a narrower honest count.
+
+### Zero-demo MIPRO owning review
+
+The two stopped logs above remain byte-identical and no provider or held-out
+call was made during this review. An executable pinned-DSPy 3.2.1 vector now
+runs the ordinary public zero-demo `MIPROv2.compile` configuration on nested
+IFBench-shaped examples. It establishes all of the following rather than
+inferring them from method names:
+
+- DSPy constructs four candidate demo sets: the true zero-shot arm and three
+  real bootstrap arms (`-2`, `-1`, `0`). The bootstrap outputs are passed into
+  instruction proposal as `task_demos`; only after proposal are demos removed
+  from the categorical search by setting `demo_candidates=None`.
+- With `max_errors=0`, the first program `ValueError`, adapter
+  `AdapterParseError`, or metric `RuntimeError` is re-raised before any prompt
+  model call. The deterministic vector observed respectively 0, 2, and 1 task
+  LM calls; the exception type and complete underlying message were preserved.
+- Imp performs the same three bootstrap arms, uses their accepted traces for
+  proposal grounding, and discards demos from zero-shot search. Skipping this
+  work would change both proposal information and shared RNG opportunity; it is
+  not a compatible optimization. A future explicitly named BEAM-native
+  zero-bootstrap mode could make that trade, but pinned `:dspy_3_2_1` cannot.
+
+The reproduced Imp defect was narrower and real: after `TrajectoryRunner`
+retained the row error, `UpstreamBootstrap.enforce_error_budget!/2` replaced it
+with one aggregate `RuntimeError`. `Imp.Optimizer` then retained only that
+message. The public path now uses the existing `Imp.EvaluationCancelledError`
+boundary. Direct MIPRO compile still aborts on the first failure; `Imp.optimize`
+and `Experiment.check` return a redacted structured reason containing stage
+`mipro_bootstrap`, content-bound row identity and local index, bootstrap-arm
+candidate identity, the underlying cause, completed predictor calls, and
+logical/transport attempts when the adapter supplied them. Raw example rows are
+not returned. Operational-safety errors continue to bypass this containment.
+
+This cannot recover the successor's exact failed row. Its trajectory held the
+original error and response metadata only in BEAM memory. The aggregate was
+raised before bootstrap metadata, checkpoint, optimizer report, Experiment
+Result, Artifact, or telemetry was written; the ordinary example then persisted
+only the aggregate stack trace. There is no retained provider response from
+which to reconstruct the parser input. The only honest stopped-run bound remains
+32--64 baseline task transports plus 1--96 bootstrap task transports, zero
+optimizer transports, and the observed account-window delta `$0.10420425`.
+
+The corrected legal source maximum is 48 bootstrap trajectories per seed
+(three arms by sixteen rows), hence 96 two-stage task transports per seed and
+288 across the three seeds. On an all-accepted clean path, the frozen RNG asks
+for 7/8/8 trajectories, or only 14/16/16 two-stage transports; rejected rows can
+raise realized work to the legal maximum. The provider-disabled ordinary entry
+now reports the source-correct total ceiling of 3,192 task plus 33 optimizer
+transports. At the frozen prices that is `$46.787328`, and against the last
+observed conservative workshop upper `$18.409063235` would expose at most
+`$65.196391235`. This is reservation arithmetic, not a bill or authority.
+
+Classification:
+
+- **Required pinned behavior:** three bootstrap arms, bootstrap traces informing
+  proposals, demos excluded from zero-shot categorical search, and immediate
+  first-failure abort at `max_errors=0`.
+- **Imp semantic/product defect:** replacing the first cause and row/candidate
+  context with an aggregate error. This is repaired without changing scoring,
+  opportunity, or treatment configuration.
+- **Avoidable work:** none within the pinned profile. The work is discardable
+  only if proposal information and RNG compatibility are also deliberately
+  surrendered.
+- **Potential BEAM-native deviation:** an explicitly distinct zero-bootstrap
+  profile could trade proposal grounding for lower cost. It is not implemented
+  here and would not satisfy DSPy 3.2.1 MIPRO compatibility.
+
+**Recommendation: redesign the frozen question (`b`), not a third successor.**
+The product observability defect is fixed, but the retained run gives no basis
+to claim its first provider parse/program/metric failure was transient or
+corrected. Under the now-proven pinned semantics, `max_errors=0` intentionally
+makes any one of up to 48 bootstrap trajectories terminal. Re-running the same
+question would merely gamble that the unknown failure does not recur. A future
+result-blind design may choose and freeze a nonzero diagnostic error budget as
+a different scientific question, retaining score-zero failures and the same
+rows/seeds/models/criterion; its legal outer cost remains `$46.787328`. Until
+that design is justified, MIPRO usefulness on this condition is unmeasured and
+Stage 2 remains dormant.

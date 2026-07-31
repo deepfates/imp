@@ -122,7 +122,7 @@ defmodule Imp.Experiment do
            provenance: provenance
          }}
       else
-        {:error, reason} -> {:error, %{stage: :optimize, reason: reason}}
+        {:error, reason} -> {:error, %{stage: :optimize, reason: public_reason(reason)}}
       end
     rescue
       error in Imp.Experiment.StageError ->
