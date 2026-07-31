@@ -110,7 +110,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.V14Readiness do
 
     result = %Result{
       candidates: [seed_value, retained_value],
-      parents: [[], [0]],
+      parents: [[], []],
       validation_scores: [seed_evaluation.score, retained_evaluation.score],
       validation_subscores: [
         %{"circle_packing_26" => seed_evaluation.score},
@@ -138,6 +138,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.V14Readiness do
         "authority_commit" => @commit,
         "gepa_state_sha256" => @circle_files["logs/gepa_state.bin"],
         "source_state_kind" => "warm-resumed-retained-state",
+        "candidate_lineage" => "not reconstructable from the retained tracker log",
+        "complete_population" => "not reconstructable from the retained tracker log",
         "reflection_calls" => "not reconstructable from the retained tracker log"
       }
     }
@@ -153,7 +155,9 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.V14Readiness do
           "configured_max_metric_calls" => 150,
           "model" => "openai/gpt-5.1",
           "evaluator_timeout_seconds" => 600,
-          "gepa_state_sha256" => @circle_files["logs/gepa_state.bin"]
+          "gepa_state_sha256" => @circle_files["logs/gepa_state.bin"],
+          "candidate_lineage" => "not reconstructable from the retained tracker log",
+          "complete_population" => "not reconstructable from the retained tracker log"
         }
       )
 
@@ -166,6 +170,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.V14Readiness do
       limitations: [
         "the selected value is a projection of a warm retained upstream state, not a cold Imp optimization",
         "the deterministic replay validates the retained geometry; it does not rerun the evolved Python solver",
+        "candidate lineage and the complete candidate population are not reconstructable from the retained tracker log",
         "the retained tracker does not expose an exact reflection-call count"
       ]
     }

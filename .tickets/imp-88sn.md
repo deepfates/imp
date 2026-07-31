@@ -81,8 +81,9 @@ output hashes, and projects the 133-call warm retained state through the existin
 with provider credentials blank reads the Artifact and independently validates
 the retained 26-circle geometry at `2.635983362593453`. This is a deterministic
 retained-state/artifact replay, not a cold optimizer rerun, code-execution replay,
-or held-out generalization result; the tracker also does not reconstruct the
-exact reflection-call count.
+or held-out generalization result. The tracker does not reconstruct candidate
+lineage, the complete candidate population, or the exact reflection-call count;
+the projected Result and Artifact therefore assert no parent relationship.
 
 The same gate authenticates the released gskill files and fails exact-reproduction
 readiness closed. The retained Bleve run requested/completed 300 calls and resumed

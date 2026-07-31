@@ -23,17 +23,35 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.V14ReadinessTest do
     assert replay.result.total_metric_calls == 133
     assert length(replay.result.history) == 133
     assert replay.result.checkpoint["source_state_kind"] == "warm-resumed-retained-state"
+    assert replay.result.parents == [[], []]
+
+    assert replay.result.checkpoint["candidate_lineage"] ==
+             "not reconstructable from the retained tracker log"
 
     assert %{
              schema_version: 3,
              champion_id: "candidate-0001",
              candidates: [
                %{"id" => "candidate-0000", "kind" => "value"},
-               %{"id" => "candidate-0001", "kind" => "value", "report" => report}
-             ]
+               %{
+                 "id" => "candidate-0001",
+                 "kind" => "value",
+                 "metadata" => %{"parent_indexes" => []},
+                 "report" => report
+               }
+             ],
+             provenance: provenance
            } = Imp.Optimizer.Artifact.inspect(replay.artifact)
 
     assert report["total_metric_calls"] == 133
+    assert report["parents"] == [[], []]
+
+    assert report["checkpoint"]["candidate_lineage"] ==
+             "not reconstructable from the retained tracker log"
+
+    assert provenance["candidate_lineage"] ==
+             "not reconstructable from the retained tracker log"
+
     :ok = Imp.Optimizer.Artifact.write!(replay.artifact, artifact_path)
 
     code = """
