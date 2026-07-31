@@ -101,3 +101,7 @@ Canonical claims classify every advertised family as stable or distinctly experi
   a completely evaluated source or bootstrapped baseline. Partial rows and
   their scores/errors remain intelligible in the report, but only complete
   candidates are eligible to become the reusable returned program.
+- Optimize Anything run-directory checkpoints now use the same owner-only,
+  synced temporary-file replacement contract as public Result and Artifact
+  files. Resumable candidate and evaluation state is no longer created under
+  ambient filesystem permissions before its atomic replacement.

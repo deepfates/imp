@@ -878,6 +878,10 @@ defmodule Imp.Optimize.Anything.RunnerTest do
 
     assert %Result{run_dir: ^run_dir} = result
 
+    checkpoint_path = Path.join(run_dir, "gepa_state.json")
+    assert File.stat!(checkpoint_path).mode |> Bitwise.band(0o777) == 0o600
+    assert checkpoint_path |> File.read!() |> Jason.decode!() |> is_map()
+
     [artifact] =
       Path.wildcard(Path.join(run_dir, "generated_best_outputs_valset/task_0/iter_0_prog_0.json"))
 

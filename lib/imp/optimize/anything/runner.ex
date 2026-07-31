@@ -938,8 +938,22 @@ defmodule Imp.Optimize.Anything.Runner do
       File.mkdir_p!(run_dir)
       path = Path.join(run_dir, "gepa_state.json")
       temporary = path <> ".tmp-#{System.unique_integer([:positive])}"
-      File.write!(temporary, Jason.encode!(checkpoint, pretty: true))
-      File.rename!(temporary, path)
+      io = File.open!(temporary, [:write, :binary, :exclusive])
+
+      try do
+        File.chmod!(temporary, 0o600)
+        :ok = IO.binwrite(io, Jason.encode!(checkpoint, pretty: true))
+        :ok = :file.sync(io)
+      after
+        File.close(io)
+      end
+
+      try do
+        File.rename!(temporary, path)
+      after
+        File.rm(temporary)
+      end
+
       if callback, do: callback.(checkpoint), else: :ok
     end
   end
