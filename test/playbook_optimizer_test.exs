@@ -275,6 +275,39 @@ defmodule Imp.Optimizer.PlaybookTest do
              )
   end
 
+  test "public compile preserves typed operational safety failures" do
+    guard =
+      Imp.OperationalSafetyError.exception(
+        kind: :budget,
+        message: "playbook proposal budget guard"
+      )
+
+    optimizer = optimizer(proposer: fn _request -> raise guard end)
+
+    assert_raise Imp.OperationalSafetyError, "playbook proposal budget guard", fn ->
+      PlaybookOptimizer.compile(
+        optimizer,
+        wrapped_program(baseline_playbook()),
+        train_rows(),
+        promotion_rows(),
+        audit_rows()
+      )
+    end
+
+    returned_optimizer =
+      optimizer(evaluator: fn _program, _rows, _context -> {:error, guard, free_usage()} end)
+
+    assert_raise Imp.OperationalSafetyError, "playbook proposal budget guard", fn ->
+      PlaybookOptimizer.compile(
+        returned_optimizer,
+        wrapped_program(baseline_playbook()),
+        train_rows(),
+        promotion_rows(),
+        audit_rows()
+      )
+    end
+  end
+
   test "tampered completed checkpoints and mismatched baselines fail closed" do
     optimizer = successful_optimizer()
 

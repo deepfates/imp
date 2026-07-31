@@ -15,6 +15,7 @@ defmodule Imp.Optimizer.Playbook do
 
   alias Imp.Optimizer.Trajectory
   alias Imp.Optimizer.Trajectory.Parameter
+  alias Imp.OperationalSafetyError
   alias Imp.Playbook, as: Context
   alias Imp.Playbook.{Canonical, Delta, Entry}
   alias Imp.ProgramParameters
@@ -160,9 +161,12 @@ defmodule Imp.Optimizer.Playbook do
       {:error, _reason} = error -> error
     end
   rescue
+    error in OperationalSafetyError -> reraise error, __STACKTRACE__
     error -> {:error, {:optimizer_exception, error.__struct__, Exception.message(error)}}
   catch
-    kind, reason -> {:error, {:optimizer_throw, kind, reason}}
+    kind, reason ->
+      OperationalSafetyError.raise_if_present!(reason)
+      {:error, {:optimizer_throw, kind, reason}}
   end
 
   @doc "Restores a completed checkpoint against fresh runtime-bound program callbacks."
@@ -302,7 +306,10 @@ defmodule Imp.Optimizer.Playbook do
       parameter: optimizer.parameter
     }
 
-    case optimizer.evaluator.(program, rows, context) do
+    result = optimizer.evaluator.(program, rows, context)
+    OperationalSafetyError.raise_if_present!(result)
+
+    case result do
       {:ok, trajectories, usage} ->
         with {:ok, usage} <- admit_usage(usage, reservation, stage),
              {:ok, trajectories} <- admit_trajectories(trajectories, rows, playbook),
@@ -340,7 +347,10 @@ defmodule Imp.Optimizer.Playbook do
       parameter: optimizer.parameter
     }
 
-    case optimizer.proposer.(request) do
+    result = optimizer.proposer.(request)
+    OperationalSafetyError.raise_if_present!(result)
+
+    case result do
       {:ok, %Delta{} = delta, usage} ->
         with {:ok, usage} <- admit_usage(usage, reservation, stage),
              {:ok, aggregate} <- add_usage(state.usage, usage, optimizer.budget) do

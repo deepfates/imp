@@ -105,3 +105,6 @@ Canonical claims classify every advertised family as stable or distinctly experi
   synced temporary-file replacement contract as public Result and Artifact
   files. Resumable candidate and evaluation state is no longer created under
   ambient filesystem permissions before its atomic replacement.
+- Playbook's public compile path now preserves typed operational safety guards
+  from raised, thrown, and callback-returned forms. Ordinary proposer and
+  evaluator failures keep the optimizer's structured diagnostic contract.
