@@ -656,3 +656,78 @@ a different scientific question, retaining score-zero failures and the same
 rows/seeds/models/criterion; its legal outer cost remains `$46.787328`. Until
 that design is justified, MIPRO usefulness on this condition is unmeasured and
 Stage 2 remains dormant.
+
+### Separately frozen diagnostic-10 revision
+
+The provider-disabled successor is now explicitly identified as
+`dspy-3.2.1-default-max-errors-10`. It changes only MIPRO's error policy from
+the terminal runs' `0` to the ordinary pinned DSPy 3.2.1 default `10`, plus the
+already-corrected 3,192-task/33-optimizer safety ceiling. Rows and source
+coordinates, ordered split bytes and digests, seeds, task/optimizer models and
+routes, four candidates, eight full trials, messages, token limits, selection
+and held-out criterion, Artifact/Result linkage, and fresh `ProgramServer`
+service are unchanged. This is a different frozen scientific question; neither
+terminal run is resumed or reinterpreted.
+
+Pinned source and executable behavior agree:
+
+- `dspy.settings.max_errors` is `10`; MIPRO resolves `None` to that value and
+  passes it to each zero-demo `BootstrapFewShot` arm and the shared `Evaluate`.
+- Bootstrap counts failures per arm. One ordinary metric failure was contained,
+  the arm continued, all four candidate demo sets were constructed, and compile
+  reached the optimization boundary. The tenth failure re-raised its original
+  `RuntimeError` immediately, after exactly ten task calls and before any prompt
+  call.
+- Candidate/full validation uses DSPy `Evaluate(failure_score=0.0)`. Fewer than
+  ten program/parser/metric exceptions occupy ordered score-zero rows. At the
+  tenth, `Evaluate` cancels; MIPRO's `eval_candidate_program` contains that
+  evaluation as a whole-candidate score `0.0`. It does not turn the exception
+  into instruction advice.
+- In the frozen configuration `fewshot_aware_proposer=false`, bootstrap outputs
+  are not rendered into proposal `task_demos`; the calls remain required for
+  pinned call-graph/RNG opportunity and the zero-demo candidates are discarded
+  before categorical search. More generally, Imp admits only successful
+  trajectories as demos. Failed trajectories remain diagnostics and never
+  become proposal evidence.
+- Route, cost, privacy, transport, budget, and cancellation failures use
+  `Imp.OperationalSafetyError`; deterministic public execution proves the first
+  such bootstrap failure escapes immediately after one call, outside the
+  numeric error budget.
+
+Imp already carries a contained bootstrap failure into both ordered
+`metadata.bootstrap.errors` and top-level `Report.errors`, setting report status
+to `:with_errors`; the provider-free review confirms it cannot appear as an
+error-free optimizer result. One ordinary failure followed by success completed
+public MIPRO search and the outer `Experiment.check` lifecycle. Ten
+bootstrap failures produced the structured redacted cancellation fixed in
+`380b284`. Ten failures in each full candidate evaluation produced candidate
+score zero, twenty ordered diagnostics across baseline and one trial, and
+retained the baseline instruction rather than selecting a failed candidate.
+The all-success two-predictor task and prompt transcripts remain byte-identical
+to pinned DSPy with the explicit value `10`.
+
+Call arithmetic has two distinct views. Under an all-accepted bootstrap, the
+frozen RNG schedules 7/8/8 trajectories across the three seeds, adding
+14/16/16 two-stage task transports to the former 2,904-call calculation. The
+clean-path expectation is therefore **2,950 task + 33 optimizer transports**, a
+`$43.441920` reservation at the frozen rates. Rejected-but-nonexceptional rows
+can exhaust all sixteen rows in each of three arms, so the legal source maximum
+remains **3,192 task + 33 optimizer**, `$46.787328`. The finite error budget can
+only stop work earlier; it does not justify lowering the safety ceiling.
+
+A read-only OpenRouter key query on 2026-07-31 reported `$17.573773485`
+cumulative/monthly usage and `$7.901552925` daily usage. Treating the coordinator's
+approximately `$0.837644` Behold amount as separately additive gives a
+conservative current workshop upper of `$18.411417485`. Clean-path aggregate
+exposure is therefore `<= $61.853337485`; worst-case exposure is
+`<= $65.198745485`, below the approximately `$100` target. These figures do not
+manufacture attribution for unknown historical calls.
+
+**Recommendation: RUN the revised question.** The value `10` is upstream's
+documented ordinary default, not a threshold selected from the two stopped
+outcomes. Provider-free execution proves it contains isolated diagnostics,
+halts pathological bootstrap failure, preserves successful opportunity, keeps
+operational guards fatal, and cannot credit a failed candidate. A completed
+three-seed negative remains decisive; another owning runtime or artifact stop
+would instead falsify current MIPRO product readiness. Stage 2 remains dormant
+regardless until Stage 1 satisfies its unchanged primary criterion.

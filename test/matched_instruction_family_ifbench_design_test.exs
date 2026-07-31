@@ -118,8 +118,10 @@ defmodule Imp.MatchedInstructionFamilyIFBenchDesignTest do
     receipt = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
     assert receipt["status"] == "provider_disabled"
     assert receipt["condition"] == "mipro_stage1"
+    assert receipt["revision"] == "dspy-3.2.1-default-max-errors-10"
     assert receipt["provider_authority_used"] == false
     assert receipt["three_seed_imp_ceiling"] == %{"task" => 3_192, "optimizer" => 33}
+    assert receipt["max_errors"] == 10
     assert receipt["seeds"] == [2_026_072_705, 2_026_072_706, 2_026_072_707]
 
     # The pinned zero-demo path still runs three bootstrap arms. Sixteen rows,

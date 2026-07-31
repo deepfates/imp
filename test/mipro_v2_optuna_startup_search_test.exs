@@ -342,6 +342,201 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
     assert Agent.get(validation_calls, & &1) == 1
   end
 
+  test "pinned default contains one bootstrap failure and still enters search" do
+    {prompt_lm, prompt_agent} = prompt_lm(4)
+    task_calls = start_supervised!({Agent, fn -> 0 end}, id: {:finite_task_calls, self()})
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          call = Agent.get_and_update(task_calls, &{&1, &1 + 1})
+
+          if call == 0,
+            do: {:error, {:adapter_error, %{reason: :first_bootstrap_failure}}},
+            else: %{route: "K11"}
+        end
+      )
+
+    compiled =
+      exact_optimizer(prompt_lm, task_lm,
+        num_candidates: 4,
+        num_trials: 1,
+        max_errors: 10
+      )
+      |> MIPROv2.compile(program(task_lm), trainset(), valset())
+
+    report = Report.fetch(compiled)
+    assert report.metadata.completed_trials == 1
+    assert report.metadata.bootstrap.trajectory_count == 8
+    assert report.metadata.bootstrap.accepted_count == 7
+    assert report.metadata.bootstrap.rejected_count == 1
+
+    assert [failure] = report.metadata.bootstrap.errors
+    assert failure.stage == :bootstrap
+
+    assert failure.reason ==
+             {:invalid_lm_result, {:error, {:adapter_error, %{reason: :first_bootstrap_failure}}}}
+
+    assert report.errors == [failure]
+    assert report.metadata.status == :with_errors
+    assert Agent.get(prompt_agent, & &1) == []
+  end
+
+  test "Experiment completes through MIPRO after one contained bootstrap failure" do
+    {prompt_lm, prompt_agent} = prompt_lm(4)
+    task_calls = start_supervised!({Agent, fn -> 0 end}, id: {:experiment_task_calls, self()})
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          if inspect(messages) =~ "request-" do
+            call = Agent.get_and_update(task_calls, &{&1, &1 + 1})
+
+            if call == 0,
+              do: {:error, {:adapter_error, %{reason: :first_bootstrap_failure}}},
+              else: %{route: "K11"}
+          else
+            %{route: "K11"}
+          end
+        end
+      )
+
+    data =
+      Imp.Experiment.Data.new(
+        train: trainset(),
+        selection:
+          Enum.map(0..1, fn index ->
+            Imp.example(text: "selection-#{index}", route: "K11") |> Imp.with_inputs(:text)
+          end),
+        test:
+          Enum.map(0..1, fn index ->
+            Imp.example(text: "test-#{index}", route: "K11") |> Imp.with_inputs(:text)
+          end)
+      )
+
+    optimizer =
+      exact_optimizer(prompt_lm, task_lm,
+        num_candidates: 4,
+        num_trials: 1,
+        max_errors: 10
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(program(task_lm), optimizer, data, &__MODULE__.metric/2,
+               evaluation_options: [max_errors: :infinity, max_concurrency: 1]
+             )
+
+    assert result.selected == :baseline
+    assert result.baseline_selection.score == 1.0
+    assert result.optimized_selection.score == 1.0
+    assert result.test.score == 1.0
+    assert Agent.get(prompt_agent, & &1) == []
+  end
+
+  test "pinned default stops bootstrap at ten failures with structured diagnostics" do
+    {prompt_lm, prompt_agent} = prompt_lm(4)
+    task_calls = start_supervised!({Agent, fn -> 0 end}, id: {:exhausted_task_calls, self()})
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          call = Agent.get_and_update(task_calls, &{&1 + 1, &1 + 1})
+          {:error, {:adapter_error, %{call: call, reason: :bootstrap_failure}}}
+        end
+      )
+
+    error =
+      assert_raise Imp.EvaluationCancelledError, fn ->
+        exact_optimizer(prompt_lm, task_lm,
+          num_candidates: 4,
+          num_trials: 1,
+          max_errors: 10
+        )
+        |> MIPROv2.compile(program(task_lm), trainset(), valset())
+      end
+
+    assert error.max_errors == 10
+    assert length(error.rows) == 10
+    assert length(error.errors) == 10
+    assert Enum.map(error.errors, & &1.index) == Enum.to_list(0..9)
+    assert Enum.all?(error.errors, &(&1.stage == :mipro_bootstrap))
+    assert Agent.get(task_calls, & &1) == 10
+    assert Agent.get(prompt_agent, & &1) != []
+  end
+
+  test "pinned default contains an exhausted candidate evaluation as score zero" do
+    {prompt_lm, prompt_agent} = prompt_lm(4)
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          if inspect(messages) =~ "validation-" do
+            {:error, {:adapter_error, %{reason: :validation_failure}}}
+          else
+            %{route: "K11"}
+          end
+        end
+      )
+
+    validation =
+      Enum.map(0..11, fn index ->
+        Imp.example(text: "validation-#{index}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    compiled =
+      exact_optimizer(prompt_lm, task_lm,
+        num_candidates: 4,
+        num_trials: 1,
+        max_errors: 10
+      )
+      |> MIPROv2.compile(program(task_lm), trainset(), validation)
+
+    report = Report.fetch(compiled)
+    assert Enum.map(report.metadata.full_evaluations, & &1.score) == [0.0, 0.0]
+    assert length(report.errors) == 20
+
+    assert Enum.all?(report.errors, fn failure ->
+             failure.reason ==
+               {:invalid_lm_result, {:error, {:adapter_error, %{reason: :validation_failure}}}}
+           end)
+
+    assert report.metadata.status == :with_errors
+    assert instruction(compiled) == "Route the opaque request."
+    assert Agent.get(prompt_agent, & &1) == []
+  end
+
+  test "operational safety escapes the finite bootstrap budget on its first call" do
+    {prompt_lm, prompt_agent} = prompt_lm(4)
+    task_calls = start_supervised!({Agent, fn -> 0 end}, id: {:guard_task_calls, self()})
+
+    safety =
+      OperationalSafetyError.exception(
+        kind: :route,
+        reason: :provider_drift,
+        message: "bootstrap route guard drift"
+      )
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Agent.update(task_calls, &(&1 + 1))
+          {:error, safety}
+        end
+      )
+
+    assert_raise OperationalSafetyError, "bootstrap route guard drift", fn ->
+      exact_optimizer(prompt_lm, task_lm,
+        num_candidates: 4,
+        num_trials: 1,
+        max_errors: 10
+      )
+      |> MIPROv2.compile(program(task_lm), trainset(), valset())
+    end
+
+    assert Agent.get(task_calls, & &1) == 1
+    assert Agent.get(prompt_agent, & &1) != []
+  end
+
   defp startup_schedule(seed) do
     {schedule, _policy} = seed |> new_policy() |> take_suggestions(9)
     schedule

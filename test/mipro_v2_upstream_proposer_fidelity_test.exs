@@ -39,6 +39,25 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     upstream = Jason.decode!(output)
     assert upstream["commit"] == @commit
+    assert upstream["default_max_errors"] == 10
+
+    assert upstream["default_budget"]["one_failure"] == %{
+             "bootstrap_candidate_sets" => 4,
+             "completed" => true,
+             "demos_discarded" => true,
+             "metric_calls" => 7,
+             "prompt_calls" => 0,
+             "task_calls" => 7
+           }
+
+    assert upstream["default_budget"]["exhausted"] == %{
+             "completed" => false,
+             "exception_type" => "RuntimeError",
+             "message" => "metric failure 10",
+             "metric_calls" => 10,
+             "prompt_calls" => 0,
+             "task_calls" => 10
+           }
 
     assert upstream["failures"]["program"] == %{
              "exception_type" => "ValueError",
@@ -928,6 +947,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         tip_aware_proposer: true,
         fewshot_aware_proposer: false,
         max_concurrency: 1,
+        max_errors: 10,
         seed: 9
       )
 

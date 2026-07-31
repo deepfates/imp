@@ -15,6 +15,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
   @seeds [2_026_072_705, 2_026_072_706, 2_026_072_707]
   @task_model "openrouter:openai/gpt-5.4-mini"
   @optimizer_model "openrouter:anthropic/claude-sonnet-4.6"
+  @mipro_revision "dspy-3.2.1-default-max-errors-10"
   @split_sha %{
     gepa: %{
       train: "8d80f329bbab37a44fe2e2ea0ea8c7e69eeb976d8a8e51af5bcd4547b4221197",
@@ -60,10 +61,12 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
       Jason.encode!(%{
         status: "provider_disabled",
         condition: condition,
+        revision: if(condition == :mipro_stage1, do: @mipro_revision, else: nil),
         seeds: @seeds,
         split_counts: %{train: 16, selection: 32, test: 64},
         split_sha256: @split_sha[condition],
         three_seed_imp_ceiling: ceiling,
+        max_errors: if(condition == :mipro_stage1, do: 10, else: :infinity),
         provider_authority_used: false
       })
     )
@@ -232,7 +235,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
       task_lm: task_lm,
       max_concurrency: 1,
       timeout: 120_000,
-      max_errors: 0,
+      max_errors: 10,
       seed: seed
     )
   end
@@ -381,10 +384,12 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
   defp experiment_config(:mipro_stage1, seed) do
     %{
       condition: "imp-88sn-ifbench-mipro-stage1",
+      revision: @mipro_revision,
       seed: seed,
       task_model: @task_model,
       optimizer_model: @optimizer_model,
       optimizer: :mipro_v2,
+      max_errors: 10,
       num_candidates: 4,
       num_trials: 8,
       split_sha256: @split_sha.mipro_stage1
