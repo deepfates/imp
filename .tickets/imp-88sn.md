@@ -77,11 +77,13 @@ it does not authorize a provider call or add an experiment coordinator.
   is 3,744 task transports and 72 reflection transports. Imp additionally
   permits four fresh-service probes per seed, each two-stage: 24 task
   transports. Total ceiling: 3,768 task and 72 reflection transports.
-- The selected Imp Artifact and Result must be written mode 0600 before held-out
-  access, linked, loaded into a freshly reconstructed trusted program in a new
-  OS BEAM, and served through `Imp.ProgramServer` for four concurrent synthetic
-  non-test probes. The applied candidate ID, both named instructions, runtime
-  route options, and typed service success must survive reload.
+- `Experiment.check` must content-seal and successfully apply the selected Imp
+  Artifact before held-out evaluation. After the completed Result contains the
+  held-out outcomes, Result and Artifact are written mode 0600 and linked, then
+  loaded into a freshly reconstructed trusted program in a new OS BEAM and
+  served through the existing `ImpDeployment.ProgramServer` for four concurrent
+  synthetic non-test probes. The applied candidate ID, both named instructions,
+  runtime route options, and typed service success must survive reload.
 - Primary outcome: per-seed paired held-out mean executable-constraint score.
   Success requires mean optimized-minus-baseline lift at least `0.05` and
   positive lift in at least two of three seeds. Report a row-paired bootstrap
@@ -126,12 +128,14 @@ it does not authorize a provider call or add an experiment coordinator.
 
 ### Cost and interpretation
 
-The combined ceiling is 3,768 task plus 90 reflection transports. At the last
-validated conservative reservations (`$0.013824` task and `$0.08064`
-reflection), new spend is at most `$59.346432`; using the existing conservative
-workshop bound `<= $12.63276875`, aggregate worst case is
-`<= $71.97920075`. Routes, privacy, capabilities, and prices must be checked
-again before any call.
+The hard execution bounds are 3,768 task plus 90 reflection transports, the
+stated output-token limits, exact routes, and disabled retries/fallbacks. The
+input-token figures are conservative reservation estimates for the frozen
+prompts and call counts, not natively enforced input-token cutoffs. At the last
+validated reservations (`$0.013824` task and `$0.08064` reflection), new spend
+is at most `$59.346432`; using the existing conservative workshop bound
+`<= $12.63276875`, aggregate worst case is `<= $71.97920075`. Routes, privacy,
+capabilities, and prices must be checked again before any call.
 
 A clean negative leaves this ticket open and falsifies usefulness only for the
 named task/model/budget condition. A runtime, transport, identity, privacy, or
@@ -144,7 +148,7 @@ existing example surfaces receive only thin invocation edits. The IFBench entry
 constructs `Imp.Experiment.Data`, the two-predictor `Imp.Module`,
 `Imp.Optimizer.GEPA`, and calls `Imp.Experiment.check`; it then uses
 `Imp.Experiment.Result.write!`, `Imp.Optimizer.Artifact.write!/read!/apply`, and
-`Imp.ProgramServer`. Its matched reference invokes the authenticated
+`ImpDeployment.ProgramServer`. Its matched reference invokes the authenticated
 `IFBenchCoT2StageModule` with public `dspy.GEPA.compile`. The OA entry remains
 `examples/local_optimize_anything_retry_policy/run.exs`, calling
 `Imp.Optimize.Anything.run`, `to_artifact`, Artifact `write!/read!/value`, and
