@@ -1523,3 +1523,126 @@ missing product phenomenon is measured. Release/docs work is not next because
 the clean package and teaching path already pass; prose and runner retirement
 cannot earn the open usefulness criterion. They become a short reconciliation
 only after a valid scientific outcome exists.
+
+## Existing-task choice after outer-repetition support (`54d4a9b`)
+
+This is a provider-free choice between the only two candidates authorized for
+inspection, not a data freeze or launch authorization. The repository's current
+code, retained results, ignored local roots, and history support **HotPotQA** and
+reject GSM8K for this tranche.
+
+### GSM8K — rejected because the existing program is not multi-stage
+
+- Reusable pieces are real but incomplete for this ticket. Public
+  `Imp.Datasets.GSM8K` loads the rows and its metric performs deterministic
+  numeric-answer equality. The retained campaign programs are
+  `Imp.chain_of_thought("question -> answer")` and a ReAct loop with the safe
+  calculator tool. The generic Experiment, Artifact, and ProgramServer
+  lifecycle could carry either selected program.
+- Neither existing program is a named solve-then-verify/extract module. CoT is
+  one optimizable predictor; ReAct can make multiple turns but remains one
+  agent/tool loop rather than two independently meaningful named stages. There
+  is no existing GSM8K verifier/extractor component for MIPRO or GEPA to alter.
+  Choosing GSM8K would therefore require a new task module, contrary to this
+  review's reuse-only boundary.
+- The native metric is suitable and prior results show both a strong-model
+  ceiling (`0.90/0.925` zero-shot CoT) and weaker-model headroom
+  (`0.725/0.75`), but those are task-wide historical observations, not probes
+  of future rows and not evidence for a multi-stage optimizer.
+- Exposure is conservatively complete for the locally materialized 120-row
+  source: campaign train/dev/test coordinates `0..59`, `60..79`, and `80..119`
+  were used across CoT, weak-model MIPRO, ReAct, and calculator runs. The source
+  file SHA-256 is
+  `c5401ed9d5d510cc714a5baeef88b21252f933f37bc08fba232a85e145c9d339`;
+  the SHA-256 of the ordered `index:sha256(normalized question)` exposure list
+  is `b686e1a34e9dfdc5b092be7f1bb6e015c057042a7ec5935d97cba5ef2ae89bd1`.
+  The pinned 1,319-row source has a large complement, but rows alone cannot
+  supply the missing program mechanism.
+
+### HotPotQA — recommended
+
+- Existing benchmark-owned `Imp.BenchmarkTruth.HotpotMultiHop` is a genuine
+  four-predictor program: `summarize1`, `create_query_hop2`, `summarize2`, and
+  `final_answer`. Every stage performs necessary work and is independently
+  visible to `Imp.ProgramParameters`. `Imp.BenchmarkTruth.HotpotFeedback`
+  already owns component-specific GEPA feedback. `Imp.Datasets.HotPotQA`,
+  `Imp.Metrics.hotpot_f1/2`, normalized exact match, Experiment, Artifact, and
+  the generic ProgramServer are reusable without a new scorer or task adapter.
+- The program accepts any `Imp.Retrieve` implementation. For this Imp-owned
+  condition it can use existing deterministic `Imp.memory` over the frozen
+  distractor passages, so retrieval, both hops, scoring, and fresh service stay
+  inside the BEAM. The source-exact HoVer BM25S/Python integration is not used;
+  requiring that external corpus/index process would reject this candidate
+  under the present boundary. The existing focused tests execute the four-stage
+  graph, independent parameter mutation, retrieval failures, and DSPy-parity
+  HotPot metrics provider-free (`20 tests`, no failures at this review).
+- Prior task-wide evidence supplies result-independent headroom only. On the
+  old 100-row campaign, one-predictor RAG scored mean F1 `0.3818/0.3853`, while
+  labeled few-shot RAG scored `0.5171/0.5005`. This neither predicts the new
+  four-stage baseline nor permits choosing future rows by difficulty.
+- Conservative local exposure excludes distractor validation coordinates
+  `0..99` in full. Within that source, model calls are directly retained for
+  demo rows `0..3` and test rows `50..89`; the broader exclusion also covers
+  every row named by the historical train/dev/test declaration. The source
+  SHA-256 is
+  `a213e77d88287804081105c24a46fa04ab66fc29a26019cc4f0fcd571fce7fb3`.
+  The ordered normalized-question digest root for `0..99` is
+  `b3cff1363610bfed4af63ed52c93ac65c42e78566a4fd74a918826deeb9feb0f`;
+  the narrower directly-called `0..3,50..89` root is
+  `1fe83bca7a6912f07418c7637f8c01ca64db165f8bb2b9a3b4ef6e27d07a4f16`.
+  Separately, the provider-free fullwiki retrieval differential used
+  coordinates `0..9`, and four retained live parity runs used fullwiki
+  coordinates `700..715`. Those live artifacts retain exact coordinates but
+  not source question bytes, so their content digests cannot be reconstructed
+  from current local files. A later freeze must exclude those coordinates and
+  reject normalized-question collisions across configs before selecting any
+  row. This is the disclosed residual uncertainty, not permission to treat the
+  rows as unseen.
+- The pinned validation source has 7,405 rows. Excluding the known ranges leaves
+  far more than the required fixed split, but the full bytes are not currently
+  materialized. A later result-blind freeze may use the existing fetch path on
+  distractor rows after coordinate `99`, remove `700..715` and every retained
+  normalized-text digest match, then choose by a committed content-hash rule.
+  No row is selected or inspected in this review.
+
+### Compact future condition (not yet frozen)
+
+Use GEPA because its round-robin component mutation and the existing HotPot
+feedback give all four named stages direct, task-grounded opportunity. A compact
+candidate design is 8 train / 8 selection / 24 untouched test rows, the same
+three fixed seeds, and three fixed outer Experiment repetitions. Selection is
+strictly selection-only with baseline on aggregate tie; the selected schema-3
+Artifact is applied before test access, then loaded into a fresh OS process and
+served for four concurrent synthetic probes. GEPA's optimizer-internal metric
+observations remain single-pass and must be reported as such.
+
+With pinned GEPA v0.1.4 semantics, minibatch 4 and semantic
+`max_metric_calls: 32` permit at most 44 metric examples, 12 reflections, and 6
+iterations per seed. Because one program evaluation makes four task-model
+transports, the per-seed legal task ceiling is exactly:
+
+`96 baseline-selection + 176 GEPA + 96 optimized-selection + 288 baseline-test + 288 selected-test + 16 fresh-service = 960`.
+
+The semantic expected opportunity before legal overshoot is 912 task
+transports per seed. Across three seeds this is 2,736 expected / 2,880 legal
+task transports and at most 36 reflection transports. At the last validated
+4,096-input/1,024-output task reservation (`$0.007104`) and reflection
+reservation (`$0.08064`), that is about `$22.34` expected-upper / `$23.36`
+legal maximum. These are planning estimates, not current route authority; the
+models, envelopes, privacy, prices, retry/fallback policy, and workshop usage
+must be frozen and revalidated before any call. If the four-stage prompts do
+not safely fit that task envelope, the larger previously used envelope raises
+the legal estimate to about `$42.72`; that material change must be reviewed
+rather than hidden.
+
+The task-scoped success claim would be: on one frozen source-disjoint HotPotQA
+distractor condition and named model/budget, current Imp GEPA improved the
+four-stage native-retrieval program's mean held-out HotPot F1 by at least
+`0.05`, with positive causal lift in at least two of three seeds, fixed-repeat
+outer selection, and fresh concurrent service of each selected artifact. Row
+uncertainty and the three seed lifts remain separate. A clean miss says only
+that this task/model/budget did not meet the usefulness bar and leaves
+`imp-88sn` open; a runtime, retrieval, safety, or artifact failure is
+inconclusive product evidence. A stock-DSPy comparison stays dormant unless
+Imp passes and both runtimes can reuse the already-pinned deterministic
+retrieval boundary with identical documents and opportunity.
