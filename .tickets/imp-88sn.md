@@ -1963,3 +1963,93 @@ evidence that atomic `:all` plus an eight-row selector was a poor application
 choice, not that GEPA's advertised selector semantics are broken. Independent
 all-component ablation remains a candidate for future product design, not the
 next required telos step.
+
+## Provider-free Banking77 confirmatory-replication feasibility
+
+**Recommendation: one independently frozen Banking77 replication is credible
+and bounded; do not freeze or launch it yet.** This would be a confirmatory
+replication of the terminal modeled-MIPRO treatment family, not a continuation,
+rehabilitation, or exact byte-for-byte rerun. Every prior Result, Artifact, row,
+seed, and conclusion remains terminal. A clean miss would end Banking77 work
+rather than trigger another split, seed set, threshold, or treatment revision.
+
+### Fresh-row inventory
+
+The pinned public source was re-read provider-free at revision
+`796a4623935746f71378f0ebd435635a8ce08e50`. Its disposable downloads match the
+recorded train/test SHA-256 values `4526edfa...e0390` and
+`535fc96c...410be` exactly. The current repository scan found only the original
+240 exposed coordinates/digests plus the 96 rows in
+`banking77-mipro-stage1.json`: 336 unique source coordinates and 336 unique
+normalized-text digests, with no overlap between those sets and no later
+Banking77 coordinate outside their union. The scan covered tracked and ignored
+text/result roots; the three oversized non-Banking files were checked directly
+for Banking77 identifiers and had none.
+
+After excluding that union by both coordinate and normalized-text digest, the
+exact remaining counts for label ids `15,16,27,32,38,45,53,70` are:
+
+- source train: `161,142,107,86,80,133,135,87`;
+- source test: `24,24,24,24,24,24,24,24`.
+
+Thus a fresh balanced `24 train / 24 selection / 48 test` condition remains
+available with `3/3/6` rows per label and substantial reserve. No row was
+ordered or selected in this review. A future freeze must repeat the exposure
+scan, choose all rows result-blind by a new committed digest-order seed, bind
+the exact bytes/digests, and use three new fixed optimizer seeds.
+
+Twenty-four selection rows are the smallest balanced eight-label size at which
+one row cannot itself clear a `0.05` accuracy difference: `1/24 = 0.041667`.
+One row can still win the strict outer admission rule, so this is not protection
+against row-sampling winner's curse. Three fixed repetitions over identical
+ordered rows address provider replay noise, not selection-set sampling error.
+
+### Opportunity, headroom, and exact bound
+
+Keep the packaged `analyze_intent -> classify_route` program, GPT-5.4 Mini task
+LM, Claude Sonnet 4.6 proposer, modeled MIPRO with startup `10` / `15` total
+trials, three instruction candidates, at most two bootstrapped plus two labeled
+demos per predictor, `max_errors: 10`, and single-pass internal objectives.
+Outer baseline selection, optimized selection, baseline test, and selected test
+use `repetitions: 3, aggregation: :mean`; ties retain baseline. The schema-3
+Artifact and four fresh concurrent two-stage service probes remain required.
+
+Per seed the legal task-transport decomposition is:
+
+- `144` outer baseline selection (`24 * 2 stages * 3`);
+- up to `48` bootstrap;
+- `48` internal baseline;
+- `720` across 15 single-pass categorical trials;
+- `144` outer optimized selection;
+- `288` baseline test and `288` selected test (`48 * 2 * 3` each);
+- `8` fresh service.
+
+That is `1,688` task transports per seed, `5,064` across three seeds, plus the
+unchanged `10` optimizer transports per seed (`30` total). With outcome-dependent
+bootstrap completion the clean range is `4,932..5,064` task transports. At the
+last validated Banking77 reservations (`$0.007104` task, `$0.08064` optimizer),
+the new reservation range is `$37.456128..$38.393856`; the legal maximum is
+`$38.393856`. Adding the latest retained account-level snapshot
+`$26.457331485` gives `$64.851187485` maximum. That snapshot is not exact
+workshop attribution and is not a live preflight; route, privacy, price, key
+usage, retry, and fallback truth must be revalidated before any authority.
+
+Historical baseline test accuracy averaged `0.888889`, leaving about `0.111111`
+mean ceiling headroom. The unchanged primary requires an average gain of at
+least `2.4/48` correct rows, roughly 45% of those historical baseline errors.
+The target is feasible but demanding rather than structurally impossible.
+Historical selection baselines were already `0.875,0.916667,0.916667`, and all
+deployed optimized candidates came from startup-random rather than modeled-TPE
+trials. Consequently a pass would support task/model/budget-specific MIPRO
+usefulness, not a claim that TPE supplied the advantage; a failure would be
+strong evidence that the prior `+0.041667` mean signal did not replicate under
+more robust outer measurement.
+
+This is materially different from retrying until green only if treated as the
+single confirmatory attempt: a wholly source-disjoint split, new fixed seeds,
+the already-shipped repetition policy applied symmetrically, all three seeds
+completed, the unchanged primary (`mean causal lift >= 0.05` and at least two
+positive seeds), and no subsequent Banking77 attempt. Same-program replay
+movement remains zero causal lift. Stock DSPy stays dormant unless Imp passes;
+even then it requires a separate disposition. No data freeze, runtime edit, or
+provider authority occurred in this feasibility review.
