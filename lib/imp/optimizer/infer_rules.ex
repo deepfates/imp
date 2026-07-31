@@ -812,7 +812,7 @@ defmodule Imp.Optimizer.InferRules do
   end
 
   defp select_best(evaluated, fallback) do
-    case Enum.filter(evaluated, &(&1.status in [:ok, :with_errors] and is_number(&1.score))) do
+    case Enum.filter(evaluated, &(&1.status == :ok and is_number(&1.score))) do
       [] ->
         {fallback, nil}
 

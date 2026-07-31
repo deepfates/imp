@@ -190,4 +190,50 @@ defmodule Imp.Optimizer.InferRulesCompileOptionsTest do
       InferRules.compile(optimizer, program, [row], [row])
     end
   end
+
+  test "partially evaluated rule candidates stay reportable but cannot be selected" do
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          if prompt =~ "candidate-rule" and prompt =~ "explode" do
+            raise "candidate task failed"
+          else
+            %{answer: if(prompt =~ "candidate-rule", do: "yes", else: "no")}
+          end
+        end
+      )
+
+    metric = fn _example, prediction ->
+      if Imp.get(prediction, :answer) == "yes", do: 1.0, else: -1.0
+    end
+
+    program = Imp.predict("question -> answer", lm: task_lm)
+
+    trainset = [
+      Imp.example(question: "train", answer: "yes") |> Imp.with_inputs(:question)
+    ]
+
+    validation =
+      Enum.map(["safe", "explode"], fn question ->
+        Imp.example(question: question, answer: "yes") |> Imp.with_inputs(:question)
+      end)
+
+    compiled =
+      InferRules.new(metric,
+        candidates: ["candidate-rule"],
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0
+      )
+      |> InferRules.compile(program, trainset, validation)
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+
+    assert report.best_score == -1.0
+    refute compiled.signature.instructions =~ "candidate-rule"
+
+    assert %{status: :with_errors, score: 0.5, errors: [_]} =
+             Enum.find(report.candidates, &(&1.index == 0))
+  end
 end

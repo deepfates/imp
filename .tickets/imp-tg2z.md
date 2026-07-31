@@ -97,3 +97,7 @@ Canonical claims classify every advertised family as stable or distinctly experi
   operational guards instead of returning the unchanged actor with a routine
   stopped-report diagnostic. Ordinary LM failures remain visible as bounded
   optimizer failures.
+- InferRules no longer selects a partially evaluated induced-rule program over
+  a completely evaluated source or bootstrapped baseline. Partial rows and
+  their scores/errors remain intelligible in the report, but only complete
+  candidates are eligible to become the reusable returned program.
