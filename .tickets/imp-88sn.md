@@ -489,10 +489,15 @@ The exact retained log is
 (SHA-256
 `009bc7fc3578c165e7691b7eea1972c18b4ea8cdc1dd7e0ff6355939848d1485`).
 Current-key usage moved from `$17.345262735` to `$17.459159985` during the run,
-a `$0.11389725` aggregate delta. Source order proves zero task transports and
-one optimizer transport; the account endpoint does not provide a request ID,
-so the dollar delta is reported as observed run-window key usage rather than
-manufactured per-request precision. The outer zsh wrapper subsequently failed
-to print Mix's exit status because it assigned the reserved `status` variable;
-that happened after Mix returned and did not cause or alter the preserved
-optimizer failure.
+a `$0.11389725` aggregate delta. Experiment source order proves all 32 baseline
+selection rows were attempted before optimize; the two-stage graph therefore
+made between 32 and 64 task transports, depending on whether a first-stage
+parse failure prevented its paired correction call. The failed result retained
+no telemetry with which to narrow that interval. MIPRO source order proves
+exactly one optimizer transport: its first dataset-summary call returned before
+local rendering of the second batch failed. The account endpoint does not
+provide a request ID, so the dollar delta is reported as observed run-window
+key usage rather than manufactured per-request precision. The outer zsh wrapper
+subsequently failed to print Mix's exit status because it assigned the reserved
+`status` variable; that happened after Mix returned and did not cause or alter
+the preserved optimizer failure.
