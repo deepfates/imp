@@ -92,8 +92,13 @@ defmodule Imp.Predict.BestOfN do
   defp safe_feedback(feedback_fn, predictions) do
     feedback_fn.(predictions)
   rescue
+    safety in Imp.OperationalSafetyError -> raise safety
     error -> {:feedback_error, Attempt.error_message(error)}
   catch
-    kind, reason -> {:feedback_error, Attempt.error_message({kind, reason})}
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> raise safety
+        nil -> {:feedback_error, Attempt.error_message({kind, reason})}
+      end
   end
 end

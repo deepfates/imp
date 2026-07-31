@@ -213,7 +213,7 @@ defmodule Imp.Predict.Search do
   defp execute_concurrent(candidates, evaluator, opts) do
     candidates
     |> Imp.Tasks.async_stream(
-      fn indexed -> evaluate(indexed, evaluator, []) end,
+      fn indexed -> evaluate_isolated(indexed, evaluator, []) end,
       ordered: false,
       max_concurrency: opts[:max_concurrency],
       timeout: opts[:timeout],
@@ -244,13 +244,17 @@ defmodule Imp.Predict.Search do
   end
 
   defp run_sequential(indexed, evaluator, outcomes, timeout) do
-    task = Imp.Tasks.async_nolink(fn -> evaluate(indexed, evaluator, outcomes) end)
+    task = Imp.Tasks.async_nolink(fn -> evaluate_isolated(indexed, evaluator, outcomes) end)
 
     case Task.yield(task, timeout) do
+      {:ok, {:operational_safety, %Imp.OperationalSafetyError{} = safety}} ->
+        raise safety
+
       {:ok, outcome} ->
         outcome
 
       {:exit, reason} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         failed_outcome(indexed, {:task_exit, reason})
 
       nil ->
@@ -286,15 +290,21 @@ defmodule Imp.Predict.Search do
             })
 
           {:error, reason} ->
+            Imp.OperationalSafetyError.raise_if_present!(reason)
             failed_outcome({candidate, index}, reason)
 
           other ->
             failed_outcome({candidate, index}, {:invalid_evaluator_result, other})
         end
       rescue
+        safety in Imp.OperationalSafetyError -> raise safety
         error -> failed_outcome({candidate, index}, {:exception, Exception.message(error)})
       catch
-        kind, reason -> failed_outcome({candidate, index}, {kind, reason})
+        kind, reason ->
+          case Imp.OperationalSafetyError.find({kind, reason}) do
+            %Imp.OperationalSafetyError{} = safety -> raise safety
+            nil -> failed_outcome({candidate, index}, {kind, reason})
+          end
       end
 
     duration = System.monotonic_time() - started
@@ -309,13 +319,30 @@ defmodule Imp.Predict.Search do
     outcome
   end
 
+  defp concurrent_outcome({:ok, {:operational_safety, %Imp.OperationalSafetyError{} = safety}}),
+    do: raise(safety)
+
   defp concurrent_outcome({:ok, outcome}), do: outcome
 
   defp concurrent_outcome({:exit, {{candidate, index}, :timeout}}),
     do: failed_outcome({candidate, index}, :timeout, :timeout)
 
-  defp concurrent_outcome({:exit, {{candidate, index}, reason}}),
-    do: failed_outcome({candidate, index}, {:task_exit, reason})
+  defp concurrent_outcome({:exit, {{candidate, index}, reason}}) do
+    Imp.OperationalSafetyError.raise_if_present!(reason)
+    failed_outcome({candidate, index}, {:task_exit, reason})
+  end
+
+  defp evaluate_isolated(indexed, evaluator, outcomes) do
+    evaluate(indexed, evaluator, outcomes)
+  rescue
+    safety in Imp.OperationalSafetyError -> {:operational_safety, safety}
+  catch
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> {:operational_safety, safety}
+        nil -> :erlang.raise(kind, reason, __STACKTRACE__)
+      end
+  end
 
   defp base_outcome(candidate, index, status) do
     %{

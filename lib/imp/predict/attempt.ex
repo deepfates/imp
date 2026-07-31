@@ -36,6 +36,9 @@ defmodule Imp.Predict.Attempt do
     |> apply([example, prediction])
     |> Imp.Metrics.normalize_result()
   rescue
+    safety in Imp.OperationalSafetyError ->
+      raise safety
+
     error ->
       %Imp.Metrics.Result{
         feedback: {:metric_error, error_message(error)},
@@ -43,10 +46,16 @@ defmodule Imp.Predict.Attempt do
       }
   catch
     kind, reason ->
-      %Imp.Metrics.Result{
-        feedback: {:metric_error, error_message({kind, reason})},
-        metadata: %{error: {kind, reason}}
-      }
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          raise safety
+
+        nil ->
+          %Imp.Metrics.Result{
+            feedback: {:metric_error, error_message({kind, reason})},
+            metadata: %{error: {kind, reason}}
+          }
+      end
   end
 
   def error_message(%_{} = exception), do: Exception.message(exception)

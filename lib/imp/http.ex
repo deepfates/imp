@@ -128,9 +128,14 @@ defmodule Imp.HTTP do
   defp safe_transport_call(transport, fun) do
     fun.()
   rescue
+    safety in Imp.OperationalSafetyError -> {:error, safety}
     error -> {:error, {:http_transport_failed, transport, Exception.message(error)}}
   catch
-    kind, reason -> {:error, {:http_transport_failed, transport, {kind, reason}}}
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> {:error, safety}
+        nil -> {:error, {:http_transport_failed, transport, {kind, reason}}}
+      end
   end
 
   defp validate_opts!(opts, context) when is_list(opts) do

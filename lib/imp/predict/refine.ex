@@ -263,12 +263,18 @@ defmodule Imp.Predict.Refine do
         {:per_predictor, parse_advice(advice_prediction, predictor_names)}
 
       {:error, reason} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
         {:feedback_error, safe_reason(reason)}
     end
   rescue
+    safety in Imp.OperationalSafetyError -> raise safety
     error -> {:feedback_error, safe_reason(error)}
   catch
-    kind, reason -> {:feedback_error, safe_reason({kind, reason})}
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> raise safety
+        nil -> {:feedback_error, safe_reason({kind, reason})}
+      end
   end
 
   defp predictor_names([]), do: ["main"]
@@ -395,9 +401,14 @@ defmodule Imp.Predict.Refine do
   defp safe_callback_feedback(feedback_fn, history) do
     feedback_fn.(history)
   rescue
+    safety in Imp.OperationalSafetyError -> raise safety
     error -> {:feedback_error, safe_reason(error)}
   catch
-    kind, reason -> {:feedback_error, safe_reason({kind, reason})}
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> raise safety
+        nil -> {:feedback_error, safe_reason({kind, reason})}
+      end
   end
 
   defp safe_reason(reason) when is_atom(reason) or is_number(reason) or is_boolean(reason),

@@ -46,11 +46,20 @@ defmodule Imp.Embeddings do
         {:error, {:invalid_embedding_result, other}}
     end
   rescue
+    safety in Imp.OperationalSafetyError ->
+      {:error, safety}
+
     error ->
       {:error, {:embedding_provider_failed, provider, Exception.message(error)}}
   catch
     kind, reason ->
-      {:error, {:embedding_provider_failed, provider, {kind, reason}}}
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          {:error, safety}
+
+        nil ->
+          {:error, {:embedding_provider_failed, provider, {kind, reason}}}
+      end
   end
 
   defp valid_vectors?(vectors, expected_count) do

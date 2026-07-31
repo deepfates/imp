@@ -240,6 +240,43 @@ defmodule AgentRuntimeTest do
              runtime.traces
   end
 
+  test "agent handlers, tools, and policies preserve typed operational safety" do
+    handler_safety =
+      Imp.OperationalSafetyError.exception(kind: :cancellation, reason: :operator_stop)
+
+    handler =
+      Agent.new(:guarded_handler, fn _input, _runtime ->
+        raise handler_safety
+      end)
+
+    assert {:error, ^handler_safety, _runtime} = Agent.run(handler, %{})
+
+    tool_safety = Imp.OperationalSafetyError.exception(kind: :cost, reason: :tool_limit)
+    tool = Imp.Tool.new(:guarded_tool, "guarded", fn _input -> raise tool_safety end)
+
+    tool_agent =
+      Agent.new(
+        :tool_agent,
+        fn agent, _input, runtime -> Agent.call_tool(agent, :guarded_tool, %{}, runtime) end,
+        tools: [tool]
+      )
+
+    assert {:error, ^tool_safety, _runtime} = Agent.run(tool_agent, %{})
+
+    policy_safety = Imp.OperationalSafetyError.exception(kind: :route, reason: :tool_route)
+    policy_tool = Imp.Tool.new(:lookup, "lookup", fn _input -> :unused end)
+
+    policy_agent =
+      Agent.new(
+        :policy_agent,
+        fn agent, _input, runtime -> Agent.call_tool(agent, :lookup, %{}, runtime) end,
+        tools: [policy_tool],
+        tool_policy: fn _name, _input -> raise policy_safety end
+      )
+
+    assert {:error, ^policy_safety, _runtime} = Agent.run(policy_agent, %{})
+  end
+
   test "invalid handler return shapes become structured agent errors" do
     agent = Agent.new(:bad_return, fn _input, _runtime -> :ok end)
 

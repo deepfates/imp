@@ -388,6 +388,47 @@ defmodule RefineFeedbackTest do
              {:feedback_error, "feedback exploded"}
   end
 
+  test "BestOfN feedback preserves typed operational safety" do
+    metric = fn _example, _prediction -> 1.0 end
+    safety = Imp.OperationalSafetyError.exception(kind: :cost, reason: :feedback_limit)
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Imp.Predict.BestOfN.new(%HintProgram{}, metric,
+        n: 1,
+        feedback_fn: fn _predictions -> raise safety end
+      )
+      |> Imp.Predict.BestOfN.call(%{})
+    end
+  end
+
+  test "BestOfN and Refine metrics preserve typed operational safety" do
+    safety = Imp.OperationalSafetyError.exception(kind: :budget, reason: :metric_limit)
+    metric = fn _example, _prediction -> raise safety end
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Imp.Predict.BestOfN.new(%HintProgram{}, metric, n: 1)
+      |> Imp.Predict.BestOfN.call(%{})
+    end
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Imp.Predict.Refine.new(%HintProgram{}, metric, max_attempts: 1)
+      |> Imp.Predict.Refine.call(%{})
+    end
+  end
+
+  test "Refine feedback preserves typed operational safety" do
+    safety = Imp.OperationalSafetyError.exception(kind: :transport, reason: :feedback_offline)
+    metric = fn _example, _prediction -> 0.0 end
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Imp.Predict.Refine.new(%HintProgram{}, metric,
+        max_attempts: 2,
+        feedback_fn: fn _history -> raise safety end
+      )
+      |> Imp.Predict.Refine.call(%{})
+    end
+  end
+
   test "BestOfN with zero attempts does not call the wrapped program" do
     metric = fn _example, _prediction -> true end
 

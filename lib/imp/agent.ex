@@ -158,6 +158,10 @@ defmodule Imp.Agent do
                  Runtime.trace(runtime, %{type: :tool, tool: name, input: input, output: output})}
             end
           rescue
+            safety in Imp.OperationalSafetyError ->
+              {:error, safety,
+               Runtime.trace(runtime, %{type: :tool_error, tool: name, error: safety})}
+
             exception ->
               reason = {:tool_error, name, Exception.message(exception)}
 
@@ -165,10 +169,17 @@ defmodule Imp.Agent do
                Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
           catch
             kind, reason ->
-              reason = {:tool_error, name, {kind, reason}}
+              case Imp.OperationalSafetyError.find({kind, reason}) do
+                %Imp.OperationalSafetyError{} = safety ->
+                  {:error, safety,
+                   Runtime.trace(runtime, %{type: :tool_error, tool: name, error: safety})}
 
-              {:error, reason,
-               Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
+                nil ->
+                  reason = {:tool_error, name, {kind, reason}}
+
+                  {:error, reason,
+                   Runtime.trace(runtime, %{type: :tool_error, tool: name, error: reason})}
+              end
           end
 
         :error ->
@@ -188,9 +199,14 @@ defmodule Imp.Agent do
         {:arity, 3} -> handler.(agent, inputs, runtime)
       end
     rescue
+      safety in Imp.OperationalSafetyError -> {:error, safety, runtime}
       exception -> {:error, {:handler_error, agent.name, Exception.message(exception)}, runtime}
     catch
-      kind, reason -> {:error, {:handler_error, agent.name, {kind, reason}}, runtime}
+      kind, reason ->
+        case Imp.OperationalSafetyError.find({kind, reason}) do
+          %Imp.OperationalSafetyError{} = safety -> {:error, safety, runtime}
+          nil -> {:error, {:handler_error, agent.name, {kind, reason}}, runtime}
+        end
     end
   end
 

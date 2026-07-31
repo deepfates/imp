@@ -154,6 +154,31 @@ defmodule Imp.Predict.SearchTest do
     refute_receive :timed_out_worker_survived, 100
   end
 
+  test "typed operational safety aborts sequential and concurrent search" do
+    safety = Imp.OperationalSafetyError.exception(kind: :budget, reason: :search_limit)
+    candidates = [Candidate.new(:guarded, :value), Candidate.new(:must_not_run, :value)]
+
+    for mode <- [:sequential, :concurrent] do
+      assert_raise Imp.OperationalSafetyError, fn ->
+        Search.run(
+          candidates,
+          fn
+            %Candidate{id: :guarded}, _context -> raise safety
+            %Candidate{id: :must_not_run}, _context -> {:ok, :unexpected, 1.0}
+          end,
+          mode: mode,
+          max_concurrency: 1
+        )
+      end
+    end
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Search.run([Candidate.new(:returned, :value)], fn _candidate, _context ->
+        {:error, safety}
+      end)
+    end
+  end
+
   test "concurrent threshold stopping cancels speculative tasks" do
     parent = self()
 

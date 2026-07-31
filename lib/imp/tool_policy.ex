@@ -38,9 +38,14 @@ defmodule Imp.ToolPolicy do
         _other -> {:error, {:tool_denied, name}}
       end
     rescue
+      safety in Imp.OperationalSafetyError -> {:error, safety}
       exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
     catch
-      kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
+      kind, reason ->
+        case Imp.OperationalSafetyError.find({kind, reason}) do
+          %Imp.OperationalSafetyError{} = safety -> {:error, safety}
+          nil -> {:error, {:tool_policy_error, name, {kind, reason}}}
+        end
     end
   end
 
