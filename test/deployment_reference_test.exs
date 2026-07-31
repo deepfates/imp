@@ -459,10 +459,10 @@ defmodule DeploymentReferenceTest do
     assert readme =~ "bounded supervised task"
     assert readme =~ "IMP_MODEL"
     assert readme =~ "IMP_MAX_CONCURRENCY"
-    assert readme =~ "two-stage Banking77"
+    assert readme =~ "The example program has two stages"
+    assert readme =~ "Research case studies stay separate"
     assert readme =~ "reload_parameters/1"
     assert readme =~ "starts a second OS process"
-    assert readme =~ "fresh OS"
   end
 
   defp start_runtime(executor, opts \\ []) do

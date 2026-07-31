@@ -148,7 +148,8 @@ these changes must not ship as another `0.2.x` patch.
 
 - Documentation restructured: the API guide is a cookbook, deep operations
   material moved to `docs/OPERATIONS_REFERENCE.md`, and maintainer gate
-  docs to `docs/maintainers/GATES.md`.
+  docs to the repository-only
+  [maintainer gate reference](https://github.com/deepfates/imp/blob/main/docs/maintainers/GATES.md).
 - CI gains an evidence-infrastructure lane, and `production.check` now runs
   `reproduction.check` so an optimizer source change without a matching
   evidence re-capture fails per-PR instead of drifting silently. The three

@@ -90,34 +90,16 @@ artifact before swapping server state. Calls already running keep their old
 program snapshot; later calls see the new one. `reload/1` is the corresponding
 whole-program operation for Imp's built-in portable program shapes.
 
-## A real-model run shows why selection matters
+## Research case studies stay separate from the deployment template
 
-`banking77_gepa.exs` runs the same public path with a two-stage Banking77
-program, GPT-5.4 Mini for the task, and Claude Sonnet 4.6 for GEPA reflection:
-
-```sh
-OPENROUTER_API_KEY=... \
-IMP_PATH=../.. \
-mix run --no-start banking77_gepa.exs
-```
-
-The retained run is an honest negative result. The baseline scored `0.25` on
-selection and the proposed program scored `0.125`, so
-`Imp.Experiment.check/5` retained the baseline. The selected program then
-scored `0.275` on 40 untouched rows with no parse errors, loaded in a fresh OS
-process, and served four concurrent calls.
-
-The exact [`Result`](banking77-gepa-exercised-result.json) and
-[`Artifact`](banking77-gepa-selected-artifact.json) are retained beside the
-example. This result does not show that GEPA is ineffective in general. It
-shows the behavior an application needs when an optimizer makes the program
-worse: choose on validation data, retain the better program, and deploy the
-selected artifact normally.
-
-The script has fixed data sizes, model routes, optimizer limits, no retries or
-fallbacks, and a conservative maximum of 328 task calls plus two optimizer
-calls. It checks provider identity, privacy, and price before making a call.
-Those checks bound this example; they are not a second deployment framework.
+The source repository retains real-provider Banking77 and HotPotQA runs,
+including clean negative optimizer outcomes and their exact artifacts. They are
+research records rather than dependencies of this application template, so
+they are not shipped in the Hex package. See the repository's
+[deployment research directory](https://github.com/deepfates/imp/tree/main/examples/deployment)
+when you need those scoped results. The packaged workflow above remains the
+canonical executable example of selection, private persistence, restart, hot
+reload, concurrency, and failure containment.
 
 ## Build a whole-program artifact when parameters are not enough
 

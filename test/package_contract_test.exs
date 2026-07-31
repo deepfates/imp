@@ -3,38 +3,35 @@ defmodule PackageContractTest do
 
   @moduletag :package
 
-  @product_files [
-    "lib/imp.ex",
-    "lib/imp/clients/req_llm.ex",
-    "lib/imp/lm/static.ex",
-    "priv/public_api.json",
-    "CHANGELOG.md",
-    "LICENSE",
-    "RELEASE_NOTES.md",
-    "README.md",
-    "docs/API_GUIDE.md",
-    "examples/deployment/lib/imp_deployment/program_server.ex",
-    "examples/deployment/lib/imp_deployment/banking77_pipeline.ex",
-    "examples/deployment/lib/imp_deployment/support_pipeline.ex",
-    "examples/deployment/lib/imp_deployment/workflow.ex",
-    "examples/deployment/banking77_gepa.exs",
-    "examples/deployment/banking77_mipro.exs",
-    "examples/deployment/data/banking77-mipro-stage1.json",
-    "examples/deployment/banking77-gepa-exercised-result.json",
-    "examples/deployment/banking77-gepa-selected-artifact.json",
+  @deployment_files [
+    "examples/deployment/README.md",
     "examples/deployment/load_workflow.exs",
+    "examples/deployment/mix.exs",
+    "examples/deployment/mix.lock",
     "examples/deployment/run_workflow.exs",
-    "examples/provider_free_ticket_router/README.md",
-    "examples/provider_free_ticket_router/mix.exs",
-    "examples/provider_free_ticket_router/run.exs",
-    "livebooks/01_real_lm_front_door.livemd",
-    "livebooks/02_programming_not_prompting.livemd"
+    "examples/deployment/lib/imp_deployment/application.ex",
+    "examples/deployment/lib/imp_deployment/callbacks.ex",
+    "examples/deployment/lib/imp_deployment/program_server.ex",
+    "examples/deployment/lib/imp_deployment/support_pipeline.ex",
+    "examples/deployment/lib/imp_deployment/workflow.ex"
   ]
 
-  @product_dataset_files [
-    "benchmarks/data/grpo-usefulness-banking77-v1.json",
-    "benchmarks/data/simba-trec-coarse-v1.json"
-  ]
+  @product_files [
+                   "lib/imp.ex",
+                   "lib/imp/clients/req_llm.ex",
+                   "lib/imp/lm/static.ex",
+                   "priv/public_api.json",
+                   "CHANGELOG.md",
+                   "LICENSE",
+                   "RELEASE_NOTES.md",
+                   "README.md",
+                   "docs/API_GUIDE.md",
+                   "examples/provider_free_ticket_router/README.md",
+                   "examples/provider_free_ticket_router/mix.exs",
+                   "examples/provider_free_ticket_router/run.exs",
+                   "livebooks/01_real_lm_front_door.livemd",
+                   "livebooks/02_programming_not_prompting.livemd"
+                 ] ++ @deployment_files
 
   @repository_files [
     "CHANGELOG.md",
@@ -48,8 +45,11 @@ defmodule PackageContractTest do
 
   @excluded_prefixes [
     "benchmarks/config/",
+    "benchmarks/",
     "benchmarks/evidence/",
     "benchmarks/results/",
+    "examples/local_",
+    "examples/matched_",
     "lib/imp/benchmark_env.ex",
     "lib/mix/tasks/imp.benchmark",
     "lib/mix/tasks/imp.gate_evidence.ex",
@@ -77,6 +77,17 @@ defmodule PackageContractTest do
     "bench/imp/upstream_authority_registry.ex",
     "bench/imp/upstream_fidelity.ex",
     "priv/public_api_policy.json"
+  ]
+
+  @excluded_deployment_files [
+    "examples/deployment/banking77-gepa-exercised-result.json",
+    "examples/deployment/banking77-gepa-selected-artifact.json",
+    "examples/deployment/banking77_gepa.exs",
+    "examples/deployment/banking77_mipro.exs",
+    "examples/deployment/hotpotqa_gepa.exs",
+    "examples/deployment/lib/imp_deployment/banking77_pipeline.ex",
+    "examples/deployment/lib/imp_deployment/hotpotqa_pipeline.ex",
+    "examples/deployment/lib/imp_deployment/optimizer_artifacts.ex"
   ]
 
   @documented_module_allowlist MapSet.new([
@@ -258,7 +269,7 @@ defmodule PackageContractTest do
     assert missing == []
   end
 
-  test "shipped docs do not point readers at files excluded from the Hex package" do
+  test "shipped Markdown has no broken relative links" do
     files =
       Mix.Project.config()
       |> Keyword.fetch!(:package)
@@ -269,7 +280,7 @@ defmodule PackageContractTest do
 
     missing =
       files
-      |> Enum.filter(&String.match?(&1, ~r/^(README\.md|docs\/.*\.md|livebooks\/.*\.livemd)$/))
+      |> Enum.filter(&shipped_markdown?/1)
       |> documented_file_references()
       |> Enum.reject(&MapSet.member?(package_file_set, &1))
 
@@ -325,8 +336,12 @@ defmodule PackageContractTest do
       refute file in files
     end
 
-    assert Enum.sort(Enum.filter(files, &String.starts_with?(&1, "benchmarks/"))) ==
-             Enum.sort(@product_dataset_files)
+    assert Enum.sort(Enum.filter(files, &String.starts_with?(&1, "examples/deployment/"))) ==
+             Enum.sort(@deployment_files)
+
+    for file <- @excluded_deployment_files do
+      refute file in files
+    end
 
     refute Enum.any?(files, &String.starts_with?(&1, "lib/mix/tasks/"))
   end
@@ -1211,7 +1226,7 @@ defmodule PackageContractTest do
       String.match?(target, ~r/^(?:https?:|mailto:|#)/) ->
         []
 
-      String.ends_with?(target, [".md", ".livemd"]) ->
+      target != "" ->
         [
           reference_base(source, target)
           |> Path.join(target)
@@ -1223,6 +1238,8 @@ defmodule PackageContractTest do
         []
     end
   end
+
+  defp shipped_markdown?(path), do: String.ends_with?(path, [".md", ".livemd"])
 
   defp reference_base(_source, "docs/" <> _rest), do: File.cwd!()
   defp reference_base(_source, "livebooks/" <> _rest), do: File.cwd!()

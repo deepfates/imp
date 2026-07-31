@@ -56,9 +56,11 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
     assert source =~ "MLXLMDeployment.stop(job)"
   end
 
-  test "package includes the cold consumer project" do
-    assert File.read!("mix.exs") =~
-             ~S|Path.wildcard("examples/local_copro_banking77/**/*")|
+  test "research runner stays in Git but outside the Hex payload" do
+    assert File.regular?(@source)
+
+    package_files = Mix.Project.config()[:package][:files]
+    refute Enum.any?(package_files, &String.starts_with?(&1, "examples/local_copro_banking77/"))
   end
 
   test "retained pre-fix fence admission does not claim heldout behavior" do

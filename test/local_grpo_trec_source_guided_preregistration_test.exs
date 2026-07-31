@@ -263,7 +263,8 @@ defmodule LocalGRPOTRECSourceGuidedPreregistrationTest do
              &String.contains?(public_instruction, &1)
            )
 
-    assert @data_path in Mix.Project.config()[:package][:files]
+    assert File.regular?(@data_path)
+    refute @data_path in Mix.Project.config()[:package][:files]
   end
 
   defp derive_rows(rows, excluded) do

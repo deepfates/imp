@@ -588,7 +588,7 @@ Executable evidence:
 - test: `test/gepa_contract_artifact_test.exs`
 - test: `test/gepa_replication_artifact_test.exs`
 - docs: `docs/ADVANCED.md`
-- docs: `examples/local_gepa_banking77/README.md`
+- docs: [examples/local_gepa_banking77/README.md](https://github.com/deepfates/imp/blob/main/examples/local_gepa_banking77/README.md) (repository only, not shipped in the package)
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json`
 - artifact: `benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json`

@@ -231,18 +231,6 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
              "Imp OTP workflow fresh-process load passed: linked result/artifact, harbor/high with 2 predictors x 4 demos" do
       Mix.raise("packaged deployment workflow did not load in a fresh OS process")
     end
-
-    banking_output =
-      offline_mix!(
-        deployment_dir,
-        ["run", "--no-start", "--no-compile", "--no-deps-check", "banking77_mipro.exs"],
-        [{"IMP_BANKING77_MIPRO_MODE", "disabled"} | env]
-      )
-
-    unless banking_output =~ ~s("status":"provider_disabled") and
-             banking_output =~ ~s("task":5064) and banking_output =~ ~s("optimizer":30) do
-      Mix.raise("packaged Banking77 MIPRO entry did not pass provider-disabled preflight")
-    end
   end
 
   defp write_consumer!(consumer_dir, package_dir, lockfile) do

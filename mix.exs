@@ -179,25 +179,8 @@ defmodule Imp.MixProject do
     # Local benchmark/evidence control files remain available only to a
     # top-level dev/test checkout.
     (runtime_source_files() ++
-       Path.wildcard("examples/deployment/**/*") ++
-       Path.wildcard("examples/local_copro_banking77/**/*") ++
-       Path.wildcard("examples/local_gepa_banking77/**/*") ++
-       Path.wildcard("examples/local_grpo_banking77/**/*") ++
-       Path.wildcard("examples/local_grpo_opaque_banking77/**/*") ++
-       Path.wildcard("examples/local_infer_rules_banking77/**/*") ++
-       Path.wildcard("examples/local_knn_few_shot_banking77/**/*") ++
-       Path.wildcard("examples/local_mipro_banking77/**/*") ++
-       Path.wildcard("examples/local_optimize_anything_retry_policy/**/*") ++
-       Path.wildcard("examples/local_random_search_banking77/**/*") ++
-       Path.wildcard("examples/local_signature_optimizer_banking77/**/*") ++
-       Path.wildcard("examples/local_simba_banking77/**/*") ++
-       Path.wildcard("examples/local_simba_trec/**/*") ++
+       deployment_example_files() ++
        Path.wildcard("examples/provider_free_ticket_router/**/*") ++
-       [
-         "examples/matched_instruction_optimizers_trec/README.md",
-         "benchmarks/data/grpo-usefulness-banking77-v1.json",
-         "benchmarks/data/simba-trec-coarse-v1.json"
-       ] ++
        product_docs() ++
        livebooks() ++
        [
@@ -212,6 +195,21 @@ defmodule Imp.MixProject do
          "mix.exs"
        ])
     |> Enum.reject(&transient_package_path?/1)
+  end
+
+  defp deployment_example_files do
+    [
+      "examples/deployment/README.md",
+      "examples/deployment/load_workflow.exs",
+      "examples/deployment/mix.exs",
+      "examples/deployment/mix.lock",
+      "examples/deployment/run_workflow.exs",
+      "examples/deployment/lib/imp_deployment/application.ex",
+      "examples/deployment/lib/imp_deployment/callbacks.ex",
+      "examples/deployment/lib/imp_deployment/program_server.ex",
+      "examples/deployment/lib/imp_deployment/support_pipeline.ex",
+      "examples/deployment/lib/imp_deployment/workflow.ex"
+    ]
   end
 
   defp transient_package_path?(path) do

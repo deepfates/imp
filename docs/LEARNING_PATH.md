@@ -324,11 +324,12 @@ selected program, report, and artifact together with
 `Imp.Optimizer.GEPA.compile_with_artifact/5`; MIPROv2 and SIMBA use the shared
 `from_optimized_program/2` path demonstrated above after their own separate
 train and validation evaluation. The [API Guide](API_GUIDE.md#optimize-a-program)
-shows both forms, while the local
-[GEPA](../examples/local_gepa_banking77/README.md),
-[MIPROv2](../examples/local_mipro_banking77/README.md), and
-[SIMBA](../examples/local_simba_banking77/README.md) programs exercise the
-save/apply/restart lifecycle with real model runtimes.
+shows both forms. Repository-only research case studies for
+[GEPA](https://github.com/deepfates/imp/tree/main/examples/local_gepa_banking77),
+[MIPROv2](https://github.com/deepfates/imp/tree/main/examples/local_mipro_banking77),
+and [SIMBA](https://github.com/deepfates/imp/tree/main/examples/local_simba_banking77)
+exercise the save/apply/restart lifecycle with real model runtimes; they are
+not part of the packaged teaching surface.
 
 Treat either artifact as deployable program state: review and version it
 alongside the metric and evaluation data that justified promoting it. Artifact
