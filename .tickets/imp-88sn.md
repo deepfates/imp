@@ -469,3 +469,30 @@ prices, no-retry/no-fallback settings, and current key usage still require one
 immediate read-only preflight before provider authority. A contradiction or
 material rise near the target returns for review; it does not change the split,
 seeds, budget, or criterion.
+
+### Stage 1 terminal runtime stop
+
+The authorized run from exact clean `2a444d7` passed the immediate account and
+route/privacy/price preflight unchanged, then stopped during seed `2026072705`
+inside MIPRO setup. One Claude Sonnet dataset-summary call completed. Before a
+second summary transport, the public pinned-DSPy proposer renderer attempted
+`to_string/1` on an IFBench `kwargs` list containing maps and raised. MIPRO had
+not evaluated its internal baseline or a trial; Experiment had completed the
+baseline-selection stage in memory but emitted no completed Result. No test row
+was read, no Artifact was built, no fresh service ran, and seeds `2026072706/07`
+never started. This is an owning public MIPRO nested-value rendering defect, not
+an optimizer outcome; the frozen primary is unevaluated and Stage 2 remains
+dormant.
+
+The exact retained log is
+`examples/matched_instruction_family_ifbench/exercised-stopped-mipro-stage1.log`
+(SHA-256
+`009bc7fc3578c165e7691b7eea1972c18b4ea8cdc1dd7e0ff6355939848d1485`).
+Current-key usage moved from `$17.345262735` to `$17.459159985` during the run,
+a `$0.11389725` aggregate delta. Source order proves zero task transports and
+one optimizer transport; the account endpoint does not provide a request ID,
+so the dollar delta is reported as observed run-window key usage rather than
+manufactured per-request precision. The outer zsh wrapper subsequently failed
+to print Mix's exit status because it assigned the reserved `status` variable;
+that happened after Mix returned and did not cause or alter the preserved
+optimizer failure.

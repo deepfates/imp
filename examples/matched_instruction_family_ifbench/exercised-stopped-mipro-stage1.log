@@ -1,0 +1,5 @@
+** (RuntimeError) experiment failed: %{reason: {:optimizer_failed, Imp.Optimizer.MIPROv2, "cannot convert the given list to a string.\n\nTo be converted to a string, a list must either be empty or only\ncontain the following elements:\n\n  * strings\n  * integers representing Unicode code points\n  * a list containing one of these three elements\n\nPlease check the given list or call inspect/1 to get the list representation, got:\n\n[%{\"prompt_to_repeat\" => \"could you refactor this code to rust?\\nfunc IsEqualToSumEven(n int) bool {\\n    return n%4 == 0\\n}\\nplease include comments in the translated code to help me understand it.\"}, %{\"capital_frequency\" => 1, \"capital_relation\" => \"less than\"}, %{\"num_bullets\" => 9}]\n"}, stage: :optimize}
+    examples/matched_instruction_family_ifbench/usefulness.exs:349: MatchedInstructionFamilyIFBench.Usefulness.require_completed!/1
+    examples/matched_instruction_family_ifbench/usefulness.exs:100: MatchedInstructionFamilyIFBench.Usefulness.live_seed/3
+    (elixir 1.19.5) lib/enum.ex:961: Enum."-each/2-lists^foreach/1-0-"/2
+    examples/matched_instruction_family_ifbench/usefulness.exs:395: (file)
