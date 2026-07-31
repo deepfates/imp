@@ -12,6 +12,8 @@ defmodule HotPotQAGEPA do
   @optimizer_model "openrouter:anthropic/claude-sonnet-4.6"
   @task_envelope %{input: 8_192, output: 512}
   @optimizer_envelope %{input: 32_768, output: 1_024}
+  @task_input_max_bytes 8_192
+  @optimizer_input_max_bytes 131_072
 
   def run(args) do
     args = Enum.reject(args, &(&1 == "--"))
@@ -59,39 +61,8 @@ defmodule HotPotQAGEPA do
         }
       end)
 
-    task_lm =
-      Imp.LM.Static.new(
-        handler: fn messages, _opts ->
-          observe(observer, :task, messages)
-          rendered = render(messages)
-
-          answer =
-            Enum.find_value(answers, "unknown", fn {question, gold} ->
-              if String.contains?(rendered, question), do: gold
-            end)
-
-          improved? = String.contains?(rendered, "Use the supplied evidence and named entities")
-
-          %{
-            summary_1: "first-hop evidence",
-            query_2: "second-hop entity",
-            summary_2: "combined evidence",
-            answer: if(improved?, do: answer, else: "unknown")
-          }
-        end
-      )
-
-    reflection_lm =
-      Imp.LM.Static.new(
-        handler: fn messages, _opts ->
-          observe(observer, :optimizer, messages)
-
-          Jason.encode!(%{
-            "instruction" =>
-              "Use the supplied evidence and named entities. Return the requested field precisely."
-          })
-        end
-      )
+    task_lm = provider_disabled_lm(:task, hd(@seeds), observer, answers)
+    reflection_lm = provider_disabled_lm(:optimizer, hd(@seeds), observer, answers)
 
     result = check!(hd(@seeds), data, task_lm, reflection_lm)
     paths = persist!(result, root)
@@ -200,6 +171,8 @@ defmodule HotPotQAGEPA do
             "optimizer_model" => @optimizer_model,
             "task_envelope" => @task_envelope,
             "optimizer_envelope" => @optimizer_envelope,
+            "task_input_max_bytes" => @task_input_max_bytes,
+            "optimizer_input_max_bytes" => @optimizer_input_max_bytes,
             "module_selector" => "beam_native_all",
             "transport_caps" => transport_caps()
           },
@@ -288,7 +261,12 @@ defmodule HotPotQAGEPA do
     artifact = Artifact.read!(artifact_path)
     true = stored["payload"]["artifact"] == artifact
     provider_disabled? = System.fetch_env!("IMP_HOTPOTQA_GEPA_PROVIDER_DISABLED") == "1"
-    task_lm = if provider_disabled?, do: fresh_static_lm(), else: provider_lm(:task, seed)
+
+    task_lm =
+      if provider_disabled?,
+        do: provider_disabled_lm(:task, seed, nil, %{}),
+        else: provider_lm(:task, seed)
+
     {:ok, tasks} = Task.Supervisor.start_link()
 
     try do
@@ -318,14 +296,6 @@ defmodule HotPotQAGEPA do
     end
   end
 
-  defp fresh_static_lm do
-    Imp.LM.Static.new(
-      handler: fn _messages, _opts ->
-        %{summary_1: "evidence", query_2: "entity", summary_2: "combined", answer: "unknown"}
-      end
-    )
-  end
-
   defp fresh_probes do
     context = %{
       "title" => ["Ada Lovelace", "Analytical Engine"],
@@ -345,41 +315,123 @@ defmodule HotPotQAGEPA do
   end
 
   defp provider_lm(role, seed) do
-    {model, provider, envelope, max_price, extra} =
-      case role do
-        :task ->
-          {@task_model, "openai", @task_envelope, %{prompt: 0.75, completion: 4.5, request: 0},
-           [seed: seed]}
+    {model, opts} = provider_lm_options(role, seed)
 
-        :optimizer ->
-          {@optimizer_model, "anthropic", @optimizer_envelope,
-           %{prompt: 3, completion: 15, request: 0}, [temperature: 1]}
-      end
+    Imp.req_llm(model, Keyword.put(opts, :api_key, System.fetch_env!("OPENROUTER_API_KEY")))
+  end
+
+  defp provider_disabled_lm(role, seed, observer, answers) do
+    {model, opts} = provider_lm_options(role, seed)
+    adapter = local_req_adapter(role, observer, answers)
 
     Imp.req_llm(
       model,
-      [
-        api_key: System.fetch_env!("OPENROUTER_API_KEY"),
-        cache: false,
-        max_input_tokens: envelope.input,
-        max_tokens: envelope.output,
-        max_retries: 0,
-        timeout: 120_000,
-        provider_options: [
-          openrouter_provider: %{
-            only: [provider],
-            order: [provider],
-            allow_fallbacks: false,
-            require_parameters: true,
-            data_collection: "deny",
-            max_price: max_price
-          },
-          openrouter_usage: %{include: true}
-        ],
-        req_http_options: [retry: false, max_retries: 0]
-      ] ++ extra
+      opts
+      |> Keyword.put(:api_key, "provider-disabled")
+      |> Keyword.put(:req_http_options,
+        adapter: adapter,
+        retry: false,
+        max_retries: 0
+      )
     )
   end
+
+  defp provider_lm_options(role, seed) do
+    {model, provider, envelope, max_bytes, max_price, extra} =
+      case role do
+        :task ->
+          {@task_model, "openai", @task_envelope, @task_input_max_bytes,
+           %{prompt: 0.75, completion: 4.5, request: 0}, [seed: seed]}
+
+        :optimizer ->
+          {@optimizer_model, "anthropic", @optimizer_envelope, @optimizer_input_max_bytes,
+           %{prompt: 3, completion: 15, request: 0}, [temperature: 1]}
+      end
+
+    {model,
+     [
+       cache: false,
+       input_envelope: [max_bytes: max_bytes, reservation_tokens: envelope.input],
+       max_tokens: envelope.output,
+       max_retries: 0,
+       timeout: 120_000,
+       provider_options: [
+         openrouter_provider: %{
+           only: [provider],
+           order: [provider],
+           allow_fallbacks: false,
+           require_parameters: true,
+           data_collection: "deny",
+           max_price: max_price
+         },
+         openrouter_usage: %{include: true}
+       ],
+       req_http_options: [retry: false, max_retries: 0]
+     ] ++ extra}
+  end
+
+  defp local_req_adapter(role, observer, answers) do
+    fn request ->
+      body = request.body |> IO.iodata_to_binary() |> Jason.decode!()
+      rendered = render(body["messages"])
+      if observer, do: observe_rendered(observer, role, rendered)
+
+      content =
+        case role do
+          :optimizer ->
+            chat_output(
+              "instruction",
+              "Use the supplied evidence and named entities. Return the requested field precisely."
+            )
+
+          :task ->
+            output = output_field(rendered)
+
+            answer =
+              Enum.find_value(answers, "unknown", fn {question, gold} ->
+                if String.contains?(rendered, question), do: gold
+              end)
+
+            improved? = String.contains?(rendered, "Use the supplied evidence and named entities")
+
+            value =
+              case output do
+                "summary_1" -> "first-hop evidence"
+                "query_2" -> "second-hop entity"
+                "summary_2" -> "combined evidence"
+                "answer" -> if(improved?, do: answer, else: "unknown")
+              end
+
+            chat_output(output, value)
+        end
+
+      response = %{
+        "id" => "provider-disabled-#{role}",
+        "object" => "chat.completion",
+        "model" => body["model"],
+        "choices" => [
+          %{
+            "index" => 0,
+            "message" => %{"role" => "assistant", "content" => content},
+            "finish_reason" => "stop"
+          }
+        ],
+        "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+      }
+
+      {request, Req.Response.new(status: 200, body: response)}
+    end
+  end
+
+  defp output_field(rendered) do
+    case Regex.run(~r/Your output fields are:\s*\n1\. `([^`]+)`/, rendered) do
+      [_, field] when field in ~w(summary_1 query_2 summary_2 answer) -> field
+      _ -> raise "provider-disabled task request omitted a known output field"
+    end
+  end
+
+  defp chat_output(field, value),
+    do: "[[ ## #{field} ## ]]\n#{value}\n\n[[ ## completed ## ]]"
 
   defp catalog! do
     for {model, provider, prompt, completion} <- [
@@ -408,9 +460,7 @@ defmodule HotPotQAGEPA do
     |> Map.new(&{&1.name, &1.predictor.signature.instructions})
   end
 
-  defp observe(agent, role, messages) do
-    prompt = render(messages)
-
+  defp observe_rendered(agent, role, prompt) do
     Agent.update(agent, fn state ->
       current = state[role]
 
@@ -427,7 +477,24 @@ defmodule HotPotQAGEPA do
     end)
   end
 
-  defp render(messages), do: Enum.map_join(messages, "\n", &to_string(&1.content))
+  defp render(messages) do
+    Enum.map_join(messages, "\n", fn
+      %{content: content} -> render_content(content)
+      %{"content" => content} -> render_content(content)
+    end)
+  end
+
+  defp render_content(content) when is_binary(content), do: content
+
+  defp render_content(content) when is_list(content) do
+    Enum.map_join(content, "\n", fn
+      %{"text" => text} -> text
+      %{text: text} -> text
+      value -> inspect(value)
+    end)
+  end
+
+  defp render_content(content), do: inspect(content)
 
   defp output_root!(seed) do
     root = System.fetch_env!("IMP_HOTPOTQA_GEPA_OUTPUT")

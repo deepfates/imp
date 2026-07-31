@@ -5,6 +5,14 @@ defmodule Imp.Clients.ReqLLM do
   Imp owns signatures, adapters, optimizers, traces, and evaluation. `req_llm`
   owns provider/model resolution, Req/Finch transport, streaming, provider
   option translation, and canonical response structs.
+
+  `:input_envelope` is an Imp-owned safety option. It accepts a positive
+  `:max_bytes` guard and an optional positive `:reservation_tokens` value. Imp
+  measures the rendered message content before cache lookup or transport,
+  raises `Imp.OperationalSafetyError` when the byte guard is exceeded, and
+  removes the envelope before calling ReqLLM. The token value records a pricing
+  or capacity reservation; without a model tokenizer it is not treated as an
+  exact token counter.
   """
 
   @behaviour Imp.LM
@@ -50,9 +58,12 @@ defmodule Imp.Clients.ReqLLM do
   def new(model_spec, opts \\ []) do
     {req_module, nested_opts} = validate_new_opts!(opts)
 
+    merged_opts = Keyword.merge(nested_opts, Keyword.drop(opts, [:opts, :req_module]))
+    validate_input_envelope_option!(merged_opts, "#{inspect(__MODULE__)}.new/2")
+
     %__MODULE__{
       model: model_spec,
-      opts: Keyword.merge(nested_opts, Keyword.drop(opts, [:opts, :req_module])),
+      opts: merged_opts,
       req_module: req_module
     }
   end
@@ -164,6 +175,9 @@ defmodule Imp.Clients.ReqLLM do
       lm.opts
       |> Keyword.merge(opts)
       |> Keyword.pop(:rollout_id)
+
+    {input_envelope, opts} = Keyword.pop(opts, :input_envelope)
+    enforce_input_envelope!(messages, input_envelope)
 
     opts =
       opts
@@ -346,6 +360,9 @@ defmodule Imp.Clients.ReqLLM do
       |> Keyword.merge(opts)
       |> Keyword.pop(:rollout_id)
 
+    {input_envelope, opts} = Keyword.pop(opts, :input_envelope)
+    enforce_input_envelope!(messages, input_envelope)
+
     opts =
       opts
       |> normalize_opts()
@@ -401,6 +418,7 @@ defmodule Imp.Clients.ReqLLM do
 
   defp validate_call_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
+      validate_input_envelope_option!(opts, context)
       opts
     else
       raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
@@ -410,6 +428,105 @@ defmodule Imp.Clients.ReqLLM do
   defp validate_call_opts!(opts, context) do
     raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
   end
+
+  defp validate_input_envelope_option!(opts, context) do
+    case Keyword.fetch(opts, :input_envelope) do
+      :error -> :ok
+      {:ok, value} -> validate_input_envelope!(value, context)
+    end
+  end
+
+  defp validate_input_envelope!(envelope, context) when is_list(envelope) do
+    unless Keyword.keyword?(envelope) do
+      raise ArgumentError,
+            "#{context}: :input_envelope must be a keyword list, got: #{inspect(envelope)}"
+    end
+
+    keys = Keyword.keys(envelope)
+    unknown = keys -- [:max_bytes, :reservation_tokens]
+
+    cond do
+      length(keys) != length(Enum.uniq(keys)) ->
+        raise ArgumentError, "#{context}: :input_envelope contains duplicate keys"
+
+      unknown != [] ->
+        raise ArgumentError,
+              "#{context}: :input_envelope has unsupported keys: #{inspect(unknown)}"
+
+      not Keyword.has_key?(envelope, :max_bytes) ->
+        raise ArgumentError, "#{context}: :input_envelope requires :max_bytes"
+
+      not positive_integer?(envelope[:max_bytes]) ->
+        raise ArgumentError,
+              "#{context}: :input_envelope :max_bytes must be a positive integer"
+
+      Keyword.has_key?(envelope, :reservation_tokens) and
+          not positive_integer?(envelope[:reservation_tokens]) ->
+        raise ArgumentError,
+              "#{context}: :input_envelope :reservation_tokens must be a positive integer"
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_input_envelope!(value, context) do
+    raise ArgumentError,
+          "#{context}: :input_envelope must be a keyword list, got: #{inspect(value)}"
+  end
+
+  defp positive_integer?(value), do: is_integer(value) and value > 0
+
+  defp enforce_input_envelope!(_messages, nil), do: :ok
+
+  defp enforce_input_envelope!(messages, envelope) do
+    actual_bytes = rendered_message_bytes(messages)
+    max_bytes = Keyword.fetch!(envelope, :max_bytes)
+
+    if actual_bytes > max_bytes do
+      raise Imp.OperationalSafetyError,
+        kind: :budget,
+        reason: %{
+          boundary: :req_llm_input_envelope,
+          actual_bytes: actual_bytes,
+          max_bytes: max_bytes,
+          reservation_tokens: Keyword.get(envelope, :reservation_tokens)
+        },
+        message:
+          "ReqLLM input envelope exceeded before transport: rendered message content " <>
+            "was #{actual_bytes} bytes, limit is #{max_bytes} bytes"
+    end
+
+    :ok
+  end
+
+  defp rendered_message_bytes(messages) when is_list(messages) do
+    Enum.reduce(messages, 0, fn message, total -> total + rendered_value_bytes(message) end)
+  end
+
+  defp rendered_message_bytes(value), do: rendered_value_bytes(value)
+
+  defp rendered_value_bytes(value) when is_binary(value), do: byte_size(value)
+
+  defp rendered_value_bytes(%_{} = struct) do
+    struct |> Map.from_struct() |> rendered_value_bytes()
+  end
+
+  defp rendered_value_bytes(value) when is_map(value) do
+    Enum.reduce(value, 0, fn {_key, nested}, total ->
+      total + rendered_value_bytes(nested)
+    end)
+  end
+
+  defp rendered_value_bytes(value) when is_list(value) do
+    Enum.reduce(value, 0, fn nested, total -> total + rendered_value_bytes(nested) end)
+  end
+
+  defp rendered_value_bytes(value) when is_tuple(value) do
+    value |> Tuple.to_list() |> rendered_value_bytes()
+  end
+
+  defp rendered_value_bytes(_value), do: 0
 
   defp maybe_put_rollout_id(opts, nil), do: opts
   defp maybe_put_rollout_id(opts, rollout_id), do: Keyword.put(opts, :rollout_id, rollout_id)

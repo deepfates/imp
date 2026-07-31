@@ -1722,6 +1722,92 @@ defmodule ReqLLMClientTest do
     refute_received {^ref, [:imp, :lm, :transport, :attempt], _, _}
   end
 
+  test "Imp input envelope is enforced before transport and never reaches ReqLLM options" do
+    owner = self()
+
+    adapter = fn request ->
+      send(owner, {:input_envelope_transport, request.body})
+
+      body = %{
+        "id" => "input-envelope-local",
+        "object" => "chat.completion",
+        "model" => "input-envelope-model",
+        "choices" => [
+          %{
+            "index" => 0,
+            "message" => %{"role" => "assistant", "content" => ~s({"answer":"ok"})},
+            "finish_reason" => "stop"
+          }
+        ],
+        "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+      }
+
+      {request, Req.Response.new(status: 200, body: body)}
+    end
+
+    lm =
+      Imp.req_llm(
+        %{
+          provider: :openai,
+          id: "input-envelope-model",
+          model: "input-envelope-model",
+          base_url: "https://provider-disabled.invalid/v1"
+        },
+        api_key: "provider-disabled",
+        cache: false,
+        input_envelope: [max_bytes: 64, reservation_tokens: 32],
+        max_retries: 0,
+        req_http_options: [adapter: adapter, retry: false, max_retries: 0]
+      )
+
+    assert {:ok, _response} =
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "within envelope"}], [])
+
+    assert_received {:input_envelope_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    refute Map.has_key?(request, "input_envelope")
+
+    guarded = %{lm | opts: Keyword.put(lm.opts, :input_envelope, max_bytes: 4)}
+
+    assert_raise Imp.OperationalSafetyError,
+                 ~r/ReqLLM input envelope exceeded before transport/,
+                 fn ->
+                   Imp.Clients.ReqLLM.generate(
+                     guarded,
+                     [%{role: :user, content: "too large"}],
+                     []
+                   )
+                 end
+
+    refute_received {:input_envelope_transport, _}
+
+    assert_raise Imp.OperationalSafetyError,
+                 ~r/ReqLLM input envelope exceeded before transport/,
+                 fn ->
+                   Imp.Clients.ReqLLM.stream(
+                     guarded,
+                     [%{role: :user, content: "too large"}],
+                     []
+                   )
+                 end
+
+    refute_received {:input_envelope_transport, _}
+  end
+
+  test "Imp input envelope rejects invalid configuration at construction" do
+    for envelope <- [
+          [],
+          [max_bytes: 0],
+          [max_bytes: 10, reservation_tokens: 0],
+          [max_bytes: 10, tokenizer: :invented],
+          [max_bytes: 10, max_bytes: 20]
+        ] do
+      assert_raise ArgumentError, ~r/:input_envelope/, fn ->
+        Imp.req_llm("openai:gpt-test", input_envelope: envelope)
+      end
+    end
+  end
+
   test "ReqLLM lifecycle starts correspond to real Chat-to-JSON fallback transports" do
     {:ok, counter} = Agent.start_link(fn -> 0 end)
 

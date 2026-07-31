@@ -134,6 +134,8 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
 
     assert_in_delta result["reservation_usd"], 28.422144, 1.0e-9
     assert result["fresh_service"] == "passed"
+    assert result["prompt_bytes"]["task"] <= 8_192
+    assert result["prompt_bytes"]["optimizer"] <= 131_072
   end
 
   test "entry uses public product APIs and names its BEAM-native selector" do
@@ -146,6 +148,9 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
     assert source =~ "ProgramServer.reload_parameters"
     assert source =~ "allow_fallbacks: false"
     assert source =~ "data_collection: \"deny\""
+    assert source =~ "input_envelope: [max_bytes: max_bytes, reservation_tokens: envelope.input]"
+    assert source =~ "Req.Response.new(status: 200"
+    refute source =~ "max_input_tokens:"
 
     refute source =~ "Imp.BenchmarkTruth"
     refute source =~ "bench/"

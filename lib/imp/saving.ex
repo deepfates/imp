@@ -1410,6 +1410,7 @@ defmodule Imp.Saving do
     "headers" => :headers,
     "base_url" => :base_url,
     "request_id" => :request_id,
+    "input_envelope" => :input_envelope,
     "req_http_options" => :req_http_options
   }
 
@@ -1439,7 +1440,33 @@ defmodule Imp.Saving do
   defp decode_req_llm_option_value!(:req_http_options, value),
     do: decode_req_http_options!(value)
 
+  defp decode_req_llm_option_value!(:input_envelope, value),
+    do: decode_req_llm_input_envelope!(value)
+
   defp decode_req_llm_option_value!(key, value), do: decode_config_value(key, value)
+
+  defp decode_req_llm_input_envelope!(entries) when is_list(entries) do
+    decoded =
+      decode_allowlisted_entries!(
+        entries,
+        %{"max_bytes" => :max_bytes, "reservation_tokens" => :reservation_tokens},
+        "saved ReqLLM input_envelope",
+        fn key, value ->
+          require_positive_integer!(value, "ReqLLM input_envelope #{key}")
+        end
+      )
+
+    unless Keyword.has_key?(decoded, :max_bytes) do
+      raise ArgumentError, "saved ReqLLM input_envelope requires max_bytes"
+    end
+
+    decoded
+  end
+
+  defp decode_req_llm_input_envelope!(value) do
+    raise ArgumentError,
+          "saved ReqLLM input_envelope must be a list, got: #{inspect(value)}"
+  end
 
   defp decode_req_http_options!(options) when is_list(options) do
     decode_allowlisted_entries!(

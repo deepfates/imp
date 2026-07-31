@@ -1661,10 +1661,16 @@ expected 912. The generic 8/4/32 stopper envelope remains semantic 32, legal
 44, at most 12 reflections and 6 iterations; the legal per-seed task ceiling is
 therefore `4 * (24 + 44 + 24 + 72 + 72 + 4) = 960`.
 
-Actual provider-disabled rendered maxima were 1,376 `o200k_base` task tokens
-(5,028 UTF-8 bytes) and 19,505 reflection tokens (83,895 bytes). The frozen
-request envelopes are therefore 8,192 input / 512 output for the task model
-and 32,768 input / 1,024 output for reflection. At the last validated route
+The original Static-LM capture measured 1,376 `o200k_base` task tokens
+(5,028 UTF-8 bytes) and 19,505 reflection tokens (83,895 bytes). The repaired
+real ReqLLM provider-disabled path measures 5,099 task bytes and 83,942
+reflection bytes. The frozen reservations remain 8,192 input / 512 output for
+the task model and 32,768 input / 1,024 output for reflection. Imp has no
+packaged tokenizer that can enforce those model-specific token counts without
+a new dependency, so the reusable live guard is explicit instead: 8,192
+rendered-content bytes for task calls and 131,072 bytes for reflections. The
+token figures own conservative pricing/capacity reservation; the byte figures
+own pretransport operational safety. At the last validated route
 prices (`$0.75/$4.50` and `$3/$15` per million input/output tokens), the legal
 three-seed reservation is:
 
@@ -1690,3 +1696,30 @@ selector, it earns no pinned-GEPA parity or matched-upstream claim.
 the complete public Experiment/GEPA/Result/Artifact/fresh-ProgramServer
 lifecycle. No benchmark module, scorer bridge, coordinator, manifest, ledger,
 dashboard, or new result schema is involved.
+
+### Zero-call live stop and reusable input-envelope repair
+
+The first authorized live attempt stopped during seed `2026080101` before any
+provider transport or scientific outcome. `max_input_tokens` had been passed
+as if it were a ReqLLM generation option; ReqLLM 1.17.1 rejected it locally.
+OpenRouter account usage was unchanged at `$21.345753735`, seeds 2/3 never
+started, and no Result or Artifact existed. The immutable private log SHA-256
+is `b84182441d5d4b3dd922a604cb0e74ccbc192535e0d225b19c2062c91bf86a45`.
+
+The owning repair adds an Imp-owned `input_envelope` at the public ReqLLM
+client boundary. It validates a positive byte guard plus optional token
+reservation at construction, measures rendered message content before cache or
+transport, raises typed `OperationalSafetyError(kind: :budget)` when exceeded,
+and removes the option before ReqLLM parsing/provider translation. Saved
+ReqLLM programs round-trip the strict allowlisted shape. No-envelope callers
+retain their prior behavior.
+
+The provider-disabled HotPot entry now uses the actual ReqLLM parser and Req
+adapter for task, reflection, and fresh-service calls rather than `Imp.LM.Static`.
+Its full deterministic execution again changed all four predictors, used 32
+metric examples and 8 reflections, selected/wrote/read/applied the Artifact,
+and passed fresh concurrent service. This exonerates the repaired wrapper and
+preserves the frozen opportunity. A fresh from-scratch successor is
+scientifically valid because the stopped attempt made zero transports and no
+selection/test observation, but it still requires separate launch disposition;
+the repair does not authorize a relaunch.

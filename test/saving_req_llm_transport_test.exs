@@ -63,6 +63,35 @@ defmodule Imp.SavingReqLLMTransportTest do
     assert config == [json_fallback: false]
   end
 
+  test "saved ReqLLM input envelope round-trips without admitting unknown keys" do
+    program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.req_llm("openai:gpt-test",
+            input_envelope: [max_bytes: 8_192, reservation_tokens: 4_096]
+          )
+      )
+
+    dumped = program |> Imp.dump() |> json_round_trip()
+    loaded = Imp.load(dumped)
+
+    assert loaded.lm.opts[:input_envelope] == [max_bytes: 8_192, reservation_tokens: 4_096]
+
+    opts = get_in(dumped, ["lm", "opts"])
+
+    assert_raise ArgumentError, ~r/unknown saved ReqLLM input_envelope key/, fn ->
+      dumped
+      |> put_in(
+        ["lm", "opts"],
+        replace_option(opts, "input_envelope", [
+          ["max_bytes", 8_192],
+          ["tokenizer", "untrusted"]
+        ])
+      )
+      |> Imp.load()
+    end
+  end
+
   test "unknown and malformed saved ReqLLM transport options fail closed" do
     dumped = stopped_program_shape() |> Imp.dump() |> json_round_trip()
     opts = get_in(dumped, ["lm", "opts"])
