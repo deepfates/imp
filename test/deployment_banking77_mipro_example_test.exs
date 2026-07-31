@@ -2,9 +2,9 @@ defmodule DeploymentBanking77MIPROExampleTest do
   use ExUnit.Case, async: true
 
   @root Path.expand("../examples/deployment", __DIR__)
-  @data Path.join(@root, "data/banking77-mipro-stage1.json")
+  @data Path.join(@root, "data/banking77-mipro-confirmatory-v1.json")
   @script Path.join(@root, "banking77_mipro.exs")
-  @data_sha "4934ebc54b06614343461c2fe79c7ca4807892c1b645cbb30790e945dcb2c34a"
+  @data_sha "6550e65edf66353af54d74daa48778a98d747052cb85ad05a64a9ad5e3680e86"
 
   Code.require_file(Path.join(@root, "lib/imp_deployment/callbacks.ex"))
   Code.require_file(Path.join(@root, "lib/imp_deployment/support_pipeline.ex"))
@@ -20,24 +20,34 @@ defmodule DeploymentBanking77MIPROExampleTest do
     assert sha256(bytes) == @data_sha
     payload = Jason.decode!(bytes)
 
-    assert payload["condition_id"] == "imp-88sn-banking77-mipro-v1"
+    assert payload["condition_id"] == "imp-88sn-banking77-mipro-confirmatory-v1"
+
+    assert payload["payload_sha256"] ==
+             "sha256:fc48ff2a8d4408eeaf917e7df4c32f80cfd162b1dcb542f467971ade217b71e3"
+
+    assert payload["derivation"]["seed"] == "imp-88sn-banking77-mipro-confirmatory-v1"
+
+    assert payload["derivation"]["base_commit"] ==
+             "868923a0a103ae4fbddc4f20b311a45bc940035d"
+
     assert payload["source"]["revision"] == "796a4623935746f71378f0ebd435635a8ce08e50"
 
     assert payload["source"]["snapshot_sha256"] ==
              "5b2420944b57c674ec91b330bd5ab015d4637873488556cbf743c14291f46d00"
 
     assert payload["digests"] == %{
-             "train" => "sha256:ec42891dc7c5bece39bf0f059ede3213b482a1276ab15b7a634e7d0974071e44",
+             "train" => "sha256:ae934e51f39eadf632b93a7715294acd601d23c693f5f5f119adb5584448cfa9",
              "selection" =>
-               "sha256:3312228c66b7890b9d632529ffde2a398f56a8fe2d1f0b6600bd041351d45ddd",
-             "test" => "sha256:dc921b772196f885e051678b5db228e8b0ade676eeea1bb85dafdaf12ae2e502"
+               "sha256:aa5cdb1b33e1ad06c1905505f4b23ff01a741c4f0000d855a4545488ff70f1ea",
+             "test" => "sha256:09f9850284f4ce70dd18c3e0dd77c6c18eead80b27ccb375c96a178b3b7f9f99"
            }
 
-    assert payload["exposure"]["files_considered"] == 85
-    assert payload["exposure"]["files_readable"] == 85
     assert payload["exposure"]["errors"] == []
-    assert payload["exposure"]["coordinate_count"] == 240
-    assert payload["exposure"]["normalized_text_digest_count"] == 240
+    assert payload["exposure"]["coordinate_count"] == 336
+    assert payload["exposure"]["normalized_text_digest_count"] == 336
+
+    assert payload["derivation"]["availability_after_exclusion"]["test"] ==
+             Map.new(~w(15 16 27 32 38 45 53 70), &{&1, 24})
 
     exposed_coordinates =
       payload["exposure"]["coordinates"]
@@ -167,17 +177,17 @@ defmodule DeploymentBanking77MIPROExampleTest do
     refute_received :unexpected_lm_call
 
     caps = Banking77MIPRO.transport_caps()
-    assert caps.per_seed.task == 48 + 48 + 48 + 15 * 48 + 48 + 2 * 48 * 2 + 4 * 2
+    assert caps.per_seed.task == 3 * 48 + 48 + 48 + 15 * 48 + 3 * 48 + 3 * 192 + 4 * 2
     assert caps.per_seed.optimizer == 4 + 2 * 3
-    assert caps.stage == %{task: 3_336, optimizer: 30}
-    assert_in_delta caps.reservation_usd, 3_336 * 0.007104 + 30 * 0.08064, 1.0e-12
+    assert caps.stage == %{task: 5_064, optimizer: 30}
+    assert_in_delta caps.reservation_usd, 5_064 * 0.007104 + 30 * 0.08064, 1.0e-12
 
-    # Outside bootstrap, 1,064 task transports are fixed per seed. The single
+    # Outside bootstrap, 1,640 task transports are fixed per seed. The single
     # calling bootstrap arm may accept two rows immediately (4 transports) or
     # scan all 24 two-stage rows (48 transports), so expected usage is outcome
-    # dependent while 1,112 remains the legal maximum.
-    assert 1_068 == 1_064 + 4
-    assert 1_112 == 1_064 + 48
+    # dependent while 1,688 remains the legal maximum.
+    assert 1_644 == 1_640 + 4
+    assert 1_688 == 1_640 + 48
   end
 
   test "finite diagnostics allow a real two-stage MIPRO artifact to continue into a fresh OS" do
@@ -275,7 +285,9 @@ defmodule DeploymentBanking77MIPROExampleTest do
                  evaluation_options: [
                    failure_score: 0.0,
                    max_concurrency: 1,
-                   max_errors: 10
+                   max_errors: 10,
+                   repetitions: 3,
+                   aggregation: :mean
                  ]
                )
              end)
@@ -285,6 +297,8 @@ defmodule DeploymentBanking77MIPROExampleTest do
     assert [%{index: 0}] = result.baseline_selection.errors
     assert result.optimized_selection.score == 1.0
     assert result.test.score == 1.0
+    assert result.repetition_summary.count == 3
+    assert result.repetition_summary.aggregation == :mean
 
     assert result.program.classify_route.demos != []
 
@@ -368,11 +382,14 @@ defmodule DeploymentBanking77MIPROExampleTest do
     assert receipt["status"] == "provider_disabled"
     assert receipt["provider_authority_used"] == false
     assert receipt["uses_ifbench_bridge"] == false
-    assert receipt["condition"] == "imp-88sn-banking77-mipro-modeled-v2"
+    assert receipt["condition"] == "imp-88sn-banking77-mipro-confirmatory-v1"
+    assert receipt["seeds"] == [2_026_073_101, 2_026_073_102, 2_026_073_103]
     assert receipt["optimizer"]["categorical_trials"] == 15
     assert receipt["optimizer"]["startup_random_trials"] == 9
     assert receipt["optimizer"]["modeled_trials"] == 6
-    assert receipt["call_caps"]["stage"] == %{"task" => 3_336, "optimizer" => 30}
+    assert receipt["optimizer"]["outer_repetitions"] == 3
+    assert receipt["optimizer"]["internal_objectives"] == "single_pass"
+    assert receipt["call_caps"]["stage"] == %{"task" => 5_064, "optimizer" => 30}
   end
 
   defp normalized_digest(text) do

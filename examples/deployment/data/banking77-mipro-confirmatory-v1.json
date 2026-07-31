@@ -1,0 +1,3538 @@
+{
+  "artifact_type": "imp_banking77_mipro_confirmatory_dataset",
+  "condition_id": "imp-88sn-banking77-mipro-confirmatory-v1",
+  "derivation": {
+    "availability_after_exclusion": {
+      "test": {
+        "15": 24,
+        "16": 24,
+        "27": 24,
+        "32": 24,
+        "38": 24,
+        "45": 24,
+        "53": 24,
+        "70": 24
+      },
+      "train": {
+        "15": 161,
+        "16": 142,
+        "27": 107,
+        "32": 86,
+        "38": 80,
+        "45": 133,
+        "53": 135,
+        "70": 87
+      }
+    },
+    "base_commit": "868923a0a103ae4fbddc4f20b311a45bc940035d",
+    "exclusion": "exclude all 336 retained source coordinates and normalized-text digests before ordering",
+    "normalization": "Unicode NFKC, casefold, collapse Unicode whitespace, strip",
+    "ordering": "sha256(seed:source_split:source_label_id:normalized_text_sha256), then raw UTF-8 sha256 and source_index only as deterministic collision tie-breakers",
+    "seed": "imp-88sn-banking77-mipro-confirmatory-v1",
+    "split_policy": "per label take first 3 remaining source-train rows as train, next 3 as selection, and first 6 remaining source-test rows as test"
+  },
+  "digests": {
+    "selection": "sha256:aa5cdb1b33e1ad06c1905505f4b23ff01a741c4f0000d855a4545488ff70f1ea",
+    "test": "sha256:09f9850284f4ce70dd18c3e0dd77c6c18eead80b27ccb375c96a178b3b7f9f99",
+    "train": "sha256:ae934e51f39eadf632b93a7715294acd601d23c693f5f5f119adb5584448cfa9"
+  },
+  "exposure": {
+    "coordinate_count": 336,
+    "coordinates": [
+      {
+        "index": 82,
+        "source_id": "banking77-796a-test-82",
+        "split": "test"
+      },
+      {
+        "index": 84,
+        "source_id": "banking77-796a-test-84",
+        "split": "test"
+      },
+      {
+        "index": 88,
+        "source_id": "banking77-796a-test-88",
+        "split": "test"
+      },
+      {
+        "index": 89,
+        "source_id": "banking77-796a-test-89",
+        "split": "test"
+      },
+      {
+        "index": 91,
+        "source_id": "banking77-796a-test-91",
+        "split": "test"
+      },
+      {
+        "index": 93,
+        "source_id": "banking77-796a-test-93",
+        "split": "test"
+      },
+      {
+        "index": 96,
+        "source_id": "banking77-796a-test-96",
+        "split": "test"
+      },
+      {
+        "index": 99,
+        "source_id": "banking77-796a-test-99",
+        "split": "test"
+      },
+      {
+        "index": 100,
+        "source_id": "banking77-796a-test-100",
+        "split": "test"
+      },
+      {
+        "index": 103,
+        "source_id": "banking77-796a-test-103",
+        "split": "test"
+      },
+      {
+        "index": 104,
+        "source_id": "banking77-796a-test-104",
+        "split": "test"
+      },
+      {
+        "index": 109,
+        "source_id": "banking77-796a-test-109",
+        "split": "test"
+      },
+      {
+        "index": 111,
+        "source_id": "banking77-796a-test-111",
+        "split": "test"
+      },
+      {
+        "index": 114,
+        "source_id": "banking77-796a-test-114",
+        "split": "test"
+      },
+      {
+        "index": 118,
+        "source_id": "banking77-796a-test-118",
+        "split": "test"
+      },
+      {
+        "index": 119,
+        "source_id": "banking77-796a-test-119",
+        "split": "test"
+      },
+      {
+        "index": 800,
+        "source_id": "banking77-796a-test-800",
+        "split": "test"
+      },
+      {
+        "index": 801,
+        "source_id": "banking77-796a-test-801",
+        "split": "test"
+      },
+      {
+        "index": 802,
+        "source_id": "banking77-796a-test-802",
+        "split": "test"
+      },
+      {
+        "index": 803,
+        "source_id": "banking77-796a-test-803",
+        "split": "test"
+      },
+      {
+        "index": 804,
+        "source_id": "banking77-796a-test-804",
+        "split": "test"
+      },
+      {
+        "index": 805,
+        "source_id": "banking77-796a-test-805",
+        "split": "test"
+      },
+      {
+        "index": 806,
+        "source_id": "banking77-796a-test-806",
+        "split": "test"
+      },
+      {
+        "index": 807,
+        "source_id": "banking77-796a-test-807",
+        "split": "test"
+      },
+      {
+        "index": 808,
+        "source_id": "banking77-796a-test-808",
+        "split": "test"
+      },
+      {
+        "index": 809,
+        "source_id": "banking77-796a-test-809",
+        "split": "test"
+      },
+      {
+        "index": 812,
+        "source_id": "banking77-796a-test-812",
+        "split": "test"
+      },
+      {
+        "index": 813,
+        "source_id": "banking77-796a-test-813",
+        "split": "test"
+      },
+      {
+        "index": 815,
+        "source_id": "banking77-796a-test-815",
+        "split": "test"
+      },
+      {
+        "index": 823,
+        "source_id": "banking77-796a-test-823",
+        "split": "test"
+      },
+      {
+        "index": 825,
+        "source_id": "banking77-796a-test-825",
+        "split": "test"
+      },
+      {
+        "index": 834,
+        "source_id": "banking77-796a-test-834",
+        "split": "test"
+      },
+      {
+        "index": 1080,
+        "source_id": "banking77-796a-test-1080",
+        "split": "test"
+      },
+      {
+        "index": 1081,
+        "source_id": "banking77-796a-test-1081",
+        "split": "test"
+      },
+      {
+        "index": 1082,
+        "source_id": "banking77-796a-test-1082",
+        "split": "test"
+      },
+      {
+        "index": 1083,
+        "source_id": "banking77-796a-test-1083",
+        "split": "test"
+      },
+      {
+        "index": 1084,
+        "source_id": "banking77-796a-test-1084",
+        "split": "test"
+      },
+      {
+        "index": 1085,
+        "source_id": "banking77-796a-test-1085",
+        "split": "test"
+      },
+      {
+        "index": 1086,
+        "source_id": "banking77-796a-test-1086",
+        "split": "test"
+      },
+      {
+        "index": 1087,
+        "source_id": "banking77-796a-test-1087",
+        "split": "test"
+      },
+      {
+        "index": 1088,
+        "source_id": "banking77-796a-test-1088",
+        "split": "test"
+      },
+      {
+        "index": 1089,
+        "source_id": "banking77-796a-test-1089",
+        "split": "test"
+      },
+      {
+        "index": 1091,
+        "source_id": "banking77-796a-test-1091",
+        "split": "test"
+      },
+      {
+        "index": 1093,
+        "source_id": "banking77-796a-test-1093",
+        "split": "test"
+      },
+      {
+        "index": 1106,
+        "source_id": "banking77-796a-test-1106",
+        "split": "test"
+      },
+      {
+        "index": 1112,
+        "source_id": "banking77-796a-test-1112",
+        "split": "test"
+      },
+      {
+        "index": 1113,
+        "source_id": "banking77-796a-test-1113",
+        "split": "test"
+      },
+      {
+        "index": 1114,
+        "source_id": "banking77-796a-test-1114",
+        "split": "test"
+      },
+      {
+        "index": 1243,
+        "source_id": "banking77-796a-test-1243",
+        "split": "test"
+      },
+      {
+        "index": 1245,
+        "source_id": "banking77-796a-test-1245",
+        "split": "test"
+      },
+      {
+        "index": 1249,
+        "source_id": "banking77-796a-test-1249",
+        "split": "test"
+      },
+      {
+        "index": 1250,
+        "source_id": "banking77-796a-test-1250",
+        "split": "test"
+      },
+      {
+        "index": 1251,
+        "source_id": "banking77-796a-test-1251",
+        "split": "test"
+      },
+      {
+        "index": 1254,
+        "source_id": "banking77-796a-test-1254",
+        "split": "test"
+      },
+      {
+        "index": 1255,
+        "source_id": "banking77-796a-test-1255",
+        "split": "test"
+      },
+      {
+        "index": 1258,
+        "source_id": "banking77-796a-test-1258",
+        "split": "test"
+      },
+      {
+        "index": 1259,
+        "source_id": "banking77-796a-test-1259",
+        "split": "test"
+      },
+      {
+        "index": 1262,
+        "source_id": "banking77-796a-test-1262",
+        "split": "test"
+      },
+      {
+        "index": 1264,
+        "source_id": "banking77-796a-test-1264",
+        "split": "test"
+      },
+      {
+        "index": 1268,
+        "source_id": "banking77-796a-test-1268",
+        "split": "test"
+      },
+      {
+        "index": 1273,
+        "source_id": "banking77-796a-test-1273",
+        "split": "test"
+      },
+      {
+        "index": 1277,
+        "source_id": "banking77-796a-test-1277",
+        "split": "test"
+      },
+      {
+        "index": 1278,
+        "source_id": "banking77-796a-test-1278",
+        "split": "test"
+      },
+      {
+        "index": 1279,
+        "source_id": "banking77-796a-test-1279",
+        "split": "test"
+      },
+      {
+        "index": 1600,
+        "source_id": "banking77-796a-test-1600",
+        "split": "test"
+      },
+      {
+        "index": 1601,
+        "source_id": "banking77-796a-test-1601",
+        "split": "test"
+      },
+      {
+        "index": 1602,
+        "source_id": "banking77-796a-test-1602",
+        "split": "test"
+      },
+      {
+        "index": 1603,
+        "source_id": "banking77-796a-test-1603",
+        "split": "test"
+      },
+      {
+        "index": 1604,
+        "source_id": "banking77-796a-test-1604",
+        "split": "test"
+      },
+      {
+        "index": 1605,
+        "source_id": "banking77-796a-test-1605",
+        "split": "test"
+      },
+      {
+        "index": 1606,
+        "source_id": "banking77-796a-test-1606",
+        "split": "test"
+      },
+      {
+        "index": 1607,
+        "source_id": "banking77-796a-test-1607",
+        "split": "test"
+      },
+      {
+        "index": 1608,
+        "source_id": "banking77-796a-test-1608",
+        "split": "test"
+      },
+      {
+        "index": 1609,
+        "source_id": "banking77-796a-test-1609",
+        "split": "test"
+      },
+      {
+        "index": 1621,
+        "source_id": "banking77-796a-test-1621",
+        "split": "test"
+      },
+      {
+        "index": 1625,
+        "source_id": "banking77-796a-test-1625",
+        "split": "test"
+      },
+      {
+        "index": 1631,
+        "source_id": "banking77-796a-test-1631",
+        "split": "test"
+      },
+      {
+        "index": 1632,
+        "source_id": "banking77-796a-test-1632",
+        "split": "test"
+      },
+      {
+        "index": 1634,
+        "source_id": "banking77-796a-test-1634",
+        "split": "test"
+      },
+      {
+        "index": 1635,
+        "source_id": "banking77-796a-test-1635",
+        "split": "test"
+      },
+      {
+        "index": 1720,
+        "source_id": "banking77-796a-test-1720",
+        "split": "test"
+      },
+      {
+        "index": 1721,
+        "source_id": "banking77-796a-test-1721",
+        "split": "test"
+      },
+      {
+        "index": 1722,
+        "source_id": "banking77-796a-test-1722",
+        "split": "test"
+      },
+      {
+        "index": 1726,
+        "source_id": "banking77-796a-test-1726",
+        "split": "test"
+      },
+      {
+        "index": 1729,
+        "source_id": "banking77-796a-test-1729",
+        "split": "test"
+      },
+      {
+        "index": 1730,
+        "source_id": "banking77-796a-test-1730",
+        "split": "test"
+      },
+      {
+        "index": 1731,
+        "source_id": "banking77-796a-test-1731",
+        "split": "test"
+      },
+      {
+        "index": 1732,
+        "source_id": "banking77-796a-test-1732",
+        "split": "test"
+      },
+      {
+        "index": 1736,
+        "source_id": "banking77-796a-test-1736",
+        "split": "test"
+      },
+      {
+        "index": 1738,
+        "source_id": "banking77-796a-test-1738",
+        "split": "test"
+      },
+      {
+        "index": 1743,
+        "source_id": "banking77-796a-test-1743",
+        "split": "test"
+      },
+      {
+        "index": 1745,
+        "source_id": "banking77-796a-test-1745",
+        "split": "test"
+      },
+      {
+        "index": 1753,
+        "source_id": "banking77-796a-test-1753",
+        "split": "test"
+      },
+      {
+        "index": 1757,
+        "source_id": "banking77-796a-test-1757",
+        "split": "test"
+      },
+      {
+        "index": 1758,
+        "source_id": "banking77-796a-test-1758",
+        "split": "test"
+      },
+      {
+        "index": 1759,
+        "source_id": "banking77-796a-test-1759",
+        "split": "test"
+      },
+      {
+        "index": 2000,
+        "source_id": "banking77-796a-test-2000",
+        "split": "test"
+      },
+      {
+        "index": 2001,
+        "source_id": "banking77-796a-test-2001",
+        "split": "test"
+      },
+      {
+        "index": 2004,
+        "source_id": "banking77-796a-test-2004",
+        "split": "test"
+      },
+      {
+        "index": 2006,
+        "source_id": "banking77-796a-test-2006",
+        "split": "test"
+      },
+      {
+        "index": 2008,
+        "source_id": "banking77-796a-test-2008",
+        "split": "test"
+      },
+      {
+        "index": 2012,
+        "source_id": "banking77-796a-test-2012",
+        "split": "test"
+      },
+      {
+        "index": 2013,
+        "source_id": "banking77-796a-test-2013",
+        "split": "test"
+      },
+      {
+        "index": 2017,
+        "source_id": "banking77-796a-test-2017",
+        "split": "test"
+      },
+      {
+        "index": 2018,
+        "source_id": "banking77-796a-test-2018",
+        "split": "test"
+      },
+      {
+        "index": 2022,
+        "source_id": "banking77-796a-test-2022",
+        "split": "test"
+      },
+      {
+        "index": 2025,
+        "source_id": "banking77-796a-test-2025",
+        "split": "test"
+      },
+      {
+        "index": 2029,
+        "source_id": "banking77-796a-test-2029",
+        "split": "test"
+      },
+      {
+        "index": 2030,
+        "source_id": "banking77-796a-test-2030",
+        "split": "test"
+      },
+      {
+        "index": 2032,
+        "source_id": "banking77-796a-test-2032",
+        "split": "test"
+      },
+      {
+        "index": 2034,
+        "source_id": "banking77-796a-test-2034",
+        "split": "test"
+      },
+      {
+        "index": 2037,
+        "source_id": "banking77-796a-test-2037",
+        "split": "test"
+      },
+      {
+        "index": 2080,
+        "source_id": "banking77-796a-test-2080",
+        "split": "test"
+      },
+      {
+        "index": 2081,
+        "source_id": "banking77-796a-test-2081",
+        "split": "test"
+      },
+      {
+        "index": 2082,
+        "source_id": "banking77-796a-test-2082",
+        "split": "test"
+      },
+      {
+        "index": 2083,
+        "source_id": "banking77-796a-test-2083",
+        "split": "test"
+      },
+      {
+        "index": 2084,
+        "source_id": "banking77-796a-test-2084",
+        "split": "test"
+      },
+      {
+        "index": 2085,
+        "source_id": "banking77-796a-test-2085",
+        "split": "test"
+      },
+      {
+        "index": 2086,
+        "source_id": "banking77-796a-test-2086",
+        "split": "test"
+      },
+      {
+        "index": 2087,
+        "source_id": "banking77-796a-test-2087",
+        "split": "test"
+      },
+      {
+        "index": 2088,
+        "source_id": "banking77-796a-test-2088",
+        "split": "test"
+      },
+      {
+        "index": 2089,
+        "source_id": "banking77-796a-test-2089",
+        "split": "test"
+      },
+      {
+        "index": 2090,
+        "source_id": "banking77-796a-test-2090",
+        "split": "test"
+      },
+      {
+        "index": 2091,
+        "source_id": "banking77-796a-test-2091",
+        "split": "test"
+      },
+      {
+        "index": 2098,
+        "source_id": "banking77-796a-test-2098",
+        "split": "test"
+      },
+      {
+        "index": 2100,
+        "source_id": "banking77-796a-test-2100",
+        "split": "test"
+      },
+      {
+        "index": 2108,
+        "source_id": "banking77-796a-test-2108",
+        "split": "test"
+      },
+      {
+        "index": 2116,
+        "source_id": "banking77-796a-test-2116",
+        "split": "test"
+      },
+      {
+        "index": 296,
+        "source_id": "banking77-796a-train-296",
+        "split": "train"
+      },
+      {
+        "index": 297,
+        "source_id": "banking77-796a-train-297",
+        "split": "train"
+      },
+      {
+        "index": 298,
+        "source_id": "banking77-796a-train-298",
+        "split": "train"
+      },
+      {
+        "index": 301,
+        "source_id": "banking77-796a-train-301",
+        "split": "train"
+      },
+      {
+        "index": 304,
+        "source_id": "banking77-796a-train-304",
+        "split": "train"
+      },
+      {
+        "index": 314,
+        "source_id": "banking77-796a-train-314",
+        "split": "train"
+      },
+      {
+        "index": 317,
+        "source_id": "banking77-796a-train-317",
+        "split": "train"
+      },
+      {
+        "index": 320,
+        "source_id": "banking77-796a-train-320",
+        "split": "train"
+      },
+      {
+        "index": 321,
+        "source_id": "banking77-796a-train-321",
+        "split": "train"
+      },
+      {
+        "index": 326,
+        "source_id": "banking77-796a-train-326",
+        "split": "train"
+      },
+      {
+        "index": 331,
+        "source_id": "banking77-796a-train-331",
+        "split": "train"
+      },
+      {
+        "index": 332,
+        "source_id": "banking77-796a-train-332",
+        "split": "train"
+      },
+      {
+        "index": 333,
+        "source_id": "banking77-796a-train-333",
+        "split": "train"
+      },
+      {
+        "index": 339,
+        "source_id": "banking77-796a-train-339",
+        "split": "train"
+      },
+      {
+        "index": 347,
+        "source_id": "banking77-796a-train-347",
+        "split": "train"
+      },
+      {
+        "index": 348,
+        "source_id": "banking77-796a-train-348",
+        "split": "train"
+      },
+      {
+        "index": 349,
+        "source_id": "banking77-796a-train-349",
+        "split": "train"
+      },
+      {
+        "index": 351,
+        "source_id": "banking77-796a-train-351",
+        "split": "train"
+      },
+      {
+        "index": 355,
+        "source_id": "banking77-796a-train-355",
+        "split": "train"
+      },
+      {
+        "index": 368,
+        "source_id": "banking77-796a-train-368",
+        "split": "train"
+      },
+      {
+        "index": 378,
+        "source_id": "banking77-796a-train-378",
+        "split": "train"
+      },
+      {
+        "index": 384,
+        "source_id": "banking77-796a-train-384",
+        "split": "train"
+      },
+      {
+        "index": 391,
+        "source_id": "banking77-796a-train-391",
+        "split": "train"
+      },
+      {
+        "index": 392,
+        "source_id": "banking77-796a-train-392",
+        "split": "train"
+      },
+      {
+        "index": 396,
+        "source_id": "banking77-796a-train-396",
+        "split": "train"
+      },
+      {
+        "index": 398,
+        "source_id": "banking77-796a-train-398",
+        "split": "train"
+      },
+      {
+        "index": 2511,
+        "source_id": "banking77-796a-train-2511",
+        "split": "train"
+      },
+      {
+        "index": 2512,
+        "source_id": "banking77-796a-train-2512",
+        "split": "train"
+      },
+      {
+        "index": 2513,
+        "source_id": "banking77-796a-train-2513",
+        "split": "train"
+      },
+      {
+        "index": 2514,
+        "source_id": "banking77-796a-train-2514",
+        "split": "train"
+      },
+      {
+        "index": 2515,
+        "source_id": "banking77-796a-train-2515",
+        "split": "train"
+      },
+      {
+        "index": 2516,
+        "source_id": "banking77-796a-train-2516",
+        "split": "train"
+      },
+      {
+        "index": 2517,
+        "source_id": "banking77-796a-train-2517",
+        "split": "train"
+      },
+      {
+        "index": 2518,
+        "source_id": "banking77-796a-train-2518",
+        "split": "train"
+      },
+      {
+        "index": 2519,
+        "source_id": "banking77-796a-train-2519",
+        "split": "train"
+      },
+      {
+        "index": 2520,
+        "source_id": "banking77-796a-train-2520",
+        "split": "train"
+      },
+      {
+        "index": 2521,
+        "source_id": "banking77-796a-train-2521",
+        "split": "train"
+      },
+      {
+        "index": 2522,
+        "source_id": "banking77-796a-train-2522",
+        "split": "train"
+      },
+      {
+        "index": 2523,
+        "source_id": "banking77-796a-train-2523",
+        "split": "train"
+      },
+      {
+        "index": 2524,
+        "source_id": "banking77-796a-train-2524",
+        "split": "train"
+      },
+      {
+        "index": 2525,
+        "source_id": "banking77-796a-train-2525",
+        "split": "train"
+      },
+      {
+        "index": 2526,
+        "source_id": "banking77-796a-train-2526",
+        "split": "train"
+      },
+      {
+        "index": 2527,
+        "source_id": "banking77-796a-train-2527",
+        "split": "train"
+      },
+      {
+        "index": 2528,
+        "source_id": "banking77-796a-train-2528",
+        "split": "train"
+      },
+      {
+        "index": 2529,
+        "source_id": "banking77-796a-train-2529",
+        "split": "train"
+      },
+      {
+        "index": 2530,
+        "source_id": "banking77-796a-train-2530",
+        "split": "train"
+      },
+      {
+        "index": 2550,
+        "source_id": "banking77-796a-train-2550",
+        "split": "train"
+      },
+      {
+        "index": 2606,
+        "source_id": "banking77-796a-train-2606",
+        "split": "train"
+      },
+      {
+        "index": 2630,
+        "source_id": "banking77-796a-train-2630",
+        "split": "train"
+      },
+      {
+        "index": 2634,
+        "source_id": "banking77-796a-train-2634",
+        "split": "train"
+      },
+      {
+        "index": 2637,
+        "source_id": "banking77-796a-train-2637",
+        "split": "train"
+      },
+      {
+        "index": 2668,
+        "source_id": "banking77-796a-train-2668",
+        "split": "train"
+      },
+      {
+        "index": 3482,
+        "source_id": "banking77-796a-train-3482",
+        "split": "train"
+      },
+      {
+        "index": 3483,
+        "source_id": "banking77-796a-train-3483",
+        "split": "train"
+      },
+      {
+        "index": 3484,
+        "source_id": "banking77-796a-train-3484",
+        "split": "train"
+      },
+      {
+        "index": 3485,
+        "source_id": "banking77-796a-train-3485",
+        "split": "train"
+      },
+      {
+        "index": 3486,
+        "source_id": "banking77-796a-train-3486",
+        "split": "train"
+      },
+      {
+        "index": 3487,
+        "source_id": "banking77-796a-train-3487",
+        "split": "train"
+      },
+      {
+        "index": 3488,
+        "source_id": "banking77-796a-train-3488",
+        "split": "train"
+      },
+      {
+        "index": 3489,
+        "source_id": "banking77-796a-train-3489",
+        "split": "train"
+      },
+      {
+        "index": 3490,
+        "source_id": "banking77-796a-train-3490",
+        "split": "train"
+      },
+      {
+        "index": 3491,
+        "source_id": "banking77-796a-train-3491",
+        "split": "train"
+      },
+      {
+        "index": 3492,
+        "source_id": "banking77-796a-train-3492",
+        "split": "train"
+      },
+      {
+        "index": 3493,
+        "source_id": "banking77-796a-train-3493",
+        "split": "train"
+      },
+      {
+        "index": 3494,
+        "source_id": "banking77-796a-train-3494",
+        "split": "train"
+      },
+      {
+        "index": 3495,
+        "source_id": "banking77-796a-train-3495",
+        "split": "train"
+      },
+      {
+        "index": 3496,
+        "source_id": "banking77-796a-train-3496",
+        "split": "train"
+      },
+      {
+        "index": 3497,
+        "source_id": "banking77-796a-train-3497",
+        "split": "train"
+      },
+      {
+        "index": 3498,
+        "source_id": "banking77-796a-train-3498",
+        "split": "train"
+      },
+      {
+        "index": 3499,
+        "source_id": "banking77-796a-train-3499",
+        "split": "train"
+      },
+      {
+        "index": 3500,
+        "source_id": "banking77-796a-train-3500",
+        "split": "train"
+      },
+      {
+        "index": 3501,
+        "source_id": "banking77-796a-train-3501",
+        "split": "train"
+      },
+      {
+        "index": 3514,
+        "source_id": "banking77-796a-train-3514",
+        "split": "train"
+      },
+      {
+        "index": 3550,
+        "source_id": "banking77-796a-train-3550",
+        "split": "train"
+      },
+      {
+        "index": 3573,
+        "source_id": "banking77-796a-train-3573",
+        "split": "train"
+      },
+      {
+        "index": 3579,
+        "source_id": "banking77-796a-train-3579",
+        "split": "train"
+      },
+      {
+        "index": 3615,
+        "source_id": "banking77-796a-train-3615",
+        "split": "train"
+      },
+      {
+        "index": 3646,
+        "source_id": "banking77-796a-train-3646",
+        "split": "train"
+      },
+      {
+        "index": 3995,
+        "source_id": "banking77-796a-train-3995",
+        "split": "train"
+      },
+      {
+        "index": 3996,
+        "source_id": "banking77-796a-train-3996",
+        "split": "train"
+      },
+      {
+        "index": 3997,
+        "source_id": "banking77-796a-train-3997",
+        "split": "train"
+      },
+      {
+        "index": 3998,
+        "source_id": "banking77-796a-train-3998",
+        "split": "train"
+      },
+      {
+        "index": 4002,
+        "source_id": "banking77-796a-train-4002",
+        "split": "train"
+      },
+      {
+        "index": 4007,
+        "source_id": "banking77-796a-train-4007",
+        "split": "train"
+      },
+      {
+        "index": 4010,
+        "source_id": "banking77-796a-train-4010",
+        "split": "train"
+      },
+      {
+        "index": 4013,
+        "source_id": "banking77-796a-train-4013",
+        "split": "train"
+      },
+      {
+        "index": 4016,
+        "source_id": "banking77-796a-train-4016",
+        "split": "train"
+      },
+      {
+        "index": 4019,
+        "source_id": "banking77-796a-train-4019",
+        "split": "train"
+      },
+      {
+        "index": 4024,
+        "source_id": "banking77-796a-train-4024",
+        "split": "train"
+      },
+      {
+        "index": 4026,
+        "source_id": "banking77-796a-train-4026",
+        "split": "train"
+      },
+      {
+        "index": 4029,
+        "source_id": "banking77-796a-train-4029",
+        "split": "train"
+      },
+      {
+        "index": 4030,
+        "source_id": "banking77-796a-train-4030",
+        "split": "train"
+      },
+      {
+        "index": 4036,
+        "source_id": "banking77-796a-train-4036",
+        "split": "train"
+      },
+      {
+        "index": 4038,
+        "source_id": "banking77-796a-train-4038",
+        "split": "train"
+      },
+      {
+        "index": 4040,
+        "source_id": "banking77-796a-train-4040",
+        "split": "train"
+      },
+      {
+        "index": 4046,
+        "source_id": "banking77-796a-train-4046",
+        "split": "train"
+      },
+      {
+        "index": 4050,
+        "source_id": "banking77-796a-train-4050",
+        "split": "train"
+      },
+      {
+        "index": 4052,
+        "source_id": "banking77-796a-train-4052",
+        "split": "train"
+      },
+      {
+        "index": 4070,
+        "source_id": "banking77-796a-train-4070",
+        "split": "train"
+      },
+      {
+        "index": 4074,
+        "source_id": "banking77-796a-train-4074",
+        "split": "train"
+      },
+      {
+        "index": 4077,
+        "source_id": "banking77-796a-train-4077",
+        "split": "train"
+      },
+      {
+        "index": 4086,
+        "source_id": "banking77-796a-train-4086",
+        "split": "train"
+      },
+      {
+        "index": 4094,
+        "source_id": "banking77-796a-train-4094",
+        "split": "train"
+      },
+      {
+        "index": 4097,
+        "source_id": "banking77-796a-train-4097",
+        "split": "train"
+      },
+      {
+        "index": 5092,
+        "source_id": "banking77-796a-train-5092",
+        "split": "train"
+      },
+      {
+        "index": 5093,
+        "source_id": "banking77-796a-train-5093",
+        "split": "train"
+      },
+      {
+        "index": 5094,
+        "source_id": "banking77-796a-train-5094",
+        "split": "train"
+      },
+      {
+        "index": 5095,
+        "source_id": "banking77-796a-train-5095",
+        "split": "train"
+      },
+      {
+        "index": 5096,
+        "source_id": "banking77-796a-train-5096",
+        "split": "train"
+      },
+      {
+        "index": 5097,
+        "source_id": "banking77-796a-train-5097",
+        "split": "train"
+      },
+      {
+        "index": 5098,
+        "source_id": "banking77-796a-train-5098",
+        "split": "train"
+      },
+      {
+        "index": 5099,
+        "source_id": "banking77-796a-train-5099",
+        "split": "train"
+      },
+      {
+        "index": 5100,
+        "source_id": "banking77-796a-train-5100",
+        "split": "train"
+      },
+      {
+        "index": 5101,
+        "source_id": "banking77-796a-train-5101",
+        "split": "train"
+      },
+      {
+        "index": 5102,
+        "source_id": "banking77-796a-train-5102",
+        "split": "train"
+      },
+      {
+        "index": 5103,
+        "source_id": "banking77-796a-train-5103",
+        "split": "train"
+      },
+      {
+        "index": 5104,
+        "source_id": "banking77-796a-train-5104",
+        "split": "train"
+      },
+      {
+        "index": 5105,
+        "source_id": "banking77-796a-train-5105",
+        "split": "train"
+      },
+      {
+        "index": 5106,
+        "source_id": "banking77-796a-train-5106",
+        "split": "train"
+      },
+      {
+        "index": 5107,
+        "source_id": "banking77-796a-train-5107",
+        "split": "train"
+      },
+      {
+        "index": 5108,
+        "source_id": "banking77-796a-train-5108",
+        "split": "train"
+      },
+      {
+        "index": 5109,
+        "source_id": "banking77-796a-train-5109",
+        "split": "train"
+      },
+      {
+        "index": 5110,
+        "source_id": "banking77-796a-train-5110",
+        "split": "train"
+      },
+      {
+        "index": 5111,
+        "source_id": "banking77-796a-train-5111",
+        "split": "train"
+      },
+      {
+        "index": 5148,
+        "source_id": "banking77-796a-train-5148",
+        "split": "train"
+      },
+      {
+        "index": 5158,
+        "source_id": "banking77-796a-train-5158",
+        "split": "train"
+      },
+      {
+        "index": 5184,
+        "source_id": "banking77-796a-train-5184",
+        "split": "train"
+      },
+      {
+        "index": 5191,
+        "source_id": "banking77-796a-train-5191",
+        "split": "train"
+      },
+      {
+        "index": 5207,
+        "source_id": "banking77-796a-train-5207",
+        "split": "train"
+      },
+      {
+        "index": 5213,
+        "source_id": "banking77-796a-train-5213",
+        "split": "train"
+      },
+      {
+        "index": 5545,
+        "source_id": "banking77-796a-train-5545",
+        "split": "train"
+      },
+      {
+        "index": 5546,
+        "source_id": "banking77-796a-train-5546",
+        "split": "train"
+      },
+      {
+        "index": 5549,
+        "source_id": "banking77-796a-train-5549",
+        "split": "train"
+      },
+      {
+        "index": 5556,
+        "source_id": "banking77-796a-train-5556",
+        "split": "train"
+      },
+      {
+        "index": 5566,
+        "source_id": "banking77-796a-train-5566",
+        "split": "train"
+      },
+      {
+        "index": 5571,
+        "source_id": "banking77-796a-train-5571",
+        "split": "train"
+      },
+      {
+        "index": 5572,
+        "source_id": "banking77-796a-train-5572",
+        "split": "train"
+      },
+      {
+        "index": 5574,
+        "source_id": "banking77-796a-train-5574",
+        "split": "train"
+      },
+      {
+        "index": 5577,
+        "source_id": "banking77-796a-train-5577",
+        "split": "train"
+      },
+      {
+        "index": 5589,
+        "source_id": "banking77-796a-train-5589",
+        "split": "train"
+      },
+      {
+        "index": 5591,
+        "source_id": "banking77-796a-train-5591",
+        "split": "train"
+      },
+      {
+        "index": 5606,
+        "source_id": "banking77-796a-train-5606",
+        "split": "train"
+      },
+      {
+        "index": 5610,
+        "source_id": "banking77-796a-train-5610",
+        "split": "train"
+      },
+      {
+        "index": 5612,
+        "source_id": "banking77-796a-train-5612",
+        "split": "train"
+      },
+      {
+        "index": 5615,
+        "source_id": "banking77-796a-train-5615",
+        "split": "train"
+      },
+      {
+        "index": 5617,
+        "source_id": "banking77-796a-train-5617",
+        "split": "train"
+      },
+      {
+        "index": 5620,
+        "source_id": "banking77-796a-train-5620",
+        "split": "train"
+      },
+      {
+        "index": 5623,
+        "source_id": "banking77-796a-train-5623",
+        "split": "train"
+      },
+      {
+        "index": 5626,
+        "source_id": "banking77-796a-train-5626",
+        "split": "train"
+      },
+      {
+        "index": 5629,
+        "source_id": "banking77-796a-train-5629",
+        "split": "train"
+      },
+      {
+        "index": 5637,
+        "source_id": "banking77-796a-train-5637",
+        "split": "train"
+      },
+      {
+        "index": 5638,
+        "source_id": "banking77-796a-train-5638",
+        "split": "train"
+      },
+      {
+        "index": 5645,
+        "source_id": "banking77-796a-train-5645",
+        "split": "train"
+      },
+      {
+        "index": 5652,
+        "source_id": "banking77-796a-train-5652",
+        "split": "train"
+      },
+      {
+        "index": 5656,
+        "source_id": "banking77-796a-train-5656",
+        "split": "train"
+      },
+      {
+        "index": 5665,
+        "source_id": "banking77-796a-train-5665",
+        "split": "train"
+      },
+      {
+        "index": 6482,
+        "source_id": "banking77-796a-train-6482",
+        "split": "train"
+      },
+      {
+        "index": 6486,
+        "source_id": "banking77-796a-train-6486",
+        "split": "train"
+      },
+      {
+        "index": 6487,
+        "source_id": "banking77-796a-train-6487",
+        "split": "train"
+      },
+      {
+        "index": 6489,
+        "source_id": "banking77-796a-train-6489",
+        "split": "train"
+      },
+      {
+        "index": 6493,
+        "source_id": "banking77-796a-train-6493",
+        "split": "train"
+      },
+      {
+        "index": 6503,
+        "source_id": "banking77-796a-train-6503",
+        "split": "train"
+      },
+      {
+        "index": 6504,
+        "source_id": "banking77-796a-train-6504",
+        "split": "train"
+      },
+      {
+        "index": 6510,
+        "source_id": "banking77-796a-train-6510",
+        "split": "train"
+      },
+      {
+        "index": 6512,
+        "source_id": "banking77-796a-train-6512",
+        "split": "train"
+      },
+      {
+        "index": 6513,
+        "source_id": "banking77-796a-train-6513",
+        "split": "train"
+      },
+      {
+        "index": 6520,
+        "source_id": "banking77-796a-train-6520",
+        "split": "train"
+      },
+      {
+        "index": 6523,
+        "source_id": "banking77-796a-train-6523",
+        "split": "train"
+      },
+      {
+        "index": 6524,
+        "source_id": "banking77-796a-train-6524",
+        "split": "train"
+      },
+      {
+        "index": 6528,
+        "source_id": "banking77-796a-train-6528",
+        "split": "train"
+      },
+      {
+        "index": 6533,
+        "source_id": "banking77-796a-train-6533",
+        "split": "train"
+      },
+      {
+        "index": 6541,
+        "source_id": "banking77-796a-train-6541",
+        "split": "train"
+      },
+      {
+        "index": 6545,
+        "source_id": "banking77-796a-train-6545",
+        "split": "train"
+      },
+      {
+        "index": 6550,
+        "source_id": "banking77-796a-train-6550",
+        "split": "train"
+      },
+      {
+        "index": 6552,
+        "source_id": "banking77-796a-train-6552",
+        "split": "train"
+      },
+      {
+        "index": 6555,
+        "source_id": "banking77-796a-train-6555",
+        "split": "train"
+      },
+      {
+        "index": 6559,
+        "source_id": "banking77-796a-train-6559",
+        "split": "train"
+      },
+      {
+        "index": 6562,
+        "source_id": "banking77-796a-train-6562",
+        "split": "train"
+      },
+      {
+        "index": 6576,
+        "source_id": "banking77-796a-train-6576",
+        "split": "train"
+      },
+      {
+        "index": 6578,
+        "source_id": "banking77-796a-train-6578",
+        "split": "train"
+      },
+      {
+        "index": 6582,
+        "source_id": "banking77-796a-train-6582",
+        "split": "train"
+      },
+      {
+        "index": 6587,
+        "source_id": "banking77-796a-train-6587",
+        "split": "train"
+      },
+      {
+        "index": 6722,
+        "source_id": "banking77-796a-train-6722",
+        "split": "train"
+      },
+      {
+        "index": 6723,
+        "source_id": "banking77-796a-train-6723",
+        "split": "train"
+      },
+      {
+        "index": 6724,
+        "source_id": "banking77-796a-train-6724",
+        "split": "train"
+      },
+      {
+        "index": 6725,
+        "source_id": "banking77-796a-train-6725",
+        "split": "train"
+      },
+      {
+        "index": 6726,
+        "source_id": "banking77-796a-train-6726",
+        "split": "train"
+      },
+      {
+        "index": 6727,
+        "source_id": "banking77-796a-train-6727",
+        "split": "train"
+      },
+      {
+        "index": 6728,
+        "source_id": "banking77-796a-train-6728",
+        "split": "train"
+      },
+      {
+        "index": 6729,
+        "source_id": "banking77-796a-train-6729",
+        "split": "train"
+      },
+      {
+        "index": 6730,
+        "source_id": "banking77-796a-train-6730",
+        "split": "train"
+      },
+      {
+        "index": 6731,
+        "source_id": "banking77-796a-train-6731",
+        "split": "train"
+      },
+      {
+        "index": 6732,
+        "source_id": "banking77-796a-train-6732",
+        "split": "train"
+      },
+      {
+        "index": 6733,
+        "source_id": "banking77-796a-train-6733",
+        "split": "train"
+      },
+      {
+        "index": 6734,
+        "source_id": "banking77-796a-train-6734",
+        "split": "train"
+      },
+      {
+        "index": 6735,
+        "source_id": "banking77-796a-train-6735",
+        "split": "train"
+      },
+      {
+        "index": 6736,
+        "source_id": "banking77-796a-train-6736",
+        "split": "train"
+      },
+      {
+        "index": 6737,
+        "source_id": "banking77-796a-train-6737",
+        "split": "train"
+      },
+      {
+        "index": 6738,
+        "source_id": "banking77-796a-train-6738",
+        "split": "train"
+      },
+      {
+        "index": 6739,
+        "source_id": "banking77-796a-train-6739",
+        "split": "train"
+      },
+      {
+        "index": 6740,
+        "source_id": "banking77-796a-train-6740",
+        "split": "train"
+      },
+      {
+        "index": 6741,
+        "source_id": "banking77-796a-train-6741",
+        "split": "train"
+      },
+      {
+        "index": 6766,
+        "source_id": "banking77-796a-train-6766",
+        "split": "train"
+      },
+      {
+        "index": 6768,
+        "source_id": "banking77-796a-train-6768",
+        "split": "train"
+      },
+      {
+        "index": 6779,
+        "source_id": "banking77-796a-train-6779",
+        "split": "train"
+      },
+      {
+        "index": 6804,
+        "source_id": "banking77-796a-train-6804",
+        "split": "train"
+      },
+      {
+        "index": 6815,
+        "source_id": "banking77-796a-train-6815",
+        "split": "train"
+      },
+      {
+        "index": 6818,
+        "source_id": "banking77-796a-train-6818",
+        "split": "train"
+      }
+    ],
+    "errors": [],
+    "normalized_text_digest_count": 336,
+    "normalized_text_sha256": [
+      "001c71f32de9ce843c361b3a8c34807c4de7950f6642ca6f440f906a1e35102c",
+      "00768d5e0c1dea2fd8ccb6aca5678527fa6e228ab5378b46565250062da37da7",
+      "008542727bb7e5ee9f6d3c4e86cb32f1f94ee6ff4f4b73cb938e793f32749136",
+      "00f4b4deebe38710c4c7f3d3d729a779cd98e3f92dddea8f714886196f56ced6",
+      "037f4d41d9beb34c726445c749c4ff81bbcd0c1fd54d685c8af665c52d9d28a4",
+      "03e3397ef0f8f8886de988e86a24fe2af82a7749f29c93e41eb8dc782e251f9d",
+      "064ba23ad887ae858434be6f2de38d21726304002aed824cd78d8343c5850e63",
+      "0823a665d5a17e6d57c8b4b34f103894b8d2ae4075a19f738861786b0a6fe20a",
+      "082bd4ba04cb36e477eee190125ba2d9acfaa0d3b14490f5b4f80a47e6c5a9b4",
+      "0881dce04f09f02370850bb10cb514a409185fce63e3babe176fdd5fe734a595",
+      "090740f5b1ca00e2daedcfaaf4c55487f28df47e311adac0e5b3a7ad0909a4b9",
+      "090f0ab0a1424f327e89d56e557296afa5b68b457b89b995282041cf36ef1708",
+      "0a8298a86e78bc7ff61ddbd2f41e640f5b058c73c730e527e816eeb6babcc933",
+      "0adeece1233b686847fe4022bd4c5f3f0ecdc94c6dc846508f139e059d61562c",
+      "0b4dcea25a5055852ece12ef1cf0d29c30c7dc6acac31b5ea45de7d1853cbb42",
+      "0b5a0fe277deca9c5d262953721efa40bebedadd846690edca5f10b85cd9e082",
+      "0d89aac7303931f4e78a98445e97771daa6c5cecbf85a324739d810b44be150c",
+      "0de60907b2601de98322012eb3d71cc42fe1bf08de5cec36591795217d36986b",
+      "0f0fb03ae8d8df3e6b1365ec40d4747c38c439c3e56eb08b6c9a023a734da848",
+      "0fc31e9cf18c1b6f3d9b0f9343bb83627aff58799dc7c2f4fe19949404e97491",
+      "102437e08b7c7ef97a0fa2949e5d7ddf8cda43831f21a99fadadd6eb39a57e77",
+      "1058e6e7812a2520148207a772a1d193fe8fd9f8eaaa790522cc61ee6862d365",
+      "10f8b43f3e19f3d01790491b4344954c699934d38ec34916a20f2509406a9759",
+      "117a6c63353ffc9f69920b2bb6c96260b52104fb7fb051734ae159d059d90bd1",
+      "119c49e1e15b75b947b1dcbf69a030803f41ca93b3aab4b6b9c15e00912f8e6e",
+      "11afe8afb67249330bc69ed38a36c0d2cd468a2a98d5e454e4a2399384bafb8e",
+      "11f25661010e2a0535021a69171dad4d67724f747e48087c14b81dd037471da0",
+      "12d9df7b21f7ca019a6890215d77477500dba10a0c10cd0fa7ac5cad1417338b",
+      "13ca57cc34df93479dba1013593180c551a4313f1c9a83b96f3380ca536ef36f",
+      "141a69a5d8e45e23656f5d3b2e29f0f6325c0a68d26df2d29c77e69879e5cf39",
+      "1537a8c82c8a1c5b9c9f48a894c4436f1f4e51415f71c54f89deedd20c60e352",
+      "155797f92461b240317b997257d8340807b54a4fab604b336e340ab76c8088e0",
+      "15fc2f7f052fe8148e0ef07791efc8b5751c96421901d9a8e4644f8df2c89e35",
+      "16c26ad2808f24ff0e60c19f60bd034798d933a751612614261710de321e291d",
+      "1799efad175fcc72856089d4dcc39d1d7dbbc4f81037f0f9e7d0025cf4dcabd4",
+      "17bf2cd414bde12b8f63901ae6c85b700f5cea9b086e8f8fb44bbe5280e4e0d5",
+      "17cac1ef86eed09841fb9948f1ebb041db87dd418e64df0ad36556e5c08ec793",
+      "18a1868084b97c6b7ce01f8c29b3203e4ccae37d334c117cf72734b2feb108b3",
+      "19309ce79ab8881cf49f77db0e6a9f2ca4ea5e573b89bc23c66ed95ef5d2968d",
+      "197be07eb71cb0266d5a773dde2c75a39f8e7161a0ee3255ccc38981869a0909",
+      "198981f16f0b023393a374670c518f81d175fe905d5dc09d909d850f0fc9d1e7",
+      "1994191ea3d0e10631d5b4795ff1544f95b87941e2fb1384be9cb8f7a08ca877",
+      "1a153dca5708dc21c042c15e1c33b721383da62cd005a672c1bf5f25bfa20420",
+      "1a298cfef7c82bdce89ecbef96c7f07eb1313887cdb9e7b069a24c9c567a3638",
+      "1a3173cbfbc85da20a35c651acba1e8e4271fea8fffb3eb0b2653f777fd22ef7",
+      "1a5e2c656d659a1b9e08f6303a2d22f5bce90472570f3e95936b0197eb901ca5",
+      "1a8b6899939688f09c3760ab29dc76fb7ef448279c5922ca9431f11eb5a2592f",
+      "1d2be483bed75b0491bbf907e2088b9b7a660f81baccbd272f8922d056367812",
+      "1d518887369df9bcf466506352959ba62ab910990e1cc411d43d19cbfbbb8094",
+      "1e08ed16371e753b9cead241b8e2a0dfc2d869c9d14bf544752cf8d2c4585f28",
+      "1e875a24dbf11837adc7ca939e35b18ed357698293e6f5ccbe4ee3ea0086f78a",
+      "1f55612509978c2384fbe5d75d39f997c9d331477673c3b4e20a6c0eb666f22f",
+      "208b7dab00d8f9f62c05ac4603d3b22d1efd2f86bd042f767db6cea9605679b3",
+      "211ee6b98b2a5c6bd0875f1df85cc36941be5fec02dfe4735d479cb04e9040d8",
+      "22ccceaee8d0579f8677d2177829d719b293ca22b3cb6fe87e63085559848e05",
+      "23695420a3b053445baf97e6b00d3731fb3d7626255f4da7de461e0ae6fad51b",
+      "2371a93d1453420281f3a6d9d52d74303341951abe21f2f0bc75c880bf16613e",
+      "2391bb72adcc58992228adc12d3f29eba9603dca28f5f40b57c3a7efd1e0a318",
+      "249c15b911d1b0259a43bf2f97eac111c8968a5c462c6215978fb617e75b2f29",
+      "250e1d474e3c3669414d4bb67232b5ab65f86f8b4e62dcf7cef6e5f0aad93700",
+      "2694a79ea170c4bc6001fcb588813f4fb022813e10911580a3234c3e203b87b7",
+      "26c47adf73d8e84f185370921a78d1dfe2ea96eadfd7e87d9bac39b71a5af160",
+      "27d2940ff36fac7907cae56d7da9b1dce6e9647752912fee2e2f4657fc7ad36d",
+      "29d1cc4dc712426456fcdc04620d3987b513d212eca45ff2d898f9e5f0705a7c",
+      "29e47e40909781214f687e3dbb43c8685dc98ae91f155b695a61e00e1f6830c0",
+      "2a7a4ab878490c8970d6ed39e329609d29b89f5a574cb17df200275c388cd5cd",
+      "2b44e5e14b2351bb7770506e5903866be6ea7984a82aeab1048b050f8cf480ed",
+      "2bd50a56bb59f2cfbed6a5350a9160827ef4b284a6b6da3e2dcab7d0cce58843",
+      "2c322ff26f14ea343abb9ccbefbb492a725a1c7386d33e0d9958bf45b2c7592c",
+      "2c8d6127a6f7e4f6a2c6910af16d50685c87b2360b636d45a2377d250605d97b",
+      "2cee5326c0836394659b584e018d4d45abc19701ef854d2300a961cc418eb924",
+      "2e86b2e5307634a756fc04c430a9987f24a80795b14b92120d0b4a55ba9f1e09",
+      "2f4b3b21e600123e3975c8c8d757f24d6932a781c9662d88df5efcdf93efa8f2",
+      "2f5eae1e01897747c380e8ffac2c7eb4151ce8d95d731d58967ad0268c265819",
+      "32c65b3c58817beaf56c624889d567ed261ebaa7df0b4c8602bd6ca64a89a433",
+      "3342aea2c9b2900921594445a3aafcd0c778f014a8c3ca5bec50ec0d7618bfed",
+      "353ea634e6ec625c603d37f0e79ec161de595ec97c627f662800caba3ff9ff8c",
+      "376587cc62dcbdee401c984bfdd124fec0862a42f92d54854f3c2eec639d39dd",
+      "3781c97c7f66822f59a157e5090219e0f839fa698a2ccef041d244f8bb6042ce",
+      "37ba682bec6215c9c853b28c7c925167990b7b4658eb2e7be7751c761d543c81",
+      "398fe2429dc84506afb187ff78dbafd1681d3682ea6b7a9c1bf77ac556e432ab",
+      "3b3c8902260e366566251a929bdf668dceb2109a31d17e6de91d5b1866ccf8dc",
+      "3bb9594a080cfe24a8eb0d389688ec1de9ff6c01566234bda7f100acc8a74224",
+      "3bcad049ce1698da0aee982dc0602718f702066174b64d421afc48f3b4822838",
+      "3cddccec57c4665a7a4c9bbf070ed80679e81daffc7512a7b863be5351ec2c5b",
+      "3cfb1bc8531538d5293d585154b336d4dc972d4373be03d64963de9930b49349",
+      "3d182ebe3629b2a75281a6fc61d08d9c47e641641c2ff7a200a6ba9432bb575f",
+      "3d2ce0e1f3faba54c2d7c70b476860e0149f3552a419abdaea074a3ad4ef5ed2",
+      "3d4a3eab1695dea32bfa760de28a3ed6239c6b4ffa2eb3eff36523725b5519d0",
+      "3e9b346d14271f5ab6e49eb4513a0ff01d1881d82c2e4a76ea65d5ef4df0f420",
+      "3fc62f89e9cc2c70dbfd7b7c2c2e223c9cac678394651ae1df29b53493525c75",
+      "403f2e4d2c60cbfa4f1146052a56e2b9ce6a863b5e00c34e92143d375bda0932",
+      "40ab57bc5cb11185cced2d1e6c03a1a24cc59137cdcc26c7540308ba7493cadb",
+      "40c4973eb87c85fffabc1bd00bc7a4027d2b91406f2b16b20d771f78f2719627",
+      "41bc8e0e494d86ea0f4795b9125d4496a27263cc50ab0c771e3f4d63c4b9c3e8",
+      "4209f4f05260f2423f1329a8ce399d0d29091ea90aac309d2685f9aa8e8d4be3",
+      "429990a54d222a07e57f0bdcc55f0660da649a3628598ed695d27026b872c3a4",
+      "42e623b323dd3543ad8a1de4b83232941c52da2fa6ca746e37c86f8451beddae",
+      "43af105489bb4c4e48af37c5adfc629f316443bc5c6160d4332b9f62dc9498e1",
+      "4475ee3f65a17ff47255893b0bf423a514dbabe17b9ed3de9ebcff3a40230385",
+      "44dd2912d26543ce5642b4f6d355c1100b37abc570d6e269f024d02dfc9c0ab0",
+      "45e87faa976dddb11393eb938494e824a98121d018ad41dd988b9499995cc7dd",
+      "462502844b44da037d33c2c29eeeaf44e8ab4db9dfc21cae307f54c23cebe8c1",
+      "47ec68a5846412037bcb7045d1f28241bac381cb5b72780719030e1e8e17b3e8",
+      "4853ecd877c8fee983d77bd9d1da0e709968426ce6af37bc84ed413fb40ecd68",
+      "488dba891ec7210f413823d0edaa22bb1cc2996931af3d2fe2d50f258fe55148",
+      "4927a3e24650fe1a5d24b80f13f7dc9a57148cb7f9a7cec1337b04cd48d2477d",
+      "49bbedde808465936cbecf1d950f85246604182aeaaa0508191fa1bdb72efecc",
+      "4a746b833efc333cd2718ddd7b6f823fd68d5fa01eba276a959b12edc6edbbb9",
+      "4b2f5054026ef73d063e811d83d781cb2febe81cf54489f596a3c26436544211",
+      "4b4db7c05d87cf316328183d216cbf05974ba0a9aa422e0e2226c9abca141851",
+      "4d0419b54407c28acfceae8e48b6be154ddf9718301203d7c8b59c80f8bcc961",
+      "4d3e2b024d432173e5141591b45cc40d0fc54aeac5da4e44f69fb5d6922193b8",
+      "4ddd9e55b62b2333ebdef160f844e0343abc79cf0874b7d9a271f8621a813941",
+      "4e870f83b52928f51151ca0a3dffd86547a59490ab2de2abca6fe03eafa75ae2",
+      "4f3b2e4782c9e56916317bb37a592d651ae390c1a160b9a2598cba75fc8b48f7",
+      "50060157b9de28ae0d401025acee15469ed287361753d332f351c1c646ed62ea",
+      "509180e11e1d4f8ea692a29e2eff8e3b8bfae84b8b6fca4a82433af3eb6e3342",
+      "51e516b4863b8df4ecb9fa78e2247fe387295c344b7517895f09b38787084f17",
+      "52cc985e4eaf89c1a240b5cf4b4a704df6a42e0a48b264c58fac1981e5be8b7c",
+      "5444f5bfb062d82ecca1c3666860960ebdfadd2f18f50607d3fd23004c8d562c",
+      "5553fdada056983e41382f5b54fe0c942a7f1093474f95d0f217004786db6575",
+      "55887ac19856448460a52ddb0693bc5ddda04dfd7c9c41b6f1f3a8d46435fa2d",
+      "55d39238f1d7607e77986d666ec7b0aa34436ecf7e9481ac1bcf1571f64cf4c0",
+      "562875c6cba65b01157ec420b15b6e2f2857e057f1e09950c9745a6d76256ce2",
+      "56486feb794d91863721059a68b5cd7ba98d6246c68e44c903c1cf760925e7cb",
+      "56842161be7249397afe80de45909fa6df140c0fc396267f81720da96f0f68ba",
+      "569375c3cac91eff2494666a58b23acb11ffd0068bf49a27ee78085401bd07b2",
+      "56d986170359e158c8a797b47294ef7e9db20ca0e303f2a02306552e81f00c14",
+      "56ee844df73e42a5063efe37f9531f179806c87d9a899236d8e43232f45ac6b3",
+      "581f041f76f7cc07ef19d6dd95441f1c5108fad4e3c3eb46c4932b00345cb8e7",
+      "584cb123180ee0df1de290766fe21e51e66314ba5efb6dca3cd00850e8c21a1e",
+      "58aa6acd64b14eeff301f1f154963b5b04e5f6c77aca27571f9893bc98f0adc5",
+      "5944e0da6e81f26be177c0b3276e21ae7ec95624df9cdbd095251be7a9a61eb2",
+      "5acf70db6ab3e8a9ca01fcb033672ae95e3bc389c9a06a34010f8b2dd5907456",
+      "5b5d5cfbd2c32fac8babb697e82d66a6f4e1735c138bf9062148b0d13290865b",
+      "5cc9a937cf009379738dceec03788998da2f6445f748ea596973e2d175a35127",
+      "5d604aea5e81f6d2b55f7014652dc3a4a6fd4e83d5c88ea23fd99189eee1e873",
+      "5e72dfdad32535adbd783bcbde31ab0a6a2e6a25e6fe29c2e9b04b1c5492a36c",
+      "5edf6e0a3844ce698bfb909ec62e308dba9c589984c5547a0695537c5bcdb282",
+      "5f34e3446c1757b9c745ec64211b35cb629b085c8650a4f195a8db3169751d0e",
+      "605ead1db538e7cb35f4002425a2225259942721644fd9710971a2f26d078415",
+      "60cd0a6ffa15c6c9882c015768c0cf269b18f61846d2edcd1d4bbb13a4410d0a",
+      "610ba6b06aa0a78166dcbc9de063449f895fe73d76f60b6b1daba758d580139e",
+      "611d31a08f40c09ea4a92defd3415a49b33820445ab56f004c2cd4284fe1cd0e",
+      "62d19c4158fc14f3198cdf87838c0626741957d409a4547bdb3f68d9176070b4",
+      "6462b48ef947e186ef60d11e0e42fbf18762cc8ecbe7e8019b870011a558c05c",
+      "649b11cb8729cfc9e10e8bb827d47d797bcd7a65dcf92561cc43e0e1e283d938",
+      "649e3aa881a68d86d66346f6e6cce7662f761e187b1e83b3feb1ba4dfb03dc11",
+      "64df299d78c3bf48a083ed314efef35a1dbea33f16b9e0e1ac642a9a9007b7aa",
+      "6640048c3196773227b409381fd81f0e9214176e8b11edf367ec00fc05d8b2ac",
+      "6682fcce1d861ee0b08ca481319768f003f4fce2b9f11f10f19598ff22b7c6db",
+      "66a08367318c3a5debf31e3e59963cc6de72fd7c4d77c54fbeffef0326578771",
+      "67252cd909198635c4ab298f4e5bd4ca2a842cb082f713c66d50334219afc9ff",
+      "6872d9047b621b2f544715352da63228e4ef2778ec40dce4e7cb96f287643961",
+      "68c86ab57d0f2d3620b5533c1ba80eec1880aba681c1d2fcd19f5fbcaa35c6e7",
+      "69eae2f6228130e73c8c4cc2055ea6246b39580ab6214a90488b5ed5ddf71674",
+      "6aaadce201af3527119280649395ce187863142fc05d6d42dc6b95cd8b5f9012",
+      "6b8790efbc93d0c83b07aa53fe099433edf69bc01cac62b665081be6fc32ed87",
+      "6ccf21271418e6ef426da9e31bcdb3eafbceb8cca3b8d44b4b74354971003355",
+      "6d756ab6d6cf3e68144300ea4adec00adab788b7271a90c628e51b2333479116",
+      "6e4a3d90162155112f3e6876c90a4f9e164a6930ec65f47538bdff90dcc5b373",
+      "6e4eb4506c845ca366b0f9cc80373dc46513998ab8879169c94c647c48273cb8",
+      "6e6724d49a3426126b72f43ac8ab96eedeacad1c50fc498fbf54bfb0544498e8",
+      "6eeff4a2b177d7436d055945be7a96929ea82acd0585dbc8a38d57ae91aa3c70",
+      "6f438cf04b07ec1f39475a98bbc348864e9237eed2105cb3d0e51b4f230df7ea",
+      "6fab0d77a4180b03116ece2cdc94e4ad95eb2c2b325a6dc67b714b4b0f6fbb99",
+      "70242289c3db7f9a0e57c427d946a15c19aaffe58a168f65edc7252ce7ab903a",
+      "713ac456e3ce80fc80dcb50d4561c1bd8cc92890a5cc3d0db73919cb776142f8",
+      "714d0fdc447870e9a3e7494320d03767382aedbc6f9d5d1ddd7d57c525d0bc36",
+      "7321ab0d4b29bfc20d28d72ca5ba30c1e742a60c3a7c4fcd39063826b547e599",
+      "73e55a456abcf43582c6a969ae69a62c15904835f81ae775c7f43eb811765905",
+      "73f02172a5333e982181d906c76152296c07b9e841360ff422bb309272ffa543",
+      "73f6b6707cad65d563d8308c99c42bfc7f1483cace973d86f03a45fcb69e5714",
+      "7729b08654a8cd1f7664ca417c562eb144877a327b08da573b2cb975be64be60",
+      "77c5bd434dce004d9d5dba8af7004843d5ae5eee849f57ae64018c25be65bfa0",
+      "786c64a7d55d67512eede3d51fa9c3a627ba4f88604638052eace71d92cdccf0",
+      "78ed5550929e076167042dd1f7e5489e41f4517169bb08ac41b09b10ea6290da",
+      "79f182e21cf4a508da53d0f2959fc80bc1d070a425135ef7a9b63d2bb9e9b9f1",
+      "7ac6b835e162c6af10d4b84f6d4b44bb415de509210ef0c501d3d4401c7ee70f",
+      "7c1c97100524233df7763f24a5d5e41b3ad07efa84cc13405fa1081c4d2d2186",
+      "7d71cf72df1bd71402a95cf75b4452d4789bb643211fe6204ca68cf4b7d3d131",
+      "7e7c24aa36a0962b10775d1866afc52ade91afd3bda46a3bc2e47dd95000a83c",
+      "7ff82ca975a6c6436e6651f64836a910e731f8bc93a3b67e8361c5b89c7a88e0",
+      "8006071a994e833c84133444401f650080909bde03793c7487d87d6c5edd578c",
+      "8051cec0f660d4c42a1fd07b2db4517a75fe57c9e1f55daa0f7eeb34a063935d",
+      "816817ba32b92d24b0bb1dce9fb23a07231a22964f9658764cf4703a22dfb85b",
+      "82aa4cfc227927867e15b1238840eea4b869a56b856689629ba1539ae64231b2",
+      "82e88b9b089dfb32373c4dbd98ec99e50db954fdbac91bb70f2e782438705c74",
+      "832d67544b41e2c2ed8931dfdec20d14a76d9325ce55434256930310a4783118",
+      "83f95b2213045519149133e8c62b2632cb702fb60e4f156181a9023997ed7f7f",
+      "841c19d0b23cd9c2efbf84e6c7253a16ae6847634d652939722c1ecad14f05ae",
+      "841e4e7a71fc52d7b2f60fbd3d2f3223724db53d114c41ffa11de4faadb21164",
+      "8815f350ae0338de2c415cd48c301301940f987f8b922dd4d79e47668fd9e75f",
+      "884b1dd778e5e01efbe10386ba0ec8dd91ec01caf4e76dbbeeb702fd053881f6",
+      "88bad9a2da4fcec27b9c643da860eda489a8fd895f1842e1acf62baea2207c02",
+      "89672e6b011283c0929f855dc77e056e3d1f6197fbd86ad5b435609082702583",
+      "8bfdb6dee956c84675c97d219029e377b5f6bab368408c8087fa5e64c0640e00",
+      "8c900d1f39b2d6f309084e054d0649c9c039fb2ee4af311d5057f70699561e3c",
+      "8d111318ebe386bf5d2827c90da533afbc8462379dc280bbb67ea25edb1a4544",
+      "8d20b1c8b49e634a53d702298a10dabaadf65608be6d3eba34cc5954c296d8ba",
+      "90b9521ec11eb7c41dbceb603ea69952cbe0a7c8d673e528230d8a37ce6c3c1d",
+      "91b21a23b34209e468bf6cea7a75480197f925032a99d07e21a7337e5766b8d6",
+      "91be999455af057990770857005409447afaec47f4eeffede76552756122a95f",
+      "9201472b04dcc7a9107d08fed9982766029fadb56bbeb903b0732fa29331fe02",
+      "922aa69ec6dab679c3f35df42fe8ce6bf8b23f592d33458620133a2f40aafb6b",
+      "93557e7a1f7791796672d91808eb9491c98a6b9bb30b26c2c1e2bbcce47aaa5c",
+      "93af267d40861ab90fc5560a5b0e3dfc6d6f83421cdfbf1a496a28c942f3c4ab",
+      "93d5888cba362f4ca184555b882d8810052ec7aca6977134aaa73349e7cd62a2",
+      "949b3d603de6abe5bdc54114d9a0b2f05473c8161c184a4f396d8935d578f2fb",
+      "94f48456e477a0dcc7fe0a225bf805e18f4653a6117a02cdf60bfcb94241aa1b",
+      "955d6583eee9aa3d27047ecd514482c99c28b80d9ef5e67e5e21a93444a97a3d",
+      "97951db9688d348c43f15dd207dad904e79f2d737c83369e5432818b1cada7f9",
+      "97c6b9b7e4bbda7ec9caa02c2e1cde989d67daaff2afb5cf7cf6298856c9d1a4",
+      "97d22f705fac9d250acc53b45a6cd8ff392064f7f5932ae302f80de69181685b",
+      "993699bba39f76700c6615ffb83a8d9f73522dcfc2fbb7f6c0720f92e7b813c4",
+      "995fa73c87e8fa4bcc71ea10d4e0bc949009a5da8b6fca818cec073680af01f7",
+      "9a527face63c4568c7544b3880d1070ec5b6e688f3b415bad259877df4d32dd5",
+      "9b5213676e474010e8067404ead395872b5506ec96f13f5ae9d6e379c35fc2c3",
+      "9b699672799276073fd41c3b51ff7f776d53cf912e97fca0de9aa9657a0051a8",
+      "9c4bba30a8466e03e836d1681fdc196956a34e1033090544fa72b1daa012b788",
+      "9c559eebfd4967e3e2c67d0aab7c69af661812b19f5de9476df8f588509a8a0a",
+      "9c98c76d75ca765c552e0445e476861748f2e2ff85d80f23744b59295886f6b4",
+      "9c9f7457a869205fb8cef5a06fb71860f848d6fec8085e37377e6aaa55ef653d",
+      "9e9b6211dabaa910a5030190b442d7defef3b2c29f7ff5c9f9f62e2db1a23bb7",
+      "a41c2b66504e5506d5217c72c0b866f88194be22180472e3e4f28e61c8e6853b",
+      "a484501bbb03f4f37008f0c17ea34895626544e920564a2387442fb0eae17d66",
+      "a5376533c89de97cd71285bc4af6cfd020a7eb4231207f33a18a29bee7cc83c6",
+      "a562d2db7ccecfb539c3fab71cfa9a5cec19827cbabeb72db1c1115125bf3aa4",
+      "a572bf3323eefa69b6eeb716328cef4a6d9c4f273f7e16af871dbc14621aaf4b",
+      "a578c1c99dfc1f8a1df93464c8c31bfa2137b19da6adafda3f4beb9366b2fee3",
+      "a6cf2d84d097ee54874813e78fa82d26439b7eda93d203333a9e25a6c2ef4321",
+      "a705d4082abe3e1c40e730f3205a12c56a3059583c66093c1cd237826fa29d37",
+      "a85631313787e7dd4bd5333089b2480d17a8cebad1501171b1a595023077e79e",
+      "a8bd320ff4bcabc8f35503f9f0cbcd1d29a3417cc5ea2ef2e6dd2a8f6d433b6f",
+      "a8f2fb6f372ff60e9f44ddf5f94b841f458284e783b84a4b7e47643441c23baa",
+      "aa83a1966e19c4101bae9fab9171215a48c1c6ed4e97aac45a73fd3ae0bf5d33",
+      "aad1638614df123b6394fb97970c473dea15d8c08365a190b0131b4c8ec9de23",
+      "aaf9e04c1769039d8e665b9a64f9615d11a09c52e85cf8e5b6daefa83b70dcba",
+      "ab5fc2e02a54f72714598a9be05fdf75f345b6cc139f8ea4d2f6911df0a7d155",
+      "ab8dbfd567d14eb44c4fe0da213abbbdf81d506fde493dde6d8841bf2706bc2e",
+      "afab759d2b485ec5cb70314864440113e542e0012f280e196b481ea336dd5b6e",
+      "b16042dd78964c6039eaf6697d316c2b92450ea4c939a13c4ac2d90210f75ed7",
+      "b26601896461721c8c7bb4beffd5de158df660301fac01ab17e4fb2f024ccf35",
+      "b3673364772215dbe71a6cf43d383761c2abf092840c027d4bc984ae2fe6fa4b",
+      "b3f5b612222f2e23291d6b10f32d56d72e111936e904f745ad2d45eaab402064",
+      "b40476e09202d55887e53e04849e2998568fa2da8d29e351a9bd216163078a2f",
+      "b411471b21a849fc51317ee7f67d80594d4e87a95e4c2481c938f86ef1f57830",
+      "b5d389a0977232396610f9ea84b2f880d50456252275800a01827ac6853cb0cc",
+      "b714e825e036369938e8dbe37e16a9d473d685c8083867dcae651274baa675e7",
+      "b965e4098a5bc0ff4bbf2d2a3168e93eefa1a91362db643cf87a96b6bbad7958",
+      "b9e912c112681edee8b9913f1357c54f1f77c6e1bde353d3182ca32b0ce231a4",
+      "bb195fd714041ba6644d0b8dd0da4c2b5edf69f21868221d52b2dd4c398840d5",
+      "bc763e87f20036d27148a9da8db5bcff727fa46107ed0a3b4790e589cc2ce6a4",
+      "bd71ede797a84848066d71712f230a773c8f37db297eccea83a341f954653e3d",
+      "be04a8d5c51fb9c948ecc5a9e0104827ad8387882b88054500c15655c0e8e0a2",
+      "c04cd8ce872849f22f10a1b956447a2024e6af570a2b49efe482b99a0f321c6e",
+      "c176dd86412fc5f995c9bc8f8ef4d8a4f4a2e06c20932bb959e7d0d8f6c74527",
+      "c407326f177d544e03948739c8694633f11db78d1c819c559ad6ea3e09790e90",
+      "c421fedfc1fb26794f484bf95a5285bdf61526cc0db95fee874b30aa9cec8bce",
+      "c57a372fe4b7a7b23da44972ebd089827b27401bb39bebf46e0e902c32900ee0",
+      "c7322c058c106d66f9bf5791b9c334a05977c47f3b4a29e2d6254ad1f55aa9e2",
+      "c89f7095427d3a7560ef869f925f8c20c2d73c5f7d0f3b12f09732195df1fc2e",
+      "c9a501013f4bc7d12d846884c438e1569a29fe34ae2d986c1b8e40c2326bacae",
+      "ca4bced71d1943cfa1bd4cd5fe560b9f06ffc60ed49ee8d6e779cf188c51cdd7",
+      "ca9058c683dde241bed344e9dad333c3e38818fdd786cbf86cc61fce96dfa84a",
+      "cb3f272d52b091b6b670045dc079ec335bcd40059fb314efc3bce80eb077c8e4",
+      "cb43781124987f2df34f19457aff39bf67c03bedb2e5207547067d35adb60ae2",
+      "cb62ce697fbd9f9d166615f0bf88d653496e87202c3eaa7ff6e33739f99d8a25",
+      "cc92f1c3aa6aabe21e235bf75292fba63b0f50e02f521f102d304013a31ba0a4",
+      "cd74cc53e18c8985254b27e8ac3fb4ddc07071c2137f473880e45e1ab58f200f",
+      "cd846c494d3280ad70b92afd3d480ae22d5ca3dcf290ecbef0902d93765ee2f7",
+      "d06c961839222e78b1bbc85cf4a36357478da665afbe4cd03dfaedc504014499",
+      "d0e57869117f0a432e67cd38046478f00a98c650add46650f9256b72c976442a",
+      "d1abc921a6787501e02e01a426f876d6b0ad8cdb1bad0bc4a87dc0e4e940438f",
+      "d2dfee3a32c23b1b3baf6605045e4d6cf8d6d240e7ae6a30a96f92e836d759d0",
+      "d2f8c1b86dd79276e67aa39e0664d99d1a3ebcfb6ae2c7d44c9db4ca54c2a318",
+      "d3ab1d85abf1e21b3a41b19b5882ce7d79f9b2057b0828beaa479c13776f3c51",
+      "d468308eea5f95b8c1e6932efefaba4d6643aa33929ff679fafa5a8dba3cc411",
+      "d57e414407e01f0a5027172f2ff98b1f8b2f286b3d334d748d8f007aa904f5fb",
+      "d5e9feb2fabe35c5452d13106e18013b543c30e4b7bac7ea0a5c4fde5b5ba75d",
+      "d7df548b3c34bcc411a0623a1fec9fe0555de2cf4e1b4b58569c9de3659f9f28",
+      "d8856b9d728fd2ecba5f559543e0cb6391d66423a8d0e80482e70fbe251442db",
+      "da2b401856046685f7eb83035f0be3cecf5480b0e42f7e0f24fc4377df10b1bd",
+      "da3575b03220e8f5280ff903cdcb9f6b01fff882c67cd1c9ef5fb93466c9392d",
+      "da4fcdd23c10719e9a2ce0930e7ff9c0658e311b07b8ec615b5785dea1f6202e",
+      "db9356e636319773dd3f2fd52fdccbeccbbf25560e2284fd9ae070fc49e50606",
+      "dc1a8bf193e10de1e610f76998452e15d9bcb8bf7cc83865fba47e8a52db7bff",
+      "dd0dbb348e9831e37382827e431ba3aa3e49f6bc9bdbe5760333ad0cf5f50eca",
+      "de08cf793f1c12ffedfdb2525c022f8772aa4b721f08f41042065bfa7918f0ce",
+      "de3776d2accb0559646f7a19972755a6dbe22fda42ef53a05a242ff57552a0dc",
+      "deda3da7979b8f39ea73c96490bdb6ba3201a5d3ad6ca01d99bdd409cc41aa9a",
+      "e013c180558a443de92840eacfe361274cb90f1990bf165542000488b0f012df",
+      "e0942c1e1adc9650181cdfd0ae1b012fec311bda08fa0f1adbc7f3ac3caecbee",
+      "e0fc38ec36ba4f04d78f41f062246b430888af6faa4df46f56cf54373ac00ff3",
+      "e27d83b8f182712f0e3bb95109c75db17d84831f3a3624c1e6fc799be4f9dbcc",
+      "e2ccca3846518044c1f29b5a8635ed9df6c6c0f816c45dacc0c150b8bcae51e2",
+      "e3f37bf78b27fd391a64bc2079cf854a8bfaf36d6d6101bc1809dc4b585a7075",
+      "e4e65094ef47bfa34cd75b31433d5ff97c96b65befebdbb32ba2045191459b4f",
+      "e5f1a0c06f397075f09b67abb4afc35a4f324fd463c9d55529b62edc6664f7cb",
+      "e6a23ffbeb74110fc645ccbe5fbb8398fbad46ac876889bec97036bd3c704ba8",
+      "e723d31360d4f80a9d8b3bf10f174bac2590a33561119fbcb6253fc2dd42e5e7",
+      "e8c30de2533b398b91027af39422f49e5abf27ceab3dfea96e6e86e724b8f28a",
+      "e8e1533e461d2596ab479da32079dd65756cf318e2f4dc5bc4bf0199a02d509e",
+      "e971bd3c8523aabf62c2c3ae2ce5017c39a97177ae81138b1bda4f9ea3d766e3",
+      "e9f5eb33f6516c3a0e580c5bac73e2488c03dc260ba43d2355d59142ae49d21b",
+      "ea4dd38ddad52a9a34a6363d06b1bfc9433e6dbefbca5764cafd6f26e095bbae",
+      "ebc415b1f66640c2629a01fea6ab08701ba460722c90234f7cd0c61ea064bc16",
+      "ece5593577ed54cfd4b9c0d1b7e0880c976b1b6a6392a354524dce7c203525e7",
+      "ed9bd05046a40558510c9d375a347a823ad04f9c25dba52eb81888c239890b31",
+      "edb2f3b8ff778888be2fc3e2c791b0f62e50c23436e8b46b25251d2bfb17eb9c",
+      "ee66067655581f08091f169764f56fa558d4f38cd69da80736820d0eafc79c03",
+      "ef58e5fce318fa0b9235e0d64c35bcca3aeb1f2efd81fa00002aa54d77036a01",
+      "ef785755bbe3349b449b76de52ccfbdec390af87a5db30f27e72ebfac19500e8",
+      "effe47592ef05700dff123cee7665986cad6c265aaf76435d603dc92cacc449c",
+      "f0ce9a42b15424a18285ad742eb431505b345750da541fc5c6f6337b21953a86",
+      "f19a5da9c9ec8fe15cfe26eda2be119f47b304001b0d406c85e8e4bf87febb00",
+      "f1c716f5d668295648ef5847370976738f2ef161aa83c626a881b0e4b29b6324",
+      "f6090bfdf1f0b86c8de244c2363636a3618c7a36f8e40c87486bb63281ab81fa",
+      "f61654fce18ec273f7b3cdbfc58da24e45796e6c91cf17f0f25e4bc40030410c",
+      "f681249f92b40f5f472f902ce2b01112f4f05e6a6c869a23d8ff91402a22874e",
+      "f6ae2b4c81870b2b20558976e8a6748ba0e5cf2098a31ee77be2c52c341f13cf",
+      "f729a86b1e0d355f03e6bf50d13abf26d283c4e559b30e66e63d55bcc4165832",
+      "f73d2299f45ab079687809da7fc49b20a9383e444f0f6885d1569a2f13b35b74",
+      "f77b34a3eb75db0175e0dc30e55c55ded6dbb57bf9a482af2e716ee2c06f2c10",
+      "f7dbfafac09b82953b31f833f0672be05edb9b7cf9222b75339c145acb5e20a3",
+      "f80bda16f7a7b2f658a190372618964ed05affbad80387715c4fecb4274cb8a3",
+      "f811d1e217ecbf3aa5d4708b1d65377f93a76ae1245f7fd146a638e10895211a",
+      "f8418dcbf1cfbe2a7281d574a4d59cdff023233ca1d11c75d2199fcb4b70d1d8",
+      "f8e2bb8dc93a29a08c59714bee2524882736d1fb134b70bacc744ef493b558b1",
+      "fab87bcc9057a99e2bc035c1d19df11ed099ba6f65e51ba6fd8b463933e0cfb2",
+      "fc3ad149a59e69e6e30a7c94ed72b5b2eae0632e4ab794ee2eb909c2771052b4",
+      "fca464440f2256be717fcd91d2d5fd8957002470976fd6172e4330eed150c514",
+      "fce566d756c145448be300809fd6806c3a10943563510e3431981f9817c3fed3",
+      "fea96219d327f1bfa1ef67cb35bec50d6e700ce85deb8565a302d0a5578bff95",
+      "ff9b0998b668f49e31d5ec49cf51fb0d1aad9412a4091f3d95fcf847cbcc4eaf"
+    ],
+    "scan_base_commit": "868923a0a103ae4fbddc4f20b311a45bc940035d",
+    "scan_summary": "current tracked and ignored text/result roots; oversized non-Banking retained files checked directly for Banking77 identifiers",
+    "source_id_count": 336,
+    "source_ids": [
+      "banking77-796a-test-100",
+      "banking77-796a-test-103",
+      "banking77-796a-test-104",
+      "banking77-796a-test-109",
+      "banking77-796a-test-1091",
+      "banking77-796a-test-1093",
+      "banking77-796a-test-1106",
+      "banking77-796a-test-111",
+      "banking77-796a-test-1112",
+      "banking77-796a-test-1113",
+      "banking77-796a-test-1114",
+      "banking77-796a-test-114",
+      "banking77-796a-test-118",
+      "banking77-796a-test-119",
+      "banking77-796a-test-1243",
+      "banking77-796a-test-1245",
+      "banking77-796a-test-1249",
+      "banking77-796a-test-1250",
+      "banking77-796a-test-1251",
+      "banking77-796a-test-1254",
+      "banking77-796a-test-1255",
+      "banking77-796a-test-1258",
+      "banking77-796a-test-1259",
+      "banking77-796a-test-1262",
+      "banking77-796a-test-1264",
+      "banking77-796a-test-1268",
+      "banking77-796a-test-1273",
+      "banking77-796a-test-1277",
+      "banking77-796a-test-1278",
+      "banking77-796a-test-1279",
+      "banking77-796a-test-1621",
+      "banking77-796a-test-1625",
+      "banking77-796a-test-1631",
+      "banking77-796a-test-1632",
+      "banking77-796a-test-1634",
+      "banking77-796a-test-1635",
+      "banking77-796a-test-1720",
+      "banking77-796a-test-1721",
+      "banking77-796a-test-1722",
+      "banking77-796a-test-1726",
+      "banking77-796a-test-1729",
+      "banking77-796a-test-1730",
+      "banking77-796a-test-1731",
+      "banking77-796a-test-1732",
+      "banking77-796a-test-1736",
+      "banking77-796a-test-1738",
+      "banking77-796a-test-1743",
+      "banking77-796a-test-1745",
+      "banking77-796a-test-1753",
+      "banking77-796a-test-1757",
+      "banking77-796a-test-1758",
+      "banking77-796a-test-1759",
+      "banking77-796a-test-2000",
+      "banking77-796a-test-2001",
+      "banking77-796a-test-2004",
+      "banking77-796a-test-2006",
+      "banking77-796a-test-2008",
+      "banking77-796a-test-2012",
+      "banking77-796a-test-2013",
+      "banking77-796a-test-2017",
+      "banking77-796a-test-2018",
+      "banking77-796a-test-2022",
+      "banking77-796a-test-2025",
+      "banking77-796a-test-2029",
+      "banking77-796a-test-2030",
+      "banking77-796a-test-2032",
+      "banking77-796a-test-2034",
+      "banking77-796a-test-2037",
+      "banking77-796a-test-2090",
+      "banking77-796a-test-2091",
+      "banking77-796a-test-2098",
+      "banking77-796a-test-2100",
+      "banking77-796a-test-2108",
+      "banking77-796a-test-2116",
+      "banking77-796a-test-812",
+      "banking77-796a-test-813",
+      "banking77-796a-test-815",
+      "banking77-796a-test-82",
+      "banking77-796a-test-823",
+      "banking77-796a-test-825",
+      "banking77-796a-test-834",
+      "banking77-796a-test-84",
+      "banking77-796a-test-88",
+      "banking77-796a-test-89",
+      "banking77-796a-test-91",
+      "banking77-796a-test-93",
+      "banking77-796a-test-96",
+      "banking77-796a-test-99",
+      "banking77-796a-train-2550",
+      "banking77-796a-train-2606",
+      "banking77-796a-train-2630",
+      "banking77-796a-train-2634",
+      "banking77-796a-train-2637",
+      "banking77-796a-train-2668",
+      "banking77-796a-train-296",
+      "banking77-796a-train-297",
+      "banking77-796a-train-298",
+      "banking77-796a-train-301",
+      "banking77-796a-train-304",
+      "banking77-796a-train-314",
+      "banking77-796a-train-317",
+      "banking77-796a-train-320",
+      "banking77-796a-train-321",
+      "banking77-796a-train-326",
+      "banking77-796a-train-331",
+      "banking77-796a-train-332",
+      "banking77-796a-train-333",
+      "banking77-796a-train-339",
+      "banking77-796a-train-347",
+      "banking77-796a-train-348",
+      "banking77-796a-train-349",
+      "banking77-796a-train-351",
+      "banking77-796a-train-3514",
+      "banking77-796a-train-355",
+      "banking77-796a-train-3550",
+      "banking77-796a-train-3573",
+      "banking77-796a-train-3579",
+      "banking77-796a-train-3615",
+      "banking77-796a-train-3646",
+      "banking77-796a-train-368",
+      "banking77-796a-train-378",
+      "banking77-796a-train-384",
+      "banking77-796a-train-391",
+      "banking77-796a-train-392",
+      "banking77-796a-train-396",
+      "banking77-796a-train-398",
+      "banking77-796a-train-3995",
+      "banking77-796a-train-3996",
+      "banking77-796a-train-3997",
+      "banking77-796a-train-3998",
+      "banking77-796a-train-4002",
+      "banking77-796a-train-4007",
+      "banking77-796a-train-4010",
+      "banking77-796a-train-4013",
+      "banking77-796a-train-4016",
+      "banking77-796a-train-4019",
+      "banking77-796a-train-4024",
+      "banking77-796a-train-4026",
+      "banking77-796a-train-4029",
+      "banking77-796a-train-4030",
+      "banking77-796a-train-4036",
+      "banking77-796a-train-4038",
+      "banking77-796a-train-4040",
+      "banking77-796a-train-4046",
+      "banking77-796a-train-4050",
+      "banking77-796a-train-4052",
+      "banking77-796a-train-4070",
+      "banking77-796a-train-4074",
+      "banking77-796a-train-4077",
+      "banking77-796a-train-4086",
+      "banking77-796a-train-4094",
+      "banking77-796a-train-4097",
+      "banking77-796a-train-5148",
+      "banking77-796a-train-5158",
+      "banking77-796a-train-5184",
+      "banking77-796a-train-5191",
+      "banking77-796a-train-5207",
+      "banking77-796a-train-5213",
+      "banking77-796a-train-5545",
+      "banking77-796a-train-5546",
+      "banking77-796a-train-5549",
+      "banking77-796a-train-5556",
+      "banking77-796a-train-5566",
+      "banking77-796a-train-5571",
+      "banking77-796a-train-5572",
+      "banking77-796a-train-5574",
+      "banking77-796a-train-5577",
+      "banking77-796a-train-5589",
+      "banking77-796a-train-5591",
+      "banking77-796a-train-5606",
+      "banking77-796a-train-5610",
+      "banking77-796a-train-5612",
+      "banking77-796a-train-5615",
+      "banking77-796a-train-5617",
+      "banking77-796a-train-5620",
+      "banking77-796a-train-5623",
+      "banking77-796a-train-5626",
+      "banking77-796a-train-5629",
+      "banking77-796a-train-5637",
+      "banking77-796a-train-5638",
+      "banking77-796a-train-5645",
+      "banking77-796a-train-5652",
+      "banking77-796a-train-5656",
+      "banking77-796a-train-5665",
+      "banking77-796a-train-6482",
+      "banking77-796a-train-6486",
+      "banking77-796a-train-6487",
+      "banking77-796a-train-6489",
+      "banking77-796a-train-6493",
+      "banking77-796a-train-6503",
+      "banking77-796a-train-6504",
+      "banking77-796a-train-6510",
+      "banking77-796a-train-6512",
+      "banking77-796a-train-6513",
+      "banking77-796a-train-6520",
+      "banking77-796a-train-6523",
+      "banking77-796a-train-6524",
+      "banking77-796a-train-6528",
+      "banking77-796a-train-6533",
+      "banking77-796a-train-6541",
+      "banking77-796a-train-6545",
+      "banking77-796a-train-6550",
+      "banking77-796a-train-6552",
+      "banking77-796a-train-6555",
+      "banking77-796a-train-6559",
+      "banking77-796a-train-6562",
+      "banking77-796a-train-6576",
+      "banking77-796a-train-6578",
+      "banking77-796a-train-6582",
+      "banking77-796a-train-6587",
+      "banking77-796a-train-6766",
+      "banking77-796a-train-6768",
+      "banking77-796a-train-6779",
+      "banking77-796a-train-6804",
+      "banking77-796a-train-6815",
+      "banking77-796a-train-6818",
+      "banking77-test-1080",
+      "banking77-test-1081",
+      "banking77-test-1082",
+      "banking77-test-1083",
+      "banking77-test-1084",
+      "banking77-test-1085",
+      "banking77-test-1086",
+      "banking77-test-1087",
+      "banking77-test-1088",
+      "banking77-test-1089",
+      "banking77-test-1600",
+      "banking77-test-1601",
+      "banking77-test-1602",
+      "banking77-test-1603",
+      "banking77-test-1604",
+      "banking77-test-1605",
+      "banking77-test-1606",
+      "banking77-test-1607",
+      "banking77-test-1608",
+      "banking77-test-1609",
+      "banking77-test-2080",
+      "banking77-test-2081",
+      "banking77-test-2082",
+      "banking77-test-2083",
+      "banking77-test-2084",
+      "banking77-test-2085",
+      "banking77-test-2086",
+      "banking77-test-2087",
+      "banking77-test-2088",
+      "banking77-test-2089",
+      "banking77-test-800",
+      "banking77-test-801",
+      "banking77-test-802",
+      "banking77-test-803",
+      "banking77-test-804",
+      "banking77-test-805",
+      "banking77-test-806",
+      "banking77-test-807",
+      "banking77-test-808",
+      "banking77-test-809",
+      "banking77-train-2511",
+      "banking77-train-2512",
+      "banking77-train-2513",
+      "banking77-train-2514",
+      "banking77-train-2515",
+      "banking77-train-2516",
+      "banking77-train-2517",
+      "banking77-train-2518",
+      "banking77-train-2519",
+      "banking77-train-2520",
+      "banking77-train-2521",
+      "banking77-train-2522",
+      "banking77-train-2523",
+      "banking77-train-2524",
+      "banking77-train-2525",
+      "banking77-train-2526",
+      "banking77-train-2527",
+      "banking77-train-2528",
+      "banking77-train-2529",
+      "banking77-train-2530",
+      "banking77-train-3482",
+      "banking77-train-3483",
+      "banking77-train-3484",
+      "banking77-train-3485",
+      "banking77-train-3486",
+      "banking77-train-3487",
+      "banking77-train-3488",
+      "banking77-train-3489",
+      "banking77-train-3490",
+      "banking77-train-3491",
+      "banking77-train-3492",
+      "banking77-train-3493",
+      "banking77-train-3494",
+      "banking77-train-3495",
+      "banking77-train-3496",
+      "banking77-train-3497",
+      "banking77-train-3498",
+      "banking77-train-3499",
+      "banking77-train-3500",
+      "banking77-train-3501",
+      "banking77-train-5092",
+      "banking77-train-5093",
+      "banking77-train-5094",
+      "banking77-train-5095",
+      "banking77-train-5096",
+      "banking77-train-5097",
+      "banking77-train-5098",
+      "banking77-train-5099",
+      "banking77-train-5100",
+      "banking77-train-5101",
+      "banking77-train-5102",
+      "banking77-train-5103",
+      "banking77-train-5104",
+      "banking77-train-5105",
+      "banking77-train-5106",
+      "banking77-train-5107",
+      "banking77-train-5108",
+      "banking77-train-5109",
+      "banking77-train-5110",
+      "banking77-train-5111",
+      "banking77-train-6722",
+      "banking77-train-6723",
+      "banking77-train-6724",
+      "banking77-train-6725",
+      "banking77-train-6726",
+      "banking77-train-6727",
+      "banking77-train-6728",
+      "banking77-train-6729",
+      "banking77-train-6730",
+      "banking77-train-6731",
+      "banking77-train-6732",
+      "banking77-train-6733",
+      "banking77-train-6734",
+      "banking77-train-6735",
+      "banking77-train-6736",
+      "banking77-train-6737",
+      "banking77-train-6738",
+      "banking77-train-6739",
+      "banking77-train-6740",
+      "banking77-train-6741"
+    ],
+    "sources": [
+      {
+        "contribution": "240 prior exposed coordinates/digests plus the prior frozen 96-row split",
+        "path": "examples/deployment/data/banking77-mipro-stage1.json",
+        "sha256": "4934ebc54b06614343461c2fe79c7ca4807892c1b645cbb30790e945dcb2c34a"
+      }
+    ]
+  },
+  "labels": [
+    {
+      "route": "R15",
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15
+    },
+    {
+      "route": "R16",
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16
+    },
+    {
+      "route": "R27",
+      "source_label": "declined_transfer",
+      "source_label_id": 27
+    },
+    {
+      "route": "R32",
+      "source_label": "exchange_rate",
+      "source_label_id": 32
+    },
+    {
+      "route": "R38",
+      "source_label": "get_physical_card",
+      "source_label_id": 38
+    },
+    {
+      "route": "R45",
+      "source_label": "pending_card_payment",
+      "source_label_id": 45
+    },
+    {
+      "route": "R53",
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53
+    },
+    {
+      "route": "R70",
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70
+    }
+  ],
+  "payload_sha256": "sha256:fc48ff2a8d4408eeaf917e7df4c32f80cfd162b1dcb542f467971ade217b71e3",
+  "schema_version": 1,
+  "selection": [
+    {
+      "normalized_text_sha256": "219b2d14d1cbfc87efc3fada9a24983dda1ccd311e451eca474cb9017095d4a6",
+      "route": "R15",
+      "selection_key_sha256": "0f1486ec188831ae3319461307e3937ace80b10b21ffc59dff2d559939e61ec0",
+      "source_id": "banking77-796a-train-2654",
+      "source_index": 2654,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "train",
+      "utterance": "Please tell my why I was charged a fee for using my card?"
+    },
+    {
+      "normalized_text_sha256": "253669c688b45ab366ea3796f9153d21932e5fc00abf812465f7b5d6054e6e41",
+      "route": "R15",
+      "selection_key_sha256": "1003947b4e02b6905dd9e6d49c32ecdfa8d58094b24ebd7d15bb9692b2142c8a",
+      "source_id": "banking77-796a-train-2686",
+      "source_index": 2686,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "train",
+      "utterance": "After I used my card I saw I was charged a fee for using it"
+    },
+    {
+      "normalized_text_sha256": "86a6b2f7ee6baf4ec1c9e2351fa2c27d83b047da9ffb3ed6b9ff25372bec22f0",
+      "route": "R15",
+      "selection_key_sha256": "10303917dfbdc2f2942a32d224e755d88a43de2f8190c266037a753717d54d67",
+      "source_id": "banking77-796a-train-2588",
+      "source_index": 2588,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "train",
+      "utterance": "An extra fee has been added to my card payment is this correct?"
+    },
+    {
+      "normalized_text_sha256": "ea50deda1f29517c4c9a144db31216d268c58b00f0952e2c84ad5295cf4a0dea",
+      "route": "R16",
+      "selection_key_sha256": "08a06f7307998b5b237915b0cb51c7ea212c2acea15be1ad3ec913f4eb8d46b6",
+      "source_id": "banking77-796a-train-3549",
+      "source_index": 3549,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "train",
+      "utterance": "I did not charge my account for that transaction.  That's an error."
+    },
+    {
+      "normalized_text_sha256": "a9ca78066517709b7f45c396f7cfd714d1a30eeef6bea27596c7c158a1578fe0",
+      "route": "R16",
+      "selection_key_sha256": "09777492c7b864b4321db9fa264d8bfb1f32d707fb352c34fa0519aa2f1f50dc",
+      "source_id": "banking77-796a-train-3561",
+      "source_index": 3561,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "train",
+      "utterance": "The app is showing a payment I never made."
+    },
+    {
+      "normalized_text_sha256": "9e5ed6f13acad6e0022ed2e053dbfab860db71c46a440813e32d041717edf011",
+      "route": "R16",
+      "selection_key_sha256": "0a2a005775368c5c4ef750ba55bff8e8fdc5e1071a4663721f5f2411fa0264c6",
+      "source_id": "banking77-796a-train-3503",
+      "source_index": 3503,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "train",
+      "utterance": "I don't recognize what this payment on my statement would be for."
+    },
+    {
+      "normalized_text_sha256": "8992cd08fbe00d897a7761f8b92cd36d418b9503d7a8309ded42b85ecc796d39",
+      "route": "R27",
+      "selection_key_sha256": "0bd6082e92a5f8fab78800fe3441592fcc0d47301a0e8233fb8020ba2a69b1e7",
+      "source_id": "banking77-796a-train-5576",
+      "source_index": 5576,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "train",
+      "utterance": "I have been doing some online shopping, but when checking out, it keeps getting declined. I tried a few times and it wouldn't work. What could be wrong?"
+    },
+    {
+      "normalized_text_sha256": "0ca8320a67eb2f2e408b4f60eb7a33e9c4bd50ecba32c3542335fd4da15005e1",
+      "route": "R27",
+      "selection_key_sha256": "0bdea4f56b7497e7699432774d7d53cdb1f60af09a9a7f5a853a8329480202ba",
+      "source_id": "banking77-796a-train-5673",
+      "source_index": 5673,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "train",
+      "utterance": "Please explain why my transfer attempt was declined. Thank you."
+    },
+    {
+      "normalized_text_sha256": "70bf44665643f69ea572a7929f93192d8370063bac9e0daa2816ecc64e286fe9",
+      "route": "R27",
+      "selection_key_sha256": "0c3ca152d19e2ca22d06d7ecdeb87dc4c16709e9381e4e4b82b3aaf26095106f",
+      "source_id": "banking77-796a-train-5664",
+      "source_index": 5664,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "train",
+      "utterance": "Hi, Yesterdays i was unable to do online shopping as it was getting declined. Today I am facing the same issue. Please help me in this respect."
+    },
+    {
+      "normalized_text_sha256": "502384d6b388d28380f626c8ecba3c8986907cb5c84eeddb8f8f77205bc6f160",
+      "route": "R32",
+      "selection_key_sha256": "0986f71ca4c5ee554700f64a5931b531844e2117d9cdb1315265bd60920e99fa",
+      "source_id": "banking77-796a-train-377",
+      "source_index": 377,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "train",
+      "utterance": "How do you decide what your exchange rates are?"
+    },
+    {
+      "normalized_text_sha256": "f46ef5abb801a547035365b68e72d6e60e88b3f06c745bafc9cf6fd3780fcc9b",
+      "route": "R32",
+      "selection_key_sha256": "09a36ae1d36b346a9c762d2010abdfb32f0a27cbd6ac14d7b7130bad88b68b56",
+      "source_id": "banking77-796a-train-306",
+      "source_index": 306,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "train",
+      "utterance": "Your exchange rates come from where?"
+    },
+    {
+      "normalized_text_sha256": "c0d9e59a29c28b128b2f7434095f2a31571a321ee23a4bb8cb387402c74d2132",
+      "route": "R32",
+      "selection_key_sha256": "0dabe5a9fec2b36792c6cd847b65a16b3f2e2a42893c22340ce3352b0d334b97",
+      "source_id": "banking77-796a-train-360",
+      "source_index": 360,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "train",
+      "utterance": "What factors effect the exchange rate?"
+    },
+    {
+      "normalized_text_sha256": "04be4410ba4406995d0fecd131a1a87895202110455a28b065b1c28e92429d27",
+      "route": "R38",
+      "selection_key_sha256": "029bf5d138f694d3b6b1d3f348bcddc7596f4a3c47d062df05b5d7fe09a0c6c5",
+      "source_id": "banking77-796a-train-4075",
+      "source_index": 4075,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "train",
+      "utterance": "I haven't been sent my new pin!"
+    },
+    {
+      "normalized_text_sha256": "30eef94ae6a0195195cdf9afe6073194cfcc3ed36666bc56f58bce23562242f6",
+      "route": "R38",
+      "selection_key_sha256": "0312386e6a02be3f78631f8ab27fb9c0538e5a356011af278010a6305d0d2d8d",
+      "source_id": "banking77-796a-train-4001",
+      "source_index": 4001,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "train",
+      "utterance": "i have yet to get my pin"
+    },
+    {
+      "normalized_text_sha256": "f1eb890af49702c171496b1c82c2c7cea0dbfd8c782ea46151d2b126889ce1c9",
+      "route": "R38",
+      "selection_key_sha256": "082aa03378cd246bd4d72367bd1bda3d122fc0260796d4abe7ffc0a7fd717505",
+      "source_id": "banking77-796a-train-4023",
+      "source_index": 4023,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "train",
+      "utterance": "My card arrived but I don't know how to get my PIN."
+    },
+    {
+      "normalized_text_sha256": "60fc9d4a5a01bc7ca907014c263c4842721efa289a939b4b4e336a873b592a43",
+      "route": "R45",
+      "selection_key_sha256": "13bca58450a46eb0f2687da925c15f6430c741f5ff57f9dec19fdfc39092d94d",
+      "source_id": "banking77-796a-train-5178",
+      "source_index": 5178,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "train",
+      "utterance": "When is a payment I made with my card going to clear>"
+    },
+    {
+      "normalized_text_sha256": "418ea6176b7f94fb5c5a4724ca6d35855fdd0d277f316f79b9434bca9d3ced56",
+      "route": "R45",
+      "selection_key_sha256": "15cd42adff0497d5934371c180c68a3669950f221da90e0c01607d7d38d11fb7",
+      "source_id": "banking77-796a-train-5176",
+      "source_index": 5176,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "train",
+      "utterance": "pending transaction?"
+    },
+    {
+      "normalized_text_sha256": "cb363e190dd13f72837e7f488f0243d8d27f44aa88da06b1f94aee2d63345efa",
+      "route": "R45",
+      "selection_key_sha256": "1627474e5abd78bf3541e81421f91ecf0fa3ab1f0fca6533ec8adad36fcef7e8",
+      "source_id": "banking77-796a-train-5214",
+      "source_index": 5214,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "train",
+      "utterance": "There is a payment showing as pending and hasn't posted for a few days.  When will it post?"
+    },
+    {
+      "normalized_text_sha256": "c146e44313d19cca04039bc6c4e6029c50f5286c3b49db8b25f2c46fb830b59a",
+      "route": "R53",
+      "selection_key_sha256": "0bbeab7a32eb192f2eaa395db0abff2d59c0133c3f14ff2218cd2ad506c30d8c",
+      "source_id": "banking77-796a-train-6800",
+      "source_index": 6800,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "train",
+      "utterance": "My payment has been returned."
+    },
+    {
+      "normalized_text_sha256": "5eb49e34c96cefc75c016519662477afb8ceea5cc0f1ad32a56e1c1b8efbb554",
+      "route": "R53",
+      "selection_key_sha256": "107a64efa4f8efda7341a324bbaaf51be566666299d9846118dc79a8365dfebd",
+      "source_id": "banking77-796a-train-6858",
+      "source_index": 6858,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "train",
+      "utterance": "I sent a payment but now it's not showing up."
+    },
+    {
+      "normalized_text_sha256": "d9f54d90f593bb7009eb26622717fa1f22fe0a925a173a7ff7abd45d76c64c5a",
+      "route": "R53",
+      "selection_key_sha256": "153f79c53e4859f65d64d61a99bd3bdac1bc31aaebb5a43940e445c4770b2b0e",
+      "source_id": "banking77-796a-train-6875",
+      "source_index": 6875,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "train",
+      "utterance": "I am not able to purchase anything online! I have been using my card on multiple sites over a period of two weeks and none of the payments have gone through. Why is this happening?"
+    },
+    {
+      "normalized_text_sha256": "6c7896ca7b876efe67cb9a6718d8cf7ef42914dc4e8e70a97134936ccf02d9d5",
+      "route": "R70",
+      "selection_key_sha256": "04474e18f947ef72a410a9df52bd7c05b28282f0d923541f060eca7ead4b0600",
+      "source_id": "banking77-796a-train-6496",
+      "source_index": 6496,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "train",
+      "utterance": "where to i get my funds from?"
+    },
+    {
+      "normalized_text_sha256": "9af4913eec1cc4d8a7d9d8e0aa8d9d555fa254227f97728218465eb373291777",
+      "route": "R70",
+      "selection_key_sha256": "06d4591cfdd826823e0d4b13fba87e74041af7f28a94c17fb91f28a0951a80ef",
+      "source_id": "banking77-796a-train-6532",
+      "source_index": 6532,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "train",
+      "utterance": "Are there steps to see where my funds come from?"
+    },
+    {
+      "normalized_text_sha256": "06bd0a5bb3013e1e906daf628f87672a7bcbf7f543ca45b33991ad2205489f3d",
+      "route": "R70",
+      "selection_key_sha256": "1429339ff732574733e9acc1c87a873ec0154658137b9fa1eaf8fb2133b807c2",
+      "source_id": "banking77-796a-train-6543",
+      "source_index": 6543,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "train",
+      "utterance": "My funds must be verified"
+    }
+  ],
+  "source": {
+    "files": {
+      "test": {
+        "bytes": 92969,
+        "path": "data/test-00000-of-00001.parquet",
+        "rows": 3080,
+        "sha256": "535fc96c4c2b4c2dbdeb0d4b31f24a4859620cf663d6c19c1bd1f97450c410be"
+      },
+      "train": {
+        "bytes": 295235,
+        "path": "data/train-00000-of-00001.parquet",
+        "rows": 10003,
+        "sha256": "4526edfa60622ff9b39e238657ab6d712f6aba1ba91c9d7ed7897b0715ee0390"
+      }
+    },
+    "license": "CC-BY-4.0",
+    "repository": "PolyAI/banking77",
+    "revision": "796a4623935746f71378f0ebd435635a8ce08e50",
+    "snapshot_sha256": "5b2420944b57c674ec91b330bd5ab015d4637873488556cbf743c14291f46d00"
+  },
+  "test": [
+    {
+      "normalized_text_sha256": "f51cacaf4d00403f4605ae3315cd354b40ebca0dcb51d1cd3105e0cb7726ddb8",
+      "route": "R15",
+      "selection_key_sha256": "0f830dd632b3662b7dc0d4a3c86a1b0d0c6277fe57372ce20a9e2ef4ce2f8d5b",
+      "source_id": "banking77-796a-test-817",
+      "source_index": 817,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "test",
+      "utterance": "I have been charged a fee for paying with card"
+    },
+    {
+      "normalized_text_sha256": "fb86202a8d440ed113d646f8ab791e8649a23c2e286b41326f25c70515f3a2d6",
+      "route": "R15",
+      "selection_key_sha256": "21969a2d445681dffdbd0dd9d1899542ed0195e291b6767a1822f6886934bebb",
+      "source_id": "banking77-796a-test-810",
+      "source_index": 810,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "test",
+      "utterance": "Why did I have to pay extra because I paid with card?"
+    },
+    {
+      "normalized_text_sha256": "45d948201e7febd4e53e2eecedcca7e5f325e50668f3dcddba2211be994356e8",
+      "route": "R15",
+      "selection_key_sha256": "25b57f954ffaa601dc67430c36eebe076b6b539049d2ae96e5ded384700b1ac0",
+      "source_id": "banking77-796a-test-839",
+      "source_index": 839,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "test",
+      "utterance": "They charged me for paying with my card."
+    },
+    {
+      "normalized_text_sha256": "306033243b2376b13f8e9d52f0e111b70b68f72925bab46e31bde2bb8447e662",
+      "route": "R15",
+      "selection_key_sha256": "26925b0de658128ff5514970ee85f3d2f00918d7cc02a1f684a66dbbffcbc703",
+      "source_id": "banking77-796a-test-821",
+      "source_index": 821,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "test",
+      "utterance": "Can I check somewhere if there will be a fee on my payment or not? Seems you are charging in some cases, what's the pattern there?"
+    },
+    {
+      "normalized_text_sha256": "d1ee31845c410867623a09c85a97f1dae0528026f4b43a60fabc06821bc38518",
+      "route": "R15",
+      "selection_key_sha256": "44842c23ce473175ce49de0f170a5f8dc842f09dd9680343cc810556b205acef",
+      "source_id": "banking77-796a-test-836",
+      "source_index": 836,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "test",
+      "utterance": "Why do you charge fees on card payments?"
+    },
+    {
+      "normalized_text_sha256": "ab68b5384f1afd83f5267cbc6aba87e401d8fe323054b30c8291493d5b72d2c7",
+      "route": "R15",
+      "selection_key_sha256": "48ab5747b7e3531c78ee71b0a1dd2daf9a564cc224b0f00758819c679b8a028f",
+      "source_id": "banking77-796a-test-811",
+      "source_index": 811,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "test",
+      "utterance": "Why are there fees for card usage?"
+    },
+    {
+      "normalized_text_sha256": "241c156de62457539e3aa3c4b654d923ef67a4cb2e1db08d303cdf7ab4a4f90d",
+      "route": "R16",
+      "selection_key_sha256": "1a7931e3a8306cb6972718d25d49a26e904d3054de9d038ede0c30bd85d27ba3",
+      "source_id": "banking77-796a-test-1108",
+      "source_index": 1108,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "test",
+      "utterance": "There is a payment in the App that is not mine."
+    },
+    {
+      "normalized_text_sha256": "a7a56dd902e1b44d6af2ed2db321c9fd09b1df3dc46011d5ff149c1b74ea6292",
+      "route": "R16",
+      "selection_key_sha256": "1d4b712a51d9fc9f1e5ef31085b69ce273f21d89c87cac47d270470770aed87b",
+      "source_id": "banking77-796a-test-1092",
+      "source_index": 1092,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "test",
+      "utterance": "There are some strange charges on my card that I didn't make from a few days ago.  Is my card stolen and if so should I cancel it?  Will I get refunded the charges?"
+    },
+    {
+      "normalized_text_sha256": "fbd3cd6eb1420ca36dec098d32f37863eca707373a328ce620f33a4d820845aa",
+      "route": "R16",
+      "selection_key_sha256": "1dbe65b8da6549aed7b055b6e0e864b1d12852937a6dfaeb496757307d10e569",
+      "source_id": "banking77-796a-test-1104",
+      "source_index": 1104,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "test",
+      "utterance": "I have a payment listed in error."
+    },
+    {
+      "normalized_text_sha256": "faf1fbb4e92865ad1ae8fe109fa109e4b6fe7760098b5ed5267c421db651b904",
+      "route": "R16",
+      "selection_key_sha256": "1f1b1d6168b7d1f62c071716ffcd6d9cfad50e43a92b346c438f4ab229c18f31",
+      "source_id": "banking77-796a-test-1097",
+      "source_index": 1097,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "test",
+      "utterance": "There is a card payment I do not recognise."
+    },
+    {
+      "normalized_text_sha256": "cbc8d8ee1fc729f918d2411aff91d10e2887151d84615e482426ef77acda11dd",
+      "route": "R16",
+      "selection_key_sha256": "316116f16ca39acded9bba3d033096737eb58848714df8e3bf43b07177c145bc",
+      "source_id": "banking77-796a-test-1116",
+      "source_index": 1116,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "test",
+      "utterance": "I think there has been a purchase made that wasn't by me."
+    },
+    {
+      "normalized_text_sha256": "72af160f36b51979131fefe60d1902f35870262939a7d654562380ef6fa04d19",
+      "route": "R16",
+      "selection_key_sha256": "34600c020ad9df90629e411809837970db139a4a8fc742c1227e0a081bb0ddb2",
+      "source_id": "banking77-796a-test-1099",
+      "source_index": 1099,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "test",
+      "utterance": "Payment i did not do"
+    },
+    {
+      "normalized_text_sha256": "b02acb492b16b1f80c52e150ffff11c621953ae47642faa30e76edf3d1c9a9b5",
+      "route": "R27",
+      "selection_key_sha256": "019776e59cabe3c2d32612a52ce04c494ad9f282725873d7e1fe4ceb76ee01fe",
+      "source_id": "banking77-796a-test-1751",
+      "source_index": 1751,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "test",
+      "utterance": "Double check your funds may be declined"
+    },
+    {
+      "normalized_text_sha256": "e1f34563ab192849eec7b1bae1f91f7d7b68e687d5c10c0f8f4b517f1b541eab",
+      "route": "R27",
+      "selection_key_sha256": "17fdb4cea9edb9df2808b0ae969a788b9e1a48bf350fbe9ff3a640f9cc9e7089",
+      "source_id": "banking77-796a-test-1742",
+      "source_index": 1742,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "test",
+      "utterance": "Why was the transfer declined?"
+    },
+    {
+      "normalized_text_sha256": "bf5916198aa44ef5b3231a05ce62af4b77c9eb8aef6f0a110a829581668f694d",
+      "route": "R27",
+      "selection_key_sha256": "18e2bfd818e650474b685b7649af5d23690b5013f14f8d912265965d576ba831",
+      "source_id": "banking77-796a-test-1750",
+      "source_index": 1750,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "test",
+      "utterance": "My transfer has been declined and I know it should have went through."
+    },
+    {
+      "normalized_text_sha256": "76d64b0e2e3b75e751dd51ddeba6f663744b60ea26b78ac189877a2ba79b3a9a",
+      "route": "R27",
+      "selection_key_sha256": "3ea3ceb31cd99d1a069410c09258b785a3d6f1be52ccad66fbee9312101ae3c7",
+      "source_id": "banking77-796a-test-1748",
+      "source_index": 1748,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "test",
+      "utterance": "I tried to make a transfer, but it was declined. Can you tell me why?"
+    },
+    {
+      "normalized_text_sha256": "c06e656b5e1ee06af20400b414a9be96f4c3f4094e3057faa8356daf8272b890",
+      "route": "R27",
+      "selection_key_sha256": "4eff461b3811a637f3a5e535871215997ab016a4916479436d5d763a1e0f0393",
+      "source_id": "banking77-796a-test-1733",
+      "source_index": 1733,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "test",
+      "utterance": "Why did my my transfer get declined?"
+    },
+    {
+      "normalized_text_sha256": "df9b08e4398ea480d347291a107dec94215777e5c01f42bb3dc8b9dbee92fa7c",
+      "route": "R27",
+      "selection_key_sha256": "54b2696135aba7711dd47a65e194724220c2f519a7e3e439abb988ed49338ddb",
+      "source_id": "banking77-796a-test-1728",
+      "source_index": 1728,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "test",
+      "utterance": "My transfers are being declined. IT has always worked for me but now it's declining my card. I've tried several times."
+    },
+    {
+      "normalized_text_sha256": "0c4fa6e76d7db9d8e68f93f6354851b1db864a1794d06e54b3c84e4d753e1d7b",
+      "route": "R32",
+      "selection_key_sha256": "108fe9e9b46bf2bd55db9dea8e9cff19b78a28aa6517e77334353c8d2561e57b",
+      "source_id": "banking77-796a-test-115",
+      "source_index": 115,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "test",
+      "utterance": "why do your exchange rates change"
+    },
+    {
+      "normalized_text_sha256": "cf6e4ced6d480c3de4368c2bace1f1272ed188232704988fabaab7c6d35b5058",
+      "route": "R32",
+      "selection_key_sha256": "12b7a565650a0e8b364713b85a8e7e9733ebd4b0ddf135366dfdd65e3e0a14fe",
+      "source_id": "banking77-796a-test-94",
+      "source_index": 94,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "test",
+      "utterance": "What is the exchange rate like on this app?"
+    },
+    {
+      "normalized_text_sha256": "8024cc9f761366e7b8d6b54ad73c86a32e919cf79aec18b072f7d9b089479099",
+      "route": "R32",
+      "selection_key_sha256": "15c1eb6b6a274568afd092cef4dab39a6f92ed0e9c902fe3e44a31a195406577",
+      "source_id": "banking77-796a-test-86",
+      "source_index": 86,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "test",
+      "utterance": "How often do your exchange rates change"
+    },
+    {
+      "normalized_text_sha256": "f465646f42f9b643bf951a47ca3de70499e755263b277859cd758cc213ec95be",
+      "route": "R32",
+      "selection_key_sha256": "1e96fd92dd1d39fb1a3bdf26f087bf9cebf3f32f01d6083d94c2f58510505127",
+      "source_id": "banking77-796a-test-106",
+      "source_index": 106,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "test",
+      "utterance": "The exchange rate would be?"
+    },
+    {
+      "normalized_text_sha256": "bdb7926ebaced603f36ca3e47eab33a0835ce7245b524d58937da5281264793f",
+      "route": "R32",
+      "selection_key_sha256": "232e951007e4cd5c8d00a2fb04d333f369a77387016c1b91962e103f99628928",
+      "source_id": "banking77-796a-test-81",
+      "source_index": 81,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "test",
+      "utterance": "What exchange rates do you offer?"
+    },
+    {
+      "normalized_text_sha256": "7cd3938d1671592b45d0d618368ada080ebe90cfdd57bab56092b777d5d31d76",
+      "route": "R32",
+      "selection_key_sha256": "2a5ad4e0c965e6096f2bee2b8cdd48c0ad9d254de919f9f29dc39ca2982eca76",
+      "source_id": "banking77-796a-test-105",
+      "source_index": 105,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "test",
+      "utterance": "How much will I get with the exchange rate?"
+    },
+    {
+      "normalized_text_sha256": "b999dd10b21a4b4462d51b23301299153ec264c46d22cb974ccdc25984b8398f",
+      "route": "R38",
+      "selection_key_sha256": "046c49535b2a40f214407530892ad7dd38d2ff9ab5b78610a5fe62cd6d1368f6",
+      "source_id": "banking77-796a-test-1261",
+      "source_index": 1261,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "test",
+      "utterance": "Where can I find the card PIN?"
+    },
+    {
+      "normalized_text_sha256": "4d625a23ca6ddc1bf7fa4c310d0b294b37656448d20c94b598a4ee4318fcee3a",
+      "route": "R38",
+      "selection_key_sha256": "0acf39d349d440d8d0668ee037c0e45e7dd1dce8d3c3f765f5d1d581aaa9987a",
+      "source_id": "banking77-796a-test-1275",
+      "source_index": 1275,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "test",
+      "utterance": "What do I need to do for a PIN?"
+    },
+    {
+      "normalized_text_sha256": "c21927042c1938398cbb82a6ad8ba04b35c5f254bc7a0299a4668d2cc223278b",
+      "route": "R38",
+      "selection_key_sha256": "0c28e7f8eeb9a999538148a7f51eb2d77d83b959cc3986d07a2a067c40aa5d01",
+      "source_id": "banking77-796a-test-1276",
+      "source_index": 1276,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "test",
+      "utterance": "Why can't I find my PIN?"
+    },
+    {
+      "normalized_text_sha256": "276412dd8c3e59f982d213efc9bf2b8835d8398104d3d9e0c6c6094ed0c5a25d",
+      "route": "R38",
+      "selection_key_sha256": "1380f329ccdd8ee8a8befbbc109b1bacf8070bc2f00c1ea86c83740802a50525",
+      "source_id": "banking77-796a-test-1256",
+      "source_index": 1256,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "test",
+      "utterance": "About this card PIN?"
+    },
+    {
+      "normalized_text_sha256": "46fe600c9db20bbb3346107f96fe64d23ca015f9cebdb8a16a9ffef5da84fe4f",
+      "route": "R38",
+      "selection_key_sha256": "1d94bb526220c7d9571840a725d45f1a5848a248d719f8cc9028db34d7079076",
+      "source_id": "banking77-796a-test-1263",
+      "source_index": 1263,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "test",
+      "utterance": "Is my PIN located on my account somewhere?"
+    },
+    {
+      "normalized_text_sha256": "63851189c38e94ab49ad63c7441a67a8c9c9827faba2d3e7b0c04bdeb8de0688",
+      "route": "R38",
+      "selection_key_sha256": "1ebfa1dd5167844baaf49546e59d0adc275b52aaff9c86d868c9b91dea6d8b80",
+      "source_id": "banking77-796a-test-1242",
+      "source_index": 1242,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "test",
+      "utterance": "I do not have my pin"
+    },
+    {
+      "normalized_text_sha256": "428870a5ff8e159e6fddf7f18aa79c249984cf7baf362ad1e7bbe08140f7ebd4",
+      "route": "R45",
+      "selection_key_sha256": "15a1fbb130c623db538df650456f6f16ee3feaf2dcd4a0b701789a56be0c3cff",
+      "source_id": "banking77-796a-test-1628",
+      "source_index": 1628,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "test",
+      "utterance": "Why would I have a pending payment?"
+    },
+    {
+      "normalized_text_sha256": "b8ccdc4b38968a44df4b7932c09c7bf87a0bd326cb41eca1eb9aa8eb173bf034",
+      "route": "R45",
+      "selection_key_sha256": "1fbae43831fae6df67cbd1f660a8a5921170db50caae9d7afb0edd198a21b6cc",
+      "source_id": "banking77-796a-test-1622",
+      "source_index": 1622,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "test",
+      "utterance": "How long do card transactions take to clear?"
+    },
+    {
+      "normalized_text_sha256": "ce2b014cf7acaa6aff7d67069a6bd51095e5752ffd22a54a71acae9aa0b7e62d",
+      "route": "R45",
+      "selection_key_sha256": "3372fde5753b38e612515c277efc4870284de27e932fe1a5d171199600ab7ece",
+      "source_id": "banking77-796a-test-1616",
+      "source_index": 1616,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "test",
+      "utterance": "What is a pending payment?"
+    },
+    {
+      "normalized_text_sha256": "6bfbdcbd363d501ea3949e2c0b53db70b1cc86f5001cd73fcadc0a326a296151",
+      "route": "R45",
+      "selection_key_sha256": "345a3a19597f2eb3ffd81444d779ed071066c492fcb54f664ff51c52b4e52790",
+      "source_id": "banking77-796a-test-1612",
+      "source_index": 1612,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "test",
+      "utterance": "My card payment is showing pending."
+    },
+    {
+      "normalized_text_sha256": "3ac3e47c48af0149c1606ea237391d422a6500428024766d3d27dc152ba87d55",
+      "route": "R45",
+      "selection_key_sha256": "3abbfc7192359125ca6ccf8a9601131890772c3c56119aa0d4c41dc96cd3aa7e",
+      "source_id": "banking77-796a-test-1638",
+      "source_index": 1638,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "test",
+      "utterance": "I have a pending payment in my account that I paid a while back ago and it still hasnt gone through. Why would it show pending for so long?"
+    },
+    {
+      "normalized_text_sha256": "73fec0bb7b3084fd1db743d30e7e472583115b3654fd1e686449d7fe083de0ca",
+      "route": "R45",
+      "selection_key_sha256": "3bfb3d7058e398ad9a85f047a2c6eddd0e431d9001bc1f5daf5df4c24008b6b9",
+      "source_id": "banking77-796a-test-1620",
+      "source_index": 1620,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "test",
+      "utterance": "Why is a payment showing up on my card as pending?"
+    },
+    {
+      "normalized_text_sha256": "31d4b29f0d990efa4dd74ce7ddeba1aae545063d99242082e54ad64f226f00c4",
+      "route": "R53",
+      "selection_key_sha256": "0764d4c4c1ff490ec57311a2f3fb3a38ce647ed0bdcf0405d6a9b27797c53f13",
+      "source_id": "banking77-796a-test-2114",
+      "source_index": 2114,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "test",
+      "utterance": "What happens if a merchant doesn't accept a payment?"
+    },
+    {
+      "normalized_text_sha256": "05686cfbad42aac8295b31d880b7aacd499ff3c2508b081a01f3467791ff1343",
+      "route": "R53",
+      "selection_key_sha256": "0e1be27d72bc347d7a9115293499bea8a5f4933bdb3e3abf18ff76ed9130926c",
+      "source_id": "banking77-796a-test-2117",
+      "source_index": 2117,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "test",
+      "utterance": "Someone stopped my payment"
+    },
+    {
+      "normalized_text_sha256": "e565e7509adf1e8f7e3b943706708a194a721a5025cee818f512988ffe03d24a",
+      "route": "R53",
+      "selection_key_sha256": "19794fc731861420db1a63878d535ad90fbbc8186a6a247ea9bfcafd6ba0ef30",
+      "source_id": "banking77-796a-test-2113",
+      "source_index": 2113,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "test",
+      "utterance": "I did a payment but the app reverted it"
+    },
+    {
+      "normalized_text_sha256": "c963659018604b37f34ae061f7539583768966235af13d900d3e9e6a6319ed65",
+      "route": "R53",
+      "selection_key_sha256": "2a54ccc76f566db8af34cc25c5635386b5efb9508a895983af2aa9937942bb00",
+      "source_id": "banking77-796a-test-2103",
+      "source_index": 2103,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "test",
+      "utterance": "Why was my card payment cancelled?"
+    },
+    {
+      "normalized_text_sha256": "935c5a85ff904582284c35375907bf107f041527538f087b12865558cbf19ab8",
+      "route": "R53",
+      "selection_key_sha256": "2ef86e7e5b30f8cc2bd7e7a4c4aab615805087786915131b9049efcfdb155df8",
+      "source_id": "banking77-796a-test-2109",
+      "source_index": 2109,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "test",
+      "utterance": "What is the reason that my card payment was cancelled?"
+    },
+    {
+      "normalized_text_sha256": "bc7113bb57493750e86010d5ed8fe2eee35bb9e407becbc5d4718c2361617744",
+      "route": "R53",
+      "selection_key_sha256": "43f28bee6f30a8219d21da1a43e0a94a942d4677eea28e159da116bd5aa4cf15",
+      "source_id": "banking77-796a-test-2101",
+      "source_index": 2101,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "test",
+      "utterance": "what happens to the funds if a merchant refuses the payment"
+    },
+    {
+      "normalized_text_sha256": "386e4fbf33721999e270dd2272905c038e9628fca8edc4bf6b55371838d780d8",
+      "route": "R70",
+      "selection_key_sha256": "093e0b33fd271da13df1ace693492afcc13db9f32c30196a129297d3b3af988c",
+      "source_id": "banking77-796a-test-2014",
+      "source_index": 2014,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "test",
+      "utterance": "What information do you need to verify my Source of Funds?"
+    },
+    {
+      "normalized_text_sha256": "709d34dbac4f4a2828e53f4d209330343eefa229db0aad39ba7b9eb7bb8c65f8",
+      "route": "R70",
+      "selection_key_sha256": "0b52ad40d28ca57e8e2a7f69df39232fbcde84fd97f5dc222e1dd06d2d15eafa",
+      "source_id": "banking77-796a-test-2021",
+      "source_index": 2021,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "test",
+      "utterance": "How can I lookup where funds came from?"
+    },
+    {
+      "normalized_text_sha256": "7c49ce7a464d087a39024c2a524bc7e964839c5184f5a05b0bd2974283b33c78",
+      "route": "R70",
+      "selection_key_sha256": "0ba7604a66baf270daa275ee1233c5eec2cfcd949fefa4993745e521f46e02ff",
+      "source_id": "banking77-796a-test-2031",
+      "source_index": 2031,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "test",
+      "utterance": "How can I check the source for my funds?"
+    },
+    {
+      "normalized_text_sha256": "e527e1af9fca33f2eed7b7d1709e3c5986a5b742a5eaa16f419e6e7b78e5790e",
+      "route": "R70",
+      "selection_key_sha256": "28a04d3624ecc5f429ce01c18cf31bd85b95ced9709b7aa16e0b6755b1e07e56",
+      "source_id": "banking77-796a-test-2003",
+      "source_index": 2003,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "test",
+      "utterance": "I would like to verify the source of my money"
+    },
+    {
+      "normalized_text_sha256": "0a79449e3fdf4a635913df5c4a1fb54b2f49d23da21115233b322d7fe40161ac",
+      "route": "R70",
+      "selection_key_sha256": "36ac457f05689bbcf98e0cac4db5c45468fb72e707211d7f79cf6c3680c8a20e",
+      "source_id": "banking77-796a-test-2039",
+      "source_index": 2039,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "test",
+      "utterance": "What do I need to do to verify the source of my funds?"
+    },
+    {
+      "normalized_text_sha256": "c2c357d2ff24d74b9c6c8a751813b6a8490be707b03556b9b4cd52cc3428a8b1",
+      "route": "R70",
+      "selection_key_sha256": "3731907ba630cba75a55258113ca994150e81cc185ff68f59dc8e757efbaade0",
+      "source_id": "banking77-796a-test-2033",
+      "source_index": 2033,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "test",
+      "utterance": "what is source of my funds, need to verify"
+    }
+  ],
+  "train": [
+    {
+      "normalized_text_sha256": "0a2bee51cf7e513f79156fbd24065a37d206546a685dde7534a41cfcfb813003",
+      "route": "R15",
+      "selection_key_sha256": "01c94ff2db8d7f838017b6b2bbb4451c78a9004928ad477ed5bed80d0f38eef8",
+      "source_id": "banking77-796a-train-2656",
+      "source_index": 2656,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "train",
+      "utterance": "I was charged a fee when buying stuff with my card."
+    },
+    {
+      "normalized_text_sha256": "4d59bace75d5a723b05e04daecbfddfb5f12a477d1a94700866b53ea75a4896d",
+      "route": "R15",
+      "selection_key_sha256": "05c328093bb971ac8afff7d34f9f627ce0f870e6f5bff20e4b348ec2a81deb86",
+      "source_id": "banking77-796a-train-2667",
+      "source_index": 2667,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "train",
+      "utterance": "Is there a fee for making a payment? If so, let me know why."
+    },
+    {
+      "normalized_text_sha256": "41529b6096fd1c9e72c459b861ef45ba91106e1eef3462427492d1212b9c00d7",
+      "route": "R15",
+      "selection_key_sha256": "0df5c12c1762d906a9561862d8874a01848043fd985150566c4608d5bae87ecc",
+      "source_id": "banking77-796a-train-2603",
+      "source_index": 2603,
+      "source_label": "card_payment_fee_charged",
+      "source_label_id": 15,
+      "source_split": "train",
+      "utterance": "I was spending cash with my card and got a fee."
+    },
+    {
+      "normalized_text_sha256": "e7b60677e52f5010783881f74c38a7e75f0cbe81572f59b9b2b4ec8986b9ee6c",
+      "route": "R16",
+      "selection_key_sha256": "00f11234064157117b85389c338dc5bb2ae91d84efc3247ecb2f2c94a6836aeb",
+      "source_id": "banking77-796a-train-3581",
+      "source_index": 3581,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "train",
+      "utterance": "I have a card payment I didn't make"
+    },
+    {
+      "normalized_text_sha256": "da34c18c30422cb5a36b909eafd7f37973b7187a722f5c714342fb2fe779f4be",
+      "route": "R16",
+      "selection_key_sha256": "06c2ce16b73a501dde8970fd82f2b9122be99547a5f5745b41f1978a0755abd9",
+      "source_id": "banking77-796a-train-3577",
+      "source_index": 3577,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "train",
+      "utterance": "A payment shows up on the app that I never made."
+    },
+    {
+      "normalized_text_sha256": "518deea1ee2473857f4b16a07b300ac522534418cc59d2a90a7fabc827c3e94a",
+      "route": "R16",
+      "selection_key_sha256": "077e2e595cf3c72a9bde49fdf3904988d27f980faa0f8a1ae21e1a1600b7e1a5",
+      "source_id": "banking77-796a-train-3638",
+      "source_index": 3638,
+      "source_label": "card_payment_not_recognised",
+      "source_label_id": 16,
+      "source_split": "train",
+      "utterance": "What is this card payment, I do not recognize it."
+    },
+    {
+      "normalized_text_sha256": "f385502a3e226f536f1552c332480c43594bcf171fc2a08e981f700d4573ba5c",
+      "route": "R27",
+      "selection_key_sha256": "079c927b68fc10d8ff357168f08c08765be2dd753b50785d51504ded9b0db81c",
+      "source_id": "banking77-796a-train-5650",
+      "source_index": 5650,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "train",
+      "utterance": "Why would you cancel my transfer?"
+    },
+    {
+      "normalized_text_sha256": "52b6b0f0bd2466e50229c424431601ccdb1ff2dd663016c5648cd1abe869b1c5",
+      "route": "R27",
+      "selection_key_sha256": "0a2cdc2ac337f898287a7a5a28a549514e7e684c1fb17528210c17d56c327f08",
+      "source_id": "banking77-796a-train-5630",
+      "source_index": 5630,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "train",
+      "utterance": "Unable to complete transfer, states 'declined'"
+    },
+    {
+      "normalized_text_sha256": "24760e0acce4c05afc264f3e886fadcd5714622458a79e3f03d72c0f22d34bc6",
+      "route": "R27",
+      "selection_key_sha256": "0b95b905d2b1cdc4d62fbbad78492df8874199887593c4b7345b4b9faf7d50a2",
+      "source_id": "banking77-796a-train-5663",
+      "source_index": 5663,
+      "source_label": "declined_transfer",
+      "source_label_id": 27,
+      "source_split": "train",
+      "utterance": "I don't know what's going on but all of my transfers keep getting declined. I have checked over the recipient details twice. These details are all correct."
+    },
+    {
+      "normalized_text_sha256": "e24f9a8646b00140dcaca76684efe8673da9515a647d90c1f055d688a0d494af",
+      "route": "R32",
+      "selection_key_sha256": "000a97df6085e3b81ba48b107ac56bf22cb239bd5459ee484ad8492669c5ec0d",
+      "source_id": "banking77-796a-train-376",
+      "source_index": 376,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "train",
+      "utterance": "How much are the rates of exchange?"
+    },
+    {
+      "normalized_text_sha256": "12248496ac65144d28f70f8ebeb291443083b5ea6ee9171045451e2a308eef70",
+      "route": "R32",
+      "selection_key_sha256": "03a28cfedd4b9aa250250980719eb7aca1b7bb80dfab5032d5e7cf994cffe092",
+      "source_id": "banking77-796a-train-399",
+      "source_index": 399,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "train",
+      "utterance": "What is the source of your exchange rates?"
+    },
+    {
+      "normalized_text_sha256": "8ea10734e0960521b5f12894912b1106e3ff6f6263822a114c5cb5887f1d891b",
+      "route": "R32",
+      "selection_key_sha256": "064b093a66098263a71b406cdcc8fe9e7f4261bc33b542d64c1881d87e119725",
+      "source_id": "banking77-796a-train-386",
+      "source_index": 386,
+      "source_label": "exchange_rate",
+      "source_label_id": 32,
+      "source_split": "train",
+      "utterance": "Could you tell me what your exchange rates are?"
+    },
+    {
+      "normalized_text_sha256": "f5980b8de14f6893fc54021b4ba91172180d5a7aadd67eb15049fd6a987b13fd",
+      "route": "R38",
+      "selection_key_sha256": "0021f495dfe4e8486abff8297e48e0a31483da58014b902d8d9729cc33748028",
+      "source_id": "banking77-796a-train-4073",
+      "source_index": 4073,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "train",
+      "utterance": "I have a question regarding the PIN of the card?"
+    },
+    {
+      "normalized_text_sha256": "88f0282fe4915d54f8902a7cc8e6c1f70806803d35e5e7fa47199ce8460a0052",
+      "route": "R38",
+      "selection_key_sha256": "01a515bf011ef6c3ca05e1ca4c112a095d7402d7fd477b605e6be3e5a9ea1193",
+      "source_id": "banking77-796a-train-4082",
+      "source_index": 4082,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "train",
+      "utterance": "I can't find the card PIN."
+    },
+    {
+      "normalized_text_sha256": "3a3d72ea2a353aa52aea3d01e67fdd04654901c0073c04b072cc95cd309856e6",
+      "route": "R38",
+      "selection_key_sha256": "020a7ac9a550cdf88983a337231ab143bd843915ae6319e2d50d8b67d497d380",
+      "source_id": "banking77-796a-train-4063",
+      "source_index": 4063,
+      "source_label": "get_physical_card",
+      "source_label_id": 38,
+      "source_split": "train",
+      "utterance": "still need to get card pin"
+    },
+    {
+      "normalized_text_sha256": "306c4bc0442f734d00eead4ed9852140bd11f7a928dde1aede8cdee9b25555d1",
+      "route": "R45",
+      "selection_key_sha256": "037313b9663a59d3c1e12e6d4341f7a55cc2fff60077f92c2eff6d74d2f5ff2e",
+      "source_id": "banking77-796a-train-5175",
+      "source_index": 5175,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "train",
+      "utterance": "It says pending status for my payment. Why?"
+    },
+    {
+      "normalized_text_sha256": "b35ddfaf793aa78c036089cd1dfbbcbdde1d08e1bf2cf1d12e973b67bca4384f",
+      "route": "R45",
+      "selection_key_sha256": "043d9117c2c0a2b01591989d19472057542a4cc4037596f4ec6c1bd0c469c357",
+      "source_id": "banking77-796a-train-5155",
+      "source_index": 5155,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "train",
+      "utterance": "I need to find out why my pending payment hasn't gone through."
+    },
+    {
+      "normalized_text_sha256": "637f32a9cf56b20283acfa21f564cba2f9e1514c1ec74f1792bbc488f3f629c8",
+      "route": "R45",
+      "selection_key_sha256": "0d27d215d0a296f8eecab5b1bb31c46f35a01bd7f6c6d47ad893b8f0c0dd997a",
+      "source_id": "banking77-796a-train-5153",
+      "source_index": 5153,
+      "source_label": "pending_card_payment",
+      "source_label_id": 45,
+      "source_split": "train",
+      "utterance": "There is a payment that has not processed."
+    },
+    {
+      "normalized_text_sha256": "c6dbb6685031aaa148af27c32e6706403d93ec38a5f0420d202804cba3015384",
+      "route": "R53",
+      "selection_key_sha256": "07e793011498b625d308d07abea50e3ff24ef8c4c99b614d4bebeb64adf012c1",
+      "source_id": "banking77-796a-train-6760",
+      "source_index": 6760,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "train",
+      "utterance": "Why would my card payment get reverted?"
+    },
+    {
+      "normalized_text_sha256": "28d3c176eb0f2f35791e3f09005a8eaf9b4ac26f2e627858b27ef0a7415c92e6",
+      "route": "R53",
+      "selection_key_sha256": "080a36745d0751047dfff801dd44ef6d9258db32d8005559a3c8e41d76fc66b6",
+      "source_id": "banking77-796a-train-6826",
+      "source_index": 6826,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "train",
+      "utterance": "I think my card payment was reverted"
+    },
+    {
+      "normalized_text_sha256": "5e29673aca16e5e87116961207a60848391e6dd42edfcecedd2223915ec4d48c",
+      "route": "R53",
+      "selection_key_sha256": "0a3d359fb078c8edf862906ca3effb3e73e316f3288c081791bb1f477b9ddca5",
+      "source_id": "banking77-796a-train-6882",
+      "source_index": 6882,
+      "source_label": "reverted_card_payment?",
+      "source_label_id": 53,
+      "source_split": "train",
+      "utterance": "Is it possible that my card payment was reverted?"
+    },
+    {
+      "normalized_text_sha256": "5aa7f27f0904f6c41f47fb5c57882af5d6d99f070353c200771ab9b70276e27f",
+      "route": "R70",
+      "selection_key_sha256": "00790c493c6e9ca4bb106926629187a7b1e3a3a5fcb5308adbe6fa7b53d8979e",
+      "source_id": "banking77-796a-train-6502",
+      "source_index": 6502,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "train",
+      "utterance": "Can I see the source of my available money?"
+    },
+    {
+      "normalized_text_sha256": "6ca3c583ea7f08f5a8ca04f2bb252076a46d875250a1dd9aeafbfabb01c9bf08",
+      "route": "R70",
+      "selection_key_sha256": "0158a4cce4e3a1f4c1b0f5c5eec103ed4c8dee72c0c56c38d0d5d919b2202373",
+      "source_id": "banking77-796a-train-6505",
+      "source_index": 6505,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "train",
+      "utterance": "How can I look at where my available cash is coming from?"
+    },
+    {
+      "normalized_text_sha256": "607bc20b4224645dfeb84e0a40faead95b944aa42f7c861f20d1cf0522e30cc4",
+      "route": "R70",
+      "selection_key_sha256": "027e651f91f1fae280ed9f393852d04878cb1a203a493249c0ec251071e5aebe",
+      "source_id": "banking77-796a-train-6495",
+      "source_index": 6495,
+      "source_label": "verify_source_of_funds",
+      "source_label_id": 70,
+      "source_split": "train",
+      "utterance": "What is my source of funds?"
+    }
+  ]
+}

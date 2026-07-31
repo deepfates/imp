@@ -2053,3 +2053,42 @@ positive seeds), and no subsequent Banking77 attempt. Same-program replay
 movement remains zero causal lift. Stock DSPy stays dormant unless Imp passes;
 even then it requires a separate disposition. No data freeze, runtime edit, or
 provider authority occurred in this feasibility review.
+
+## Banking77 confirmatory replication frozen checkpoint
+
+The final independently frozen condition is
+`imp-88sn-banking77-mipro-confirmatory-v1`. It was derived result-blind from the
+pinned CC-BY-4.0 `PolyAI/banking77` revision
+`796a4623935746f71378f0ebd435635a8ce08e50`, whose train/test source hashes
+remain `4526edfa...e0390` and `535fc96c...410be`. It excludes all 336 prior
+coordinates and normalized-text digests before ordering by
+`sha256(imp-88sn-banking77-mipro-confirmatory-v1:split:label-id:normalized-text-digest)`.
+No model output informed row choice.
+
+The frozen dataset is
+`examples/deployment/data/banking77-mipro-confirmatory-v1.json`, file SHA-256
+`6550e65edf66353af54d74daa48778a98d747052cb85ad05a64a9ad5e3680e86`
+and canonical payload SHA-256
+`fc48ff2a8d4408eeaf917e7df4c32f80cfd162b1dcb542f467971ade217b71e3`.
+It contains balanced `24 train / 24 selection / 48 test` rows (`3/3/6` per
+label). Ordered split hashes are:
+
+- train `ae934e51...8cfa9`;
+- selection `aa5cdb1b...0f1ea`;
+- test `09f98502...f9f99`.
+
+New fixed seeds are `2026073101/02/03`. The ordinary packaged entry retains the
+same two-stage program, models, modeled MIPRO startup `10` / `15` trials, three
+candidates, `2+2` demo limits, `max_errors: 10`, strict baseline-on-tie
+selection, paired baseline/selected test, schema-3 Artifact, and fresh four-call
+concurrent ProgramServer acceptance. Outer selection and test stages use three
+fixed repetitions with arithmetic-mean aggregation; optimizer-internal
+objectives remain single-pass. The legal ceiling is unchanged from the
+feasibility bound: `5,064` task plus `30` optimizer transports and `$38.393856`
+new reservation maximum.
+
+The primary remains mean held-out causal lift `>= 0.05` and positive lift in at
+least two of three seeds. A parameter-identical selected baseline has causal
+lift zero regardless of replay movement. A clean negative terminates Banking77
+work; it does not authorize a new split or treatment. Stock DSPy remains
+dormant unless Imp passes and then still requires separate disposition.

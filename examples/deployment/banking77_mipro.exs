@@ -5,13 +5,13 @@ defmodule Banking77MIPRO do
   alias Imp.Optimizer.{Artifact, MIPROv2}
   alias ImpDeployment.{Banking77Pipeline, ProgramServer}
 
-  @condition "imp-88sn-banking77-mipro-modeled-v2"
-  @dataset_condition "imp-88sn-banking77-mipro-v1"
-  @dataset "data/banking77-mipro-stage1.json"
-  @dataset_sha "4934ebc54b06614343461c2fe79c7ca4807892c1b645cbb30790e945dcb2c34a"
+  @condition "imp-88sn-banking77-mipro-confirmatory-v1"
+  @dataset_condition @condition
+  @dataset "data/banking77-mipro-confirmatory-v1.json"
+  @dataset_sha "6550e65edf66353af54d74daa48778a98d747052cb85ad05a64a9ad5e3680e86"
   @task_model "openrouter:openai/gpt-5.4-mini"
   @optimizer_model "openrouter:anthropic/claude-sonnet-4.6"
-  @seeds [2_026_072_705, 2_026_072_706, 2_026_072_707]
+  @seeds [2_026_073_101, 2_026_073_102, 2_026_073_103]
   @routes ~w(R15 R16 R27 R32 R38 R45 R53 R70)
 
   @analysis_instruction """
@@ -52,18 +52,18 @@ defmodule Banking77MIPRO do
   def transport_caps do
     %{
       per_seed: %{
-        baseline_selection: 48,
+        baseline_selection: 144,
         bootstrap: 48,
         internal_baseline: 48,
         categorical_trials: 720,
-        optimized_selection: 48,
-        baseline_and_selected_test: 192,
+        optimized_selection: 144,
+        baseline_and_selected_test: 576,
         fresh_service: 8,
-        task: 1_112,
+        task: 1_688,
         optimizer: 10
       },
-      stage: %{task: 3_336, optimizer: 30},
-      reservation_usd: 26.118144
+      stage: %{task: 5_064, optimizer: 30},
+      reservation_usd: 38.393856
     }
   end
 
@@ -101,9 +101,9 @@ defmodule Banking77MIPRO do
 
     true =
       payload["digests"] == %{
-        "train" => "sha256:ec42891dc7c5bece39bf0f059ede3213b482a1276ab15b7a634e7d0974071e44",
-        "selection" => "sha256:3312228c66b7890b9d632529ffde2a398f56a8fe2d1f0b6600bd041351d45ddd",
-        "test" => "sha256:dc921b772196f885e051678b5db228e8b0ade676eeea1bb85dafdaf12ae2e502"
+        "train" => "sha256:ae934e51f39eadf632b93a7715294acd601d23c693f5f5f119adb5584448cfa9",
+        "selection" => "sha256:aa5cdb1b33e1ad06c1905505f4b23ff01a741c4f0000d855a4545488ff70f1ea",
+        "test" => "sha256:09f9850284f4ce70dd18c3e0dd77c6c18eead80b27ccb375c96a178b3b7f9f99"
       }
 
     Data.new(
@@ -138,7 +138,10 @@ defmodule Banking77MIPRO do
         modeled_trials: 6,
         max_bootstrapped_demos: 2,
         max_labeled_demos: 2,
-        max_errors: 10
+        max_errors: 10,
+        outer_repetitions: 3,
+        outer_aggregation: "mean",
+        internal_objectives: "single_pass"
       },
       call_caps: transport_caps(),
       uses_ifbench_bridge: false
@@ -170,9 +173,18 @@ defmodule Banking77MIPRO do
             "dataset_sha256" => @dataset_sha,
             "task_model" => @task_model,
             "optimizer_model" => @optimizer_model,
+            "outer_repetitions" => 3,
+            "outer_aggregation" => "mean",
+            "internal_objectives" => "single_pass",
             "transport_caps" => transport_caps()
           },
-          evaluation_options: [max_concurrency: 1, max_errors: 10, timeout: 120_000]
+          evaluation_options: [
+            max_concurrency: 1,
+            max_errors: 10,
+            timeout: 120_000,
+            repetitions: 3,
+            aggregation: :mean
+          ]
         )
       end)
 
@@ -196,7 +208,7 @@ defmodule Banking77MIPRO do
             result: result_path,
             artifact: artifact_path
           },
-          label: "Banking77 MIPRO Stage 1"
+          label: "Banking77 MIPRO confirmatory replication"
         )
 
       {:error, failure} ->
