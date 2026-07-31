@@ -947,8 +947,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/copro_isolation/c92bda26185071e7f317a66c314a8d0ff19e5ebfce595b016c34b83c83f235c0.json",
-        "artifact_sha256": "c92bda26185071e7f317a66c314a8d0ff19e5ebfce595b016c34b83c83f235c0",
+        "artifact": "benchmarks/evidence/admitted/copro_isolation/4f2d959d76bde9fb87da8091223232255074a431be2c05e2e757638c0c43870d.json",
+        "artifact_sha256": "4f2d959d76bde9fb87da8091223232255074a431be2c05e2e757638c0c43870d",
         "protocol_id": "copro_isolation"
       }
     },

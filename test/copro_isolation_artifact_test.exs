@@ -9,7 +9,7 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
   @python "tmp/dspy-parity-venv/bin/python"
   @script "scripts/dspy_copro_isolation_differential.py"
   @config "benchmarks/config/copro-isolation-differential-v1.json"
-  @admission "benchmarks/evidence/admitted/copro_isolation/5cf88e790cdf7fd12ffd6e24396b3512d59655238854b7c6406a24caa82ab37e.json"
+  @admission "benchmarks/evidence/admitted/copro_isolation/4f2d959d76bde9fb87da8091223232255074a431be2c05e2e757638c0c43870d.json"
 
   setup_all do
     unless File.exists?(@python) and File.dir?("tmp/dspy-3.2.1/.git") do
@@ -155,12 +155,12 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
     end
   end
 
-  test "unrelated authority-ledger changes do not revoke the admitted receipt" do
+  test "current authority-ledger binding validates the admitted receipt" do
     artifact = @admission |> File.read!() |> Jason.decode!()
     historical = artifact["source_bindings"]
     current = COPROArtifact.source_bindings()
 
-    refute historical["authority_ledger_sha256"] == current["authority_ledger_sha256"]
+    assert historical["authority_ledger_sha256"] == current["authority_ledger_sha256"]
 
     assert Map.drop(historical, ["authority_ledger_sha256", "task_sha256"]) ==
              Map.drop(current, ["authority_ledger_sha256", "task_sha256"])
