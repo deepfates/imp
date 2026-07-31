@@ -274,7 +274,7 @@ defmodule Imp.ExperimentTest do
     assert result.baseline_selection.score == 0.5
     assert result.optimized_selection.score == 1.0
     assert result.test.score == 1.0
-    assert %Report{optimizer: :labeled_few_shot} = Report.fetch(result.program)
+    assert %Report{optimizer: "labeled_few_shot"} = Report.fetch(result.program)
     assert Artifact.inspect(result.artifact).champion_id == "optimized"
 
     fresh =

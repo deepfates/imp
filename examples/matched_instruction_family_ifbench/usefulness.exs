@@ -30,8 +30,10 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
   }
 
   def run do
+    configure_ifbench_scorer!()
     condition = condition!()
     data = data!(condition)
+    validate_ifbench_scorer!(data)
 
     case System.get_env("IMP_88SN_MODE", "disabled") do
       "disabled" -> disabled!(condition, data)
@@ -40,6 +42,30 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
       "fresh" -> fresh!()
       mode -> raise "unknown IMP_88SN_MODE #{inspect(mode)}"
     end
+  end
+
+  defp configure_ifbench_scorer! do
+    bridge = Path.expand("../../scripts/ifbench_nlp_check.py", __DIR__)
+    python = Path.expand("../../tmp/ifbench-parity-venv/bin/python", __DIR__)
+
+    unless File.regular?(bridge) and File.regular?(python) do
+      raise "source-exact IFBench scoring requires the pinned parity bridge and Python environment"
+    end
+
+    System.put_env("IMP_IFBENCH_NLP_BRIDGE", bridge)
+    System.put_env("IMP_IFBENCH_NLP_PYTHON", python)
+  end
+
+  defp validate_ifbench_scorer!(data) do
+    metric = GepaMetrics.metric(%{"upstream_metric" => "IFBench.ifbench_metric.metric"})
+
+    # The frozen held-out bytes remain unavailable to scoring until selection
+    # seals. Their rule coverage is checked provider-free by the source-bound
+    # parity test, not by this live entry.
+    Enum.each(data.train ++ data.selection, fn example ->
+      response = Imp.Example.get(example, :prompt)
+      _score = metric.(example, Imp.Prediction.new(%{response: response}))
+    end)
   end
 
   defp disabled!(condition, data) do

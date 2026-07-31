@@ -594,8 +594,8 @@ results are merged with matching upstream comparator outputs and sidecar
 evidence.
 IFBench imports the larger AllenAI `instructions_registry`; Imp ports the
 registry in Elixir and keeps unknown ids fail-closed rather than silently
-scoring as false. Four upstream IFBench checks depend on Python NLP packages
-(`nltk` stopwords/POS data, `emoji`, and `syllapy`). Imp ships native fallback
+scoring as false. Five upstream IFBench checks depend on Python NLP packages
+(`langdetect`, `nltk` stopwords/POS data, `emoji`, and `syllapy`). Imp ships native fallback
 checks for normal deterministic evidence and a source-exact bridge for research
 campaigns: set `IMP_IFBENCH_NLP_BRIDGE=scripts/ifbench_nlp_check.py` and, when
 needed, `IMP_IFBENCH_NLP_PYTHON` to a Python with those packages and corpora.

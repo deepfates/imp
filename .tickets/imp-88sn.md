@@ -158,6 +158,11 @@ result is resumed.
 
 ## Frozen portfolio outcome (2026-07-30)
 
+> **Superseded scientific interpretation:** the source-exact scorer audit at
+> the end of this ticket invalidates the MIPRO outcome and leaves the Imp GEPA
+> lift/noninferiority conclusions unverified for pinned IFBench. The raw values
+> below remain immutable historical observations of the scorer used then.
+
 The structured Optimize Anything condition met its frozen criterion. Seeds
 `2026073101` and `2026073102` each selected a proposer-generated candidate and
 improved exact untouched execution from 3/6 to 5/6; seed `2026073103` retained
@@ -790,7 +795,7 @@ retained, so they cannot be independently replayed; the failure precedes their
 response-dependent checks.
 
 More importantly, re-scoring all retained selection outputs with the pinned
-scorer gives baseline `0.75` and optimized `0.7239583333`, reversing the frozen
+scorer gives baseline `0.7916666667` and optimized `0.75`, reversing the frozen
 Imp selection. Thus the recorded `+.03125` held-out difference is descriptive
 for the implemented Imp metric, but it is not an interpretable MIPRO lift for
 the intended pinned-IFBench question. Repairing Artifact portability alone
@@ -798,3 +803,66 @@ does not preserve that scientific question. **Continuation recommendation:
 do not start seeds 2/3.** Repair and validate the scorer representation boundary
 as a product change, then pose any future run as a separately frozen condition;
 do not reuse this seed as a scientific outcome or silently rescore it.
+
+## Source-exact scorer ownership correction (2026-07-31)
+
+The scorer audit found two distinct representation errors at the Imp boundary.
+MIPRO's pinned proposer input correctly retained nested JSON objects as
+`Jason.OrderedObject`, but the Elixir scorer treated those objects as missing
+rule arguments. Separately, `language:response_language` used an English-only
+native fallback even though pinned IFBench uses `langdetect`. The scorer now
+recursively copies ordered JSON values into ordinary maps only for evaluation,
+leaving proposer order and source rows unchanged, and delegates language
+detection through the existing pinned Python bridge. Unknown rules still fail
+closed. The ordinary IFBench entry binds that bridge before provider authority
+and evaluates train/selection support provider-free; held-out scoring remains
+after artifact selection.
+
+Provider-free comparison now agrees exactly with the pinned scorer on 337
+source-derived constraint instances covering every frozen GEPA/MIPRO row and
+80 rule families. The independent registry fixture covers all 83 active rule
+ids with a passing response and the pinned blank-response failure boundary.
+No unsupported frozen rule remains. This is exact agreement on the frozen
+source-derived and constructed boundary corpus, not a proof over every possible
+response string.
+
+The scientific reach is narrower than the earlier portfolio prose implied:
+
+- The terminal diagnostic-10 MIPRO seed remains **invalid as an optimizer
+  outcome**. Source-exact rescoring gives selection `0.7916666667 -> 0.75`, so
+  pinned selection retains baseline, not the stored optimized artifact. The
+  corresponding retained held-out outputs rescore `0.5390625 -> 0.578125`, but
+  held-out cannot authorize selection and the optimizer itself ran against the
+  faulty scorer. Its runtime diagnostics and the generic Artifact portability
+  repair remain valid product evidence.
+- The completed three-seed Imp GEPA run predates ordered-object loading, so it
+  is not affected by that representation bug. It did, however, run without the
+  source-exact non-English language bridge. Re-scoring only the retained final
+  rows gives selection `0.770833 -> 0.911458`, `0.864583 -> 0.864583`, and
+  `0.822917 -> 0.833333`; baseline/selected held-out gives
+  `0.507812 -> 0.53125`, `0.484375 -> 0.515625`, and
+  `0.484375 -> 0.5390625`. Final outer choices happen to remain unchanged, but
+  optimization-time scores and reflection feedback were different from pinned
+  IFBench. Therefore the earlier `+0.0390625/0/+0.0546875` causal-lift claim,
+  its intervals, mean, and matched noninferiority conclusion are **unverified
+  for pinned IFBench** and must not support imp-88sn. The stored scores remain
+  an immutable description of the implemented scorer at that commit.
+- The local IFBench V1/V2 and matched v1/v2/v3/GEPA-0.1.4 stops retain valid
+  operational facts (format, transport, workflow, stop location, held-out
+  barrier). Any Imp numeric IFBench score produced without the pinned language
+  bridge is unverified as an exact benchmark score. None of those stopped runs
+  supplies an optimizer-effectiveness conclusion.
+- Authenticated stock-DSPy/GEPA outputs imported
+  `gepa_artifact.benchmarks.IFBench.ifbench_metric` directly. Their raw scores
+  and all-zero outer-selected causal lifts are unaffected. The matched
+  Imp-minus-upstream conclusion is not valid because the Imp side was not using
+  the same scorer. TREC, Banking77, and Optimize Anything evidence use other
+  metrics and are unaffected.
+
+**Strategic recommendation:** stop using IFBench for the next full-telos swing.
+The scorer boundary is now suitable for a separately frozen future rerun, but
+IFBench has already consumed substantial integration effort and still mixes
+strict-format noise with optimizer signal. Choose a different realistic
+multi-stage task with a compact, natively executable metric for the next
+current-source usefulness condition; retain IFBench as a pinned compatibility
+regression rather than immediately paying to re-freeze it.

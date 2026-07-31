@@ -67,3 +67,8 @@ canonical release-profile reconciliation and a cross-family condition instead
 of more GEPA-only execution. The test file remained unopened. The retained
 `exercised-result-v2.json` is baseline/format evidence only and V2 must not be
 resumed.
+
+The retained `0.4375` values were produced before Imp required pinned
+non-English language detection at the scorer boundary. They are therefore
+unverified as exact IFBench scores. The format, call completion, stop location,
+and unopened-test facts remain valid; the retained files are unchanged.

@@ -155,6 +155,36 @@ defmodule GepaMetricsTest do
     assert metric.(example, Imp.prediction(response: "prefix\n{\"ok\": true}\nsuffix")) == 1.0
   end
 
+  test "IFBench metric adapts ordered scorer arguments without mutating proposer data" do
+    metric =
+      Imp.BenchmarkTruth.GepaMetrics.metric(%{
+        "upstream_metric" => "IFBench.ifbench_metric.metric"
+      })
+
+    ordered_keywords =
+      %Jason.OrderedObject{
+        values: [
+          {"keywords", ["alpha", "beta"]},
+          {"unused", %Jason.OrderedObject{values: [{"nested", [1, 2, 3]}]}},
+          {"nil_value", nil}
+        ]
+      }
+
+    ordered_forbidden =
+      %Jason.OrderedObject{values: [{"forbidden_words", ["gamma"]}]}
+
+    example =
+      Imp.example(
+        prompt: "p",
+        instruction_id_list: ["keywords:existence", "keywords:forbidden_words"],
+        kwargs: [ordered_keywords, ordered_forbidden]
+      )
+      |> Imp.with_inputs(:prompt)
+
+    assert metric.(example, Imp.prediction(response: "alpha beta")) == 1.0
+    assert Imp.Example.get(example, :kwargs) == [ordered_keywords, ordered_forbidden]
+  end
+
   test "IFBench metric covers remaining active deterministic registry checks" do
     metric =
       Imp.BenchmarkTruth.GepaMetrics.metric(%{
@@ -421,6 +451,7 @@ defmodule GepaMetricsTest do
         "format:emoji",
         "words:start_verb",
         "words:odd_even_syllables",
+        "language:response_language",
     }
     assert payload["value"] == "bridge-ok"
     print(json.dumps({"following": True}))
@@ -451,9 +482,10 @@ defmodule GepaMetricsTest do
           "ratio:stop_words",
           "format:emoji",
           "words:start_verb",
-          "words:odd_even_syllables"
+          "words:odd_even_syllables",
+          "language:response_language"
         ],
-        kwargs: [%{"percentage" => 10}, %{}, %{}, %{}]
+        kwargs: [%{"percentage" => 10}, %{}, %{}, %{}, %{"language" => "fa"}]
       )
       |> Imp.with_inputs(:prompt)
 
@@ -472,6 +504,13 @@ defmodule GepaMetricsTest do
 
     if System.get_env("IMP_IFBENCH_UPSTREAM_PARITY") == "1" do
       run_ifbench_upstream_parity!(fixture_path, fixtures)
+    end
+  end
+
+  @tag :evidence_infrastructure
+  test "IFBench scorer matches pinned semantics on every frozen GEPA and MIPRO row" do
+    if System.get_env("IMP_IFBENCH_UPSTREAM_PARITY") == "1" do
+      run_frozen_ifbench_parity!()
     end
   end
 
@@ -792,6 +831,7 @@ defmodule GepaMetricsTest do
     Enum.each(report["results"], fn result ->
       refute Map.has_key?(result, "error"), inspect(result)
       assert result["upstream_following"], inspect(result)
+      refute result["upstream_blank_following"], inspect(result)
 
       fixture = Map.fetch!(by_id, result["instruction_id"])
 
@@ -805,6 +845,119 @@ defmodule GepaMetricsTest do
 
       assert metric.(example, Imp.prediction(response: fixture["response"])) == 1.0,
              "Imp disagreed with upstream for #{fixture["instruction_id"]}"
+
+      assert metric.(example, Imp.prediction(response: "")) == 0.0,
+             "Imp accepted a blank response for #{fixture["instruction_id"]}"
     end)
+  end
+
+  defp run_frozen_ifbench_parity! do
+    paths =
+      Path.wildcard("examples/matched_instruction_family_ifbench/data/*.jsonl") ++
+        Path.wildcard("examples/matched_instruction_family_ifbench/data/mipro_stage1/*.jsonl")
+
+    entries =
+      Enum.flat_map(paths, fn path ->
+        path
+        |> File.stream!()
+        |> Enum.flat_map(fn line ->
+          row = Jason.decode!(line)
+
+          %Jason.OrderedObject{values: ordered_values} =
+            Jason.decode!(line, objects: :ordered_objects)
+
+          ordered = Map.new(ordered_values)
+
+          row["instruction_id_list"]
+          |> Enum.with_index()
+          |> Enum.map(fn {instruction_id, index} ->
+            fixture = %{
+              "instruction_id" => instruction_id,
+              "kwargs" => Enum.at(row["kwargs"], index),
+              "prompt" => row["prompt"],
+              "response" => row["prompt"]
+            }
+
+            {fixture, ordered, index}
+          end)
+        end)
+      end)
+
+    assert length(entries) == 337
+
+    assert entries
+           |> Enum.map(fn {fixture, _row, _index} -> fixture["instruction_id"] end)
+           |> Enum.uniq()
+           |> length() == 80
+
+    fixture_path =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-ifbench-frozen-#{System.unique_integer([:positive])}.jsonl"
+      )
+
+    File.write!(
+      fixture_path,
+      Enum.map_join(entries, "", fn {fixture, _ordered, _index} ->
+        Jason.encode!(fixture) <> "\n"
+      end)
+    )
+
+    previous_bridge = System.get_env("IMP_IFBENCH_NLP_BRIDGE")
+    previous_python = System.get_env("IMP_IFBENCH_NLP_PYTHON")
+    python = System.get_env("IMP_IFBENCH_UPSTREAM_PYTHON") || "python3"
+    System.put_env("IMP_IFBENCH_NLP_BRIDGE", Path.expand("scripts/ifbench_nlp_check.py"))
+    System.put_env("IMP_IFBENCH_NLP_PYTHON", python)
+
+    try do
+      {output, status} =
+        System.cmd(
+          python,
+          [
+            "scripts/ifbench_upstream_eval.py",
+            "--artifact-root",
+            "tmp/gepa-artifact",
+            "--fixtures",
+            fixture_path
+          ],
+          stderr_to_stdout: true
+        )
+
+      assert status == 0, output
+      report = Jason.decode!(output)
+      assert report["fixture_count"] == length(entries)
+      assert Enum.all?(report["results"], &(not Map.has_key?(&1, "error")))
+
+      metric =
+        Imp.BenchmarkTruth.GepaMetrics.metric(%{
+          "upstream_metric" => "IFBench.ifbench_metric.metric"
+        })
+
+      Enum.zip(entries, report["results"])
+      |> Enum.each(fn {{fixture, ordered, index}, upstream} ->
+        example =
+          Imp.Example.new(%{
+            prompt: ordered["prompt"],
+            instruction_id_list: [fixture["instruction_id"]],
+            kwargs: [Enum.at(ordered["kwargs"], index)]
+          })
+
+        imp_following =
+          metric.(example, Imp.Prediction.new(%{response: fixture["response"]})) == 1.0
+
+        assert imp_following == upstream["upstream_following"],
+               "frozen scorer mismatch for #{fixture["instruction_id"]}"
+      end)
+    after
+      File.rm(fixture_path)
+
+      if previous_bridge,
+        do: System.put_env("IMP_IFBENCH_NLP_BRIDGE", previous_bridge),
+        else: System.delete_env("IMP_IFBENCH_NLP_BRIDGE")
+
+      if previous_python,
+        do: System.put_env("IMP_IFBENCH_NLP_PYTHON", previous_python),
+        else: System.delete_env("IMP_IFBENCH_NLP_PYTHON")
+    end
   end
 end

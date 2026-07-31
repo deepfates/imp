@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Source-derived IFBench NLP check bridge.
 
-Imp ports most IFBench checks directly in Elixir. Four AllenAI IFBench
-instructions depend on Python NLP packages upstream: NLTK stopwords/POS,
-emoji, and syllapy. This bridge provides a source-compatible path for parity
+Imp ports most IFBench checks directly in Elixir. Five AllenAI IFBench
+instructions depend on Python NLP packages upstream: langdetect, NLTK
+stopwords/POS, emoji, and syllapy. This bridge provides a source-compatible path for parity
 runs without making those Python packages normal Imp runtime dependencies.
 """
 
@@ -148,7 +148,20 @@ def words_odd_even_syllables(_args, value):
     return all(syllables[index] != syllables[index + 1] for index in range(len(syllables) - 1))
 
 
+def language_response(args, value):
+    try:
+        import langdetect
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("language:response_language requires langdetect") from exc
+
+    try:
+        return langdetect.detect(value) == args.get("language")
+    except langdetect.LangDetectException:
+        return False
+
+
 CHECKS = {
+    "language:response_language": language_response,
     "ratio:stop_words": ratio_stop_words,
     "format:emoji": format_emoji,
     "words:start_verb": words_start_verb,

@@ -99,7 +99,26 @@ def evaluate_fixture(registry, fixture):
     args = {key: value for key, value in fixture.get("kwargs", {}).items() if value is not None}
 
     instruction.build_description(**args)
-    return bool(instruction.check_following(fixture["response"]))
+    instruction_args = instruction.get_instruction_args()
+    if instruction_args and "prompt" in instruction_args:
+        instruction.build_description(prompt=fixture.get("prompt", ""))
+
+    response = fixture["response"]
+    lines = response.split("\n")
+    remove_first = "\n".join(lines[1:]).strip()
+    remove_last = "\n".join(lines[:-1]).strip()
+    remove_both = "\n".join(lines[1:-1]).strip()
+    variants = [
+        response,
+        response.replace("*", ""),
+        remove_first,
+        remove_last,
+        remove_both,
+        remove_first.replace("*", ""),
+        remove_last.replace("*", ""),
+        remove_both.replace("*", ""),
+    ]
+    return any(value.strip() and instruction.check_following(value) for value in variants)
 
 
 def main():
@@ -119,11 +138,15 @@ def main():
     for fixture in fixtures:
         try:
             following = evaluate_fixture(registry, fixture)
+            blank_fixture = dict(fixture)
+            blank_fixture["response"] = ""
+            blank_following = evaluate_fixture(registry, blank_fixture)
             results.append(
                 {
                     "instruction_id": fixture["instruction_id"],
                     "line": fixture["line"],
                     "upstream_following": following,
+                    "upstream_blank_following": blank_following,
                 }
             )
         except Exception as exc:

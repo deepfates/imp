@@ -280,11 +280,31 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
     |> Kernel.++(Enum.map([remove_first, remove_last, remove_both], &String.replace(&1, "*", "")))
   end
 
-  defp strip_nil_values(map) when is_map(map) do
-    Map.reject(map, fn {_key, value} -> is_nil(value) end)
+  defp strip_nil_values(%Jason.OrderedObject{values: values}) do
+    values
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new(fn {key, value} -> {key, normalize_ifbench_value(value)} end)
+  end
+
+  defp strip_nil_values(map) when is_map(map) and not is_struct(map) do
+    map
+    |> Map.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new(fn {key, value} -> {key, normalize_ifbench_value(value)} end)
   end
 
   defp strip_nil_values(_other), do: %{}
+
+  defp normalize_ifbench_value(%Jason.OrderedObject{values: values}) do
+    Map.new(values, fn {key, value} -> {key, normalize_ifbench_value(value)} end)
+  end
+
+  defp normalize_ifbench_value(map) when is_map(map) and not is_struct(map),
+    do: Map.new(map, fn {key, value} -> {key, normalize_ifbench_value(value)} end)
+
+  defp normalize_ifbench_value(list) when is_list(list),
+    do: Enum.map(list, &normalize_ifbench_value/1)
+
+  defp normalize_ifbench_value(value), do: value
 
   defp ifbench_following?("keywords:existence", %{"keywords" => keywords}, _prompt, value) do
     Enum.all?(List.wrap(keywords), &regex_contains?(value, &1, "i"))
@@ -1395,7 +1415,7 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
         try do
           case System.cmd(python, [bridge, payload_path], stderr_to_stdout: true) do
             {output, 0} ->
-              case Jason.decode!(output) do
+              case decode_last_json_object!(output) do
                 %{"following" => following} when is_boolean(following) ->
                   following
 
@@ -1930,12 +1950,16 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
     end
   end
 
-  defp ifbench_language?("en", value) do
-    cleaned = String.replace(value, ~r/[^A-Za-z\s.,!?'"-]/, "")
-    String.trim(cleaned) != "" and String.length(cleaned) >= div(String.length(value), 2)
+  defp ifbench_language?(language, value) do
+    ifbench_nlp_bridge("language:response_language", %{"language" => language}, value, fn ->
+      if language == "en" do
+        cleaned = String.replace(value, ~r/[^A-Za-z\s.,!?'"-]/, "")
+        String.trim(cleaned) != "" and String.length(cleaned) >= div(String.length(value), 2)
+      else
+        false
+      end
+    end)
   end
-
-  defp ifbench_language?(_language, _value), do: false
 
   defp livebench_math(example, prediction) do
     question = Imp.Example.get(example, :question_d, %{})

@@ -103,7 +103,7 @@ defmodule Imp.MatchedInstructionFamilyIFBenchDesignTest do
     # zsh reserves `status`; use an ordinary non-reserved exit variable in the
     # same shell shape operators use for the provider-disabled/live entry.
     command =
-      "mix run --no-compile #{@root}/usefulness.exs; " <>
+      "mix run #{@root}/usefulness.exs; " <>
         "exit_code=$?; exit $exit_code"
 
     {output, 0} =

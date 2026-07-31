@@ -133,8 +133,8 @@ defmodule Imp.PublicOptimizerConsumerTest do
           |> Imp.Optimizer.Artifact.read!()
           |> Imp.Optimizer.Artifact.apply(program())
 
-        assert %Imp.Optimizer.Report{optimizer: ^family} =
-                 Imp.Optimizer.Report.fetch(deployed)
+        deployed_report = Imp.Optimizer.Report.fetch(deployed)
+        assert to_string(deployed_report.optimizer) == Atom.to_string(family)
 
         assert {:ok, prediction} = Imp.call(deployed, %{question: "fresh consumer call"})
         assert Imp.get(prediction, :answer) == "yes"
