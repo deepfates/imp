@@ -84,3 +84,8 @@ Canonical claims classify every advertised family as stable or distinctly experi
   BetterTogether also refuses to turn a guarded child step into an ordinary
   failed prefix, so composed optimization cannot continue after a hard route,
   cost, budget, transport, or cancellation refusal.
+- Optimize Anything now preserves the same boundary through scalar, grouped,
+  returned-error, raised-error, and task-exit evaluator paths. Its documented
+  `raise_on_exception: false` mode still makes ordinary evaluator failures
+  candidate-local, but cannot convert a provider safety refusal into a zero
+  score and continue selecting artifacts.

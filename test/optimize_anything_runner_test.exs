@@ -237,6 +237,45 @@ defmodule Imp.Optimize.Anything.RunnerTest do
                  end
   end
 
+  test "operational safety failures stay fatal when ordinary evaluator failures are contained" do
+    guard =
+      Imp.OperationalSafetyError.exception(
+        kind: :budget,
+        message: "Optimize Anything evaluator budget exhausted"
+      )
+
+    assert_raise Imp.OperationalSafetyError,
+                 "Optimize Anything evaluator budget exhausted",
+                 fn ->
+                   Anything.run(
+                     "base",
+                     fn _candidate -> {:error, guard} end,
+                     config:
+                       Config.new(engine: [max_candidate_proposals: 0, raise_on_exception: false]),
+                     fallback_proposer: fn candidate, component, _records, _iteration ->
+                       Map.fetch!(candidate, component)
+                     end
+                   )
+                 end
+
+    assert_raise Imp.OperationalSafetyError,
+                 "Optimize Anything evaluator budget exhausted",
+                 fn ->
+                   Anything.run(
+                     "base",
+                     nil,
+                     dataset: [%{id: :train}],
+                     valset: [%{id: :selection}],
+                     batch_evaluator: fn _pairs -> [{:error, guard}] end,
+                     config:
+                       Config.new(engine: [max_candidate_proposals: 0, raise_on_exception: false]),
+                     fallback_proposer: fn candidate, component, _records, _iteration ->
+                       Map.fetch!(candidate, component)
+                     end
+                   )
+                 end
+  end
+
   test "named candidates are passed to the evaluator and returned without string unwrapping" do
     receiver = self()
     candidate = %{planner: "plan carefully", writer: "answer briefly"}

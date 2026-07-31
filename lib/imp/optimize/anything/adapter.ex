@@ -414,21 +414,27 @@ defmodule Imp.Optimize.Anything.Adapter do
       {:ok, {:ok, raw_results}} ->
         normalize_batch_results(adapter, contexts, raw_results)
 
-      {:ok, {:raised, kind, reason, stacktrace}} when adapter.raise_on_exception ->
-        :erlang.raise(kind, reason, stacktrace)
+      {:ok, {:raised, kind, reason, stacktrace}} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
 
-      {:ok, {:raised, _kind, reason, _stacktrace}} ->
-        batch_failure_evaluations(contexts, redact_error(reason))
-
-      {:exit, reason} when adapter.raise_on_exception ->
-        raise RuntimeError,
-              "Optimize Anything batch evaluator task exited: #{redact_error(reason)}"
+        if adapter.raise_on_exception do
+          :erlang.raise(kind, reason, stacktrace)
+        else
+          batch_failure_evaluations(contexts, redact_error(reason))
+        end
 
       {:exit, reason} ->
-        batch_failure_evaluations(
-          contexts,
-          "batch evaluator task exited: #{redact_error(reason)}"
-        )
+        Imp.OperationalSafetyError.raise_if_present!(reason)
+
+        if adapter.raise_on_exception do
+          raise RuntimeError,
+                "Optimize Anything batch evaluator task exited: #{redact_error(reason)}"
+        else
+          batch_failure_evaluations(
+            contexts,
+            "batch evaluator task exited: #{redact_error(reason)}"
+          )
+        end
     end
   end
 
@@ -481,6 +487,8 @@ defmodule Imp.Optimize.Anything.Adapter do
   end
 
   defp normalize_batch_evaluation(adapter, context, {:error, reason}) do
+    Imp.OperationalSafetyError.raise_if_present!(reason)
+
     if adapter.raise_on_exception do
       raise RuntimeError,
             "Optimize Anything batch evaluator failed for pair #{context.example_index}: #{redact_error(reason)}"
@@ -670,6 +678,7 @@ defmodule Imp.Optimize.Anything.Adapter do
          index,
          captured_stdout
        ) do
+    Imp.OperationalSafetyError.raise_if_present!(raw)
     {raw, evaluated_candidate} = unwrap_internal_result(raw, public_candidate)
     {score, side_info} = normalize_result!(raw)
     validate_score!(score)
@@ -867,6 +876,7 @@ defmodule Imp.Optimize.Anything.Adapter do
          {:ok, {:raised, _kind, reason, _stacktrace, candidate, example, index}},
          false
        ) do
+    Imp.OperationalSafetyError.raise_if_present!(reason)
     diagnostic = %{"error" => redact_error(reason)}
 
     %{
@@ -882,6 +892,8 @@ defmodule Imp.Optimize.Anything.Adapter do
          {:ok, {:raised, _kind, reason, _stacktrace, candidate, example, index, captured_stdout}},
          false
        ) do
+    Imp.OperationalSafetyError.raise_if_present!(reason)
+
     diagnostic =
       %{"error" => redact_error(reason)}
       |> merge_captured_stdout(captured_stdout)
@@ -903,10 +915,14 @@ defmodule Imp.Optimize.Anything.Adapter do
   end
 
   defp resolve_task_result({:exit, {{example, index}, reason}}, false) do
+    Imp.OperationalSafetyError.raise_if_present!(reason)
     task_exit_evaluation(example, index, reason)
   end
 
-  defp resolve_task_result({:exit, reason}, false), do: task_exit_evaluation(nil, -1, reason)
+  defp resolve_task_result({:exit, reason}, false) do
+    Imp.OperationalSafetyError.raise_if_present!(reason)
+    task_exit_evaluation(nil, -1, reason)
+  end
 
   defp task_exit_evaluation(example, index, reason) do
     diagnostic = %{"error" => "evaluator task exited: #{redact_error(reason)}"}
