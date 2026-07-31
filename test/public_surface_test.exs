@@ -263,6 +263,20 @@ defmodule PublicSurfaceTest do
     def call(%__MODULE__{}, _inputs), do: raise("program exploded")
   end
 
+  defmodule GuardedProgram do
+    @behaviour Imp.Module
+    defstruct []
+
+    @impl true
+    def call(%__MODULE__{}, _inputs) do
+      {:error,
+       Imp.OperationalSafetyError.exception(
+         kind: :transport,
+         message: "ensemble child transport guard"
+       )}
+    end
+  end
+
   defmodule InvalidPredictionProgram do
     @behaviour Imp.Module
     defstruct []
@@ -775,6 +789,37 @@ defmodule PublicSurfaceTest do
 
     assert {:error, {:ensemble_reduce_failed, "reducer exploded", [{:ok, %Imp.Prediction{}}]}} =
              Imp.Optimizer.Ensemble.Program.call(reducer, %{question: "2+2?"})
+  end
+
+  test "ensemble preserves operational safety through children and reducers" do
+    guarded_child =
+      Imp.Optimizer.Ensemble.new()
+      |> Imp.Optimizer.Ensemble.compile([%GuardedProgram{}])
+
+    assert_raise Imp.OperationalSafetyError, "ensemble child transport guard", fn ->
+      Imp.Optimizer.Ensemble.Program.call(guarded_child, %{question: "2+2?"})
+    end
+
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
+      )
+
+    guarded_reducer =
+      Imp.Optimizer.Ensemble.new(
+        reduce_fn: fn _predictions ->
+          {:error,
+           Imp.OperationalSafetyError.exception(
+             kind: :cost,
+             message: "ensemble reducer cost guard"
+           )}
+        end
+      )
+      |> Imp.Optimizer.Ensemble.compile([program])
+
+    assert_raise Imp.OperationalSafetyError, "ensemble reducer cost guard", fn ->
+      Imp.Optimizer.Ensemble.Program.call(guarded_reducer, %{question: "2+2?"})
+    end
   end
 
   test "composition optimizer constructors reject invalid boundary contracts" do

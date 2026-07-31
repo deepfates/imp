@@ -89,3 +89,7 @@ Canonical claims classify every advertised family as stable or distinctly experi
   `raise_on_exception: false` mode still makes ordinary evaluator failures
   candidate-local, but cannot convert a provider safety refusal into a zero
   score and continue selecting artifacts.
+- Ensemble keeps ordinary child and reducer failures as structured outputs, but
+  now preserves hard operational guards from either layer. Composition can no
+  longer make a budget, route, cost, transport, or cancellation refusal look
+  like one ignorable failed vote.
