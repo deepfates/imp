@@ -731,3 +731,70 @@ operational guards fatal, and cannot credit a failed candidate. A completed
 three-seed negative remains decisive; another owning runtime or artifact stop
 would instead falsify current MIPRO product readiness. Stage 2 remains dormant
 regardless until Stage 1 satisfies its unchanged primary criterion.
+
+### Diagnostic-10 seed 1: portability repair and scorer diagnosis
+
+The diagnostic-10 run is terminal and inconclusive. Seed `2026072705` completed
+selection and held-out evaluation (`0.328125 -> 0.3697916667` on selection;
+`0.53125 -> 0.5625` on the recorded Imp metric), then its fresh process failed
+while decoding the selected Artifact. Seeds 2/3 and Stage 2 did not start. The
+retained bytes remain unchanged: run log `44d2e830...`, Result `3ed95c51...`,
+and Artifact `65131e49...`.
+
+The Artifact failure was generic, not MIPRO-specific. Schema-2/3 parameter
+snapshots and attached reports encoded identifier atoms and restored them with
+`binary_to_existing_atom/2`; a fresh VM failed first on `metric_error`. A scan
+of this exact Artifact found 104 distinct tagged atom names, 82 of which were
+absent without incidental optimizer-module loading. Artifact restoration now
+keeps persisted predictor, signature/demo/config, report, error, and metadata
+identifiers as strings and resolves only names present in the trusted live
+program. It never creates an atom from Artifact bytes. The exact retained
+champion now applies to a freshly reconstructed two-stage program; its
+canonical parameter snapshot equals the retained candidate after only the
+legacy name-tag-to-string normalization, and a deterministic local two-stage
+probe executes. Original provider outputs cannot be reproduced provider-free,
+so this proves exact selected parameter state and executable application, not
+provider-response replay. An unpacked-package test additionally uses predictor,
+field, demo, and report names absent from the fresh VM and proves they remain
+uninterned through write/read/apply/call.
+
+The 48 optimizer diagnostics reveal a separate scientific defect. The frozen
+loader intentionally retained `kwargs` as `Jason.OrderedObject` values so the
+DSPy 3.2.1 proposer saw insertion-ordered Python-like data. The Imp IFBench
+metric's `strip_nil_values/1` accepted ordinary maps but did not unwrap that
+representation. Its later clauses therefore saw no rule arguments: keyword
+rules fell through to the misleading "unsupported" catch-all and
+`nth_paragraph - 1` raised arithmetic failure.
+
+The exact failures are deterministic:
+
+- bootstrap's first shuffled arm (`internal_seed=-2`) failed at trajectory
+  indices 0/4/6: train sources `000345` (`keywords:existence`), `000343`
+  (`length_constraints:nth_paragraph_first_word`), and `000372`
+  (`keywords:existence`);
+- nine full candidate evaluations each failed selection indices 9, 10, 14, 29,
+  and 30: sources `000084`/`000179`/`000109` (existence), `000234`
+  (nth-paragraph arithmetic), and `000214` (forbidden words). That is 27
+  existence, 9 arithmetic, and 9 forbidden-word diagnostics, plus the three
+  bootstrap diagnostics.
+
+Pinned upstream IFBench evaluation on the retained outer baseline/optimized
+outputs accepts all five row/rule shapes without exceptions. Per-row scores are
+`[1, 1, .5, 1, 1]` for baseline and `[1, 1, .5, 1, 2/3]` for optimized. Feeding
+the same values to Imp with ordinary maps yields those same five scores; feeding
+the frozen ordered representation reproduces all five recorded failures. The
+rows are valid and the outputs are ordinary task outcomes. The defect is the
+Imp scorer/ordered-data adapter boundary. Internal outputs for the 45 trial
+diagnostics were reduced to scores/errors before the report and are not
+retained, so they cannot be independently replayed; the failure precedes their
+response-dependent checks.
+
+More importantly, re-scoring all retained selection outputs with the pinned
+scorer gives baseline `0.75` and optimized `0.7239583333`, reversing the frozen
+Imp selection. Thus the recorded `+.03125` held-out difference is descriptive
+for the implemented Imp metric, but it is not an interpretable MIPRO lift for
+the intended pinned-IFBench question. Repairing Artifact portability alone
+does not preserve that scientific question. **Continuation recommendation:
+do not start seeds 2/3.** Repair and validate the scorer representation boundary
+as a product change, then pose any future run as a separately frozen condition;
+do not reuse this seed as a scientific outcome or silently rescore it.

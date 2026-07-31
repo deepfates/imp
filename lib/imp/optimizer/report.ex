@@ -216,7 +216,12 @@ defmodule Imp.Optimizer.Report do
     |> Imp.Redaction.redact()
   end
 
-  def load(state) when is_map(state) do
+  def load(state) when is_map(state), do: load_report(state, :atoms)
+
+  @doc false
+  def load_portable(state) when is_map(state), do: load_report(state, :strings)
+
+  defp load_report(state, atom_mode) do
     reject_canonical_key_collisions!(state, "optimizer report state")
     validate_report_keys!(state)
 
@@ -227,11 +232,11 @@ defmodule Imp.Optimizer.Report do
       raise ArgumentError, "malformed optimizer report state"
     end
 
-    optimizer = state |> fetch_required!(:optimizer) |> load_value()
+    optimizer = state |> fetch_required!(:optimizer) |> load_value(atom_mode)
     ensure_optimizer_runtime_loaded!(optimizer)
-    best_score = state |> fetch_required!(:best_score) |> load_value()
-    candidate_count = state |> fetch_required!(:candidate_count) |> load_value()
-    metadata = state |> fetch_required!(:metadata) |> load_value()
+    best_score = state |> fetch_required!(:best_score) |> load_value(atom_mode)
+    candidate_count = state |> fetch_required!(:candidate_count) |> load_value(atom_mode)
+    metadata = state |> fetch_required!(:metadata) |> load_value(atom_mode)
 
     unless (is_nil(optimizer) or is_atom(optimizer) or is_binary(optimizer)) and
              (is_nil(best_score) or is_number(best_score)) and
@@ -243,8 +248,8 @@ defmodule Imp.Optimizer.Report do
       optimizer: optimizer,
       best_score: best_score,
       candidate_count: candidate_count,
-      candidates: Enum.map(candidates, &load_value/1),
-      errors: Enum.map(errors, &load_value/1),
+      candidates: Enum.map(candidates, &load_value(&1, atom_mode)),
+      errors: Enum.map(errors, &load_value(&1, atom_mode)),
       metadata: metadata
     })
   end
@@ -258,7 +263,10 @@ defmodule Imp.Optimizer.Report do
   def encode_term(value), do: dump_value(value)
 
   @doc "Decodes a value produced by `encode_term/1`."
-  def decode_term(value), do: load_value(value)
+  def decode_term(value), do: load_value(value, :atoms)
+
+  @doc false
+  def decode_term_portable(value), do: load_value(value, :strings)
 
   @doc "Returns a JSON-encodable projection with credential-bearing data redacted."
   def json_safe(value), do: value |> dump_value() |> Imp.Redaction.redact()
@@ -508,49 +516,47 @@ defmodule Imp.Optimizer.Report do
     %{"__imp_type__" => "map", "entries" => entries}
   end
 
-  defp load_value(%{"__imp_type__" => "atom"} = state) do
+  defp load_value(%{"__imp_type__" => "atom"} = state, atom_mode) do
     validate_exact_tag!(state, @atom_tag_keys, "atom")
 
     case state["value"] do
       value when is_binary(value) ->
-        Map.get_lazy(@portable_optimizer_atoms, value, fn ->
-          :erlang.binary_to_existing_atom(value, :utf8)
-        end)
+        decode_atom(value, atom_mode)
 
       _value ->
         raise ArgumentError, "malformed Imp atom JSON tag"
     end
   end
 
-  defp load_value(%{"__imp_type__" => "optimizer_report"} = state) do
+  defp load_value(%{"__imp_type__" => "optimizer_report"} = state, atom_mode) do
     validate_exact_tag!(state, @optimizer_report_tag_keys, "optimizer report")
 
     state
     |> Map.delete("__imp_type__")
-    |> load()
+    |> load_report(atom_mode)
   end
 
-  defp load_value(%{"__imp_type__" => "improper_list"} = state) do
+  defp load_value(%{"__imp_type__" => "improper_list"} = state, atom_mode) do
     validate_exact_tag!(state, @improper_list_tag_keys, "improper list")
 
     case state do
       %{"heads" => heads, "tail" => tail} when is_list(heads) and heads != [] ->
         heads
-        |> Enum.map(&load_value/1)
+        |> Enum.map(&load_value(&1, atom_mode))
         |> Enum.reverse()
-        |> Enum.reduce(load_value(tail), fn head, acc -> [head | acc] end)
+        |> Enum.reduce(load_value(tail, atom_mode), fn head, acc -> [head | acc] end)
 
       _state ->
         raise ArgumentError, "malformed Imp improper-list JSON tag"
     end
   end
 
-  defp load_value(%{"__imp_type__" => "example"} = state) do
+  defp load_value(%{"__imp_type__" => "example"} = state, atom_mode) do
     validate_exact_tag!(state, @example_tag_keys, "example")
 
-    fields = load_value(state["fields"])
-    input_keys = load_value(state["input_keys"])
-    demos = load_value(state["demos"])
+    fields = load_value(state["fields"], atom_mode)
+    input_keys = load_value(state["input_keys"], atom_mode)
+    demos = load_value(state["demos"], atom_mode)
 
     unless is_map(fields) and (is_nil(input_keys) or is_list(input_keys)) and is_list(demos) do
       raise ArgumentError, "malformed Imp example JSON tag"
@@ -562,43 +568,46 @@ defmodule Imp.Optimizer.Report do
     |> maybe_with_demos(demos)
   end
 
-  defp load_value(%{"__imp_type__" => "image"} = state) do
+  defp load_value(%{"__imp_type__" => "image"} = state, atom_mode) do
     if valid_image_state?(state) do
       %Imp.Adapter.Types.Image{
         url: state["url"],
         data: state["data"],
         mime_type: state["mime_type"],
-        metadata: load_value(state["metadata"])
+        metadata: load_value(state["metadata"], atom_mode)
       }
     else
       raise ArgumentError, "malformed Imp image JSON tag"
     end
   end
 
-  defp load_value(%{"__imp_type__" => "tuple"} = state) do
+  defp load_value(%{"__imp_type__" => "tuple"} = state, atom_mode) do
     validate_exact_tag!(state, @tuple_tag_keys, "tuple")
 
     case state["items"] do
-      items when is_list(items) -> items |> Enum.map(&load_value/1) |> List.to_tuple()
-      _items -> raise ArgumentError, "malformed Imp tuple JSON tag"
+      items when is_list(items) ->
+        items |> Enum.map(&load_value(&1, atom_mode)) |> List.to_tuple()
+
+      _items ->
+        raise ArgumentError, "malformed Imp tuple JSON tag"
     end
   end
 
-  defp load_value(%{"__imp_type__" => "map"} = state) do
+  defp load_value(%{"__imp_type__" => "map"} = state, atom_mode) do
     validate_exact_tag!(state, @map_tag_keys, "map")
 
     case state["entries"] do
       entries when is_list(entries) ->
         Enum.reduce(entries, %{}, fn
           [key, value], decoded ->
-            key = load_value(key)
+            key = load_value(key, atom_mode)
 
             if Map.has_key?(decoded, key) do
               raise ArgumentError,
                     "optimizer report map contains duplicate decoded key #{inspect(key)}"
             end
 
-            Map.put(decoded, key, load_value(value))
+            Map.put(decoded, key, load_value(value, atom_mode))
 
           _entry, _decoded ->
             raise ArgumentError, "malformed Imp map JSON tag"
@@ -609,21 +618,34 @@ defmodule Imp.Optimizer.Report do
     end
   end
 
-  defp load_value(%{"__imp_type__" => type}),
+  defp load_value(%{"__imp_type__" => type}, _atom_mode),
     do: raise(ArgumentError, "unsupported Imp JSON wire tag: #{inspect(type)}")
 
-  defp load_value(map) when is_map(map) do
+  defp load_value(map, atom_mode) when is_map(map) do
     Enum.reduce(map, %{}, fn {key, value}, decoded ->
       unless is_binary(key) do
         raise ArgumentError, "unsupported optimizer report JSON map key: #{inspect(key)}"
       end
 
-      Map.put(decoded, key, load_value(value))
+      Map.put(decoded, key, load_value(value, atom_mode))
     end)
   end
 
-  defp load_value(list) when is_list(list), do: Enum.map(list, &load_value/1)
-  defp load_value(value), do: value
+  defp load_value(list, atom_mode) when is_list(list),
+    do: Enum.map(list, &load_value(&1, atom_mode))
+
+  defp load_value(value, _atom_mode), do: value
+
+  defp decode_atom("nil", :strings), do: nil
+  defp decode_atom("true", :strings), do: true
+  defp decode_atom("false", :strings), do: false
+  defp decode_atom(value, :strings), do: value
+
+  defp decode_atom(value, :atoms) do
+    Map.get_lazy(@portable_optimizer_atoms, value, fn ->
+      :erlang.binary_to_existing_atom(value, :utf8)
+    end)
+  end
 
   defp maybe_with_inputs(example, nil), do: example
   defp maybe_with_inputs(example, input_keys), do: Imp.Example.with_inputs(example, input_keys)

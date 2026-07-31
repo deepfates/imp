@@ -395,6 +395,41 @@ defmodule PackageContractTest do
 
     File.mkdir_p!(consumer_dir)
     File.write!(Path.join(consumer_dir, "mix.exs"), mix_exs)
+    File.mkdir_p!(Path.join(consumer_dir, "lib/imp_consumer"))
+
+    File.write!(
+      Path.join(consumer_dir, "lib/imp_consumer/unseen_artifact_program.ex"),
+      """
+      defmodule ImpConsumer.UnseenArtifactProgram do
+        @behaviour Imp.Module
+        defstruct [:predict]
+
+        @predictor_name "cold_package_unseen_predictor_7f42"
+
+        def new(lm) do
+          %__MODULE__{
+            predict:
+              Imp.predict("cold_package_input_7f42 -> cold_package_output_7f42",
+                lm: lm
+              )
+          }
+        end
+
+        @impl true
+        def optimizer_predictors(%__MODULE__{predict: predict}),
+          do: [%{name: @predictor_name, predictor: predict}]
+
+        @impl true
+        def update_optimizer_predictor(%__MODULE__{} = program, @predictor_name, update),
+          do: %{program | predict: update.(program.predict)}
+
+        @impl true
+        def call(%__MODULE__{predict: predict}, inputs), do: Imp.call(predict, inputs)
+      end
+      """
+    )
+
+    unseen_artifact = Path.join(consumer_dir, "unseen-artifact.json")
 
     script = """
     case Application.load(:imp) do
@@ -732,13 +767,13 @@ defmodule PackageContractTest do
       |> Imp.Optimizer.Artifact.apply(program)
 
     unless match?(
-             %Imp.Optimizer.Report{optimizer: :random_search},
+             %Imp.Optimizer.Report{optimizer: "random_search"},
              Imp.Optimizer.Report.fetch(random_deployed)
            ) do
       raise "RandomSearch package artifact lost its optimizer report on application"
     end
 
-    verify_program_optimizer.(:random_search_artifact, :random_search, random_deployed)
+    verify_program_optimizer.(:random_search_artifact, "random_search", random_deployed)
 
     knn_few_shot =
       Imp.Optimizer.KNNFewShot.new(1, fixture_trainset,
@@ -988,6 +1023,38 @@ defmodule PackageContractTest do
     if inspect(dump) =~ "sk-redacted-test" do
       raise "provider credential leaked through save/load boundary"
     end
+
+    unseen_marker = "cold_package_unseen_report_atom_7f42"
+    unseen_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{"cold_package_output_7f42" => "fresh"} end)
+    unseen_program = ImpConsumer.UnseenArtifactProgram.new(unseen_lm)
+
+    unseen_selected =
+      Imp.ProgramParameters.put_instruction(
+        unseen_program,
+        "cold_package_unseen_predictor_7f42",
+        "Selected from a portable cold-package artifact."
+      )
+      |> Imp.ProgramParameters.put_demos(
+        "cold_package_unseen_predictor_7f42",
+        [
+          Imp.Example.new(%{
+            String.to_atom("cold_package_input_7f42") => "known input",
+            String.to_atom("cold_package_output_7f42") => "known output"
+          })
+          |> Imp.Example.with_inputs(String.to_atom("cold_package_input_7f42"))
+        ]
+      )
+      |> Imp.Optimizer.Report.attach(
+        Imp.Optimizer.Report.new(
+          optimizer: String.to_atom(unseen_marker),
+          best_score: 1.0,
+          candidate_count: 1
+        )
+      )
+
+    unseen_selected
+    |> Imp.Optimizer.Artifact.from_optimized_program(artifact_id: "cold-package-selected")
+    |> Imp.Optimizer.Artifact.write!(#{inspect(unseen_artifact)})
     """
 
     {deps_output, deps_status} =
@@ -1006,6 +1073,69 @@ defmodule PackageContractTest do
 
     assert status == 0, output
     refute output =~ ~r/warning: Imp\..* is undefined/, output
+
+    fresh_script = """
+    {:ok, _} = Application.ensure_all_started(:imp)
+    marker = "cold_package_unseen_report_atom_7f42"
+
+    for identifier <- [marker, "cold_package_input_7f42", "cold_package_output_7f42"] do
+      try do
+        :erlang.binary_to_existing_atom(identifier, :utf8)
+        raise "untrusted artifact identifier was unexpectedly preloaded: \#{identifier}"
+      rescue
+        ArgumentError -> :ok
+      end
+    end
+
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{"cold_package_output_7f42" => "fresh"} end)
+    live = ImpConsumer.UnseenArtifactProgram.new(lm)
+
+    applied =
+      #{inspect(unseen_artifact)}
+      |> Imp.Optimizer.Artifact.read!()
+      |> Imp.Optimizer.Artifact.apply(live)
+
+    [%{name: "cold_package_unseen_predictor_7f42", predictor: predictor}] =
+      Imp.ProgramParameters.predictors(applied)
+
+    unless predictor.signature.instructions == "Selected from a portable cold-package artifact." do
+      raise "fresh package consumer did not apply selected parameters"
+    end
+
+    [demo] = predictor.demos
+
+    unless Imp.Example.get(demo, "cold_package_input_7f42") == "known input" and
+             Imp.Example.get(demo, "cold_package_output_7f42") == "known output" do
+      raise "fresh package consumer did not resolve portable demo identifiers"
+    end
+
+    unless Imp.Optimizer.Report.fetch(applied).optimizer == marker do
+      raise "fresh package consumer did not retain the string report identity"
+    end
+
+    for identifier <- [marker, "cold_package_input_7f42", "cold_package_output_7f42"] do
+      try do
+        :erlang.binary_to_existing_atom(identifier, :utf8)
+        raise "artifact application interned an untrusted identifier: \#{identifier}"
+      rescue
+        ArgumentError -> :ok
+      end
+    end
+
+    {:ok, prediction} = Imp.call(applied, %{"cold_package_input_7f42" => "probe"})
+
+    unless Imp.get(prediction, "cold_package_output_7f42") == "fresh" do
+      raise "fresh package consumer could not execute the applied program"
+    end
+    """
+
+    {fresh_output, fresh_status} =
+      System.cmd("mix", ["run", "-e", fresh_script],
+        cd: consumer_dir,
+        stderr_to_stdout: true
+      )
+
+    assert fresh_status == 0, fresh_output
   end
 
   defp consumer_tmp_dir do

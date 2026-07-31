@@ -136,7 +136,11 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
              Enum.map(optimized.demos, &Imp.Example.to_map/1)
 
     assert applied.lm == fresh.lm
-    assert Report.fetch(applied) == Report.fetch(optimized)
+    applied_report = Report.fetch(applied)
+    optimized_report = Report.fetch(optimized)
+    assert to_string(applied_report.optimizer) == to_string(optimized_report.optimizer)
+    assert applied_report.best_score == optimized_report.best_score
+    assert applied_report.candidate_count == optimized_report.candidate_count
     assert_fresh_os_artifact(path, Report.fetch(optimized))
   end
 
@@ -157,7 +161,7 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
 
     report = Imp.Optimizer.Report.fetch(applied)
 
-    unless report && report.optimizer == #{inspect(expected_report.optimizer)} and
+    unless report && to_string(report.optimizer) == #{inspect(to_string(expected_report.optimizer))} and
              report.best_score == #{inspect(expected_report.best_score)} and
              report.candidate_count == #{inspect(expected_report.candidate_count)} and
              length(applied.demos) == 1 and applied.lm == fresh.lm do

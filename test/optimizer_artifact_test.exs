@@ -47,7 +47,7 @@ defmodule Imp.Optimizer.ArtifactTest do
 
     assert %{
              score_delta: 0.5,
-             changed_predictors: ["atom:main"]
+             changed_predictors: ["main"]
            } = Artifact.compare(loaded, "baseline", "candidate-1")
 
     applied = Artifact.apply(loaded, live, "candidate-1")
@@ -56,7 +56,15 @@ defmodule Imp.Optimizer.ArtifactTest do
     assert [%Imp.Example{}] = predictor.predictor.demos
     assert predictor.predictor.lm == live.predict.lm
     assert predictor.predictor.adapter == live.predict.adapter
-    assert Report.fetch(applied) == report
+
+    assert %Report{
+             optimizer: "gepa",
+             best_score: 0.9,
+             candidate_count: 2,
+             candidates: [],
+             errors: [],
+             metadata: %{}
+           } = Report.fetch(applied)
 
     assert applied.predict.lm == live.predict.lm
     assert applied.predict.lm.opts[:api_key] == "sk-live-credential-123456"
@@ -355,7 +363,7 @@ defmodule Imp.Optimizer.ArtifactTest do
     assert %{schema_version: 2, champion_id: "baseline"} = Artifact.inspect(legacy)
     assert Artifact.apply(legacy, optimized("fresh")).predict.signature.instructions == "legacy"
 
-    assert %{score_delta: 0.5, changed_predictors: ["atom:main"]} =
+    assert %{score_delta: 0.5, changed_predictors: ["main"]} =
              Artifact.compare(legacy, "baseline", "selected")
 
     promoted = Artifact.promote(legacy, "selected")
@@ -363,6 +371,71 @@ defmodule Imp.Optimizer.ArtifactTest do
 
     assert %{champion_id: "baseline", revision: 3} =
              promoted |> Artifact.rollback() |> Artifact.inspect()
+  end
+
+  test "legacy artifact identifiers stay strings and resolve against a trusted live program" do
+    suffix = Integer.to_string(System.unique_integer([:positive]))
+    predictor_name = "artifact_unseen_predictor_" <> suffix
+    report_identifier = "artifact_unseen_report_identifier_" <> suffix
+
+    assert_raise ArgumentError, fn ->
+      :erlang.binary_to_existing_atom(predictor_name, :utf8)
+    end
+
+    assert_raise ArgumentError, fn ->
+      :erlang.binary_to_existing_atom(report_identifier, :utf8)
+    end
+
+    baseline =
+      Imp.Optimizer.Artifact.ParameterSnapshot.new([
+        %{name: predictor_name, predictor: Imp.predict("question -> answer")}
+      ])
+
+    selected =
+      Imp.ProgramParameters.put_instruction(
+        baseline,
+        predictor_name,
+        "Selected portable instruction."
+      )
+
+    candidate =
+      Artifact.candidate("selected", selected,
+        report: Report.new(optimizer: "placeholder", best_score: 1.0, candidate_count: 1)
+      )
+
+    legacy_name = %{"__imp_type__" => "atom", "value" => predictor_name}
+
+    candidate =
+      candidate
+      |> put_in(["program", "predictors", Access.at(0), "name"], legacy_name)
+      |> put_in(
+        ["report", "optimizer"],
+        %{"__imp_type__" => "atom", "value" => report_identifier}
+      )
+      |> then(
+        &Map.put(
+          &1,
+          "program_sha256",
+          Codec.checksum(&1["program"])
+        )
+      )
+
+    artifact = Artifact.new(candidate)
+    applied = Artifact.apply(artifact, baseline)
+
+    assert [%{name: ^predictor_name, predictor: predictor}] =
+             Imp.ProgramParameters.predictors(applied)
+
+    assert predictor.signature.instructions == "Selected portable instruction."
+    assert %Report{optimizer: ^report_identifier} = Report.load_portable(candidate["report"])
+
+    assert_raise ArgumentError, fn ->
+      :erlang.binary_to_existing_atom(predictor_name, :utf8)
+    end
+
+    assert_raise ArgumentError, fn ->
+      :erlang.binary_to_existing_atom(report_identifier, :utf8)
+    end
   end
 
   defp optimized(instruction) do

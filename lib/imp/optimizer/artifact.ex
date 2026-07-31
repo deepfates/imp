@@ -5,7 +5,9 @@ defmodule Imp.Optimizer.Artifact do
   Artifacts contain checksummed `Imp.Saving` program states or explicit
   parameter-only snapshots and redacted provenance. Applying a candidate copies
   only optimizable predictor parameters onto a compatible live program,
-  preserving its runtime LMs, adapters, and trusted callbacks.
+  preserving its runtime LMs, adapters, and trusted callbacks. Persisted names
+  remain strings and are resolved against that trusted live program; artifact
+  bytes never create atoms or depend on unrelated modules preloading them.
   """
 
   import Kernel, except: [inspect: 1]
@@ -327,9 +329,13 @@ defmodule Imp.Optimizer.Artifact do
 
       ProgramParameters.update_predictor(acc, target_name, fn live_predictor ->
         live_predictor
-        |> Imp.Predict.Predict.with_signature(source_predictor.signature)
-        |> Imp.Predict.Predict.with_demos(source_predictor.demos)
-        |> Map.put(:config, source_predictor.config)
+        |> Imp.Predict.Predict.with_signature(
+          resolve_signature(source_predictor.signature, target_predictor.signature, identity)
+        )
+        |> Imp.Predict.Predict.with_demos(
+          resolve_demos(source_predictor.demos, target_predictor.signature, identity)
+        )
+        |> Map.put(:config, resolve_config(source_predictor.config, target_predictor.config))
       end)
     end)
     |> attach_candidate_report(candidate)
@@ -618,7 +624,7 @@ defmodule Imp.Optimizer.Artifact do
     expected = MapSet.new(~w(optimizer best_score candidate_count candidates errors metadata))
 
     if MapSet.equal?(MapSet.new(Map.keys(report)), expected) do
-      Report.attach(program, Report.load(report))
+      Report.attach(program, Report.load_portable(report))
     else
       program
     end
@@ -639,8 +645,94 @@ defmodule Imp.Optimizer.Artifact do
     end
   end
 
-  defp name_identity(name) when is_atom(name), do: "atom:" <> Atom.to_string(name)
-  defp name_identity(name) when is_binary(name), do: "string:" <> name
+  defp name_identity(name) when is_atom(name), do: Atom.to_string(name)
+  defp name_identity(name) when is_binary(name), do: name
+
+  defp resolve_signature(source, target, identity) do
+    %{
+      source
+      | inputs: resolve_fields(source.inputs, target.inputs, identity),
+        outputs: resolve_fields(source.outputs, target.outputs, identity)
+    }
+  end
+
+  defp resolve_fields(source_fields, target_fields, identity) do
+    trusted = Map.new(target_fields, &{canonical_identifier(&1.name), &1})
+
+    Enum.map(source_fields, fn source ->
+      case Map.fetch(trusted, canonical_identifier(source.name)) do
+        {:ok, target} ->
+          %{source | name: target.name, kind: target.kind, type: target.type}
+
+        :error ->
+          raise ArgumentError,
+                "optimizer artifact predictor #{Kernel.inspect(identity)} names an unknown signature field #{Kernel.inspect(source.name)}"
+      end
+    end)
+  end
+
+  defp resolve_demos(demos, signature, identity) do
+    trusted =
+      (signature.inputs ++ signature.outputs)
+      |> Map.new(&{canonical_identifier(&1.name), &1.name})
+
+    Enum.map(demos, &resolve_demo(&1, trusted, identity))
+  end
+
+  defp resolve_demo(%Imp.Example{} = example, trusted, identity) do
+    fields =
+      example
+      |> Imp.Example.to_map()
+      |> Map.new(fn {name, value} ->
+        canonical = canonical_identifier(name)
+
+        case Map.fetch(trusted, canonical) do
+          {:ok, trusted_name} -> {trusted_name, value}
+          :error -> {canonical, value}
+        end
+      end)
+
+    input_keys =
+      case example.input_keys do
+        nil ->
+          nil
+
+        keys ->
+          Enum.map(keys, fn name ->
+            Map.get_lazy(trusted, canonical_identifier(name), fn ->
+              raise ArgumentError,
+                    "optimizer artifact predictor #{Kernel.inspect(identity)} demo names an unknown input #{Kernel.inspect(name)}"
+            end)
+          end)
+      end
+
+    fields
+    |> Imp.Example.new()
+    |> maybe_with_inputs(input_keys)
+    |> maybe_with_nested_demos(example.demos, trusted, identity)
+  end
+
+  defp resolve_config(source, target) when is_list(source) and is_list(target) do
+    trusted = Map.new(target, fn {name, _value} -> {canonical_identifier(name), name} end)
+
+    Enum.map(source, fn {name, value} ->
+      {Map.get(trusted, canonical_identifier(name), canonical_identifier(name)), value}
+    end)
+  end
+
+  defp resolve_config(source, _target), do: source
+
+  defp maybe_with_inputs(example, nil), do: example
+  defp maybe_with_inputs(example, keys), do: Imp.Example.with_inputs(example, keys)
+
+  defp maybe_with_nested_demos(example, [], _trusted, _identity), do: example
+
+  defp maybe_with_nested_demos(example, demos, trusted, identity) do
+    Imp.Example.with_demos(example, Enum.map(demos, &resolve_demo(&1, trusted, identity)))
+  end
+
+  defp canonical_identifier(name) when is_atom(name), do: Atom.to_string(name)
+  defp canonical_identifier(name) when is_binary(name), do: name
 
   defp validate_signature_compatibility!(left, right, identity) do
     shape = fn signature ->

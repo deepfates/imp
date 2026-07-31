@@ -319,7 +319,7 @@ defmodule Imp.Saving do
       "predictors" =>
         Enum.map(snapshot.predictors, fn %{name: name, predictor: predictor} ->
           %{
-            "name" => Imp.Optimizer.Report.encode_term(name),
+            "name" => encode_parameter_name!(name),
             "predictor" => dump(predictor)
           }
         end)
@@ -751,8 +751,8 @@ defmodule Imp.Saving do
       |> Enum.map(fn entry ->
         exact_keys!(entry, ["name", "predictor"], "saved optimizer parameter snapshot entry")
 
-        name = entry["name"] |> Imp.Optimizer.Report.decode_term() |> require_parameter_name!()
-        predictor = require_predict!(load(entry["predictor"]), "optimizer parameter snapshot")
+        name = decode_parameter_name!(entry["name"])
+        predictor = load_parameter_predictor!(entry["predictor"])
         %{name: name, predictor: predictor}
       end)
 
@@ -1686,11 +1686,57 @@ defmodule Imp.Saving do
     raise ArgumentError, "#{context} must be a map"
   end
 
-  defp require_parameter_name!(name) when is_atom(name) or is_binary(name), do: name
+  # Optimizer artifacts are an untrusted persistence boundary. Predictor names
+  # are compared with the trusted live program during Artifact.apply/4, so the
+  # wire representation stays a string and never interns an atom from bytes.
+  # The tagged-atom clause preserves schema-2/schema-3 artifacts written by
+  # earlier Imp versions without depending on incidental VM atom preloading.
+  defp encode_parameter_name!(name) when is_atom(name), do: Atom.to_string(name)
+  defp encode_parameter_name!(name) when is_binary(name), do: name
 
-  defp require_parameter_name!(name) do
+  defp decode_parameter_name!(name) when is_binary(name), do: name
+
+  defp decode_parameter_name!(%{"__imp_type__" => "atom", "value" => name} = state)
+       when is_binary(name) do
+    exact_keys!(state, ["__imp_type__", "value"], "saved optimizer parameter name")
+    name
+  end
+
+  defp decode_parameter_name!(name) do
     raise ArgumentError,
-          "saved optimizer parameter snapshot name must be an atom or string, got: #{inspect(name)}"
+          "saved optimizer parameter name must be a string or legacy atom tag, got: #{inspect(name)}"
+  end
+
+  # Parameter snapshots cross the untrusted Artifact boundary. Unlike a normal
+  # saved program, their identifier vocabulary is reconciled with a trusted
+  # live program by Artifact.apply/4, so demos and metadata must not depend on
+  # atoms already interned in the loading VM.
+  defp load_parameter_predictor!(%{"type" => "predict"} = state) do
+    require_keys!(state, @predict_required_keys)
+    signature = Map.fetch!(state, "signature")
+    demos = require_list!(state, "demos")
+    config = Map.fetch!(state, "config")
+
+    metadata =
+      state
+      |> require_map!("metadata")
+      |> Imp.Optimizer.Report.decode_term_portable()
+
+    opts =
+      [
+        demos: Enum.map(demos, &load_portable_demo!/1),
+        config: decode_config(config),
+        metadata: metadata
+      ]
+      |> maybe_put_adapter(state)
+      |> maybe_put_lm(state)
+
+    Imp.Predict.Predict.new(Imp.Signature.load(signature), opts)
+  end
+
+  defp load_parameter_predictor!(state) do
+    raise ArgumentError,
+          "saved optimizer parameter predictor must be a Predict state, got: #{inspect(state)}"
   end
 
   defp require_list!(state, key) do
@@ -1721,5 +1767,23 @@ defmodule Imp.Saving do
 
   defp load_demo!(demo) do
     raise ArgumentError, "saved Imp demo must be a map or keyword list, got: #{inspect(demo)}"
+  end
+
+  defp load_portable_demo!(%{"__imp_type__" => "example"} = demo) do
+    case Imp.Optimizer.Report.decode_term_portable(demo) do
+      %Imp.Example{} = example ->
+        example
+
+      other ->
+        raise ArgumentError,
+              "saved optimizer parameter demo restored to invalid value: #{inspect(other)}"
+    end
+  end
+
+  defp load_portable_demo!(demo) when is_map(demo) or is_list(demo), do: Imp.Example.new(demo)
+
+  defp load_portable_demo!(demo) do
+    raise ArgumentError,
+          "saved optimizer parameter demo must be a map or keyword list, got: #{inspect(demo)}"
   end
 end

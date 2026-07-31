@@ -49,13 +49,16 @@ defmodule Imp.Optimizer.Artifact.ParameterSnapshot do
 
   def update_optimizer_predictor(%__MODULE__{} = snapshot, name, update)
       when is_function(update, 1) do
+    requested_identity = name_identity(name)
+
     {updated, found?} =
       Enum.map_reduce(snapshot.predictors, false, fn
-        %{name: ^name, predictor: predictor} = entry, _found? ->
-          {%{entry | predictor: portable_predictor(update.(predictor))}, true}
-
-        entry, found? ->
-          {entry, found?}
+        %{name: entry_name, predictor: predictor} = entry, found? ->
+          if name_identity(entry_name) == requested_identity do
+            {%{entry | predictor: portable_predictor(update.(predictor))}, true}
+          else
+            {entry, found?}
+          end
       end)
 
     if found?,
@@ -84,6 +87,6 @@ defmodule Imp.Optimizer.Artifact.ParameterSnapshot do
           "invalid optimizer parameter snapshot entry: #{inspect(other)}"
   end
 
-  defp name_identity(name) when is_atom(name), do: {:atom, Atom.to_string(name)}
-  defp name_identity(name) when is_binary(name), do: {:string, name}
+  defp name_identity(name) when is_atom(name), do: Atom.to_string(name)
+  defp name_identity(name) when is_binary(name), do: name
 end
