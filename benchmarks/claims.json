@@ -252,7 +252,7 @@
       "limitations": ["Imp evaluates rewritten candidates before accepting them; exact Python sampling and RNG order are excluded.", "DSPy 3.2.1 AvatarOptimizer cannot construct as released; upstream observations are captured under a disclosed sidecar monkey-patch of the absent dspy.TypedPredictor and dspy.Predict factories, recorded in the artifact scope."],
       "statement": "Imp has source-bound C1 evidence for the admitted AvatarOptimizer classification, comparator, rewrite, and feedback-propagation observations, with the candidate-evaluation correction explicit.",
       "category": "optimizer", "surface": ["AvatarOptimizer"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_optimizer_differential/78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317.json", "test/avatar_optimizer_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/avatar_optimizer_differential/97dbf8ef7518973fc050b4e51d3ce3325f3797d52687e6b810c51c08eab61d4a.json", "test/avatar_optimizer_differential_test.exs"],
       "requirements": [{"id": "optimizer.avatar_optimizer.semantic", "kind": "optimizer_conformance", "lane": "avatar_optimizer_differential", "evidence": "full", "threshold": "the canonical AvatarOptimizer artifact verifies its declared observations, native corrections, and exclusions"}]
     },
     {
@@ -332,7 +332,7 @@
       "limitations": ["DSPy rejects deterministic mode; Imp's seeded replay is native. Exact sampled membership, RNG sequence, and structured failure parity are excluded."],
       "statement": "Imp has source-bound C1 evidence for the admitted Ensemble all-program, reducer, and subset-cardinality observations, with deterministic replay declared native.",
       "category": "optimizer", "surface": ["Ensemble"], "claim_type": "conformance", "comparison": "dspy_3_2_1", "gate_policy": "informational",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/ensemble_differential/3a7d990af2dd277371e33f81d53d5640dfa50beac6b843a2511cfe24ac5a61e1.json", "test/ensemble_differential_test.exs"],
+      "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/evidence/admitted/ensemble_differential/df73a1f72a241214570e76b7a824ce5472c0dcff4dcc9bcc62c0d984df3866c8.json", "test/ensemble_differential_test.exs"],
       "requirements": [{"id": "optimizer.ensemble.semantic", "kind": "optimizer_conformance", "lane": "ensemble_differential", "evidence": "full", "threshold": "the canonical Ensemble artifact verifies the admitted shared observations, native replay, and retained exclusions"}]
     },
     {

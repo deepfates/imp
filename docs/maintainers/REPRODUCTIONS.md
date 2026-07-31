@@ -34,11 +34,11 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | SIMBA | replication | instruction_contract<br>instruction_live | T2 | benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json |
 | GEPA | replication | gepa_contract<br>gepa_live | T1 | benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json |
 | Avatar actor | adaptation | provider_training<br>avatar_actor_differential | T1 | benchmarks/evidence/admitted/avatar_actor_differential/190b4002bcb3c96f7a0a3bcea442bb58f2999a935bb2c1b0f1e64c37911beb77.json |
-| Avatar optimizer | adaptation | provider_training<br>avatar_optimizer_differential | T1 | benchmarks/evidence/admitted/avatar_optimizer_differential/78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317.json |
+| Avatar optimizer | adaptation | provider_training<br>avatar_optimizer_differential | T1 | benchmarks/evidence/admitted/avatar_optimizer_differential/97dbf8ef7518973fc050b4e51d3ce3325f3797d52687e6b810c51c08eab61d4a.json |
 | BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training<br>bootstrap_finetune_differential | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |
 | GRPO | adaptation | provider_training<br>mmgrpo_differential | T1 | benchmarks/evidence/admitted/mmgrpo_differential/e05710b743aa9bac3c65ecbfbcb90fa0b24e6957262564f06e917db4527360f3.json |
 | BetterTogether | adaptation | provider_training<br>better_together_differential | T1 | benchmarks/evidence/admitted/better_together_differential/36898d226771e4bf121df661bac365e0a8a9c2fc98270c6e4126073ccdc015c8.json |
-| Ensemble | adaptation | optimizer_lift<br>ensemble_differential | T1 | benchmarks/evidence/admitted/ensemble_differential/c614e943063dab5507254a6a3cc412651de5124e06d04f1a0c9f80c8aa7bd21a.json |
+| Ensemble | adaptation | optimizer_lift<br>ensemble_differential | T1 | benchmarks/evidence/admitted/ensemble_differential/df73a1f72a241214570e76b7a824ce5472c0dcff4dcc9bcc62c0d984df3866c8.json |
 | Fast-Slow orchestration and CISPO handoff | adaptation | fast_slow | NONE | none |
 | Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json |
 | Retrieval, RAG, embeddings, and datasets | adaptation | rag_agent | NONE | none |

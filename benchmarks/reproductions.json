@@ -1159,8 +1159,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/avatar_optimizer_differential/78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317.json",
-        "artifact_sha256": "78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317",
+        "artifact": "benchmarks/evidence/admitted/avatar_optimizer_differential/97dbf8ef7518973fc050b4e51d3ce3325f3797d52687e6b810c51c08eab61d4a.json",
+        "artifact_sha256": "97dbf8ef7518973fc050b4e51d3ce3325f3797d52687e6b810c51c08eab61d4a",
         "protocol_id": "avatar_optimizer_differential"
       }
     },
@@ -1274,8 +1274,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/ensemble_differential/c614e943063dab5507254a6a3cc412651de5124e06d04f1a0c9f80c8aa7bd21a.json",
-        "artifact_sha256": "c614e943063dab5507254a6a3cc412651de5124e06d04f1a0c9f80c8aa7bd21a",
+        "artifact": "benchmarks/evidence/admitted/ensemble_differential/df73a1f72a241214570e76b7a824ce5472c0dcff4dcc9bcc62c0d984df3866c8.json",
+        "artifact_sha256": "df73a1f72a241214570e76b7a824ce5472c0dcff4dcc9bcc62c0d984df3866c8",
         "protocol_id": "ensemble_differential"
       }
     },
