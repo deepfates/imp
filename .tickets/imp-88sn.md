@@ -72,13 +72,29 @@ been granted:
   600-call protocol belongs to Pygments. Five seeds would be a new robustness
   protocol, not released behavior.
 
-The next authorized work remains provider-free and repository-only: replay the
-released Circle Packing retained state through `Optimize.Anything.Result` ->
-schema-3 value Artifact -> fresh trusted evaluator, and fail closed on incomplete
-gskill identity. Do not add benchmark code to `lib` or Hex. Do not create a
-runner framework, coordinator, manifest, dashboard, or custom result format.
+The bounded provider-free OA readiness slice is now complete. The repository-only
+gate authenticates `gepa-ai/optimize-anything-artifact@v1.4` at
+`6388548aac5de93ed3e581de20cc943bb3bee3fe`, verifies the exact Circle source,
+checkpoint, tracker, seed, retained code, refiner prompt, incumbent, and final
+output hashes, and projects the 133-call warm retained state through the existing
+`Optimize.Anything.Result` -> schema-3 value `Artifact` boundary. A fresh BEAM
+with provider credentials blank reads the Artifact and independently validates
+the retained 26-circle geometry at `2.635983362593453`. This is a deterministic
+retained-state/artifact replay, not a cold optimizer rerun, code-execution replay,
+or held-out generalization result; the tracker also does not reconstruct the
+exact reflection-call count.
+
+The same gate authenticates the released gskill files and fails exact-reproduction
+readiness closed. The retained Bleve run requested/completed 300 calls and resumed
+a prior state; Jinja requested 300 and completed 307; the 600-call default is the
+separate Pygments protocol. The released loader has no SWE-smith revision, and
+the evidence lacks ordered 200/50/100 IDs and hashes, repository/base commits,
+Docker image digests, dependency locks, and OS/architecture. A future five-seed
+study remains a newly pinned current-source replication, not reproduction of the
+v1.4 artifacts. No provider, dataset, Docker task, or proposal call was made.
+
 No Circle Packing, gskill, HoVer, PAPILLON, comparator, or cost-pilot provider
-call is authorized by this ticket.
+call is authorized by this ticket. The full usefulness criterion remains open.
 
 ## Frozen portfolio design (provider authority: none)
 
