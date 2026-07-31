@@ -8,9 +8,9 @@ the ordinary consumer finish line and `tk` owns unfinished work.
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Release profile: v0.1
 Total: 26
-Conformant: 15
+Conformant: 14
 Elixir-native equivalents: 7
-Tracking: 1
+Tracking: 2
 Gaps: 3
 Claim-specific non-blocking gaps: 3
 Invalid evidence: 0
@@ -47,7 +47,7 @@ Conformance profile passing: true
 | runtime.observability | runtime | conformant | satisfied | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |
 | state.persistence_deployment | operations | conformant | satisfied | Module.save, Module.load, load, dump_state, load_state, deployment |
 | product.learning_path | product | conformant | satisfied | getting started, tutorials, real-world examples, API reference, production guide |
-| product.release | product | conformant | satisfied | installable package, versioned release, security policy, CI, clean-room consumer |
+| product.release | product | tracking | tracked | installable package, versioned release, security policy, CI, clean-room consumer |
 
 ## Executable Contracts
 
@@ -881,7 +881,7 @@ Missing evidence or behavior:
 
 ### `product.release`
 
-Status: `conformant`
+Status: `tracking`
 
 Upstream source: `Hex package and canonical GitHub repository`
 

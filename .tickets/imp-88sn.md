@@ -18,6 +18,27 @@ Obstacle: Imp has one narrow historical positive matched result, several honest 
 
 Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
 
+## Current status at `26eb666`
+
+This ticket remains open. Its non-prompt half passed: the structured retry-policy
+condition selected proposer-generated values in two of three seeds, improved the
+new untouched executable rows from `3/6` to `5/6`, retained baseline in the
+third seed, and loaded every value Artifact in a fresh process.
+
+The realistic multi-stage LM half has not passed. IFBench's Imp effectiveness
+interpretation is invalid/unverified after a scorer representation defect. A
+complete modeled-MIPRO Banking77 condition averaged `+0.041667`; the final
+exposure-disjoint confirmation averaged `+0.020833`; and the complete HotPotQA
+JSON-GEPA condition averaged `-0.015256`. All were retained as scoped results,
+not threshold-adjusted into wins. No further Banking77 or HotPotQA treatment and
+no upstream comparator is authorized by this ticket today.
+
+Everything below is a chronological research record. Earlier recommendations,
+budgets, and runnable proposals are not current authority merely because they
+remain preserved. The next decision is a landscape-informed benchmark portfolio
+and an explicit owner-approved scientific question, not an automatic fourth
+task treatment.
+
 ## Frozen portfolio design (provider authority: none)
 
 This design binds inputs and opportunity before any new proposal or task-model

@@ -87,7 +87,14 @@ defmodule Imp.UpstreamFidelityTest do
     refute Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C3 "))
     refute Enum.any?(gepa.evidence.missing, &String.starts_with?(&1, "C5 "))
     assert by_id["product.learning_path"].status == :conformant
-    assert by_id["product.release"].status == :conformant
+    assert by_id["product.release"].status == :tracking
+    refute by_id["product.release"].release_blocking
+
+    assert Enum.any?(
+             by_id["product.release"].evidence.missing,
+             &String.contains?(&1, "published")
+           )
+
     assert by_id["optimization.anything"].status == :gap
 
     assert report.summary.invalid_evidence == 0

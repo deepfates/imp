@@ -403,10 +403,14 @@ authority URL at the CLI, campaign, and pure admission layers.
 The immutable pre-v2 artifact `58ff84ac…` remains valid T2 evidence that a
 live provider-backed campaign executed with recorded costs and checkpoints.
 It does not establish C3 effectiveness because it selected and finally scored
-candidates on the same development set. No provider-backed schema-v2 artifact
-has been admitted, so Imp-native non-prompt effectiveness remains an open
-target. Neither schema establishes full paper reproduction or equality with an
-upstream implementation under matched internals.
+candidates on the same development set. A later provider-backed retry-policy
+schema-v2 condition used distinct train, selection, and untouched test rows:
+two of three seeds selected proposer-generated values and improved exact
+executable behavior from `3/6` to `5/6`, one retained baseline, and all three
+loaded fresh. That is scoped evidence for one non-prompt task, not admission of
+the declared three-class portfolio. Broad Imp-native non-prompt effectiveness
+therefore remains an open target. Neither schema establishes paper reproduction
+or equality with an upstream implementation under matched internals.
 
 ## Run GEPA Paper Replication
 

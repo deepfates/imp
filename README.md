@@ -94,15 +94,20 @@ an API key.
 ## What the current evidence says
 
 The core program, evaluation, experiment, artifact, and OTP deployment path is
-exercised from an unpacked package and a fresh process. The optimizer families
-are still being completed and reviewed family by family before 1.0.
+exercised from an unpacked package, real providers, and fresh OS processes. All
+optimizer modules remain experimental while their mechanisms and usefulness are
+reviewed family by family before 1.0.
 
-Existing results are deliberately narrow. A frozen TREC comparison found
-positive held-out gains for GEPA and MIPROv2 on one task. A real two-stage
-Banking77 run found a worse GEPA proposal, correctly retained the baseline,
-and still produced a reusable served artifact. Those results show both sides
-of the product: optimization can help, and selection must protect you when it
-does not. They do not establish that every optimizer will improve every task.
+Existing results are deliberately narrow and mixed. A frozen TREC comparison
+found positive held-out gains for GEPA and MIPROv2 on one task. A structured
+Optimize Anything retry-policy condition improved new executable cases in two
+of three seeds. Two modeled-MIPRO Banking77 conditions and one JSON-GEPA
+HotPotQA condition completed their real multi-stage Artifact and fresh-service
+lifecycles but missed their preregistered mean-lift bars. IFBench remains a
+compatibility regression, not Imp effectiveness evidence, after its scorer bug
+invalidated the earlier interpretation. These outcomes show that the product
+can optimize, select, persist, and serve honestly; they do not establish broad
+optimizer effectiveness.
 
 ## Read next
 

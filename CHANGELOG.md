@@ -13,6 +13,16 @@ these changes must not ship as another `0.2.x` patch.
 
 ### Added
 
+- `Imp.Optimizer.Artifact` schema 3 now stores either trusted program
+  parameters or canonical JSON values. Optimize Anything results export through
+  that shared content-verified boundary and load in a fresh process without
+  forcing value optimization through the program-shaped Experiment API.
+- `Imp.Experiment.check/5` supports fixed repeated outer evaluation with mean
+  aggregation. Repeated selection and test observations are persisted in
+  backward-compatible Result schema 3; single-pass experiments remain schema 2.
+- Pinned MIPROv2 can execute DSPy 3.2.1 program/data/few-shot-aware proposal
+  grounding and Optuna 4.9.0 categorical modeled TPE, including durable resume
+  across startup and modeled trials.
 - `Imp.Experiment.check/5` now powers the packaged two-stage OTP deployment
   workflow end to end: disjoint selection/test evaluation, selected-artifact
   construction, checksummed `Result`/`Artifact` persistence, fresh-process
@@ -60,6 +70,11 @@ these changes must not ship as another `0.2.x` patch.
 
 ### Changed
 
+- Finite `max_errors` is now an actual diagnostic budget across Experiment
+  stages: `0` cancels on the first ordinary row failure, finite `N` retains
+  score-zero diagnostics below `N` and cancels on the Nth, and `:infinity`
+  retains all ordinary diagnostics. Typed operational-safety failures always
+  remain fatal.
 - **Breaking:** `Imp.optimize/3`, `/4`, and `/5` now return
   `{:ok, compiled_program}` or `{:error, reason}`, mirroring `Imp.train/4`.
   The old raising behavior lives on unchanged as `Imp.optimize!/3`, `/4`,
@@ -70,6 +85,20 @@ these changes must not ship as another `0.2.x` patch.
   to `Imp.Adapter.Types`, folding the stray `adapters/` directory into
   `adapter/`. Migration: replace the `Imp.Adapters.` prefix with
   `Imp.Adapter.`.
+
+### Fixed
+
+- Typed route, cost, budget, transport, and cancellation failures now propagate
+  through evaluation, optimizer facades, proposal, composition, and Optimize
+  Anything instead of being converted into ordinary low-scoring candidates.
+- Fresh-process parameter artifacts keep persisted identifiers as strings and
+  resolve them only against the trusted live program vocabulary; loading no
+  longer depends on incidental atoms in the writing VM.
+- ReqLLM-backed programs expose a validated input byte envelope that is enforced
+  before cache or transport and removed before provider option validation.
+- Invalid pinned MIPROv2 search combinations fail before Experiment evaluation
+  or model work, and nested JSON-safe Example values use recursively faithful
+  DSPy/Python representation during proposal grounding.
 
 ### Deprecated
 

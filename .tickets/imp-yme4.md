@@ -28,20 +28,17 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Closure frontier at `54d4a9b`
+## Closure frontier at `26eb666`
 
 This is a criterion-by-criterion reading of the finish line above, not a new
 status system.
 
-- **Clean multi-stage consumer lifecycle — partially satisfied.** The unpacked
-  deployment package defines a typed two-stage module, runs
-  `Experiment.check`, writes linked private Result/Artifact files, reloads in a
-  fresh OS BEAM, serves concurrent calls, hot-reloads, and contains failures.
-  Its provider-free improvement is a planted teaching fixture; the real
-  Banking77 GEPA and modeled-MIPRO executions completed or reached the same
-  lifecycle but did not meet the material-lift requirement. There is still no
-  current-source realistic multi-stage LM artifact that combines positive
-  three-seed held-out lift with fresh serving.
+- **Clean multi-stage consumer lifecycle — operationally satisfied.** The
+  unpacked deployment package and the final real-provider Banking77 condition
+  both run the ordinary typed program -> `Experiment.check` -> private linked
+  Result/Artifact -> fresh-OS concurrent `ProgramServer` path. All three final
+  Banking77 seeds completed that lifecycle. This establishes the product path,
+  not the missing usefulness result.
 - **Coherent public concepts — satisfied for the current supported center.**
   Program experiments use Data, metric, optimizer, explicit evaluation options,
   Result, and parameter Artifact; Optimize Anything keeps its own value-result
@@ -56,12 +53,14 @@ status system.
   does not make the portfolio proven or stable.
 - **Release-defining improvement — partially satisfied.** The current-source
   non-prompt OA retry-policy condition selected proposer-generated mutations in
-  two of three seeds, improved untouched executable behavior, and loaded the
-  portable values fresh. Historical TREC is a narrow positive comparator and
-  COPRO recorded parent-process lift but failed byte-identical fresh replay.
-  None supplies the missing realistic multi-stage, three-seed LM improvement;
-  Banking77 modeled MIPRO is a clean narrow negative with mean causal lift
-  `+0.041667`, below its frozen `0.05` bar.
+  two of three seeds, improved untouched executable behavior from `3/6` to
+  `5/6`, and loaded all three portable values fresh. Historical TREC remains a
+  narrow positive GEPA/MIPROv2 result. The realistic multi-stage LM half is
+  still open: the first Banking77 modeled-MIPRO condition averaged `+0.041667`,
+  the exposure-disjoint confirmation averaged `+0.020833`, and HotPotQA JSON
+  GEPA averaged `-0.015256`; each missed its frozen `+0.05` bar. IFBench's Imp
+  effectiveness interpretation remains invalid/unverified after the scorer
+  representation defect.
 - **Observable upstream compatibility — satisfied as a product/semantic
   boundary.** Pinned DSPy, GEPA, Optimize Anything, Optuna, and Ax-facing gates
   compare public inputs, opportunity, stopping, failures, outputs, and named
@@ -82,17 +81,21 @@ status system.
 - **Coherent package and public teaching path — satisfied for the current
   package center.** README, Learning Path, API Guide, deployment example,
   unpacked package, and fresh-process checks teach the same program → measure →
-  select → Artifact → OTP shape. Documentation cannot substitute for the open
-  usefulness result.
+  select → Artifact → OTP shape. The package is still unpublished, and this
+  exact `26eb666` checkpoint still needs its bounded release reconciliation.
+  Documentation cannot substitute for the open usefulness result.
 
-Minimum remaining composition: close `imp-88sn` with one valid current-source
-multi-stage LM result that meets its frozen material-lift and three-seed
-requirements through the ordinary Experiment/Artifact/fresh-service path, then
-perform a bounded release reconciliation that records the outcome and retires
-only superseded active runners. No additional product implementation is known
-to be a prerequisite today. Outer fixed repetitions are implemented product
-capability but have produced no new effectiveness evidence; optimizer-internal
-objectives remain single-pass and explicitly open.
+Current disposition: `imp-argb` and `imp-tg2z` are completed prerequisites, not
+epic closure. No reproduced package or optimizer-mechanism defect is the known
+blocker today. `imp-88sn` and this epic remain open because current source still
+lacks a realistic multi-stage LM result meeting the declared three-seed
+material-lift bar. Stop choosing another paid task mechanically. First reconcile
+this exact checkpoint as an internal release candidate and ratify a
+landscape-grounded benchmark portfolio; only then authorize more science.
+Historical results and stopped runs remain immutable, while active runners are
+retired only when an owning replacement decision exists. Outer fixed
+repetitions are implemented product capability, not retrospective evidence;
+optimizer-internal objectives remain single-pass and explicit.
 
 ## Notes
 

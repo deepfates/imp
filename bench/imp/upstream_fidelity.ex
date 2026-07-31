@@ -873,7 +873,7 @@ defmodule Imp.UpstreamFidelity do
         "clean-room consumer"
       ],
       source: "Hex package and canonical GitHub repository",
-      disposition: :conformant,
+      disposition: :tracking,
       ticket: "de-p29x",
       imp: [Imp],
       invariants: [
