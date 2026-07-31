@@ -37,7 +37,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | Avatar optimizer | adaptation | provider_training<br>avatar_optimizer_differential | T1 | benchmarks/evidence/admitted/avatar_optimizer_differential/78d9bfef98f9469aec0c9274cdd7a457182f5f909afb8dbb4a944eeb9e9fb317.json |
 | BootstrapFinetune and training protocol | adaptation | local_mlx<br>provider_training<br>bootstrap_finetune_differential | T2 | benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json |
 | GRPO | adaptation | provider_training<br>mmgrpo_differential | T1 | benchmarks/evidence/admitted/mmgrpo_differential/e05710b743aa9bac3c65ecbfbcb90fa0b24e6957262564f06e917db4527360f3.json |
-| BetterTogether | adaptation | provider_training<br>better_together_differential | T1 | benchmarks/evidence/admitted/better_together_differential/d32a6ace9d20ff3cb32b50333a5be92121fedb8e32d590ced27b7e95e11aa306.json |
+| BetterTogether | adaptation | provider_training<br>better_together_differential | T1 | benchmarks/evidence/admitted/better_together_differential/36898d226771e4bf121df661bac365e0a8a9c2fc98270c6e4126073ccdc015c8.json |
 | Ensemble | adaptation | optimizer_lift<br>ensemble_differential | T1 | benchmarks/evidence/admitted/ensemble_differential/c614e943063dab5507254a6a3cc412651de5124e06d04f1a0c9f80c8aa7bd21a.json |
 | Fast-Slow orchestration and CISPO handoff | adaptation | fast_slow | NONE | none |
 | Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json |

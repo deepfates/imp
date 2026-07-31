@@ -1249,8 +1249,8 @@
       ],
       "admitted_evidence": {
         "tier": "t1",
-        "artifact": "benchmarks/evidence/admitted/better_together_differential/d32a6ace9d20ff3cb32b50333a5be92121fedb8e32d590ced27b7e95e11aa306.json",
-        "artifact_sha256": "d32a6ace9d20ff3cb32b50333a5be92121fedb8e32d590ced27b7e95e11aa306",
+        "artifact": "benchmarks/evidence/admitted/better_together_differential/36898d226771e4bf121df661bac365e0a8a9c2fc98270c6e4126073ccdc015c8.json",
+        "artifact_sha256": "36898d226771e4bf121df661bac365e0a8a9c2fc98270c6e4126073ccdc015c8",
         "protocol_id": "better_together_differential"
       }
     },
