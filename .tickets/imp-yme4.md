@@ -28,7 +28,7 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Closure frontier at `bbd033c`
+## Closure frontier at `715f24b`
 
 This is a criterion-by-criterion reading of the finish line above, not a new
 status system.
@@ -94,8 +94,12 @@ epic closure. Subsequent provider-free work fixed credential-rotation-safe
 optimizer resume (`7abefaa`), proved the released HoVer and PAPILLON task graphs
 through public GEPA/Result/Artifact/fresh-BEAM boundaries (`fa9f3b6`), and
 preserved typed operational-safety failures across the exercised public callback
-layers (`5475ba0`, `bbd033c`). Those are real product capabilities, not
-effectiveness evidence.
+layers (`5475ba0`, `bbd033c`). The source-authenticated Optimize Anything v1.4
+readiness gate projects Circle Packing's 133-call warm retained state through
+the existing OA Result -> schema-3 value Artifact -> credential-free fresh-BEAM
+evaluator path and reproduces the retained geometry score (`e27b0d3`, corrected
+at `715f24b` so unknown candidate lineage is never invented). Those are real
+product capabilities and fidelity boundaries, not effectiveness evidence.
 
 `imp-88sn` and this epic remain open because current source still lacks a
 realistic multi-stage LM result meeting its predeclared usefulness criterion and
@@ -103,8 +107,9 @@ OA still lacks a reproducible held-out generalization result. The next external
 LM portfolio is HoVer plus PAPILLON with unconditional baseline, BootstrapRS,
 MIPROv2-Heavy, and GEPA-with-merge arms across Imp and pinned upstream. Its
 corrected lower bound is at least 1,710,400 task-shaped transports, so no paid
-pilot or full run is automatic. Circle Packing is only a zero-cost OA
-mechanism/artifact check; the released gskill split is not exactly reconstructable
+pilot or full run is automatic. Circle Packing has completed only its zero-cost
+warm-state mechanism/artifact check; it is not cold optimizer replay or
+generalization evidence. The released gskill split is not exactly reconstructable
 and requires a newly pinned current-source replication design before any run.
 Historical outcomes remain immutable. No Banking77, HotPotQA, or IFBench
 successor is authorized.
