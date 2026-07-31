@@ -297,7 +297,7 @@ defmodule Imp.Predict.Search do
             failed_outcome({candidate, index}, {:invalid_evaluator_result, other})
         end
       rescue
-        safety in Imp.OperationalSafetyError -> raise safety
+        safety in Imp.OperationalSafetyError -> reraise safety, __STACKTRACE__
         error -> failed_outcome({candidate, index}, {:exception, Exception.message(error)})
       catch
         kind, reason ->
