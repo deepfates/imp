@@ -866,3 +866,113 @@ strict-format noise with optimizer signal. Choose a different realistic
 multi-stage task with a compact, natively executable metric for the next
 current-source usefulness condition; retain IFBench as a pinned compatibility
 regression rather than immediately paying to re-freeze it.
+
+## Next usefulness task recommendation (provider authority: none)
+
+**Recommend Banking77; do not continue IFBench or introduce another task
+adapter.** This is a design recommendation only. It freezes no new row, starts
+no model, and does not authorize provider use.
+
+Three existing candidates were compared:
+
+- **Banking77 is the only candidate that meets the product shape without new
+  infrastructure.** The packaged deployment example already owns a public
+  two-stage `analyze_intent -> classify_route` program, exact label accuracy,
+  `Experiment.check`, linked `Result`/`Artifact`, and fresh concurrent
+  `ProgramServer` service. Both stages can do real work: the analyzer extracts
+  payment state and evidence; the router distinguishes fee charged, payment
+  not recognized, pending payment, and reverted payment. The route instruction
+  must disclose that semantic mapping. A secret opaque-code mapping would
+  manufacture baseline weakness rather than test useful optimization.
+- **TREC is worse for this question.** Its successful matched GEPA/MIPRO result
+  is a one-predictor classifier. Turning it into a genuinely two-stage program
+  would create a new task graph merely to revisit a task that already supplies
+  Imp's only positive matched evidence, rather than testing a missing product
+  claim on a different realistic problem.
+- **The packaged support-router fixture is worse scientifically.** It has the
+  right two-stage deployment lifecycle, but only eight synthetic rows and a
+  scripted LM whose planted demonstration rule guarantees the improvement. It
+  is a strong feature test and cannot answer real-model usefulness across
+  seeds.
+
+### Source-disjoint condition that can be frozen result-blind
+
+The two pinned Banking77 snapshots currently retained in the repository expose
+240 unique source coordinates: 160 train and 80 test rows spanning eight
+labels. Every tracked Banking77 optimizer example resolves to those snapshots;
+results may repeat rows but do not add a third source dataset. The proposed
+source authority is the already-pinned `PolyAI/banking77` revision
+`796a4623935746f71378f0ebd435635a8ce08e50`, whose train/test parquet digests
+are already recorded in `grpo-usefulness-banking77-v1.json`.
+
+If approved, derive 24 train, 24 selection, and 48 test rows from the four
+card-payment labels above: 6/6/12 per label. Before choosing any row, exclude
+the full retained exposure union by both `(source split, source index)` and
+normalized utterance digest across the `796a...` and `90d4...` snapshots. Then
+order the remaining rows by SHA-256 of
+`imp-88sn-banking77-mipro-v1:split:label:source-index:text` and take the first
+required count. This is deterministic, balanced, independent of model outcome,
+and uses the source train split for train/selection and the source test split
+only for untouched test. At freeze time the derivation must also scan retained
+ignored experiment roots for any additional source coordinate or text digest;
+any hit joins the exclusion set. No difficulty filtering or row replacement is
+allowed.
+
+This condition has plausible headroom without pathological row selection: the
+four intents are naturally confusable, but their meanings and route mapping are
+given to the program. Prior Banking77 runs establish that this task family is
+nontrivial and learnable; they do not predict this new split's outcome. If the
+strong baseline saturates, that is a clean lack-of-opportunity result, not a
+reason to choose harder rows.
+
+### Compact staged MIPRO design
+
+Use the existing two-predictor module, exact route accuracy, GPT-5.4 Mini task
+LM, Claude Sonnet 4.6 proposal LM, and seeds `2026072705/06/07`. Configure
+pinned DSPy-3.2.1 MIPRO semantics with three instruction/demo candidates, six
+full categorical trials, two startup trials, at most two bootstrapped and two
+labeled demos per predictor, batch size 10, `max_errors: 10`, serial calls,
+cache/retry/fallback/JSON fallback disabled, and strict selection improvement
+(tie retains baseline). MIPRO therefore gets grounded dataset summaries,
+predictor-specific instructions, joint demo choices, and adaptive categorical
+search rather than instruction-only mutation.
+
+For one Imp seed the conservative legal ceiling is 680 task transports:
+48 outer baseline-selection, 48 bootstrap, 48 internal baseline-selection,
+288 for six trials, 48 outer optimized-selection, 192 for paired baseline and
+selected test, and 8 for four fresh two-stage service probes. Dataset grounding
+and proposals add at most 10 optimizer transports (four summary plus three per
+predictor). All three seeds are therefore bounded by **2,040 task + 30 optimizer
+transports**. At the last Banking77 reservation rates (`$0.007104` and
+`$0.08064`) that is **at most `$16.91136` new spend**, about one third of the
+abandoned IFBench Stage-1 ceiling. These are conservative per-call reservations,
+not an input-token hard cap; route, privacy, price, and current workshop usage
+must be revalidated before authority.
+
+Run all three Imp seeds before interpreting the condition. Selection alone
+chooses the artifact; `compare_baseline_on_test: true` evaluates baseline and
+selected on the same ordered untouched rows only after the selected Artifact
+is built and applied. Each Result/Artifact must reload into a freshly
+reconstructed program and serve four concurrent non-test probes. Report
+within-seed paired row intervals and the three seed lifts/dispersion/sign count
+separately. Success requires mean held-out accuracy lift `>= 0.05` and positive
+lift in at least two seeds. Parameter-identical replay movement is noise, not
+optimizer credit.
+
+Only if Imp passes should a stock-DSPy 3.2.1 MIPRO arm run with the same task
+messages, rows, seeds, candidates, demos, trials, error policy, and outer
+selection rule. Its maximum is 2,016 task + 30 optimizer transports
+(`$16.740864` at the same reservations); it adds matched semantic evidence but
+cannot rescue a failed Imp own-baseline result. No coordinator, manifest,
+dashboard, ledger, or new result type is needed: the Imp arm is the existing
+`MIPROv2 -> Experiment.check -> Result/Artifact -> ProgramServer` path, and a
+later matched arm must first prove its ordinary DSPy module renders the same
+two-stage messages provider-free.
+
+The exact claim on success is limited to: *on one source-disjoint, four-intent
+Banking77 split under the named models, three seeds, and compact MIPRO budget,
+current Imp MIPRO improved its two-stage program over its own baseline and
+produced a reusable fresh-served artifact.* A clean negative earns no
+effectiveness claim. A runtime, safety, persistence, or artifact failure is an
+inconclusive product defect. IFBench remains only a pinned provider-free
+compatibility/scorer regression and receives no further provider work.
