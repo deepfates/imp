@@ -14,6 +14,12 @@ defmodule HotPotQAGEPA do
   @optimizer_envelope %{input: 32_768, output: 1_024}
   @task_input_max_bytes 8_192
   @optimizer_input_max_bytes 131_072
+  # Content bytes are a conservative token upper bound because every token
+  # consumes at least one encoded byte. These fixed additions cover the finite
+  # two-message chat framing, field instructions, and provider request wrapper;
+  # they are deliberately much larger than the observed local framing.
+  @task_framing_token_allowance 4_096
+  @optimizer_framing_token_allowance 16_384
 
   def run(args) do
     args = Enum.reject(args, &(&1 == "--"))
@@ -38,12 +44,20 @@ defmodule HotPotQAGEPA do
 
   def reservation_usd do
     caps = transport_caps()
-    task = (@task_envelope.input * 0.75 + @task_envelope.output * 4.5) / 1_000_000
+    bounds = input_token_upper_bounds()
+    task = (bounds.task * 0.75 + @task_envelope.output * 4.5) / 1_000_000
 
     optimizer =
-      (@optimizer_envelope.input * 3.0 + @optimizer_envelope.output * 15.0) / 1_000_000
+      (bounds.optimizer * 3.0 + @optimizer_envelope.output * 15.0) / 1_000_000
 
     3 * (caps.task_legal * task + caps.optimizer_legal * optimizer)
+  end
+
+  def input_token_upper_bounds do
+    %{
+      task: @task_input_max_bytes + @task_framing_token_allowance,
+      optimizer: @optimizer_input_max_bytes + @optimizer_framing_token_allowance
+    }
   end
 
   defp provider_disabled! do
@@ -98,6 +112,7 @@ defmodule HotPotQAGEPA do
           optimizer_metric_examples: optimizer_metric_calls
         },
         transport_caps: transport_caps(),
+        input_token_upper_bounds: input_token_upper_bounds(),
         reservation_usd: reservation_usd(),
         fresh_service: "passed"
       })
@@ -173,6 +188,7 @@ defmodule HotPotQAGEPA do
             "optimizer_envelope" => @optimizer_envelope,
             "task_input_max_bytes" => @task_input_max_bytes,
             "optimizer_input_max_bytes" => @optimizer_input_max_bytes,
+            "input_token_upper_bounds" => input_token_upper_bounds(),
             "module_selector" => "beam_native_all",
             "transport_caps" => transport_caps()
           },

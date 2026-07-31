@@ -132,7 +132,12 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
              "task_legal" => 960
            }
 
-    assert_in_delta result["reservation_usd"], 28.422144, 1.0e-9
+    assert result["input_token_upper_bounds"] == %{
+             "task" => 12_288,
+             "optimizer" => 147_456
+           }
+
+    assert_in_delta result["reservation_usd"], 49.655808, 1.0e-9
     assert result["fresh_service"] == "passed"
     assert result["prompt_bytes"]["task"] <= 8_192
     assert result["prompt_bytes"]["optimizer"] <= 131_072

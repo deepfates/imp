@@ -1669,15 +1669,22 @@ the task model and 32,768 input / 1,024 output for reflection. Imp has no
 packaged tokenizer that can enforce those model-specific token counts without
 a new dependency, so the reusable live guard is explicit instead: 8,192
 rendered-content bytes for task calls and 131,072 bytes for reflections. The
-token figures own conservative pricing/capacity reservation; the byte figures
-own pretransport operational safety. At the last validated route
-prices (`$0.75/$4.50` and `$3/$15` per million input/output tokens), the legal
-three-seed reservation is:
+token figures remain descriptive capacity reservations; the byte figures own
+pretransport operational safety. They therefore cannot be used as the cost
+maximum. For the legal outer price ceiling, each enforced content byte is
+treated as one possible input token and a generous fixed allowance covers the
+finite two-message chat framing and request wrapper: 4,096 additional tokens
+per task request and 16,384 per reflection request. The resulting input-token
+upper bounds are 12,288 task and 147,456 reflection tokens. At the last
+validated route prices (`$0.75/$4.50` and `$3/$15` per million input/output
+tokens), the legal three-seed maximum is:
 
-`2,880 * $0.008448 + 36 * $0.113664 = $28.422144`.
+`2,880 * $0.01152 + 36 * $0.457728 = $49.655808`.
 
-This is a conservative reservation from hard call/output limits and the frozen
-input envelopes, not actual spend or provider authority. Immediately before a
+The earlier `$28.422144` figure was only a reservation estimate and is not a
+legal maximum after the byte guard was made explicit. The corrected figure is
+a conservative outer ceiling from hard call/output/byte limits; it is not
+actual spend or provider authority. Immediately before a
 launch, the exact OpenAI GPT-5.4 Mini and Anthropic Claude Sonnet 4.6 routes,
 privacy deny, no fallback/retry/cache, capabilities, prices, and workshop usage
 must be revalidated.
