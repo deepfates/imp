@@ -203,6 +203,38 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
     assert report.candidate_count == 1
   end
 
+  test "public pinned profile derives legal execution from a finite semantic metric budget" do
+    reflection_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{__imp_lm_output__: %{"instruction" => "Answer exactly."}}
+        end
+      )
+
+    optimizer =
+      GEPA.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :gepa_v0_1_4,
+        generations: 6,
+        minibatch_size: 8,
+        max_metric_calls: 80,
+        max_reflection_calls: 12,
+        reflection_lm: reflection_lm
+      )
+
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
+    program = Imp.predict("question -> answer", lm: lm)
+    trainset = Enum.map(0..15, &example(&1))
+    validation = Enum.map(100..131, &example(&1))
+
+    {_compiled, report} = GEPA.compile_with_report(optimizer, program, trainset, validation)
+
+    assert report.metadata.max_metric_calls == 80
+    assert report.metadata.operational_metric_call_cap == 120
+    assert report.metadata.max_reflection_calls == 12
+    assert report.metadata.max_iterations == 6
+    assert report.metadata.metric_calls == 80
+  end
+
   test "pinned stopper permits the exact legal current-iteration overshoot" do
     assert GEPA.v014_budget_envelope(40, 10, 280) == %{
              max_metric_calls: 330,

@@ -37,7 +37,10 @@ defmodule Imp.Optimizer.GEPA do
   once as the corresponding single task. Like pinned GEPA, `max_metric_calls`
   is checked between iterations: an iteration that legally starts is allowed
   to finish. Separate internal metric/reflection envelopes bound that legal
-  overshoot; they are not alternate stopping rules.
+  overshoot; they are not alternate stopping rules. A finite
+  `:max_metric_calls` is the pinned profile's authoritative semantic budget and
+  supersedes the BEAM-native `:generations` knob. When the metric budget is
+  `:infinity`, `:generations` retains its legacy budget-derivation behavior.
 
   `:proposal_concurrency` enables first-party GEPA speculative parallel
   proposals. Contexts are sampled sequentially from one archive and RNG
@@ -408,6 +411,7 @@ defmodule Imp.Optimizer.GEPA do
           metric_calls: state.budget.metric_calls,
           max_metric_calls: envelope.semantic_max_metric_calls,
           operational_metric_call_cap: state.budget.max_metric_calls,
+          max_iterations: envelope.max_iterations,
           reflection_calls: state.budget.reflection_calls,
           max_reflection_calls: state.budget.max_reflection_calls,
           max_reflection_cost: optimizer.max_reflection_cost,
@@ -719,16 +723,18 @@ defmodule Imp.Optimizer.GEPA do
          devset
        ) do
     minibatch_size = optimizer.minibatch_size || min(3, length(trainset))
-    required = length(devset) + optimizer.generations * (2 * minibatch_size + length(devset))
 
-    unless optimizer.max_metric_calls in [:infinity, required] do
-      raise ArgumentError,
-            ":execution_profile :gepa_v0_1_4 requires :max_metric_calls #{required} for " <>
-              "this validation set, minibatch, and nominal iteration budget; got: " <>
-              inspect(optimizer.max_metric_calls)
-    end
+    semantic_max_metric_calls =
+      case optimizer.max_metric_calls do
+        :infinity ->
+          length(devset) + optimizer.generations * (2 * minibatch_size + length(devset))
 
-    envelope = v014_budget_envelope(length(devset), minibatch_size, required)
+        finite when is_integer(finite) ->
+          finite
+      end
+
+    envelope =
+      v014_budget_envelope(length(devset), minibatch_size, semantic_max_metric_calls)
 
     unless optimizer.max_reflection_calls in [:infinity, envelope.max_reflection_calls] do
       raise ArgumentError,
@@ -738,7 +744,7 @@ defmodule Imp.Optimizer.GEPA do
     end
 
     %{
-      semantic_max_metric_calls: required,
+      semantic_max_metric_calls: semantic_max_metric_calls,
       operational_metric_call_cap: envelope.max_metric_calls,
       operational_reflection_call_cap: envelope.max_reflection_calls,
       max_iterations: envelope.max_iterations
