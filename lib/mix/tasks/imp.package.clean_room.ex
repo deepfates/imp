@@ -240,7 +240,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
       )
 
     unless banking_output =~ ~s("status":"provider_disabled") and
-             banking_output =~ ~s("task":2040) and banking_output =~ ~s("optimizer":30) do
+             banking_output =~ ~s("task":3336) and banking_output =~ ~s("optimizer":30) do
       Mix.raise("packaged Banking77 MIPRO entry did not pass provider-disabled preflight")
     end
   end

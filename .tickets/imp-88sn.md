@@ -1561,21 +1561,18 @@ reject GSM8K for this tranche.
 
 ### HotPotQA — recommended
 
-- Existing benchmark-owned `Imp.BenchmarkTruth.HotpotMultiHop` is a genuine
-  four-predictor program: `summarize1`, `create_query_hop2`, `summarize2`, and
-  `final_answer`. Every stage performs necessary work and is independently
-  visible to `Imp.ProgramParameters`. `Imp.BenchmarkTruth.HotpotFeedback`
-  already owns component-specific GEPA feedback. `Imp.Datasets.HotPotQA`,
-  `Imp.Metrics.hotpot_f1/2`, normalized exact match, Experiment, Artifact, and
-  the generic ProgramServer are reusable without a new scorer or task adapter.
-- The program accepts any `Imp.Retrieve` implementation. For this Imp-owned
-  condition it can use existing deterministic `Imp.memory` over the frozen
-  distractor passages, so retrieval, both hops, scoring, and fresh service stay
-  inside the BEAM. The source-exact HoVer BM25S/Python integration is not used;
-  requiring that external corpus/index process would reject this candidate
-  under the present boundary. The existing focused tests execute the four-stage
-  graph, independent parameter mutation, retrieval failures, and DSPy-parity
-  HotPot metrics provider-free (`20 tests`, no failures at this review).
+- The benchmark tree demonstrates that four named stages are appropriate, but
+  it is not a package-consumer API. The owning public example now defines the
+  compact consumer program `ImpDeployment.HotPotQAPipeline`: `summarize1`,
+  `create_query_hop2`, `summarize2`, and `final_answer`. It uses only
+  `Imp.Module`, `Imp.predict`, `Imp.memory`, `Imp.retrieve`, Experiment,
+  Artifact, and the generic ProgramServer; no `bench/` module or task-specific
+  `lib/` code is imported.
+- Every row supplies only its question and distractor context. The program
+  builds an in-BEAM memory for that row, retrieves twice, and passes each named
+  stage's output to the next stage. The answer is never a program input. The
+  source-exact HoVer BM25S/Python integration is deliberately not part of this
+  Imp-own-baseline condition.
 - Prior task-wide evidence supplies result-independent headroom only. On the
   old 100-row campaign, one-predictor RAG scored mean F1 `0.3818/0.3853`, while
   labeled few-shot RAG scored `0.5171/0.5005`. This neither predicts the new
@@ -1605,44 +1602,91 @@ reject GSM8K for this tranche.
   normalized-text digest match, then choose by a committed content-hash rule.
   No row is selected or inspected in this review.
 
-### Compact future condition (not yet frozen)
+### Frozen HotPotQA GEPA condition (`9608121` successor)
 
-Use GEPA because its round-robin component mutation and the existing HotPot
-feedback give all four named stages direct, task-grounded opportunity. A compact
-candidate design is 8 train / 8 selection / 24 untouched test rows, the same
-three fixed seeds, and three fixed outer Experiment repetitions. Selection is
-strictly selection-only with baseline on aggregate tie; the selected schema-3
-Artifact is applied before test access, then loaded into a fresh OS process and
-served for four concurrent synthetic probes. GEPA's optimizer-internal metric
-observations remain single-pass and must be reported as such.
+The source is `hotpotqa/hotpot_qa`, config `distractor`, validation split, at
+revision `1908d6afbbead072334abe2965f91bd2709910ab`. The pinned Parquet SHA-256
+is `c20b638ca82b21d04fe12e14ff417ad05153d4d215a65de54497fca4e972f7c6`;
+the pinned dataset-card SHA-256 is
+`3cfab003a856275d3198b031c6b2ac46c63178fb462a4123705f652b71b22813`,
+which declares CC-BY-SA-4.0. Exact provenance, coordinates, normalized-question
+digests, and the derivation rule live beside the rows in
+`examples/deployment/data/hotpotqa-gepa/receipt.json`.
 
-With pinned GEPA v0.1.4 semantics, minibatch 4 and semantic
-`max_metric_calls: 32` permit at most 44 metric examples, 12 reflections, and 6
-iterations per seed. Because one program evaluation makes four task-model
-transports, the per-seed legal task ceiling is exactly:
+Before choosing rows, tracked and ignored retained evidence was scanned by
+exact question and by SHA-256 of Unicode-NFKC/case-folded/whitespace-collapsed
+question text. Distractor coordinates `0..99` and `700..715` were excluded in
+full; the latter also conservatively covers the retained fullwiki `700..715`
+exposure. The scan found no normalized source collision outside those 116
+rows. From the complement, the fixed seed `imp-88sn-hotpotqa-gepa-v1` ranks by
+SHA-256 over seed, declared question type, normalized-question digest, and
+source ID. Per-type rank order is consumed without viewing model outputs into
+train `6 bridge + 2 comparison`, selection `6 + 2`, and test `18 + 6`.
+Frozen file SHA-256 values are:
 
-`96 baseline-selection + 176 GEPA + 96 optimized-selection + 288 baseline-test + 288 selected-test + 16 fresh-service = 960`.
+- train: `0f52607fe7259a8b84930c43bcd5ae575cc0c2050c9dae4dd52ba7feaf69c302`;
+- selection: `c5feada568c9c796745c274f4c3a65ea7636f6adac2a597b3f722b5059d3f9e5`;
+- test: `6550b57d5a72e191b328c17e1d03074b0c0c233877f26b9f910beaa290bf6792`;
+- receipt: `3ca2955ec517fa070b4f43e54c1f340b2c7cd3a54b52afc5c3d23daf75e04032`.
 
-The semantic expected opportunity before legal overshoot is 912 task
-transports per seed. Across three seeds this is 2,736 expected / 2,880 legal
-task transports and at most 36 reflection transports. At the last validated
-4,096-input/1,024-output task reservation (`$0.007104`) and reflection
-reservation (`$0.08064`), that is about `$22.34` expected-upper / `$23.36`
-legal maximum. These are planning estimates, not current route authority; the
-models, envelopes, privacy, prices, retry/fallback policy, and workshop usage
-must be frozen and revalidated before any call. If the four-stage prompts do
-not safely fit that task envelope, the larger previously used envelope raises
-the legal estimate to about `$42.72`; that material change must be reviewed
-rather than hidden.
+The native metric is HotPot F1, with normalized exact match secondary. A
+provider-free comparison over all 40 gold answers under exact, upper-case,
+article-prefixed, and extra-token outputs plus six normalization/special-label
+boundaries compared 166 cases against pinned DSPy 3.2.1
+`dspy.evaluate.metrics.hotpot_f1_score` with zero F1 or EM mismatches (case-input
+SHA-256 `b05033d7b0aab0a5d7de24691314a1b8965eeee31227fd356639c32dfcdd7c19`).
+There is no Python scorer or external retrieval boundary in the condition.
 
-The task-scoped success claim would be: on one frozen source-disjoint HotPotQA
-distractor condition and named model/budget, current Imp GEPA improved the
-four-stage native-retrieval program's mean held-out HotPot F1 by at least
-`0.05`, with positive causal lift in at least two of three seeds, fixed-repeat
-outer selection, and fresh concurrent service of each selected artifact. Row
-uncertainty and the three seed lifts remain separate. A clean miss says only
-that this task/model/budget did not meet the usefulness bar and leaves
-`imp-88sn` open; a runtime, retrieval, safety, or artifact failure is
-inconclusive product evidence. A stock-DSPy comparison stays dormant unless
-Imp passes and both runtimes can reuse the already-pinned deterministic
-retrieval boundary with identical documents and opportunity.
+Seeds are `2026080101`, `2026080102`, and `2026080103`. Outer baseline and
+optimized selection, baseline test, and selected test each use three fixed
+repetitions over identical ordered rows, arithmetic-mean aggregation,
+`max_errors: 10`, and score-zero diagnostics. GEPA's internal objective remains
+single-pass. Selection is strict with baseline retained on an aggregate tie;
+the schema-3 selected Artifact is applied before test access, persisted with
+the Result, loaded by a fresh OS BEAM, and served for four concurrent synthetic
+four-stage probes.
+
+**Named deviation:** this Imp-own-baseline question uses the explicit
+BEAM-native `module_selector: :all`, not pinned GEPA 0.1.4 round-robin and not a
+matched-upstream condition. Pinned round-robin is incompatible with guaranteed
+four-component opportunity at this small budget: after the initial 8-row
+validation, three rejected 4-row parent/child iterations consume the semantic
+32-call budget before the fourth component rotates. `:all` gives each of the
+four named predictors proposal opportunity together. A deterministic public
+execution selected a candidate in which all four instructions changed, used 32
+optimizer metric examples and 8 reflection calls, wrote/read/applied the
+Artifact, and passed the fresh concurrent service. The same observed trajectory
+made 896 main-process task calls; adding 16 fresh-service calls gives the
+expected 912. The generic 8/4/32 stopper envelope remains semantic 32, legal
+44, at most 12 reflections and 6 iterations; the legal per-seed task ceiling is
+therefore `4 * (24 + 44 + 24 + 72 + 72 + 4) = 960`.
+
+Actual provider-disabled rendered maxima were 1,376 `o200k_base` task tokens
+(5,028 UTF-8 bytes) and 19,505 reflection tokens (83,895 bytes). The frozen
+request envelopes are therefore 8,192 input / 512 output for the task model
+and 32,768 input / 1,024 output for reflection. At the last validated route
+prices (`$0.75/$4.50` and `$3/$15` per million input/output tokens), the legal
+three-seed reservation is:
+
+`2,880 * $0.008448 + 36 * $0.113664 = $28.422144`.
+
+This is a conservative reservation from hard call/output limits and the frozen
+input envelopes, not actual spend or provider authority. Immediately before a
+launch, the exact OpenAI GPT-5.4 Mini and Anthropic Claude Sonnet 4.6 routes,
+privacy deny, no fallback/retry/cache, capabilities, prices, and workshop usage
+must be revalidated.
+
+The primary remains mean paired held-out HotPot F1 own-baseline lift at least
+`0.05` and positive causal lift in at least two of three seeds. Report EM
+secondarily, per-seed row-paired uncertainty separately from the three seed
+lifts, and same-program replay as zero causal lift. A clean miss is a narrow
+negative for this task/model/budget and leaves this ticket open; a runtime,
+safety, persistence, Artifact, or service failure is inconclusive product
+evidence. Because this condition intentionally uses the BEAM-native all-module
+selector, it earns no pinned-GEPA parity or matched-upstream claim.
+
+**Recommendation: RUN after live preflight.** The frozen ordinary entry is
+`examples/deployment/hotpotqa_gepa.exs`; provider-disabled execution completed
+the complete public Experiment/GEPA/Result/Artifact/fresh-ProgramServer
+lifecycle. No benchmark module, scorer bridge, coordinator, manifest, ledger,
+dashboard, or new result schema is involved.
