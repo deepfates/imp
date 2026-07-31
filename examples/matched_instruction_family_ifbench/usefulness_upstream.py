@@ -33,6 +33,27 @@ def private_write(path: Path, content: str) -> None:
         os.fsync(output.fileno())
 
 
+def private_save_program(program, path: Path) -> None:
+    temporary = path.with_name(path.stem + ".private" + path.suffix)
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.close(descriptor)
+    program.save(temporary)
+    os.replace(temporary, path)
+
+
+def instruction_state(program):
+    return [
+        (name, predictor.signature.instructions)
+        for name, predictor in program.named_predictors()
+    ]
+
+
+def select_program(baseline, candidate, baseline_selection: dict, candidate_selection: dict):
+    if candidate_selection["score"] > baseline_selection["score"]:
+        return "optimized", candidate, candidate_selection
+    return "baseline", baseline, baseline_selection
+
+
 def install_runtime():
     sys.path.append(
         str(ROOT / "tmp/ifbench-parity-venv/lib/python3.13/site-packages")
@@ -193,6 +214,12 @@ def disabled():
     reflection = dspy.LM("openrouter/anthropic/claude-sonnet-4.6", cache=False, max_tokens=1024, num_retries=0)
     program.set_lm(task)
     _ = optimizer(dspy, semantic_metric(dspy, feedback), reflection, SEEDS[0])
+    changed = copy.deepcopy(program)
+    predictor = changed.generate_response_module.predict
+    predictor.signature = predictor.signature.with_instructions("Changed instruction")
+    assert select_program(program, program, {"score": 1.0}, {"score": 1.1})[0] == "optimized"
+    assert select_program(program, changed, {"score": 1.0}, {"score": 1.0})[0] == "baseline"
+    assert select_program(program, changed, {"score": 1.0}, {"score": 1.1})[0] == "optimized"
     assert scalar is not None
     print(json.dumps({
         "status": "provider_disabled",
@@ -220,30 +247,36 @@ def live():
         baseline_selection = aggregate(evaluate(baseline, dspy, selection_rows, scalar))
         candidate = copy.deepcopy(baseline)
         with dspy.context(lm=task_lm), patch():
-            selected = optimizer(dspy, semantic_metric(dspy, feedback), reflection_lm, seed).compile(
+            candidate = optimizer(dspy, semantic_metric(dspy, feedback), reflection_lm, seed).compile(
                 candidate,
                 trainset=examples(dspy, train_rows, True),
                 valset=examples(dspy, selection_rows, True),
             )
-        selected_selection = aggregate(evaluate(selected, dspy, selection_rows, scalar))
+        candidate_selection = aggregate(evaluate(candidate, dspy, selection_rows, scalar))
+        selected, selected_program, selected_selection = select_program(
+            baseline, candidate, baseline_selection, candidate_selection
+        )
         artifact_path = seed_dir / "selected-program.json"
-        artifact_temp = seed_dir / "selected-program.private.json"
-        descriptor = os.open(artifact_temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        os.close(descriptor)
-        selected.save(artifact_temp)
-        os.replace(artifact_temp, artifact_path)
+        private_save_program(selected_program, artifact_path)
         if not artifact_path.is_file():
             raise RuntimeError("DSPy selected artifact was not written before held-out access")
 
         test_rows = rows("test", allow_test=True)
         baseline_test = aggregate(evaluate(baseline, dspy, test_rows, scalar))
-        selected_test = aggregate(evaluate(selected, dspy, test_rows, scalar))
+        selected_test = (
+            aggregate(evaluate(candidate, dspy, test_rows, scalar))
+            if selected == "optimized"
+            else baseline_test
+        )
         result = {
             "seed": seed,
             "effective_gepa": identity,
             "artifact_path": str(artifact_path),
             "artifact_sha256": sha256(artifact_path),
             "baseline_selection": baseline_selection,
+            "candidate_selection": candidate_selection,
+            "candidate_changed": instruction_state(candidate) != instruction_state(baseline),
+            "selected": selected,
             "selected_selection": selected_selection,
             "baseline_test": baseline_test,
             "selected_test": selected_test,

@@ -155,3 +155,56 @@ constructs `Imp.Experiment.Data`, the two-predictor `Imp.Module`,
 the existing executable evaluator. Parent and fresh-OS modes remain separate
 ordinary `mix run` invocations. No terminal treatment runner or historical
 result is resumed.
+
+## Frozen portfolio outcome (2026-07-30)
+
+The structured Optimize Anything condition met its frozen criterion. Seeds
+`2026073101` and `2026073102` each selected a proposer-generated candidate and
+improved exact untouched execution from 3/6 to 5/6; seed `2026073103` retained
+the baseline at 3/6. The mean exact-count lift was 4/3 cases with two positive
+seeds. All three portable value artifacts loaded in fresh OS BEAM processes and
+reproduced the six ordered executable outputs. The first seed's post-result
+launcher initially stopped before fresh loading; commit `46ba37e` fixed only
+that ordinary entry boundary, and the retained artifact was then loaded without
+another proposal or test evaluation in the parent.
+
+The IFBench condition completed all three Imp seeds and the three authenticated
+stock-DSPy/GEPA reference seeds. Imp's selected-artifact causal lifts were
+`+0.0390625`, `0`, and `+0.0546875`: two positive seeds, mean `+0.03125`, median
+`+0.0390625`, and range `[0, +0.0546875]`. The within-seed row-paired empirical
+bootstrap intervals were `[-0.0390625, 0.125]`, `[0, 0]`, and
+`[-0.03125, 0.140625]`. The middle seed tied on selection and retained the
+baseline; its same-program held-out replay changed from `0.484375` to
+`0.515625`, which is recorded as provider nondeterminism rather than optimizer
+lift. Every Imp Result/Artifact pair was written mode 0600 and passed the fresh
+OS four-probe concurrent service check.
+
+The reference runner originally treated the raw `dspy.GEPA.compile` return as
+the deployed program even when it lost full-selection scoring. The immutable raw
+outputs remain preserved. Applying the already-frozen strict outer selection
+rule without model calls retained baseline for seeds `2026072705` and
+`2026072706`; seed `2026072707` selected the GEPA return by score, but that
+return's two named predictor instructions were identical to baseline, so its
+causal lift by selected-artifact identity is also zero. Reference causal lifts
+are therefore `0`, `0`, `0`; replay scores of raw or parameter-identical returns
+are not optimization credit. The prospective runner now saves and evaluates the
+GEPA return only when its full selection score strictly exceeds baseline, while
+retaining the raw candidate result separately.
+
+The primary IFBench requirement is not met because Imp's mean causal lift is
+below `0.05`, despite two positive seeds. The observed matched mean difference
+against the reference is `+0.03125`, above the secondary `-0.05` margin, but
+that cannot substitute for own-baseline improvement. This ticket remains open.
+
+Raw ordinary outputs and logs are retained under the existing ignored evidence
+root `tmp/imp-88sn-usefulness-9916276-stopped/ifbench-66c0f1d-completed`;
+the three immutable reference result SHA-256 values are
+`05db774290857f840f82b31bff713f0c27cce3eab2f045f50eff3b0a66de0c0c`,
+`62c3eb8920dd80c86a6f01b6c9fa7eb5cd9b0e4c813d29d3bc68efe3a6f53146`,
+and `e490504cffe5b4df8beef0d28a7bfdc3872dae67138dabd746a3993d7af6fef0`.
+Imp telemetry observed 1,590 task and 4 reflection transports inside the three
+experiments plus 24 fresh-service task transports, each with one attempt. The
+reference histories retain only a lower bound of 553 task and 6 reflection
+calls costing `$1.31805105`; DSPy deep-copy histories prevent an exact reference
+total. The frozen `$59.346432` reservation remains the conservative portfolio
+upper bound; no exact total dollar claim is made.
