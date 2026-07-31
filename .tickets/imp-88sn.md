@@ -1115,3 +1115,60 @@ and positive causal lift in at least two of three seeds. Same-program replay
 movement is zero causal lift. Passing can earn only a task/model/budget-specific
 current-source modeled-MIPRO claim; a clean negative is valid. Stock DSPy stays
 dormant pending a separate decision.
+
+### Modeled-MIPRO Stage 1 result
+
+Exact clean `f0c34ff` completed all three Imp seeds through the ordinary
+`MIPROv2 -> Experiment.check -> Result/Artifact -> fresh ProgramServer` path.
+Seed 1's outer shell returned after completion because the operator used zsh's
+reserved variable `status`; seeds 2 and 3 continued in the same private root
+without rerunning seed 1 or changing any treatment input.
+
+The frozen per-seed outcomes are:
+
+- `2026072705`: selection `0.875 -> 0.958333`; optimized selected; held-out
+  `0.895833 -> 0.979167`; causal lift `+0.083333`.
+- `2026072706`: selection tied `0.916667 -> 0.916667`; baseline selected;
+  causal lift `0`. Its two same-program held-out evaluations were `0.916667`
+  and `0.854167`; that difference is provider nondeterminism, not optimizer
+  harm or benefit.
+- `2026072707`: selection `0.916667 -> 0.958333`; optimized selected; held-out
+  `0.854167 -> 0.895833`; causal lift `+0.041667`.
+
+The sign criterion passed at two positive seeds out of three, but mean causal
+lift was `0.041667`, below the frozen `0.05` threshold. **The primary did not
+pass.** Stock DSPy therefore remains dormant. This is a clean, task/model/budget
+specific negative for the preregistered headline, not evidence that MIPRO is
+generally ineffective.
+
+Every seed completed 15 candidates: objective trials 1--9 were startup-random
+and 10--15 were modeled TPE. The internally selected optimizer candidates came
+from startup trials 4, 3, and 2 respectively; modeled trials executed but did
+not displace those winners. Bootstrap accepted two examples per seed after
+three, two, and two program attempts. Optimizer reports retained 7, 17, and 14
+diagnostics; outer selection retained 0, 2, and 0 errors, while paired test
+evaluations retained `(1,0)`, `(0,3)`, and `(2,2)` baseline/selected errors.
+No error exhausted `max_errors: 10`, and no operational-safety failure occurred.
+
+The ordinary path performed 535, 534, and 534 logical two-stage program
+evaluations and 10 optimizer calls per seed. The corresponding conservative
+task-transport ceilings were 1,070, 1,068, and 1,068 (3,206 total); exact task
+transport counts are not persisted when a first-stage parse failure prevents
+the second stage. OpenRouter key usage moved from `$19.504255485` immediately
+before launch to `$21.345753735` afterward, an observed key-level delta of
+`$1.84149825`; that is the strongest retained cost evidence, not a fabricated
+per-response ledger.
+
+All three mode-0600 Result/Artifact pairs loaded and served four concurrent
+fresh-process two-stage calls. Their SHA-256 pairs (Result, Artifact) are:
+
+- seed 1: `f5d4594f3e2e6aaf72981dd8d0f2d1b54b5a66ac5c5a44249ea4b36d20dc4109`,
+  `38079ae7344f83fc7c64b3b5d80c82074d19ada975a6058f477ddee4fc518491`;
+- seed 2: `9e1ab86037bc49a297ff17d48ad3440f07acf5f64a4e57b694bc290a5758a5d6`,
+  `5034170cce55749096db656cb7a19a2ac74e9256205740ec102c93be24a94b26`;
+- seed 3: `f5e7f918c62baf78bdfefcba4a61224d2f62d8f1154d7c2af583172754056e68`,
+  `4bbaef67dfb520d39f3590b0d8a5a2faefaa690fe8053e928aa9827d47f81c49`.
+
+The private retained root is
+`benchmarks/results/banking77-mipro-modeled-v2-f0c34ff`; predecessor roots and
+logs remain unchanged.
