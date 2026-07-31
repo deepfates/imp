@@ -174,6 +174,21 @@ defmodule Imp.BenchmarkTruth.HoverFeedbackTest do
     assert report.metadata.reflection_calls == 4
   end
 
+  test "raised retriever safety remains fatal through the public HoVer evaluator" do
+    safety = Imp.OperationalSafetyError.exception(kind: :transport, reason: :offline)
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{} end)
+    program = HoverMultiHop.from_retriever(lm, fn _query, _opts -> raise safety end)
+
+    example =
+      Imp.example(claim: "Alpha connects to Gamma", supporting_facts: [])
+      |> Imp.with_inputs(:claim)
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Imp.Evaluate.new([example], fn _example, _prediction -> 0.0 end, max_errors: :infinity)
+      |> Imp.Evaluate.run(program)
+    end
+  end
+
   defp context(component, predictor_inputs, opts \\ []) do
     final_docs =
       if Keyword.get(opts, :include_gamma?, false),

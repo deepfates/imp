@@ -56,13 +56,22 @@ defmodule Imp.Optimizer.GEPA.ComponentFeedback do
     |> callback.()
     |> normalize!()
   rescue
+    safety in Imp.OperationalSafetyError ->
+      raise safety
+
     error ->
       raise RuntimeError,
             "GEPA component feedback failed for #{inspect(context.component)}: #{Exception.message(error)}"
   catch
     kind, reason ->
-      raise RuntimeError,
-            "GEPA component feedback failed for #{inspect(context.component)}: #{inspect({kind, reason})}"
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          raise safety
+
+        nil ->
+          raise RuntimeError,
+                "GEPA component feedback failed for #{inspect(context.component)}: #{inspect({kind, reason})}"
+      end
   end
 
   defp normalize!(%{feedback_text: feedback}), do: normalize_text!(feedback)

@@ -165,6 +165,24 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
     end
   end
 
+  test "component feedback preserves typed operational safety" do
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "x"} end)
+    program = Imp.predict("question -> answer", lm: lm)
+    metric = fn _example, _prediction -> 1.0 end
+    safety = Imp.OperationalSafetyError.exception(kind: :cost, reason: :limit)
+
+    adapter =
+      ProgramAdapter.new(program, metric,
+        component_feedback: %{main: fn _context -> raise safety end}
+      )
+
+    batch = [Imp.example(question: "q") |> Imp.with_inputs(:question)]
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Evaluation.evaluate(adapter, batch, Candidate.from_program(program), capture_traces: true)
+    end
+  end
+
   test "keeps program and metric failures ordered and diagnostic-only" do
     lm = %{
       module: Imp.LM.Static,

@@ -74,10 +74,17 @@ defmodule Imp.Retrieve do
       other -> {:error, {:invalid_retriever_result, other}}
     end
   rescue
+    safety in Imp.OperationalSafetyError -> {:error, safety}
     error -> {:error, {:retriever_failed, retriever_name(retriever), error_message(error)}}
   catch
     kind, reason ->
-      {:error, {:retriever_failed, retriever_name(retriever), error_message({kind, reason})}}
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety ->
+          {:error, safety}
+
+        nil ->
+          {:error, {:retriever_failed, retriever_name(retriever), error_message({kind, reason})}}
+      end
   end
 
   defp normalize_docs(docs) do

@@ -177,9 +177,14 @@ defmodule Imp.LM do
       other -> {:error, {:invalid_lm_result, other}}
     end
   rescue
+    safety in Imp.OperationalSafetyError -> {:error, safety}
     error -> {:error, {:lm_failed, lm_name(lm), error_message(error)}}
   catch
-    kind, reason -> {:error, {:lm_failed, lm_name(lm), error_message({kind, reason})}}
+    kind, reason ->
+      case Imp.OperationalSafetyError.find({kind, reason}) do
+        %Imp.OperationalSafetyError{} = safety -> {:error, safety}
+        nil -> {:error, {:lm_failed, lm_name(lm), error_message({kind, reason})}}
+      end
   end
 
   defp lm_name(lm) when is_atom(lm), do: lm
