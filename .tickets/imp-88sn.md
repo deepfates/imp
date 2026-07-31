@@ -1814,3 +1814,108 @@ and `ed66e07ec177948f48a2a96b14c74b0133c1c7bd3c61d669595540cc4261d3af`.
 The terminal Chat condition and its artifacts remain separate and unchanged.
 This negative does not satisfy the open multi-stage usefulness acceptance in
 this ticket.
+
+## Cross-result diagnosis after the terminal HotPotQA condition
+
+This is a provider-free comparison of the immutable Banking77 modeled-MIPRO,
+HotPotQA JSON-GEPA, and structured OA outputs. It does not revise any score or
+authorize another treatment.
+
+### HotPotQA mechanism and selected parameters
+
+Every seed spent 32 metric examples and 8 reflection calls, completed two full
+evaluations, produced baseline plus one accepted and one rejected candidate,
+and stopped at the frozen budget. `module_selector: :all` gave every named
+component two proposal opportunities, but each opportunity was one atomic
+four-component program mutation rather than four independently attributable
+mutations. All demos remained empty.
+
+The baseline instruction SHA-256/byte identities were `summarize1`
+`f371dae2...4ab5`/83, `create_query_hop2` `fc42e3b8...374`/61,
+`summarize2` `32961168...9f53`/83, and `final_answer`
+`32166eef...c351`/52. Seed 1 selected four expanded instructions:
+`370493f8...d155`/3,243, `f3ca2146...4d7`/2,487,
+`eff28536...503`/2,050, and `da8e84b7...3ca`/595 bytes. They specify
+evidence-preserving hop summaries, a bridge-entity query, integrated second-hop
+evidence, and a shortest supported answer. Seed 2 selected the analogous four
+rewrites `348ffd38...979`/1,017, `16784411...033`/1,662,
+`eb7d7be3...2c7`/2,427, and `47cf0cdc...152`/1,012 bytes. Seed 3's optimized
+candidate also rewrote all four components, but outer selection tied and the
+Artifact retained the exact baseline.
+
+The internal accepted-candidate scores were `0.598718`, `0.633333`, and
+`0.651496`, from baselines `0.533333`, `0.531061`, and `0.531061`. The second
+four-component candidates were rejected on their aligned minibatches; their
+reported scores (`0.328947`, `0.828947`, `0.5`) are rejection-minibatch scores,
+not comparable full-validation scores. The second candidates grew still
+larger. Two seed-1 and one seed-3 rejection diagnostics were pretransport input
+envelope failures.
+
+Outer paired behavior exposes the generalization failure:
+
+| Seed | Selection row wins/losses/ties | Test row wins/losses/ties | Per-repeat selection deltas | Per-repeat test/replay deltas |
+|---|---:|---:|---|---|
+| `2026080101` | `1/1/6` | `5/4/15` | `+.0654,+.1154,+.0779` | `+.0595,-.0544,-.0988` |
+| `2026080102` | `1/1/6` | `2/3/19` | `+.1111,+.0688,+.1136` | `+.0317,-.0377,-.0377` |
+| `2026080103` | `0/0/8` | baseline replay `3/3/18` | `+.025,0,-.025` | `-.0833,+.1071,+.0278` |
+
+For both admitted optimized programs, essentially the entire eight-row
+selection gain came from source row `2435` (`+.8231` and `+.8660`) while six
+rows tied and one row worsened. That is a strong small-selection/winner's-curse
+signal, not broad validation improvement. On seed 1 test, comparison questions
+improved `3/0/3`, but bridge questions were `2/4/12` with mean delta `-.0972`;
+seed 2 was mixed in both types. Seed 1's selected program also exceeded the
+8,192-byte task envelope on the same two rows in every repetition. One of
+those rows, source `1182`, changed from F1 `1` to `0`; the other already scored
+zero. These are deterministic candidate-feasibility failures caused by prompt
+growth, not parser normalization or model replay.
+
+The three-repeat policy did expose substantial model noise. Baseline test run
+ranges were `.1667`, effectively `0`, and `.1905`; seed 3's selected baseline
+replay moved `+.017196` in aggregate while causal lift remained zero. But replay
+noise is not the main explanation for seeds 1 and 2: their validation advantage
+was positive in every repetition and concentrated on one source row, while the
+held-out sign reversed in two of three repetitions. The more direct diagnosis
+is selection sampling/overfit compounded by an atomic all-stage mutation.
+Baseline test F1 was already `.716-.779`, materially higher than selection
+baseline `.517-.536`, confirming split difficulty shift while leaving genuine
+headroom.
+
+### Cross-result interpretation
+
+Banking77 is similar only in selection uncertainty, not in exact sign. Its two
+optimized selected artifacts gained on both selection and test; the third seed
+retained baseline. The clean causal lifts were `+.083333`, `0`, and `+.041667`.
+What reversed there was a same-baseline replay (`-3/48`), not an optimized
+program's causal sign. MIPRO's selected programs combined localized
+instruction/demo choices, but all selected winners came from startup-random
+trials; modeled TPE found no better deployed candidate. Thus Banking supports
+a small transferable signal obscured by seed/replay variability, whereas
+HotPot shows a stronger validation winner's curse and coupled-program harm.
+
+OA provides the useful control. In seeds 1 and 2 the proposer changed exactly
+one typed field, `honor_server_hint: false -> true`; deterministic selection
+rose `.563650 -> .862501` and genuinely new executable test cases improved
+from `3/6` to `5/6`. Seed 3's harmful `cap_ms: 8000 -> 1200` proposal lost and
+baseline was retained. There is no provider replay and the mutation's behavior
+is directly attributable. This demonstrates that the public selection,
+Artifact, and fresh-consumer boundaries can preserve useful optimization when
+candidate effects are localized and the objective is deterministic.
+
+The evidence does not support lowering or reconsidering the positive-lift
+acceptance. Doing so would promote a Banking signal smaller than observed
+same-program movement and would not rescue HotPot's negative mean. Nor is the
+next move another task/model treatment: the HotPot run exposed a reusable
+algorithm-application weakness first.
+
+**Smallest next decision: improve GEPA's BEAM-native all-component admission
+before more usefulness science.** Preserve parallel proposal opportunity, but
+score component-local deltas (or explicit ablations) before an optional merged
+candidate so a helpful stage can survive a harmful co-proposal and prompt
+growth has an attributable owner. Keep the existing strict outer selection and
+input-envelope safety. A provider-free falsifier is one four-stage case where
+one proposed component improves the objective, one degrades it or exceeds the
+envelope, and the admitted Artifact contains only the useful delta. Stop this
+tranche if component-local admission cannot be expressed without replacing
+GEPA's candidate/frontier semantics. This is an algorithm/product improvement,
+not evidence that the current experiment threshold or task labels were wrong.
