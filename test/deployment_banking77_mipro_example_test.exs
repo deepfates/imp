@@ -112,18 +112,59 @@ defmodule DeploymentBanking77MIPROExampleTest do
              [:analyze_intent, :classify_route]
   end
 
-  test "MIPRO opportunity and legal transport ceiling are frozen before providers" do
-    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{} end)
-    optimizer = Banking77MIPRO.optimizer(lm, lm, hd(Banking77MIPRO.seeds()))
+  test "the frozen invalid MIPRO options fail before Banking program or evaluator work" do
+    owner = self()
 
-    assert optimizer.config.num_candidates == 3
-    assert optimizer.config.num_trials == 6
-    assert optimizer.config.max_bootstrapped_demos == 2
-    assert optimizer.config.max_labeled_demos == 2
-    assert optimizer.config.proposer_fidelity == :dspy_3_2_1
-    assert optimizer.config.search_fidelity == :dspy_3_2_1_optuna_4_9_0
-    assert optimizer.startup_trials == 2
-    assert optimizer.max_errors == 10
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          send(owner, :unexpected_lm_call)
+          %{}
+        end
+      )
+
+    assert_raise ArgumentError, ~r/requires startup_trials: 10/, fn ->
+      Banking77MIPRO.optimizer(lm, lm, hd(Banking77MIPRO.seeds()))
+    end
+
+    valid =
+      Imp.Optimizer.MIPROv2.new(&Banking77MIPRO.metric/2,
+        auto: nil,
+        num_candidates: 3,
+        num_trials: 6,
+        max_bootstrapped_demos: 2,
+        max_labeled_demos: 2,
+        prompt_lm: lm,
+        task_lm: lm,
+        startup_trials: 10,
+        minibatch: false,
+        proposer_fidelity: :dspy_3_2_1,
+        search_fidelity: :dspy_3_2_1_optuna_4_9_0,
+        program_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        fewshot_aware_proposer: true,
+        max_concurrency: 1,
+        max_errors: 10,
+        seed: hd(Banking77MIPRO.seeds())
+      )
+
+    invalid = %{valid | startup_trials: 2}
+
+    assert {:error,
+            %{
+              stage: :optimizer_validation,
+              reason: "pinned DSPy 3.2.1/Optuna 4.9.0 search requires startup_trials: 10"
+            }} =
+             Imp.Experiment.check(
+               Banking77MIPRO.program(),
+               invalid,
+               Banking77MIPRO.data!(),
+               &Banking77MIPRO.metric/2,
+               evaluation_options: [max_errors: 10]
+             )
+
+    refute_received :unexpected_lm_call
 
     caps = Banking77MIPRO.transport_caps()
     assert caps.per_seed.task == 48 + 48 + 48 + 6 * 48 + 48 + 2 * 48 * 2 + 4 * 2
@@ -155,6 +196,7 @@ defmodule DeploymentBanking77MIPROExampleTest do
             cond do
               call == 0 -> "[[ ## route ## ]]\nR15\n[[ ## completed ]]"
               rendered =~ "candidate router" -> %{route: "R15"}
+              rendered =~ ~r/fee [0-3] charged/ -> %{route: "R15"}
               true -> %{route: "R16"}
             end
           end
@@ -202,20 +244,20 @@ defmodule DeploymentBanking77MIPROExampleTest do
     optimizer =
       Imp.Optimizer.MIPROv2.new(&Banking77MIPRO.metric/2,
         auto: nil,
-        num_candidates: 2,
-        num_trials: 4,
-        max_bootstrapped_demos: 0,
-        max_labeled_demos: 0,
+        num_candidates: 3,
+        num_trials: 15,
+        max_bootstrapped_demos: 2,
+        max_labeled_demos: 2,
         minibatch: false,
         prompt_lm: prompt_lm,
         task_lm: task_lm,
         startup_trials: 10,
         proposer_fidelity: :dspy_3_2_1,
-        search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup,
+        search_fidelity: :dspy_3_2_1_optuna_4_9_0,
         program_aware_proposer: false,
         data_aware_proposer: true,
         tip_aware_proposer: true,
-        fewshot_aware_proposer: false,
+        fewshot_aware_proposer: true,
         view_data_batch_size: 10,
         max_concurrency: 1,
         max_errors: 10,
@@ -244,7 +286,15 @@ defmodule DeploymentBanking77MIPROExampleTest do
     assert result.optimized_selection.score == 1.0
     assert result.test.score == 1.0
 
-    assert result.program.classify_route.signature.instructions == "candidate router"
+    assert result.program.classify_route.demos != []
+
+    report = Imp.Optimizer.Report.fetch(result.program)
+    assert report.metadata["completed_trials"] == 15
+    assert report.metadata["sampler"] == "optuna_4_9_0_multivariate_categorical_tpe"
+    assert length(report.candidates) == 15
+    assert report.metadata["bootstrap"]["accepted_count"] > 0
+    assert report.metadata["proposals"]["analyze_intent"]["slots"] |> length() == 3
+    assert report.metadata["proposals"]["classify_route"]["slots"] |> length() == 3
 
     root = Path.join(System.tmp_dir!(), "imp-mipro-finite-#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
@@ -259,7 +309,7 @@ defmodule DeploymentBanking77MIPROExampleTest do
       rendered = Enum.map_join(messages, "\\n", & &1.content)
       if rendered =~ "`evidence`" and not (rendered =~ "`route`"),
         do: %{evidence: "fee evidence"},
-        else: %{route: if(rendered =~ "candidate router", do: "R15", else: "R16")}
+        else: %{route: if(rendered =~ "candidate router" or rendered =~ ~r/fee [0-3] charged/, do: "R15", else: "R16")}
     end)
     source = ImpDeployment.Banking77Pipeline.new(
       routes: ["R15", "R16"],
@@ -272,7 +322,8 @@ defmodule DeploymentBanking77MIPROExampleTest do
     end)
     File.write!(#{inspect(receipt_path)}, Jason.encode!(%{
       route: Imp.get(prediction, :route),
-      instruction: selected.classify_route.signature.instructions
+      instruction: selected.classify_route.signature.instructions,
+      demo_count: length(selected.classify_route.demos)
     }))
     """
 
@@ -283,8 +334,14 @@ defmodule DeploymentBanking77MIPROExampleTest do
                stderr_to_stdout: true
              )
 
-    assert %{"instruction" => "candidate router", "route" => "R15"} =
-             receipt_path |> File.read!() |> Jason.decode!()
+    assert %{
+             "demo_count" => demo_count,
+             "instruction" => instruction,
+             "route" => "R15"
+           } = receipt_path |> File.read!() |> Jason.decode!()
+
+    assert demo_count == length(result.program.classify_route.demos)
+    assert instruction == result.program.classify_route.signature.instructions
 
     File.rm_rf!(root)
   end

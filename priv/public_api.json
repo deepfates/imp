@@ -3915,6 +3915,10 @@
         {
           "name": "validate_invocation_options/1",
           "optional": true
+        },
+        {
+          "name": "validate_invocation_options/2",
+          "optional": true
         }
       ],
       "category": "spi",
@@ -3930,7 +3934,8 @@
       "signatures": {
         "callbacks": {
           "run/3": [],
-          "validate_invocation_options/1": []
+          "validate_invocation_options/1": [],
+          "validate_invocation_options/2": []
         },
         "functions": {
           "capabilities/1": [

@@ -48,6 +48,14 @@ defmodule Imp.Experiment do
     }
 
     try do
+      case prevalidate_optimizer(optimizer, optimizer_opts) do
+        :ok ->
+          :ok
+
+        {:error, reason} ->
+          raise Imp.Experiment.StageError, stage: :optimizer_validation, reason: reason
+      end
+
       provenance = stage!(:bootstrap, fn -> Bootstrap.capture!(data, config, bootstrap_opts) end)
 
       baseline =
@@ -285,6 +293,14 @@ defmodule Imp.Experiment do
   end
 
   defp evaluation_keys, do: [:failure_score, :max_concurrency, :max_errors, :timeout]
+
+  defp prevalidate_optimizer(optimizer, opts) do
+    case Imp.Optimizer.validate_invocation_options(optimizer, opts) do
+      :ok -> :ok
+      :deferred -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
 
   defp stage!(stage, fun) do
     fun.()

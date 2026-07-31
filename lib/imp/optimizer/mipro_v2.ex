@@ -100,23 +100,26 @@ defmodule Imp.Optimizer.MIPROv2 do
 
     {config_opts, runtime_opts} = normalize_options(opts)
 
-    %__MODULE__{
-      metric: metric,
-      config: Config.new(config_opts),
-      prompt_lm: runtime_opts[:prompt_lm],
-      task_lm: runtime_opts[:task_lm],
-      teacher: runtime_opts[:teacher],
-      metric_threshold: runtime_opts[:metric_threshold],
-      metric_identity:
-        DurableCallbackIdentity.normalize!(runtime_opts[:metric_identity], :metric_identity),
-      init_temperature: Keyword.get(runtime_opts, :init_temperature, 1.0),
-      proposal_response_format: Keyword.get(runtime_opts, :proposal_response_format, :off),
-      max_errors: Keyword.get(runtime_opts, :max_errors, :infinity),
-      max_concurrency: Keyword.get(runtime_opts, :max_concurrency, 1),
-      timeout: Keyword.get(runtime_opts, :timeout, :infinity),
-      startup_trials: Keyword.get(runtime_opts, :startup_trials, 10)
-    }
-    |> validate_runtime!()
+    optimizer =
+      %__MODULE__{
+        metric: metric,
+        config: Config.new(config_opts),
+        prompt_lm: runtime_opts[:prompt_lm],
+        task_lm: runtime_opts[:task_lm],
+        teacher: runtime_opts[:teacher],
+        metric_threshold: runtime_opts[:metric_threshold],
+        metric_identity:
+          DurableCallbackIdentity.normalize!(runtime_opts[:metric_identity], :metric_identity),
+        init_temperature: Keyword.get(runtime_opts, :init_temperature, 1.0),
+        proposal_response_format: Keyword.get(runtime_opts, :proposal_response_format, :off),
+        max_errors: Keyword.get(runtime_opts, :max_errors, :infinity),
+        max_concurrency: Keyword.get(runtime_opts, :max_concurrency, 1),
+        timeout: Keyword.get(runtime_opts, :timeout, :infinity),
+        startup_trials: Keyword.get(runtime_opts, :startup_trials, 10)
+      }
+
+    :ok = validate_optimizer!(optimizer, optimizer.config)
+    optimizer
   end
 
   @doc """
@@ -182,6 +185,34 @@ defmodule Imp.Optimizer.MIPROv2 do
     _validated_runtime =
       opts |> Keyword.take(@compile_runtime_keys) |> validate_compile_options!()
 
+    :ok
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
+  end
+
+  @impl true
+  def validate_invocation_options(%__MODULE__{} = optimizer, opts) do
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "MIPROv2 invocation options must be a keyword list")
+
+    unknown = Keyword.keys(opts) -- (Config.option_keys() ++ @compile_runtime_keys)
+
+    if unknown != [],
+      do: raise(ArgumentError, "unknown MIPROv2 invocation options: #{inspect(unknown)}")
+
+    config_options =
+      optimizer.config
+      |> Map.from_struct()
+      |> Map.take(Config.option_keys())
+      |> Enum.to_list()
+      |> Keyword.merge(Keyword.take(opts, Config.option_keys()))
+
+    config = Config.new(config_options)
+
+    _validated_runtime =
+      opts |> Keyword.take(@compile_runtime_keys) |> validate_compile_options!()
+
+    :ok = validate_optimizer!(optimizer, config)
     :ok
   rescue
     error in ArgumentError -> {:error, Exception.message(error)}
@@ -270,7 +301,7 @@ defmodule Imp.Optimizer.MIPROv2 do
   end
 
   defp run(optimizer, config, program, predictors, run_opts) do
-    validate_search_fidelity!(optimizer, config)
+    :ok = validate_optimizer!(optimizer, config)
 
     prompt_lm =
       optimizer.prompt_lm || predictors |> hd() |> Map.fetch!(:predictor) |> Map.get(:lm)
@@ -944,7 +975,7 @@ defmodule Imp.Optimizer.MIPROv2 do
           raise ArgumentError,
                 "pinned DSPy 3.2.1/Optuna 4.9.0 search requires startup_trials: 10"
 
-        startup_only_search_fidelity?(config) and
+        startup_only_search_fidelity?(config) and is_integer(config.num_trials) and
             config.num_trials > optimizer.startup_trials - 1 ->
           raise ArgumentError,
                 "pinned DSPy 3.2.1/Optuna 4.9.0 startup fidelity supports at most " <>
@@ -962,7 +993,14 @@ defmodule Imp.Optimizer.MIPROv2 do
         true ->
           :ok
       end
+    else
+      :ok
     end
+  end
+
+  defp validate_optimizer!(optimizer, config) do
+    _optimizer = validate_runtime!(optimizer)
+    validate_search_fidelity!(optimizer, config)
   end
 
   defp search_policy(%{search_fidelity: :beam_native}, _predictors, _demos),

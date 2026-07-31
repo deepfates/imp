@@ -63,8 +63,9 @@ defmodule Imp.Optimizer do
   @callback __optimizer__() :: capabilities()
   @callback run(struct(), program :: term(), keyword()) :: {:ok, term()} | {:error, term()}
   @callback validate_invocation_options(keyword()) :: :ok | {:error, term()}
+  @callback validate_invocation_options(struct(), keyword()) :: :ok | {:error, term()}
 
-  @optional_callbacks validate_invocation_options: 1
+  @optional_callbacks validate_invocation_options: 1, validate_invocation_options: 2
 
   @doc "Returns validated capability metadata for an optimizer value."
   @spec capabilities(struct()) :: {:ok, capabilities()} | {:error, term()}
@@ -157,10 +158,13 @@ defmodule Imp.Optimizer do
   def reject_options(opts), do: {:error, {:unsupported_optimizer_options, Keyword.keys(opts)}}
 
   @doc false
-  def validate_invocation_options(%module{}, opts) when is_list(opts) do
+  def validate_invocation_options(%module{} = optimizer, opts) when is_list(opts) do
     cond do
       not Keyword.keyword?(opts) ->
         {:error, {:invalid_optimizer_options, opts}}
+
+      function_exported?(module, :validate_invocation_options, 2) ->
+        module.validate_invocation_options(optimizer, opts)
 
       function_exported?(module, :validate_invocation_options, 1) ->
         module.validate_invocation_options(opts)
