@@ -457,6 +457,143 @@ defmodule Imp.ExperimentTest do
     assert_received {:pretransport_generate, _, _}
   end
 
+  test "positive finite error budgets retain completed diagnostics in every evaluation stage" do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Answer the question.")
+      |> Imp.predict(
+        lm: %PretransportLM{owner: owner},
+        adapter: Imp.Adapter.Chat,
+        config: [cache: false, json_fallback: false]
+      )
+
+    data =
+      Data.new(
+        train: [row("train-id", "train")],
+        selection: [row("selection-id", "selection")],
+        test: [row("test-id", "test")],
+        id: :id
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [failure_score: -0.25, max_errors: 10],
+               compare_baseline_on_test: true
+             )
+
+    assert result.selected == :baseline
+
+    for evaluation <- [
+          result.baseline_selection,
+          result.optimized_selection,
+          result.baseline_test,
+          result.test
+        ] do
+      assert evaluation.score == -0.25
+      assert [%{index: 0, reason: {:request_validation_failed, _}}] = evaluation.errors
+      assert [%{index: 0, score: -0.25, passed?: false}] = evaluation.rows
+    end
+
+    durable = Result.to_map(result, include_rows: true)
+    assert durable["payload"]["selection"]["baseline"]["error_count"] == 1
+    assert durable["payload"]["selection"]["optimized"]["error_count"] == 1
+    assert durable["payload"]["baseline_test"]["error_count"] == 1
+    assert durable["payload"]["test"]["error_count"] == 1
+    refute inspect(durable) =~ "sk-provider-secret"
+
+    durable_errors = durable["payload"]["selection"]["baseline"]["errors"]
+    assert inspect(durable_errors) =~ "unsupported_shape"
+    assert inspect(durable_errors) =~ "[REDACTED]"
+  end
+
+  test "the tenth ordinary failure cancels while the Experiment default cancels on the first" do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Answer the question.")
+      |> Imp.predict(
+        lm: %PretransportLM{owner: owner},
+        adapter: Imp.Adapter.Chat,
+        config: [cache: false, json_fallback: false]
+      )
+
+    rows = Enum.map(0..9, &row("selection-#{&1}", "selection-#{&1}"))
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: rows,
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    assert {:error,
+            %{
+              stage: :baseline_selection,
+              reason: %{kind: :evaluation_cancelled, max_errors: 10, completed_rows: 10}
+            }} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [max_errors: 10]
+             )
+
+    assert {:error,
+            %{
+              stage: :baseline_selection,
+              reason: %{kind: :evaluation_cancelled, max_errors: 0, completed_rows: 1}
+            }} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer)
+             )
+  end
+
+  test "operational safety bypasses an otherwise retaining finite error budget" do
+    safety =
+      Imp.OperationalSafetyError.exception(
+        kind: :route,
+        reason: :provider_drift,
+        message: "provider route changed"
+      )
+
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> {:error, safety} end)
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Answer the question.")
+      |> Imp.predict(lm: lm, adapter: Imp.Adapter.Chat, config: [json_fallback: false])
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: [row("selection", "selection")],
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    assert_raise Imp.OperationalSafetyError, "provider route changed", fn ->
+      Imp.Experiment.check(
+        program,
+        %SelectableOptimizer{owner: nil},
+        data,
+        Imp.exact_match(:answer),
+        evaluation_options: [max_errors: 10]
+      )
+    end
+  end
+
   test "custom identities remain private while row contents stay content-bound" do
     first =
       Data.new(

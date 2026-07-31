@@ -10,9 +10,12 @@ defmodule Imp.Experiment do
   `compare_baseline_on_test: true` to evaluate the baseline on the same ordered
   test rows after the selected artifact has been built and applied.
 
-  Evaluation failures remain ordered diagnostic rows when
-  `evaluation_options: [max_errors: :infinity]` is explicit. Finite error
-  budgets still cancel the stage loudly rather than returning partial results.
+  Evaluation failures remain ordered `failure_score` diagnostic rows while the
+  configured error budget has not been exhausted. `max_errors: 0` (the
+  Experiment default) stops on the first ordinary failure, a positive finite
+  budget stops when that many failures have occurred, and `:infinity` retains
+  every ordinary failure. Operational-safety failures always escape
+  immediately.
 
   This boundary is for ordinary product checks and bounded scientific runs. It
   does not turn a single result into a general optimizer-effectiveness claim.
@@ -125,6 +128,9 @@ defmodule Imp.Experiment do
         {:error, reason} -> {:error, %{stage: :optimize, reason: public_reason(reason)}}
       end
     rescue
+      error in Imp.OperationalSafetyError ->
+        reraise error, __STACKTRACE__
+
       error in Imp.Experiment.StageError ->
         {:error,
          %{
@@ -163,10 +169,6 @@ defmodule Imp.Experiment do
   defp evaluate!(stage, program, rows, row_ids, metric, opts) do
     stage!(stage, fn ->
       result = Imp.evaluate(program, rows, metric, opts)
-
-      if result.errors != [] and not retain_evaluation_failures?(opts) do
-        raise Imp.Experiment.StageError, stage: stage, reason: {:evaluation_errors, result.errors}
-      end
 
       unless is_number(result.score) do
         raise Imp.Experiment.StageError, stage: stage, reason: {:non_numeric_score, result.score}
@@ -238,7 +240,12 @@ defmodule Imp.Experiment do
       do: raise(ArgumentError, "unknown Imp.Experiment.check options: #{inspect(unknown)}")
 
     optimizer_opts = Keyword.get(opts, :optimizer_options, [])
-    evaluation_opts = Keyword.get(opts, :evaluation_options, [])
+
+    evaluation_opts =
+      opts
+      |> Keyword.get(:evaluation_options, [])
+      |> Keyword.put_new(:max_errors, 0)
+
     bootstrap_opts = Keyword.get(opts, :bootstrap, [])
     artifact_id = Keyword.get(opts, :artifact_id, "optimized")
     declared_config = Keyword.get(opts, :config, %{})
@@ -279,15 +286,14 @@ defmodule Imp.Experiment do
 
   defp evaluation_keys, do: [:failure_score, :max_concurrency, :max_errors, :timeout]
 
-  defp retain_evaluation_failures?(opts),
-    do: Keyword.fetch(opts, :max_errors) == {:ok, :infinity}
-
   defp stage!(stage, fun) do
     fun.()
   rescue
-    error in [Imp.Experiment.StageError] -> reraise error, __STACKTRACE__
-    error in [Imp.EvaluationCancelledError] -> reraise error, __STACKTRACE__
-    error -> raise Imp.Experiment.StageError, stage: stage, reason: Exception.message(error)
+    error in [Imp.Experiment.StageError, Imp.EvaluationCancelledError, Imp.OperationalSafetyError] ->
+      reraise error, __STACKTRACE__
+
+    error ->
+      raise Imp.Experiment.StageError, stage: stage, reason: Exception.message(error)
   catch
     kind, reason -> raise Imp.Experiment.StageError, stage: stage, reason: {kind, reason}
   end

@@ -139,6 +139,156 @@ defmodule DeploymentBanking77MIPROExampleTest do
     assert 680 == 632 + 48
   end
 
+  test "finite diagnostics allow a real two-stage MIPRO artifact to continue into a fresh OS" do
+    {:ok, router_calls} = Agent.start_link(fn -> 0 end)
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          rendered = Enum.map_join(messages, "\n", & &1.content)
+
+          if rendered =~ "`evidence`" and not (rendered =~ "`route`") do
+            %{evidence: "fee evidence"}
+          else
+            call = Agent.get_and_update(router_calls, &{&1, &1 + 1})
+
+            cond do
+              call == 0 -> "[[ ## route ## ]]\nR15\n[[ ## completed ]]"
+              rendered =~ "candidate router" -> %{route: "R15"}
+              true -> %{route: "R16"}
+            end
+          end
+        end
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          rendered = Enum.map_join(messages, "\n", & &1.content)
+
+          cond do
+            rendered =~ "`proposed_instruction`" -> %{proposed_instruction: "candidate router"}
+            rendered =~ "`summary`" -> %{summary: "All rows ask about a card fee."}
+            true -> %{observations: "The route is R15 for fee rows."}
+          end
+        end
+      )
+
+    source =
+      ImpDeployment.Banking77Pipeline.new(
+        routes: ["R15", "R16"],
+        analysis_instruction: "Extract fee evidence.",
+        routing_instruction: "Return R16 for this baseline."
+      )
+
+    rows =
+      Enum.map(0..7, fn index ->
+        Imp.example(
+          source_id: "row-#{index}",
+          utterance: "Why was fee #{index} charged?",
+          route: "R15"
+        )
+        |> Imp.with_inputs(:utterance)
+      end)
+
+    data =
+      Imp.Experiment.Data.new(
+        train: Enum.slice(rows, 0, 4),
+        selection: Enum.slice(rows, 4, 2),
+        test: Enum.slice(rows, 6, 2),
+        id: :source_id
+      )
+
+    optimizer =
+      Imp.Optimizer.MIPROv2.new(&Banking77MIPRO.metric/2,
+        auto: nil,
+        num_candidates: 2,
+        num_trials: 4,
+        max_bootstrapped_demos: 0,
+        max_labeled_demos: 0,
+        minibatch: false,
+        prompt_lm: prompt_lm,
+        task_lm: task_lm,
+        startup_trials: 10,
+        proposer_fidelity: :dspy_3_2_1,
+        search_fidelity: :dspy_3_2_1_optuna_4_9_0_startup,
+        program_aware_proposer: false,
+        data_aware_proposer: true,
+        tip_aware_proposer: true,
+        fewshot_aware_proposer: false,
+        view_data_batch_size: 10,
+        max_concurrency: 1,
+        max_errors: 10,
+        seed: 9
+      )
+
+    assert {:ok, result} =
+             Imp.context([lm: task_lm], fn ->
+               Imp.Experiment.check(
+                 source,
+                 optimizer,
+                 data,
+                 &Banking77MIPRO.metric/2,
+                 artifact_id: "finite-error-selected",
+                 evaluation_options: [
+                   failure_score: 0.0,
+                   max_concurrency: 1,
+                   max_errors: 10
+                 ]
+               )
+             end)
+
+    assert result.selected == :optimized
+    assert result.baseline_selection.score == 0.0
+    assert [%{index: 0}] = result.baseline_selection.errors
+    assert result.optimized_selection.score == 1.0
+    assert result.test.score == 1.0
+
+    assert result.program.classify_route.signature.instructions == "candidate router"
+
+    root = Path.join(System.tmp_dir!(), "imp-mipro-finite-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(root)
+    artifact_path = Path.join(root, "artifact.json")
+    receipt_path = Path.join(root, "fresh.json")
+    :ok = Imp.Optimizer.Artifact.write!(result.artifact, artifact_path)
+
+    code = """
+    Code.require_file(#{inspect(Path.join(@root, "lib/imp_deployment/banking77_pipeline.ex"))})
+    artifact = Imp.Optimizer.Artifact.read!(#{inspect(artifact_path)})
+    lm = Imp.LM.Static.new(handler: fn messages, _opts ->
+      rendered = Enum.map_join(messages, "\\n", & &1.content)
+      if rendered =~ "`evidence`" and not (rendered =~ "`route`"),
+        do: %{evidence: "fee evidence"},
+        else: %{route: if(rendered =~ "candidate router", do: "R15", else: "R16")}
+    end)
+    source = ImpDeployment.Banking77Pipeline.new(
+      routes: ["R15", "R16"],
+      analysis_instruction: "Extract fee evidence.",
+      routing_instruction: "Return R16 for this baseline."
+    )
+    selected = Imp.Optimizer.Artifact.apply(artifact, source)
+    {:ok, prediction} = Imp.context([lm: lm], fn ->
+      Imp.call(selected, %{utterance: "Why was the fee charged?"})
+    end)
+    File.write!(#{inspect(receipt_path)}, Jason.encode!(%{
+      route: Imp.get(prediction, :route),
+      instruction: selected.classify_route.signature.instructions
+    }))
+    """
+
+    assert {"", 0} =
+             System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+               cd: File.cwd!(),
+               env: [{"MIX_ENV", "test"}],
+               stderr_to_stdout: true
+             )
+
+    assert %{"instruction" => "candidate router", "route" => "R15"} =
+             receipt_path |> File.read!() |> Jason.decode!()
+
+    File.rm_rf!(root)
+  end
+
   test "provider-disabled ordinary entry needs no key or benchmark bridge" do
     source = File.read!(@script)
     refute source =~ "IFBench"

@@ -153,7 +153,10 @@ defmodule Imp.Experiment.Result do
     if include_rows? do
       Map.merge(summary, %{
         "rows" => result |> EvaluationResult.output_rows() |> Imp.Optimizer.Report.json_safe(),
-        "errors" => Imp.Optimizer.Report.json_safe(result.errors)
+        "errors" =>
+          result.errors
+          |> Imp.Redaction.redact()
+          |> Imp.Optimizer.Report.json_safe()
       })
     else
       summary
