@@ -14,7 +14,7 @@ defmodule Imp.Experiment.Result do
     :test,
     :provenance
   ]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [baseline_test: nil]
 
   @type t :: %__MODULE__{
           status: :completed,
@@ -23,6 +23,7 @@ defmodule Imp.Experiment.Result do
           artifact: map(),
           baseline_selection: EvaluationResult.t(),
           optimized_selection: EvaluationResult.t(),
+          baseline_test: EvaluationResult.t() | nil,
           test: EvaluationResult.t(),
           provenance: map()
         }
@@ -40,6 +41,7 @@ defmodule Imp.Experiment.Result do
         "baseline" => evaluation_map(result.baseline_selection, include_rows?),
         "optimized" => evaluation_map(result.optimized_selection, include_rows?)
       },
+      "baseline_test" => evaluation_map(result.baseline_test, include_rows?),
       "test" => evaluation_map(result.test, include_rows?),
       "artifact" => result.artifact,
       "provenance" => Imp.Optimizer.Report.json_safe(result.provenance)
@@ -47,7 +49,7 @@ defmodule Imp.Experiment.Result do
 
     %{
       "result_type" => "imp_experiment_result",
-      "schema_version" => 1,
+      "schema_version" => 2,
       "payload_sha256" => Imp.Experiment.Data.digest(payload),
       "payload" => payload
     }
@@ -84,19 +86,23 @@ defmodule Imp.Experiment.Result do
     payload = result["payload"]
 
     unless MapSet.new(Map.keys(result)) == expected and
-             result["result_type"] == "imp_experiment_result" and result["schema_version"] == 1 and
+             result["result_type"] == "imp_experiment_result" and
+             result["schema_version"] in [1, 2] and
              is_binary(result["payload_sha256"]) and is_map(payload) and
              result["payload_sha256"] == Imp.Experiment.Data.digest(payload) do
       raise ArgumentError, "invalid Imp experiment result envelope"
     end
 
-    validate_payload!(payload)
+    validate_payload!(payload, result["schema_version"])
     result
   end
 
-  defp validate_payload!(payload) do
+  defp validate_payload!(payload, schema_version) do
     expected =
       MapSet.new(["status", "detail", "selected", "selection", "test", "artifact", "provenance"])
+      |> then(fn keys ->
+        if schema_version == 2, do: MapSet.put(keys, "baseline_test"), else: keys
+      end)
 
     selection = payload["selection"]
 
@@ -107,6 +113,7 @@ defmodule Imp.Experiment.Result do
         MapSet.new(Map.keys(selection)) == MapSet.new(["baseline", "optimized"]) and
         valid_evaluation?(selection["baseline"], payload["detail"]) and
         valid_evaluation?(selection["optimized"], payload["detail"]) and
+        valid_optional_evaluation?(payload["baseline_test"], payload["detail"], schema_version) and
         valid_evaluation?(payload["test"], payload["detail"]) and is_map(payload["provenance"])
 
     unless valid?, do: raise(ArgumentError, "invalid Imp experiment result payload")
@@ -130,6 +137,12 @@ defmodule Imp.Experiment.Result do
 
   defp valid_evaluation?(_evaluation, _detail), do: false
 
+  defp valid_optional_evaluation?(_evaluation, _detail, 1), do: true
+  defp valid_optional_evaluation?(nil, _detail, 2), do: true
+
+  defp valid_optional_evaluation?(evaluation, detail, 2),
+    do: valid_evaluation?(evaluation, detail)
+
   defp evaluation_map(%EvaluationResult{} = result, include_rows?) do
     summary = %{
       "score" => result.score,
@@ -146,6 +159,8 @@ defmodule Imp.Experiment.Result do
       summary
     end
   end
+
+  defp evaluation_map(nil, _include_rows?), do: nil
 
   defp result_options!(opts) do
     unless Keyword.keyword?(opts),

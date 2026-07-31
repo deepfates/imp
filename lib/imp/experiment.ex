@@ -6,7 +6,9 @@ defmodule Imp.Experiment do
   chooses the higher score (retaining baseline on a tie), and only then evaluates
   the selected program on untouched test data. The returned artifact contains
   both parameter snapshots and can be applied to a freshly reconstructed trusted
-  program with `Imp.Optimizer.Artifact.apply/4`.
+  program with `Imp.Optimizer.Artifact.apply/4`. Set
+  `compare_baseline_on_test: true` to evaluate the baseline on the same ordered
+  test rows after the selected artifact has been built and applied.
 
   This boundary is for ordinary product checks and bounded scientific runs. It
   does not turn a single result into a general optimizer-effectiveness claim.
@@ -25,13 +27,14 @@ defmodule Imp.Experiment do
     unless Keyword.keyword?(opts), do: invalid_options!(opts)
 
     {optimizer_opts, evaluation_opts, bootstrap_opts, artifact_id, declared_config,
-     metric_identity} =
+     metric_identity, compare_baseline_on_test?} =
       split_options!(opts)
 
     config = %{
       optimizer_module: optimizer.__struct__,
       optimizer_options: Imp.Optimizer.Report.json_safe(optimizer_opts),
       evaluation_options: Imp.Optimizer.Report.json_safe(evaluation_opts),
+      compare_baseline_on_test: compare_baseline_on_test?,
       artifact_id: artifact_id,
       declared: declared_config,
       metric: metric_identity
@@ -80,6 +83,18 @@ defmodule Imp.Experiment do
         selected_program =
           stage!(:artifact_application, fn -> Artifact.apply(artifact, program) end)
 
+        baseline_test =
+          if compare_baseline_on_test? do
+            evaluate!(
+              :baseline_test,
+              program,
+              data.test,
+              data.ids.test,
+              metric,
+              evaluation_opts
+            )
+          end
+
         test =
           evaluate!(
             :test,
@@ -98,6 +113,7 @@ defmodule Imp.Experiment do
            artifact: artifact,
            baseline_selection: baseline,
            optimized_selection: optimized_result,
+           baseline_test: baseline_test,
            test: test,
            provenance: provenance
          }}
@@ -208,7 +224,8 @@ defmodule Imp.Experiment do
       :optimizer_options,
       :evaluation_options,
       :config,
-      :metric_identity
+      :metric_identity,
+      :compare_baseline_on_test
     ]
 
     unknown = Keyword.keys(opts) -- public
@@ -222,6 +239,7 @@ defmodule Imp.Experiment do
     artifact_id = Keyword.get(opts, :artifact_id, "optimized")
     declared_config = Keyword.get(opts, :config, %{})
     metric_identity = Keyword.get(opts, :metric_identity)
+    compare_baseline_on_test? = Keyword.get(opts, :compare_baseline_on_test, false)
 
     unless Keyword.keyword?(optimizer_opts),
       do: raise(ArgumentError, ":optimizer_options must be a keyword list")
@@ -248,8 +266,11 @@ defmodule Imp.Experiment do
       raise ArgumentError, ":metric_identity must be nil, a non-empty map, or a string"
     end
 
+    unless is_boolean(compare_baseline_on_test?),
+      do: raise(ArgumentError, ":compare_baseline_on_test must be boolean")
+
     {optimizer_opts, evaluation_opts, bootstrap_opts, artifact_id, declared_config,
-     metric_identity}
+     metric_identity, compare_baseline_on_test?}
   end
 
   defp evaluation_keys, do: [:max_concurrency, :max_errors, :timeout]

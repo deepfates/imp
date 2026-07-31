@@ -119,12 +119,14 @@ defmodule Imp.ExperimentTest do
              Imp.Experiment.check(program, %SelectableOptimizer{owner: owner}, data, metric,
                artifact_id: "selected-v1",
                optimizer_options: [custom_optimizer_control: :owned],
-               evaluation_options: [max_concurrency: 1]
+               evaluation_options: [max_concurrency: 1],
+               compare_baseline_on_test: true
              )
 
     assert result.selected == :optimized
     assert result.baseline_selection.score == 0.0
     assert result.optimized_selection.score == 1.0
+    assert result.baseline_test.score == 0.0
     assert result.test.score == 1.0
     assert Artifact.inspect(result.artifact).champion_id == "selected-v1"
     assert_received {:optimizer_opts, optimizer_opts}
@@ -133,8 +135,8 @@ defmodule Imp.ExperimentTest do
 
     assert_received {:call, "selection", false}
     assert_received {:call, "selection", true}
+    assert_received {:call, "test", false}
     assert_received {:call, "test", true}
-    refute_received {:call, "test", false}
     refute_received {:call, "train", _selected?}
 
     result_path = Path.join(root, "result.json")
@@ -142,8 +144,17 @@ defmodule Imp.ExperimentTest do
     :ok = Result.write!(result, result_path)
     :ok = Artifact.write!(result.artifact, artifact_path)
 
-    assert %{"payload" => %{"selected" => "optimized", "status" => "completed"}} =
+    assert %{
+             "schema_version" => 2,
+             "payload" => %{
+               "selected" => "optimized",
+               "status" => "completed",
+               "baseline_test" => baseline_test
+             }
+           } =
              Result.read!(result_path)
+
+    assert baseline_test["score"] == 0.0
 
     persisted = Jason.decode!(File.read!(result_path))
     encoded = File.read!(result_path)
@@ -155,7 +166,21 @@ defmodule Imp.ExperimentTest do
 
     detailed = Result.to_map(result, include_rows: true)
     assert detailed["payload"]["detail"] == "rows"
+    assert length(detailed["payload"]["baseline_test"]["rows"]) == 1
     assert length(detailed["payload"]["test"]["rows"]) == 1
+
+    legacy_path = Path.join(root, "legacy-result.json")
+    legacy_payload = Map.delete(persisted["payload"], "baseline_test")
+
+    legacy = %{
+      persisted
+      | "schema_version" => 1,
+        "payload" => legacy_payload,
+        "payload_sha256" => Data.digest(legacy_payload)
+    }
+
+    File.write!(legacy_path, Jason.encode!(legacy))
+    assert %{"schema_version" => 1} = Result.read!(legacy_path)
 
     receipt_path = Path.join(root, "fresh-receipt.json")
 
