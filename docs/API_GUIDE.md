@@ -293,8 +293,9 @@ report = Imp.Optimizer.Report.fetch(compiled)
 
 The optimizer modules remain pre-1.0 surfaces. Some have strong task-scoped
 effectiveness results; others currently have lifecycle or mechanism evidence
-without broad positive results. See [Evidence](EVIDENCE.md) when that
-distinction matters to a decision.
+without broad positive results. The source repository's
+[evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
+records that distinction separately from this API cookbook.
 
 ## Multi-stage programs are normal Elixir modules
 

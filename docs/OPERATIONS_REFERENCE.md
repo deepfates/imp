@@ -15,7 +15,8 @@ provider-compatible boundaries. They do not by themselves establish that a paid
 provider ran your specific job, or that an optimizer improved your task — that is
 the difference between a faithful boundary and a live outcome. Whether any
 capability here has been proven effective, and to what rung, is recorded in
-[Evidence](EVIDENCE.md).
+the source repository's
+[evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md).
 
 ## Durable Run-Level Resume
 
@@ -88,9 +89,8 @@ the provider reports a non-empty model artifact. Submit, refresh, and cancel
 requests use stable idempotency keys and bounded retries. These lifecycle APIs
 classify documented provider states before cleanup: known active jobs may be
 cancelled, known terminal jobs are preserved, and unknown states fail closed
-without a destructive cancellation guess. From a source checkout, the
-source-checkout-only `mix protocol.training.check` gate exercises the provider
-wire contracts locally.
+without a destructive cancellation guess. Repository-only protocol checks
+exercise these provider wire contracts without becoming consumer Mix tasks.
 
 ### Dispatch Journals
 

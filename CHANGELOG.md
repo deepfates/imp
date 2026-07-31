@@ -176,12 +176,13 @@ installs from a source checkout, not from Hex.
   each teacher execution. The runner always enforced a timeout; callers can
   now raise it for slow teachers — agentic and environment-backed teachers
   routinely run for minutes. Found live by dogfooding.
-- The evidence ladder is public: `docs/EVIDENCE.md` defines the C0–C5 rungs
-  every claim in `benchmarks/claims.json` is graded on, with the live ledger
-  counts. Nine new differential artifact families landed; every
-  semantic-conformance claim in the ledger is now asserted ("asserted" is a
-  maintainer attestation — `docs/EVIDENCE.md` reconciles it against what a
-  fresh checkout computes from committed evidence alone).
+- The source repository's
+  [evidence ladder](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
+  defines the C0–C5 rungs every claim in `benchmarks/claims.json` is graded on,
+  with the live ledger counts. Nine new differential artifact families landed;
+  every semantic-conformance claim in the ledger is now asserted ("asserted"
+  is a maintainer attestation — the evidence guide reconciles it against what
+  a fresh checkout computes from committed evidence alone).
 - The README is a pyramid: claim, proof, install, the lifecycle in six
   stages, and a stage-by-stage table of the entire facade surface.
 
@@ -193,9 +194,9 @@ installs from a source checkout, not from Hex.
   standalone fallback targets the Hex release and works once it is
   published.
 - The documentation is now a reader-first book: the API guide teaches before
-  it specifies, the conformance report against pinned upstream DSPy is a
-  first-class user document (`docs/CONFORMANCE.md`), and the prior-art
-  lineage is stated in daylight (`docs/PRIOR_ART.md`). Internal fidelity and
+  it specifies, the conformance report against pinned upstream DSPy remains a
+  [repository audit document](https://github.com/deepfates/imp/blob/main/docs/CONFORMANCE.md),
+  and the prior-art lineage is stated in daylight (`docs/PRIOR_ART.md`). Internal fidelity and
   evidence audits are repository-only — the package ships no
   `docs/internal/` files; `docs/ADVANCED.md` and `docs/OBSERVABILITY.md`
   are promoted user docs.

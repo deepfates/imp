@@ -17,12 +17,15 @@ application code.
 
 ## Run the complete workflow without a provider
 
-From this directory in a source checkout:
+From this directory in a source checkout or unpacked Hex artifact:
 
 ```sh
 IMP_PATH=../.. mix deps.get
 IMP_PATH=../.. mix run --no-start run_workflow.exs
 ```
+
+After Imp is published, a copied application can omit `IMP_PATH` and resolve
+the declared Hex dependency normally.
 
 The workflow:
 

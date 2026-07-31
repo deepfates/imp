@@ -36,28 +36,13 @@ end
 live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```
 
-## Local Quality Gates
+## Operational boundaries
 
-The earlier notebooks built Imp programs. This chapter is about trust: what
-maintainers run before shipping the library, and what application developers
-should decide before putting provider calls in production.
-
-Run these in a terminal from the source checkout repo root:
-
-```sh
-mix production.check
-mix integration.check
-mix protocol.check
-```
-
-These gates are the local project contract. They check formatting, compilation,
-deterministic tests, package shape, docs, local service integration, and
-provider-compatible protocol behavior. Run the executable notebook gate when you
-change teaching material in the source checkout:
-
-```sh
-mix livebook.execute.check
-```
+The earlier notebooks built Imp programs. This chapter is about the choices an
+application developer must make before putting provider calls in production:
+credentials, timeouts, retries, redaction, concurrency, cost limits, and
+failure behavior. Imp's own maintainer gates remain in the source repository;
+they are not consumer commands installed by the package.
 
 ## Application Checklist
 
@@ -128,16 +113,11 @@ else
 end
 ```
 
-## Live Gate
+## Live application probe
 
-In a terminal from the source checkout:
-
-```sh
-set -a
-. ./.env
-set +a
-LIVE_PROVIDER=1 mix live.check
-```
+The next cell is the consumer-facing live probe. It runs only when the three
+explicit environment variables above are present and otherwise stays
+provider-free.
 
 ## Live Operations Proof
 

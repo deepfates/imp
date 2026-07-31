@@ -111,10 +111,10 @@ receive no causal prior outcomes. Concurrent threshold stopping may therefore
 include completed speculative work; incomplete work is
 cancelled and represented in full-list provenance.
 
-The source-checkout `mix benchmark.search.check` lane records deterministic
-quality, ordering, projected-cost, failure-free completion, and observed
-concurrency-bound checks. It records latency samples as measurements only and
-does not turn local scheduler timing into a release assertion.
+Repository-only search benchmarks record deterministic quality, ordering,
+projected cost, failure-free completion, and observed concurrency bounds. They
+record latency samples as measurements only and do not turn local scheduler
+timing into a release assertion.
 
 ## Adapters
 
@@ -386,10 +386,9 @@ capturing ambient environment credentials. Programs that embed function tools,
 such as ReAct and CodeAct, should be rebuilt with their tool catalogs instead
 of deserialized from disk.
 
-## Gates
+## Maintainer verification
 
-The source-checkout production gates are not docs-only promises:
-
-- `mix production.check`
-- `mix integration.check`
-- `LIVE_PROVIDER=1 mix live.check`
+Release, integration, and live-provider gates remain in the
+[source repository](https://github.com/deepfates/imp/blob/main/docs/maintainers/GATES.md).
+They validate this runtime behavior before release but are not installed as
+consumer Mix tasks.

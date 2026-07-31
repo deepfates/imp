@@ -1,9 +1,8 @@
 # Production Operations
 
-This document covers consumer runtime operations and source-checkout validation
-for Imp maintainers. Mix gate aliases mentioned here are available only in a
-source checkout; they are not installed with the Hex package. The canonical
-release procedure remains in repository-only maintainer documentation.
+This document covers consumer runtime operations. Imp's release procedure and
+maintainer-only verification commands remain in the source repository rather
+than the Hex package.
 
 It is the final chapter of the same manual path used by the README, API guide,
 and Livebooks: after an Imp program has a signature, examples, metrics,
@@ -66,13 +65,12 @@ Dependency policy:
 - docs and gate claims must name which paths are live-proven, deterministic
   only, or reserved.
 
-## Gates And Maintainer Evidence
+## Maintainer verification
 
-The `mix` gates that prove and bound Imp's behavior — what each gate proves and
-does not prove, the benchmark evidence lanes, and how to debug a failing gate —
-are maintainer material and live in the repository's `maintainers` directory.
-They are available only in a source checkout, are not installed with the Hex
-package, and are not needed to run Imp in production.
+Release gates, benchmark evidence, and gate-debugging instructions remain in
+the [source repository](https://github.com/deepfates/imp/blob/main/docs/maintainers/GATES.md).
+They are not installed as consumer Mix tasks and are not needed to run Imp in
+production.
 
 ## Secret Handling
 
@@ -153,18 +151,5 @@ secret keys are replaced with `[REDACTED]`.
 
 ## Live Provider Setup
 
-Typical `.env`:
-
-```sh
-OPENAI_API_KEY=...
-OPENAI_MODEL=...
-```
-
-Run:
-
-```sh
-set -a
-. ./.env
-set +a
-LIVE_PROVIDER=1 mix live.check
-```
+Configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the host application's secret
+store, then exercise the application's own bounded live smoke before rollout.

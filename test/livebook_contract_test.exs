@@ -73,15 +73,18 @@ defmodule LivebookContractTest do
     refute output =~ "resolved_imp_repo=#{foreign}"
   end
 
-  test "operations Livebook names the full local gate set" do
+  test "operations Livebook teaches the consumer live boundary, not maintainer gates" do
     body = File.read!("livebooks/05_operate_and_live_checks.livemd")
 
     assert body =~ "Operate And Live Checks"
-    assert body =~ "mix production.check"
-    assert body =~ "mix livebook.execute.check"
-    refute body =~ "mix " <> "v2" <> ".check"
-    assert body =~ "mix integration.check"
-    assert body =~ "LIVE_PROVIDER=1 mix live.check"
+    assert body =~ "Operational boundaries"
+    assert body =~ "Imp.req_llm"
+    assert body =~ "LIVE_PROVIDER"
+    assert body =~ "OPENAI_API_KEY"
+    refute body =~ "mix production.check"
+    refute body =~ "mix livebook.execute.check"
+    refute body =~ "mix integration.check"
+    refute body =~ "mix live.check"
   end
 
   test "real LM Livebook teaches the front-door provider journey" do

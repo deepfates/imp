@@ -71,14 +71,8 @@ reload, and contained worker failure.
 
 ## Read research evidence separately from product guidance
 
-Most users do not need the repository's compatibility and research records to
-build an application. When you do need to audit a claim:
-
-- [Conformance](CONFORMANCE.md) describes the observable upstream behavior
-  currently compared with DSPy and related projects.
-- [Evidence](EVIDENCE.md) links narrowly worded research claims to their
-  retained results.
-
-Maintainer protocols, benchmark machinery, and release procedures live under
-`docs/internal/` and `docs/maintainers/`. They support the user-facing docs;
-they are not part of the learning path.
+Most users do not need Imp's compatibility records or scientific results to
+build an application. They remain reviewable in the source repository's
+[conformance report](https://github.com/deepfates/imp/blob/main/docs/CONFORMANCE.md)
+and [evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md),
+but are deliberately not part of the packaged manual or learning path.

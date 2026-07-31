@@ -11,8 +11,11 @@ and held-out evaluation — cost about **$0.01** and ran in about **ten
 seconds** with `gpt-5.4-mini`.
 
 Those numbers come from a committed, content-addressed run artifact in the
-repository, produced by `scripts/tutorial_ticket_routing_experiment.exs` —
-you can rerun it yourself and compare.
+source repository. The repository-only
+[experiment script](https://github.com/deepfates/imp/blob/main/scripts/tutorial_ticket_routing_experiment.exs)
+retains their research provenance; the packaged tutorial below uses the same
+public program, evaluation, and optimizer APIs without shipping that evidence
+runner.
 The gain has a plain-English reason: our routing labels encode conventions
 the model cannot guess, and the optimizer put examples of those conventions
 into the program.

@@ -17,8 +17,9 @@ install from a source checkout:
 {:imp, path: "path/to/imp"}
 ```
 
-Documentation ships in the repository under `docs/` and will land on
-hexdocs.pm with the Hex release.
+The product manual, five Livebooks, provider-free tutorial, and deployment
+example are bundled for HexDocs. Research evidence and maintainer procedures
+remain in the source repository.
 
 The `v0.2.1` tag is the last named 0.2.x source candidate. Current `main`
 contains additional unreleased changes, including the breaking changes listed
@@ -39,9 +40,11 @@ optimizer and adapter families carry executable differential tests that run
 pinned DSPy 3.2.1 and compare their declared observations, backed by committed,
 content-addressed evidence artifacts. The conformance report records a
 differential, an Elixir-native equivalent, or an honest gap for each tracked
-surface. See [Evidence](docs/EVIDENCE.md) for the C0–C5 ladder this is graded on
-and [Conformance](docs/CONFORMANCE.md) for the per-surface table. Several scoped
-effectiveness results ship with artifacts: the
+surface. The source repository's
+[evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
+and [conformance report](https://github.com/deepfates/imp/blob/main/docs/CONFORMANCE.md)
+retain those research records separately from the packaged manual. Several
+scoped effectiveness results remain reviewable with source-repository artifacts: the
 [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s router improves
 from 25–30% to 85% on held-out data across three committed live runs, for
 about a cent. On a separately frozen matched TREC contract, Imp GEPA improved
@@ -96,18 +99,19 @@ evidence, not GEPA effectiveness evidence.
 
 ## Since v0.1.0
 
-- Packaged for Hex, with the full manual in the package (the package ships
-  the guides, livebooks, and the deployment example; internal audit material
-  stays in the repository). Publication to hex.pm is still pending — until
+- Packaged for Hex with the product guides, five Livebooks, provider-free
+  tutorial, and deployment example; research and internal audit material stay
+  in the repository. Publication to hex.pm is still pending — until
   it happens, install from a source checkout.
 - Documentation rebuilt reader-first: new README, Learning Path, tutorial with
-  honest artifact-cited numbers, DSPy-users mapping, and the public evidence
-  ladder.
+  honest artifact-cited numbers, and DSPy-users mapping. The evidence ladder
+  remains a repository audit surface rather than part of the packaged manual.
 - Evidence campaign: nine new differential artifact families landed; every
   semantic-conformance claim in the ledger is now asserted (was 1 of 4).
   "Asserted" is a maintainer attestation, not a fresh-checkout replay — see
-  the reconciliation in [docs/EVIDENCE.md](docs/EVIDENCE.md) for what a
-  clean clone can verify from committed evidence alone.
+  the source repository's
+  [evidence reconciliation](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
+  for what a clean clone can verify from committed evidence alone.
 - Streaming promoted to the facade (`Imp.stream/3`, `Imp.collect/3`) with
   provider token streaming and an honest local fallback.
 - Two silent-failure bugs found and fixed the same day they were exposed by

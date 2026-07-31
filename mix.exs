@@ -226,8 +226,6 @@ defmodule Imp.MixProject do
       "docs/GLOSSARY.md",
       "docs/PHILOSOPHY.md",
       "docs/IMP_FOR_DSPY_USERS.md",
-      "docs/CONFORMANCE.md",
-      "docs/EVIDENCE.md",
       "docs/PRIOR_ART.md",
       "docs/ARCHITECTURE.md",
       "docs/API_GUIDE.md",

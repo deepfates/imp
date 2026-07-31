@@ -61,6 +61,8 @@ defmodule PackageContractTest do
   ]
 
   @excluded_files [
+    "docs/CONFORMANCE.md",
+    "docs/EVIDENCE.md",
     "docs/internal/BENCHMARK_CATALOG.md",
     "docs/internal/BENCHMARK_TRUTH.md",
     "docs/internal/COVERAGE_MATRIX.md",
@@ -287,19 +289,19 @@ defmodule PackageContractTest do
     assert missing == []
   end
 
-  test "shipped docs label source-checkout commands as source-checkout commands" do
+  test "shipped docs do not instruct consumers to run repository-only Mix tasks" do
     files =
       Mix.Project.config()
       |> Keyword.fetch!(:package)
       |> Keyword.fetch!(:files)
       |> Enum.filter(&String.match?(&1, ~r/^(README\.md|docs\/.*\.md|livebooks\/.*\.livemd)$/))
 
-    unqualified =
+    unavailable =
       files
-      |> Enum.flat_map(&unqualified_source_checkout_command_mentions/1)
+      |> Enum.flat_map(&repository_only_command_mentions/1)
       |> Enum.sort()
 
-    assert unqualified == []
+    assert unavailable == []
   end
 
   test "README states the honest install: source checkout now, Hex pending publication" do
@@ -1245,22 +1247,13 @@ defmodule PackageContractTest do
   defp reference_base(_source, "livebooks/" <> _rest), do: File.cwd!()
   defp reference_base(source, _target), do: Path.dirname(source)
 
-  defp unqualified_source_checkout_command_mentions(path) do
+  defp repository_only_command_mentions(path) do
     lines = path |> File.read!() |> String.split("\n")
 
-    if source_checkout_document?(lines) do
-      []
-    else
-      unqualified_source_checkout_command_mentions(path, lines)
-    end
-  end
-
-  defp unqualified_source_checkout_command_mentions(path, lines) do
     lines
     |> Enum.with_index()
     |> Enum.flat_map(fn {line, index} ->
-      if String.match?(line, source_checkout_command_pattern()) and
-           not source_checkout_context?(lines, index) do
+      if String.match?(line, repository_only_command_pattern()) do
         ["#{path}:#{index + 1}:#{line}"]
       else
         []
@@ -1268,30 +1261,8 @@ defmodule PackageContractTest do
     end)
   end
 
-  defp source_checkout_document?(lines) do
-    lines
-    |> Enum.take(12)
-    |> Enum.any?(fn line ->
-      normalized = String.downcase(line)
-
-      String.contains?(normalized, "source checkout") or
-        String.contains?(normalized, "source-checkout")
-    end)
-  end
-
-  defp source_checkout_context?(lines, index) do
-    lines
-    |> Enum.slice(max(index - 12, 0), 13)
-    |> Enum.any?(fn line ->
-      normalized = String.downcase(line)
-
-      String.contains?(normalized, "source checkout") or
-        String.contains?(normalized, "source-checkout")
-    end)
-  end
-
-  defp source_checkout_command_pattern do
-    ~r/(?:LIVE_PROVIDER=1\s+)?mix (?:production\.check|public_surface\.check|integration\.check|protocol(?:\.\w+)?\.check|live\.check|livebook(?:\.execute)?\.check|package\.check|quality\.check|evidence\.check|benchmark[.\w]*)/
+  defp repository_only_command_pattern do
+    ~r/(?:LIVE_PROVIDER=1\s+)?mix (?:production\.check|public_surface\.check|integration\.check|protocol(?:\.\w+)?\.check|live\.check|livebook(?:\.execute)?\.check|package\.check|quality\.check|evidence\.check|benchmark[.\w]*|imp\.benchmark[.\w]*|research[.\w]*)/
   end
 
   defp module_from_string(name) do

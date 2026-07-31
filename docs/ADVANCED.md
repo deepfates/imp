@@ -168,39 +168,11 @@ or finish failures are warnings. Imp reports accurate failed terminal status,
 while the isolated W&B client can reproduce GEPA v0.1.1's success-only finish
 behavior when explicitly configured for compatibility.
 
-The source-checkout effectiveness target uses executable code, agent
-configuration, and scheduling artifacts:
-
-```sh
-mix benchmark.optimize_anything.check
-mix imp.benchmark.optimize_anything --live --provider openai \
-  --model gpt-5.4-2026-03-05 \
-  --pricing-profile openai-gpt-5.4-standard-2026-03-05 \
-  --seeds 17,23,31 --max-proposals 5 \
-  --max-cost-usd 0.50 --max-requests 20 \
-  --max-input-tokens 100000 --max-output-tokens 20000 \
-  --max-output-tokens-per-request 1000 \
-  --out benchmarks/runs/optimize-anything
-```
-
-The smoke command validates wiring only. The source-checkout benchmark guide
-defines the multi-seed, three-split held-out evaluation, cost, and checkpoint
-requirements for the still-open scoped live effectiveness claim. The immutable
-pre-v2 artifact is T2 execution evidence only because it reused its development
-set for final scoring. The live command requires
-all spend and token ceilings explicitly, reserves worst-case request cost
-before transport, disables cache hits and transport retries, and records a
-checksummed budget checkpoint; missing or zero provider cost telemetry aborts
-the campaign. A provider-reported final-call overrun is retained in the
-checkpoint but cannot produce full evidence. The pinned price profile is bound
-to the exact provider/model snapshot and the official OpenAI pricing source.
-The final checkpoint envelope is embedded and validated without relying on its
-informational local path. Persistence is a sync-write plus rename of the latest
-snapshot, not an append-only log, resumable spend state, directory-fsync, or
-power-loss guarantee. Existing run ids are refused; after a process restart,
-review the checkpoint and launch a new run id with a fresh limit. The separate
-$15 matched-upstream research maximum is not the $0.50 ceiling for this narrow
-rerun and does not authorize an additional asserted product claim.
+Optimize Anything's executable research results, frozen budgets, and matched
+upstream work remain in the repository's
+[evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md).
+They are intentionally separate from this public API guide and are not consumer
+commands installed by the package.
 
 Current implementation fidelity is pinned to GEPA v0.1.4; earlier comparisons
 against the v0.1.1 checkout are kept as history in the repository's internal
@@ -536,16 +508,11 @@ after
 end
 ```
 
-Run the source-checkout campaign with:
-
-```sh
-mix imp.benchmark.local_mlx
-```
-
-The source-checkout campaign validates immutable dataset and model-tree inputs,
-matched evaluation, fusion, deployment rebinding, checksummed save/load, and
-server cleanup. A passing artifact supports only its pinned model, task, split,
-and run; it does not establish general SFT or BetterTogether effectiveness.
+Repository-only MLX acceptance records validate immutable dataset and model-tree
+inputs, matched evaluation, fusion, deployment rebinding, checksummed save/load,
+and server cleanup. A passing artifact supports only its pinned model, task,
+split, and run; it does not establish general SFT or BetterTogether
+effectiveness.
 
 The preserved public-consumer acceptance at commit `dd6f6ad` used one pinned
 Qwen2.5-0.5B MLX SFT artifact and the frozen four-intent Banking77 subset. On
@@ -605,8 +572,8 @@ with warnings as errors, preserve JSON-safe persistence where applicable, and
 keep provider credentials out of saved artifacts.
 
 MCP support covers catalog import plus JSON-RPC HTTP, stdio, and Streamable HTTP
-clients. The bundled benchmark tests are deterministic regression checks on
-Imp behavior, not public leaderboard claims. Provider-native schema APIs and
+clients. Repository benchmark tests are deterministic regression checks on Imp
+behavior, not public leaderboard claims. Provider-native schema APIs and
 streaming are explicit provider responsibilities layered over the shared Imp
 contracts and tested through injectable transports.
 
