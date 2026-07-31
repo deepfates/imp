@@ -1424,3 +1424,34 @@ update. This capability would make outer admission and reported comparisons
 more robust. It would not rehabilitate the terminal Banking77 result, prove an
 optimizer useful, or by itself remove noisy observations inside optimizer
 search. Those remain separate scientific and algorithm-specific questions.
+
+### Outer-repetition implementation checkpoint
+
+The bounded slice above is implemented provider-free. `Experiment.check/5`
+accepts positive `evaluation_options[:repetitions]` and only `:mean`
+aggregation, validates both before bootstrap or executable work, repeats every
+outer selection/test stage over the identical ordered rows, selects on the mean,
+and retains baseline on a tie. The existing Evaluate error budget applies to
+each run; an incomplete run fails its stage and operational safety remains
+fatal.
+
+The default and explicit `repetitions: 1` paths retain the ordinary in-memory
+behavior and schema-2 durable shape. Repeated checks use Result schema 3 solely
+to add one redacted `repetitions` block: ordered run index/score/row/error
+counts, aggregate scores, paired candidate-minus-baseline deltas, and exact
+outer row-evaluation opportunity. Detailed rows/errors remain opt-in. Schemas 1
+and 2 remain readable, and Artifact/ProgramServer require no change.
+
+A provider-free public two-stage `LabeledFewShot` feature test demonstrates the
+user behavior: one pass retains a baseline favored by its first noisy sample;
+three fixed repeats score baseline `[1,0,0]`, optimized `[0,1,1]`, select the
+better expected optimized program, write/read the linked Result and Artifact,
+and apply/call it in a fresh OS BEAM. Separate tests cover aggregate ties,
+pre-side-effect validation, per-repetition diagnostics, cancellation, immediate
+operational-safety escape, deterministic opportunity multiplication, redacted
+persistence, and schema-1/2 compatibility.
+
+This closes only outer admission robustness. Optimizer-internal objectives and
+search observations remain single-pass unless that optimizer explicitly owns a
+different policy. The implementation does not alter or rehabilitate the
+terminal Banking77 evidence.

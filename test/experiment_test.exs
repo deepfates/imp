@@ -119,7 +119,7 @@ defmodule Imp.ExperimentTest do
              Imp.Experiment.check(program, %SelectableOptimizer{owner: owner}, data, metric,
                artifact_id: "selected-v1",
                optimizer_options: [custom_optimizer_control: :owned],
-               evaluation_options: [max_concurrency: 1],
+               evaluation_options: [max_concurrency: 1, repetitions: 1, aggregation: :mean],
                compare_baseline_on_test: true
              )
 
@@ -299,6 +299,39 @@ defmodule Imp.ExperimentTest do
     _program = Imp.predict("question -> answer", lm: lm(owner))
   end
 
+  test "invalid repetition policy fails before optimizer or evaluator work" do
+    owner = self()
+    program = Imp.predict("question -> answer", lm: lm(owner))
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: [row("selection", "selection")],
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    for evaluation_options <- [
+          [repetitions: 0],
+          [repetitions: -1],
+          [repetitions: 1.5],
+          [aggregation: :median]
+        ] do
+      assert_raise ArgumentError, fn ->
+        Imp.Experiment.check(
+          program,
+          %SelectableOptimizer{owner: owner},
+          data,
+          Imp.exact_match(:answer),
+          evaluation_options: evaluation_options
+        )
+      end
+
+      refute_received {:call, _, _}
+      refute_received {:optimizer_opts, _}
+    end
+  end
+
   test "optimizer failure returns its stage without touching untouched test" do
     owner = self()
     program = Imp.predict("question -> answer", lm: lm(owner))
@@ -457,6 +490,113 @@ defmodule Imp.ExperimentTest do
     assert_received {:pretransport_generate, _, _}
   end
 
+  test "repeated diagnostics preserve aggregate ties, per-run evidence, and opportunity" do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Answer the question.")
+      |> Imp.predict(
+        lm: %PretransportLM{owner: owner},
+        adapter: Imp.Adapter.Chat,
+        config: [cache: false, json_fallback: false]
+      )
+
+    data =
+      Data.new(
+        train: [row("train-id", "train")],
+        selection: [row("selection-id", "selection")],
+        test: [row("test-id", "test")],
+        id: :id
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [
+                 repetitions: 2,
+                 aggregation: :mean,
+                 failure_score: -0.25,
+                 max_errors: :infinity
+               ]
+             )
+
+    assert result.selected == :baseline
+    assert result.baseline_selection.score == -0.25
+    assert length(result.baseline_selection.rows) == 2
+    assert Enum.map(result.baseline_selection.rows, & &1.repetition) == [1, 2]
+    assert result.repetition_summary.count == 2
+    assert result.repetition_summary.aggregation == :mean
+    assert result.repetition_summary.paired_deltas.selection == [0.0, 0.0]
+    assert result.repetition_summary.paired_deltas.test == nil
+
+    assert result.repetition_summary.outer_row_evaluations == %{
+             stages: %{baseline_selection: 2, optimized_selection: 2, test: 2},
+             total: 6
+           }
+
+    persisted = Result.to_map(result)
+    assert persisted["schema_version"] == 3
+    repetitions = persisted["payload"]["repetitions"]
+    assert repetitions["count"] == 2
+    assert repetitions["aggregation"] == "mean"
+    assert repetitions["paired_deltas"]["selection"] == [0.0, 0.0]
+
+    assert repetitions["stages"]["baseline_selection"]["runs"] == [
+             %{"index" => 1, "score" => -0.25, "row_count" => 1, "error_count" => 1},
+             %{"index" => 2, "score" => -0.25, "row_count" => 1, "error_count" => 1}
+           ]
+
+    refute inspect(persisted) =~ "selection-id"
+    detailed = Result.to_map(result, include_rows: true)
+
+    assert Enum.all?(
+             detailed["payload"]["repetitions"]["stages"]["baseline_selection"]["runs"],
+             &(length(&1["rows"]) == 1 and length(&1["errors"]) == 1)
+           )
+  end
+
+  test "a cancelled repetition fails structurally and is never averaged" do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Answer the question.")
+      |> Imp.predict(
+        lm: %PretransportLM{owner: owner},
+        adapter: Imp.Adapter.Chat,
+        config: [cache: false, json_fallback: false]
+      )
+
+    data =
+      Data.new(
+        train: [row("train-id", "train")],
+        selection: [row("selection-id", "selection")],
+        test: [row("test-id", "test")],
+        id: :id
+      )
+
+    assert {:error,
+            %{
+              stage: :baseline_selection,
+              reason: %{kind: :evaluation_cancelled, repetition: 1, max_errors: 0}
+            }} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [repetitions: 3]
+             )
+
+    assert_received {:pretransport_generate, _, _}
+    refute_received {:optimizer_opts, _}
+    refute_received {:pretransport_generate, _, _}
+  end
+
   test "positive finite error budgets retain completed diagnostics in every evaluation stage" do
     owner = self()
 
@@ -589,7 +729,7 @@ defmodule Imp.ExperimentTest do
         %SelectableOptimizer{owner: nil},
         data,
         Imp.exact_match(:answer),
-        evaluation_options: [max_errors: 10]
+        evaluation_options: [max_errors: 10, repetitions: 3]
       )
     end
   end

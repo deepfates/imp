@@ -17,6 +17,13 @@ defmodule Imp.Experiment do
   every ordinary failure. Operational-safety failures always escape
   immediately.
 
+  For a noisy model, set `evaluation_options: [repetitions: n,
+  aggregation: :mean]` to repeat each outer selection and test evaluation over
+  the same ordered rows. The default is one pass. Repetitions change only the
+  family-independent Experiment admission and reporting boundary; an
+  optimizer's internal candidate evaluations remain under that optimizer's
+  own documented policy.
+
   This boundary is for ordinary product checks and bounded scientific runs. It
   does not turn a single result into a general optimizer-effectiveness claim.
   """
@@ -58,7 +65,7 @@ defmodule Imp.Experiment do
 
       provenance = stage!(:bootstrap, fn -> Bootstrap.capture!(data, config, bootstrap_opts) end)
 
-      baseline =
+      {baseline, baseline_repetitions} =
         evaluate!(
           :baseline_selection,
           program,
@@ -70,7 +77,7 @@ defmodule Imp.Experiment do
 
       with {:ok, optimized} <-
              stage!(:optimize, fn -> optimize(program, optimizer, data, optimizer_opts) end) do
-        optimized_result =
+        {optimized_result, optimized_repetitions} =
           evaluate!(
             :optimized_selection,
             optimized,
@@ -98,7 +105,7 @@ defmodule Imp.Experiment do
         selected_program =
           stage!(:artifact_application, fn -> Artifact.apply(artifact, program) end)
 
-        baseline_test =
+        {baseline_test, baseline_test_repetitions} =
           if compare_baseline_on_test? do
             evaluate!(
               :baseline_test,
@@ -108,9 +115,11 @@ defmodule Imp.Experiment do
               metric,
               evaluation_opts
             )
+          else
+            {nil, nil}
           end
 
-        test =
+        {test, test_repetitions} =
           evaluate!(
             :test,
             selected_program,
@@ -130,7 +139,16 @@ defmodule Imp.Experiment do
            optimized_selection: optimized_result,
            baseline_test: baseline_test,
            test: test,
-           provenance: provenance
+           provenance: provenance,
+           repetition_summary:
+             repetition_summary(
+               evaluation_opts,
+               data,
+               baseline_repetitions,
+               optimized_repetitions,
+               baseline_test_repetitions,
+               test_repetitions
+             )
          }}
       else
         {:error, reason} -> {:error, %{stage: :optimize, reason: public_reason(reason)}}
@@ -175,23 +193,122 @@ defmodule Imp.Experiment do
   end
 
   defp evaluate!(stage, program, rows, row_ids, metric, opts) do
-    stage!(stage, fn ->
-      result = Imp.evaluate(program, rows, metric, opts)
+    repetitions = Keyword.get(opts, :repetitions, 1)
+    evaluate_opts = Keyword.drop(opts, [:repetitions, :aggregation])
 
-      unless is_number(result.score) do
-        raise Imp.Experiment.StageError, stage: stage, reason: {:non_numeric_score, result.score}
-      end
+    results =
+      Enum.map(1..repetitions, fn repetition ->
+        try do
+          stage!(stage, fn ->
+            result = Imp.evaluate(program, rows, metric, evaluate_opts)
 
-      result
-    end)
-  rescue
-    error in Imp.EvaluationCancelledError ->
-      reraise Imp.Experiment.StageError.exception(
+            unless is_number(result.score) do
+              raise Imp.Experiment.StageError,
                 stage: stage,
-                reason: evaluation_cancelled(stage, error, row_ids)
-              ),
-              __STACKTRACE__
+                reason: {:non_numeric_score, result.score}
+            end
+
+            result
+          end)
+        rescue
+          error in Imp.EvaluationCancelledError ->
+            reraise Imp.Experiment.StageError.exception(
+                      stage: stage,
+                      reason: evaluation_cancelled(stage, repetition, error, row_ids)
+                    ),
+                    __STACKTRACE__
+        end
+      end)
+
+    {aggregate_evaluations(results), repetition_runs(results, repetitions)}
   end
+
+  defp aggregate_evaluations([result]), do: result
+
+  defp aggregate_evaluations(results) do
+    %Imp.Evaluate.Result{
+      score: results |> Enum.map(& &1.score) |> average(),
+      rows: tagged_entries(results, :rows),
+      errors: tagged_entries(results, :errors)
+    }
+  end
+
+  defp tagged_entries(results, field) do
+    results
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {result, repetition} ->
+      result
+      |> Map.fetch!(field)
+      |> Enum.map(&Map.put(&1, :repetition, repetition))
+    end)
+  end
+
+  defp repetition_runs(_results, 1), do: nil
+
+  defp repetition_runs(results, _repetitions) do
+    results
+    |> Enum.with_index(1)
+    |> Enum.map(fn {evaluation, index} -> %{index: index, evaluation: evaluation} end)
+  end
+
+  defp repetition_summary(opts, data, baseline, optimized, baseline_test, test) do
+    repetitions = Keyword.get(opts, :repetitions, 1)
+
+    if repetitions == 1 do
+      nil
+    else
+      selection_rows = length(data.selection) * repetitions
+      test_rows = length(data.test) * repetitions
+
+      opportunities = %{
+        baseline_selection: selection_rows,
+        optimized_selection: selection_rows,
+        test: test_rows
+      }
+
+      opportunities =
+        if baseline_test,
+          do: Map.put(opportunities, :baseline_test, test_rows),
+          else: opportunities
+
+      %{
+        count: repetitions,
+        aggregation: :mean,
+        outer_row_evaluations: %{
+          stages: opportunities,
+          total: opportunities |> Map.values() |> Enum.sum()
+        },
+        stages: %{
+          baseline_selection: stage_repetitions(baseline),
+          optimized_selection: stage_repetitions(optimized),
+          baseline_test: stage_repetitions(baseline_test),
+          test: stage_repetitions(test)
+        },
+        paired_deltas: %{
+          selection: paired_deltas(baseline, optimized),
+          test: paired_deltas(baseline_test, test)
+        }
+      }
+    end
+  end
+
+  defp stage_repetitions(nil), do: nil
+
+  defp stage_repetitions(runs) do
+    %{aggregate_score: runs |> Enum.map(& &1.evaluation.score) |> average(), runs: runs}
+  end
+
+  defp paired_deltas(nil, _right), do: nil
+
+  defp paired_deltas(left, right) do
+    left
+    |> Enum.zip(right)
+    |> Enum.map(fn {left_run, right_run} ->
+      right_run.evaluation.score - left_run.evaluation.score
+    end)
+  end
+
+  defp average(values), do: Enum.sum(values) / length(values)
 
   defp select(baseline, optimized_result) do
     if optimized_result.score > baseline.score,
@@ -271,6 +388,16 @@ defmodule Imp.Experiment do
     if unknown_evaluation != [],
       do: raise(ArgumentError, "unknown :evaluation_options: #{inspect(unknown_evaluation)}")
 
+    repetitions = Keyword.get(evaluation_opts, :repetitions, 1)
+
+    unless is_integer(repetitions) and repetitions > 0,
+      do: raise(ArgumentError, ":evaluation_options :repetitions must be a positive integer")
+
+    aggregation = Keyword.get(evaluation_opts, :aggregation, :mean)
+
+    unless aggregation == :mean,
+      do: raise(ArgumentError, ":evaluation_options :aggregation only supports :mean")
+
     unless Keyword.keyword?(bootstrap_opts),
       do: raise(ArgumentError, ":bootstrap must be a keyword list")
 
@@ -292,7 +419,8 @@ defmodule Imp.Experiment do
      metric_identity, compare_baseline_on_test?}
   end
 
-  defp evaluation_keys, do: [:failure_score, :max_concurrency, :max_errors, :timeout]
+  defp evaluation_keys,
+    do: [:failure_score, :max_concurrency, :max_errors, :timeout, :repetitions, :aggregation]
 
   defp prevalidate_optimizer(optimizer, opts) do
     case Imp.Optimizer.validate_invocation_options(optimizer, opts) do
@@ -317,7 +445,7 @@ defmodule Imp.Experiment do
   defp failure_stage(%Imp.Experiment.StageError{stage: stage}), do: stage
   defp failure_stage(_error), do: :bootstrap
 
-  defp evaluation_cancelled(stage, error, row_ids) do
+  defp evaluation_cancelled(stage, repetition, error, row_ids) do
     failures =
       Enum.map(error.errors, fn failure ->
         index = Map.get(failure, :index, Map.get(failure, "index"))
@@ -333,6 +461,7 @@ defmodule Imp.Experiment do
 
     %{
       kind: :evaluation_cancelled,
+      repetition: repetition,
       max_errors: error.max_errors,
       completed_rows: length(error.rows),
       failures: failures

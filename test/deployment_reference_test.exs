@@ -144,6 +144,120 @@ defmodule DeploymentReferenceTest do
     assert Imp.get(after_failures, :team) == "quill"
   end
 
+  test "fixed outer repetitions select the better expected two-stage program and load fresh" do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-deployment-repetitions-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    [train | _] = ImpDeployment.Workflow.trainset()
+    [selection | _] = ImpDeployment.Workflow.selection_set()
+    [test | _] = ImpDeployment.Workflow.testset()
+
+    data = Imp.Experiment.Data.new(train: [train], selection: [selection], test: [test])
+    optimizer = Imp.Optimizer.LabeledFewShot.new(k: 1, sample: false)
+
+    single_state =
+      start_supervised!(
+        Supervisor.child_spec(
+          {Agent, fn -> %{baseline: 0, optimized: 0} end},
+          id: make_ref()
+        )
+      )
+
+    assert {:ok, single} =
+             Imp.context([lm: noisy_routing_lm(single_state)], fn ->
+               Imp.Experiment.check(
+                 ImpDeployment.Workflow.program(),
+                 optimizer,
+                 data,
+                 &ImpDeployment.Workflow.metric/2
+               )
+             end)
+
+    assert single.selected == :baseline
+    assert single.baseline_selection.score == 1.0
+    assert single.optimized_selection.score == 0.0
+    assert single.repetition_summary == nil
+
+    repeated_state =
+      start_supervised!(
+        Supervisor.child_spec(
+          {Agent, fn -> %{baseline: 0, optimized: 0} end},
+          id: make_ref()
+        )
+      )
+
+    assert {:ok, repeated} =
+             Imp.context([lm: noisy_routing_lm(repeated_state)], fn ->
+               Imp.Experiment.check(
+                 ImpDeployment.Workflow.program(),
+                 optimizer,
+                 data,
+                 &ImpDeployment.Workflow.metric/2,
+                 artifact_id: "repeated-selected",
+                 compare_baseline_on_test: true,
+                 evaluation_options: [repetitions: 3, aggregation: :mean]
+               )
+             end)
+
+    assert repeated.selected == :optimized
+    assert_in_delta repeated.baseline_selection.score, 1 / 3, 1.0e-12
+    assert_in_delta repeated.optimized_selection.score, 2 / 3, 1.0e-12
+    assert repeated.repetition_summary.paired_deltas.selection == [-1.0, 1.0, 1.0]
+    assert repeated.repetition_summary.paired_deltas.test == [-1.0, 1.0, 1.0]
+    assert repeated.repetition_summary.outer_row_evaluations.total == 12
+
+    result_path = Path.join(root, "result.json")
+    artifact_path = Path.join(root, "artifact.json")
+    receipt_path = Path.join(root, "fresh.json")
+    :ok = Imp.Experiment.Result.write!(repeated, result_path)
+    :ok = Imp.Optimizer.Artifact.write!(repeated.artifact, artifact_path)
+
+    assert %{"schema_version" => 3, "payload" => payload} =
+             Imp.Experiment.Result.read!(result_path)
+
+    assert payload["artifact"] == Imp.Optimizer.Artifact.read!(artifact_path)
+    assert payload["repetitions"]["outer_row_evaluations"]["total"] == 12
+
+    support_pipeline = Path.join(@example_root, "lib/imp_deployment/support_pipeline.ex")
+
+    code = """
+    Code.require_file(#{inspect(support_pipeline)})
+    artifact = Imp.Optimizer.Artifact.read!(#{inspect(artifact_path)})
+    program = Imp.Optimizer.Artifact.apply(artifact, ImpDeployment.SupportPipeline.new())
+    lm = Imp.LM.Static.new(handler: fn messages, _opts ->
+      rendered = Enum.map_join(messages, "\\n", & &1.content)
+      if String.contains?(rendered, "`team`") do
+        %{team: "atlas", urgency: "normal"}
+      else
+        %{analysis: "fresh two-stage analysis"}
+      end
+    end)
+    {:ok, prediction} = Imp.context([lm: lm], fn ->
+      Imp.call(program, %{ticket: "Fresh invoice question"})
+    end)
+    File.write!(#{inspect(receipt_path)}, Jason.encode!(%{
+      team: Imp.get(prediction, :team),
+      champion: Imp.Optimizer.Artifact.inspect(artifact).champion_id
+    }))
+    """
+
+    assert {"", 0} =
+             System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+               cd: File.cwd!(),
+               env: [{"MIX_ENV", "test"}],
+               stderr_to_stdout: true
+             )
+
+    assert %{"team" => "atlas", "champion" => "repeated-selected"} =
+             receipt_path |> File.read!() |> Jason.decode!()
+  end
+
   test "reference OTP server loads a checksummed registry-backed artifact and serves calls" do
     path =
       Path.join(System.tmp_dir!(), "imp-deployment-#{System.unique_integer([:positive])}.json")
@@ -335,6 +449,37 @@ defmodule DeploymentReferenceTest do
     start_supervised!(
       {ImpDeployment.ProgramServer,
        name: nil, task_supervisor: task_supervisor, program: program, lm: lm}
+    )
+  end
+
+  defp noisy_routing_lm(state) do
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        rendered = Enum.map_join(messages, "\n", & &1.content)
+
+        if String.contains?(rendered, "`team`") do
+          optimized? = Enum.any?(messages, &(Map.get(&1, :role) in [:assistant, "assistant"]))
+          key = if optimized?, do: :optimized, else: :baseline
+
+          index =
+            Agent.get_and_update(
+              state,
+              &{Map.fetch!(&1, key), Map.update!(&1, key, fn n -> n + 1 end)}
+            )
+
+          correct? =
+            Enum.at(
+              if(optimized?, do: [false, true, true], else: [true, false, false]),
+              rem(index, 3)
+            )
+
+          if correct?,
+            do: %{team: "atlas", urgency: "normal"},
+            else: %{team: "harbor", urgency: "high"}
+        else
+          %{analysis: "two-stage analysis"}
+        end
+      end
     )
   end
 

@@ -206,6 +206,31 @@ reads the test split. If optimization, evaluation, artifact construction, or
 artifact application fails, the function returns the failed stage instead of
 a partial success.
 
+Language-model outputs can be noisy even when the program and rows are
+unchanged. When one lucky or unlucky pass could decide selection, predeclare a
+fixed repeat count:
+
+```elixir
+{:ok, result} =
+  Imp.Experiment.check(program, optimizer, data, metric,
+    evaluation_options: [repetitions: 3, aggregation: :mean]
+  )
+
+result.repetition_summary.paired_deltas.selection
+```
+
+Imp runs every outer selection and test stage three times over the same ordered
+row identities, selects by the arithmetic mean, and records each run plus the
+paired candidate-minus-baseline deltas. Calls and row-evaluation opportunity
+multiply by the repeat count. The default remains one pass and keeps the
+ordinary schema-2 result shape; repeated checks write one additional redacted
+summary in schema 3, with detailed rows still opt-in.
+
+This policy does not repeat or otherwise change an optimizer's internal search
+objective. It improves the final Experiment admission decision; it does not
+retroactively change earlier results or turn a noisy negative benchmark into a
+positive one.
+
 This is the best default for an application or a bounded experiment. Use
 `Imp.optimize/3..5` directly when you deliberately need an optimizer's native
 return value or lifecycle.

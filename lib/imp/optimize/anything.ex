@@ -57,7 +57,7 @@ defmodule Imp.Optimize.Anything do
   Values must already be canonical JSON so a fresh VM can restore them without
   creating atoms or loading executable code.
   """
-  @spec to_artifact(Result.t(), keyword()) :: OptimizerArtifact.artifact()
+  @spec to_artifact(struct(), keyword()) :: Imp.Optimizer.Artifact.artifact()
   def to_artifact(result, opts \\ [])
 
   def to_artifact(%Result{} = result, opts) when is_list(opts) do
