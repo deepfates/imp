@@ -562,3 +562,18 @@ moved from `$17.467214985` to `$17.571419235` during the run, an observed-window
 delta of `$0.10420425`; it is not manufactured per-request attribution. Adding
 the separately conservative approximately `$0.837644` Behold amount gives a
 current unknown-inclusive workshop upper of `$18.409063235`.
+
+The stop also falsified one part of the frozen safety arithmetic. Pinned DSPy
+MIPRO still executes three bootstrap arms when both retained-demo limits are
+zero, then discards those demos after the calls advance shared RNG. With four
+candidates and 16 train rows, that is at most 48 two-stage trajectories, or 96
+task transports per seed. The declared 2,904-task Stage 1 ceiling incorrectly
+counted zero bootstrap transports. The source-correct outer ceiling would have
+been 3,192 task plus 33 optimizer transports, `$46.787328` at the frozen rates;
+against the post-stop current upper it would expose at most `$65.196391235`.
+This correction does not reinterpret the stopped run or authorize another one.
+
+For this stop, source order bounds task transports to 32--64 baseline-selection
+transports plus 1--96 bootstrap transports; no optimizer-summary/proposal
+transport occurred because bootstrap precedes dataset grounding. The missing
+underlying trajectory diagnostic and telemetry prevent a narrower honest count.
