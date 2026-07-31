@@ -2221,6 +2221,29 @@ before launch to `$29.170792035` afterward, a `$2.71346055` observed delta. It
 is the strongest available cost bound but is not per-call attribution; the
 ordinary path does not persist an exact HTTP transport ledger.
 
+## HoVer/PAPILLON training-only calibration checkpoint
+
+Exact clean commit `5f188fb1404c1f7a9181860a63fcf91bc66a3d75`
+passed independent provider-disabled review. It binds only the two released
+HoVer training rows and one PUPA training row, with no validation/test access,
+and executes a fixed 96-opportunity schedule: 48 Imp and 48 pinned-DSPy task or
+judge transports. The prospective guard refuses before transport whenever
+cumulative observed cost plus the next legal reservation would exceed `$5.00`.
+Raw PUPA material and runtime evidence remain private under `0700` directories
+and `0600` files; tracked and reachable Git contain only source coordinates and
+digests. The default focused test is offline, while the explicit
+`evidence_infrastructure` test authenticates and privately materializes the
+pinned source and completes both real provider-disabled program graphs.
+
+This checkpoint is instrument calibration only. It earns no optimizer
+effectiveness, Imp/upstream parity, or historical-artifact reproduction claim,
+and it grants no provider authority. Live execution remains blocked at a real
+owner/account boundary: this environment has no direct `OPENAI_API_KEY`, no
+dedicated `OPENAI_PROJECT`, and no current verified ZDR attestation or timestamp.
+Both runtime scripts intentionally refuse `--live`; later execution requires an
+owner-provided direct project/account with current ZDR verification and a
+separate explicit live disposition.
+
 ## Notes
 
 **2026-07-31T20:57:09Z**
