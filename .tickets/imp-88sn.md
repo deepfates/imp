@@ -1760,3 +1760,57 @@ The legal maximum remains 2,880 task plus 36 reflection transports and
 predictors, selected/wrote/read/applied the Artifact, preserved JSON adapters
 in a fresh process, and served four concurrent calls. This establishes
 runnability only; the JSON treatment has no live outcome before launch.
+
+### Terminal JSON treatment outcome (`b37ff51`)
+
+`imp-88sn-hotpotqa-json-gepa-v1` completed all three frozen seeds through the
+ordinary Experiment, GEPA, Result, Artifact, fresh-OS, and concurrent
+ProgramServer lifecycle. This is a clean negative for the named
+task/model/budget condition, not a product stop and not a general GEPA claim.
+
+| Seed | Selection baseline -> optimized | Selected artifact | Held-out baseline -> selected F1 | Causal lift | Held-out EM baseline -> selected |
+|---|---:|---|---:|---:|---:|
+| `2026080101` | `0.520833 -> 0.607051` | optimized | `0.757143 -> 0.725926` | `-0.031217` | `0.597222 -> 0.680556` |
+| `2026080102` | `0.535501 -> 0.633333` | optimized | `0.779365 -> 0.764815` | `-0.014550` | `0.625000 -> 0.597222` |
+| `2026080103` | `0.516667 -> 0.516667` | baseline on tie | `0.715873 -> 0.733069` replay | `0` | `0.569444 -> 0.569444` |
+
+The selected-artifact causal lifts are therefore `-0.031217`, `-0.014550`,
+and `0`: mean `-0.015256`, with `0/3` positive seeds. The frozen primary
+(`>= 0.05` mean F1 lift and at least two positive seeds) failed. Seed 3's
+same-baseline replay difference `+0.017196` is provider nondeterminism, not
+optimizer credit. A 100,000-resample row-paired bootstrap over the 24 rows
+after averaging each row's three repetitions gave replay-difference intervals
+`[-0.154762, 0.073148]`, `[-0.100529, 0.082011]`, and
+`[-0.050926, 0.097222]`; the third seed's causal interval by selected-artifact
+identity is `[0, 0]`. These row intervals do not measure seed or model
+variability.
+
+Each optimizer used 32 metric examples and 8 reflection transports, produced
+three candidates, and rejected one candidate. Seeds 1 and 2 selected programs
+whose four named instructions changed and whose demos remained empty; seed 3
+retained the unchanged baseline. Final outer evaluation retained no errors in
+seed 2 or 3. Seed 1 retained six strict selected-test parse diagnostics across
+72 repeated row evaluations; selection and baseline test remained error-free.
+All three fresh services returned four successful concurrent four-stage calls.
+
+The execution made the expected 912 task transports and 8 reflection
+transports per seed (2,736 and 24 total), with one-attempt/no-fallback settings.
+The account usage snapshots immediately bracketing the run moved from
+`$22.731487485` to `$26.449702485`, an account-level delta of `$3.718215`;
+that is the strongest native cost evidence, not a per-response attribution
+claim. The later read-only snapshot was `$26.457331485`. The legal
+`$49.655808` reservation was not approached.
+
+The private mode-0700 output root is
+`/var/folders/h6/q8syhnmx1mq07kl_hm4p5jx40000gn/T/imp-hotpotqa-json-gepa-live-4zCbRQUa`;
+every retained file is mode 0600. Result SHA-256 values are
+`67f52f72ecb4ca4aa3322ede0652e4dab7b43b2a31d112ee17baeefa79427632`,
+`7dc79e9370f70a4b0884ff823e7f2d5a782a70bec73cf0ccf1cf2c4d79b24d92`,
+and `1d05b57f6e7163e380422aa31bcf5c7eea04d24693d75222f1197421186ff05d`.
+Artifact SHA-256 values are
+`1f1d534506ff14dd0a38d2c228b20b386fa93a062830ab1016e4bcc5d9f9d27a`,
+`569ab9dec4b3592d7f606b4f82d4b9afb49efb8d61287459aa41e9d24c9be99d`,
+and `ed66e07ec177948f48a2a96b14c74b0133c1c7bd3c61d669595540cc4261d3af`.
+The terminal Chat condition and its artifacts remain separate and unchanged.
+This negative does not satisfy the open multi-stage usefulness acceptance in
+this ticket.
