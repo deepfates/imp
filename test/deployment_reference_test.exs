@@ -354,6 +354,46 @@ defmodule DeploymentReferenceTest do
     assert Process.alive?(server)
   end
 
+  test "concurrent calls preserve successful and returned structured error identities" do
+    parse_error = %Imp.AdapterParseError{
+      message: "strict chat marker was malformed",
+      reason: :missing_output_marker
+    }
+
+    safety_error = %Imp.OperationalSafetyError{
+      message: "input envelope exceeded",
+      kind: :budget,
+      reason: {:input_bytes, 9_001, 8_192}
+    }
+
+    executor = fn _program, _lm, input ->
+      case input do
+        :ok -> {:ok, Imp.Prediction.new(answer: "ok")}
+        :parse -> {:error, parse_error}
+        :safety -> {:error, safety_error}
+      end
+    end
+
+    {server, _task_supervisor} = start_runtime(executor, max_children: 3)
+
+    results =
+      [:ok, :parse, :safety]
+      |> Task.async_stream(&deployment_call(server, &1, 1_000),
+        ordered: true,
+        max_concurrency: 3,
+        timeout: 1_000
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    assert [
+             {:ok, %Imp.Prediction{}},
+             {:error, ^parse_error},
+             {:error, ^safety_error}
+           ] = results
+
+    assert Process.alive?(server)
+  end
+
   test "bounded workers reject excess calls without disturbing in-flight work" do
     test_pid = self()
 

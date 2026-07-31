@@ -267,6 +267,7 @@ defmodule HotPotQAGEPA do
         stderr_to_stdout: true
       )
 
+    IO.write(output)
     if status != 0, do: raise("fresh OS service failed: #{output}")
   end
 
@@ -305,6 +306,7 @@ defmodule HotPotQAGEPA do
         )
         |> Enum.map(fn {:ok, value} -> value end)
 
+      IO.puts(Jason.encode!(%{fresh_service_results: summarize_service_results(results)}))
       true = Enum.all?(results, &match?({:ok, _}, &1))
       IO.puts("fresh OS service passed with four concurrent four-stage calls")
     after
@@ -328,6 +330,29 @@ defmodule HotPotQAGEPA do
           "Whose engine was discussed in Ada Lovelace's notes?"
         ],
         do: %{question: question, context: context}
+  end
+
+  defp summarize_service_results(results) do
+    results
+    |> Enum.with_index()
+    |> Enum.map(fn
+      {{:ok, _prediction}, index} ->
+        %{index: index, status: "ok"}
+
+      {{:error, reason}, index} ->
+        %{
+          index: index,
+          status: "error",
+          reason: reason |> Imp.Redaction.redact() |> inspect(limit: 20, printable_limit: 1_000)
+        }
+
+      {other, index} ->
+        %{
+          index: index,
+          status: "invalid_result",
+          reason: other |> Imp.Redaction.redact() |> inspect(limit: 20, printable_limit: 1_000)
+        }
+    end)
   end
 
   defp provider_lm(role, seed) do

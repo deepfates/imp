@@ -141,6 +141,18 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
     assert result["fresh_service"] == "passed"
     assert result["prompt_bytes"]["task"] <= 8_192
     assert result["prompt_bytes"]["optimizer"] <= 131_072
+
+    fresh_summary =
+      output
+      |> String.split("\n", trim: true)
+      |> Enum.map(&Jason.decode/1)
+      |> Enum.find_value(fn
+        {:ok, %{"fresh_service_results" => summaries}} -> summaries
+        _ -> nil
+      end)
+
+    assert fresh_summary ==
+             for(index <- 0..3, do: %{"index" => index, "status" => "ok"})
   end
 
   test "entry uses public product APIs and names its BEAM-native selector" do
@@ -155,6 +167,7 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
     assert source =~ "data_collection: \"deny\""
     assert source =~ "input_envelope: [max_bytes: max_bytes, reservation_tokens: envelope.input]"
     assert source =~ "Req.Response.new(status: 200"
+    assert source =~ "summarize_service_results(results)"
     refute source =~ "max_input_tokens:"
 
     refute source =~ "Imp.BenchmarkTruth"
