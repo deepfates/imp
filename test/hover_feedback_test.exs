@@ -100,6 +100,80 @@ defmodule Imp.BenchmarkTruth.HoverFeedbackTest do
     end
   end
 
+  test "public GEPA reflection reaches every named HoVer predictor" do
+    owner = self()
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
+
+          cond do
+            prompt =~ "`summary`" -> %{reasoning: "evidence", summary: "alpha beta gamma"}
+            prompt =~ "`query`" -> %{reasoning: "bridge", query: "gamma"}
+          end
+        end
+      )
+
+    retriever = fn _query, _opts ->
+      {:ok,
+       [
+         %{title: "Alpha", text: "one"},
+         %{title: "Beta", text: "two"},
+         %{title: "Gamma", text: "three"}
+       ]}
+    end
+
+    program = HoverMultiHop.from_retriever(task_lm, retriever)
+
+    callbacks =
+      HoverFeedback.callbacks()
+      |> Map.new(fn {name, callback} ->
+        {name,
+         fn context ->
+           send(owner, {:hover_feedback, name, context.component})
+           callback.(context)
+         end}
+      end)
+
+    proposer = fn candidate, _records, components ->
+      send(owner, {:hover_reflection, components})
+
+      %{new_texts: Map.new(components, &{&1, Map.fetch!(candidate, &1) <> " Improved."})}
+    end
+
+    example =
+      Imp.example(claim: "Alpha connects to Gamma", supporting_facts: [%{key: "Gamma"}])
+      |> Imp.with_inputs(:claim)
+
+    {_selected, report} =
+      Imp.Optimizer.GEPA.new(fn _example, _prediction -> 0.0 end,
+        generations: 4,
+        minibatch_size: 1,
+        module_selector: :round_robin,
+        reflection_strategy: proposer,
+        component_feedback: callbacks
+      )
+      |> Imp.Optimizer.GEPA.compile_with_report(program, [example], [example])
+
+    reflected =
+      for _ <- 1..4 do
+        assert_receive {:hover_reflection, [component]}
+        component
+      end
+
+    assert reflected == [:summarize1, :create_query_hop2, :summarize2, :create_query_hop3]
+
+    feedback =
+      for _ <- 1..4 do
+        assert_receive {:hover_feedback, component, component}
+        component
+      end
+
+    assert Enum.sort(feedback) == Enum.sort(reflected)
+    assert report.metadata.reflection_calls == 4
+  end
+
   defp context(component, predictor_inputs, opts \\ []) do
     final_docs =
       if Keyword.get(opts, :include_gamma?, false),

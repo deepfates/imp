@@ -2162,3 +2162,9 @@ finite error policy. Account-level usage moved from `$26.457331485` immediately
 before launch to `$29.170792035` afterward, a `$2.71346055` observed delta. It
 is the strongest available cost bound but is not per-call attribution; the
 ordinary path does not persist an exact HTTP transport ledger.
+
+## Notes
+
+**2026-07-31T20:57:09Z**
+
+Provider-free builder-readiness checkpoint (2026-07-31): HoVer public GEPA round-robin reflection exercised all four source-named predictors with component feedback; PAPILLON exercised both predictor-scoped reflective datasets. Repaired benchmark-local PAPILLON failure handling so released empty-field outputs and numeric scoring remain unchanged while redacted stage/judge diagnostics are reconstructable, and typed operational-safety errors remain fatal. GEPA accepted-candidate reports now retain ordered per-row scores alongside candidate identity, diagnostics, and metric/reflection call counts. Public GEPA compiled both benchmark-local graphs to schema-3 Artifacts; a fresh BEAM reconstructed and rebound HoVer retriever/task LM and PAPILLON trusted/untrusted/judge clients, applied each Artifact, and executed both tasks. Authority/config already pin HoVer 150/300/300 with budget 7051 and PAPILLON 111/111/221 with budget 2426 to gepa-artifact cbefbc1; bench/benchmarks remain excluded from Hex. Arithmetic correction for the proposed 4-arm x 2-runtime x 5-seed core: those are program/evaluator invocations, not LM transports; task-specific expansion is at least 1,710,400 LM/judge transports (HoVer 7051*4*40 + PAPILLON 2426*6*40), before conservative reservation/framing. This is $0 lifecycle readiness, not effectiveness or budget authorization.

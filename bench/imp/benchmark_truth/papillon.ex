@@ -29,17 +29,26 @@ defmodule Imp.BenchmarkTruth.Papillon do
   def call(%__MODULE__{} = program, inputs) do
     with {:ok, user_query} <- fetch_user_query(inputs),
          {:ok, craft_prediction} <-
-           Imp.Module.call(program.craft_redacted_request, %{user_query: user_query}),
-         llm_request <- Imp.Prediction.fetch!(craft_prediction, :llm_request),
-         {:ok, raw_llm_response} <- call_untrusted_model(program.untrusted_model, llm_request),
-         {:ok, llm_response} <- untrusted_response(raw_llm_response),
+           stage(:craft_redacted_request, fn ->
+             Imp.Module.call(program.craft_redacted_request, %{user_query: user_query})
+           end),
+         {:ok, llm_request} <-
+           prediction_field(:craft_redacted_request, craft_prediction, :llm_request),
+         {:ok, raw_llm_response} <-
+           stage(:untrusted_model, fn ->
+             call_untrusted_model(program.untrusted_model, llm_request)
+           end),
+         {:ok, llm_response} <-
+           stage(:untrusted_model, fn -> untrusted_response(raw_llm_response) end),
          {:ok, response_prediction} <-
-           Imp.Module.call(program.respond_to_query, %{
-             related_llm_request: llm_request,
-             related_llm_response: llm_response,
-             user_query: user_query
-           }),
-         response <- Imp.Prediction.fetch!(response_prediction, :response) do
+           stage(:respond_to_query, fn ->
+             Imp.Module.call(program.respond_to_query, %{
+               related_llm_request: llm_request,
+               related_llm_response: llm_response,
+               user_query: user_query
+             })
+           end),
+         {:ok, response} <- prediction_field(:respond_to_query, response_prediction, :response) do
       {:ok,
        Imp.Prediction.new(
          llm_request: llm_request,
@@ -47,12 +56,17 @@ defmodule Imp.BenchmarkTruth.Papillon do
          response: response
        )}
     else
-      _failure -> empty_prediction()
+      {:error, {:papillon_stage_failed, stage, reason}} -> empty_prediction(stage, reason)
+      {:error, reason} -> empty_prediction(:input, reason)
     end
   rescue
-    _error -> empty_prediction()
+    error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
+      empty_prediction(:papillon, error)
   catch
-    _kind, _reason -> empty_prediction()
+    kind, reason ->
+      Imp.OperationalSafetyError.raise_if_present!({kind, reason})
+      empty_prediction(:papillon, {kind, reason})
   end
 
   @impl true
@@ -130,7 +144,45 @@ defmodule Imp.BenchmarkTruth.Papillon do
     end
   end
 
-  defp empty_prediction do
-    {:ok, Imp.Prediction.new(llm_request: "", llm_response: "", response: "")}
+  defp stage(name, fun) do
+    case fun.() do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        Imp.OperationalSafetyError.raise_if_present!(reason)
+        {:error, {:papillon_stage_failed, name, reason}}
+
+      other ->
+        {:error, {:papillon_stage_failed, name, {:invalid_stage_result, other}}}
+    end
+  rescue
+    error ->
+      Imp.OperationalSafetyError.raise_if_present!(error)
+      {:error, {:papillon_stage_failed, name, error}}
+  catch
+    kind, reason ->
+      Imp.OperationalSafetyError.raise_if_present!({kind, reason})
+      {:error, {:papillon_stage_failed, name, {kind, reason}}}
+  end
+
+  defp prediction_field(stage, prediction, field) do
+    case Imp.Prediction.get(prediction, field) do
+      value when is_binary(value) -> {:ok, value}
+      value -> {:error, {:papillon_stage_failed, stage, {:invalid_output, field, value}}}
+    end
+  end
+
+  defp empty_prediction(stage, reason) do
+    diagnostic = %{
+      stage: stage,
+      reason: Imp.Redaction.redact(reason)
+    }
+
+    {:ok,
+     Imp.Prediction.new(
+       %{llm_request: "", llm_response: "", response: ""},
+       metadata: %{papillon_failure: diagnostic}
+     )}
   end
 end

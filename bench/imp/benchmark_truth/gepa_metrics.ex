@@ -2387,9 +2387,17 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
            {:ok, leaked_count} <- papillon_leakage_count(leakage_judge, pii, updated_query) do
         quality = judgment_1 or judgment_1 == judgment_2
         leakage = if pii == [], do: 0.0, else: leaked_count / length(pii)
-        (boolean_score(quality) + (1.0 - leakage)) / 2.0
+        score = (boolean_score(quality) + (1.0 - leakage)) / 2.0
+        papillon_result(score, prediction)
       else
-        _error -> 0.0
+        error ->
+          Imp.OperationalSafetyError.raise_if_present!(error)
+
+          %Imp.Metrics.Result{
+            score: 0.0,
+            passed?: false,
+            metadata: %{imp_metric_error: Imp.Redaction.redact(error)}
+          }
       end
     end
   end
@@ -2402,6 +2410,21 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
          }) do
       {:ok, prediction} -> {:ok, truthy?(Imp.Prediction.get(prediction, :judgment))}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp papillon_result(score, %Imp.Prediction{metadata: metadata}) do
+    case Map.get(metadata, :papillon_failure) do
+      nil ->
+        score
+
+      diagnostic ->
+        %Imp.Metrics.Result{
+          score: score,
+          passed?: score > 0,
+          feedback: %{diagnostic_only: true, error: diagnostic},
+          metadata: %{papillon_program_failure: diagnostic}
+        }
     end
   end
 

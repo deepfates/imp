@@ -115,6 +115,7 @@ defmodule Imp.Optimizer.Report do
     "rejected_candidates" => :rejected_candidates,
     "sampling_strategy" => :sampling_strategy,
     "score" => :score,
+    "scores" => :scores,
     "selection" => :selection,
     "selection_strategy" => :selection_strategy,
     # Optimize Anything stores the adapter's evaluation envelope in public

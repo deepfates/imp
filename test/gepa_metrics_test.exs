@@ -1,6 +1,19 @@
 defmodule GepaMetricsTest do
   use ExUnit.Case, async: false
 
+  defmodule FailingJudgeLM do
+    defstruct [:reason]
+    def generate(%__MODULE__{reason: reason}, _messages, _opts), do: {:error, reason}
+  end
+
+  defmodule FixedProgram do
+    @behaviour Imp.Module
+    defstruct [:prediction]
+
+    @impl true
+    def call(%__MODULE__{prediction: prediction}, _inputs), do: {:ok, prediction}
+  end
+
   test "AIME metric parses integer answers exactly" do
     metric =
       Imp.BenchmarkTruth.GepaMetrics.metric(%{
@@ -51,6 +64,80 @@ defmodule GepaMetricsTest do
            )
 
     refute metric.(example, Imp.prediction(retrieved_docs: ["Alpha Page | text"]))
+  end
+
+  test "Papillon judge failures keep ordered scorer inputs and structured diagnostics" do
+    metric =
+      Imp.BenchmarkTruth.GepaMetrics.metric(
+        %{"upstream_metric" => "papillon_utils.compute_overall_score"},
+        judge_lm: %FailingJudgeLM{reason: :judge_unavailable}
+      )
+
+    example =
+      Imp.example(
+        user_query: "private question",
+        target_response: "target answer",
+        pii_str: "alice@example.com"
+      )
+      |> Imp.with_inputs(:user_query)
+
+    prediction =
+      Imp.prediction(
+        llm_request: "redacted question",
+        llm_response: "external answer",
+        response: "final answer"
+      )
+
+    # Use the public evaluator with a minimal program so the retained row is
+    # exactly the scorer input users can inspect after a judge failure.
+    callable = %FixedProgram{prediction: prediction}
+
+    result =
+      Imp.Evaluate.new([example], metric, max_errors: :infinity, failure_score: 0.0)
+      |> Imp.Evaluate.run(callable)
+
+    assert [%{index: 0, example: ^example, prediction: ^prediction, score: +0.0} = row] =
+             result.rows
+
+    assert %{imp_metric_error: {:error, :judge_unavailable}} = row.metric_metadata
+    assert [%{index: 0, stage: :metric, reason: {:error, :judge_unavailable}}] = result.errors
+  end
+
+  test "Papillon task failures keep the released score and remain diagnostic-only" do
+    judge =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
+
+          if prompt =~ "num_pii_leaked",
+            do: %{reasoning: "none", num_pii_leaked: 0},
+            else: %{reasoning: "equal", judgment: true}
+        end
+      )
+
+    metric =
+      Imp.BenchmarkTruth.GepaMetrics.metric(
+        %{"upstream_metric" => "papillon_utils.compute_overall_score"},
+        judge_lm: judge
+      )
+
+    example =
+      Imp.example(user_query: "q", target_response: "", pii_str: "")
+      |> Imp.with_inputs(:user_query)
+
+    diagnostic = %{stage: :untrusted_model, reason: :offline}
+
+    prediction =
+      Imp.Prediction.new(
+        %{llm_request: "", llm_response: "", response: ""},
+        metadata: %{papillon_failure: diagnostic}
+      )
+
+    assert %Imp.Metrics.Result{
+             score: 1.0,
+             feedback: %{diagnostic_only: true, error: ^diagnostic},
+             metadata: %{papillon_program_failure: ^diagnostic}
+           } = metric.(example, prediction)
   end
 
   test "IFBench metric scores instruction-following constraints fractionally over upstream variants" do

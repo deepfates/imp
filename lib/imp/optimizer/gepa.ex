@@ -531,6 +531,7 @@ defmodule Imp.Optimizer.GEPA do
 
         %{
           score: entry.validation.aggregate_score,
+          scores: entry.validation.scores,
           instruction: primary_instruction(entry.candidate),
           parameters: entry.candidate,
           id: candidate_id(entry.id),
