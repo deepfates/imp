@@ -880,10 +880,11 @@ Three existing candidates were compared:
   two-stage `analyze_intent -> classify_route` program, exact label accuracy,
   `Experiment.check`, linked `Result`/`Artifact`, and fresh concurrent
   `ProgramServer` service. Both stages can do real work: the analyzer extracts
-  payment state and evidence; the router distinguishes fee charged, payment
-  not recognized, pending payment, and reverted payment. The route instruction
-  must disclose that semantic mapping. A secret opaque-code mapping would
-  manufacture baseline weakness rather than test useful optimization.
+  payment state and evidence; the router distinguishes eight already-declared
+  intents spanning card-payment state, transfers, exchange, physical cards,
+  and source-of-funds verification. The route instruction must disclose that
+  semantic mapping. A secret opaque-code mapping would manufacture baseline
+  weakness rather than test useful optimization.
 - **TREC is worse for this question.** Its successful matched GEPA/MIPRO result
   is a one-predictor classifier. Turning it into a genuinely two-stage program
   would create a new task graph merely to revisit a task that already supplies
@@ -905,13 +906,13 @@ source authority is the already-pinned `PolyAI/banking77` revision
 `796a4623935746f71378f0ebd435635a8ce08e50`, whose train/test parquet digests
 are already recorded in `grpo-usefulness-banking77-v1.json`.
 
-If approved, derive 24 train, 24 selection, and 48 test rows from the four
-card-payment labels above: 6/6/12 per label. Before choosing any row, exclude
+If approved, derive 24 train, 24 selection, and 48 test rows from all eight
+declared labels: 3/3/6 per label. Before choosing any row, exclude
 the full retained exposure union by both `(source split, source index)` and
 normalized utterance digest across the `796a...` and `90d4...` snapshots. Then
-order the remaining rows by SHA-256 of
-`imp-88sn-banking77-mipro-v1:split:label:source-index:text` and take the first
-required count. This is deterministic, balanced, independent of model outcome,
+order the remaining rows by SHA-256 of the committed seed, split, label id, and
+normalized-text digest, using raw-text digest and source index only as collision
+tie-breakers. This is deterministic, balanced, independent of model outcome,
 and uses the source train split for train/selection and the source test split
 only for untouched test. At freeze time the derivation must also scan retained
 ignored experiment roots for any additional source coordinate or text digest;
@@ -919,11 +920,11 @@ any hit joins the exclusion set. No difficulty filtering or row replacement is
 allowed.
 
 This condition has plausible headroom without pathological row selection: the
-four intents are naturally confusable, but their meanings and route mapping are
-given to the program. Prior Banking77 runs establish that this task family is
-nontrivial and learnable; they do not predict this new split's outcome. If the
-strong baseline saturates, that is a clean lack-of-opportunity result, not a
-reason to choose harder rows.
+eight intents include naturally confusable cases, but their meanings and route
+mapping are given to the program. Prior Banking77 runs establish that this task
+family is nontrivial and learnable; they do not predict this new split's
+outcome. If the strong baseline saturates, that is a clean lack-of-opportunity
+result, not a reason to choose harder rows.
 
 ### Compact staged MIPRO design
 
@@ -969,10 +970,114 @@ dashboard, ledger, or new result type is needed: the Imp arm is the existing
 later matched arm must first prove its ordinary DSPy module renders the same
 two-stage messages provider-free.
 
-The exact claim on success is limited to: *on one source-disjoint, four-intent
+The exact claim on success is limited to: *on one source-disjoint, eight-intent
 Banking77 split under the named models, three seeds, and compact MIPRO budget,
 current Imp MIPRO improved its two-stage program over its own baseline and
 produced a reusable fresh-served artifact.* A clean negative earns no
 effectiveness claim. A runtime, safety, persistence, or artifact failure is an
 inconclusive product defect. IFBench remains only a pinned provider-free
 compatibility/scorer regression and receives no further provider work.
+
+## Banking77 MIPRO Stage 1 frozen checkpoint
+
+Scientific review expanded the recommended condition from four to all eight
+Banking77 labels already declared by Imp's two retained source snapshots. This
+is still one exact-label task, not eight separately selected tasks. No model
+outcome was inspected while deriving the complement.
+
+The pre-selection exposure scan at parent commit `79daf9b` read 85 unique
+Banking77-related JSON records: 63 tracked files and 22 ignored retained-result
+or temporary files, including package copies. Every file parsed. The union is
+exactly 240 source coordinates (160 train, 80 test) and 240 normalized utterance
+digests across eight labels. Ignored roots added no coordinate or text outside
+the tracked union. Normalization is Unicode NFKC, casefold, whitespace collapse,
+and strip. The complete file hashes, source IDs, coordinates, and normalized
+digests are retained inside the frozen public dataset; there is no unread-file
+residual uncertainty.
+
+The result-blind derivation uses pinned `PolyAI/banking77` revision
+`796a4623935746f71378f0ebd435635a8ce08e50`. Its train parquet is 10,003 rows,
+295,235 bytes, SHA-256 `4526edfa...e0390`; its test parquet is 3,080 rows,
+92,969 bytes, SHA-256 `535fc96c...410be`. The combined canonical source
+description has SHA-256 `5b242094...6d00`. After excluding every exposed
+coordinate and normalized text, remaining rows are ordered by
+`sha256(imp-88sn-banking77-mipro-v1:split:label-id:normalized-text-digest)`;
+raw-text digest and source index are collision tie-breakers only. Per label the
+first three source-train rows become train, the next three become selection,
+and the first six source-test rows become test. No difficulty or baseline
+filter is present.
+
+The frozen file is
+`examples/deployment/data/banking77-mipro-stage1.json`, SHA-256
+`4934ebc54b06614343461c2fe79c7ca4807892c1b645cbb30790e945dcb2c34a`;
+its canonical payload SHA-256 is `040d6628...dafe`. Ordered split hashes are:
+
+- train 24 (3 per label): `ec42891d...1e44`;
+- selection 24 (3 per label): `3312228c...5ddd`;
+- untouched test 48 (6 per label): `dc921b77...e502`.
+
+`ImpDeployment.Banking77Pipeline` is the existing deployment example's exact
+analyzer-then-router program extracted into its package. The retained GEPA
+Artifact still applies to the default program. This condition configures eight
+typed routes and discloses their real meanings: fee charged, payment not
+recognized, declined transfer, exchange rate, physical card, pending payment,
+reverted payment, and source-of-funds verification. The analyzer must produce
+intent evidence without choosing a route; the router consumes that evidence
+and the original utterance. Both named predictors are visible and mutable
+through `Imp.Module`; the metric is native exact route accuracy.
+
+The thin ordinary entry is `examples/deployment/banking77_mipro.exs`. It uses
+only public `MIPROv2 -> Experiment.check -> Result/Artifact -> ProgramServer`
+surfaces. Seeds remain `2026072705/06/07`; settings are three instruction/demo
+candidates, six full categorical trials with two startup trials, at most two
+bootstrapped plus two labeled demos, pinned DSPy proposer and modeled Optuna
+TPE search, `max_errors: 10`, serial calls, no cache/retry/fallback/JSON
+fallback, strict validation selection, paired baseline/selected test on the
+identical 48 rows, schema-3 Artifact, and four fresh concurrent two-stage
+probes. The stock-DSPy arm remains absent and dormant.
+
+Per seed the legal task maximum is 680: 48 outer baseline-selection, 48
+bootstrap, 48 internal baseline, 288 across six trials, 48 outer optimized
+selection, 192 paired test, and 8 fresh service. Grounding costs four optimizer
+calls and the two predictors receive three proposals each, for 10 optimizer
+calls. Across three seeds the legal ceiling is **2,040 task + 30 optimizer**.
+Non-bootstrap task work is fixed at 632 per seed; the single calling bootstrap
+arm can finish after two accepted examples (4 two-stage transports) or scan all
+24 rows (48), so completed clean usage has an outcome-dependent range of
+1,908..2,040 task transports rather than a fabricated point estimate. At the
+last validated reservations, `2,040 * $0.007104 + 30 * $0.08064 = $16.91136`.
+This is a reservation maximum, not an input-token hard cap.
+
+Before calls, the primary remains mean own-baseline held-out accuracy lift
+`>= 0.05` with positive causal lift in at least two of three seeds. Forty-eight
+rows give `1/48 = 0.020833` resolution, so the threshold requires an average
+gain of at least 2.4 correct rows and needs no revision. Selection alone chooses
+the Artifact. Parameter-identical baseline/selected programs receive zero
+causal lift regardless of replay score movement. Report row-paired intervals
+within each seed and seed dispersion/sign count separately.
+
+Provider-disabled execution succeeds from the source example and unpacked Hex
+package, constructing the 24/24/48 `Experiment.Data`, both named predictors,
+the exact MIPRO configuration, and the call plan without a key or network.
+Focused MIPRO/Experiment/Artifact tests pass (34 tests), public surface passes
+(44/44), and full `package.check` passes (13 contract tests plus clean-room
+compile/release/workflow/fresh-load/provider-disabled entry). The entry contains
+no IFBench bridge, ledger, coordinator, manifest, dashboard, or new result
+schema.
+
+Read-only OpenRouter key status at `2026-07-31` reports `$9.797824425` daily
+usage and `$19.470044985` cumulative/monthly usage, with `$480.529955015` of the
+account limit remaining. Those are verified key totals, not guaranteed workshop
+attribution. Even conservatively assigning the whole monthly total to the
+workshop and adding the Stage-1 maximum gives `$36.381404985`, below the
+approximately `$100` workshop target.
+
+**Launch recommendation: RUN STAGE 1 after the required immediate live
+route/provider/privacy/price/no-retry preflight.** The exact claim on success is:
+*on one source-disjoint eight-intent Banking77 condition, under GPT-5.4 Mini,
+Claude Sonnet 4.6, three frozen seeds, and the stated compact budget, current Imp
+MIPRO improved its real two-stage program over its own baseline by mean at
+least 0.05 with at least two positive seeds and produced reusable fresh-served
+Artifacts.* A clean negative is valid and leaves the ticket open. A runtime,
+safety, persistence, or fresh-service failure is inconclusive. No provider
+authority was used at this checkpoint.

@@ -1,59 +1,9 @@
 Application.ensure_all_started(:imp)
 
-defmodule Banking77GEPA.Router do
-  @behaviour Imp.Module
-  defstruct [:analyze_intent, :classify_route]
-
-  def new do
-    %__MODULE__{
-      analyze_intent:
-        Imp.predict(
-          Imp.signature("utterance -> evidence", "Summarize the banking request for routing."),
-          adapter: Imp.Adapter.Chat,
-          config: [cache: false, json_fallback: false]
-        ),
-      classify_route:
-        Imp.predict(
-          Imp.signature(
-            "utterance, evidence -> route: enum[R17,R42,R68,R93]",
-            "Choose exactly one opaque route code."
-          ),
-          adapter: Imp.Adapter.Chat,
-          config: [cache: false, json_fallback: false]
-        )
-    }
-  end
-
-  @impl true
-  def optimizer_predictors(router),
-    do: [analyze_intent: router.analyze_intent, classify_route: router.classify_route]
-
-  @impl true
-  def update_optimizer_predictor(router, :analyze_intent, update),
-    do: %{router | analyze_intent: update.(router.analyze_intent)}
-
-  def update_optimizer_predictor(router, :classify_route, update),
-    do: %{router | classify_route: update.(router.classify_route)}
-
-  @impl true
-  def call(router, inputs) do
-    utterance = Map.get(Map.new(inputs), :utterance, Map.get(Map.new(inputs), "utterance"))
-
-    with true <- is_binary(utterance) || {:error, {:missing_input_fields, [:utterance]}},
-         {:ok, analysis} <- Imp.call(router.analyze_intent, %{utterance: utterance}),
-         evidence <- Imp.get(analysis, :evidence),
-         {:ok, prediction} <-
-           Imp.call(router.classify_route, %{utterance: utterance, evidence: evidence}) do
-      {:ok, prediction}
-    end
-  end
-end
-
 defmodule Banking77GEPA do
-  alias Banking77GEPA.Router
   alias Imp.Experiment.{Data, Result}
   alias Imp.Optimizer.{Artifact, GEPA}
-  alias ImpDeployment.ProgramServer
+  alias ImpDeployment.{Banking77Pipeline, ProgramServer}
 
   @dataset "../../benchmarks/data/grpo-usefulness-banking77-v1.json"
   @dataset_sha "2dc52c1b06002f44e03986d675cd05f078d4690fe3ee0a41be27c00c7135afb1"
@@ -82,7 +32,7 @@ defmodule Banking77GEPA do
       Imp.Observability.trace(fn ->
         Imp.context([lm: task_lm], fn ->
           Imp.Experiment.check(
-            Router.new(),
+            Banking77Pipeline.new(),
             GEPA.new(&metric/2,
               reflection_lm: optimizer_lm,
               generations: 1,
@@ -153,7 +103,7 @@ defmodule Banking77GEPA do
       {:ok, server} =
         ProgramServer.start_link(
           name: nil,
-          program: Router.new(),
+          program: Banking77Pipeline.new(),
           lm: lm(:task),
           task_supervisor: tasks
         )
