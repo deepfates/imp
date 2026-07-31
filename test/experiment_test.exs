@@ -406,6 +406,57 @@ defmodule Imp.ExperimentTest do
     refute_received {:optimizer_opts, _}
   end
 
+  test "explicit infinite error budget retains ordered score-zero diagnostics" do
+    owner = self()
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Answer the question.")
+      |> Imp.predict(
+        lm: %PretransportLM{owner: owner},
+        adapter: Imp.Adapter.Chat,
+        config: [cache: false, json_fallback: false]
+      )
+
+    data =
+      Data.new(
+        train: [row("train-id", "train")],
+        selection: [row("selection-id", "selection")],
+        test: [row("test-id", "test")],
+        id: :id
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [
+                 failure_score: 0.0,
+                 max_concurrency: 1,
+                 max_errors: :infinity
+               ]
+             )
+
+    assert result.selected == :baseline
+    assert result.baseline_selection.score == 0.0
+    assert result.optimized_selection.score == 0.0
+    assert result.test.score == 0.0
+
+    assert [%{index: 0, reason: {:request_validation_failed, _}}] =
+             result.baseline_selection.errors
+
+    assert [%{index: 0, reason: {:request_validation_failed, _}}] =
+             result.optimized_selection.errors
+
+    assert [%{index: 0, reason: {:request_validation_failed, _}}] = result.test.errors
+    assert length(result.baseline_selection.rows) == 1
+    assert length(result.optimized_selection.rows) == 1
+    assert length(result.test.rows) == 1
+    assert_received {:pretransport_generate, _, _}
+  end
+
   test "custom identities remain private while row contents stay content-bound" do
     first =
       Data.new(

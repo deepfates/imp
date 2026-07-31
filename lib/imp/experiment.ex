@@ -10,6 +10,10 @@ defmodule Imp.Experiment do
   `compare_baseline_on_test: true` to evaluate the baseline on the same ordered
   test rows after the selected artifact has been built and applied.
 
+  Evaluation failures remain ordered diagnostic rows when
+  `evaluation_options: [max_errors: :infinity]` is explicit. Finite error
+  budgets still cancel the stage loudly rather than returning partial results.
+
   This boundary is for ordinary product checks and bounded scientific runs. It
   does not turn a single result into a general optimizer-effectiveness claim.
   """
@@ -160,7 +164,7 @@ defmodule Imp.Experiment do
     stage!(stage, fn ->
       result = Imp.evaluate(program, rows, metric, opts)
 
-      if result.errors != [] do
+      if result.errors != [] and not retain_evaluation_failures?(opts) do
         raise Imp.Experiment.StageError, stage: stage, reason: {:evaluation_errors, result.errors}
       end
 
@@ -273,7 +277,10 @@ defmodule Imp.Experiment do
      metric_identity, compare_baseline_on_test?}
   end
 
-  defp evaluation_keys, do: [:max_concurrency, :max_errors, :timeout]
+  defp evaluation_keys, do: [:failure_score, :max_concurrency, :max_errors, :timeout]
+
+  defp retain_evaluation_failures?(opts),
+    do: Keyword.fetch(opts, :max_errors) == {:ok, :infinity}
 
   defp stage!(stage, fun) do
     fun.()

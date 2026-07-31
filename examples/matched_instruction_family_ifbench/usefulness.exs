@@ -68,7 +68,12 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
           metric,
           artifact_id: "ifbench-gepa-#{seed}",
           compare_baseline_on_test: true,
-          evaluation_options: [max_concurrency: 1, max_errors: 0, timeout: 120_000],
+          evaluation_options: [
+            failure_score: 0.0,
+            max_concurrency: 1,
+            max_errors: :infinity,
+            timeout: 120_000
+          ],
           config: %{
             condition: "imp-88sn-ifbench",
             seed: seed,
