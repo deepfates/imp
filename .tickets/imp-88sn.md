@@ -537,3 +537,28 @@ of `$18.304858985`. A clean successor under the unchanged `$42.806016` Stage 1
 ceiling would therefore expose at most `$61.110874985`, still below the
 approximately `$100` workshop target. This is headroom arithmetic, not provider
 authority or an exact attribution of historical usage.
+
+### Stage 1 successor terminal runtime stop
+
+The authorized successor from exact clean `52b252f` passed its immediate
+route/provider/price/privacy and current-usage preflight, then stopped during
+seed `2026072705` in pinned MIPRO bootstrap. One retained bootstrap trajectory
+had an error and the frozen `max_errors: 0` configuration raised before dataset
+summary/proposal completion or categorical search. The ordinary Experiment had
+already evaluated baseline selection in memory, but emitted no Result; no
+held-out row was read, no Artifact or fresh service was created, and seeds
+`2026072706/07` did not start. This is an inconclusive runtime/treatment failure,
+not a MIPRO outcome, and Stage 2 remains dormant.
+
+The exact tracked log is
+`examples/matched_instruction_family_ifbench/exercised-stopped-mipro-stage1-successor.log`
+(SHA-256
+`562007203bad0040f92549c871ab57b7a23d6fa9fb065b92efc10ba7037649d0`).
+The failed Experiment result retained only the aggregate bootstrap error, not
+the underlying row/adapter diagnostic or telemetry, so exact transport counts
+cannot be reconstructed. Source order proves all 32 baseline-selection rows
+were attempted and at least one bootstrap trajectory ran. Current-key usage
+moved from `$17.467214985` to `$17.571419235` during the run, an observed-window
+delta of `$0.10420425`; it is not manufactured per-request attribution. Adding
+the separately conservative approximately `$0.837644` Behold amount gives a
+current unknown-inclusive workshop upper of `$18.409063235`.

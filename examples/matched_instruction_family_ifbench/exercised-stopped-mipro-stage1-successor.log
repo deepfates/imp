@@ -1,0 +1,7 @@
+** (RuntimeError) experiment failed: %{reason: {:optimizer_failed, Imp.Optimizer.MIPROv2, "MIPROv2 error budget exhausted during DSPy 3.2.1 bootstrap: 1 errors (maximum 0)"}, stage: :optimize}
+    examples/matched_instruction_family_ifbench/usefulness.exs:355: MatchedInstructionFamilyIFBench.Usefulness.require_completed!/1
+    examples/matched_instruction_family_ifbench/usefulness.exs:100: MatchedInstructionFamilyIFBench.Usefulness.live_seed/3
+    (elixir 1.19.5) lib/enum.ex:961: Enum."-each/2-lists^foreach/1-0-"/2
+    examples/matched_instruction_family_ifbench/usefulness.exs:401: (file)
+
+IMP_88SN_EXIT_CODE=1
