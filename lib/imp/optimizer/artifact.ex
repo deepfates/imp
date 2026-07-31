@@ -16,7 +16,8 @@ defmodule Imp.Optimizer.Artifact do
   alias Imp.{ProgramParameters, Redaction, Saving}
 
   @artifact_type "imp_optimizer_artifact"
-  @schema_version 2
+  @schema_version 3
+  @supported_schema_versions [2, 3]
   @artifact_keys MapSet.new([
                    "artifact_type",
                    "schema_version",
@@ -31,14 +32,16 @@ defmodule Imp.Optimizer.Artifact do
                   "provenance",
                   "security"
                 ])
-  @candidate_keys MapSet.new([
-                    "id",
-                    "program",
-                    "program_sha256",
-                    "score",
-                    "report",
-                    "metadata"
-                  ])
+  @common_candidate_keys MapSet.new(["id", "score", "report", "metadata"])
+  @program_candidate_v2_keys MapSet.union(
+                               @common_candidate_keys,
+                               MapSet.new(["program", "program_sha256"])
+                             )
+  @program_candidate_v3_keys MapSet.put(@program_candidate_v2_keys, "kind")
+  @value_candidate_keys MapSet.union(
+                          @common_candidate_keys,
+                          MapSet.new(["kind", "value", "value_sha256"])
+                        )
   @history_keys MapSet.new(["champion_id", "revision"])
 
   @type artifact :: %{required(String.t()) => term()}
@@ -66,34 +69,17 @@ defmodule Imp.Optimizer.Artifact do
     restored = Saving.load(state, registry_opts)
     ensure_predictors!(restored)
 
-    report =
-      case Keyword.get(opts, :report) do
-        nil ->
-          nil
-
-        %Report{} = value ->
-          value |> Report.dump() |> sanitize()
-
-        value when is_map(value) ->
-          value |> Report.encode_term() |> sanitize()
-
-        value ->
-          raise ArgumentError,
-                "optimizer artifact report must be a Report or map, got: #{Kernel.inspect(value)}"
-      end
-
-    candidate = %{
+    %{
       "id" => id,
+      "kind" => "program",
       "program" => state,
       "program_sha256" => Codec.checksum(state),
       "score" => validate_score!(Keyword.get(opts, :score)),
-      "report" => report,
+      "report" => normalize_report(Keyword.get(opts, :report)),
       "metadata" => opts |> Keyword.get(:metadata, %{}) |> sanitize()
     }
-
-    candidate
     |> json_normalize!("optimizer candidate")
-    |> validate_candidate!()
+    |> validate_candidate!(3)
   end
 
   def candidate(id, _program, _opts),
@@ -124,6 +110,32 @@ defmodule Imp.Optimizer.Artifact do
   def parameter_candidate(id, program, opts) do
     raise ArgumentError,
           "optimizer parameter candidate requires a program struct and keyword options, got: #{Kernel.inspect({id, program, opts})}"
+  end
+
+  @doc "Builds a checksummed candidate containing one canonical JSON value."
+  @spec value_candidate(String.t(), term(), keyword()) :: candidate()
+  def value_candidate(id, value, opts \\ [])
+
+  def value_candidate(id, value, opts) when is_binary(id) and id != "" and is_list(opts) do
+    validate_keyword!(opts, [:score, :report, :metadata], "value_candidate/3")
+    value = canonical_json!(value, "optimizer artifact value")
+
+    %{
+      "id" => id,
+      "kind" => "value",
+      "value" => value,
+      "value_sha256" => Codec.checksum(value),
+      "score" => validate_score!(Keyword.get(opts, :score)),
+      "report" => normalize_report(Keyword.get(opts, :report)),
+      "metadata" => opts |> Keyword.get(:metadata, %{}) |> sanitize()
+    }
+    |> json_normalize!("optimizer value candidate")
+    |> validate_candidate!(3)
+  end
+
+  def value_candidate(id, _value, _opts) do
+    raise ArgumentError,
+          "optimizer value candidate id must be a non-empty string, got: #{Kernel.inspect(id)}"
   end
 
   @doc """
@@ -175,12 +187,17 @@ defmodule Imp.Optimizer.Artifact do
   @spec new(candidate(), [candidate()], keyword()) :: artifact()
   def new(champion, challengers \\ [], opts \\ []) when is_list(challengers) and is_list(opts) do
     validate_keyword!(opts, [:provenance], "new/3")
-    champion = validate_candidate!(champion)
-    candidates = Enum.map([champion | challengers], &validate_candidate!/1)
+    champion = validate_candidate!(champion, @schema_version)
+    candidates = Enum.map([champion | challengers], &validate_candidate!(&1, @schema_version))
     ids = Enum.map(candidates, & &1["id"])
+    kinds = candidates |> Enum.map(& &1["kind"]) |> Enum.uniq()
 
     if length(ids) != MapSet.size(MapSet.new(ids)) do
       raise ArgumentError, "optimizer artifact candidate ids must be unique"
+    end
+
+    if length(kinds) != 1 do
+      raise ArgumentError, "optimizer artifact candidates must all have the same kind"
     end
 
     payload = %{
@@ -219,7 +236,7 @@ defmodule Imp.Optimizer.Artifact do
     end
   end
 
-  @doc "Reads and validates a current-schema optimizer artifact."
+  @doc "Reads and validates a supported optimizer artifact schema."
   @spec read!(Path.t()) :: artifact()
   def read!(path) when is_binary(path) do
     path
@@ -234,7 +251,7 @@ defmodule Imp.Optimizer.Artifact do
     payload = artifact |> validate!() |> Map.fetch!("payload")
 
     %{
-      schema_version: @schema_version,
+      schema_version: artifact["schema_version"],
       revision: payload["revision"],
       champion_id: payload["champion_id"],
       challengers: Enum.reject(Map.keys(payload["candidates"]), &(&1 == payload["champion_id"])),
@@ -242,7 +259,17 @@ defmodule Imp.Optimizer.Artifact do
         payload["candidates"]
         |> Map.values()
         |> Enum.sort_by(& &1["id"])
-        |> Enum.map(&Map.take(&1, ["id", "score", "report", "metadata", "program_sha256"])),
+        |> Enum.map(
+          &Map.take(&1, [
+            "id",
+            "kind",
+            "score",
+            "report",
+            "metadata",
+            "program_sha256",
+            "value_sha256"
+          ])
+        ),
       rollback_depth: length(payload["history"]),
       provenance: payload["provenance"],
       security: payload["security"]
@@ -255,6 +282,8 @@ defmodule Imp.Optimizer.Artifact do
     artifact = validate!(artifact)
     left_candidate = fetch_candidate!(artifact, left)
     right_candidate = fetch_candidate!(artifact, right)
+    require_program_candidate!(left_candidate)
+    require_program_candidate!(right_candidate)
     left_parameters = parameters(left_candidate, opts)
     right_parameters = parameters(right_candidate, opts)
     names = Map.keys(left_parameters) |> Enum.concat(Map.keys(right_parameters)) |> Enum.uniq()
@@ -274,6 +303,7 @@ defmodule Imp.Optimizer.Artifact do
   @spec apply(artifact(), struct(), selection(), keyword()) :: struct()
   def apply(artifact, program, selection \\ :champion, opts \\ []) do
     candidate = artifact |> validate!() |> fetch_candidate!(selection)
+    require_program_candidate!(candidate)
     candidate_program = restore_program(candidate, opts)
 
     source = index_predictors(candidate_program)
@@ -305,6 +335,19 @@ defmodule Imp.Optimizer.Artifact do
     |> attach_candidate_report(candidate)
   end
 
+  @doc "Returns one selected portable value without restoring executable code."
+  @spec value(artifact(), selection()) :: term()
+  def value(artifact, selection \\ :champion) do
+    case artifact |> validate!() |> fetch_candidate!(selection) do
+      %{"kind" => "value", "value" => value} ->
+        value
+
+      _program ->
+        raise ArgumentError,
+              "optimizer artifact candidate is a program; use apply/4 with a trusted compatible program"
+    end
+  end
+
   @doc "Promotes a challenger and records the prior champion for rollback."
   @spec promote(artifact(), String.t()) :: artifact()
   def promote(artifact, candidate_id) when is_binary(candidate_id) do
@@ -317,15 +360,18 @@ defmodule Imp.Optimizer.Artifact do
             "optimizer artifact candidate #{Kernel.inspect(candidate_id)} is already champion"
     end
 
-    seal(%{
-      payload
-      | "revision" => payload["revision"] + 1,
-        "champion_id" => candidate_id,
-        "history" => [
-          %{"champion_id" => payload["champion_id"], "revision" => payload["revision"]}
-          | payload["history"]
-        ]
-    })
+    seal(
+      %{
+        payload
+        | "revision" => payload["revision"] + 1,
+          "champion_id" => candidate_id,
+          "history" => [
+            %{"champion_id" => payload["champion_id"], "revision" => payload["revision"]}
+            | payload["history"]
+          ]
+      },
+      artifact["schema_version"]
+    )
   end
 
   @doc "Restores the most recently preserved champion."
@@ -336,24 +382,27 @@ defmodule Imp.Optimizer.Artifact do
 
     case payload["history"] do
       [%{"champion_id" => champion_id} | rest] ->
-        seal(%{
-          payload
-          | "revision" => payload["revision"] + 1,
-            "champion_id" => champion_id,
-            "history" => rest
-        })
+        seal(
+          %{
+            payload
+            | "revision" => payload["revision"] + 1,
+              "champion_id" => champion_id,
+              "history" => rest
+          },
+          artifact["schema_version"]
+        )
 
       [] ->
         raise ArgumentError, "optimizer artifact has no preserved champion to roll back to"
     end
   end
 
-  defp seal(payload) do
+  defp seal(payload, schema_version \\ @schema_version) do
     payload = json_normalize!(payload, "optimizer artifact payload")
 
     %{
       "artifact_type" => @artifact_type,
-      "schema_version" => @schema_version,
+      "schema_version" => schema_version,
       "payload_sha256" => Codec.checksum(payload),
       "payload" => payload
     }
@@ -363,7 +412,7 @@ defmodule Imp.Optimizer.Artifact do
   defp validate!(artifact) do
     validate_envelope!(artifact)
 
-    unless artifact["schema_version"] == @schema_version do
+    unless artifact["schema_version"] in @supported_schema_versions do
       raise ArgumentError,
             "unsupported optimizer artifact schema version: #{Kernel.inspect(artifact["schema_version"])}"
     end
@@ -371,16 +420,16 @@ defmodule Imp.Optimizer.Artifact do
     payload = artifact["payload"]
     exact_keys!(payload, @payload_keys, "optimizer artifact payload")
     validate_checksum!(payload, artifact["payload_sha256"])
-    validate_payload!(payload)
+    validate_payload!(payload, artifact["schema_version"])
     artifact
   end
 
-  defp validate_payload!(payload) do
+  defp validate_payload!(payload, schema_version) do
     unless is_integer(payload["revision"]) and payload["revision"] > 0 do
       raise ArgumentError, "optimizer artifact revision must be a positive integer"
     end
 
-    validate_candidates!(payload["candidates"], payload["champion_id"])
+    validate_candidates!(payload["candidates"], payload["champion_id"], schema_version)
     validate_history!(payload["history"], payload["candidates"])
 
     unless is_map(payload["provenance"]) do
@@ -394,17 +443,22 @@ defmodule Imp.Optimizer.Artifact do
     reject_sensitive_keys!(payload)
   end
 
-  defp validate_candidates!(candidates, champion_id) do
+  defp validate_candidates!(candidates, champion_id, schema_version) do
     unless is_map(candidates) and map_size(candidates) > 0 do
       raise ArgumentError, "optimizer artifact candidates must be a non-empty map"
     end
 
     Enum.each(candidates, fn {id, candidate} ->
-      validate_candidate!(candidate)
+      validate_candidate!(candidate, schema_version)
 
       if id != candidate["id"],
         do: raise(ArgumentError, "optimizer artifact candidate key/id mismatch")
     end)
+
+    if schema_version == 3 and
+         candidates |> Map.values() |> Enum.map(& &1["kind"]) |> Enum.uniq() |> length() != 1 do
+      raise ArgumentError, "optimizer artifact candidates must all have the same kind"
+    end
 
     unless Map.has_key?(candidates, champion_id) do
       raise ArgumentError, "optimizer artifact champion does not identify a candidate"
@@ -421,38 +475,61 @@ defmodule Imp.Optimizer.Artifact do
 
   defp validate_envelope!(_artifact), do: raise(ArgumentError, "optimizer artifact must be a map")
 
-  defp validate_candidate!(candidate) when is_map(candidate) do
-    exact_keys!(candidate, @candidate_keys, "optimizer artifact candidate")
+  defp validate_candidate!(candidate, 2) when is_map(candidate) do
+    exact_keys!(candidate, @program_candidate_v2_keys, "optimizer artifact program candidate")
+    validate_program_candidate!(candidate)
+  end
 
-    unless is_binary(candidate["id"]) and candidate["id"] != "" do
-      raise ArgumentError, "optimizer artifact candidate id must be a non-empty string"
-    end
+  defp validate_candidate!(%{"kind" => "program"} = candidate, 3) do
+    exact_keys!(candidate, @program_candidate_v3_keys, "optimizer artifact program candidate")
+    validate_program_candidate!(candidate)
+  end
 
-    unless is_map(candidate["program"]) do
-      raise ArgumentError, "optimizer artifact candidate program must be a map"
-    end
-
-    validate_checksum!(candidate["program"], candidate["program_sha256"])
-    validate_score!(candidate["score"])
-
-    unless is_nil(candidate["report"]) or is_map(candidate["report"]) do
-      raise ArgumentError, "optimizer artifact candidate report must be a map or nil"
-    end
-
-    unless is_map(candidate["metadata"]) do
-      raise ArgumentError, "optimizer artifact candidate metadata must be a map"
-    end
-
-    reject_sensitive_keys!(candidate)
+  defp validate_candidate!(%{"kind" => "value"} = candidate, 3) do
+    exact_keys!(candidate, @value_candidate_keys, "optimizer artifact value candidate")
+    validate_candidate_common!(candidate)
+    canonical_json!(candidate["value"], "optimizer artifact value")
+    validate_checksum!(candidate["value"], candidate["value_sha256"])
     candidate
   end
 
-  defp validate_candidate!(candidate),
+  defp validate_candidate!(candidate, 3) when is_map(candidate) do
+    raise ArgumentError,
+          "optimizer artifact candidate kind must be \"program\" or \"value\", got: #{Kernel.inspect(candidate["kind"])}"
+  end
+
+  defp validate_candidate!(candidate, _schema_version),
     do:
       raise(
         ArgumentError,
         "optimizer artifact candidate must be a map, got: #{Kernel.inspect(value_type(candidate))}"
       )
+
+  defp validate_program_candidate!(candidate) do
+    validate_candidate_common!(candidate)
+
+    unless is_map(candidate["program"]),
+      do: raise(ArgumentError, "optimizer artifact candidate program must be a map")
+
+    validate_checksum!(candidate["program"], candidate["program_sha256"])
+    candidate
+  end
+
+  defp validate_candidate_common!(candidate) do
+    unless is_binary(candidate["id"]) and candidate["id"] != "",
+      do: raise(ArgumentError, "optimizer artifact candidate id must be a non-empty string")
+
+    validate_score!(candidate["score"])
+
+    unless is_nil(candidate["report"]) or is_map(candidate["report"]),
+      do: raise(ArgumentError, "optimizer artifact candidate report must be a map or nil")
+
+    unless is_map(candidate["metadata"]),
+      do: raise(ArgumentError, "optimizer artifact candidate metadata must be a map")
+
+    reject_sensitive_keys!(candidate)
+    candidate
+  end
 
   defp validate_history!(history, candidates) when is_list(history) do
     Enum.each(history, fn entry ->
@@ -507,6 +584,34 @@ defmodule Imp.Optimizer.Artifact do
   defp restore_program(candidate, opts) do
     validate_keyword!(opts, [:registry], "artifact operation")
     Saving.load(candidate["program"], saving_opts(opts))
+  end
+
+  defp require_program_candidate!(%{"kind" => "value"}) do
+    raise ArgumentError,
+          "optimizer artifact candidate contains a value; use value/2 instead of apply/4"
+  end
+
+  defp require_program_candidate!(_program), do: :ok
+
+  defp normalize_report(nil), do: nil
+  defp normalize_report(%Report{} = report), do: report |> Report.dump() |> sanitize()
+
+  defp normalize_report(report) when is_map(report),
+    do: report |> Report.encode_term() |> sanitize()
+
+  defp normalize_report(report) do
+    raise ArgumentError,
+          "optimizer artifact report must be a Report or map, got: #{Kernel.inspect(report)}"
+  end
+
+  defp canonical_json!(value, context) do
+    canonical = json_normalize!(value, context)
+
+    unless canonical === value do
+      raise ArgumentError, "#{context} must already be canonical JSON with string map keys"
+    end
+
+    canonical
   end
 
   defp attach_candidate_report(program, %{"report" => report}) when is_map(report) do

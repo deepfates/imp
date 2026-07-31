@@ -317,6 +317,54 @@ defmodule Imp.Optimizer.ArtifactTest do
     end
   end
 
+  test "value candidates are portable data and schema-2 program artifacts remain compatible",
+       %{path: path} do
+    value = %{"enabled" => true, "retries" => 3, "labels" => ["fast", "safe"]}
+    value_artifact = Artifact.new(Artifact.value_candidate("selected", value, score: 1.0))
+    :ok = Artifact.write!(value_artifact, path)
+    assert Artifact.value(Artifact.read!(path)) == value
+
+    assert_raise ArgumentError, ~r/use value\/2 instead/, fn ->
+      Artifact.apply(value_artifact, optimized("trusted"))
+    end
+
+    assert_raise ArgumentError, ~r/canonical JSON/, fn ->
+      Artifact.value_candidate("unsafe", %{consumer_key: :consumer_value})
+    end
+
+    current =
+      Artifact.new(
+        Artifact.candidate("baseline", optimized("legacy"), score: 0.25),
+        [Artifact.candidate("selected", optimized("selected"), score: 0.75)]
+      )
+
+    legacy_candidates =
+      Map.new(current["payload"]["candidates"], fn {id, candidate} ->
+        {id, Map.delete(candidate, "kind")}
+      end)
+
+    payload = %{current["payload"] | "candidates" => legacy_candidates}
+
+    legacy = %{
+      "artifact_type" => "imp_optimizer_artifact",
+      "schema_version" => 2,
+      "payload_sha256" => Codec.checksum(payload),
+      "payload" => payload
+    }
+
+    assert %{schema_version: 2, champion_id: "baseline"} = Artifact.inspect(legacy)
+    assert Artifact.apply(legacy, optimized("fresh")).predict.signature.instructions == "legacy"
+
+    assert %{score_delta: 0.5, changed_predictors: ["atom:main"]} =
+             Artifact.compare(legacy, "baseline", "selected")
+
+    promoted = Artifact.promote(legacy, "selected")
+    assert %{schema_version: 2, champion_id: "selected", revision: 2} = Artifact.inspect(promoted)
+
+    assert %{champion_id: "baseline", revision: 3} =
+             promoted |> Artifact.rollback() |> Artifact.inspect()
+  end
+
   defp optimized(instruction) do
     demo = Imp.example(question: "known", answer: "known") |> Imp.with_inputs(:question)
 

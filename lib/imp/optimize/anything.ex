@@ -27,6 +27,7 @@ defmodule Imp.Optimize.Anything do
   end
 
   alias Imp.Optimize.Anything.{Result, Runner}
+  alias Imp.Optimizer.Artifact, as: OptimizerArtifact
 
   @doc "Runs Optimize Anything for a text or JSON-safe structured seed and returns a Result."
   @spec run(String.t() | map() | nil, function() | nil, keyword()) :: struct()
@@ -48,6 +49,58 @@ defmodule Imp.Optimize.Anything do
   @spec best_candidate(struct()) :: map() | String.t()
   def best_candidate(%Result{} = result), do: Result.best_candidate(result)
 
+  @doc """
+  Exports an existing Optimize Anything result as a portable value artifact.
+
+  Export is pure: it preserves the result's candidate order, validation scores,
+  and selected champion without invoking an evaluator, proposer, or selector.
+  Values must already be canonical JSON so a fresh VM can restore them without
+  creating atoms or loading executable code.
+  """
+  @spec to_artifact(Result.t(), keyword()) :: OptimizerArtifact.artifact()
+  def to_artifact(result, opts \\ [])
+
+  def to_artifact(%Result{} = result, opts) when is_list(opts) do
+    unless Keyword.keyword?(opts), do: invalid_artifact_options!(opts)
+    unknown = Keyword.keys(opts) -- [:provenance]
+
+    if unknown != [],
+      do: raise(ArgumentError, "unknown Optimize Anything artifact options: #{inspect(unknown)}")
+
+    unless length(result.candidates) == length(result.validation_scores) do
+      raise ArgumentError,
+            "Optimize Anything result candidates and validation scores are misaligned"
+    end
+
+    champion_index = Result.best_index(result)
+    report = Result.to_map(result)
+
+    candidates =
+      result.candidates
+      |> Enum.zip(result.validation_scores)
+      |> Enum.with_index()
+      |> Enum.map(fn {{value, score}, index} ->
+        OptimizerArtifact.value_candidate(candidate_id(index), value,
+          score: score,
+          report: if(index == champion_index, do: report),
+          metadata: %{
+            "candidate_index" => index,
+            "discovered_at_metric_call" => Enum.at(result.discovery_evaluation_counts, index),
+            "parent_indexes" => Enum.at(result.parents, index, [])
+          }
+        )
+      end)
+
+    champion = Enum.fetch!(candidates, champion_index)
+    challengers = List.delete_at(candidates, champion_index)
+    OptimizerArtifact.new(champion, challengers, provenance: Keyword.get(opts, :provenance, %{}))
+  end
+
+  def to_artifact(result, opts) do
+    raise ArgumentError,
+          "Optimize Anything to_artifact/2 expects a Result and keyword options, got: #{inspect({result, opts})}"
+  end
+
   @doc false
   def validate_resume_state(nil), do: {:ok, nil}
   def validate_resume_state(state) when is_map(state), do: {:ok, state}
@@ -63,4 +116,14 @@ defmodule Imp.Optimize.Anything do
 
   def validate_checkpoint_fn(checkpoint_fn),
     do: {:error, "expected nil or an arity-1 function, got: #{inspect(checkpoint_fn)}"}
+
+  defp candidate_id(index),
+    do: "candidate-" <> String.pad_leading(Integer.to_string(index), 4, "0")
+
+  defp invalid_artifact_options!(opts),
+    do:
+      raise(
+        ArgumentError,
+        "Optimize Anything artifact options must be a keyword list, got: #{inspect(opts)}"
+      )
 end
