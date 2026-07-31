@@ -7,6 +7,7 @@ defmodule HotPotQAGEPA do
 
   @data_dir Path.expand("data/hotpotqa-gepa", __DIR__)
   @receipt_sha "3ca2955ec517fa070b4f43e54c1f340b2c7cd3a54b52afc5c3d23daf75e04032"
+  @condition "imp-88sn-hotpotqa-json-gepa-v1"
   @seeds [2_026_080_101, 2_026_080_102, 2_026_080_103]
   @task_model "openrouter:openai/gpt-5.4-mini"
   @optimizer_model "openrouter:anthropic/claude-sonnet-4.6"
@@ -61,7 +62,7 @@ defmodule HotPotQAGEPA do
   end
 
   defp provider_disabled! do
-    root = Path.join(System.tmp_dir!(), "imp-hotpotqa-gepa-provider-disabled")
+    root = Path.join(System.tmp_dir!(), "imp-hotpotqa-json-gepa-provider-disabled")
     File.rm_rf!(root)
     File.mkdir_p!(root)
     data = data!()
@@ -80,9 +81,9 @@ defmodule HotPotQAGEPA do
 
     result = check!(hd(@seeds), data, task_lm, reflection_lm)
     paths = persist!(result, root)
-    selected = Artifact.apply(Artifact.read!(paths.artifact), HotPotQAPipeline.new())
+    selected = Artifact.apply(Artifact.read!(paths.artifact), program())
 
-    baseline_instructions = instructions(HotPotQAPipeline.new())
+    baseline_instructions = instructions(program())
     selected_instructions = instructions(selected)
 
     unless Enum.all?(Map.keys(baseline_instructions), fn name ->
@@ -103,6 +104,8 @@ defmodule HotPotQAGEPA do
     IO.puts(
       Jason.encode!(%{
         mode: "provider_disabled",
+        condition: @condition,
+        task_adapter: inspect(Imp.Adapter.JSON),
         selected: result.selected,
         named_predictors: Map.keys(selected_instructions),
         prompt_bytes: Map.new(prompts, fn {role, prompt} -> {role, byte_size(prompt)} end),
@@ -172,15 +175,24 @@ defmodule HotPotQAGEPA do
     result =
       Imp.context([lm: task_lm], fn ->
         Imp.Experiment.check(
-          HotPotQAPipeline.new(),
+          program(),
           optimizer,
           data,
           &metric/2,
-          artifact_id: "hotpotqa-gepa-#{seed}",
+          artifact_id: "hotpotqa-json-gepa-#{seed}",
+          bootstrap: [
+            metadata: %{
+              "condition" => @condition,
+              "task_adapter" => inspect(Imp.Adapter.JSON),
+              "native_json_schema" => "enabled"
+            }
+          ],
           metric_identity: %{"kind" => "hotpotqa_f1", "version" => 1},
           compare_baseline_on_test: true,
           config: %{
-            "condition" => "imp-88sn-hotpotqa-gepa-v1",
+            "condition" => @condition,
+            "task_adapter" => inspect(Imp.Adapter.JSON),
+            "native_json_schema" => true,
             "seed" => seed,
             "task_model" => @task_model,
             "optimizer_model" => @optimizer_model,
@@ -290,7 +302,7 @@ defmodule HotPotQAGEPA do
       {:ok, server} =
         ProgramServer.start_link(
           name: nil,
-          program: HotPotQAPipeline.new(),
+          program: program(),
           lm: task_lm,
           task_supervisor: tasks
         )
@@ -426,6 +438,7 @@ defmodule HotPotQAGEPA do
             )
 
           :task ->
+            %{"type" => "json_schema"} = body["response_format"]
             output = output_field(rendered)
 
             answer =
@@ -443,7 +456,7 @@ defmodule HotPotQAGEPA do
                 "answer" -> if(improved?, do: answer, else: "unknown")
               end
 
-            chat_output(output, value)
+            Jason.encode!(%{output => value})
         end
 
       response = %{
@@ -500,6 +513,8 @@ defmodule HotPotQAGEPA do
     |> Imp.ProgramParameters.predictors()
     |> Map.new(&{&1.name, &1.predictor.signature.instructions})
   end
+
+  defp program, do: HotPotQAPipeline.new(adapter: Imp.Adapter.JSON)
 
   defp observe_rendered(agent, role, prompt) do
     Agent.update(agent, fn state ->

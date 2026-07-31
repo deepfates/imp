@@ -93,6 +93,20 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
     refute source =~ "fetch(inputs, :answer)"
   end
 
+  test "consumer program can select native JSON for every named predictor" do
+    program = ImpDeployment.HotPotQAPipeline.new(adapter: Imp.Adapter.JSON)
+
+    assert Enum.map(Imp.ProgramParameters.predictors(program), fn descriptor ->
+             {descriptor.name, descriptor.predictor.adapter,
+              descriptor.predictor.config[:native_json_schema]}
+           end) == [
+             {:summarize1, Imp.Adapter.JSON, true},
+             {:create_query_hop2, Imp.Adapter.JSON, true},
+             {:summarize2, Imp.Adapter.JSON, true},
+             {:final_answer, Imp.Adapter.JSON, true}
+           ]
+  end
+
   test "packaged metric has HotPot F1 and exact-match behavior" do
     assert Imp.Metrics.hotpot_f1("The Eiffel Tower", "Eiffel Tower") == 1.0
     assert Imp.Metrics.hotpot_f1("yes", "no") == 0.0
@@ -116,6 +130,19 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
 
     result = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
     assert result["selected"] == "optimized"
+    assert result["condition"] == "imp-88sn-hotpotqa-json-gepa-v1"
+    assert result["task_adapter"] == "Imp.Adapter.JSON"
+
+    stored =
+      System.tmp_dir!()
+      |> Path.join("imp-hotpotqa-json-gepa-provider-disabled/experiment-result.json")
+      |> Imp.Experiment.Result.read!()
+
+    assert stored["payload"]["provenance"]["metadata"] == %{
+             "condition" => "imp-88sn-hotpotqa-json-gepa-v1",
+             "task_adapter" => "Imp.Adapter.JSON",
+             "native_json_schema" => "enabled"
+           }
 
     assert Enum.sort(result["named_predictors"]) ==
              ~w(create_query_hop2 final_answer summarize1 summarize2)
@@ -161,6 +188,9 @@ defmodule DeploymentHotPotQAGEPAExampleTest do
 
     assert source =~ "Imp.Experiment.check"
     assert source =~ "module_selector: :all"
+    assert source =~ "imp-88sn-hotpotqa-json-gepa-v1"
+    assert source =~ "HotPotQAPipeline.new(adapter: Imp.Adapter.JSON)"
+    assert source =~ ~s(%{"type" => "json_schema"} = body["response_format"])
     assert source =~ "repetitions: 3"
     assert source =~ "ProgramServer.reload_parameters"
     assert source =~ "allow_fallbacks: false"

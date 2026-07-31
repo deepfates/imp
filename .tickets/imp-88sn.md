@@ -1730,3 +1730,33 @@ preserves the frozen opportunity. A fresh from-scratch successor is
 scientifically valid because the stopped attempt made zero transports and no
 selection/test observation, but it still requires separate launch disposition;
 the repair does not authorize a relaunch.
+
+### Terminal Chat condition and separately frozen JSON treatment
+
+The Chat-adapter condition is terminal and inconclusive. Seed `2026080101`
+completed optimization, selection, held-out evaluation, and durable Artifact
+creation: selection improved `0.300926 -> 0.410458`, but held-out F1 fell
+`0.646597 -> 0.579365` (causal lift `-0.067232`). Its fresh service acceptance
+then returned one success and three strict `summary_2` parse failures because
+the model omitted the trailing `##` in the required Chat marker. The parser
+and ProgramServer correctly preserved those failures. Seeds 2 and 3 were not
+run, and no Chat result rolls into another treatment. The retained Result,
+Artifact, original log, and indexed continuation log remain immutable under
+commits `38745e9` and `fd89ec2`.
+
+`imp-88sn-hotpotqa-json-gepa-v1` is a separately frozen treatment. It changes
+only the task adapter and therefore the task prompts: all four trusted
+predictors use public `Imp.Adapter.JSON` with native JSON Schema through the
+same ReqLLM client. Data bytes and hashes, seeds, task/reflection models,
+BEAM-native `module_selector: :all`, semantic 32/legal 44 metric opportunity,
+12-reflection ceiling, outer repetitions, metrics, selection rule, primary
+criterion, Artifact, and four-call fresh-service acceptance remain unchanged.
+The adapter choice and condition name are bound in Experiment config and
+Artifact provenance.
+
+The legal maximum remains 2,880 task plus 36 reflection transports and
+`$49.655808`. Provider-disabled real-ReqLLM execution asserted native
+`json_schema` requests, made 896 task calls and 8 reflections, mutated all four
+predictors, selected/wrote/read/applied the Artifact, preserved JSON adapters
+in a fresh process, and served four concurrent calls. This establishes
+runnability only; the JSON treatment has no live outcome before launch.

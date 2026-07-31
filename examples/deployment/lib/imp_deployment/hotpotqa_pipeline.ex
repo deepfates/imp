@@ -16,6 +16,7 @@ defmodule ImpDeployment.HotPotQAPipeline do
 
   def new(opts \\ []) when is_list(opts) do
     k = Keyword.get(opts, :k, 4)
+    adapter = Keyword.get(opts, :adapter, Imp.Adapter.Chat)
 
     unless is_integer(k) and k > 0 do
       raise ArgumentError, "k must be a positive integer"
@@ -25,22 +26,26 @@ defmodule ImpDeployment.HotPotQAPipeline do
       summarize1:
         predictor(
           "question, passages -> summary_1",
-          "Summarize the passages that help answer the question. Preserve names and relations."
+          "Summarize the passages that help answer the question. Preserve names and relations.",
+          adapter
         ),
       create_query_hop2:
         predictor(
           "question, summary_1 -> query_2",
-          "Write a focused second-hop search query for the missing fact."
+          "Write a focused second-hop search query for the missing fact.",
+          adapter
         ),
       summarize2:
         predictor(
           "question, summary_1, passages -> summary_2",
-          "Combine the first summary with the new passages into the evidence needed to answer."
+          "Combine the first summary with the new passages into the evidence needed to answer.",
+          adapter
         ),
       final_answer:
         predictor(
           "question, summary_1, summary_2 -> answer",
-          "Answer with only the shortest supported answer span."
+          "Answer with only the shortest supported answer span.",
+          adapter
         ),
       k: k
     }
@@ -103,10 +108,14 @@ defmodule ImpDeployment.HotPotQAPipeline do
 
   def call(_program, inputs), do: {:error, {:invalid_hotpotqa_inputs, inputs}}
 
-  defp predictor(signature, instruction) do
+  defp predictor(signature, instruction, adapter) do
+    config =
+      [cache: false, json_fallback: false] ++
+        if(adapter == Imp.Adapter.JSON, do: [native_json_schema: true], else: [])
+
     Imp.predict(Imp.signature(signature, instruction),
-      adapter: Imp.Adapter.Chat,
-      config: [cache: false, json_fallback: false]
+      adapter: adapter,
+      config: config
     )
   end
 
