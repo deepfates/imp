@@ -15,7 +15,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Usefulness do
     case System.get_env("IMP_88SN_MODE", "disabled") do
       "disabled" -> disabled!(test_rows)
       "preflight" -> catalog!()
-      "live" -> Enum.each(@seeds, &live_seed(&1, test_rows))
+      "live" -> Enum.each(live_seeds!(), &live_seed(&1, test_rows))
       "fresh" -> fresh!(test_rows)
       mode -> raise "unknown IMP_88SN_MODE #{inspect(mode)}"
     end
@@ -37,6 +37,20 @@ defmodule LocalOptimizeAnythingRetryPolicy.Usefulness do
         optimizer_transport_ceiling: 18
       })
     )
+  end
+
+  defp live_seeds! do
+    selected =
+      System.get_env("IMP_88SN_SEEDS", Enum.join(@seeds, ","))
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.to_integer/1)
+
+    unless selected != [] and Enum.uniq(selected) == selected and
+             Enum.all?(selected, &(&1 in @seeds)) do
+      raise "IMP_88SN_SEEDS must be a unique non-empty subset of #{inspect(@seeds)}"
+    end
+
+    selected
   end
 
   defp live_seed(seed, test_rows) do
