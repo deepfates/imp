@@ -3,7 +3,9 @@ defmodule Imp.Test.SIMBAMetricResumeOS do
 
   def run(["create", checkpoint_path, result_path]) do
     {:ok, state} = Agent.start_link(fn -> counters() end)
-    {program, optimizer, trainset, final_set} = fixture(state, identity("exact"))
+
+    {program, optimizer, trainset, final_set} =
+      fixture(state, identity("exact"), "credential-before")
 
     report =
       optimizer
@@ -18,7 +20,10 @@ defmodule Imp.Test.SIMBAMetricResumeOS do
   def run(["resume", checkpoint_path, result_path, mode]) when mode in ["same", "drift"] do
     {:ok, state} = Agent.start_link(fn -> counters() end)
     config = if mode == "same", do: "exact", else: "case_insensitive"
-    {program, optimizer, trainset, final_set} = fixture(state, identity(config))
+
+    {program, optimizer, trainset, final_set} =
+      fixture(state, identity(config), "credential-after")
+
     checkpoint = checkpoint_path |> File.read!() |> Jason.decode!()
 
     try do
@@ -51,9 +56,10 @@ defmodule Imp.Test.SIMBAMetricResumeOS do
     end
   end
 
-  defp fixture(state, identity) do
+  defp fixture(state, identity, credential) do
     task_lm =
       Imp.LM.Static.new(
+        api_key: credential,
         handler: fn messages, opts ->
           Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
           rendered = Enum.map_join(messages, "\n", & &1.content)
@@ -66,6 +72,7 @@ defmodule Imp.Test.SIMBAMetricResumeOS do
 
     prompt_lm =
       Imp.LM.Static.new(
+        api_key: credential,
         handler: fn _messages, _opts ->
           Agent.update(state, &Map.update!(&1, :prompt_calls, fn count -> count + 1 end))
           %{discussion: "Prefer success.", module_advice: %{main: "Answer yes."}}

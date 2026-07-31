@@ -1096,8 +1096,8 @@ defmodule Imp.Optimizer.SIMBA do
       },
       datasets: %{trainset: trainset, final_set: final_set},
       metric: metric_identity,
-      prompt_lm: runtime_identity(optimizer.prompt_lm),
-      teacher_lm: runtime_identity(optimizer.teacher_lm),
+      prompt_lm: DurableCallbackIdentity.runtime_identity(optimizer.prompt_lm),
+      teacher_lm: DurableCallbackIdentity.runtime_identity(optimizer.teacher_lm),
       predictors:
         Enum.map(predictors, fn %{name: name, predictor: predictor} ->
           %{
@@ -1105,8 +1105,8 @@ defmodule Imp.Optimizer.SIMBA do
             signature: predictor.signature,
             demos: predictor.demos,
             config: predictor.config,
-            lm: runtime_identity(predictor.lm),
-            adapter: runtime_identity(predictor.adapter),
+            lm: DurableCallbackIdentity.runtime_identity(predictor.lm),
+            adapter: DurableCallbackIdentity.runtime_identity(predictor.adapter),
             dynamic_lm?: predictor.dynamic_lm?,
             dynamic_adapter?: predictor.dynamic_adapter?
           }
@@ -1123,28 +1123,6 @@ defmodule Imp.Optimizer.SIMBA do
 
     %{"sha256" => digest}
   end
-
-  defp runtime_identity(callback) when is_function(callback) do
-    Map.new([:module, :name, :arity, :type, :uniq, :index], fn key ->
-      {key, callback |> :erlang.fun_info(key) |> elem(1)}
-    end)
-  end
-
-  defp runtime_identity(%_{} = struct),
-    do: struct |> Map.from_struct() |> runtime_identity()
-
-  defp runtime_identity(map) when is_map(map),
-    do: Map.new(map, fn {key, value} -> {key, runtime_identity(value)} end)
-
-  defp runtime_identity(list) when is_list(list), do: Enum.map(list, &runtime_identity/1)
-
-  defp runtime_identity(tuple) when is_tuple(tuple),
-    do: tuple |> Tuple.to_list() |> Enum.map(&runtime_identity/1) |> List.to_tuple()
-
-  defp runtime_identity(pid) when is_pid(pid), do: :runtime_pid
-  defp runtime_identity(reference) when is_reference(reference), do: :runtime_reference
-  defp runtime_identity(port) when is_port(port), do: :runtime_port
-  defp runtime_identity(value), do: value
 
   defp durable_controls?(run_opts) do
     not is_nil(run_opts[:resume_state]) or not is_nil(run_opts[:checkpoint_fn]) or

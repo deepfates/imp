@@ -76,6 +76,45 @@ defmodule Imp.Optimizer.DurableCallbackIdentity do
 
   def external_function?(_callback), do: false
 
+  @doc false
+  def runtime_identity(callback) when is_function(callback) do
+    Map.new([:module, :name, :arity, :type, :uniq, :index], fn key ->
+      {key, callback |> :erlang.fun_info(key) |> elem(1)}
+    end)
+  end
+
+  def runtime_identity(%_{} = struct),
+    do: struct |> Map.from_struct() |> runtime_identity()
+
+  def runtime_identity(map) when is_map(map) do
+    Map.new(map, fn {key, value} ->
+      {key, runtime_identity_entry(key, value)}
+    end)
+  end
+
+  def runtime_identity({key, value}) when is_atom(key) or is_binary(key),
+    do: {key, runtime_identity_entry(key, value)}
+
+  def runtime_identity(list) when is_list(list), do: Enum.map(list, &runtime_identity/1)
+
+  def runtime_identity(tuple) when is_tuple(tuple) do
+    tuple
+    |> Tuple.to_list()
+    |> Enum.map(&runtime_identity/1)
+    |> List.to_tuple()
+  end
+
+  def runtime_identity(pid) when is_pid(pid), do: :runtime_pid
+  def runtime_identity(reference) when is_reference(reference), do: :runtime_reference
+  def runtime_identity(port) when is_port(port), do: :runtime_port
+  def runtime_identity(value), do: value
+
+  defp runtime_identity_entry(key, value) do
+    if Imp.Redaction.credential_entry?(key, value),
+      do: :runtime_credential,
+      else: runtime_identity(value)
+  end
+
   defp json_safe?(nil), do: true
   defp json_safe?(value) when is_binary(value) or is_boolean(value), do: true
   defp json_safe?(value) when is_integer(value), do: true

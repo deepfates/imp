@@ -110,7 +110,11 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
       |> Jason.encode!()
       |> Jason.decode!()
 
-    changed_lm = %{program.lm | opts: Keyword.put(program.lm.opts, :runtime_tag, :changed)}
+    changed_lm = %{
+      program.lm
+      | opts: Keyword.put(program.lm.opts, :endpoint, "https://changed.invalid")
+    }
+
     changed_runtime = %{program | lm: changed_lm}
 
     assert_raise ArgumentError,
@@ -132,6 +136,53 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
                      max_trials: 0
                    )
                  end
+  end
+
+  test "resume permits credential rotation while retaining task runtime identity", %{state: state} do
+    {program, optimizer, trainset, valset} = fixture(state)
+
+    program = %{
+      program
+      | lm:
+          program.lm
+          |> put_lm_option(:api_key, "credential-before")
+          |> put_lm_option(:headers, [
+            {"authorization", "Bearer credential-before"},
+            {"x-runtime-profile", "stable"}
+          ])
+    }
+
+    checkpoint =
+      optimizer
+      |> MIPROv2.compile(program, trainset, valset, max_trials: 1)
+      |> Report.fetch()
+      |> then(& &1.metadata.resume_state)
+      |> Jason.encode!()
+      |> Jason.decode!()
+
+    refute Jason.encode!(checkpoint) =~ "credential-before"
+
+    rebound = %{
+      program
+      | lm:
+          program.lm
+          |> put_lm_option(:api_key, "credential-after")
+          |> put_lm_option(:headers, [
+            {"authorization", "Bearer credential-after"},
+            {"x-runtime-profile", "stable"}
+          ])
+    }
+
+    report =
+      optimizer
+      |> MIPROv2.compile(rebound, trainset, valset,
+        resume_state: checkpoint,
+        max_trials: 0
+      )
+      |> Report.fetch()
+
+    assert report.metadata.resumed
+    assert report.metadata.completed_trials == 1
   end
 
   test "resume rejects a mutated checkpoint payload", %{state: state} do
@@ -350,4 +401,7 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
   defp metric_identity(config \\ %{"field" => "answer"}) do
     %{"id" => "exact-answer", "version" => 1, "config" => config}
   end
+
+  defp put_lm_option(%{opts: opts} = lm, key, value),
+    do: %{lm | opts: Keyword.put(opts, key, value)}
 end
