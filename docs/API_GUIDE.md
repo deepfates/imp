@@ -229,10 +229,20 @@ need.
 | `BootstrapFinetune`, `GRPO` | You intend to change model weights through an explicit trainer. |
 | `Imp.Optimize.Anything` | The thing being improved is a text or JSON-safe artifact rather than an Imp program. |
 
+All optimizer modules currently remain experimental in Imp's canonical public
+API policy. This table helps you choose which mechanism to investigate; it is
+not a stability promise.
+
 An optimizer that needs a proposal or reflection model requires one
 explicitly. GEPA and COPRO do not fabricate local proposals or silently reuse
 the task program's LM. Training optimizers likewise require an explicit
 trainer; creating a training-shaped report is not a weight update.
+
+COPRO accepts a validation or development set so it composes with the shared
+optimizer interface, but its pinned DSPy 3.2.1 behavior scores and selects
+coordinate candidates on the training set. `Imp.Experiment.check/5` can still
+compare COPRO's returned program with the baseline on a separate selection
+split; that outer comparison does not change COPRO's internal search semantic.
 
 These names describe mechanisms, not guaranteed improvement. GEPA and MIPROv2
 have positive matched evidence on one frozen TREC task. COPRO, SIMBA, and
