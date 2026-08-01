@@ -92,17 +92,23 @@ provider-free, but its executable was rejected: exact route/generation joins,
 prospective cost admission, private provisional/reconciled evidence, and
 ordinary-versus-fatal failure handling required a second experiment controller
 disproportionate to the measurement. No current-model provider call is
-authorized. The full HoVer condition remains `REVISE` pending a benchmark path
-through ordinary product APIs without another evidence runtime.
+authorized. The one-seed live feasibility path is also rejected under current
+credentials and the no-controller constraint: the shared OpenRouter key is not
+a management key, account activity export is unavailable, and ordinary runtime
+state cannot supply the required isolated route/count/cost reconciliation.
+Provider-free readiness remains valid, and full HoVer remains `REVISE`, not
+scientifically disproved.
 
-The next HoVer decision must either ratify an ordinary product path that directly
-optimizes, or reject this direction; another calibration lane is not accepted. A
-ratified protocol must name tasks, public programs, native metrics,
-optimizer/upstream arms, fixed seeds, result-blind data, effect thresholds,
-uncertainty treatment, artifact/service acceptance, and a realistic cost. The
-earlier HoVer/PAPILLON four-arm proposal exceeds 1.7 million task-shaped
-transports and remains rejected as the default; the present HoVer-only candidate
-is not automatically the portfolio merely because its mechanics pass.
+BFCL V4 is rejected as the next optimizer-usefulness candidate. Its four public
+non-live multi-turn categories are variants of 200 underlying scenario groups
+released as test/evaluation data, with no official optimization split, and its
+official metric executes stateful Python backends rather than a thin native
+scorer. Repartitioning leaderboard rows or porting that benchmark behavior is
+outside this ticket's product path; this audit established no Imp product
+defect. The next decision must therefore select a representative task with an
+official result-blind optimization split and a thin native metric/program path,
+or separately revisit HoVer's credential/evidence boundary. Neither direction
+currently has provider authority.
 
 Provider-free LM readiness remains valuable but insufficient: public GEPA can
 reach every named HoVer/PAPILLON predictor, reports retain reconstructable
