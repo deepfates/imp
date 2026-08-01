@@ -1569,25 +1569,40 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
   end
 
   defp optimize_anything_task_specific_lane(max_age_hours) do
-    path =
+    legacy_path =
       "examples/local_optimize_anything_retry_policy/exercised-typed-round-robin-result.json"
 
-    with {:ok, artifact} <- read_artifact(path),
-         true <- valid_optimize_anything_task_specific_result?(artifact) do
-      artifact_lane("optimize_anything_task_specific", path, artifact, max_age_hours,
+    manifest_path =
+      "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json"
+
+    with {:ok, legacy} <- read_artifact(legacy_path),
+         true <- valid_optimize_anything_task_specific_result?(legacy),
+         {:ok, manifest} <- read_artifact(manifest_path),
+         true <- valid_optimize_anything_three_seed_result?(manifest, manifest_path) do
+      artifact_lane("optimize_anything_task_specific", manifest_path, manifest, max_age_hours,
         passing: true,
         full_evidence: true,
         freshness: :immutable_admission,
         scale: "task_specific_c3",
         summary: %{
-          "treatment_id" => artifact["treatment_id"],
-          "model" => artifact["model"],
-          "baseline_exact" => get_in(artifact, ["untouched_test", "baseline", "exact"]),
-          "selected_exact" => get_in(artifact, ["untouched_test", "selected", "exact"]),
-          "fresh_byte_identical" => artifact["fresh_byte_identical"]
+          "legacy_one_seed" => %{
+            "treatment_id" => legacy["treatment_id"],
+            "model" => legacy["model"],
+            "baseline_exact" => get_in(legacy, ["untouched_test", "baseline", "exact"]),
+            "selected_exact" => get_in(legacy, ["untouched_test", "selected", "exact"]),
+            "fresh_byte_identical" => legacy["fresh_byte_identical"]
+          },
+          "three_seed_v2" => %{
+            "condition" => manifest["condition"],
+            "seeds" => Enum.map(manifest["seeds"], & &1["seed"]),
+            "exact_lifts" => manifest["aggregate"]["exact_lifts"],
+            "mean_exact_lift" => manifest["aggregate"]["mean_exact_lift"],
+            "positive_seeds" => manifest["aggregate"]["positive_seeds"],
+            "fresh_artifacts" => manifest["aggregate"]["fresh_artifacts"]
+          }
         },
         limitation:
-          "One local mixed-type retry-policy task; this does not establish general Optimize Anything effectiveness, schema-v2 portfolio evidence, or upstream parity."
+          "Two frozen conditions on one retry-policy domain; this does not establish general Optimize Anything effectiveness, the declared three-class portfolio, upstream parity, or paper reproduction."
       )
     else
       _ ->
@@ -1605,6 +1620,137 @@ defmodule Mix.Tasks.Imp.Benchmark.Dashboard do
       artifact["split_sizes"] == %{"train" => 8, "selection" => 6, "untouched_test" => 6} and
       get_in(artifact, ["untouched_test", "baseline", "exact"]) == 4 and
       get_in(artifact, ["untouched_test", "selected", "exact"]) == 5
+  end
+
+  defp valid_optimize_anything_three_seed_result?(manifest, manifest_path) do
+    expected = [
+      %{
+        "seed" => 2_026_073_101,
+        "artifact_path" =>
+          "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/seed-2026073101-artifact.json",
+        "artifact_bytes" => 1_937_067,
+        "artifact_sha256" => "53078e0db2a9a9ecc8b320184f7b2403d1228e177d10c2a6175a59ee45c56cb5",
+        "champion_id" => "candidate-0001",
+        "scores" => [0.5636503770362039, 0.8625005207682372],
+        "selected_test_exact" => 5,
+        "exact_lift" => 2,
+        "fresh_outputs_sha256" =>
+          "5c2eacbf0d3007956205ef780574f10444ef53b22b449662d6dd682016315eed"
+      },
+      %{
+        "seed" => 2_026_073_102,
+        "artifact_path" =>
+          "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/seed-2026073102-artifact.json",
+        "artifact_bytes" => 2_033_767,
+        "artifact_sha256" => "66b447a069e3666278b7310edb271f3ed2d2d702ff24ae5d8894533ee4a4d5d2",
+        "champion_id" => "candidate-0001",
+        "scores" => [0.5636503770362039, 0.8625005207682372, 0.8583343748698079],
+        "selected_test_exact" => 5,
+        "exact_lift" => 2,
+        "fresh_outputs_sha256" =>
+          "5c2eacbf0d3007956205ef780574f10444ef53b22b449662d6dd682016315eed"
+      },
+      %{
+        "seed" => 2_026_073_103,
+        "artifact_path" =>
+          "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/seed-2026073103-artifact.json",
+        "artifact_bytes" => 1_995_147,
+        "artifact_sha256" => "2548291493dc8afc0289a14c1e861f30574cba9cb4daeba355559ba85d3416ad",
+        "champion_id" => "candidate-0000",
+        "scores" => [0.5636503770362039, 0.265321001541474],
+        "selected_test_exact" => 3,
+        "exact_lift" => 0,
+        "fresh_outputs_sha256" =>
+          "ac3d1ce140a696bafbc87d20d8a4f6cdd9e1c6f8e7cb361036584fafc5bccdb3"
+      }
+    ]
+
+    manifest["artifact_type"] == "imp_optimize_anything_retry_policy_three_seed_evidence" and
+      manifest["condition"] == "imp-88sn-oa" and manifest["schema_version"] == 1 and
+      manifest["task"] == %{
+        "replay_source_path" => "examples/local_optimize_anything_retry_policy/run.exs",
+        "replay_source_sha256" =>
+          "09ecca7da95a3d0152329a50470f502efa018110669ca0cdf7a76cfcd19794c5",
+        "train_count" => 8,
+        "trainset_term_sha256" =>
+          "1bfb7ecf6cfa5e2dd6e78bfe6e6bd657fb51fb160829a5e4d5c5661f0e678313",
+        "selection_count" => 6,
+        "selection_term_sha256" =>
+          "513e22941121f88142acf8641e0a484fe0e2eb915ede1c422c8a0dd010f82446",
+        "test_count" => 6,
+        "test_path" => "examples/local_optimize_anything_retry_policy/data/untouched-v2.jsonl",
+        "test_sha256" => "522245b0d7ec8d896c4b88c0475572a6325c2f25986d8b588d633bffa00590ff"
+      } and
+      file_sha256(manifest_path) ==
+        "b80b0c32d142863eb7d89ca89773cacb9846913503bd7c7e3b8faa24d52326fc" and
+      file_sha256(manifest["task"]["replay_source_path"]) ==
+        manifest["task"]["replay_source_sha256"] and
+      file_sha256(manifest["task"]["test_path"]) == manifest["task"]["test_sha256"] and
+      manifest["aggregate"] == %{
+        "exact_lifts" => [2, 2, 0],
+        "mean_exact_lift" => 4 / 3,
+        "positive_seeds" => 2,
+        "fresh_artifacts" => 3
+      } and
+      length(manifest["seeds"] || []) == 3 and
+      Enum.zip_with(manifest["seeds"] || [], expected, fn entry, exact ->
+        Map.take(
+          entry,
+          ~w(seed artifact_path artifact_bytes artifact_sha256 selected_candidate_id selection_scores selected_test_exact exact_lift fresh_outputs_sha256)
+        ) ==
+          %{
+            "seed" => exact["seed"],
+            "artifact_path" => exact["artifact_path"],
+            "artifact_bytes" => exact["artifact_bytes"],
+            "artifact_sha256" => exact["artifact_sha256"],
+            "selected_candidate_id" => exact["champion_id"],
+            "selection_scores" => exact["scores"],
+            "selected_test_exact" => exact["selected_test_exact"],
+            "exact_lift" => exact["exact_lift"],
+            "fresh_outputs_sha256" => exact["fresh_outputs_sha256"]
+          } and entry["baseline_test_exact"] == 3 and
+          valid_optimize_anything_three_seed_artifact?(entry, exact)
+      end)
+      |> then(&(&1 == [true, true, true]))
+  end
+
+  defp valid_optimize_anything_three_seed_artifact?(entry, expected) do
+    path = entry["artifact_path"]
+
+    with {:ok, stat} <- File.stat(path),
+         true <- stat.size == entry["artifact_bytes"],
+         true <- file_sha256(path) == entry["artifact_sha256"],
+         {:ok, artifact} <- read_artifact(path),
+         validated <- Imp.Optimizer.Artifact.read!(path) do
+      payload = artifact["payload"] || %{}
+      candidates = payload["candidates"] || %{}
+
+      scores =
+        candidates
+        |> Map.values()
+        |> Enum.sort_by(& &1["id"])
+        |> Enum.map(& &1["score"])
+
+      validated["payload"]["champion_id"] == expected["champion_id"] and
+        artifact["schema_version"] == 3 and
+        Enum.all?(Map.values(candidates), &(&1["kind"] == "value")) and
+        payload["security"] == %{
+          "credentials_absent" => true,
+          "functions_absent" => true,
+          "json_safe" => true,
+          "redaction_policy" => "imp_default_v1"
+        } and
+        payload["champion_id"] == expected["champion_id"] and
+        scores == expected["scores"] and
+        get_in(payload, ["provenance", "seed"]) == expected["seed"] and
+        get_in(payload, ["provenance", "condition"]) == "imp-88sn-oa" and
+        get_in(payload, ["provenance", "test_sha256"]) ==
+          "522245b0d7ec8d896c4b88c0475572a6325c2f25986d8b588d633bffa00590ff"
+    else
+      _ -> false
+    end
+  rescue
+    _ -> false
   end
 
   defp valid_matched_instruction_optimizer_result?(artifact) do

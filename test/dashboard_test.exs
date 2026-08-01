@@ -392,6 +392,13 @@ defmodule DashboardTest do
     assert "claim.optimizer.mipro_v2.matched_trec_effectiveness" in proven_claim_ids
     assert "claim.optimize_anything.retry_policy_task_effectiveness" in proven_claim_ids
 
+    oa_summary = dashboard["lanes"]["optimize_anything_task_specific"]["summary"]
+    assert get_in(oa_summary, ["legacy_one_seed", "baseline_exact"]) == 4
+    assert get_in(oa_summary, ["legacy_one_seed", "selected_exact"]) == 5
+    assert get_in(oa_summary, ["three_seed_v2", "exact_lifts"]) == [2, 2, 0]
+    assert get_in(oa_summary, ["three_seed_v2", "positive_seeds"]) == 2
+    assert get_in(oa_summary, ["three_seed_v2", "fresh_artifacts"]) == 3
+
     assert [
              "claim.dspy_semantics.golden_trace",
              "claim.evaluation.auto_evaluation.semantic_conformance",

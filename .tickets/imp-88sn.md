@@ -18,12 +18,16 @@ Obstacle: Imp has one narrow historical positive matched result, several honest 
 
 Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
 
-## Current status after `7411e43f`
+## Current status after `51b46ef0`
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
 new untouched executable rows from `3/6` to `5/6`, retained baseline in the
-third seed, and loaded every value Artifact in a fresh process.
+third seed, and loaded every value Artifact in a fresh process. The three exact
+schema-3 Artifacts are retained under
+`benchmarks/evidence/archive/optimize_anything/retry-policy-v2`; their embedded
+checkpoints bind the historical 8/6 train/selection assignment, and the ordinary
+evidence test recomputes all three test outcomes and fresh-process outputs.
 
 The realistic multi-stage LM half has not passed. IFBench's Imp effectiveness
 interpretation is invalid/unverified after a scorer representation defect. A
@@ -48,9 +52,15 @@ At the earlier product-fit checkpoint no split, objective, model, price, budget,
 or provider run was frozen. The current candidate now freezes the receipt,
 adapted objective, current task/proposer models, and exact mechanism for review;
 price/catalog revalidation, an owner spend cap, and provider authority remain
-absent. Because official dev is treatment-unseen but not globally untouched or
-source-disjoint, even a passing result could not silently satisfy this ticket's
-strongest literal evidence wording.
+absent. Official train and dev are source-file/source-row disjoint: they have no
+row-ID, normalized composed-question, or decomposition-ID overlap. They are not
+semantic-content disjoint: 95 normalized decomposition questions and 3,697 exact
+title-plus-paragraph values overlap. Dev is treatment-unseen but not globally
+unread because the provider-free scorer audit decoded its gold rows. The owner
+must ratify whether the acceptance criterion uses the ordinary benchmark
+meaning—official source-row disjoint and treatment-unseen with this audit and
+semantic-overlap disclosure—or requires the stronger globally unread/content-
+disjoint meaning before any MuSiQue admission or spend work continues.
 
 The MuSiQue current-MIPRO design is frozen for provider-free review, not yet a
 reviewed executable, owner-accepted, or provider-authorized treatment. Generic

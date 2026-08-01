@@ -496,7 +496,8 @@ defmodule Imp.UpstreamFidelity do
         "a source-bound T1 differential matches 33 declared DSPy 3.3.0b1 MIPROv2 and SIMBA structural cases while retaining RNG, sampler, and proposer-call-graph deviations",
         "a provider-free exact DSPy 3.2.1 InferRules differential exercises formatting, rule updates, implicit train/validation splitting, multi-predictor traversal, candidate scoring, and the drop-one-example context recovery schedule while exposing upstream mutable signature aliasing and retaining rollout-ID differences",
         "the admitted one-seed live AIME preflight is operational T2 evidence only",
-        "on one frozen three-seed strong-model TREC contract, Imp MIPROv2 improved its own baseline by mean 0.1458 held-out accuracy with a positive 95% clustered interval; this is task-specific C3 evidence, not general MIPROv2 or instruction-family effectiveness"
+        "on one frozen three-seed strong-model TREC contract, Imp MIPROv2 improved its own baseline by mean 0.1458 held-out accuracy with a positive 95% clustered interval; this is task-specific C3 evidence, not general MIPROv2 or instruction-family effectiveness",
+        "two later modeled-MIPRO Banking77 conditions completed ordinary Result, Artifact, and fresh-service lifecycles but missed their preregistered mean-lift bars; the confirmatory condition improved two of three seeds by mean 0.041667 against a 0.05 requirement, so it is a clean task-scoped negative rather than evidence of broad effectiveness"
       ],
       evidence: %{
         tests: [
@@ -543,7 +544,9 @@ defmodule Imp.UpstreamFidelity do
         "candidate lineage, Pareto state, and source-versioned results are retained locally",
         "an ordinary local Banking77 workflow optimized two named predictors, retained the better baseline when reflection regressed, persisted the selected parameter artifact, and reproduced it in a fresh OS process",
         "on one frozen strong-model TREC contract, Imp GEPA improved its own baseline by mean 0.4000 held-out accuracy and cleared a preregistered -0.05 noninferiority margin against pinned DSPy GEPA",
-        "the matched TREC result is task-specific C3 evidence and does not establish general effectiveness, superiority, or paper-family outcomes"
+        "a later three-seed JSON-GEPA HotPotQA treatment completed all ordinary Artifact and fresh-service lifecycles but produced mean held-out F1 lift -0.015256 with zero positive seeds; its earlier Chat treatment was operationally invalid and is not effectiveness evidence",
+        "IFBench remains compatibility-regression evidence only because a task-scorer representation defect invalidated the earlier Imp effectiveness interpretation",
+        "the matched TREC result is task-specific C3 evidence; the clean negatives and invalid IFBench treatment bound rather than erase it, and no result establishes general effectiveness, superiority, or paper-family outcomes"
       ],
       evidence: %{
         tests: [
@@ -557,7 +560,8 @@ defmodule Imp.UpstreamFidelity do
         docs: [
           "docs/ADVANCED.md",
           "examples/local_gepa_banking77/README.md",
-          "docs/internal/RESEARCH_LANDSCAPE.md"
+          "docs/internal/RESEARCH_LANDSCAPE.md",
+          ".tickets/imp-88sn.md"
         ],
         artifacts: [
           "benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json",
@@ -691,7 +695,8 @@ defmodule Imp.UpstreamFidelity do
         "GEPA v0.1.4 text candidates stay distinct from Imp's strict JSON-safe structured-artifact extension",
         "feedback is per-task and per-metric",
         "search retains lineage and Pareto trade-offs",
-        "paper tasks reproduce at meaningful scale"
+        "the public lifecycle optimizes, selects, persists, and fresh-loads task-owned text and JSON-safe structured artifacts without implying paper-task reproduction",
+        "a later three-seed retry-policy condition used disjoint train, selection, and untouched executable test rows: two proposer-generated values improved exact behavior from 3/6 to 5/6, one seed retained baseline, and all three loaded fresh; the retained Artifacts do not independently bind provider/model identity, and this is one scoped task result rather than a three-class portfolio"
       ],
       evidence: %{
         tests: [
@@ -705,11 +710,15 @@ defmodule Imp.UpstreamFidelity do
           "test/optimize_anything_multimodal_test.exs",
           "test/optimize_anything_tracking_test.exs",
           "test/gepa_module_selector_test.exs",
-          "test/gepa_evaluation_cache_backend_test.exs"
+          "test/gepa_evaluation_cache_backend_test.exs",
+          "test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs"
         ],
-        docs: ["docs/ADVANCED.md", "docs/internal/BENCHMARK_TRUTH.md"],
+        docs: ["docs/ADVANCED.md", "docs/internal/BENCHMARK_TRUTH.md", ".tickets/imp-88sn.md"],
+        artifacts: [
+          "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json"
+        ],
         missing: [
-          "schema-v2 multi-seed live effectiveness on distinct train, selection, and untouched test sets",
+          "schema-v2 multi-seed effectiveness across all three declared non-prompt artifact classes; one retry-policy class has passed its scoped criterion",
           "paper-scale upstream comparison"
         ]
       }

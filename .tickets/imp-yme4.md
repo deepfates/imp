@@ -42,7 +42,7 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Current frontier after `8e801d68`
+## Current frontier after `51b46ef0`
 
 The product center is real but the telos is open.
 
@@ -55,77 +55,69 @@ The product center is real but the telos is open.
   `imp-tg2z` removed reproduced facades and exercised the named families through
   their defining public transitions and safety boundaries. All optimizer modules
   remain experimental; this milestone does not establish broad usefulness or
-  stable-family status.
+  stable-family status. Generic commit `f2711d23` additionally admits pinned
+  DSPy 3.2.1 MIPRO minibatch search, matches pinned Python minibatch sampling,
+  half-even score aggregation, inserted-full-evaluation schedule, and the
+  exercised modeled Optuna trajectory, and preserves exact resumable RNG state
+  without turning mechanism fidelity into an effectiveness claim.
 - **Usefulness — open.** Structured Optimize Anything has one scoped current-
   source positive on new executable rows. Historical TREC is a narrow positive.
   Two modeled-MIPRO Banking77 conditions and one JSON-GEPA HotPotQA condition
   completed their lifecycle but missed frozen lift bars. IFBench effectiveness
   is invalid/unverified after its scorer defect. No current realistic multi-stage
   LM condition has satisfied `imp-88sn`.
-- **External benchmark program — historical instrument exercised, portfolio
-  unratified.**
-  The fixed 96-opportunity HoVer/PAPILLON OpenRouter calibration completed its
-  ordinary Imp and pinned-DSPy vectors with exact private route, usage, cost,
-  cache, and failure evidence. PAPILLON produced scoped per-runtime format,
-  judge, and leakage variability. HoVer's cross-runtime semantic/noise result is
-  invalid because the bound Imp fixture split multi-word retriever titles while
-  DSPy retained them. Prospective commit `87d6baf5` fixes that fixture and proves
-  provider-free semantic input equivalence without changing the immutable live
-  result. The instrument is operable and inexpensive, but it used a now-
-  historical treatment and does not authorize or predict the current candidate.
-- **Next-tranche mechanics — current-model provider-free readiness only.** The
-  adapted HoVer no-merge target has source-grounded nominal/legal opportunity,
-  and its compact four-stage Experiment/Artifact/fresh-service lifecycle passes. The exact
-  released `150/300/300` rows, pinned archive, and 5,233,330-row corpus now
-  materialize provider-free. Ordinary `Experiment.Data` then exposed one exact
-  content duplicate across released train and validation, originating in two
-  raw HoVer records with different source UIDs. The active adapted split now
-  retains 749 released rows, removes validation position 57, and appends one
-  result-blind same-pool replacement chosen by canonical content hash; its
-  active train/dev/test hashes are `448048cc...` / `052fdda8...` / `cf1b51ca...`.
-  The receipted `d8ef9ed4...` BM25S build owns the corrected train+dev top-24
-  fingerprint `2662ef6b...`. A resident source-exact Python worker matches that
-  fingerprint across repeated real-index queries, avoiding a fresh 5.2-million-
-  row corpus load for every Imp retrieval. Both planned runtime entries must
-  verify the same split lineage, source/config/dependency tuple, paths, build
-  receipt, and fingerprint. Historical split and `c35ec786...` identities remain
-  provenance only. Historical GPT-4.1 Mini identifies the released artifact; it
-  is not the current treatment. The current candidate uses
-  `deepseek/deepseek-v4-flash-0731` for task stages and
-  `anthropic/claude-sonnet-5` for reflection. Commit `4a0d8646` adds the generic
-  persisted OpenRouter nested-reasoning option needed to express those routes
-  without benchmark-owned request rewriting. Commit `8e801d68` exercises both
-  ordinary Imp and pinned DSPy 3.2.1/GEPA 0.1.4 lifecycles and inspects their
-  final provider-disabled HTTP bodies: task reasoning is disabled, reflection
-  effort is high, exact route/privacy/no-fallback/no-retry policy is present,
-  evaluation is serial and ordered, and selected state loads in a fresh process.
-  This is current-model condition readiness, not live provider behavior,
-  universal rebuild identity, effectiveness, or provider authority.
-  Circle v1.4's exact one-metric cold probe authenticates source before imports,
-  preserves the released objective and refiner context, carries Imp
-  `current_best`, records upstream's cache-induced one-evaluation asymmetry, and
-  loads/evaluates a schema-3 value Artifact fresh. It does not derive the
-  upstream full `150`-call loop boundary or a five-seed ceiling. Neither probe
-  supplies provider authority, effectiveness, parity, or generalization, and
-  the epic remains open.
+- **External benchmark program — one current candidate, not yet executable.**
+  HoVer/PAPILLON remains a historical instrument: it measured route, usage,
+  cost, cache, and format behavior, but its live HoVer comparison was invalidated
+  by a task-fixture information asymmetry. The corrected HoVer and Circle probes
+  remain provider-free readiness/mechanism evidence only; disproportionate live
+  lanes were rejected rather than promoted into another campaign framework.
+  MuSiQue-Ans is the current landscape-grounded candidate because its official
+  adapted Select-to-Answer topology gives two predictors meaningful work and
+  uses native answer/support scoring. Commit `00ec9424` pins the source/archive,
+  proves exact scorer parity on all 19,938 train rows, matches the ordered top-7
+  information boundary in Imp and pinned DSPy, mutates both predictors, and
+  applies a schema-3 Artifact through a fresh `ProgramServer` process. Commit
+  `51b46ef0` freezes a result-blind normalized-question-group receipt with 700
+  optimizer-train and 300 selection rows and all 2,417 official dev rows held
+  out from the treatment. The full modeled-MIPRO plan is three seeds, 40
+  objective trials, outer mean over three repetitions, and symmetric fresh
+  service; its declared opportunity is 46,412 task plus 47 proposer transports
+  per runtime/seed. Compact Imp and pinned-DSPy selected-state/fresh-process
+  lifecycles pass, but explicitly do not claim the full opportunity.
+- **MuSiQue admission and claim boundary — open.** The frozen condition remains
+  `executable: false`. Pinned DSPy still needs a complete C6 demo-bearing
+  task/proposer serializer census, exact-route single-transport proof, and
+  equivalent pretransport guards. Both runtimes need one canonical wire-byte
+  accounting boundary, and generated accepted bootstrap outputs must be bounded
+  before they become later demos. Therefore `$2,192.04012144` remains planning
+  arithmetic, not a legal ceiling or spend authority. Official train/dev have
+  zero row-ID, normalized composed-question, and decomposition-ID overlap, but
+  95 normalized decomposition-question and 3,697 exact paragraph overlaps.
+  Dev was loaded previously only for provider-free scorer auditing; no model,
+  optimizer, split, threshold, candidate selection, or treatment score used it.
+  The owner must ratify whether the ticket's existing `source-disjoint untouched`
+  wording has its ordinary benchmark meaning—official source-row disjoint and
+  treatment-unseen with semantic-overlap disclosure—or a stronger global-
+  content-disjoint meaning not stated by the ticket. No MuSiQue provider build
+  or spend proceeds before that interpretation.
 
 ## Backward checkpoint plan
 
 Work proceeds backward from the finish line, without turning this list into a
 second tracking system:
 
-1. **Make the current measurement trustworthy.** The historical
-   HoVer/PAPILLON calibration is complete and scoped. For the current HoVer
-   candidate, use at most one result-blind train-only calibration—if scientific
-   review finds it necessary—to measure real request sizes, format reliability,
-   route/privacy identity, latency, cache exposure, and cost in both runtimes.
-   It must not access selection/test rows, optimize, or become another permanent
-   calibration program.
-2. **Ratify or reject the representative portfolio.** Use the calibration and
-   current ecosystem research to choose tasks, public programs, metrics,
-   optimizer/upstream arms, seeds, data sizes, effect thresholds, statistical
-   treatment, and a real cost envelope. The previously proposed 1.7M-transport
-   HoVer/PAPILLON design is a candidate, not automatic authority.
+1. **Ratify the held-out meaning and representative portfolio.** Decide whether
+   ordinary official-split, source-row-disjoint, treatment-unseen data with
+   explicit semantic-overlap disclosure satisfies `imp-88sn`, or require a
+   stronger global-content-disjoint standard before further MuSiQue work. Keep
+   the retained positive OA condition and clean Banking77/HotPot negatives
+   separate from the missing realistic multi-stage positive.
+2. **Authenticate admission before spend.** If MuSiQue remains in scope, finish
+   both runtimes' complete serializer census, exact route/fallback behavior,
+   canonical pretransport input/output guards (including bootstrap demos), and
+   legal call/cost ceiling. Reject the lane if that requires another generic
+   benchmark controller or materially changes the frozen opportunity.
 3. **Freeze ordinary benchmark paths.** Each chosen task must use thin public
    Imp composition, native validated metrics, result-blind splits, ordinary
    Result/Artifact boundaries, fresh concurrent service, and pinned ordinary
