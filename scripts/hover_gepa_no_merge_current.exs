@@ -22,13 +22,19 @@ unless plan.optimizer.use_merge == false and
          plan.status == :readiness_only and
          plan.data_readiness.data_ready == true and
          plan.optimizer.execution_profile == :gepa_v0_1_4 and
-         plan.transports.nominal_total == 115_248 and
-         plan.transports.legal_total == 122_520 do
+         plan.current_treatment.status == :provider_free_candidate and
+         plan.transports.nominal_total == 194_448 and
+         plan.transports.legal_total == 201_720 do
   raise "HoVer no-merge plan does not match the frozen opportunity"
 end
 
 retrieval_probe =
   HoverGepaNoMergePlan.source_exact_retrieval_probe!(material_root,
+    gepa_root: "tmp/gepa-artifact"
+  )
+
+train_only_reflection_census =
+  HoverGepaNoMergePlan.train_only_reflection_census!(material_root,
     gepa_root: "tmp/gepa-artifact"
   )
 
@@ -42,6 +48,11 @@ IO.puts(
   Jason.encode!(%{
     plan: plan,
     source_exact_retrieval_probe: retrieval_probe,
+    train_only_reflection_census: train_only_reflection_census,
+    reflection_census_scope: %{
+      census_data_access: "train_only",
+      invocation_preflight: "all_split_identity_authentication"
+    },
     provider_disabled_results: results
   })
 )

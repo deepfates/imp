@@ -282,7 +282,7 @@ defmodule Imp do
   credentials, so bind a newly configured LM before calling them:
 
       loaded
-      |> Imp.with_lm(Imp.req_llm("openai:gpt-4.1-mini", api_key: api_key))
+      |> Imp.with_lm(Imp.req_llm(System.fetch_env!("IMP_MODEL"), api_key: api_key))
       |> Imp.call(%{question: "What changed?"})
 
   Core predictors, callback wrappers, evaluators, and optimizer-produced KNN

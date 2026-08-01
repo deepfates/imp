@@ -78,7 +78,7 @@ Configure the live application with environment variables:
 
 ```sh
 IMP_ARTIFACT_PATH=/secure/program.json \
-IMP_MODEL=openai:gpt-4.1-mini \
+IMP_MODEL=provider:model-id \
 IMP_API_KEY=... \
 mix run --no-halt
 ```
