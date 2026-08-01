@@ -72,9 +72,12 @@ The sampling harness must preserve:
 
 ## Prioritized Additions
 
-1. **Catalog-to-dashboard integration.** The machine-readable catalog exists;
-   connect it to ticket and dashboard views so stale prose cannot drift from
-   executable evidence.
+1. **Representative multi-stage optimizer tranche.** Use MuSiQue as the leading
+   reference design while comparing credible alternatives by claim value,
+   ordinary-path thinness, task representativeness, and enforceable cost. Run a
+   chosen lane only after its Imp and comparator paths have bounded transport
+   and owner spend authority. Preserve the result whether positive or negative;
+   do not replace it with more catalog or dashboard machinery.
 2. **Classification/factuality sampler.** Support Colors, Iris/Iris-Typo,
    Heart Disease, PubMedQA/CovidQA-like binary or multiclass rows, and macro-F1
    metrics.

@@ -63,18 +63,38 @@ with the scorer audit and semantic overlap disclosed. It does not mean globally
 unread bytes or semantic-content disjointness. This resolves the claim meaning;
 it does not authorize provider work or spend.
 
-MuSiQue readiness work is not automatically the current strategy merely because
-the candidate is detailed. Principal review must first finish the meaningful
-DSPy capability and direct operational comparison, then compare MuSiQue's
-scientific value, expected cost, and task-owned implementation burden with the
-smallest credible landscape-grounded alternative. If admission becomes another
-benchmark controller or evidence project, reject the lane rather than treating
-that machinery as progress on this ticket.
+Principal review now treats MuSiQue as the leading hero-tranche reference after
+the meaningful DSPy capability audit, direct operational comparison, and an
+outside-view comparison with the MIPRO benchmark. This is not ratification by
+readiness momentum. Banking77 and HotPot are exhausted clean negatives; IFBench
+is invalid; BFCL lacks an official optimization split and thin native scorer;
+Circle is a single deterministic mechanism instance; GSM8K is not a realistic
+multi-stage program; and HoVer's credible lane is larger and carries a
+retrieval-fixture history. MuSiQue supplies the smallest current repository path
+that combines an official source split, meaningful work in two named stages,
+native answer and support metrics, modeled joint instruction/demo search,
+matched pinned DSPy, and the ordinary Result/Artifact/fresh-service lifecycle.
 
-The MuSiQue current-MIPRO design is frozen for provider-free review, not yet an
-executable or provider-authorized treatment. It is one serious candidate for
-this ticket's missing realistic multi-stage result, not a complete external
-benchmark portfolio. Generic
+The proposed scale is serious rather than automatically mandatory. The MIPRO
+paper used `500` training, `500` development, and up to `2,000` test rows,
+optimizer budgets of `20–50` full evaluations, and five runs per method. This
+adapted condition uses `700/300/2,417`, forty modeled objectives, three seeds,
+and repeated paired outer evaluation. It can support an externally legible
+current-source result; a cheap smoke alone cannot satisfy this ticket. If the
+intended claim is a matched comparison, the Imp and DSPy arms must remain
+unconditional because launching the comparator only after an Imp pass would
+make the comparison result-conditioned. A differently scoped discovery claim
+may justify a smaller tranche if it is preregistered honestly and followed by
+independent confirmation. If the remaining admission work grows
+into another generic benchmark controller or changes the scientific
+opportunity, reject the lane rather than treating that machinery as progress.
+
+The MuSiQue current-MIPRO design is the leading scientific reference, but is not
+the only allowed tranche, executable, or provider-authorized. It targets this
+ticket's missing realistic multi-stage result, not a complete external
+benchmark portfolio. A materially better task/claim/model/scale design may
+supersede it before spend; readiness investment alone gives it no priority.
+Generic
 pinned-minibatch search
 fidelity was repaired at `f2711d2`: the exact DSPy 3.2.1 size-35/full-every-5
 schedule is now admitted through ordinary pinned MIPRO and independently matches

@@ -42,7 +42,7 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Current frontier after `16ffc17d`
+## Current frontier after `01e5c4d3`
 
 The product center is real but the telos is open.
 
@@ -174,15 +174,26 @@ second tracking system:
    passes with the scope above; long-running recovery, overload behavior, and
    external acceptance remain open and should be tested through ordinary use,
    not a new operations campaign.
-3. **Ratify the representative scientific tranche.** Treat official-split,
-   source-row-disjoint, treatment-unseen MuSiQue dev as a valid held-out boundary
-   with the audit and semantic overlap disclosed. Keep the retained positive OA
-   condition and clean Banking77/HotPot negatives separate. A passing MuSiQue
-   result can satisfy `imp-88sn`'s missing realistic multi-stage condition; it
-   would still be one arm rather than broad epic-level portfolio completion.
-   MuSiQue remains a candidate, not the automatic next task: compare its
-   scientific value, expected cost, and implementation burden with the smallest
-   landscape-grounded alternative before completing admission work.
+3. **Choose the representative scientific tranche.** MuSiQue is the leading
+   reference design, not an irreversible task commitment. It is an adapted
+   current-source study rather than a paper
+   replication, but it preserves the central MIPRO construct: joint instruction
+   and demonstration optimization across a real two-stage program with only a
+   program-level metric. Its `700/300/2,417` train/selection/held-out scale,
+   three optimizer seeds, and repeated paired outer measurement are comparable
+   in seriousness to the MIPRO paper's `500/500/up-to-2,000` splits and five
+   runs per method, rather than a tiny fixture. Treat official-split,
+   source-row-disjoint, treatment-unseen dev as the held-out boundary with the
+   scorer audit and semantic overlap disclosed. Keep the retained positive OA
+   condition and clean Banking77/HotPot negatives separate. Run the matched Imp
+   and pinned-DSPy arms unconditionally if the intended claim is a matched
+   comparison; result-conditioned comparator spend would weaken that claim. A
+   passing MuSiQue result can satisfy `imp-88sn`'s missing realistic multi-stage
+   condition, but remains one arm rather than broad epic-level portfolio
+   completion. Before spend, retain explicit freedom over claim, task,
+   optimizer, comparator, scale, model, and provider. Prefer another lane if
+   primary-source review shows it can answer a more important question through
+   a thinner ordinary path or a materially better cost/credibility tradeoff.
 4. **Authenticate the chosen arm before spend.** Finish
    both runtimes' complete serializer census, exact route/fallback behavior,
    canonical pretransport input/output guards (including bootstrap demos), and
