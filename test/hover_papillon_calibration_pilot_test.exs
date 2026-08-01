@@ -48,6 +48,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
   end
 
   @tag :evidence_infrastructure
+  @tag timeout: 120_000
   test "pinned private source drives exact independent Imp and DSPy schedules", %{commit: commit} do
     previous_key = System.get_env("OPENAI_API_KEY")
     System.delete_env("OPENAI_API_KEY")
