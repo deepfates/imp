@@ -62,14 +62,17 @@ The product center is real but the telos is open.
   completed their lifecycle but missed frozen lift bars. IFBench effectiveness
   is invalid/unverified after its scorer defect. No current realistic multi-stage
   LM condition has satisfied `imp-88sn`.
-- **External benchmark program — in calibration, not execution.** HoVer and
-  PAPILLON are candidate tasks because they exercise real multi-stage retrieval,
-  delegation, quality, and privacy behavior. Their 96-opportunity training-only
-  OpenRouter calibration is meant to measure format reliability, repetition
-  noise, privacy, usage, and cost before any large optimizer portfolio. Its first
-  two live attempts were scientifically null product/evidence stops. The current
-  provider-free repair at `3b65a3e0` corrects route identity and transported-
-  failure persistence; an interpretable calibration result is still absent.
+- **External benchmark program — instrument exercised, portfolio unratified.**
+  The fixed 96-opportunity HoVer/PAPILLON OpenRouter calibration completed its
+  ordinary Imp and pinned-DSPy vectors with exact private route, usage, cost,
+  cache, and failure evidence. PAPILLON produced scoped per-runtime format,
+  judge, and leakage variability. HoVer's cross-runtime semantic/noise result is
+  invalid because the bound Imp fixture split multi-word retriever titles while
+  DSPy retained them. Prospective commit `87d6baf5` fixes that fixture and proves
+  provider-free semantic input equivalence without changing the immutable live
+  result. The instrument is operable and inexpensive, but the candidate
+  portfolio is not ratified and another calibration lane is not the next
+  default action.
 
 ## Backward checkpoint plan
 

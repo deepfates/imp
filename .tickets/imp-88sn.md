@@ -2433,6 +2433,65 @@ provider-free product/evidence proofs. They do not rehabilitate the stopped
 run, establish live format/noise behavior, earn any scientific claim, or imply
 authority for another completion.
 
+## OpenRouter prompt-cache calibration v2 terminal result
+
+The separately named condition
+`imp-88sn-hover-papillon-openrouter-calibration-v2-provider-prompt-cache`
+ran once from exact clean source
+`22ea9e125810c612e968b4baf05bba24dce5232f`. It kept OpenRouter response
+caching disabled while permitting the documented ephemeral provider prompt
+cache under ZDR. The exact Novita `novita/fp8` route, dated model snapshot,
+ZDR/data-deny policy, no-retry/no-fallback contract, fixed train rows, 48+48
+opportunity vectors, and combined `$5.00` stop all held.
+
+Imp transported and reconciled all 48 stages with 48 strict parses. Pinned DSPy
+transported and reconciled 43 stages; an ordinary `quality_ab` parse failure in
+PAPILLON repetition 1 and an ordinary response-stage program failure in
+repetition 4 skipped exactly their five remaining suffix opportunities without
+replacement, while repetitions 2 and 3 completed. Joined generation costs are
+`$0.011171636` for Imp and `$0.009269456` for DSPy, `$0.020441092` combined.
+Four calls reported provider prompt-cache reads totaling 1,664 tokens
+(Imp 1,152; DSPy 512). The account snapshot moved `$0.019926872`; its exact
+`$0.00051422` shortfall is the final DSPy generation cost and is retained only
+as a lagging account-level corroboration, not substituted for joined generation
+cost. No undocumented cache tariff, uncached latency/cost, parity, or cache-noise
+claim is inferred.
+
+The terminal private root is
+`benchmarks/results/hover-papillon-openrouter-calibration-v2-provider-prompt-cache-22ea9e1-20260801T035738Z`.
+Its mode-0600 terminal record SHA-256 is
+`bd443f70a7f8b7d154ffd2818deac37ec2d1987aab8f2e88a4aaf12bcbcc5f8b`.
+Independent audit recomputed all 193 bound nonterminal files, exact schedules,
+request/generation joins, modes, route/ZDR identity, costs, and private PUPA
+containment with no hidden artifact defect.
+
+This is not a valid HoVer cross-runtime semantic or noise calibration. The
+bound Imp fixture used `~w(The\ Dinner\ Party ...)`, which Elixir split into
+individual words; Imp therefore retained malformed retrieval context and
+missed all gold titles in all six repetitions, while DSPy retained the six
+full titles and hit all gold titles in all six. That is non-model task-graph
+information asymmetry, not renderer or provider noise. HoVer still contributes
+route/format/accounting mechanics (24/24 parsed transports per runtime), but
+not intended-task scores, cross-runtime effects, or a clean full-study cost
+projection.
+
+PAPILLON remains interpretable only as per-runtime instrument evidence. Imp
+completed four scores (`0.5`, `0.722222`, `1.0`, `1.0`); DSPy completed two
+(`1.0`, `0.722222`) and retained the two ordinary failures above. This exposes
+real format, judge, leakage, and cost variability, but the ordinary renderers
+differ and one repeated private training row cannot establish parity,
+effectiveness, or portfolio suitability by itself. The calibration therefore
+establishes that the route/evidence instrument is operable and inexpensive,
+but does not ratify the proposed benchmark portfolio or satisfy this ticket.
+
+Provider-free commit `87d6baf5` replaces only the misleading Imp title sigil
+with the exact ordered full-title literals used by pinned DSPy. The focused
+two-runtime test now proves identical semantic retriever inputs, retrieved-title
+order, and all-gold outcomes; the opted-in calibration suite passes 11/11 and
+`mix fast.check` passes. The live v2 root and terminal seal remain byte-for-byte
+unchanged. No provider rerun follows from this correction, and none of the
+invalid HoVer outcomes above are reinterpreted.
+
 ## Notes
 
 **2026-07-31T20:57:09Z**
