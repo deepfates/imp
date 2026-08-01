@@ -104,9 +104,15 @@ that the ordinary aggregator recomputes directly without the 181 MB private raw
 provider traces. `docs/CASE_STUDY_TREC.md` now gives ordinary readers the exact
 source-checkout command, public input hashes, result, and limitations; the Hex
 product payload does not absorb the research runner or scored rows. That story
-still requires a fresh independent claim-recomputation review and must not be
-inflated into broad usefulness, DSPy superiority, or production-readiness. Fund MuSiQue only for the additional claim that Imp
-improves a realistic multi-stage program, after a precision/power review shows
+passed a fresh independent claim-recomputation review at source
+`0ff21661cfcb6daf6e1b700ba38fcd096efd5757`: all five documented hashes
+matched, and the ordinary command reproduced GEPA `+0.4000`, MIPROv2
+`+0.1458`, and GEPA Imp-minus-DSPy `-0.0083`. This verifies the committed
+scored-row aggregate, not the private raw provider execution, routing, cost, or
+selection generation, and must not be inflated into broad usefulness, DSPy
+superiority, or production-readiness. Fund MuSiQue only for the additional
+claim that Imp improves a realistic multi-stage program, after a
+precision/power review shows
 that its scale is warranted; release-story credibility alone does not require
 the full current MuSiQue opportunity.
 

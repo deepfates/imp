@@ -65,8 +65,21 @@ The product center is real but the telos is open.
   service. That establishes the deployable provider-free lifecycle for that
   exact package. It also exposed two public-boundary gaps: retention environment
   variables were implemented but undocumented, and the package narrated TREC
-  without a discoverable recomputation path. The docs repair after that review
-  requires a fresh cold check before external acceptance is complete.
+  without a discoverable recomputation path. After the docs repair, a different
+  uncoached reviewer independently verified package digest
+  `67087f6cd7e214c085b5a3f887eebb19e1139515752ed333efc266f39d557e98`
+  from source `0ff21661cfcb6daf6e1b700ba38fcd096efd5757`, followed the
+  now-documented retention command, and reproduced the same complete lifecycle.
+  The retained Artifact and Result were `0600`; the combined program improved
+  `0.25 -> 1.0`, both named predictors received four selected demos, the fresh
+  service completed four calls, and it remained healthy after a killed worker
+  and timeout. This proves selected parameters on both stages and whole-program
+  improvement, not isolated per-stage lift. The same reviewer used only the
+  public case study and exact source archive to verify all five input hashes and
+  recompute GEPA `+0.4000`, MIPROv2 `+0.1458`, and GEPA Imp-minus-DSPy
+  `-0.0083`. Independent adversarial package/recomputation review is therefore
+  achieved at this exact candidate boundary. A Codex peer is still not an
+  external human/user adoption result, and no broad usefulness claim follows.
 - **Advertised mechanisms — complete as an experimental prerequisite.**
   `imp-tg2z` removed reproduced facades and exercised the named families through
   their defining public transitions and safety boundaries. All optimizer modules
