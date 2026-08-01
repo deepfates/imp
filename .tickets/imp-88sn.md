@@ -2310,8 +2310,8 @@ reservation and therefore is not attributed to the calibration. This is an
 inconclusive live-instrument/evidence failure, not a program-format, noise,
 cost-feasibility, effectiveness, parity, or historical-reproduction result.
 The benchmark-program decision is unchanged: the fixed pilot still lacks live
-calibration evidence, and its evidence reconciliation/persistence boundary must
-be repaired and independently reviewed before any future authority.
+calibration evidence. Its evidence reconciliation/persistence boundary required
+a provider-free repair and independent review before any future authority.
 
 The bounded provider-free owning repair is commit
 `a6e16d79e5e629ffdb52bfbd8af03e1b18318c08`. Both repository-only runtimes now
@@ -2332,8 +2332,12 @@ the next scheduled opportunity in either runtime. The exact provider-disabled
 test, `mix fast.check`, and `mix package.check` pass. This repairs the reproduced
 evidence-loss class but does not rehabilitate the terminal run, establish that
 OpenRouter's live generation record will become available within the bound, or
-authorize another completion. Independent review remains required before any
-future live authority.
+authorize another completion. Independent review passed exact clean commit
+`82855ded525d9c3b43a0d4e5f6cb465d44e1c3cb`: both runtimes retained the full
+provisional response identity, usage, cache, route, and finish evidence through
+local 404-to-200 recovery and terminal three-404 refusal with no next stage.
+This closes the provider-free repair review only. Live availability remains
+unexercised, and another completion still requires separate authority.
 
 ## Notes
 
