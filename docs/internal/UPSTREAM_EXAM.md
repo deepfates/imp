@@ -119,7 +119,7 @@ prior-art). Most also require pydantic model schemas. One row each:
 | test_baml_adapter_handles_type_casting_errors | blocked | No BAMLAdapter. |
 | test_baml_adapter_with_images | blocked | No BAMLAdapter. |
 | test_baml_adapter_with_tools | blocked | No BAMLAdapter; also typed tool fields (see chat). |
-| test_baml_adapter_with_code | blocked | No BAMLAdapter; also Code field type. |
+| test_baml_adapter_with_code | blocked | No BAMLAdapter; the ordinary Chat/JSON/XML Code field type is covered separately. |
 | test_baml_adapter_with_conversation_history | blocked | No BAMLAdapter. |
 | test_baml_vs_json_adapter_token_efficiency | blocked | No BAMLAdapter. |
 | test_baml_vs_json_adapter_functional_compatibility | blocked | No BAMLAdapter. |
@@ -150,8 +150,8 @@ prior-art). Most also require pydantic model schemas. One row each:
 | test_chat_adapter_formats_image_with_nested_images | n/a | Images nested in pydantic wrapper models; no model-traversal surface in Imp. |
 | test_chat_adapter_formats_image_with_few_shot_examples_with_nested_images | n/a | Same. |
 | test_chat_adapter_with_tool | blocked | Requires `list[dspy.Tool]`/`dspy.ToolCalls` as typed signature fields (with `ToolCalls.description()` in the system message). Imp renders tools via the ReAct runtime, not signature field types. |
-| test_chat_adapter_with_code | blocked | Requires `dspy.Code` as a field type (description in system message; parse to a Code value). Imp's Code struct is a content value only. |
-| test_code_output_field_omits_json_schema_in_prompt | blocked | Same missing Code field-type surface. |
+| test_chat_adapter_with_code | pass (adapted) | A `type: :code` field carries language metadata, emits the language-aware Code description, renders plain source inputs, and parses output into `Imp.Adapter.Types.Code`. |
+| test_code_output_field_omits_json_schema_in_prompt | pass | Code guidance is compact language-aware text; no custom-type JSON schema is duplicated in the Chat prompt. |
 | test_citations_output_field_keeps_json_schema_in_prompt | blocked | DSPy `Citations` custom type not modeled (see test_citation.py). |
 | test_chat_adapter_formats_conversation_history | pass | Exact-string message contents for both history turns. |
 | test_chat_adapter_fallback_to_json_adapter_on_exception | pass (was FAIL) | Fixed by dee-coia + dee-16qm: strict chat parse fails, Imp.Predict's JSON fallback fires a second LM call, and JSONRepair decodes the single-quoted object. |
@@ -188,10 +188,10 @@ DSPy's `Citations` is the Anthropic citations type (`cited_text`,
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_code_validate_input | pass (partial) | Code payload carried; invalid (non-binary) code rejected at the provider boundary (`Types.to_openai/1`) rather than at construction. The `dspy.Code["python"]` parameterized-class form has no Imp analog. |
+| test_code_validate_input | pass (adapted) | `Types.Code.new/2` validates binary code at construction; language is explicit data rather than a parameterized Python class. |
 | test_code_in_nested_type | n/a | Pydantic wrapper model. |
-| test_code_with_language | pass (partial) | Language rides the struct. `Code.description()` ("Programming language: java") has no Imp surface — that half blocked. |
-| test_code_parses_from_dirty_code | blocked | DSPy strips markdown fences/prose at construction; Imp has no parsing constructor for Code (and no Code output-field type to trigger it). |
+| test_code_with_language | pass | Language rides the struct and `Types.Code.description/1` emits the matching prompt guidance. |
+| test_code_parses_from_dirty_code | pass | `Types.Code.new/2` extracts the first markdown code block and strips its fence/prose. |
 
 ## tests/adapters/test_document.py (4)
 
@@ -224,7 +224,7 @@ renders as a text block.
 | test_json_adapter_formats_with_nested_documents | n/a | Pydantic wrapper + Anthropic document blocks (see test_document.py). |
 | test_json_adapter_formats_image_with_few_shot_examples_with_nested_images | n/a | Pydantic wrapper traversal. |
 | test_json_adapter_with_tool | blocked | Typed tool fields + native `tools` request param surface absent. |
-| test_json_adapter_with_code | blocked | Code field type absent. |
+| test_json_adapter_with_code | pass (adapted) | Code is represented as a JSON string on the provider wire and parsed into the typed value; language-aware guidance matches the ordinary custom-type meaning. |
 | test_json_adapter_formats_conversation_history | pass | Exact strings incl. pretty-JSON assistant turns. |
 | test_json_adapter_on_pydantic_model_async | n/a | asyncio + pydantic. |
 | test_json_adapter_fallback_to_json_mode_on_structured_output_failure | n/a | Same runtime-retry design substitution as above. |
@@ -308,7 +308,7 @@ n/a wholesale.
 | test_xml_adapter_format_and_parse_list_of_models | n/a | Pydantic list output. |
 | test_xml_adapter_with_tool_like_output | n/a | Pydantic ToolCall models. |
 | test_xml_adapter_formats_nested_images | n/a | Pydantic wrapper traversal. |
-| test_xml_adapter_with_code | blocked | Code field type absent. |
+| test_xml_adapter_with_code | pass (adapted) | XML renders plain source inside the field tag and parses fenced or plain output into the typed Code value. |
 | test_xml_adapter_full_prompt | blocked | Requires `context: str \| None` — an Optional/Union input annotation rendered as `UnionType[str, NoneType]`; Imp has no union type surface, so the byte-exact prompt cannot be reproduced. |
 | test_format_system_message | pass | Full-string equality (XML structure blocks, no completed sentinel, JSON-schema notes). |
 

@@ -2,6 +2,7 @@ defmodule Imp.Optimizer.Report do
   @moduledoc "Optimizer candidate history and diagnostic metadata."
 
   @image_schema_version 1
+  @code_schema_version 1
   @report_keys MapSet.new([
                  "optimizer",
                  "best_score",
@@ -23,6 +24,12 @@ defmodule Imp.Optimizer.Report do
                     "mime_type",
                     "metadata"
                   ])
+  @code_tag_keys MapSet.new([
+                   "__imp_type__",
+                   "schema_version",
+                   "code",
+                   "language"
+                 ])
   @map_tag_keys MapSet.new(["__imp_type__", "entries"])
   # Public optimizer identities are part of the portable Report contract. A
   # clean BEAM may not have loaded the owning optimizer module yet, so relying
@@ -360,6 +367,15 @@ defmodule Imp.Optimizer.Report do
     }
   end
 
+  defp dump_value(%Imp.Adapter.Types.Code{} = code) do
+    %{
+      "__imp_type__" => "code",
+      "schema_version" => @code_schema_version,
+      "code" => code.code,
+      "language" => code.language
+    }
+  end
+
   defp dump_value(%__MODULE__{} = report) do
     Map.put(dump(report), "__imp_type__", "optimizer_report")
   end
@@ -423,6 +439,15 @@ defmodule Imp.Optimizer.Report do
       "data" => image.data,
       "mime_type" => image.mime_type,
       "metadata" => dump_projection(image.metadata)
+    }
+  end
+
+  defp dump_projection(%Imp.Adapter.Types.Code{} = code) do
+    %{
+      "__imp_type__" => "code",
+      "schema_version" => @code_schema_version,
+      "code" => code.code,
+      "language" => code.language
     }
   end
 
@@ -582,6 +607,14 @@ defmodule Imp.Optimizer.Report do
     end
   end
 
+  defp load_value(%{"__imp_type__" => "code"} = state, _atom_mode) do
+    if valid_code_state?(state) do
+      %Imp.Adapter.Types.Code{code: state["code"], language: state["language"]}
+    else
+      raise ArgumentError, "malformed Imp code JSON tag"
+    end
+  end
+
   defp load_value(%{"__imp_type__" => "tuple"} = state, atom_mode) do
     validate_exact_tag!(state, @tuple_tag_keys, "tuple")
 
@@ -718,6 +751,13 @@ defmodule Imp.Optimizer.Report do
       optional_binary?(state["data"]) and
       optional_binary?(state["mime_type"]) and
       is_map(state["metadata"])
+  end
+
+  defp valid_code_state?(state) do
+    MapSet.equal?(MapSet.new(Map.keys(state)), @code_tag_keys) and
+      state["schema_version"] == @code_schema_version and
+      is_binary(state["code"]) and
+      (is_nil(state["language"]) or is_binary(state["language"]))
   end
 
   defp optional_binary?(value), do: is_nil(value) or is_binary(value)

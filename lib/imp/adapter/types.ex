@@ -16,7 +16,88 @@ defmodule Imp.Adapter.Types do
   defmodule Audio, do: defstruct([:url, :data, :mime_type, metadata: %{}])
   defmodule File, do: defstruct([:path, :url, :data, :mime_type, metadata: %{}])
   defmodule Document, do: defstruct([:text, metadata: %{}])
-  defmodule Code, do: defstruct([:code, language: nil])
+
+  defmodule Code do
+    @moduledoc """
+    Typed source code used by signature-level code inputs and outputs.
+
+    `new/2` accepts plain or markdown-fenced code and removes the first fenced
+    block's delimiters. The language defaults to `"python"`, matching DSPy's
+    `Code` type, and can be carried explicitly by a signature field.
+    """
+
+    defstruct [:code, language: nil]
+
+    @type t :: %__MODULE__{code: String.t(), language: String.t() | nil}
+
+    def new(value, opts \\ [])
+
+    def new(%__MODULE__{code: code, language: language}, opts) when is_binary(code) do
+      %__MODULE__{
+        code: filter(code),
+        language: normalize_language(Keyword.get(opts, :language, language || "python"))
+      }
+    end
+
+    def new(value, opts) when is_binary(value) do
+      %__MODULE__{
+        code: filter(value),
+        language: normalize_language(Keyword.get(opts, :language, "python"))
+      }
+    end
+
+    def new(%{} = value, opts) do
+      code = Map.get(value, :code, Map.get(value, "code"))
+      language = Map.get(value, :language, Map.get(value, "language"))
+
+      if is_binary(code) do
+        new(code, Keyword.put_new(opts, :language, language || "python"))
+      else
+        raise ArgumentError, "Imp.Adapter.Types.Code requires a binary :code field"
+      end
+    end
+
+    def new(value, _opts) do
+      raise ArgumentError,
+            "Imp.Adapter.Types.Code expects code text, a Code struct, or a map with binary :code; got: #{inspect(value)}"
+    end
+
+    @doc "Returns the plain source text carried by a code value."
+    def format(%__MODULE__{code: code}) when is_binary(code), do: code
+
+    @doc "Language-aware prompt guidance for a signature-level code field."
+    def description(language \\ "python") do
+      language = normalize_language(language)
+
+      "Code represented in a string, specified in the `code` field. If this is an output field, the code " <>
+        "field should follow the markdown code block format, e.g. \n```#{String.downcase(language)}\n{code}\n```" <>
+        "\nProgramming language: #{language}"
+    end
+
+    @doc false
+    def filter(code) when is_binary(code) do
+      case Regex.run(~r/```(?:[^\n]*)\n(.*?)```/s, code) do
+        [_all, fenced] -> String.trim(fenced)
+        nil -> filter_simple(code)
+      end
+    end
+
+    defp filter_simple(code) do
+      case Regex.run(~r/```(.*?)```/s, code) do
+        [_all, fenced] -> String.trim(fenced)
+        nil -> code
+      end
+    end
+
+    defp normalize_language(language) when is_atom(language), do: Atom.to_string(language)
+    defp normalize_language(language) when is_binary(language), do: language
+
+    defp normalize_language(language) do
+      raise ArgumentError,
+            "Imp.Adapter.Types.Code language must be a string or atom, got: #{inspect(language)}"
+    end
+  end
+
   defmodule Reasoning, do: defstruct([:text, metadata: %{}])
   defmodule History, do: defstruct(messages: [])
   defmodule Citation, do: defstruct([:text, :source, metadata: %{}])

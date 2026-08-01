@@ -105,7 +105,20 @@ defmodule Imp.Adapter.JSON do
   # to the "${name}" placeholder (the ChainOfThought reasoning sentinel) as
   # empty. chat.ex already mirrors this; json.ex must too (dee-cidk).
   defp field_desc(field) do
-    if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
+    base = if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
+
+    if code_field?(field) do
+      type_description =
+        "Type description of #{code_annotation(field)}: " <>
+          Imp.Adapter.Types.Code.description(code_language(field))
+
+      case base do
+        "" -> "\n    " <> type_description
+        _ -> base <> "\n    " <> type_description
+      end
+    else
+      base
+    end
   end
 
   # JSONAdapter.format_field_structure.
@@ -190,8 +203,11 @@ defmodule Imp.Adapter.JSON do
 
   # DSPy annotation name for a field: composite types (Literal/list/dict) resolve
   # through CompositeType; scalars fall back to the plain type-name mapping.
-  defp field_annotation_name(field),
-    do: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
+  defp field_annotation_name(field) do
+    if code_field?(field),
+      do: code_annotation(field),
+      else: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
+  end
 
   # utils.get_annotation_name for the scalar types Imp models.
   defp annotation_name(:string), do: "str"
@@ -210,9 +226,14 @@ defmodule Imp.Adapter.JSON do
   defp render_assistant_json(signature, outputs, missing_field_message) do
     signature
     |> Imp.Adapter.Chat.resolve_demo_outputs(outputs, missing_field_message)
-    |> Enum.map(fn {name, value} -> {to_string(name), value} end)
+    |> Enum.map(fn {name, value} -> {to_string(name), json_value(value)} end)
     |> pretty_json_object()
   end
+
+  defp json_value(%Imp.Adapter.Types.Code{} = value),
+    do: Imp.Adapter.Types.Code.format(value)
+
+  defp json_value(value), do: value
 
   # Mirror Python `json.dumps(obj, indent=2, ensure_ascii=False)` for an ordered
   # object whose values are JSON scalars (strings for the structure template;
@@ -254,6 +275,12 @@ defmodule Imp.Adapter.JSON do
   with no DSPy analog: `native_json_schema: true` forces Imp's own json_schema
   envelope, and a caller-supplied `response_format` map is passed through
   untouched (returns `[]` so the caller's value wins).
+
+  Signature-level `:code` outputs deliberately use a flat JSON string schema.
+  That matches the actual JSON prompt and serialized value Imp accepts. Current
+  DSPy exposes its pydantic `Code_<language>` wrapper as a `$ref` object in
+  native response schema even though its JSONAdapter prompt and serializer use
+  a string; Imp does not reproduce that internal pydantic mismatch.
   """
   def lm_opts(signature, opts) do
     opts = validate_lm_opts!(opts, "#{inspect(__MODULE__)}.lm_opts/2")
@@ -372,11 +399,22 @@ defmodule Imp.Adapter.JSON do
   defp scalar_json_type(:float), do: "number"
   defp scalar_json_type(:number), do: "number"
   defp scalar_json_type(:boolean), do: "boolean"
+  defp scalar_json_type(:code), do: "string"
   defp scalar_json_type("string"), do: "string"
   defp scalar_json_type("integer"), do: "integer"
   defp scalar_json_type("float"), do: "number"
   defp scalar_json_type("number"), do: "number"
   defp scalar_json_type("boolean"), do: "boolean"
+  defp scalar_json_type("code"), do: "string"
+
+  defp code_field?(%{type: type}), do: type in [:code, "code"]
+
+  defp code_language(field) do
+    Map.get(field.metadata, :language, Map.get(field.metadata, "language", "python"))
+    |> to_string()
+  end
+
+  defp code_annotation(field), do: "Code_#{code_language(field)}"
 
   @impl true
   def parse(signature, raw, opts) when is_map(raw),

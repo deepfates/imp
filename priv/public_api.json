@@ -818,6 +818,45 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
+        "description/1",
+        "format/1",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.Code",
+      "signatures": {
+        "functions": {
+          "description/1": [
+            "description(language \\\\ \"python\")"
+          ],
+          "format/1": [
+            "format(code)"
+          ],
+          "new/2": [
+            "new(value, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "code",
+        "language"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
         "format/1",
         "from_map/1",
         "new/3"

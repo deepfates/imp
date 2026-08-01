@@ -15,6 +15,11 @@ provider-free MuSiQue readiness without adding those research surfaces to the
 Hex payload. These changes remain part of the unpublished candidate until an
 owner-approved release cut decides otherwise.
 
+Signature fields can now use `type: :code` with explicit `language:` metadata.
+Chat, JSON, and XML adapters emit language-aware guidance, render source inputs,
+and return fenced or plain outputs as validated typed code values;
+the type transports source but does not execute it.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is

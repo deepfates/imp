@@ -139,10 +139,22 @@ defmodule Imp.Adapter.Chat do
   # annotation gets Python `str(value)`; everything else keeps the typed
   # coercion clauses below.
   defp coerce_field(field, value) do
-    case enum_constraint(field) do
-      values when is_list(values) -> coerce_literal(value, values)
-      _no_enum -> coerce_value(value, field.type)
+    cond do
+      code_field?(field) ->
+        coerce_code(value, code_language(field))
+
+      true ->
+        case enum_constraint(field) do
+          values when is_list(values) -> coerce_literal(value, values)
+          _no_enum -> coerce_value(value, field.type)
+        end
     end
+  end
+
+  defp coerce_code(value, language) do
+    Imp.Adapter.Types.Code.new(value, language: language)
+  rescue
+    ArgumentError -> value
   end
 
   # parse_value's Literal branch: the raw value if allowed; otherwise (strings
@@ -383,6 +395,15 @@ defmodule Imp.Adapter.Chat do
   # through the injectable section renderer (Chat markers by default, XML tags
   # for Imp.Adapter.XML).
   defp render_input_section(field, value, section_renderer) do
+    if code_field?(field) do
+      code = Imp.Adapter.Types.Code.new(value, language: code_language(field))
+      section_renderer.(field, Imp.Adapter.Types.Code.format(code))
+    else
+      render_non_code_input_section(field, value, section_renderer)
+    end
+  end
+
+  defp render_non_code_input_section(field, value, section_renderer) do
     if native_content?(value) do
       ["[[ ## #{field.name} ## ]]\n" | native_content_parts(value)]
     else
@@ -546,9 +567,23 @@ defmodule Imp.Adapter.Chat do
     # ChainOfThought reasoning sentinel) as empty; match that exactly.
     desc = if field.desc == "${#{field.name}}", do: nil, else: field.desc
 
-    [desc, answer_shape_instruction(field)]
-    |> Enum.reject(&(is_nil(&1) or &1 == ""))
-    |> Enum.join(" ")
+    base =
+      [desc, answer_shape_instruction(field)]
+      |> Enum.reject(&(is_nil(&1) or &1 == ""))
+      |> Enum.join(" ")
+
+    if code_field?(field) do
+      type_description =
+        "Type description of #{code_annotation(field)}: " <>
+          Imp.Adapter.Types.Code.description(code_language(field))
+
+      case base do
+        "" -> "\n    " <> type_description
+        _ -> base <> "\n    " <> type_description
+      end
+    else
+      base
+    end
   end
 
   defp answer_shape_instruction(field) do
@@ -686,8 +721,11 @@ defmodule Imp.Adapter.Chat do
 
   # DSPy annotation name for a field: composite types (Literal/list/dict) resolve
   # through CompositeType; scalars fall back to the plain type-name mapping.
-  defp field_annotation(field),
-    do: Imp.Adapter.CompositeType.annotation_name(field) || field_type(field.type)
+  defp field_annotation(field) do
+    if code_field?(field),
+      do: code_annotation(field),
+      else: Imp.Adapter.CompositeType.annotation_name(field) || field_type(field.type)
+  end
 
   defp append_content(content, ""), do: content
   defp append_content(content, suffix) when is_binary(content), do: content <> suffix
@@ -714,8 +752,19 @@ defmodule Imp.Adapter.Chat do
   # string form, e.g. "2024-11-25T10:00:00", before the prompt is built).
   def format_value(%DateTime{} = value), do: DateTime.to_iso8601(value)
   def format_value(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
+  def format_value(%Imp.Adapter.Types.Code{} = value), do: Imp.Adapter.Types.Code.format(value)
 
   def format_value(value), do: inspect(value)
+
+  defp code_field?(%{type: type}), do: type in [:code, "code"]
+
+  defp code_language(field) do
+    field.metadata
+    |> fetch_meta(:language, "python")
+    |> to_string()
+  end
+
+  defp code_annotation(field), do: "Code_#{code_language(field)}"
 
   defp render_demos(_signature, [], _renderer, _input_renderer), do: []
   defp render_demos(_signature, nil, _renderer, _input_renderer), do: []

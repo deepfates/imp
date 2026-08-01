@@ -25,14 +25,15 @@ defmodule Imp.Signature.Field do
 
   def new(%{} = attrs, kind) do
     name = attrs |> Map.get(:name, Map.get(attrs, "name")) |> normalize_name()
+    type = attrs |> Map.get(:type, Map.get(attrs, "type", :string)) |> normalize_type()
 
     %__MODULE__{
       name: name,
       kind: attrs |> Map.get(:kind, Map.get(attrs, "kind", kind)) |> normalize_kind(),
-      type: attrs |> Map.get(:type, Map.get(attrs, "type", :string)) |> normalize_type(),
+      type: type,
       desc: Map.get(attrs, :desc, Map.get(attrs, "desc")),
       prefix: Map.get(attrs, :prefix, Map.get(attrs, "prefix", infer_prefix(name))),
-      metadata: metadata(attrs)
+      metadata: metadata(attrs, type)
     }
   end
 
@@ -71,9 +72,10 @@ defmodule Imp.Signature.Field do
   def optional(%__MODULE__{} = field),
     do: %__MODULE__{field | metadata: Map.put(field.metadata, :optional, true)}
 
-  defp metadata(attrs) do
+  defp metadata(attrs, type) do
     metadata = Map.get(attrs, :metadata, Map.get(attrs, "metadata", %{}))
     constraints = Map.get(attrs, :constraints, Map.get(attrs, "constraints"))
+    language = Map.get(attrs, :language, Map.get(attrs, "language"))
 
     metadata =
       if constraints do
@@ -81,6 +83,10 @@ defmodule Imp.Signature.Field do
       else
         metadata
       end
+
+    metadata = if is_nil(language), do: metadata, else: Map.put(metadata, :language, language)
+
+    metadata = validate_code_language!(metadata, type)
 
     # DSPy InputField(default=...): an input field may carry a default value
     # that fills the input when the caller omits it (Predict fills it before
@@ -91,6 +97,25 @@ defmodule Imp.Signature.Field do
       :error -> metadata
     end
   end
+
+  defp validate_code_language!(metadata, type) when type in [:code, "code"] do
+    case Map.get(metadata, :language, Map.get(metadata, "language")) do
+      nil ->
+        metadata |> Map.delete(:language) |> Map.delete("language")
+
+      language when is_atom(language) ->
+        metadata |> Map.delete("language") |> Map.put(:language, Atom.to_string(language))
+
+      language when is_binary(language) and language != "" ->
+        metadata |> Map.delete("language") |> Map.put(:language, language)
+
+      language ->
+        raise ArgumentError,
+              "code field language must be a non-empty string or atom, got: #{inspect(language)}"
+    end
+  end
+
+  defp validate_code_language!(metadata, _type), do: metadata
 
   defp fetch_default(attrs) do
     case Map.fetch(attrs, :default) do

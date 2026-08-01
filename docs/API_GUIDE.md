@@ -46,6 +46,32 @@ The signature is more than prompt text. The adapter uses it to render the
 request and validate the response. An output outside the declared enum is an
 error, not a string your application discovers later.
 
+Use the map form for a language-aware code field. Code inputs are rendered as
+plain source text; fenced or plain outputs are returned as a validated typed
+code value:
+
+```elixir
+signature =
+  Imp.signature(
+    %{
+      inputs: [:task],
+      outputs: [%{name: :code, type: :code, language: "elixir"}]
+    },
+    "Write the requested Elixir function."
+  )
+
+program = Imp.predict(signature, lm: lm)
+{:ok, prediction} = Imp.call(program, %{task: "Define double/1 for integers."})
+
+%Imp.Adapter.Types.Code{code: source, language: "elixir"} = Imp.get(prediction, :code)
+```
+
+This type validates and transports source code; it does not execute it. Keep
+execution behind an application-owned sandbox or trusted evaluator.
+Imp's native structured-output schema represents this field as a JSON string,
+matching the adapter prompt and returned wire value. This is a deliberate
+flat-wire adaptation rather than DSPy's pydantic wrapper-object schema.
+
 Use `Imp.chain_of_thought/2` when a declared reasoning field helps the task:
 
 ```elixir

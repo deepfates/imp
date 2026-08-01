@@ -364,6 +364,12 @@ defmodule Imp.Predict.Predict do
       :datetime ->
         match?(%DateTime{}, value) or match?(%NaiveDateTime{}, value)
 
+      :code ->
+        code_input?(value)
+
+      "code" ->
+        code_input?(value)
+
       :array ->
         case fetch_meta(descriptor, :items) do
           items when is_map(items) ->
@@ -378,6 +384,15 @@ defmodule Imp.Predict.Predict do
         true
     end
   end
+
+  defp code_input?(value) when is_binary(value), do: true
+  defp code_input?(%Imp.Adapter.Types.Code{code: code}), do: is_binary(code)
+
+  defp code_input?(%{} = value) do
+    is_binary(Map.get(value, :code, Map.get(value, "code")))
+  end
+
+  defp code_input?(_value), do: false
 
   defp scalar?(value),
     do: is_binary(value) or is_atom(value) or is_number(value)

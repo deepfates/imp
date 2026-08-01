@@ -77,6 +77,8 @@ defmodule Imp.Schema do
         :array -> is_list(value)
         :object -> is_map(value)
         :datetime -> match?(%DateTime{}, value) or match?(%NaiveDateTime{}, value)
+        :code -> match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
+        "code" -> match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
         _ -> true
       end
 

@@ -992,26 +992,241 @@ defmodule UpstreamExam.AdaptersTest do
     # (partial port: Imp validates the code payload at the provider boundary
     # (Types.to_openai/1) rather than at struct construction.)
     test "code validate input" do
-      code = %Types.Code{code: "print('Hello, world!')"}
+      code = Types.Code.new("print('Hello, world!')")
       assert code.code == "print('Hello, world!')"
+      assert code.language == "python"
 
       assert_raise ArgumentError, fn ->
-        Types.to_openai(%Types.Code{code: 123})
+        Types.Code.new(%{code: 123})
       end
     end
 
     # Upstream: tests/adapters/test_code.py::test_code_with_language
-    # (partial port: the language rides the struct; Imp has no
-    # Code.description() prompt-description surface — recorded as blocked in
-    # the exam table.)
     test "code with language" do
-      java_code = %Types.Code{code: "System.out.println('Hello, world!');", language: "java"}
+      java_code = Types.Code.new("System.out.println('Hello, world!');", language: "java")
       assert java_code.code == "System.out.println('Hello, world!');"
       assert java_code.language == "java"
+      assert Types.Code.description("java") =~ "Programming language: java"
 
-      cpp_code = %Types.Code{code: "std::cout << 'Hello, world!' << std::endl;", language: "cpp"}
+      cpp_code =
+        Types.Code.new("std::cout << 'Hello, world!' << std::endl;", language: "cpp")
+
       assert cpp_code.code == "std::cout << 'Hello, world!' << std::endl;"
       assert cpp_code.language == "cpp"
+      assert Types.Code.description("cpp") =~ "Programming language: cpp"
+    end
+
+    # Upstream: tests/adapters/test_code.py::test_code_parses_from_dirty_code
+    test "code parses from dirty markdown code" do
+      dirty = """
+      The generated code is:
+      ```python
+      print('Hello, world!')
+      ```
+
+      The reasoning follows.
+      """
+
+      assert Types.Code.new(dirty).code == "print('Hello, world!')"
+    end
+
+    test "signature-level code is rendered and parsed across ordinary adapters" do
+      output_signature =
+        Imp.Signature.new(%{
+          instructions: "Generate code.",
+          inputs: [:question],
+          outputs: [%{name: :code, type: :code, language: "elixir"}]
+        })
+
+      input_signature =
+        Imp.Signature.new(%{
+          instructions: "Analyze code.",
+          inputs: [%{name: :code, type: :code, language: "elixir"}],
+          outputs: [:result]
+        })
+
+      input = Types.Code.new("before\n```elixir\nIO.puts(:ok)\n```\nafter", language: "elixir")
+
+      for adapter <- [Imp.Adapter.Chat, Imp.Adapter.JSON, Imp.Adapter.XML] do
+        [%{role: :system, content: system} | _] =
+          adapter.format(output_signature, %{question: "hello"}, [])
+
+        assert system =~ "(Code_elixir):"
+        assert system =~ Types.Code.description("elixir")
+        refute system =~ "must adhere to the JSON schema"
+
+        messages = adapter.format(input_signature, %{code: input}, [])
+        user_content = messages |> List.last() |> Map.fetch!(:content)
+        assert user_content =~ "IO.puts(:ok)"
+        refute user_content =~ "%Imp.Adapter.Types.Code{"
+
+        program =
+          Imp.predict(output_signature,
+            adapter: adapter,
+            lm:
+              Imp.LM.Static.new(
+                handler: fn _messages, _opts ->
+                  %{code: "```elixir\nIO.puts(:ok)\n```"}
+                end
+              )
+          )
+
+        assert {:ok, prediction} = Imp.call(program, %{question: "hello"})
+
+        assert %Types.Code{code: "IO.puts(:ok)", language: "elixir"} =
+                 Imp.get(prediction, :code)
+      end
+
+      assert {:ok, chat_prediction} =
+               Imp.Adapter.Chat.parse(
+                 output_signature,
+                 "[[ ## code ## ]]\n```elixir\nIO.puts(:ok)\n```\n[[ ## completed ## ]]",
+                 []
+               )
+
+      assert %Types.Code{code: "IO.puts(:ok)", language: "elixir"} =
+               Imp.get(chat_prediction, :code)
+
+      assert {:ok, json_prediction} =
+               Imp.Adapter.JSON.parse(
+                 output_signature,
+                 Jason.encode!(%{code: "```elixir\nIO.puts(:ok)\n```"}),
+                 []
+               )
+
+      assert %Types.Code{code: "IO.puts(:ok)", language: "elixir"} =
+               Imp.get(json_prediction, :code)
+
+      assert {:ok, xml_prediction} =
+               Imp.Adapter.XML.parse(
+                 output_signature,
+                 "<code>```elixir\nIO.puts(:ok)\n```</code>",
+                 []
+               )
+
+      assert %Types.Code{code: "IO.puts(:ok)", language: "elixir"} =
+               Imp.get(xml_prediction, :code)
+
+      assert {:error, %Imp.AdapterParseError{message: invalid_message}} =
+               Imp.Adapter.JSON.parse(output_signature, %{code: 123}, [])
+
+      assert invalid_message =~ "expected code"
+
+      assert get_in(Imp.Signature.json_schema(output_signature), ["properties", "code", "type"]) ==
+               "string"
+
+      restored_signature =
+        output_signature
+        |> Imp.Signature.dump()
+        |> Jason.encode!()
+        |> Jason.decode!()
+        |> Imp.Signature.load()
+
+      assert [%{type: :code, metadata: metadata}] = restored_signature.outputs
+      assert Map.get(metadata, "language", Map.get(metadata, :language)) == "elixir"
+
+      assert Imp.Adapter.Chat.field_description_string(restored_signature.outputs) =~
+               "Programming language: elixir"
+
+      json_with_demo =
+        Imp.Adapter.JSON.format(output_signature, %{question: "again"},
+          demos: [
+            %{
+              question: "first",
+              code: Types.Code.new("IO.puts(:ok)", language: "elixir")
+            }
+          ]
+        )
+
+      assert Enum.any?(json_with_demo, fn
+               %{role: :assistant, content: content} ->
+                 content =~ "\"code\": \"IO.puts(:ok)\""
+
+               _ ->
+                 false
+             end)
+
+      demo =
+        Imp.example(
+          question: "first",
+          code: Types.Code.new("IO.puts(:ok)", language: "elixir")
+        )
+        |> Imp.with_inputs(:question)
+
+      for adapter <- [Imp.Adapter.Chat, Imp.Adapter.JSON, Imp.Adapter.XML] do
+        restored_program =
+          output_signature
+          |> Imp.predict(adapter: adapter, demos: [demo])
+          |> Imp.dump()
+          |> Jason.encode!()
+          |> Jason.decode!()
+          |> Imp.load()
+
+        assert [%Imp.Example{} = restored_demo] = restored_program.demos
+
+        assert %Types.Code{code: "IO.puts(:ok)", language: "elixir"} =
+                 Imp.get(restored_demo, :code)
+
+        rendered =
+          adapter.format(restored_program.signature, %{question: "again"},
+            demos: restored_program.demos
+          )
+
+        assert Enum.any?(rendered, fn
+                 %{role: :assistant, content: content} ->
+                   content =~ "IO.puts(:ok)" and
+                     not String.contains?(content, "%Imp.Adapter.Types.Code{") and
+                     not String.contains?(content, "\"language\"")
+
+                 _ ->
+                   false
+               end)
+      end
+
+      code_tag =
+        Types.Code.new("IO.puts(:ok)", language: "elixir")
+        |> Imp.Optimizer.Report.encode_term()
+        |> Jason.encode!()
+        |> Jason.decode!()
+
+      assert %Types.Code{code: "IO.puts(:ok)", language: "elixir"} =
+               Imp.Optimizer.Report.decode_term(code_tag)
+
+      assert_raise ArgumentError, ~r/malformed Imp code JSON tag/, fn ->
+        code_tag
+        |> Map.put("language", 123)
+        |> Imp.Optimizer.Report.decode_term()
+      end
+
+      assert_raise ArgumentError, ~r/code field language must be/, fn ->
+        Imp.Signature.new(%{
+          inputs: [:question],
+          outputs: [%{name: :code, type: :code, language: %{bad: true}}]
+        })
+      end
+
+      nil_language_signature =
+        Imp.Signature.new(%{
+          inputs: [:question],
+          outputs: [%{name: :code, type: :code, metadata: %{language: nil}}]
+        })
+
+      assert [%{metadata: nil_language_metadata}] = nil_language_signature.outputs
+      refute Map.has_key?(nil_language_metadata, :language)
+      refute Map.has_key?(nil_language_metadata, "language")
+
+      assert Imp.Adapter.Chat.field_description_string(nil_language_signature.outputs) =~
+               "Code_python"
+
+      assert {:ok, nil_language_prediction} =
+               Imp.Adapter.Chat.parse(
+                 nil_language_signature,
+                 "[[ ## code ## ]]\nprint('ok')\n[[ ## completed ## ]]",
+                 []
+               )
+
+      assert %Types.Code{code: "print('ok')", language: "python"} =
+               Imp.get(nil_language_prediction, :code)
     end
   end
 

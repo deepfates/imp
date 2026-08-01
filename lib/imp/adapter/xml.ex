@@ -141,7 +141,20 @@ defmodule Imp.Adapter.XML do
   # DSPy get_field_description_string renders a description equal to the
   # "${name}" placeholder (the ChainOfThought reasoning sentinel) as empty.
   defp field_desc(field) do
-    if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
+    base = if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
+
+    if code_field?(field) do
+      type_description =
+        "Type description of #{code_annotation(field)}: " <>
+          Imp.Adapter.Types.Code.description(code_language(field))
+
+      case base do
+        "" -> "\n    " <> type_description
+        _ -> base <> "\n    " <> type_description
+      end
+    else
+      base
+    end
   end
 
   # XMLAdapter.format_field_structure: the same lead sentence as Chat, then
@@ -199,8 +212,11 @@ defmodule Imp.Adapter.XML do
 
   # DSPy annotation name for a field: composite types (Literal/list/dict)
   # resolve through the shared CompositeType module; scalars map directly.
-  defp field_annotation_name(field),
-    do: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
+  defp field_annotation_name(field) do
+    if code_field?(field),
+      do: code_annotation(field),
+      else: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
+  end
 
   # utils.get_annotation_name for the scalar types Imp models.
   defp annotation_name(:string), do: "str"
@@ -209,4 +225,13 @@ defmodule Imp.Adapter.XML do
   defp annotation_name(:boolean), do: "bool"
   defp annotation_name(:number), do: "float"
   defp annotation_name(type), do: to_string(type)
+
+  defp code_field?(%{type: type}), do: type in [:code, "code"]
+
+  defp code_language(field) do
+    Map.get(field.metadata, :language, Map.get(field.metadata, "language", "python"))
+    |> to_string()
+  end
+
+  defp code_annotation(field), do: "Code_#{code_language(field)}"
 end

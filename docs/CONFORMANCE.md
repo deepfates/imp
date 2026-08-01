@@ -260,13 +260,15 @@ Imp modules: `Imp.Adapter.Types`
 Semantic invariants:
 
 - Image, Audio, and File values validate and normalize ordinary provider content blocks
-- Imp's Code, Document, Citation, and Reasoning values are useful native content values but do not claim DSPy's richer typed field and provider-native citation semantics
+- Code fields validate language-aware source inputs and outputs across Chat, JSON, and XML while direct Code content values retain their fenced provider-content behavior
+- Imp's Document, Citation, and Reasoning values are useful native content values but do not claim DSPy's provider-native citation semantics
 - encoding support is not evidence of model reasoning quality
 
 Executable evidence:
 
 - test: `test/multimodal_adapter_test.exs`
 - test: `test/multimodal_quality_benchmark_test.exs`
+- test: `test/upstream_exam/adapters_test.exs`
 - docs: `docs/API_GUIDE.md`
 - docs: [docs/internal/MULTIMODAL_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/MULTIMODAL_FIDELITY.md) (repository only, not shipped in the package)
 
@@ -274,7 +276,6 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- DSPy-compatible Code output-field parsing and language-specific description semantics
 - citation-enabled Document blocks plus native Citations response extraction and streaming
 - audio quality remains an unsupported claim rather than an implied capability
 

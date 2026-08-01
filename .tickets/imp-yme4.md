@@ -76,8 +76,8 @@ The product center is real but the telos is open.
   one representative complete packaged lifecycle has been exercised. The
   granular upstream exam now has no retained executable FAIL after repairing
   split Chat-marker streaming. That does not imply complete parity: provider-native
-  Document/Citations behavior, typed citation streaming, Code field parsing,
-  ecosystem breadth, current DSPy's first-class typed tool-call field contract,
+  Document/Citations behavior, typed citation streaming, ecosystem breadth,
+  current DSPy's first-class typed tool-call field contract,
   and several advanced ergonomic surfaces remain real gaps. The prerelease
   `LMRequest`/`LMResponse` structs are scaffold rather than an exercised runtime
   seam, and `LMStream` is absent. Current DSPy also has save/load, concurrency,
