@@ -127,6 +127,28 @@ defmodule Imp.Optimizer.MIPROv2.ConfigTest do
     assert Config.resolve(config, 1, [:train], [:valid], seed: 3).seed == 3
   end
 
+  test "full pinned Optuna fidelity admits minibatching but startup-only does not" do
+    common = [
+      auto: nil,
+      num_candidates: 2,
+      num_trials: 1,
+      max_bootstrapped_demos: 0,
+      max_labeled_demos: 0,
+      minibatch: true,
+      program_aware_proposer: false,
+      fewshot_aware_proposer: false,
+      data_aware_proposer: true,
+      tip_aware_proposer: true,
+      proposer_fidelity: :dspy_3_2_1
+    ]
+
+    assert Config.new(Keyword.put(common, :search_fidelity, :dspy_3_2_1_optuna_4_9_0)).minibatch
+
+    assert_raise ArgumentError, ~r/startup-only.*does not admit minibatching/s, fn ->
+      Config.new(Keyword.put(common, :search_fidelity, :dspy_3_2_1_optuna_4_9_0_startup))
+    end
+  end
+
   test "dataset validation mirrors DSPy splitting rules" do
     resolved = Config.new() |> Config.resolve(1, Enum.to_list(1..10), minibatch_size: 1)
     assert resolved.trainset == [1, 2]

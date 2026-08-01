@@ -12,6 +12,8 @@ defmodule Imp.Optimizer.MIPROv2.PythonRandom do
 
   defstruct [:state, :index]
 
+  @algorithm "python_random_mt19937"
+
   @spec new(non_neg_integer()) :: %__MODULE__{}
   def new(seed) when is_integer(seed) and seed >= 0 do
     words = seed_words(seed)
@@ -19,6 +21,33 @@ defmodule Imp.Optimizer.MIPROv2.PythonRandom do
     state = init_by_array(state, words)
     %__MODULE__{state: List.to_tuple(state), index: @n}
   end
+
+  @doc false
+  @spec dump(%__MODULE__{}) :: map()
+  def dump(%__MODULE__{state: state, index: index})
+      when is_tuple(state) and tuple_size(state) == @n and is_integer(index) and index >= 0 and
+             index <= @n do
+    %{
+      "algorithm" => @algorithm,
+      "state" => Tuple.to_list(state),
+      "index" => index
+    }
+  end
+
+  @doc false
+  @spec load!(map()) :: %__MODULE__{}
+  def load!(%{"algorithm" => @algorithm, "state" => state, "index" => index} = checkpoint)
+      when is_list(state) and length(state) == @n and is_integer(index) and index >= 0 and
+             index <= @n and map_size(checkpoint) == 3 do
+    unless Enum.all?(state, &(is_integer(&1) and &1 >= 0 and &1 <= @word_mask)) do
+      raise ArgumentError, "invalid Python random checkpoint state"
+    end
+
+    %__MODULE__{state: List.to_tuple(state), index: index}
+  end
+
+  def load!(value),
+    do: raise(ArgumentError, "invalid Python random checkpoint: #{inspect(value)}")
 
   @spec choice(%__MODULE__{}, nonempty_list(term())) :: {term(), %__MODULE__{}}
   def choice(%__MODULE__{} = rng, values) when is_list(values) and values != [] do

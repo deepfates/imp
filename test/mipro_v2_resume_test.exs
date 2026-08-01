@@ -75,6 +75,40 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     assert Jason.encode!(resumed.metadata.resume_state)
   end
 
+  test "schema-one BEAM RNG checkpoints remain resumable", %{state: state} do
+    {program, optimizer, trainset, valset} = fixture(state)
+
+    checkpoint =
+      optimizer
+      |> MIPROv2.compile(program, trainset, valset, max_trials: 2)
+      |> Report.fetch()
+      |> then(& &1.metadata.resume_state)
+
+    legacy_payload =
+      put_in(
+        checkpoint["payload"],
+        ["state", "rng"],
+        get_in(checkpoint, ["payload", "state", "rng", "state"])
+      )
+
+    legacy = %{
+      checkpoint
+      | "schema_version" => 1,
+        "payload" => legacy_payload,
+        "payload_sha256" => checkpoint_checksum(legacy_payload)
+    }
+
+    resumed =
+      MIPROv2.compile(optimizer, program, trainset, valset,
+        resume_state: Jason.decode!(Jason.encode!(legacy))
+      )
+      |> Report.fetch()
+
+    assert resumed.metadata.resumed
+    assert resumed.metadata.run_status == :complete
+    assert resumed.metadata.completed_trials == 6
+  end
+
   test "resume rejects a different resolved dataset", %{state: state} do
     {program, optimizer, trainset, valset} = fixture(state)
 
@@ -400,6 +434,13 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
 
   defp metric_identity(config \\ %{"field" => "answer"}) do
     %{"id" => "exact-answer", "version" => 1, "config" => config}
+  end
+
+  defp checkpoint_checksum(payload) do
+    payload
+    |> :erlang.term_to_binary([:deterministic])
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
   end
 
   defp put_lm_option(%{opts: opts} = lm, key, value),

@@ -295,11 +295,16 @@ defmodule Imp.Optimizer.MIPROv2.Config do
     if config.search_fidelity in [
          :dspy_3_2_1_optuna_4_9_0_startup,
          :dspy_3_2_1_optuna_4_9_0
-       ] and
-         (config.proposer_fidelity != :dspy_3_2_1 or config.minibatch) do
+       ] and config.proposer_fidelity != :dspy_3_2_1 do
       raise ArgumentError,
             "pinned DSPy 3.2.1/Optuna 4.9.0 search fidelity requires " <>
-              "proposer_fidelity: :dspy_3_2_1 and minibatch: false"
+              "proposer_fidelity: :dspy_3_2_1"
+    end
+
+    if config.search_fidelity == :dspy_3_2_1_optuna_4_9_0_startup and config.minibatch do
+      raise ArgumentError,
+            "pinned startup-only DSPy 3.2.1/Optuna 4.9.0 search does not admit minibatching; " <>
+              "inserted full evaluations can enter modeled TPE"
     end
 
     config

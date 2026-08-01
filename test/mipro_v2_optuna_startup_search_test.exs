@@ -36,6 +36,23 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
     end
   end
 
+  test "Python-compatible RNG checkpoint resumes the exact sample stream" do
+    {first, rng} = PythonRandom.sample(PythonRandom.new(9), Enum.to_list(0..19), 7)
+
+    loaded =
+      rng |> PythonRandom.dump() |> Jason.encode!() |> Jason.decode!() |> PythonRandom.load!()
+
+    {second, _rng} = PythonRandom.sample(loaded, Enum.to_list(0..19), 7)
+
+    {expected_first, uninterrupted} =
+      PythonRandom.sample(PythonRandom.new(9), Enum.to_list(0..19), 7)
+
+    {expected_second, _uninterrupted} =
+      PythonRandom.sample(uninterrupted, Enum.to_list(0..19), 7)
+
+    assert {first, second} == {expected_first, expected_second}
+  end
+
   @tag :evidence_infrastructure
   test "three sealed schedules match independently executed Optuna 4.9.0" do
     {output, 0} =

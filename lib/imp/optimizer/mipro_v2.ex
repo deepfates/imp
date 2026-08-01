@@ -1,5 +1,7 @@
 defmodule Imp.Optimizer.MIPROv2 do
   @behaviour Imp.Optimizer
+  import Bitwise
+
   @moduledoc """
   Joint instruction and few-shot optimization using grounded proposals and categorical TPE.
 
@@ -398,6 +400,7 @@ defmodule Imp.Optimizer.MIPROv2 do
           search_policy: SearchPolicy.dump(state.policy),
           full_evaluations: Enum.map(state.full_evaluations, &Map.drop(&1, [:program])),
           evaluation_calls: state.evaluation_calls,
+          evaluation_call_accounting: evaluation_call_accounting(state, config),
           resumed: resumed?,
           durable: durable?,
           metric_identity: metric_identity,
@@ -456,7 +459,7 @@ defmodule Imp.Optimizer.MIPROv2 do
         )
       end
 
-    {instruction_pairs, {proposal_metadata, _proposal_rng}} =
+    {instruction_pairs, {proposal_metadata, proposal_rng}} =
       predictors
       |> Enum.with_index()
       |> Enum.map_reduce({%{}, proposal_rng}, fn {%{name: name, predictor: predictor},
@@ -569,7 +572,7 @@ defmodule Imp.Optimizer.MIPROv2 do
 
     state = %{
       policy: policy,
-      rng: Sampling.new(config.seed),
+      rng: search_evaluation_rng(config, proposal_rng),
       trials: [],
       combo_scores: %{},
       full_evaluations: [full_record(0, default_params, baseline.score, program, :baseline)],
@@ -624,7 +627,7 @@ defmodule Imp.Optimizer.MIPROv2 do
     upstream_trial_num = state.next_study_number + 1
     {params, policy} = SearchPolicy.suggest(state.policy, :candidate)
     candidate = apply_params(program, predictors, params, instructions, demos)
-    {examples, rng} = trial_examples(config, state.rng)
+    {examples, sampled_indices, rng} = trial_examples(config, state.rng)
 
     result =
       Imp.Telemetry.span(
@@ -648,6 +651,9 @@ defmodule Imp.Optimizer.MIPROv2 do
       params: params,
       score: result.score,
       example_count: length(examples),
+      sampled_indices: sampled_indices,
+      evaluation_scope:
+        if(length(examples) == length(config.valset), do: :full_validation, else: :minibatch),
       program: candidate
     }
 
@@ -681,10 +687,7 @@ defmodule Imp.Optimizer.MIPROv2 do
       |> Enum.map(&params_key(&1.params))
       |> MapSet.new()
 
-    ranked =
-      state.trials
-      |> Enum.group_by(&params_key(&1.params))
-      |> Enum.sort_by(fn {_key, records} -> average(Enum.map(records, & &1.score)) end, :desc)
+    ranked = promotion_ranking(state.trials, config)
 
     candidate =
       Enum.find(ranked, fn {key, _records} -> not MapSet.member?(evaluated, key) end) ||
@@ -791,14 +794,82 @@ defmodule Imp.Optimizer.MIPROv2 do
       enforce_error_budget!(result.errors, optimizer.max_errors)
     end
 
-    result
+    if exact_search_fidelity?(config) do
+      # DSPy sums row scores, converts to a percentage, then applies Python's
+      # half-even round(..., 2). Keep Imp's 0..1 scale after that exact step.
+      scores = Enum.map(result.rows, & &1.score)
+      score = if scores == [], do: 0.0, else: upstream_evaluation_score(scores)
+      %{result | score: score}
+    else
+      result
+    end
   end
 
-  defp trial_examples(%{minibatch: false, valset: valset}, rng), do: {valset, rng}
+  @doc false
+  def upstream_evaluation_score([_ | _] = scores) do
+    percentage = 100.0 * Enum.sum(scores) / length(scores)
+    round_binary_half_even(percentage, 100) / 100 / 100
+  end
+
+  defp round_binary_half_even(value, decimal_scale) when is_float(value) do
+    <<sign::1, exponent::11, fraction::52>> = <<value::float>>
+
+    {mantissa, binary_exponent} =
+      if exponent == 0,
+        do: {fraction, -1074},
+        else: {(1 <<< 52) + fraction, exponent - 1023 - 52}
+
+    numerator = mantissa * decimal_scale
+
+    rounded =
+      if binary_exponent >= 0 do
+        numerator <<< binary_exponent
+      else
+        denominator = 1 <<< -binary_exponent
+        quotient = div(numerator, denominator)
+        remainder = rem(numerator, denominator)
+
+        case compare(remainder * 2, denominator) do
+          :gt -> quotient + 1
+          :lt -> quotient
+          :eq -> if rem(quotient, 2) == 0, do: quotient, else: quotient + 1
+        end
+      end
+
+    if sign == 0, do: rounded, else: -rounded
+  end
+
+  defp compare(left, right) when left < right, do: :lt
+  defp compare(left, right) when left > right, do: :gt
+  defp compare(_left, _right), do: :eq
+
+  defp trial_examples(%{minibatch: false, valset: valset}, rng),
+    do: {valset, indices(valset), rng}
+
+  defp trial_examples(
+         %{search_fidelity: fidelity, valset: valset, minibatch_size: size},
+         %PythonRandom{} = rng
+       )
+       when fidelity in [
+              :dspy_3_2_1_optuna_4_9_0_startup,
+              :dspy_3_2_1_optuna_4_9_0
+            ] do
+    if size >= length(valset) do
+      {valset, indices(valset), rng}
+    else
+      {sampled_indices, rng} = PythonRandom.sample(rng, indices(valset), size)
+      {Enum.map(sampled_indices, &Enum.fetch!(valset, &1)), sampled_indices, rng}
+    end
+  end
 
   defp trial_examples(config, rng) do
-    {shuffled, rng} = Sampling.shuffle(config.valset, rng)
-    {Enum.take(shuffled, config.minibatch_size), rng}
+    {shuffled, rng} =
+      config.valset
+      |> Enum.with_index()
+      |> Sampling.shuffle(rng)
+
+    selected = Enum.take(shuffled, config.minibatch_size)
+    {Enum.map(selected, &elem(&1, 0)), Enum.map(selected, &elem(&1, 1)), rng}
   end
 
   defp search_space(predictors, instructions, demos) do
@@ -845,6 +916,7 @@ defmodule Imp.Optimizer.MIPROv2 do
   defp params_key(params),
     do: params |> Enum.sort() |> :erlang.term_to_binary() |> Base.encode16()
 
+  defp indices([]), do: []
   defp indices(values), do: Enum.to_list(0..(length(values) - 1))
   defp trial_indices(count) when count > 0, do: 1..count
   defp trial_indices(_count), do: []
@@ -900,7 +972,14 @@ defmodule Imp.Optimizer.MIPROv2 do
       |> then(&:crypto.hash(:sha256, &1))
       |> Base.encode16(case: :lower)
 
-    %{"sha256" => digest}
+    %{
+      "sha256" => digest,
+      "search_evaluation_rng" =>
+        if(exact_search_fidelity?(config) and config.minibatch,
+          do: "python_random",
+          else: "beam_sampling"
+        )
+    }
   end
 
   # Checkpoints reconstruct candidates over the caller-supplied runtime program.
@@ -918,6 +997,66 @@ defmodule Imp.Optimizer.MIPROv2 do
 
   defp average([]), do: 0.0
   defp average(values), do: Enum.sum(values) / length(values)
+
+  # Python preserves defaultdict insertion order and its sort is stable. Keep
+  # the first occurrence as an explicit secondary key rather than relying on
+  # BEAM map enumeration when minibatch means tie.
+  defp promotion_ranking(trials, config) do
+    {order, groups} =
+      Enum.reduce(trials, {[], %{}}, fn record, {order, groups} ->
+        key = params_key(record.params)
+
+        if Map.has_key?(groups, key) do
+          {order, Map.update!(groups, key, &(&1 ++ [record]))}
+        else
+          {order ++ [key], Map.put(groups, key, [record])}
+        end
+      end)
+
+    order
+    |> Enum.with_index()
+    |> Enum.map(fn {key, first_seen} ->
+      records = Map.fetch!(groups, key)
+      {key, records, promotion_mean(records, config), first_seen}
+    end)
+    |> Enum.sort_by(fn {_key, _records, mean, first_seen} -> {-mean, first_seen} end)
+    |> Enum.map(fn {key, records, _mean, _first_seen} -> {key, records} end)
+  end
+
+  defp promotion_mean(records, config) do
+    if exact_search_fidelity?(config) do
+      # Pinned DSPy scores are hundredths of a percentage point. Ranking their
+      # integer basis points avoids a second runtime-specific float reduction.
+      records
+      |> Enum.map(&round(&1.score * 10_000))
+      |> average()
+    else
+      average(Enum.map(records, & &1.score))
+    end
+  end
+
+  defp search_evaluation_rng(config, proposal_rng) do
+    if exact_search_fidelity?(config) and config.minibatch,
+      do: proposal_rng,
+      else: Sampling.new(config.seed)
+  end
+
+  defp evaluation_call_accounting(state, config) do
+    baseline = length(config.valset)
+    objectives = Enum.sum(Enum.map(state.trials, & &1.example_count))
+    promotions = Enum.count(state.full_evaluations, &(&1.kind == :promoted_full))
+    promoted_full = promotions * length(config.valset)
+
+    %{
+      unit: :requested_example_evaluations,
+      baseline: baseline,
+      objectives: objectives,
+      promoted_full: promoted_full,
+      total: state.evaluation_calls,
+      provider_calls?: false,
+      interrupted_attempts_included?: false
+    }
+  end
 
   defp bootstrap_demo_limit(%{zeroshot: true}), do: 3
   defp bootstrap_demo_limit(config), do: config.max_bootstrapped_demos
