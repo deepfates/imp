@@ -32,7 +32,8 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
              aggregate: :mean,
              artifact_required: true,
              component_floors: %{mean_answer_f1_lift: 0.0, mean_support_f1_lift: 0.0},
-             evidence_scope: :treatment_unseen_dev_not_globally_untouched_or_source_disjoint,
+             evidence_scope:
+               :official_source_row_disjoint_treatment_unseen_semantic_overlap_disclosed,
              fresh_service_calls_per_seed: 4,
              minimum_mean_lift: 0.05,
              minimum_positive_seeds: 2,

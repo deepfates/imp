@@ -56,14 +56,17 @@ absent. Official train and dev are source-file/source-row disjoint: they have no
 row-ID, normalized composed-question, or decomposition-ID overlap. They are not
 semantic-content disjoint: 95 normalized decomposition questions and 3,697 exact
 title-plus-paragraph values overlap. Dev is treatment-unseen but not globally
-unread because the provider-free scorer audit decoded its gold rows. The owner
-must ratify whether the acceptance criterion uses the ordinary benchmark
-meaning—official source-row disjoint and treatment-unseen with this audit and
-semantic-overlap disclosure—or requires the stronger globally unread/content-
-disjoint meaning before any MuSiQue admission or spend work continues.
+unread because the provider-free scorer audit decoded its gold rows. For this
+ticket, `source-disjoint untouched` has the ordinary benchmark meaning:
+official source-file/source-row disjoint and model/optimizer/treatment-unseen,
+with the scorer audit and semantic overlap disclosed. It does not mean globally
+unread bytes or semantic-content disjointness. This resolves the claim meaning;
+it does not authorize provider work or spend.
 
-The MuSiQue current-MIPRO design is frozen for provider-free review, not yet a
-reviewed executable, owner-accepted, or provider-authorized treatment. Generic
+The MuSiQue current-MIPRO design is frozen for provider-free review, not yet an
+executable or provider-authorized treatment. It is one serious candidate for
+this ticket's missing realistic multi-stage result, not a complete external
+benchmark portfolio. Generic
 pinned-minibatch search
 fidelity was repaired at `f2711d2`: the exact DSPy 3.2.1 size-35/full-every-5
 schedule is now admitted through ordinary pinned MIPRO and independently matches

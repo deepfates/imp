@@ -42,7 +42,7 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Current frontier after `51b46ef0`
+## Current frontier after `16ffc17d`
 
 The product center is real but the telos is open.
 
@@ -66,7 +66,7 @@ The product center is real but the telos is open.
   completed their lifecycle but missed frozen lift bars. IFBench effectiveness
   is invalid/unverified after its scorer defect. No current realistic multi-stage
   LM condition has satisfied `imp-88sn`.
-- **External benchmark program — one current candidate, not yet executable.**
+- **External benchmark program — one serious candidate, not the portfolio.**
   HoVer/PAPILLON remains a historical instrument: it measured route, usage,
   cost, cache, and format behavior, but its live HoVer comparison was invalidated
   by a task-fixture information asymmetry. The corrected HoVer and Circle probes
@@ -84,8 +84,10 @@ The product center is real but the telos is open.
   objective trials, outer mean over three repetitions, and symmetric fresh
   service; its declared opportunity is 46,412 task plus 47 proposer transports
   per runtime/seed. Compact Imp and pinned-DSPy selected-state/fresh-process
-  lifecycles pass, but explicitly do not claim the full opportunity.
-- **MuSiQue admission and claim boundary — open.** The frozen condition remains
+  lifecycles pass, but explicitly do not claim the full opportunity. This is a
+  credible candidate for the missing realistic multi-stage result, not by
+  itself the broad portfolio required to close this epic.
+- **MuSiQue scientific meaning — decided; operational admission — open.** The condition remains
   `executable: false`. Pinned DSPy still needs a complete C6 demo-bearing
   task/proposer serializer census, exact-route single-transport proof, and
   equivalent pretransport guards. Both runtimes need one canonical wire-byte
@@ -96,28 +98,32 @@ The product center is real but the telos is open.
   95 normalized decomposition-question and 3,697 exact paragraph overlaps.
   Dev was loaded previously only for provider-free scorer auditing; no model,
   optimizer, split, threshold, candidate selection, or treatment score used it.
-  The owner must ratify whether the ticket's existing `source-disjoint untouched`
-  wording has its ordinary benchmark meaning—official source-row disjoint and
-  treatment-unseen with semantic-overlap disclosure—or a stronger global-
-  content-disjoint meaning not stated by the ticket. No MuSiQue provider build
-  or spend proceeds before that interpretation.
+  `Source-disjoint untouched` has its ordinary benchmark meaning here: official
+  source-file/source-row disjoint and model/optimizer/treatment-unseen, with the
+  prior scorer audit and semantic overlap disclosed. It does not mean globally
+  unread bytes or semantic-content disjointness. That stronger requirement was
+  not in the acceptance criterion and is not imposed retroactively. No provider
+  call follows: executable admission and a real owner spend decision remain.
 
 ## Backward checkpoint plan
 
 Work proceeds backward from the finish line, without turning this list into a
 second tracking system:
 
-1. **Ratify the held-out meaning and representative portfolio.** Decide whether
-   ordinary official-split, source-row-disjoint, treatment-unseen data with
-   explicit semantic-overlap disclosure satisfies `imp-88sn`, or require a
-   stronger global-content-disjoint standard before further MuSiQue work. Keep
-   the retained positive OA condition and clean Banking77/HotPot negatives
-   separate from the missing realistic multi-stage positive.
-2. **Authenticate admission before spend.** If MuSiQue remains in scope, finish
+1. **Hold the representative claim fixed.** Treat official-split,
+   source-row-disjoint, treatment-unseen MuSiQue dev as a valid held-out boundary
+   with the audit and semantic overlap disclosed. Keep the retained positive OA
+   condition and clean Banking77/HotPot negatives separate. A passing MuSiQue
+   result can satisfy `imp-88sn`'s missing realistic multi-stage condition; it
+   would still be one arm rather than broad epic-level portfolio completion.
+2. **Authenticate admission before spend.** Finish
    both runtimes' complete serializer census, exact route/fallback behavior,
    canonical pretransport input/output guards (including bootstrap demos), and
-   legal call/cost ceiling. Reject the lane if that requires another generic
-   benchmark controller or materially changes the frozen opportunity.
+   legal call/cost ceiling using the existing task-owned paths. Reject the lane
+   if that requires another generic benchmark controller or materially changes
+   the scientific opportunity. Then present the actual maximum and realistic
+   expected cost as one explicit owner spend decision; planning arithmetic is
+   not authority.
 3. **Freeze ordinary benchmark paths.** Each chosen task must use thin public
    Imp composition, native validated metrics, result-blind splits, ordinary
    Result/Artifact boundaries, fresh concurrent service, and pinned ordinary

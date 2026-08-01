@@ -98,11 +98,11 @@ The packaged [OTP deployment example](examples/deployment/README.md) is the
 release front door: an unpacked consumer runs a two-stage typed program through
 disjoint selection and test splits, optimizer selection, checksummed result and
 artifact persistence, fresh-process loading, concurrent serving, hot reload,
-and contained failure. Its retained one-seed Banking77 run is deliberately
-negative: GEPA's candidate regressed on validation, so the public experiment
-boundary retained baseline; the selected artifact then completed untouched
-evaluation and fresh-process concurrent service. That is real-model lifecycle
-evidence, not GEPA effectiveness evidence.
+and contained failure using a provider-free support workflow. The source
+repository separately retains real-model Banking77 research, including an
+honest negative GEPA selection and successful fresh-service lifecycle; those
+research data, runners, results, and artifacts are deliberately excluded from
+the packaged example.
 
 ## Since v0.1.0
 

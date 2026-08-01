@@ -5,7 +5,15 @@ Versioning once the first public package is released.
 
 ## Unreleased
 
-No changes yet.
+The unpublished `0.3.0` candidate continues to receive corrections before its
+first public tag. Since the initial release-candidate checkpoint, Artifact
+fresh-process portability, finite Experiment error budgets, fixed repeated
+outer evaluation, OpenRouter request/evidence handling, and pinned MIPROv2
+minibatch/Optuna fidelity have been strengthened. Repository-only benchmark
+work added independently recomputable Optimize Anything evidence and
+provider-free MuSiQue readiness without adding those research surfaces to the
+Hex payload. These changes remain part of the unpublished candidate until an
+owner-approved release cut decides otherwise.
 
 ## 0.3.0 — 2026-07-31
 

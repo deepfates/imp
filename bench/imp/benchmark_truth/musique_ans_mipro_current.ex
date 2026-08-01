@@ -86,7 +86,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
         joint_metric_scope: :adapted_not_official,
         prohibited_claims: [:broad_mipro_effectiveness, :modeled_tpe_causation]
       },
-      evidence_scope: :treatment_unseen_dev_not_globally_untouched_or_source_disjoint
+      evidence_scope: :official_source_row_disjoint_treatment_unseen_semantic_overlap_disclosed
     }
   end
 
