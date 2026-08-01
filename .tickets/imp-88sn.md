@@ -94,6 +94,17 @@ the only allowed tranche, executable, or provider-authorized. It targets this
 ticket's missing realistic multi-stage result, not a complete external
 benchmark portfolio. A materially better task/claim/model/scale design may
 supersede it before spend; readiness investment alone gives it no priority.
+There is also a legitimate cheaper milestone that does not close this ticket:
+publish the already-earned scoped experimental story from matched TREC, the
+small retry-policy OA result, the clean Banking77/HotPot negatives, and the
+exact artifact/timeout probes. TREC now has committed compact scored-row inputs
+that the ordinary aggregator recomputes directly without the 181 MB private raw
+provider traces. That story still requires a genuinely independent cold
+consumer and must not be inflated into broad usefulness, DSPy superiority, or
+production-readiness. Fund MuSiQue only for the additional claim that Imp
+improves a realistic multi-stage program, after a precision/power review shows
+that its scale is warranted; release-story credibility alone does not require
+the full current MuSiQue opportunity.
 Generic
 pinned-minibatch search
 fidelity was repaired at `f2711d2`: the exact DSPy 3.2.1 size-35/full-every-5

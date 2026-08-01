@@ -194,6 +194,15 @@ second tracking system:
    optimizer, comparator, scale, model, and provider. Prefer another lane if
    primary-source review shows it can answer a more important question through
    a thinner ordinary path or a materially better cost/credibility tradeoff.
+   Keep a separate cheaper release milestone available: the matched TREC row
+   outcomes are now compact and independently recomputable, and can support an
+   honest experimental package story alongside OA, clean negatives, and the
+   scoped operational probes once an independent consumer validates the cold
+   path. That milestone does not satisfy the missing multi-stage usefulness
+   criterion and does not make MuSiQue mandatory. Before paying for MuSiQue,
+   justify held-out size and inference repetitions against the intended
+   precision; a preregistered discovery/reserve-confirmation design remains a
+   valid alternative to evaluating every dev row three times.
 4. **Authenticate the chosen arm before spend.** Finish
    both runtimes' complete serializer census, exact route/fallback behavior,
    canonical pretransport input/output guards (including bootstrap demos), and

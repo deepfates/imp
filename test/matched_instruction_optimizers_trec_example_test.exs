@@ -39,6 +39,7 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
 
   @manifest "examples/matched_instruction_optimizers_trec/contract.json"
   @result "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json"
+  @recomputation_root "benchmarks/evidence/archive/matched_experiments/trec"
 
   test "freezes exact authorities, dataset IDs, models, and runtime request controls" do
     manifest = Contract.load!(@manifest)
@@ -323,6 +324,82 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
              result["claim_boundary"]["excludes"],
              &String.starts_with?(&1, "SIMBA, COPRO, InferRules")
            )
+  end
+
+  test "committed compact scored rows independently recompute the matched outcome" do
+    receipt =
+      @recomputation_root
+      |> Path.join("recomputation.json")
+      |> File.read!()
+      |> Jason.decode!()
+
+    imp_path = Path.join(@recomputation_root, "imp-scored-rows.json")
+    upstream_path = Path.join(@recomputation_root, "upstream-scored-rows.json")
+    aggregate_path = Path.join(@recomputation_root, "aggregate-recomputed.json")
+
+    assert_file_receipt!(imp_path, receipt["inputs"]["imp"])
+    assert_file_receipt!(upstream_path, receipt["inputs"]["upstream"])
+    assert_file_receipt!(aggregate_path, receipt["aggregate"])
+    assert_file_receipt!(@result, receipt["source_outcome"])
+
+    aggregate = Aggregator.aggregate!(@manifest, imp_path, upstream_path)
+    assert aggregate == aggregate_path |> File.read!() |> Jason.decode!()
+
+    outcome = @result |> File.read!() |> Jason.decode!()
+
+    for runtime <- ~w(imp upstream) do
+      assert Map.take(receipt["raw_sources"][runtime], ~w(bytes sha256)) ==
+               Map.take(outcome["raw_retained_artifacts"][runtime], ~w(bytes sha256))
+    end
+
+    assert Map.take(receipt["raw_sources"]["aggregate"], ~w(bytes sha256)) ==
+             Map.take(outcome["raw_retained_artifacts"]["aggregate"], ~w(bytes sha256))
+
+    assert get_in(aggregate, ["acceptance", "winning_optimizer"]) ==
+             outcome["paired_acceptance"]["winning_optimizer"]
+
+    assert get_in(aggregate, ["acceptance", "improvements", "gepa", "mean"]) ==
+             get_in(outcome, ["paired_acceptance", "imp_gepa_minus_imp_baseline", "mean"])
+
+    assert get_in(aggregate, ["acceptance", "improvements", "mipro_v2", "mean"]) ==
+             get_in(outcome, ["paired_acceptance", "imp_mipro_v2_minus_imp_baseline", "mean"])
+
+    assert get_in(
+             aggregate,
+             ["acceptance", "winning_optimizer_imp_minus_upstream", "confidence_interval"]
+           ) ==
+             get_in(
+               outcome,
+               ["paired_acceptance", "imp_gepa_minus_upstream_gepa", "confidence_interval_95"]
+             )
+  end
+
+  test "compact recomputation rejects a consistently falsified gold label" do
+    root = Path.join(System.tmp_dir!(), "imp-trec-compact-gold-#{System.unique_integer()}")
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf(root) end)
+
+    imp =
+      @recomputation_root
+      |> Path.join("imp-scored-rows.json")
+      |> File.read!()
+      |> Jason.decode!()
+
+    altered =
+      update_in(imp, ["seeds", Access.at(0), "arms", Access.at(0), "rows", "held_out"], fn
+        [row | rest] ->
+          expected = if row["expected"] == "K11", do: "K47", else: "K11"
+          [%{row | "expected" => expected, "correct" => expected == row["parsed_route"]} | rest]
+      end)
+
+    imp_path = Path.join(root, "imp.json")
+    File.write!(imp_path, Jason.encode!(altered))
+
+    upstream_path = Path.join(@recomputation_root, "upstream-scored-rows.json")
+
+    assert_raise ArgumentError, ~r/result row score fields are inconsistent/, fn ->
+      Aggregator.aggregate!(@manifest, imp_path, upstream_path)
+    end
   end
 
   test "shared aggregator recomputes three-seed rows and labels uncertainty honestly" do
@@ -720,5 +797,12 @@ defmodule MatchedInstructionOptimizersTRECExampleTest do
         "error" => nil
       }
     end)
+  end
+
+  defp assert_file_receipt!(path, receipt) do
+    bytes = File.read!(path)
+    assert byte_size(bytes) == receipt["bytes"]
+
+    assert :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower) == receipt["sha256"]
   end
 end

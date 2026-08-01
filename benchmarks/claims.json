@@ -448,7 +448,13 @@
       "gate_policy": "informational",
       "sources": [
         "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/recomputation.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/aggregate-recomputed.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/imp-scored-rows.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/upstream-scored-rows.json",
         "examples/matched_instruction_optimizers_trec/README.md",
+        "examples/matched_instruction_optimizers_trec/aggregate.exs",
+        "examples/matched_instruction_optimizers_trec/recompute_compact.exs",
         "test/matched_instruction_optimizers_trec_example_test.exs"
       ],
       "requirements": [
@@ -478,7 +484,13 @@
       "gate_policy": "informational",
       "sources": [
         "benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/recomputation.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/aggregate-recomputed.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/imp-scored-rows.json",
+        "benchmarks/evidence/archive/matched_experiments/trec/upstream-scored-rows.json",
         "examples/matched_instruction_optimizers_trec/README.md",
+        "examples/matched_instruction_optimizers_trec/aggregate.exs",
+        "examples/matched_instruction_optimizers_trec/recompute_compact.exs",
         "test/matched_instruction_optimizers_trec_example_test.exs"
       ],
       "requirements": [

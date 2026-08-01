@@ -38,6 +38,27 @@ The treatment used 6,491 calls and `$3.13862325` in provider-reported cost.
 Adding the conservative pre-treatment workshop bound yields at most
 `$6.221975` against the `$100` ceiling.
 
+The compact scored-row inputs are committed separately from the private raw
+provider traces. From the repository root, a third party can rerun the frozen
+gold-label checks, row scoring, clustered bootstrap, Holm correction, and
+noninferiority decision with one provider-free command:
+
+```sh
+mix run --no-start \
+  examples/matched_instruction_optimizers_trec/recompute_compact.exs -- \
+  examples/matched_instruction_optimizers_trec/contract.json \
+  benchmarks/evidence/archive/matched_experiments/trec/imp-scored-rows.json \
+  benchmarks/evidence/archive/matched_experiments/trec/upstream-scored-rows.json \
+  benchmarks/evidence/archive/matched_experiments/trec/aggregate-recomputed.json
+```
+
+This verifies the statistics asserted by the compact rows. It does not
+independently revalidate private provider responses, request routing, cost,
+selection sealing, or artifact provenance. Maintainers with the retained raw
+files can regenerate the projection with `compact_evidence.exs`; that extractor
+also verifies both raw runtime hashes and semantic equality with the retained
+original aggregate before writing the public files.
+
 A coordinated partial run had previously falsified the old
 assumption that four nominal GEPA generations imply exactly four runtime
 iterations. Pinned GEPA checks `max_metric_calls = 280` only between iterations

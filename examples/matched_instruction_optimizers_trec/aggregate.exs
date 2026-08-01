@@ -5,12 +5,13 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
 
   def aggregate!(manifest_path, imp_path, upstream_path) do
     manifest = MatchedInstructionOptimizersTREC.Contract.load!(manifest_path)
+    gold_routes = gold_routes!(manifest)
     results = %{"imp" => load_result!(imp_path), "upstream" => load_result!(upstream_path)}
     validate_pair!(results, manifest)
 
     metrics =
       Map.new(results, fn {runtime, result} ->
-        {runtime, recompute_runtime!(result, manifest)}
+        {runtime, recompute_runtime!(result, manifest, gold_routes)}
       end)
 
     %{
@@ -59,7 +60,7 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
       do: raise(ArgumentError, "runtime source identities differ")
   end
 
-  defp recompute_runtime!(result, manifest) do
+  defp recompute_runtime!(result, manifest, gold_routes) do
     seeds = result["seeds"]
 
     unless Enum.map(seeds, & &1["seed"]) == manifest["seeds"],
@@ -79,12 +80,14 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
            "selection" =>
              recompute_rows!(
                splits["selection"],
-               manifest["dataset"]["splits"]["selection_ids"]
+               manifest["dataset"]["splits"]["selection_ids"],
+               gold_routes
              ),
            "held_out" =>
              recompute_rows!(
                splits["held_out"],
-               manifest["dataset"]["splits"]["held_out_ids"]
+               manifest["dataset"]["splits"]["held_out_ids"],
+               gold_routes
              )
          }
 
@@ -107,12 +110,13 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
     end)
   end
 
-  defp recompute_rows!(rows, expected_ids) when is_list(rows) do
+  defp recompute_rows!(rows, expected_ids, gold_routes) when is_list(rows) do
     unless Enum.map(rows, & &1["source_id"]) == expected_ids,
       do: raise(ArgumentError, "result row identity/order drift")
 
     unless Enum.all?(rows, fn row ->
              row["expected"] in @routes and
+               row["expected"] == Map.fetch!(gold_routes, row["source_id"]) and
                (is_nil(row["parsed_route"]) or row["parsed_route"] in @routes) and
                row["correct"] == (row["expected"] == row["parsed_route"])
            end),
@@ -126,7 +130,22 @@ defmodule MatchedInstructionOptimizersTREC.Aggregator do
     }
   end
 
-  defp recompute_rows!(_, _), do: raise(ArgumentError, "result rows must be a list")
+  defp recompute_rows!(_, _, _), do: raise(ArgumentError, "result rows must be a list")
+
+  defp gold_routes!(manifest) do
+    ~w(selection held_out)
+    |> Enum.flat_map(fn split ->
+      manifest["dataset"]["#{split}_path"]
+      |> File.stream!()
+      |> Enum.map(fn line ->
+        row = Jason.decode!(line)
+        prefix = row["label"] |> String.split(":", parts: 2) |> hd()
+        route = Map.fetch!(%{"DESC" => "K11", "ENTY" => "K47"}, prefix)
+        {row["id"], route}
+      end)
+    end)
+    |> Map.new()
+  end
 
   defp assert_summary!(claimed, recomputed, split, rows) do
     claimed =
