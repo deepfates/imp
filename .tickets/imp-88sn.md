@@ -2280,6 +2280,39 @@ treatment variable, not missing task information, parity, or noise. No
 normalization or private shared prompt path was added. This treatment remains
 instrument calibration, not effectiveness, parity, or historical reproduction.
 
+## OpenRouter calibration terminal stop
+
+The separately named OpenRouter calibration was attempted once from exact clean
+source `7360a5c60fea909a566316b780b978587bc53700`. The zero-call preflight passed:
+the Imp, DSPy, and historical-source commits were exact; the private PUPA row
+materialized with its pinned digest; the model and independent ZDR catalogs
+contained only the frozen `novita/fp8` / DeepSeek V4 Flash snapshot at the
+frozen prices and parameters; key capacity was sufficient; and the complete
+`$0.85786624` reservation fit under the combined `$5.00` prospective guard.
+
+Imp then completed one task transport for the first scheduled opportunity. Its
+mandatory read-only generation reconciliation returned HTTP 404, raising
+`Imp.OperationalSafetyError` before the response identity, usage, or event was
+durably written. Per the frozen stop rule, the condition stopped immediately:
+there was no retry or substitution, DSPy did not start, and none of the
+remaining 95 opportunities ran. The private terminal evidence root is
+`benchmarks/results/hover-papillon-openrouter-calibration-v1-7360a5c-20260731T181633`;
+its mode-0600 stop record has SHA-256
+`18314e3b94e256788bc0ce27d8e7d7f708ea99f60fd7e77f9724fbf89c295613`,
+and the exact failure log has SHA-256
+`49664d1541c9f144def203303109d95d6f0cb631c9268579f10b8623e7bab983`.
+
+Exact request-attributable cost is unknown because reconciliation failed before
+durable usage capture. The first opportunity's legal reservation was
+`$0.01376256`. Account usage moved from `$29.44648172` to `$29.714273235`, a
+`$0.267791515` concurrent account-level delta that exceeds this request's legal
+reservation and therefore is not attributed to the calibration. This is an
+inconclusive live-instrument/evidence failure, not a program-format, noise,
+cost-feasibility, effectiveness, parity, or historical-reproduction result.
+The benchmark-program decision is unchanged: the fixed pilot still lacks live
+calibration evidence, and its evidence reconciliation/persistence boundary must
+be repaired and independently reviewed before any future authority.
+
 ## Notes
 
 **2026-07-31T20:57:09Z**
