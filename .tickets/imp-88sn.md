@@ -2313,6 +2313,28 @@ The benchmark-program decision is unchanged: the fixed pilot still lacks live
 calibration evidence, and its evidence reconciliation/persistence boundary must
 be repaired and independently reviewed before any future authority.
 
+The bounded provider-free owning repair is commit
+`a6e16d79e5e629ffdb52bfbd8af03e1b18318c08`. Both repository-only runtimes now
+write a mode-0600 provisional record containing the scheduled opportunity,
+canonical message identity, provider response identity, reported usage, router
+metadata, and finish reason before querying the read-only generation endpoint.
+Only generation-record HTTP 404 is retried, for a fixed 12 attempts one second
+apart; any other drift remains immediately fatal. A successful reconciliation
+writes a separate durable event with the validated request identity and billed
+usage before the next task stage may begin.
+
+The owned local transports prove both boundaries without provider authority.
+An initial 404 followed by 200 reconciles and retains both provisional and final
+evidence. A terminal three-attempt 404 fixture retains exactly one provisional
+transport, writes no reconciled event or aggregate result, and does not execute
+the next scheduled opportunity in either runtime. The exact provider-disabled
+48+48 graphs remain unchanged. Focused tests, the opted-in train-only evidence
+test, `mix fast.check`, and `mix package.check` pass. This repairs the reproduced
+evidence-loss class but does not rehabilitate the terminal run, establish that
+OpenRouter's live generation record will become available within the bound, or
+authorize another completion. Independent review remains required before any
+future live authority.
+
 ## Notes
 
 **2026-07-31T20:57:09Z**
