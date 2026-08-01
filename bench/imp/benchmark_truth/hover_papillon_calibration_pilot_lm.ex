@@ -48,13 +48,18 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
     duration = System.monotonic_time(:microsecond) - started
     wire = Process.get(:imp_calibration_wire) || raise "missing canonical wire evidence"
     status = if match?({:ok, _}, result), do: "ok", else: "error"
+    injected_parse_failure? = opportunity.id in lm.fail_on
+    event_status = if injected_parse_failure?, do: "error", else: status
 
     provider_response =
       Process.get(:imp_calibration_provider_response) ||
-        raise "missing provider response evidence"
+        raise Imp.OperationalSafetyError,
+          kind: :transport,
+          message: "missing provider response evidence"
 
     persist_provisional!(lm, opportunity, wire, provider_response, duration)
-    metadata = response_metadata!(result)
+    validate_response_identity!(provider_response)
+    metadata = response_metadata(result)
     response_usage = response_usage!(metadata, provider_response)
     validate_router_metadata!(provider_response["openrouter_metadata"])
     generation = generation_metadata!(lm, provider_response)
@@ -69,7 +74,8 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
       "repetition" => opportunity.repetition,
       "stage" => opportunity.stage,
       "model_requested" => Pilot.model(),
-      "model_effective" => provider_response["model"],
+      "model_response" => provider_response["model"],
+      "model_effective" => generation["model"],
       "provider" => "openrouter",
       "upstream_provider" => generation["provider_name"],
       "endpoint_tag" => Pilot.endpoint_tag(),
@@ -77,7 +83,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
       "generation_id" => provider_response["generation_id"],
       "timestamp_ns" => System.system_time(:nanosecond),
       "latency_us" => duration,
-      "status" => status,
+      "status" => event_status,
       "finish_reason" => provider_response["finish_reason"],
       "message_sha256" => wire.sha256,
       "message_bytes" => wire.bytes,
@@ -85,9 +91,21 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
       "max_input_bytes" => opportunity.max_input_bytes,
       "usage" => usage,
       "router_metadata" => provider_response["openrouter_metadata"],
-      "parse_status" => if(opportunity.id in lm.fail_on, do: "error", else: status),
+      "parse_status" => event_status,
       "error" =>
-        if(status == "error", do: result |> Imp.Redaction.redact() |> inspect(), else: nil),
+        cond do
+          injected_parse_failure? ->
+            %{
+              "type" => "AdapterParseError",
+              "reason" => "redacted provider-disabled adapter failure"
+            }
+
+          status == "error" ->
+            result |> Imp.Redaction.redact() |> inspect()
+
+          true ->
+            nil
+        end,
       "transport_count" => 1
     }
 
@@ -99,7 +117,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
     result
   end
 
-  defp response_metadata!({:ok, raw}) do
+  defp response_metadata({:ok, raw}) do
     case Imp.LM.Result.split(raw) do
       {:ok, _output, %{req_llm: metadata}} when is_map(metadata) ->
         metadata
@@ -109,15 +127,15 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
 
       other ->
         raise Imp.OperationalSafetyError,
-          kind: :identity,
+          kind: :transport,
           message: "ReqLLM metadata missing",
           reason: other
     end
   end
 
-  defp response_metadata!({:error, reason}) do
+  defp response_metadata({:error, reason}) do
     Imp.OperationalSafetyError.raise_if_present!(reason)
-    raise "provider request failed: #{inspect(Imp.Redaction.redact(reason))}"
+    %{}
   end
 
   defp generation_metadata!(%{generation_fetch: fetch} = lm, response)
@@ -139,7 +157,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
   defp generation_metadata!(%{mode: :provider_disabled}, response) do
     %{
       "id" => response["generation_id"],
-      "model" => Pilot.model(),
+      "model" => Pilot.endpoint_model(),
       "provider_name" => "Novita",
       "cancelled" => false,
       "session_id" => nil,
@@ -175,6 +193,23 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
       "cached_tokens" => cached,
       "total_tokens" => total
     }
+  end
+
+  defp validate_response_identity!(response) do
+    unless response["model"] == Pilot.model() and response["provider"] == "Novita" and
+             is_binary(response["generation_id"]) and response["generation_id"] != "" do
+      raise Imp.OperationalSafetyError,
+        kind: :route,
+        message: "OpenRouter response route identity drift",
+        reason:
+          Imp.Redaction.redact(%{
+            model: response["model"],
+            provider: response["provider"],
+            generation_id: response["generation_id"]
+          })
+    end
+
+    :ok
   end
 
   defp reconcile_usage!(usage, generation) do
@@ -248,18 +283,18 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
          "requested" => requested,
          "strategy" => "direct",
          "attempt" => 1,
-         "endpoints" => %{"total" => 1, "available" => available}
+         "endpoints" => %{"total" => total, "available" => available}
        })
-       when is_list(available) and length(available) == 1 do
+       when is_integer(total) and total >= 1 and is_list(available) and length(available) == 1 do
     selected = Enum.filter(available, &(&1["selected"] == true))
 
     selected_endpoint = List.first(selected) || %{}
 
-    unless requested == Pilot.model() and length(selected) == 1 and
-             selected_endpoint["model"] == Pilot.model() and
+    unless requested == Pilot.model() and total >= length(available) and length(selected) == 1 and
+             selected_endpoint["model"] == Pilot.endpoint_model() and
              selected_endpoint["provider"] == "Novita" do
       raise Imp.OperationalSafetyError,
-        kind: :identity,
+        kind: :route,
         message: "OpenRouter routing metadata drift",
         reason: %{requested: requested, selected: selected}
     end
@@ -269,7 +304,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
 
   defp validate_router_metadata!(other) do
     raise Imp.OperationalSafetyError,
-      kind: :identity,
+      kind: :route,
       message: "OpenRouter routing metadata missing",
       reason: Imp.Redaction.redact(other)
   end

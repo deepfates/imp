@@ -3,6 +3,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
 
   @condition "imp-88sn-hover-papillon-openrouter-calibration-v1"
   @model "deepseek/deepseek-v4-flash"
+  @endpoint_model "deepseek/deepseek-v4-flash-20260423"
   @endpoint_tag "novita/fp8"
   @endpoint_name "Novita | deepseek/deepseek-v4-flash-20260423"
   @endpoint_provider "Novita"
@@ -36,6 +37,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   }
 
   def model, do: @model
+  def endpoint_model, do: @endpoint_model
   def condition, do: @condition
   def endpoint_tag, do: @endpoint_tag
   def endpoint_name, do: @endpoint_name
@@ -150,7 +152,8 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
         require_equal!(event["usage"], %{}, "skipped usage")
       else
         require_equal!(event["model_requested"], @model, "requested model")
-        require_equal!(event["model_effective"], @model, "effective model")
+        require_equal!(event["model_response"], @model, "response model")
+        require_equal!(event["model_effective"], @endpoint_model, "effective model")
         require_equal!(event["provider"], "openrouter", "provider")
         require_equal!(event["upstream_provider"], @endpoint_provider, "upstream provider")
         require_equal!(event["endpoint_tag"], @endpoint_tag, "endpoint tag")
@@ -354,22 +357,55 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   end
 
   def validate_generation!(data, generation_id) when is_map(data) do
-    require_equal!(data["id"], generation_id, "generation ID")
-    require_equal!(data["model"], @model, "generation model")
-    require_equal!(data["provider_name"], @endpoint_provider, "generation provider")
-    require_equal!(data["cancelled"], false, "generation cancellation")
-    require_equal!(data["session_id"], nil, "generation session")
-    require_nonempty!(data["request_id"], "OpenRouter request ID")
-    require_nonnegative_integer!(data["native_tokens_prompt"], "native prompt tokens")
-    require_nonnegative_integer!(data["native_tokens_completion"], "native completion tokens")
-    require_nonnegative_integer!(data["native_tokens_cached"], "native cached tokens")
-    require_equal!(data["native_tokens_cached"], 0, "native cached tokens")
-    require_number!(data["total_cost"], "generation cost")
+    unless data["id"] == generation_id and data["model"] == @endpoint_model and
+             data["provider_name"] == @endpoint_provider and data["cancelled"] == false and
+             is_nil(data["session_id"]) do
+      raise Imp.OperationalSafetyError,
+        kind: :route,
+        message: "OpenRouter generation route identity drift",
+        reason:
+          Imp.Redaction.redact(%{
+            id: data["id"],
+            model: data["model"],
+            provider: data["provider_name"],
+            cancelled: data["cancelled"],
+            session_id: data["session_id"]
+          })
+    end
+
+    unless nonempty?(data["request_id"]) do
+      raise Imp.OperationalSafetyError,
+        kind: :transport,
+        message: "OpenRouter generation request identity missing",
+        reason: %{generation_id: generation_id}
+    end
+
+    unless is_integer(data["native_tokens_prompt"]) and data["native_tokens_prompt"] >= 0 and
+             is_integer(data["native_tokens_completion"]) and
+             data["native_tokens_completion"] >= 0 and
+             data["native_tokens_cached"] == 0 and is_number(data["total_cost"]) and
+             data["total_cost"] >= 0 do
+      raise Imp.OperationalSafetyError,
+        kind: :cost,
+        message: "OpenRouter generation usage or cost drift",
+        reason:
+          Imp.Redaction.redact(%{
+            prompt: data["native_tokens_prompt"],
+            completion: data["native_tokens_completion"],
+            cached: data["native_tokens_cached"],
+            cost: data["total_cost"]
+          })
+    end
+
     data
   end
 
   def validate_generation!(_data, _generation_id),
-    do: raise(ArgumentError, "OpenRouter generation metadata drift")
+    do:
+      raise(Imp.OperationalSafetyError,
+        kind: :transport,
+        message: "OpenRouter generation metadata missing"
+      )
 
   def live_preflight!(env \\ System.get_env()) do
     require_equal!(env["IMP_CALIBRATION_MODE"], "live", "mode")
@@ -921,9 +957,9 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
       "attempt" => 1,
       "is_byok" => false,
       "endpoints" => %{
-        "total" => 1,
+        "total" => 22,
         "available" => [
-          %{"model" => @model, "provider" => @endpoint_provider, "selected" => true}
+          %{"model" => @endpoint_model, "provider" => @endpoint_provider, "selected" => true}
         ]
       }
     }
@@ -999,8 +1035,6 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
 
   defp require_nonempty!(value, _label) when is_binary(value) and byte_size(value) > 0, do: :ok
   defp require_nonempty!(_value, label), do: raise(ArgumentError, "missing #{label}")
-  defp require_number!(value, _label) when is_number(value) and value >= 0, do: :ok
-  defp require_number!(_value, label), do: raise(ArgumentError, "missing or invalid #{label}")
 
   defp fetch_public_json!(url, label) do
     case Req.get(url, retry: false, max_retries: 0, receive_timeout: 30_000) do

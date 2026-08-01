@@ -244,7 +244,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       assert %{opportunity_count: 48, transport_count: 43, actual_cost_usd: cost} = result.summary
       assert_in_delta cost, 0.0001505, 1.0e-12
       r1 = Enum.filter(result.events, &(&1["task"] == "papillon" and &1["repetition"] == 1))
-      assert Enum.map(r1, & &1["status"]) == ["ok" | List.duplicate("skipped", 5)]
+      assert Enum.map(r1, & &1["status"]) == ["error" | List.duplicate("skipped", 5)]
       assert hd(r1)["parse_status"] == "error"
       assert Enum.map(r1, & &1["transport_count"]) == [1, 0, 0, 0, 0, 0]
       assert Enum.all?(tl(r1), &(&1["skip_reason"] == "prior_stage_failed"))
@@ -253,6 +253,37 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       assert Enum.map(r2, & &1["status"]) == List.duplicate("ok", 6)
 
       assert vectors(result.events) == vectors(Pilot.runtime_schedule("imp"))
+
+      reconciled =
+        root
+        |> Path.join("live-evidence/reconciled/imp__papillon__P0__r1__rewrite.json")
+        |> File.read!()
+        |> Jason.decode!()
+
+      assert %{
+               "status" => "error",
+               "parse_status" => "error",
+               "transport_count" => 1,
+               "model_response" => response_model,
+               "model_effective" => endpoint_model,
+               "router_metadata" => %{
+                 "endpoints" => %{
+                   "total" => 22,
+                   "available" => [
+                     %{"model" => selected_model, "provider" => "Novita", "selected" => true}
+                   ]
+                 }
+               }
+             } = reconciled
+
+      assert response_model == Pilot.model()
+      assert endpoint_model == Pilot.endpoint_model()
+      assert selected_model == Pilot.endpoint_model()
+
+      assert reconciled["error"] == %{
+               "type" => "AdapterParseError",
+               "reason" => "redacted provider-disabled adapter failure"
+             }
 
       assert %{error: _} = hd(result.outcomes.papillon)
       assert Enum.all?(tl(result.outcomes.papillon), &papillon_components_complete?/1)
@@ -341,7 +372,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
        } do
     generation = %{
       "id" => "gen-delayed",
-      "model" => Pilot.model(),
+      "model" => Pilot.endpoint_model(),
       "provider_name" => "Novita",
       "cancelled" => false,
       "session_id" => nil,
@@ -414,7 +445,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
              "router_metadata" => %{
                "strategy" => "direct",
                "attempt" => 1,
-               "endpoints" => %{"total" => 1}
+               "endpoints" => %{"total" => 22}
              },
              "usage_reported" => %{
                "prompt_tokens" => 11,
@@ -531,7 +562,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
 
     generation = %{
       "id" => "gen-test",
-      "model" => Pilot.model(),
+      "model" => Pilot.endpoint_model(),
       "provider_name" => "Novita",
       "cancelled" => false,
       "session_id" => nil,
@@ -544,9 +575,49 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
 
     assert Pilot.validate_generation!(generation, "gen-test") == generation
 
-    assert_raise ArgumentError, ~r/native cached tokens drift/, fn ->
+    assert_raise Imp.OperationalSafetyError, ~r/usage or cost drift/, fn ->
       Pilot.validate_generation!(Map.put(generation, "native_tokens_cached", 1), "gen-test")
     end
+
+    assert_raise Imp.OperationalSafetyError, ~r/route identity drift/, fn ->
+      Pilot.validate_generation!(Map.put(generation, "model", Pilot.model()), "gen-test")
+    end
+  end
+
+  test "generation route drift is fatal after one transported stage", %{commit: commit} do
+    root = temp_root("route-drift")
+    {:ok, transports} = Agent.start_link(fn -> 0 end)
+
+    fetch = fn generation_id, _api_key ->
+      {:ok,
+       %{
+         "id" => generation_id,
+         "model" => Pilot.model(),
+         "provider_name" => "Novita",
+         "cancelled" => false,
+         "session_id" => nil,
+         "request_id" => "req-route-drift",
+         "native_tokens_prompt" => 11,
+         "native_tokens_completion" => 7,
+         "native_tokens_cached" => 0,
+         "total_cost" => 0.0000035
+       }}
+    end
+
+    assert_raise Imp.OperationalSafetyError, ~r/generation route identity drift/, fn ->
+      Pilot.run_provider_disabled!(root,
+        expected_commit: commit,
+        private_pupa_fixture: @private_fixture,
+        transport_counter: transports,
+        generation_fetch: fetch
+      )
+    end
+
+    assert Agent.get(transports, & &1) == 1
+    assert [_] = Path.wildcard(Path.join(root, "live-evidence/provisional/*.json"))
+    assert [] = Path.wildcard(Path.join(root, "live-evidence/reconciled/*.json"))
+    refute File.exists?(Path.join(root, "imp.json"))
+    File.rm_rf!(root)
   end
 
   defp event_for(opportunity) do
@@ -558,7 +629,8 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       "repetition" => opportunity.repetition,
       "stage" => opportunity.stage,
       "model_requested" => Pilot.model(),
-      "model_effective" => Pilot.model(),
+      "model_response" => Pilot.model(),
+      "model_effective" => Pilot.endpoint_model(),
       "provider" => "openrouter",
       "upstream_provider" => "Novita",
       "endpoint_tag" => "novita/fp8",

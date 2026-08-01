@@ -25,6 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CONDITION = "imp-88sn-hover-papillon-openrouter-calibration-v1"
 MODEL = "deepseek/deepseek-v4-flash"
+ENDPOINT_MODEL = "deepseek/deepseek-v4-flash-20260423"
 ENDPOINT_TAG = "novita/fp8"
 ENDPOINT_NAME = "Novita | deepseek/deepseek-v4-flash-20260423"
 ENDPOINT_PROVIDER = "Novita"
@@ -194,7 +195,7 @@ def synthetic_router_metadata():
         "summary": "available=1, selected=Novita",
         "attempt": 1,
         "is_byok": False,
-        "endpoints": {"total": 1, "available": [{"model": MODEL, "provider": ENDPOINT_PROVIDER, "selected": True}]},
+        "endpoints": {"total": 22, "available": [{"model": ENDPOINT_MODEL, "provider": ENDPOINT_PROVIDER, "selected": True}]},
     }
 
 
@@ -208,10 +209,11 @@ def validate_router_metadata(metadata):
         raise RuntimeError("OpenRouter routing metadata missing or drifted")
     endpoints = metadata.get("endpoints", {})
     available = endpoints.get("available", [])
-    if endpoints.get("total") != 1 or len(available) != 1:
-        raise RuntimeError("OpenRouter routing metadata contains multiple endpoints")
+    total = endpoints.get("total")
+    if not isinstance(total, int) or total < 1 or total < len(available) or len(available) != 1:
+        raise RuntimeError("OpenRouter routing metadata endpoint shape drift")
     selected = [endpoint for endpoint in available if endpoint.get("selected") is True]
-    if len(selected) != 1 or selected[0].get("model") != MODEL or selected[0].get("provider") != ENDPOINT_PROVIDER:
+    if len(selected) != 1 or selected[0].get("model") != ENDPOINT_MODEL or selected[0].get("provider") != ENDPOINT_PROVIDER:
         raise RuntimeError("OpenRouter selected endpoint drift")
     return metadata
 
@@ -231,7 +233,7 @@ def validate_generation(payload, generation_id):
     data = payload.get("data", {})
     exact = {
         "id": generation_id,
-        "model": MODEL,
+        "model": ENDPOINT_MODEL,
         "provider_name": ENDPOINT_PROVIDER,
         "cancelled": False,
         "session_id": None,
@@ -483,6 +485,7 @@ class Recorder:
         event = {
             **event_identity(item),
             "model_requested": MODEL,
+            "model_response": live["model_response"],
             "model_effective": live["model_effective"],
             "provider": "openrouter",
             "upstream_provider": live["upstream_provider"],
@@ -513,7 +516,8 @@ class Recorder:
         generation_id = "gen-" + item["id"].replace("/", "-")
         router = synthetic_router_metadata()
         return {
-            "model_effective": MODEL,
+            "model_response": MODEL,
+            "model_effective": ENDPOINT_MODEL,
             "upstream_provider": ENDPOINT_PROVIDER,
             "request_id": "req-" + item["id"].replace("/", "-"),
             "generation_id": generation_id,
@@ -540,7 +544,6 @@ class Recorder:
         router = field(response, "openrouter_metadata")
         choices = field(response, "choices") or []
         finish_reason = field(choices[0], "finish_reason") if choices else None
-        validate_router_metadata(router)
         if not generation_id or not model_effective:
             raise RuntimeError("OpenRouter response identity is missing")
         if not all(isinstance(value, int) and value >= 0 for value in (input_tokens, output_tokens, total_tokens, cached)):
@@ -575,7 +578,8 @@ class Recorder:
                     "transport_count": 1,
                 },
             )
-        if provider_reported != ENDPOINT_PROVIDER:
+        validate_router_metadata(router)
+        if model_effective != MODEL or provider_reported != ENDPOINT_PROVIDER:
             raise RuntimeError("OpenRouter response provider missing or drifted")
         generation = generation_metadata(
             self.generation_url,
@@ -590,7 +594,8 @@ class Recorder:
         if abs(generation["total_cost"] - expected_cost) > 1e-9:
             raise RuntimeError("OpenRouter billed cost disagrees with frozen prices")
         return {
-            "model_effective": model_effective,
+            "model_response": model_effective,
+            "model_effective": generation["model"],
             "upstream_provider": generation["provider_name"],
             "request_id": generation["request_id"],
             "generation_id": generation_id,
@@ -689,7 +694,7 @@ def verify_live_transport_offline(dspy_root, output_root):
             if generation_gets["normal"] == 1:
                 self.send_error(404)
                 return
-            payload = {"data": {"id": "gen-offline-live", "model": MODEL,
+            payload = {"data": {"id": "gen-offline-live", "model": ENDPOINT_MODEL,
                        "provider_name": ENDPOINT_PROVIDER, "cancelled": False, "session_id": None,
                        "request_id": "req-offline-live", "native_tokens_prompt": 11,
                        "native_tokens_completion": 7, "native_tokens_cached": 0,
