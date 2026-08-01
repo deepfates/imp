@@ -73,6 +73,18 @@ The product center is real but the telos is open.
   result. The instrument is operable and inexpensive, but the candidate
   portfolio is not ratified and another calibration lane is not the next
   default action.
+- **Next-tranche mechanics — provider-free readiness only.** The adapted HoVer
+  no-merge target has source-grounded nominal/legal opportunity and its compact
+  four-stage Experiment/Artifact/fresh-service lifecycle passes, but the real
+  `150/300/300` rows and source-exact 5.2M-document corpus/index are absent on
+  this machine; the planner fails readiness closed instead of treating pinned
+  constants as materialized evidence. Circle v1.4's exact one-metric cold probe
+  authenticates source before imports, preserves the released objective and
+  refiner context, carries Imp `current_best`, records upstream's cache-induced
+  one-evaluation asymmetry, and loads/evaluates a schema-3 value Artifact fresh.
+  It does not derive the upstream full `150`-call loop boundary or a five-seed
+  ceiling. Neither probe supplies provider authority, effectiveness, parity, or
+  generalization, and the epic remains open.
 
 ## Backward checkpoint plan
 

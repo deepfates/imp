@@ -37,6 +37,30 @@ Everything below is a chronological research record. Earlier recommendations,
 budgets, and runnable proposals are not current authority merely because they
 remain preserved.
 
+The current provider-free preparation establishes two narrower facts without
+advancing the usefulness criterion. The adapted HoVer no-merge target has a
+source-grounded nominal `115,248` and legal `122,520` task-transport envelope;
+its compact fixture exercises all four predictors in round-robin order, accepts
+four incremental mutations, rejects a fifth, selects strictly, writes linked
+Result/Artifact state, and serves four fresh-process calls. It is
+`readiness_only`: this machine does not contain the full `150/300/300` rows or
+the source-exact 5.2M-document corpus/index, and the planner now reports
+`data_ready: false` until their counts and hashes are recomputed through the
+existing materialized-data and retrieval verifiers. It grants no live/data
+readiness or provider authority.
+
+The exact Circle v1.4 one-metric cold probe also passes provider-free. It
+authenticates the OA source files and DSPy checkout before imports, uses the
+released objective, background, and refiner prompt, carries Imp's first returned
+circles into its second evaluator call, records the ordered state hashes, and
+exports a schema-3 value Artifact that a fresh trusted process evaluates. The
+pinned upstream path performs one evaluator call because its cache collapses the
+identical refined code; that asymmetry is explicit. Released `150`-call,
+`600s`, parallel configuration is separate from the exercised `1`-metric,
+`30s`, serial probe. Exact full-loop overshoot and five-seed ceilings remain
+open, so this earns readiness only—not effectiveness, parity, generalization,
+or provider authority.
+
 The current work is a bounded training-only calibration of released HoVer and
 PAPILLON programs through ordinary Imp and pinned-DSPy paths. It is not an
 optimizer arm and cannot satisfy this ticket. It must measure whether the
