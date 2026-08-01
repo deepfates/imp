@@ -18,7 +18,7 @@ Obstacle: Imp has one narrow historical positive matched result, several honest 
 
 Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
 
-## Current status after `8e801d68`
+## Current status after `7411e43f`
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
@@ -87,17 +87,17 @@ or provider authority.
 
 The completed HoVer/PAPILLON calibration is historical instrument evidence. Its
 two null starts and final v2 outcome remain immutable; its GPT-4.1-era treatment
-does not roll forward. The current HoVer candidate may justify one fixed,
-train-only live calibration to measure real request sizes, format reliability,
-route identity, latency, cache exposure, and cost before a full study. That
-calibration is not an optimizer arm and cannot satisfy this ticket. It may not
-load selection/test rows, optimize, adapt after favorable observations, or grow
-into a generic campaign layer. No current-model provider call is authorized by
-this ticket; the owner must review the fixed opportunity and spend ceiling.
+does not roll forward. A current-model train-only calibration design was derived
+provider-free, but its executable was rejected: exact route/generation joins,
+prospective cost admission, private provisional/reconciled evidence, and
+ordinary-versus-fatal failure handling required a second experiment controller
+disproportionate to the measurement. No current-model provider call is
+authorized. The full HoVer condition remains `REVISE` pending a benchmark path
+through ordinary product APIs without another evidence runtime.
 
-That measurement must lead to a decision: ratify a credible representative
-portfolio, revise the treatment once for a reproduced defect, or reject this
-direction. A ratified protocol must name tasks, public programs, native metrics,
+The next HoVer decision must either ratify an ordinary product path that directly
+optimizes, or reject this direction; another calibration lane is not accepted. A
+ratified protocol must name tasks, public programs, native metrics,
 optimizer/upstream arms, fixed seeds, result-blind data, effect thresholds,
 uncertainty treatment, artifact/service acceptance, and a realistic cost. The
 earlier HoVer/PAPILLON four-arm proposal exceeds 1.7 million task-shaped
