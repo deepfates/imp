@@ -351,7 +351,13 @@ defmodule Imp.Streaming.Messages do
     end
 
     defp new_parser(field, Imp.Adapter.Chat, nil) do
-      %{kind: :chat, start: "[[ ## #{field} ## ]]", phase: :searching, buffer: ""}
+      %{
+        kind: :chat,
+        start: "[[ ## #{field} ## ]]",
+        phase: :searching,
+        buffer: "",
+        pending: ""
+      }
     end
 
     defp new_parser(field, Imp.Adapter.XML, nil) do
@@ -442,14 +448,27 @@ defmodule Imp.Streaming.Messages do
 
       case Regex.run(@chat_end_pattern, combined, return: :index) do
         [{index, _length}] ->
-          value = combined |> binary_part(0, index) |> String.trim_trailing()
-          {%{parser | phase: :done, buffer: ""}, maybe_chunk(value)}
+          value = parser.pending <> binary_part(combined, 0, index)
+          value = String.trim_trailing(value)
+          {%{parser | phase: :done, buffer: "", pending: ""}, maybe_chunk(value)}
 
         nil ->
           suffix = end_candidate_suffix(combined)
-          emit_size = byte_size(combined) - byte_size(suffix)
-          value = binary_part(combined, 0, emit_size)
-          {%{parser | buffer: suffix}, maybe_chunk(value)}
+
+          if suffix == "" do
+            chunks = maybe_chunk(parser.pending) ++ maybe_chunk(combined)
+            {%{parser | buffer: "", pending: ""}, chunks}
+          else
+            emit_size = byte_size(combined) - byte_size(suffix)
+            value = binary_part(combined, 0, emit_size)
+
+            # Keep the content from the provider chunk that introduced a
+            # possible end marker separate from the delimiter prefix. If the
+            # marker completes, its preceding whitespace can be trimmed and
+            # the content emitted as the terminal chunk. If it proves false,
+            # both pieces are flushed unchanged on the next feed.
+            {%{parser | buffer: suffix, pending: parser.pending <> value}, []}
+          end
       end
     end
 
@@ -620,8 +639,12 @@ defmodule Imp.Streaming.Messages do
       %{parser | key_index: index + 1, key_match: matches?}
     end
 
-    defp parser_finish(%{kind: kind, phase: :streaming} = parser)
-         when kind in [:chat, :delimited] do
+    defp parser_finish(%{kind: :chat, phase: :streaming} = parser) do
+      chunks = maybe_chunk(parser.pending) ++ maybe_chunk(parser.buffer)
+      {%{parser | phase: :done, buffer: "", pending: ""}, chunks}
+    end
+
+    defp parser_finish(%{kind: :delimited, phase: :streaming} = parser) do
       {%{parser | phase: :done, buffer: ""}, maybe_chunk(parser.buffer)}
     end
 

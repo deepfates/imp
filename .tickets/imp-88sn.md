@@ -63,6 +63,14 @@ with the scorer audit and semantic overlap disclosed. It does not mean globally
 unread bytes or semantic-content disjointness. This resolves the claim meaning;
 it does not authorize provider work or spend.
 
+MuSiQue readiness work is not automatically the current strategy merely because
+the candidate is detailed. Principal review must first finish the meaningful
+DSPy capability and direct operational comparison, then compare MuSiQue's
+scientific value, expected cost, and task-owned implementation burden with the
+smallest credible landscape-grounded alternative. If admission becomes another
+benchmark controller or evidence project, reject the lane rather than treating
+that machinery as progress on this ticket.
+
 The MuSiQue current-MIPRO design is frozen for provider-free review, not yet an
 executable or provider-authorized treatment. It is one serious candidate for
 this ticket's missing realistic multi-stage result, not a complete external

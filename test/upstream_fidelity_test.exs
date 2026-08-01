@@ -69,7 +69,7 @@ defmodule Imp.UpstreamFidelityTest do
              "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
            ]
 
-    assert by_id["primitives.multimodal"].status == :conformant
+    assert by_id["primitives.multimodal"].status == :gap
     few_shot = by_id["optimization.few_shot"]
     assert few_shot.status == :elixir_native_equivalent
     assert few_shot.disposition == :elixir_native_equivalent

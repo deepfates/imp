@@ -8,11 +8,11 @@ the ordinary consumer finish line and `tk` owns unfinished work.
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Release profile: v0.1
 Total: 26
-Conformant: 14
+Conformant: 13
 Elixir-native equivalents: 7
 Tracking: 2
-Gaps: 3
-Claim-specific non-blocking gaps: 3
+Gaps: 4
+Claim-specific non-blocking gaps: 4
 Invalid evidence: 0
 Invalid aggregate rows: 0
 Missing manifest surfaces: 0
@@ -29,7 +29,7 @@ Conformance profile passing: true
 | adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter |
 | adapters.xml | adapters | conformant | satisfied | XMLAdapter |
 | adapters.two_step | adapters | conformant | satisfied | TwoStepAdapter |
-| primitives.multimodal | primitives | conformant | satisfied | Image, Audio, File, Code, Document, Citations, Reasoning |
+| primitives.multimodal | primitives | gap | claim-specific gap | Image, Audio, File, Code, Document, Citations, Reasoning |
 | tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
 | agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |
 | agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper |
@@ -250,13 +250,15 @@ Missing evidence or behavior:
 
 ### `primitives.multimodal`
 
-Status: `conformant`
+Status: `gap`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
 Imp modules: `Imp.Adapter.Types`
 Semantic invariants:
 
+- Image, Audio, and File values validate and normalize ordinary provider content blocks
+- Imp's Code, Document, Citation, and Reasoning values are useful native content values but do not claim DSPy's richer typed field and provider-native citation semantics
 - encoding support is not evidence of model reasoning quality
 
 Executable evidence:
@@ -270,6 +272,8 @@ Executable evidence:
 
 Missing evidence or behavior:
 
+- DSPy-compatible Code output-field parsing and language-specific description semantics
+- citation-enabled Document blocks plus native Citations response extraction and streaming
 - audio quality remains an unsupported claim rather than an implied capability
 
 ### `tools.typed_calls`

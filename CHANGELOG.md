@@ -36,10 +36,12 @@ publication remain owner actions.
 - `Imp.Experiment.check/5` now powers the packaged two-stage OTP deployment
   workflow end to end: disjoint selection/test evaluation, selected-artifact
   construction, checksummed `Result`/`Artifact` persistence, fresh-process
-  loading, concurrent serving, hot reload, and failure containment. A retained
-  one-seed Banking77 run records the honest negative case where GEPA regressed
-  on validation, baseline was retained, and the selected artifact still served
-  successfully after restart.
+  loading, concurrent serving, hot reload, and failure containment. The
+  packaged workflow is provider-free. Repository-only Banking77 research
+  separately retains the honest negative case where GEPA regressed on
+  validation, baseline was retained, and the selected artifact still served
+  successfully after restart; its runner, data, results, and artifacts are not
+  part of the package.
 - Experiment evaluation cancellation at `max_errors` now returns redacted,
   structured row evidence with the failed stage, row identity/index, and
   underlying reason instead of collapsing the failure into an opaque optimizer

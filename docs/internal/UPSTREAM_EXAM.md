@@ -893,29 +893,23 @@ internals). Design substitutions that recur in the rows:
 | Upstream test functions in scope | **123** (teleprompt 65, evaluate 21, streaming 37) |
 | Ported | **75** (76 ExUnit tests; some ports cover two same-surface upstream fns, some upstream fns split across two ports) |
 | — pass | **74** |
-| — FAIL (real divergence found by upstream's own test) | **1** (chat stream listener trailing-whitespace trim; tagged `@tag :upstream_fail` + `:skip`, failing output preserved in the test comment) |
+| — FAIL (real divergence found by upstream's own test) | **0** (the split chat-marker trailing-whitespace divergence found by the exam is fixed) |
 | Blocked (behavior should/could exist in Imp; not expressible yet) | **20** (17 flipped by the two dee-r67q batches: GEPA selector/proposer 9 to pass + 2 to n/a; utility surface 6 to pass — save_as_json/csv, eval_candidate_program x3, bootstrap_trace_data) |
 | Not applicable (Python/pydantic/litellm/asyncio specific, or a documented Imp design substitution) | **28** |
 
-### The FAIL
+### The split-marker FAIL found by the exam — fixed
 
-**Chat stream listener does not trim trailing section whitespace when the end
-marker arrives split across chunks** (streaming_test.exs, tagged). With
-upstream's recorded gpt-4o-mini token split (`"!\n\n[[ ##"`, `" completed"`,
-`" ##"`, `" ]]"`), DSPy's listener yields `"!"` as the final content chunk
-(trailing `\n\n` trimmed, `is_last_chunk` on it). Imp's chat parser emits the
-untrimmed `"!\n\n"` — the whitespace precedes a then-unconfirmed marker
-prefix and is flushed as content — then marks doneness on a separate
-nil-content terminal chunk. Concatenated listener output therefore differs
-from upstream by the trailing whitespace. When the full end marker arrives in
-ONE chunk, Imp does drop the preceding whitespace, so the divergence is
-specific to split markers. JSON and XML extraction are content-exact
-(JSON byte-exact including chunk boundaries and the done flag).
+The chat listener now retains the provider chunk that introduced a possible
+split end marker until that marker is confirmed or disproved. With upstream's
+recorded gpt-4o-mini token split (`"!\n\n[[ ##"`, `" completed"`, `" ##"`,
+`" ]]"`), it trims the section whitespace and emits `"!"` as the terminal
+content chunk, matching DSPy. A false marker prefix is still flushed unchanged.
 
 ### Gaps and notable findings (fix-wave candidates)
 
-1. **Chat listener trailing-whitespace FAIL** above — the one place
-   upstream's own test catches Imp emitting different bytes.
+1. **Chat listener trailing-whitespace FAIL** — CLOSED. Split end markers now
+   retain the introducing chunk until confirmation, so the final content bytes
+   and done flag match upstream.
 2. **BetterTogether accepts a non-optimizer at construction**
    (test_bettertogether_initialization_invalid_optimizer): DSPy raises
    TypeError at `__init__`; Imp accepts `%{p: "not_a_teleprompter"}` silently
@@ -1148,14 +1142,14 @@ trace)` shape as a `%{example:, pred:, trace:}` map.
 | test_streaming_handles_space_correctly | pass | Joined chunks == "How are you doing?" byte-exact. |
 | test_sync_streaming | n/a | llm_call (and Imp streaming is already synchronous — the sync/async split collapses). |
 | test_sync_status_streaming | blocked | Status provider absent (gap #6). |
-| test_stream_listener_returns_correct_chunk_chat_adapter | **FAIL** | The one real divergence: split end marker → Imp emits untrimmed "!\n\n" and a separate nil terminal chunk; upstream trims to "!" with is_last_chunk. Tagged `@tag :upstream_fail` + `:skip`; observed output preserved in the test. |
+| test_stream_listener_returns_correct_chunk_chat_adapter | pass (was FAIL) | Split end marker → the listener retains the introducing chunk, trims trailing section whitespace, and emits `"!"` with the terminal flag, matching upstream. |
 | test_stream_listener_returns_correct_chunk_json_adapter | pass | Byte-exact including quotes in chunks, chunk boundaries, and done on the final content chunk; split-key ("jud"/"gement") half also ported. |
 | test_stream_listener_returns_correct_chunk_chat_adapter_untokenized_stream | pass | Whole-section chunks; done marked on the terminal boundary chunk (nil-chunk seam, gap #3). |
 | test_stream_listener_missing_completion_marker_chat_adapter | pass | All tokens flushed, terminal done, nothing lost. |
 | test_stream_listener_returns_correct_chunk_json_adapter_untokenized_stream | pass (adapted) | Joined content byte-exact incl. quotes; upstream's single-chunk granularity is its buffering artifact (Imp may split at fed-chunk seams). |
 | test_status_message_non_blocking | pass (adapted) | Listener status stream: exactly one :started and one :completed around the pulled events (Imp's status vocabulary; upstream's is tool-status + async timing). |
 | test_status_message_non_blocking_async_program | n/a | asyncio twin. |
-| test_stream_listener_allow_reuse | pass (adapted) | Same listener extracts its field from two consecutive streams; markers fed unsplit so the recorded FAIL does not mask the reuse behavior. |
+| test_stream_listener_allow_reuse | pass (adapted) | Same listener extracts its field from two consecutive streams. |
 | test_stream_listener_returns_correct_chunk_xml_adapter | pass | Joined content byte-exact for both fields; done on terminal boundary chunk (nil-chunk seam). |
 | test_streaming_allows_custom_chunk_types | n/a | Arbitrary user dataclasses passing through streamify; Imp streams are ordinary Enumerables — any term already passes through (nothing to gate). |
 | test_streaming_allows_custom_streamable_type | blocked | No custom Type.is_streamable/parse_stream_chunk protocol; typed partial-value streaming absent. |

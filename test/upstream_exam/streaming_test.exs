@@ -89,16 +89,11 @@ defmodule UpstreamExam.StreamingTest do
   # ---------------------------------------------------------------------------
   # test_stream_listener_returns_correct_chunk_chat_adapter
   #
-  # FINDING (real divergence): with upstream's exact token split — the end
-  # marker arriving as "!\n\n[[ ##" / " completed" / " ##" / " ]]" — DSPy's
-  # listener yields "!" as the final content chunk (trailing section
-  # whitespace trimmed, is_last_chunk on it). Imp's chat parser emits the
-  # untrimmed "!\n\n" (the whitespace precedes a then-unconfirmed marker
-  # prefix) and marks doneness on a separate terminal chunk. Observed output:
-  #   [..., {" plate", false}, {"!\n\n", false}, {nil, true}]
+  # The end marker arrives across four provider chunks. The listener must keep
+  # the chunk that introduced the possible marker until the marker is either
+  # confirmed or disproved, so trailing section whitespace can be trimmed and
+  # the final content chunk can carry the done flag.
   # ---------------------------------------------------------------------------
-  @tag :upstream_fail
-  @tag :skip
   test "chat listener: split end marker trims trailing whitespace from the final chunk" do
     chunks =
       listener_chunks(:answer, Imp.Adapter.Chat, [

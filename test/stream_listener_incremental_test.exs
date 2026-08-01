@@ -60,10 +60,12 @@ defmodule Imp.StreamListenerIncrementalTest do
                           }}
 
         "lo[" ->
-          assert_receive {:field, %StreamResponse{chunk: "lo", done: false}}
+          # The possible end-marker prefix keeps this provider chunk pending
+          # until the next chunk confirms or disproves the marker.
+          :ok
 
         "[ ## completed ## ]]ignored" ->
-          assert_receive {:field, %StreamResponse{chunk: nil, done: true}}
+          assert_receive {:field, %StreamResponse{chunk: "lo", done: true}}
 
         _other ->
           :ok

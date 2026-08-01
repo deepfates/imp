@@ -66,6 +66,17 @@ The product center is real but the telos is open.
   completed their lifecycle but missed frozen lift bars. IFBench effectiveness
   is invalid/unverified after its scorer defect. No current realistic multi-stage
   LM condition has satisfied `imp-88sn`.
+- **Meaningful DSPy capability audit — active, not a mechanical port count.**
+  The ordinary programming, evaluation, optimizer, agent/tool, retrieval,
+  persistence, and supervised deployment capabilities are broadly present and
+  the complete packaged lifecycle has been exercised. The granular upstream
+  exam now has no retained executable FAIL after repairing split Chat-marker
+  streaming. That does not imply complete parity: provider-native
+  Document/Citations behavior, typed citation streaming, Code field parsing,
+  ecosystem breadth, and several advanced ergonomic surfaces remain real
+  gaps. Current DSPy also has save/load, concurrency, streaming, caching, and
+  deployment paths, so Imp's stronger OTP/artifact story is an architectural
+  hypothesis until a direct ordinary-path comparison exercises it.
 - **External benchmark program — one serious candidate, not the portfolio.**
   HoVer/PAPILLON remains a historical instrument: it measured route, usage,
   cost, cache, and format behavior, but its live HoVer comparison was invalidated
@@ -110,13 +121,28 @@ The product center is real but the telos is open.
 Work proceeds backward from the finish line, without turning this list into a
 second tracking system:
 
-1. **Hold the representative claim fixed.** Treat official-split,
+1. **Finish the capability-level falsification audit.** Classify meaningful
+   DSPy user capabilities as implemented and exercised, implemented through a
+   deliberate BEAM-native substitute, genuinely missing, or merely different
+   in Python mechanics. Repair only consequential product defects and make the
+   public conformance source agree with the granular evidence. Do not turn the
+   upstream test inventory into a literal port checklist.
+2. **Exercise the claimed BEAM advantage directly.** Compare ordinary safe
+   state persistence, credential rebinding, tamper handling, fresh restart,
+   concurrent service, timeout/crash containment, and operational visibility
+   against current DSPy's documented ordinary paths. Architecture alone cannot
+   earn a superiority claim; keep the result scoped if only some operational
+   dimensions are better.
+3. **Ratify the representative scientific tranche.** Treat official-split,
    source-row-disjoint, treatment-unseen MuSiQue dev as a valid held-out boundary
    with the audit and semantic overlap disclosed. Keep the retained positive OA
    condition and clean Banking77/HotPot negatives separate. A passing MuSiQue
    result can satisfy `imp-88sn`'s missing realistic multi-stage condition; it
    would still be one arm rather than broad epic-level portfolio completion.
-2. **Authenticate admission before spend.** Finish
+   MuSiQue remains a candidate, not the automatic next task: compare its
+   scientific value, expected cost, and implementation burden with the smallest
+   landscape-grounded alternative before completing admission work.
+4. **Authenticate the chosen arm before spend.** Finish
    both runtimes' complete serializer census, exact route/fallback behavior,
    canonical pretransport input/output guards (including bootstrap demos), and
    legal call/cost ceiling using the existing task-owned paths. Reject the lane
@@ -124,19 +150,19 @@ second tracking system:
    the scientific opportunity. Then present the actual maximum and realistic
    expected cost as one explicit owner spend decision; planning arithmetic is
    not authority.
-3. **Freeze ordinary benchmark paths.** Each chosen task must use thin public
+5. **Freeze ordinary benchmark paths.** Each chosen task must use thin public
    Imp composition, native validated metrics, result-blind splits, ordinary
    Result/Artifact boundaries, fresh concurrent service, and pinned ordinary
    upstream APIs. Benchmark-local code must not own missing generic behavior.
-4. **Run the first representative tranche.** Execute the predeclared seeds and
+6. **Run the first representative tranche.** Execute the predeclared seeds and
    arms without seed shopping or threshold changes; retain row- and seed-level
    uncertainty, exact costs, artifacts, clean negatives, and independently
    recomputable evidence.
-5. **Improve and stabilize the product from the evidence.** Fix reusable product
+7. **Improve and stabilize the product from the evidence.** Fix reusable product
    defects, redesign invalid treatments, and learn from scientific negatives.
    Promote optimizer families only when their semantics, operations, reports,
    documentation, and appropriately scoped usefulness evidence support it.
-6. **Complete the user experience and external acceptance.** Rewrite remaining
+8. **Complete the user experience and external acceptance.** Rewrite remaining
    user documentation around purpose and use, conduct a cold independent
    install-to-optimize-to-serve review, prepare an owner-ready release, and leave
    publication as an explicit owner action.

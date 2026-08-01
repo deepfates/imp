@@ -250,14 +250,22 @@ defmodule Imp.UpstreamFidelity do
       category: :primitives,
       upstream: ["Image", "Audio", "File", "Code", "Document", "Citations", "Reasoning"],
       source: "dspy/adapters/types; dspy/experimental",
-      disposition: :conformant,
+      disposition: :gap,
       ticket: "de-ezg9",
       imp: [Imp.Adapter.Types],
-      invariants: ["encoding support is not evidence of model reasoning quality"],
+      invariants: [
+        "Image, Audio, and File values validate and normalize ordinary provider content blocks",
+        "Imp's Code, Document, Citation, and Reasoning values are useful native content values but do not claim DSPy's richer typed field and provider-native citation semantics",
+        "encoding support is not evidence of model reasoning quality"
+      ],
       evidence: %{
         tests: ["test/multimodal_adapter_test.exs", "test/multimodal_quality_benchmark_test.exs"],
         docs: ["docs/API_GUIDE.md", "docs/internal/MULTIMODAL_FIDELITY.md"],
-        missing: ["audio quality remains an unsupported claim rather than an implied capability"]
+        missing: [
+          "DSPy-compatible Code output-field parsing and language-specific description semantics",
+          "citation-enabled Document blocks plus native Citations response extraction and streaming",
+          "audio quality remains an unsupported claim rather than an implied capability"
+        ]
       }
     },
     %{
