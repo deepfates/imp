@@ -1,6 +1,46 @@
 defmodule GepaDatasetExportTest do
   use ExUnit.Case
 
+  test "family selector isolates hoverBench without importing other families" do
+    script = Path.expand("scripts/gepa_export_dataset_root.py")
+
+    python = """
+    import importlib.util, json
+    spec = importlib.util.spec_from_file_location("gepa_export", #{inspect(script)})
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    print(json.dumps(list(module.selected_family_specs("hoverBench").keys())))
+    """
+
+    assert {"[\"hoverBench\"]\n", 0} = System.cmd("python3", ["-c", python])
+  end
+
+  test "authenticated hoverBench export refuses a missing raw-source checkout before imports" do
+    gepa_root = tmp_dir("gepa-export-hover-source")
+    out = tmp_dir("gepa-export-hover-out")
+    write_fake_gepa_package!(gepa_root)
+    initialize_source_repo!(gepa_root)
+
+    {output, status} =
+      System.cmd(
+        "python3",
+        [
+          "scripts/gepa_export_dataset_root.py",
+          "--gepa-root",
+          gepa_root,
+          "--out",
+          out,
+          "--family",
+          "hoverBench"
+        ],
+        stderr_to_stdout: true
+      )
+
+    assert status != 0
+    assert output =~ "authenticated hoverBench export requires --hover-source-root"
+    refute File.exists?(Path.join(out, "hoverBench/train.jsonl"))
+  end
+
   test "GEPA dataset exporter writes campaign dataset root from upstream-shaped package" do
     gepa_root = tmp_dir("gepa-export-source")
     out = tmp_dir("gepa-export-out")

@@ -42,12 +42,19 @@ advancing the usefulness criterion. The adapted HoVer no-merge target has a
 source-grounded nominal `115,248` and legal `122,520` task-transport envelope;
 its compact fixture exercises all four predictors in round-robin order, accepts
 four incremental mutations, rejects a fifth, selects strictly, writes linked
-Result/Artifact state, and serves four fresh-process calls. It is
-`readiness_only`: this machine does not contain the full `150/300/300` rows or
-the source-exact 5.2M-document corpus/index, and the planner now reports
-`data_ready: false` until their counts and hashes are recomputed through the
-existing materialized-data and retrieval verifiers. It grants no live/data
-readiness or provider authority.
+Result/Artifact state, and serves four fresh-process calls. It remains
+`readiness_only`. A provider-free materialization now authenticates and exports
+the exact `150/300/300` rows, authenticates the pinned 608,448,121-byte archive,
+and reproduces the 5,233,330-row corpus hash. One exact source-recipe build with
+`bm25s==0.2.12`, `k1=0.9`, `b=0.4`, English stopwords, and PyStemmer produced a
+receipted index tree `d8ef9ed4...`; all three existing frozen retrieval title
+vectors match byte/order-exact. The previously frozen `c35ec786...` tree first
+appears in historical authority/generated metadata without a retained index,
+dependency lock, per-file hashes, or build receipt. It is therefore unsupported
+as a deterministic serialization authority. Because `d8ef9ed4...` does not
+match that frozen tree identity, the planner correctly remains
+`data_ready: false`. This grants no live/data readiness, effectiveness claim, or
+provider authority; a separate review must ratify semantic retrieval authority.
 
 The exact Circle v1.4 one-metric cold probe also passes provider-free. It
 authenticates the OA source files and DSPy checkout before imports, uses the

@@ -75,16 +75,21 @@ The product center is real but the telos is open.
   default action.
 - **Next-tranche mechanics — provider-free readiness only.** The adapted HoVer
   no-merge target has source-grounded nominal/legal opportunity and its compact
-  four-stage Experiment/Artifact/fresh-service lifecycle passes, but the real
-  `150/300/300` rows and source-exact 5.2M-document corpus/index are absent on
-  this machine; the planner fails readiness closed instead of treating pinned
-  constants as materialized evidence. Circle v1.4's exact one-metric cold probe
-  authenticates source before imports, preserves the released objective and
-  refiner context, carries Imp `current_best`, records upstream's cache-induced
-  one-evaluation asymmetry, and loads/evaluates a schema-3 value Artifact fresh.
-  It does not derive the upstream full `150`-call loop boundary or a five-seed
-  ceiling. Neither probe supplies provider authority, effectiveness, parity, or
-  generalization, and the epic remains open.
+  four-stage Experiment/Artifact/fresh-service lifecycle passes. The exact
+  `150/300/300` rows, pinned archive, and 5,233,330-row corpus now materialize
+  provider-free and match their frozen hashes. The one authorized source-recipe
+  BM25S build is receipted as tree `d8ef9ed4...` and reproduces all three frozen
+  retrieval title vectors, but it does not match the historical `c35ec786...`
+  tree. That older value has no retained build receipt or dependency lock and is
+  unsupported as a deterministic serialization authority, so retrieval and
+  `data_ready` remain false pending a separate semantic-authority disposition.
+  Circle v1.4's exact one-metric cold probe authenticates source before imports,
+  preserves the released objective and refiner context, carries Imp
+  `current_best`, records upstream's cache-induced one-evaluation asymmetry, and
+  loads/evaluates a schema-3 value Artifact fresh. It does not derive the
+  upstream full `150`-call loop boundary or a five-seed ceiling. Neither probe
+  supplies provider authority, effectiveness, parity, or generalization, and
+  the epic remains open.
 
 ## Backward checkpoint plan
 

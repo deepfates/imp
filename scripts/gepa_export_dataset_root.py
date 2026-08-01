@@ -35,6 +35,40 @@ FAMILY_DATASETS = {
     "Papillon": ["Columbia-NLP/PUPA"],
 }
 
+HOVER_RAW_SOURCE = {
+    "repository": "https://github.com/hover-nlp/hover",
+    "commit": "39b84697f196308f398a251a7aea9b82ae0f0562",
+    "files": {
+        "data/hover/hover_train_release_v1.1.json": {
+            "bytes": 9_205_582,
+            "sha256": "1f1cd57abd616fa00c70bdc575ce77c16fc6cf1a6cffd5ff87c208030a336bb6",
+        },
+        "data/hover/hover_dev_release_v1.1.json": {
+            "bytes": 2_153_439,
+            "sha256": "67c14858f2d7fcdb96b6fe3d538ffcd6f76e3ba594aa2c0cd4359f601101e89d",
+        },
+        "data/hover/hover_test_release_v1.1.json": {
+            "bytes": 898_814,
+            "sha256": "c58e7fc59b4962213a5a6d41d746384ee88a7645e36cb3a439969cf762c8ec24",
+        },
+    },
+}
+
+HOVER_FROZEN_SPLITS = {
+    "train": {
+        "count": 150,
+        "sha256": "448048cc80de7982b344ef3c8767816164eeabe3d2a1ad4f776245e3dff39370",
+    },
+    "dev": {
+        "count": 300,
+        "sha256": "b342dbaaa4516e55b7f4f7ac046828c2201952e69de5b97751173238674a74a7",
+    },
+    "test": {
+        "count": 300,
+        "sha256": "cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807",
+    },
+}
+
 
 FAMILY_SPECS: Dict[str, Dict[str, Any]] = {
     "AIMEBench": {
@@ -105,19 +139,35 @@ def main() -> int:
     parser.add_argument("--gepa-root", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--max-per-split", type=int)
+    parser.add_argument("--family", choices=sorted(FAMILY_SPECS))
+    parser.add_argument("--hover-source-root")
     args = parser.parse_args()
     dataset_scope = "full" if args.max_per_split is None else "capped"
 
     gepa_root = Path(args.gepa_root).resolve()
     out = Path(args.out).resolve()
     source = source_identity(gepa_root)
+    selected_specs = selected_family_specs(args.family)
+    hover_raw_authority = None
+
+    if args.family == "hoverBench":
+        if args.max_per_split is not None:
+            raise RuntimeError("the authenticated hoverBench export must not be capped")
+        if not args.hover_source_root:
+            raise RuntimeError(
+                "the authenticated hoverBench export requires --hover-source-root"
+            )
+        hover_raw_authority = verify_hover_raw_source(
+            Path(args.hover_source_root).resolve()
+        )
+
     sys.path.insert(0, str(gepa_root))
     install_dataset_compatibility_shims()
 
     out.mkdir(parents=True, exist_ok=True)
     exported_specs: List[Dict[str, Any]] = []
 
-    for family, spec in FAMILY_SPECS.items():
+    for family, spec in selected_specs.items():
         benchmark = instantiate_benchmark(spec["module"], family)
         family_dir = out / family
         family_dir.mkdir(parents=True, exist_ok=True)
@@ -138,6 +188,9 @@ def main() -> int:
             split_counts[split_name] = len(records)
             split_checksums[split_name] = "sha256:" + sha256(path)
 
+        if args.family == "hoverBench":
+            verify_frozen_hover_export(family_dir, split_counts, split_checksums)
+
         exported_specs.append(
             {
                 **{key: value for key, value in spec.items() if key != "module"},
@@ -147,7 +200,9 @@ def main() -> int:
                 "max_per_split": args.max_per_split,
                 "split_counts": split_counts,
                 "split_checksums": split_checksums,
-                "dataset_authorities": dataset_authorities(gepa_root, family, source),
+                "dataset_authorities": dataset_authorities(
+                    gepa_root, family, source, hover_raw_authority
+                ),
                 **family_extra_metadata(gepa_root, family),
                 "metric_fidelity": (
                     "upstream_metric_named_for_adapter; Imp campaign runner ports "
@@ -165,6 +220,7 @@ def main() -> int:
             "upstream_source": source,
             "dataset_scope": dataset_scope,
             "max_per_split": args.max_per_split,
+            "selected_family": args.family,
             "dataset_aliases": DATASET_ALIASES,
             "families": exported_specs,
         },
@@ -172,6 +228,75 @@ def main() -> int:
 
     print(out)
     return 0
+
+
+def selected_family_specs(family: str | None) -> Dict[str, Dict[str, Any]]:
+    if family is None:
+        return FAMILY_SPECS
+    return {family: FAMILY_SPECS[family]}
+
+
+def verify_hover_raw_source(source_root: Path) -> Dict[str, Any]:
+    repository = canonical_repository(git_value(source_root, "remote", "get-url", "origin"))
+    commit = git_value(source_root, "rev-parse", "HEAD")
+
+    if repository != HOVER_RAW_SOURCE["repository"]:
+        raise RuntimeError(
+            f"HoVer raw source repository mismatch: expected {HOVER_RAW_SOURCE['repository']}, "
+            f"got {repository or '<missing>'}"
+        )
+    if commit != HOVER_RAW_SOURCE["commit"]:
+        raise RuntimeError(
+            f"HoVer raw source commit mismatch: expected {HOVER_RAW_SOURCE['commit']}, "
+            f"got {commit or '<missing>'}"
+        )
+
+    files = []
+    for relative_path, expected in HOVER_RAW_SOURCE["files"].items():
+        path = source_root / relative_path
+        actual_bytes = path.stat().st_size if path.is_file() else None
+        actual_sha256 = sha256(path) if path.is_file() else None
+        if actual_bytes != expected["bytes"] or actual_sha256 != expected["sha256"]:
+            raise RuntimeError(
+                f"HoVer raw source file mismatch: {relative_path}; expected "
+                f"{expected['bytes']} bytes/{expected['sha256']}, got "
+                f"{actual_bytes}/{actual_sha256 or '<missing>'}"
+            )
+        files.append(
+            {
+                "path": relative_path,
+                "bytes": actual_bytes,
+                "sha256": actual_sha256,
+                "raw_url": (
+                    f"https://raw.githubusercontent.com/hover-nlp/hover/"
+                    f"{HOVER_RAW_SOURCE['commit']}/{relative_path}"
+                ),
+            }
+        )
+
+    return {
+        "kind": "git_raw_dataset_files",
+        "repository": repository,
+        "revision": commit,
+        "files": files,
+    }
+
+
+def verify_frozen_hover_export(
+    family_dir: Path,
+    split_counts: Dict[str, int],
+    split_checksums: Dict[str, str],
+) -> None:
+    for split, expected in HOVER_FROZEN_SPLITS.items():
+        actual_count = split_counts.get(split)
+        actual_sha256 = split_checksums.get(split)
+        expected_sha256 = "sha256:" + expected["sha256"]
+        if actual_count != expected["count"] or actual_sha256 != expected_sha256:
+            raise RuntimeError(
+                f"frozen hoverBench {split} mismatch at {family_dir / (split + '.jsonl')}: "
+                f"expected {expected['count']} rows/{expected_sha256}, got "
+                f"{actual_count}/{actual_sha256}"
+            )
 
 
 def install_dataset_compatibility_shims() -> None:
@@ -252,7 +377,10 @@ def family_extra_metadata(gepa_root: Path, family: str) -> Dict[str, Any]:
 
 
 def dataset_authorities(
-    gepa_root: Path, family: str, source: Dict[str, str]
+    gepa_root: Path,
+    family: str,
+    source: Dict[str, str],
+    hover_raw_authority: Dict[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
     authorities = [
         {
@@ -277,6 +405,9 @@ def dataset_authorities(
                     "sha256": sha256(gepa_root / relative_path),
                 }
             )
+
+    if family == "hoverBench" and hover_raw_authority is not None:
+        authorities.append(hover_raw_authority)
 
     return authorities
 
