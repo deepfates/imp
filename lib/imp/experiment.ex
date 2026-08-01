@@ -19,10 +19,11 @@ defmodule Imp.Experiment do
 
   For a noisy model, set `evaluation_options: [repetitions: n,
   aggregation: :mean]` to repeat each outer selection and test evaluation over
-  the same ordered rows. The default is one pass. Repetitions change only the
-  family-independent Experiment admission and reporting boundary; an
-  optimizer's internal candidate evaluations remain under that optimizer's
-  own documented policy.
+  the same ordered rows. Use `repetitions: [selection: n, test: m]` when the
+  selection decision and final test estimate require different repeat counts.
+  The default is one pass. Repetitions change only the family-independent
+  Experiment admission and reporting boundary; an optimizer's internal
+  candidate evaluations remain under that optimizer's own documented policy.
 
   This boundary is for ordinary product checks and bounded scientific runs. It
   does not turn a single result into a general optimizer-effectiveness claim.
@@ -193,7 +194,7 @@ defmodule Imp.Experiment do
   end
 
   defp evaluate!(stage, program, rows, row_ids, metric, opts) do
-    repetitions = Keyword.get(opts, :repetitions, 1)
+    repetitions = repetition_count(opts, stage)
     evaluate_opts = Keyword.drop(opts, [:repetitions, :aggregation])
 
     results =
@@ -220,7 +221,7 @@ defmodule Imp.Experiment do
         end
       end)
 
-    {aggregate_evaluations(results), repetition_runs(results, repetitions)}
+    {aggregate_evaluations(results), repetition_runs(results)}
   end
 
   defp aggregate_evaluations([result]), do: result
@@ -243,17 +244,37 @@ defmodule Imp.Experiment do
     end)
   end
 
-  defp repetition_runs(_results, 1), do: nil
-
-  defp repetition_runs(results, _repetitions) do
+  defp repetition_runs(results) do
     results
     |> Enum.with_index(1)
     |> Enum.map(fn {evaluation, index} -> %{index: index, evaluation: evaluation} end)
   end
 
   defp repetition_summary(opts, data, baseline, optimized, baseline_test, test) do
-    repetitions = Keyword.get(opts, :repetitions, 1)
+    case repetition_counts(opts) do
+      %{selection: repetitions, test: repetitions} ->
+        uniform_repetition_summary(
+          repetitions,
+          data,
+          baseline,
+          optimized,
+          baseline_test,
+          test
+        )
 
+      counts ->
+        staged_repetition_summary(counts, data, baseline, optimized, baseline_test, test)
+    end
+  end
+
+  defp uniform_repetition_summary(
+         repetitions,
+         data,
+         baseline,
+         optimized,
+         baseline_test,
+         test
+       ) do
     if repetitions == 1 do
       nil
     else
@@ -290,6 +311,41 @@ defmodule Imp.Experiment do
         }
       }
     end
+  end
+
+  defp staged_repetition_summary(counts, data, baseline, optimized, baseline_test, test) do
+    selection_rows = length(data.selection) * counts.selection
+    test_rows = length(data.test) * counts.test
+
+    opportunities = %{
+      baseline_selection: selection_rows,
+      optimized_selection: selection_rows,
+      test: test_rows
+    }
+
+    opportunities =
+      if baseline_test,
+        do: Map.put(opportunities, :baseline_test, test_rows),
+        else: opportunities
+
+    %{
+      counts: counts,
+      aggregation: :mean,
+      outer_row_evaluations: %{
+        stages: opportunities,
+        total: opportunities |> Map.values() |> Enum.sum()
+      },
+      stages: %{
+        baseline_selection: stage_repetitions(baseline),
+        optimized_selection: stage_repetitions(optimized),
+        baseline_test: stage_repetitions(baseline_test),
+        test: stage_repetitions(test)
+      },
+      paired_deltas: %{
+        selection: paired_deltas(baseline, optimized),
+        test: paired_deltas(baseline_test, test)
+      }
+    }
   end
 
   defp stage_repetitions(nil), do: nil
@@ -388,10 +444,7 @@ defmodule Imp.Experiment do
     if unknown_evaluation != [],
       do: raise(ArgumentError, "unknown :evaluation_options: #{inspect(unknown_evaluation)}")
 
-    repetitions = Keyword.get(evaluation_opts, :repetitions, 1)
-
-    unless is_integer(repetitions) and repetitions > 0,
-      do: raise(ArgumentError, ":evaluation_options :repetitions must be a positive integer")
+    validate_repetitions!(Keyword.get(evaluation_opts, :repetitions, 1))
 
     aggregation = Keyword.get(evaluation_opts, :aggregation, :mean)
 
@@ -421,6 +474,57 @@ defmodule Imp.Experiment do
 
   defp evaluation_keys,
     do: [:failure_score, :max_concurrency, :max_errors, :timeout, :repetitions, :aggregation]
+
+  defp validate_repetitions!(repetitions) when is_integer(repetitions) and repetitions > 0,
+    do: :ok
+
+  defp validate_repetitions!(repetitions) when is_list(repetitions) do
+    valid? =
+      if Keyword.keyword?(repetitions) do
+        keys = Keyword.keys(repetitions)
+
+        length(keys) == 2 and Enum.sort(keys) == [:selection, :test] and
+          Enum.all?(repetitions, fn {_stage, count} ->
+            is_integer(count) and count > 0
+          end)
+      else
+        false
+      end
+
+    unless valid? do
+      invalid_repetitions!()
+    end
+
+    :ok
+  end
+
+  defp validate_repetitions!(_repetitions), do: invalid_repetitions!()
+
+  defp invalid_repetitions! do
+    raise ArgumentError,
+          ":evaluation_options :repetitions must be a positive integer or exactly [selection: positive_integer, test: positive_integer]"
+  end
+
+  defp repetition_count(opts, stage) do
+    counts = repetition_counts(opts)
+
+    if stage in [:baseline_selection, :optimized_selection],
+      do: counts.selection,
+      else: counts.test
+  end
+
+  defp repetition_counts(opts) do
+    case Keyword.get(opts, :repetitions, 1) do
+      repetitions when is_integer(repetitions) ->
+        %{selection: repetitions, test: repetitions}
+
+      repetitions when is_list(repetitions) ->
+        %{
+          selection: Keyword.fetch!(repetitions, :selection),
+          test: Keyword.fetch!(repetitions, :test)
+        }
+    end
+  end
 
   defp prevalidate_optimizer(optimizer, opts) do
     case Imp.Optimizer.validate_invocation_options(optimizer, opts) do

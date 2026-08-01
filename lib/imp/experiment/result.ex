@@ -50,8 +50,14 @@ defmodule Imp.Experiment.Result do
 
     {schema_version, payload} =
       case result.repetition_summary do
-        nil -> {2, payload}
-        summary -> {3, Map.put(payload, "repetitions", repetition_map(summary, include_rows?))}
+        nil ->
+          {2, payload}
+
+        %{counts: _counts} = summary ->
+          {4, Map.put(payload, "repetitions", repetition_map(summary, include_rows?))}
+
+        summary ->
+          {3, Map.put(payload, "repetitions", repetition_map(summary, include_rows?))}
       end
 
     %{
@@ -94,7 +100,7 @@ defmodule Imp.Experiment.Result do
 
     unless MapSet.new(Map.keys(result)) == expected and
              result["result_type"] == "imp_experiment_result" and
-             result["schema_version"] in [1, 2, 3] and
+             result["schema_version"] in [1, 2, 3, 4] and
              is_binary(result["payload_sha256"]) and is_map(payload) and
              result["payload_sha256"] == Imp.Experiment.Data.digest(payload) do
       raise ArgumentError, "invalid Imp experiment result envelope"
@@ -108,10 +114,10 @@ defmodule Imp.Experiment.Result do
     expected =
       MapSet.new(["status", "detail", "selected", "selection", "test", "artifact", "provenance"])
       |> then(fn keys ->
-        if schema_version in [2, 3], do: MapSet.put(keys, "baseline_test"), else: keys
+        if schema_version in [2, 3, 4], do: MapSet.put(keys, "baseline_test"), else: keys
       end)
       |> then(fn keys ->
-        if schema_version == 3, do: MapSet.put(keys, "repetitions"), else: keys
+        if schema_version in [3, 4], do: MapSet.put(keys, "repetitions"), else: keys
       end)
 
     selection = payload["selection"]
@@ -152,11 +158,12 @@ defmodule Imp.Experiment.Result do
 
   defp valid_optional_evaluation?(_evaluation, _detail, 1), do: true
 
-  defp valid_optional_evaluation?(nil, _detail, schema_version) when schema_version in [2, 3],
-    do: true
+  defp valid_optional_evaluation?(nil, _detail, schema_version)
+       when schema_version in [2, 3, 4],
+       do: true
 
   defp valid_optional_evaluation?(evaluation, detail, schema_version)
-       when schema_version in [2, 3],
+       when schema_version in [2, 3, 4],
        do: valid_evaluation?(evaluation, detail)
 
   defp valid_repetitions?(_repetitions, _detail, schema_version) when schema_version in [1, 2],
@@ -191,6 +198,35 @@ defmodule Imp.Experiment.Result do
       valid_optional_deltas?(deltas["test"], repetitions["count"])
   end
 
+  defp valid_repetitions?(repetitions, detail, 4) when is_map(repetitions) do
+    expected =
+      MapSet.new([
+        "counts",
+        "aggregation",
+        "outer_row_evaluations",
+        "stages",
+        "paired_deltas"
+      ])
+
+    counts = repetitions["counts"]
+    stages = repetitions["stages"]
+    deltas = repetitions["paired_deltas"]
+    opportunity = repetitions["outer_row_evaluations"]
+
+    MapSet.new(Map.keys(repetitions)) == expected and valid_stage_counts?(counts) and
+      repetitions["aggregation"] == "mean" and is_map(stages) and
+      MapSet.new(Map.keys(stages)) ==
+        MapSet.new(~w(baseline_selection optimized_selection baseline_test test)) and
+      valid_repetition_stage?(stages["baseline_selection"], detail, counts["selection"]) and
+      valid_repetition_stage?(stages["optimized_selection"], detail, counts["selection"]) and
+      valid_optional_repetition_stage?(stages["baseline_test"], detail, counts["test"]) and
+      valid_repetition_stage?(stages["test"], detail, counts["test"]) and is_map(deltas) and
+      MapSet.new(Map.keys(deltas)) == MapSet.new(~w(selection test)) and
+      valid_deltas?(deltas["selection"], counts["selection"]) and
+      valid_optional_deltas?(deltas["test"], counts["test"]) and
+      valid_exact_opportunity?(opportunity, stages)
+  end
+
   defp valid_repetitions?(_repetitions, _detail, _schema_version), do: false
 
   defp valid_opportunity?(%{"stages" => stages, "total" => total})
@@ -202,6 +238,28 @@ defmodule Imp.Experiment.Result do
   end
 
   defp valid_opportunity?(_opportunity), do: false
+
+  defp valid_stage_counts?(%{"selection" => selection, "test" => test} = counts) do
+    MapSet.new(Map.keys(counts)) == MapSet.new(~w(selection test)) and
+      is_integer(selection) and selection > 0 and is_integer(test) and test > 0 and
+      selection != test
+  end
+
+  defp valid_stage_counts?(_counts), do: false
+
+  defp valid_exact_opportunity?(%{"stages" => opportunities, "total" => total}, stages)
+       when is_map(opportunities) and is_integer(total) and total > 0 do
+    expected =
+      stages
+      |> Enum.reject(fn {_stage, summary} -> is_nil(summary) end)
+      |> Map.new(fn {stage, summary} ->
+        {stage, Enum.sum(Enum.map(summary["runs"], & &1["row_count"]))}
+      end)
+
+    opportunities == expected and Enum.sum(Map.values(opportunities)) == total
+  end
+
+  defp valid_exact_opportunity?(_opportunity, _stages), do: false
 
   defp valid_repetition_stage?(stage, detail, count) when is_map(stage) do
     MapSet.new(Map.keys(stage)) == MapSet.new(~w(aggregate_score runs)) and
@@ -263,9 +321,34 @@ defmodule Imp.Experiment.Result do
 
   defp evaluation_map(nil, _include_rows?), do: nil
 
-  defp repetition_map(summary, include_rows?) do
+  defp repetition_map(%{count: _count} = summary, include_rows?) do
     %{
       "count" => summary.count,
+      "aggregation" => Atom.to_string(summary.aggregation),
+      "outer_row_evaluations" => %{
+        "stages" =>
+          Map.new(summary.outer_row_evaluations.stages, fn {stage, count} ->
+            {Atom.to_string(stage), count}
+          end),
+        "total" => summary.outer_row_evaluations.total
+      },
+      "stages" =>
+        Map.new(summary.stages, fn {stage, value} ->
+          {Atom.to_string(stage), repetition_stage_map(value, include_rows?)}
+        end),
+      "paired_deltas" => %{
+        "selection" => summary.paired_deltas.selection,
+        "test" => summary.paired_deltas.test
+      }
+    }
+  end
+
+  defp repetition_map(%{counts: counts} = summary, include_rows?) do
+    %{
+      "counts" => %{
+        "selection" => counts.selection,
+        "test" => counts.test
+      },
       "aggregation" => Atom.to_string(summary.aggregation),
       "outer_row_evaluations" => %{
         "stages" =>

@@ -252,6 +252,23 @@ multiply by the repeat count. The default remains one pass and keeps the
 ordinary schema-2 result shape; repeated checks write one additional redacted
 summary in schema 3, with detailed rows still opt-in.
 
+When the admission decision needs more replication than the final test
+estimate, declare both counts explicitly:
+
+```elixir
+evaluation_options: [
+  repetitions: [selection: 3, test: 1],
+  aggregation: :mean
+]
+```
+
+Both baseline and optimized selection evaluations use the selection count. The
+selected-program test evaluation—and the baseline test evaluation when
+requested—use the test count. Unequal counts are written in result schema 4
+with per-stage counts, runs, paired deltas, and exact row-evaluation
+opportunity. The integer form remains the uniform shorthand and retains its
+existing result schema.
+
 This policy does not repeat or otherwise change an optimizer's internal search
 objective. It improves the final Experiment admission decision; it does not
 retroactively change earlier results or turn a noisy negative benchmark into a

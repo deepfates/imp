@@ -87,6 +87,28 @@ defmodule Imp.ExperimentTest do
     def response_format_capability(_lm), do: Imp.LM.Capability.none()
   end
 
+  defmodule StagedRepetitionLM do
+    defstruct [:agent, :owner]
+
+    def generate(%__MODULE__{agent: agent, owner: owner}, messages, _opts) do
+      rendered = Enum.map_join(messages, "\n", & &1.content)
+      selected? = String.contains?(rendered, "Return the selected answer.")
+      phase = if String.contains?(rendered, "selection"), do: :selection, else: :test
+      key = {phase, selected?}
+
+      answer =
+        Agent.get_and_update(agent, fn queues ->
+          {answer, rest} = queues |> Map.fetch!(key) |> List.pop_at(0)
+          {answer, Map.put(queues, key, rest)}
+        end)
+
+      send(owner, {:staged_call, phase, selected?})
+      {:ok, %{answer: answer}}
+    end
+
+    def response_format_capability(_lm), do: Imp.LM.Capability.none()
+  end
+
   setup do
     root = Path.join(System.tmp_dir!(), "imp-experiment-#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
@@ -267,13 +289,16 @@ defmodule Imp.ExperimentTest do
                program,
                Imp.Optimizer.LabeledFewShot.new(k: 2, sample: false),
                data,
-               Imp.exact_match(:team)
+               Imp.exact_match(:team),
+               evaluation_options: [repetitions: [selection: 2, test: 1]]
              )
 
     assert result.selected == :optimized
     assert result.baseline_selection.score == 0.5
     assert result.optimized_selection.score == 1.0
     assert result.test.score == 1.0
+    assert result.repetition_summary.counts == %{selection: 2, test: 1}
+    assert Result.to_map(result)["schema_version"] == 4
     assert %Report{optimizer: "labeled_few_shot"} = Report.fetch(result.program)
     assert Artifact.inspect(result.artifact).champion_id == "optimized"
 
@@ -315,6 +340,13 @@ defmodule Imp.ExperimentTest do
           [repetitions: 0],
           [repetitions: -1],
           [repetitions: 1.5],
+          [repetitions: []],
+          [repetitions: [selection: 1]],
+          [repetitions: [selection: 1, test: 0]],
+          [repetitions: [selection: 1, test: 1, extra: 1]],
+          [repetitions: [selection: 1, selection: 2]],
+          [repetitions: [1, 2]],
+          [repetitions: %{selection: 1, test: 1}],
           [aggregation: :median]
         ] do
       assert_raise ArgumentError, fn ->
@@ -330,6 +362,215 @@ defmodule Imp.ExperimentTest do
       refute_received {:call, _, _}
       refute_received {:optimizer_opts, _}
     end
+  end
+
+  test "stage-specific repetitions select by three runs and test once durably", %{root: root} do
+    owner = self()
+
+    queues = %{
+      {:selection, false} => ["yes", "no", "no"],
+      {:selection, true} => ["yes", "yes", "no"],
+      {:test, false} => ["no"],
+      {:test, true} => ["yes"]
+    }
+
+    agent = start_supervised!({Agent, fn -> queues end})
+    lm = %StagedRepetitionLM{agent: agent, owner: owner}
+
+    program =
+      "question -> answer"
+      |> Imp.signature("Return the baseline answer.")
+      |> Imp.predict(lm: lm, adapter: Imp.Adapter.Chat)
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: [row("selection", "selection")],
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               artifact_id: "stage-selected",
+               compare_baseline_on_test: true,
+               evaluation_options: [
+                 repetitions: [selection: 3, test: 1],
+                 aggregation: :mean,
+                 max_concurrency: 1
+               ]
+             )
+
+    assert result.selected == :optimized
+    assert result.baseline_selection.score == 1 / 3
+    assert result.optimized_selection.score == 2 / 3
+    assert result.baseline_test.score == 0.0
+    assert result.test.score == 1.0
+
+    assert result.repetition_summary.counts == %{selection: 3, test: 1}
+    assert length(result.repetition_summary.stages.baseline_selection.runs) == 3
+    assert length(result.repetition_summary.stages.optimized_selection.runs) == 3
+    assert length(result.repetition_summary.stages.baseline_test.runs) == 1
+    assert length(result.repetition_summary.stages.test.runs) == 1
+    assert length(result.repetition_summary.paired_deltas.selection) == 3
+    assert length(result.repetition_summary.paired_deltas.test) == 1
+
+    assert result.repetition_summary.outer_row_evaluations == %{
+             stages: %{
+               baseline_selection: 3,
+               optimized_selection: 3,
+               baseline_test: 1,
+               test: 1
+             },
+             total: 8
+           }
+
+    assert_received {:staged_call, :selection, false}
+    assert_received {:staged_call, :selection, true}
+    assert_received {:staged_call, :test, false}
+    assert_received {:staged_call, :test, true}
+    assert Agent.get(agent, & &1) == Map.new(queues, fn {key, _values} -> {key, []} end)
+
+    path = Path.join(root, "staged-result.json")
+    :ok = Result.write!(result, path)
+    stored = Result.read!(path)
+    assert stored["schema_version"] == 4
+    assert stored["payload"]["repetitions"]["counts"] == %{"selection" => 3, "test" => 1}
+
+    assert Enum.map(
+             stored["payload"]["repetitions"]["stages"]["test"]["runs"],
+             & &1["index"]
+           ) == [1]
+
+    tampered_path = Path.join(root, "staged-result-tampered.json")
+
+    tampered_payload =
+      put_in(
+        stored,
+        ["payload", "repetitions", "outer_row_evaluations", "stages", "test"],
+        2
+      )["payload"]
+
+    tampered = %{
+      stored
+      | "payload" => tampered_payload,
+        "payload_sha256" => Data.digest(tampered_payload)
+    }
+
+    File.write!(tampered_path, Jason.encode!(tampered))
+
+    assert_raise ArgumentError, ~r/invalid Imp experiment result payload/, fn ->
+      Result.read!(tampered_path)
+    end
+
+    equal_counts_payload =
+      stored
+      |> put_in(["payload", "repetitions", "counts", "test"], 3)
+      |> Map.fetch!("payload")
+
+    equal_counts = %{
+      stored
+      | "payload" => equal_counts_payload,
+        "payload_sha256" => Data.digest(equal_counts_payload)
+    }
+
+    File.write!(tampered_path, Jason.encode!(equal_counts))
+
+    assert_raise ArgumentError, ~r/invalid Imp experiment result payload/, fn ->
+      Result.read!(tampered_path)
+    end
+
+    fresh_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          rendered = Enum.map_join(messages, "\n", & &1.content)
+
+          %{
+            answer:
+              if(String.contains?(rendered, "Return the selected answer."), do: "yes", else: "no")
+          }
+        end
+      )
+
+    fresh =
+      "question -> answer"
+      |> Imp.signature("Fresh trusted baseline.")
+      |> Imp.predict(lm: fresh_lm)
+      |> then(&Artifact.apply(stored["payload"]["artifact"], &1))
+
+    assert {:ok, prediction} = Imp.call(fresh, %{question: "fresh"})
+    assert Imp.get(prediction, :answer) == "yes"
+  end
+
+  test "equal stage-specific repetition counts retain schema 3" do
+    owner = self()
+    program = Imp.predict("question -> answer", lm: lm(owner))
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: [row("selection", "selection")],
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [repetitions: [selection: 2, test: 2]]
+             )
+
+    assert result.repetition_summary.count == 2
+    assert Result.to_map(result)["schema_version"] == 3
+  end
+
+  test "stage-specific results omit an unrequested baseline test coherently", %{root: root} do
+    owner = self()
+    program = Imp.predict("question -> answer", lm: lm(owner))
+
+    data =
+      Data.new(
+        train: [row("train", "train")],
+        selection: [row("selection", "selection")],
+        test: [row("test", "test")],
+        id: :id
+      )
+
+    assert {:ok, result} =
+             Imp.Experiment.check(
+               program,
+               %SelectableOptimizer{owner: nil},
+               data,
+               Imp.exact_match(:answer),
+               evaluation_options: [repetitions: [selection: 2, test: 1]]
+             )
+
+    assert result.baseline_test == nil
+    assert result.repetition_summary.stages.baseline_test == nil
+    assert result.repetition_summary.paired_deltas.test == nil
+
+    path = Path.join(root, "staged-without-baseline-test.json")
+    :ok = Result.write!(result, path, include_rows: true)
+
+    stored = Result.read!(path)
+    assert stored["schema_version"] == 4
+    assert stored["payload"]["baseline_test"] == nil
+
+    assert stored["payload"]["repetitions"]["outer_row_evaluations"] == %{
+             "stages" => %{
+               "baseline_selection" => 2,
+               "optimized_selection" => 2,
+               "test" => 1
+             },
+             "total" => 5
+           }
   end
 
   test "optimizer failure returns its stage without touching untouched test" do
