@@ -23,7 +23,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-CONDITION = "imp-88sn-hover-papillon-openrouter-calibration-v1"
+CONDITION = "imp-88sn-hover-papillon-openrouter-calibration-v2-provider-prompt-cache"
 MODEL = "deepseek/deepseek-v4-flash"
 ENDPOINT_MODEL = "deepseek/deepseek-v4-flash-20260423"
 ENDPOINT_TAG = "novita/fp8"
@@ -237,7 +237,6 @@ def validate_generation(payload, generation_id):
         "provider_name": ENDPOINT_PROVIDER,
         "cancelled": False,
         "session_id": None,
-        "native_tokens_cached": 0,
     }
     for key, value in exact.items():
         if data.get(key) != value:
@@ -247,6 +246,9 @@ def validate_generation(payload, generation_id):
     for key in ("native_tokens_prompt", "native_tokens_completion"):
         if not isinstance(data.get(key), int) or data[key] < 0:
             raise RuntimeError(f"OpenRouter generation {key} missing")
+    cached = data.get("native_tokens_cached")
+    if not isinstance(cached, int) or cached < 0 or cached > data["native_tokens_prompt"]:
+        raise RuntimeError("OpenRouter generation cached-token usage drift")
     if not isinstance(data.get("total_cost"), (int, float)) or data["total_cost"] < 0:
         raise RuntimeError("OpenRouter generation cost missing")
     return data
@@ -544,7 +546,7 @@ class Recorder:
         if self.mode == "live" and self.evidence_root is not None:
             secure_evidence(self.evidence_root, "reconciled", item["id"], event)
         self.events.append(event)
-        self.actual_cost_usd += live["usage"]["input_tokens"] / 1_000_000 * INPUT_PRICE + live["usage"]["output_tokens"] / 1_000_000 * OUTPUT_PRICE
+        self.actual_cost_usd += live["usage"]["provider_cost_usd"]
         return value
 
     def _synthetic_metadata(self, item):
@@ -576,6 +578,7 @@ class Recorder:
         input_tokens = field(usage, "prompt_tokens")
         output_tokens = field(usage, "completion_tokens")
         total_tokens = field(usage, "total_tokens")
+        response_cost = field(usage, "cost")
         router = field(response, "openrouter_metadata")
         choices = field(response, "choices") or []
         finish_reason = field(choices[0], "finish_reason") if choices else None
@@ -607,8 +610,10 @@ class Recorder:
             raise RuntimeError("OpenRouter response identity is missing")
         if not all(isinstance(value, int) and value >= 0 for value in (input_tokens, output_tokens, total_tokens, cached)):
             raise RuntimeError("OpenRouter response usage is missing")
-        if total_tokens != input_tokens + output_tokens or cached != 0:
+        if total_tokens != input_tokens + output_tokens or cached > input_tokens:
             raise RuntimeError("OpenRouter response usage/cache drift")
+        if not isinstance(response_cost, (int, float)) or response_cost < 0:
+            raise RuntimeError("OpenRouter response cost is missing")
         validate_router_metadata(router)
         if model_effective != MODEL or provider_reported != ENDPOINT_PROVIDER:
             raise RuntimeError("OpenRouter response provider missing or drifted")
@@ -619,11 +624,13 @@ class Recorder:
             attempts=self.generation_attempts,
             sleep=self.generation_sleep,
         )
-        if generation["native_tokens_prompt"] != input_tokens or generation["native_tokens_completion"] != output_tokens:
+        if (generation["native_tokens_prompt"] != input_tokens
+                or generation["native_tokens_completion"] != output_tokens
+                or generation["native_tokens_cached"] != cached):
             raise RuntimeError("OpenRouter generation usage disagrees with response usage")
-        expected_cost = input_tokens / 1_000_000 * INPUT_PRICE + output_tokens / 1_000_000 * OUTPUT_PRICE
-        if abs(generation["total_cost"] - expected_cost) > 1e-9:
-            raise RuntimeError("OpenRouter billed cost disagrees with frozen prices")
+        full_price = input_tokens / 1_000_000 * INPUT_PRICE + output_tokens / 1_000_000 * OUTPUT_PRICE
+        if abs(generation["total_cost"] - response_cost) > 1e-9 or generation["total_cost"] > full_price + 1e-9:
+            raise RuntimeError("OpenRouter response/generation cost join or full-price ceiling drift")
         return {
             "model_response": model_effective,
             "model_effective": generation["model"],
@@ -656,7 +663,7 @@ def tracking_live_class(dspy, recorder):
     return TrackingLive
 
 
-def validate_provisional_evidence(path, item, generation_id):
+def validate_provisional_evidence(path, item, generation_id, cached_tokens=0):
     record = json.loads(path.read_text())
     expected = {
         "state": "response_received_reconciliation_pending",
@@ -680,7 +687,7 @@ def validate_provisional_evidence(path, item, generation_id):
         usage.get("prompt_tokens") != 11
         or usage.get("completion_tokens") != 7
         or usage.get("total_tokens") != 18
-        or usage.get("prompt_tokens_details", {}).get("cached_tokens") != 0
+        or usage.get("prompt_tokens_details", {}).get("cached_tokens") != cached_tokens
     ):
         raise RuntimeError("DSPy provisional reported usage drift")
     if path.stat().st_mode & 0o777 != 0o600:
@@ -709,7 +716,8 @@ def verify_live_transport_offline(dspy_root, output_root):
                 "choices": [{"index": 0, "message": {"role": "assistant", "content": "offline"},
                              "finish_reason": "stop"}],
                 "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18,
-                          "prompt_tokens_details": {"cached_tokens": 0}},
+                          "prompt_tokens_details": {"cached_tokens": 3},
+                          "cost": 0.0000031},
             }
             encoded = json.dumps(payload).encode()
             self.send_response(200)
@@ -733,8 +741,8 @@ def verify_live_transport_offline(dspy_root, output_root):
             payload = {"data": {"id": "gen-offline-live", "model": ENDPOINT_MODEL,
                        "provider_name": ENDPOINT_PROVIDER, "cancelled": False, "session_id": None,
                        "request_id": "req-offline-live", "native_tokens_prompt": 11,
-                       "native_tokens_completion": 7, "native_tokens_cached": 0,
-                       "total_cost": 11 / 1_000_000 * INPUT_PRICE + 7 / 1_000_000 * OUTPUT_PRICE}}
+                       "native_tokens_completion": 7, "native_tokens_cached": 3,
+                       "total_cost": 0.0000031}}
             encoded = json.dumps(payload).encode()
             self.send_response(200)
             self.send_header("content-type", "application/json")
@@ -799,7 +807,7 @@ def verify_live_transport_offline(dspy_root, output_root):
         reconciled = list((output_root / "live-evidence" / "reconciled").glob("*.json"))
         if len(provisional) != 1 or len(reconciled) != 1 or generation_gets["normal"] != 2:
             raise RuntimeError("delayed generation reconciliation evidence drift")
-        validate_provisional_evidence(provisional[0], item, "gen-offline-live")
+        validate_provisional_evidence(provisional[0], item, "gen-offline-live", cached_tokens=3)
         diagnostic = recorder.mark_ordinary_failure("hover", "H0", 1, ValueError("private"))
         reconciled_record = json.loads(reconciled[0].read_text())
         if (
@@ -832,7 +840,7 @@ def verify_live_transport_offline(dspy_root, output_root):
             "openrouter_metadata": synthetic_router_metadata(),
             "choices": [{"finish_reason": "stop"}],
             "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18,
-                      "prompt_tokens_details": {"cached_tokens": 0}},
+                      "prompt_tokens_details": {"cached_tokens": 0}, "cost": 0.0000035},
         }
         invocations = {"count": 0}
 
@@ -884,6 +892,7 @@ def verify_live_transport_offline(dspy_root, output_root):
                 "total_tokens": 19,
                 "prompt_tokens_details": {"cached_tokens": 0},
                 "completion_tokens_details": {"reasoning_tokens": 3},
+                "cost": 0.0000035,
             },
         }
         drift_invocations = {"count": 0}

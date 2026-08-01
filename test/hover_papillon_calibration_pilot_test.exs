@@ -475,7 +475,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
     File.rm_rf!(root)
   end
 
-  test "event guards reject duplicates, overflow, cache, drift, cap and post-hoc cost" do
+  test "event guards retain prompt-cache exposure and reject invalid usage, drift, cap and cost" do
     schedule = Pilot.runtime_schedule("imp")
     events = Enum.map(schedule, &event_for/1)
     [event | rest] = events
@@ -490,8 +490,17 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       Pilot.validate_events!(events ++ [event], "imp")
     end
 
+    cached =
+      event
+      |> put_in(["usage", "cached_tokens"], 1)
+      |> put_in(["usage", "provider_cost_usd"], 0.0000003)
+
+    assert %{transport_count: 48} = Pilot.validate_events!([cached | rest], "imp")
+
     for poisoned <- [
-          put_in(event, ["usage", "cached_tokens"], 1),
+          put_in(event, ["usage", "cached_tokens"], 2),
+          put_in(event, ["usage", "total_tokens"], 3),
+          put_in(event, ["usage", "provider_cost_usd"], 1.0),
           Map.put(event, "model_effective", "drift"),
           Map.put(event, "provider", "proxy"),
           Map.put(event, "transport_count", 2),
@@ -500,11 +509,50 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       assert_raise ArgumentError, fn -> Pilot.validate_events!([poisoned | rest], "imp") end
     end
 
-    expensive = put_in(event, ["usage", "output_tokens"], 20_000_000)
+    expensive =
+      event
+      |> put_in(["usage", "output_tokens"], 20_000_000)
+      |> put_in(["usage", "total_tokens"], 20_000_001)
+      |> put_in(["usage", "provider_cost_usd"], 5.6)
 
-    assert_raise ArgumentError, ~r/exceeds \$5/, fn ->
+    assert_raise ArgumentError, ~r/full-price contract/, fn ->
       Pilot.validate_events!([expensive | rest], "imp")
     end
+  end
+
+  test "ordinary Imp path retains provider prompt-cache usage and joined actual cost", %{
+    commit: commit
+  } do
+    root = temp_root("prompt-cache")
+
+    result =
+      Pilot.run_provider_disabled!(root,
+        expected_commit: commit,
+        private_pupa_fixture: @private_fixture,
+        provider_disabled_usage: %{
+          "prompt_tokens" => 11,
+          "completion_tokens" => 7,
+          "total_tokens" => 18,
+          "prompt_tokens_details" => %{"cached_tokens" => 3},
+          "cost" => 0.0000031
+        }
+      )
+
+    assert result.condition ==
+             "imp-88sn-hover-papillon-openrouter-calibration-v2-provider-prompt-cache"
+
+    assert Enum.all?(result.events, fn event ->
+             event["usage"] == %{
+               "input_tokens" => 11,
+               "output_tokens" => 7,
+               "cached_tokens" => 3,
+               "total_tokens" => 18,
+               "provider_cost_usd" => 0.0000031
+             }
+           end)
+
+    assert_in_delta result.summary.actual_cost_usd, 48 * 0.0000031, 1.0e-12
+    File.rm_rf!(root)
   end
 
   test "candidate and live preflight refuse ambiguity before authority" do
@@ -577,8 +625,10 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
 
     assert Pilot.validate_generation!(generation, "gen-test") == generation
 
+    assert Pilot.validate_generation!(Map.put(generation, "native_tokens_cached", 1), "gen-test")
+
     assert_raise Imp.OperationalSafetyError, ~r/usage or cost drift/, fn ->
-      Pilot.validate_generation!(Map.put(generation, "native_tokens_cached", 1), "gen-test")
+      Pilot.validate_generation!(Map.put(generation, "native_tokens_cached", 12), "gen-test")
     end
 
     assert_raise Imp.OperationalSafetyError, ~r/route identity drift/, fn ->
@@ -642,7 +692,13 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       "message_bytes" => 1,
       "message_serialization" => "canonical_json_utf8_v1",
       "max_input_bytes" => opportunity.max_input_bytes,
-      "usage" => %{"input_tokens" => 1, "output_tokens" => 1, "cached_tokens" => 0},
+      "usage" => %{
+        "input_tokens" => 1,
+        "output_tokens" => 1,
+        "cached_tokens" => 0,
+        "total_tokens" => 2,
+        "provider_cost_usd" => 0.00000042
+      },
       "router_metadata" => %{},
       "transport_count" => 1,
       "status" => "ok"

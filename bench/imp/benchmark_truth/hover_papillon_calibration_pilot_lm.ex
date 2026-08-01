@@ -155,6 +155,8 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
     do: Pilot.generation_metadata!(response["generation_id"], api_key)
 
   defp generation_metadata!(%{mode: :provider_disabled}, response) do
+    usage = response["usage"]
+
     %{
       "id" => response["generation_id"],
       "model" => Pilot.endpoint_model(),
@@ -162,10 +164,10 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
       "cancelled" => false,
       "session_id" => nil,
       "request_id" => "req-" <> response["generation_id"],
-      "native_tokens_prompt" => 11,
-      "native_tokens_completion" => 7,
-      "native_tokens_cached" => 0,
-      "total_cost" => 11 / 1_000_000 * 0.14 + 7 / 1_000_000 * 0.28
+      "native_tokens_prompt" => usage["prompt_tokens"],
+      "native_tokens_completion" => usage["completion_tokens"],
+      "native_tokens_cached" => get_in(usage, ["prompt_tokens_details", "cached_tokens"]),
+      "total_cost" => usage["cost"]
     }
   end
 
@@ -174,25 +176,56 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
     raw = response["usage"] || %{}
     details = raw["prompt_tokens_details"] || %{}
 
-    input = map_value(usage, :input_tokens) || raw["prompt_tokens"]
-    output = map_value(usage, :output_tokens) || raw["completion_tokens"]
-    cached = map_value(usage, :cached_tokens) || details["cached_tokens"]
-    total = map_value(usage, :total_tokens) || raw["total_tokens"]
+    # The raw OpenRouter response is the durable route evidence. ReqLLM's
+    # normalized usage is checked when it contains concrete token counts, but
+    # its defaults must never replace provider-reported values.
+    input = raw["prompt_tokens"]
+    output = raw["completion_tokens"]
+    cached = details["cached_tokens"]
+    total = raw["total_tokens"]
+    # OpenRouter's response `usage.cost` is the route-attributable bill joined
+    # to `/generation`. ReqLLM's normalized `:cost` is a component map and is
+    # intentionally not substituted for that provider evidence.
+    cost = raw["cost"]
 
     unless is_integer(input) and input >= 0 and is_integer(output) and output >= 0 and
-             is_integer(cached) and cached == 0 and is_integer(total) and total == input + output do
+             is_integer(cached) and cached >= 0 and cached <= input and is_integer(total) and
+             total == input + output and is_number(cost) and cost >= 0 do
       raise Imp.OperationalSafetyError,
         kind: :cost,
         message: "OpenRouter usage metadata missing or inconsistent",
         reason: %{normalized: Imp.Redaction.redact(usage), raw: Imp.Redaction.redact(raw)}
     end
 
+    crosscheck_normalized_usage!(usage, %{
+      input_tokens: input,
+      output_tokens: output,
+      cached_tokens: cached,
+      total_tokens: total
+    })
+
     %{
       "input_tokens" => input,
       "output_tokens" => output,
       "cached_tokens" => cached,
-      "total_tokens" => total
+      "total_tokens" => total,
+      "provider_cost_usd" => cost
     }
+  end
+
+  defp crosscheck_normalized_usage!(normalized, expected) do
+    Enum.each(expected, fn {key, provider_value} ->
+      case map_value(normalized, key) do
+        value when is_integer(value) and value >= 0 and value != provider_value ->
+          raise Imp.OperationalSafetyError,
+            kind: :cost,
+            message: "ReqLLM normalized usage disagrees with OpenRouter response",
+            reason: %{field: key, normalized: value, provider: provider_value}
+
+        _ ->
+          :ok
+      end
+    end)
   end
 
   defp validate_response_identity!(response) do
@@ -217,24 +250,30 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
     output = usage["output_tokens"]
 
     unless generation["native_tokens_prompt"] == input and
-             generation["native_tokens_completion"] == output do
+             generation["native_tokens_completion"] == output and
+             generation["native_tokens_cached"] == usage["cached_tokens"] do
       raise Imp.OperationalSafetyError,
         kind: :cost,
         message: "OpenRouter generation usage disagrees with response usage",
         reason: %{response_input: input, response_output: output}
     end
 
-    expected_cost = input / 1_000_000 * 0.14 + output / 1_000_000 * 0.28
+    full_price = input / 1_000_000 * 0.14 + output / 1_000_000 * 0.28
 
     unless is_number(generation["total_cost"]) and
-             abs(generation["total_cost"] - expected_cost) <= 1.0e-9 do
+             abs(generation["total_cost"] - usage["provider_cost_usd"]) <= 1.0e-9 and
+             generation["total_cost"] <= full_price + 1.0e-9 do
       raise Imp.OperationalSafetyError,
         kind: :cost,
-        message: "OpenRouter billed cost disagrees with frozen prices",
-        reason: %{provider_cost: generation["total_cost"], expected_cost: expected_cost}
+        message: "OpenRouter response/generation cost join or full-price ceiling drift",
+        reason: %{
+          generation_cost: generation["total_cost"],
+          response_cost: usage["provider_cost_usd"],
+          full_price_ceiling: full_price
+        }
     end
 
-    Map.put(usage, "provider_cost_usd", generation["total_cost"])
+    usage
   end
 
   defp persist_provisional!(lm, opportunity, wire, response, duration) do

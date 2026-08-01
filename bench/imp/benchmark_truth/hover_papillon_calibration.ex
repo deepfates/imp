@@ -1,7 +1,7 @@
 defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   @moduledoc false
 
-  @condition "imp-88sn-hover-papillon-openrouter-calibration-v1"
+  @condition "imp-88sn-hover-papillon-openrouter-calibration-v2-provider-prompt-cache"
   @model "deepseek/deepseek-v4-flash"
   @endpoint_model "deepseek/deepseek-v4-flash-20260423"
   @endpoint_tag "novita/fp8"
@@ -158,7 +158,6 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
         require_equal!(event["upstream_provider"], @endpoint_provider, "upstream provider")
         require_equal!(event["endpoint_tag"], @endpoint_tag, "endpoint tag")
         require_equal!(event["transport_count"], 1, "transport count")
-        require_equal!(get_in(event, ["usage", "cached_tokens"]), 0, "cached tokens")
         require_equal!(event["message_serialization"], "canonical_json_utf8_v1", "serialization")
         bytes = event["message_bytes"]
 
@@ -167,6 +166,9 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
 
         require_nonnegative_integer!(get_in(event, ["usage", "input_tokens"]), "input tokens")
         require_nonnegative_integer!(get_in(event, ["usage", "output_tokens"]), "output tokens")
+        require_nonnegative_integer!(get_in(event, ["usage", "cached_tokens"]), "cached tokens")
+        require_nonnegative_integer!(get_in(event, ["usage", "total_tokens"]), "total tokens")
+        validate_usage!(event["usage"], opportunity)
         require_nonempty!(event["request_id"], "request id")
         require_nonempty!(event["message_sha256"], "message sha256")
       end
@@ -383,7 +385,9 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     unless is_integer(data["native_tokens_prompt"]) and data["native_tokens_prompt"] >= 0 and
              is_integer(data["native_tokens_completion"]) and
              data["native_tokens_completion"] >= 0 and
-             data["native_tokens_cached"] == 0 and is_number(data["total_cost"]) and
+             is_integer(data["native_tokens_cached"]) and data["native_tokens_cached"] >= 0 and
+             data["native_tokens_cached"] <= data["native_tokens_prompt"] and
+             is_number(data["total_cost"]) and
              data["total_cost"] >= 0 do
       raise Imp.OperationalSafetyError,
         kind: :cost,
@@ -675,6 +679,15 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
       opportunity = Process.get(:imp_calibration_opportunity)
       content = local_content(body["messages"], opportunity, Keyword.get(opts, :fail_on, []))
 
+      usage =
+        Keyword.get(opts, :provider_disabled_usage, %{
+          "prompt_tokens" => 11,
+          "completion_tokens" => 7,
+          "total_tokens" => 18,
+          "prompt_tokens_details" => %{"cached_tokens" => 0},
+          "cost" => 11 / 1_000_000 * @input_price + 7 / 1_000_000 * @output_price
+        })
+
       response = %{
         "id" => "req-" <> String.replace(opportunity.id, "/", "-"),
         "object" => "chat.completion",
@@ -688,12 +701,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
             "finish_reason" => "stop"
           }
         ],
-        "usage" => %{
-          "prompt_tokens" => 11,
-          "completion_tokens" => 7,
-          "total_tokens" => 18,
-          "prompt_tokens_details" => %{"cached_tokens" => 0}
-        }
+        "usage" => usage
       }
 
       {request, Req.Response.new(status: 200, body: response)}
@@ -991,9 +999,22 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   defp canonical_json(value), do: Jason.encode!(value)
   defp sha256(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
 
-  defp usage_cost(usage) do
-    usage["input_tokens"] / 1_000_000 * @input_price +
-      usage["output_tokens"] / 1_000_000 * @output_price
+  defp usage_cost(usage), do: usage["provider_cost_usd"]
+
+  defp validate_usage!(usage, opportunity) do
+    input = usage["input_tokens"]
+    output = usage["output_tokens"]
+    cached = usage["cached_tokens"]
+    total = usage["total_tokens"]
+    cost = usage["provider_cost_usd"]
+    full_price = input / 1_000_000 * @input_price + output / 1_000_000 * @output_price
+
+    unless cached <= input and total == input + output and is_number(cost) and cost >= 0 and
+             cost <= full_price + 1.0e-9 and cost <= reservation_cost(opportunity) + 1.0e-9 do
+      raise ArgumentError, "usage/cost exceeds the conservative full-price contract"
+    end
+
+    :ok
   end
 
   defp contains?(rendered, required, forbidden \\ []) do
