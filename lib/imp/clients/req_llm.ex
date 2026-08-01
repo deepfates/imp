@@ -13,6 +13,11 @@ defmodule Imp.Clients.ReqLLM do
   removes the envelope before calling ReqLLM. The token value records a pricing
   or capacity reservation; without a model tokenizer it is not treated as an
   exact token counter.
+
+  `:openrouter_reasoning` is an Imp-owned OpenRouter wire option for the
+  documented nested `reasoning` object. It currently accepts exactly an
+  `:effort` value and is removed before ReqLLM option validation. This avoids
+  relying on ReqLLM's legacy top-level `reasoning_effort` encoding.
   """
 
   @behaviour Imp.LM
@@ -58,7 +63,11 @@ defmodule Imp.Clients.ReqLLM do
   def new(model_spec, opts \\ []) do
     {req_module, nested_opts} = validate_new_opts!(opts)
 
-    merged_opts = Keyword.merge(nested_opts, Keyword.drop(opts, [:opts, :req_module]))
+    merged_opts =
+      nested_opts
+      |> Keyword.merge(Keyword.drop(opts, [:opts, :req_module]))
+      |> normalize_openrouter_reasoning_option!("#{inspect(__MODULE__)}.new/2")
+
     validate_input_envelope_option!(merged_opts, "#{inspect(__MODULE__)}.new/2")
 
     %__MODULE__{
@@ -174,6 +183,7 @@ defmodule Imp.Clients.ReqLLM do
     {rollout_id, opts} =
       lm.opts
       |> Keyword.merge(opts)
+      |> normalize_openrouter_reasoning_option!("#{inspect(__MODULE__)}.generate/3")
       |> Keyword.pop(:rollout_id)
 
     {input_envelope, opts} = Keyword.pop(opts, :input_envelope)
@@ -249,7 +259,11 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp do_generate_uncached(lm, messages, opts) do
-    opts = opts |> cap_transport_timeouts() |> enforce_explicit_no_retry()
+    opts =
+      opts
+      |> prepare_openrouter_reasoning!(lm.model)
+      |> cap_transport_timeouts()
+      |> enforce_explicit_no_retry()
 
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
@@ -358,6 +372,7 @@ defmodule Imp.Clients.ReqLLM do
     {_rollout_id, opts} =
       lm.opts
       |> Keyword.merge(opts)
+      |> normalize_openrouter_reasoning_option!("#{inspect(__MODULE__)}.stream/3")
       |> Keyword.pop(:rollout_id)
 
     {input_envelope, opts} = Keyword.pop(opts, :input_envelope)
@@ -372,7 +387,11 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp safe_stream(lm, messages, opts) do
-    opts = opts |> cap_transport_timeouts() |> enforce_explicit_no_retry()
+    opts =
+      opts
+      |> prepare_openrouter_reasoning!(lm.model)
+      |> cap_transport_timeouts()
+      |> enforce_explicit_no_retry()
 
     case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
@@ -419,7 +438,7 @@ defmodule Imp.Clients.ReqLLM do
   defp validate_call_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
       validate_input_envelope_option!(opts, context)
-      opts
+      normalize_openrouter_reasoning_option!(opts, context)
     else
       raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
     end
@@ -434,6 +453,126 @@ defmodule Imp.Clients.ReqLLM do
       :error -> :ok
       {:ok, value} -> validate_input_envelope!(value, context)
     end
+  end
+
+  defp normalize_openrouter_reasoning_option!(opts, context) do
+    case Keyword.get_values(opts, :openrouter_reasoning) do
+      [] ->
+        opts
+
+      [reasoning] ->
+        normalized = normalize_openrouter_reasoning!(reasoning, context)
+
+        if Keyword.has_key?(opts, :reasoning_effort) do
+          raise ArgumentError,
+                "#{context}: :openrouter_reasoning cannot be combined with :reasoning_effort"
+        end
+
+        Keyword.put(opts, :openrouter_reasoning, normalized)
+
+      _values ->
+        raise ArgumentError, "#{context}: duplicate :openrouter_reasoning options"
+    end
+  end
+
+  defp normalize_openrouter_reasoning!(reasoning, context) when is_list(reasoning) do
+    if Keyword.keyword?(reasoning) do
+      keys = Keyword.keys(reasoning)
+
+      if length(keys) != length(Enum.uniq(keys)) do
+        raise ArgumentError, "#{context}: :openrouter_reasoning contains duplicate keys"
+      end
+
+      normalize_openrouter_reasoning!(Map.new(reasoning), context)
+    else
+      raise ArgumentError,
+            "#{context}: :openrouter_reasoning must be a map or keyword list"
+    end
+  end
+
+  defp normalize_openrouter_reasoning!(reasoning, context) when is_map(reasoning) do
+    entries = Enum.map(reasoning, fn {key, value} -> {to_string(key), value} end)
+
+    if length(entries) != length(Enum.uniq_by(entries, &elem(&1, 0))) do
+      raise ArgumentError, "#{context}: :openrouter_reasoning contains duplicate keys"
+    end
+
+    reasoning = Map.new(entries)
+
+    case reasoning do
+      %{"effort" => effort} when map_size(reasoning) == 1 ->
+        effort = to_string(effort)
+
+        if effort in ~w(none minimal low medium high xhigh max) do
+          %{"effort" => effort}
+        else
+          raise ArgumentError,
+                "#{context}: :openrouter_reasoning :effort is unsupported: #{inspect(effort)}"
+        end
+
+      _ ->
+        raise ArgumentError,
+              "#{context}: :openrouter_reasoning requires exactly :effort"
+    end
+  end
+
+  defp normalize_openrouter_reasoning!(reasoning, context) do
+    raise ArgumentError,
+          "#{context}: :openrouter_reasoning must be a map or keyword list, got: #{inspect(reasoning)}"
+  end
+
+  defp prepare_openrouter_reasoning!(opts, model_spec) do
+    case Keyword.pop(opts, :openrouter_reasoning) do
+      {nil, opts} ->
+        opts
+
+      {reasoning, opts} ->
+        reasoning = normalize_openrouter_reasoning!(reasoning, "Imp OpenRouter request")
+
+        unless openrouter_model?(model_spec) do
+          raise ArgumentError,
+                ":openrouter_reasoning is supported only for an OpenRouter model"
+        end
+
+        http_opts = Keyword.get(opts, :req_http_options, [])
+        plugins = Keyword.get(http_opts, :plugins, [])
+
+        plugin = fn request ->
+          Req.Request.append_request_steps(
+            request,
+            imp_openrouter_reasoning_wire: {
+              __MODULE__,
+              :prepare_openrouter_reasoning_wire,
+              [reasoning]
+            }
+          )
+        end
+
+        Keyword.put(
+          opts,
+          :req_http_options,
+          Keyword.put(http_opts, :plugins, plugins ++ [plugin])
+        )
+    end
+  end
+
+  defp openrouter_model?(%{provider: provider}) when provider in [:openrouter, "openrouter"],
+    do: true
+
+  defp openrouter_model?(model) when is_binary(model),
+    do: String.starts_with?(model, "openrouter:")
+
+  defp openrouter_model?(_model), do: false
+
+  @doc false
+  def prepare_openrouter_reasoning_wire(%Req.Request{} = request, reasoning) do
+    body = request.body |> IO.iodata_to_binary() |> Jason.decode!()
+
+    if Map.has_key?(body, "reasoning_effort") or Map.has_key?(body, "reasoning") do
+      raise ArgumentError, "OpenRouter reasoning wire field is ambiguous"
+    end
+
+    %{request | body: Jason.encode!(Map.put(body, "reasoning", reasoning))}
   end
 
   defp validate_input_envelope!(envelope, context) when is_list(envelope) do

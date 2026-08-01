@@ -92,6 +92,60 @@ defmodule Imp.SavingReqLLMTransportTest do
     end
   end
 
+  test "saved OpenRouter reasoning effort round-trips and remains narrowly allowlisted" do
+    program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.req_llm("openrouter:provider/model",
+            openrouter_reasoning: %{effort: :high}
+          )
+      )
+
+    dumped = program |> Imp.dump() |> json_round_trip()
+    loaded = Imp.load(dumped)
+    assert loaded.lm.opts[:openrouter_reasoning] == %{"effort" => "high"}
+
+    root = tmp_dir("openrouter-reasoning-fresh-beam")
+    artifact = Path.join(root, "program.json")
+    receipt = Path.join(root, "receipt.bin")
+    :ok = Imp.save!(program, artifact)
+
+    code = """
+    loaded = Imp.load!(#{inspect(artifact)})
+    File.write!(#{inspect(receipt)}, :erlang.term_to_binary(Imp.ProgramAccess.lm(loaded).opts, [:deterministic]))
+    """
+
+    {output, status} =
+      System.cmd("mix", ["run", "--no-compile", "--no-deps-check", "-e", code],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "test"}],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+
+    fresh_opts = receipt |> File.read!() |> :erlang.binary_to_term([:safe])
+    assert fresh_opts[:openrouter_reasoning] == %{"effort" => "high"}
+
+    opts = get_in(dumped, ["lm", "opts"])
+
+    for invalid <- [
+          [["effort", "high"], ["effort", "low"]],
+          [["budget", 100]],
+          [["effort", "invented"]],
+          %{"effort" => "high", "budget" => 100}
+        ] do
+      assert_raise ArgumentError, ~r/openrouter_reasoning/, fn ->
+        dumped
+        |> put_in(
+          ["lm", "opts"],
+          replace_option(opts, "openrouter_reasoning", invalid)
+        )
+        |> Imp.load()
+      end
+    end
+  end
+
   test "unknown and malformed saved ReqLLM transport options fail closed" do
     dumped = stopped_program_shape() |> Imp.dump() |> json_round_trip()
     opts = get_in(dumped, ["lm", "opts"])
