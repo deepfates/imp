@@ -220,16 +220,9 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
       Mix.raise("packaged deployment workflow did not complete its cold OTP lifecycle")
     end
 
-    fresh_output =
-      offline_mix!(
-        deployment_dir,
-        ["run", "--no-start", "--no-compile", "--no-deps-check", "load_workflow.exs"],
-        workflow_env
-      )
-
-    unless fresh_output =~
-             "Imp OTP workflow fresh-process load passed: linked result/artifact, harbor/high with 2 predictors x 4 demos" do
-      Mix.raise("packaged deployment workflow did not load in a fresh OS process")
+    unless workflow_output =~
+             "Imp OTP workflow fresh-process service passed: linked result/artifact, 4 concurrent harbor/high calls with 2 predictors x 4 demos" do
+      Mix.raise("packaged deployment workflow did not serve from its fresh OS process")
     end
   end
 

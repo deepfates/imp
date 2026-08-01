@@ -463,6 +463,15 @@ defmodule DeploymentReferenceTest do
     assert readme =~ "Research case studies stay separate"
     assert readme =~ "reload_parameters/1"
     assert readme =~ "starts a second OS process"
+    assert readme =~ "serves four\nconcurrent predictions"
+
+    workflow = File.read!(Path.join(@example_root, "run_workflow.exs"))
+    loader = File.read!(Path.join(@example_root, "load_workflow.exs"))
+
+    assert workflow =~ ~s(System.cmd(mix, ["run", "--no-start", "load_workflow.exs"])
+    assert workflow =~ "Application.stop(:imp_deployment)"
+    assert loader =~ "ProgramServer.reload_parameters(artifact_path)"
+    assert loader =~ "Task.await_many(5_000)"
   end
 
   defp start_runtime(executor, opts \\ []) do

@@ -41,9 +41,10 @@ The workflow:
 9. serves four calls concurrently; and
 10. contains one crashed call and one timed-out call before serving again.
 
-It then starts a second OS process, reads the result and artifact, reconstructs
-the trusted program, reapplies the selected parameters, and makes another
-prediction.
+It then stops the in-process service and starts a second OS process. That fresh
+process reads the result and artifact, reconstructs the trusted program,
+reapplies the selected parameters, starts `ProgramServer`, and serves four
+concurrent predictions before the parent removes its temporary files.
 
 The scripted model has planted routing rules, so the deterministic selection
 score moves from `0.25` to `1.0`. That number proves the application lifecycle,

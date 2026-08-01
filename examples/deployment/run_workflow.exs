@@ -96,6 +96,30 @@ try do
   )
 
   IO.puts("Imp OTP workflow passed: selection 0.25 -> 1.0, untouched 1.0")
+
+  # Prove restart from the exact persisted pair before the temporary files are
+  # removed. The child is a separate OS process and reconstructs the trusted
+  # application code rather than inheriting this process's program value.
+  :ok = Application.stop(:imp_deployment)
+
+  mix = System.find_executable("mix") || raise "mix executable is unavailable"
+
+  {fresh_output, fresh_status} =
+    System.cmd(mix, ["run", "--no-start", "load_workflow.exs"],
+      cd: __DIR__,
+      env: [
+        {"IMP_WORKFLOW_ARTIFACT_PATH", Path.expand(artifact_path)},
+        {"IMP_WORKFLOW_RESULT_PATH", Path.expand(result_path)}
+      ],
+      stderr_to_stdout: true
+    )
+
+  IO.write(fresh_output)
+
+  unless fresh_status == 0 and
+           String.contains?(fresh_output, "Imp OTP workflow fresh-process service passed") do
+    raise "fresh-process workflow failed with status #{fresh_status}"
+  end
 after
   Application.stop(:imp_deployment)
 
