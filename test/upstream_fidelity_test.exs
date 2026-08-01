@@ -25,6 +25,13 @@ defmodule Imp.UpstreamFidelityTest do
     assert by_id["programming.contracts"].status == :conformant
     assert by_id["models.runtime"].status == :elixir_native_equivalent
     assert by_id["models.normalized_runtime_prerelease"].status == :tracking
+
+    assert by_id["models.normalized_runtime_prerelease"].evidence.tests == [
+             "test/public_surface_test.exs"
+           ]
+
+    assert by_id["tools.typed_calls"].status == :elixir_native_equivalent
+    assert by_id["state.persistence_deployment"].status == :elixir_native_equivalent
     react = by_id["agents.react_family"]
     assert react.status == :elixir_native_equivalent
     assert react.rationale =~ "provider-native function calls"

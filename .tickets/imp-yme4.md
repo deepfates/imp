@@ -69,14 +69,52 @@ The product center is real but the telos is open.
 - **Meaningful DSPy capability audit — active, not a mechanical port count.**
   The ordinary programming, evaluation, optimizer, agent/tool, retrieval,
   persistence, and supervised deployment capabilities are broadly present and
-  the complete packaged lifecycle has been exercised. The granular upstream
-  exam now has no retained executable FAIL after repairing split Chat-marker
-  streaming. That does not imply complete parity: provider-native
+  one representative complete packaged lifecycle has been exercised. The
+  granular upstream exam now has no retained executable FAIL after repairing
+  split Chat-marker streaming. That does not imply complete parity: provider-native
   Document/Citations behavior, typed citation streaming, Code field parsing,
-  ecosystem breadth, and several advanced ergonomic surfaces remain real
-  gaps. Current DSPy also has save/load, concurrency, streaming, caching, and
-  deployment paths, so Imp's stronger OTP/artifact story is an architectural
-  hypothesis until a direct ordinary-path comparison exercises it.
+  ecosystem breadth, current DSPy's first-class typed tool-call field contract,
+  and several advanced ergonomic surfaces remain real gaps. The prerelease
+  `LMRequest`/`LMResponse` structs are scaffold rather than an exercised runtime
+  seam, and `LMStream` is absent. Current DSPy also has save/load, concurrency,
+  streaming, caching, and deployment paths, so Imp's stronger OTP/artifact
+  story requires direct ordinary-path evidence rather than architectural prose.
+  The claim-specific red rows for instruction optimizers, GEPA, and Optimize
+  Anything do not mean those mechanisms are absent: their public mechanisms and
+  bounded lifecycles are exercised, while cross-task usefulness, some exact
+  algorithm semantics, and paper-family evidence remain unverified or negative
+  by task. Keep mechanism capability and scientific generalization separate.
+- **Portable-state and operations comparison — scoped advantage, not blanket
+  superiority.** A source-verified, provider-free DSPy `3.3.0b1` execution now
+  establishes its actual ordinary boundary: state-only JSON fresh-loads into
+  reconstructed trusted program code, omits API keys, removes unsafe endpoint
+  configuration by default, and rejects malformed state transactionally. Its
+  JSON is intentionally human-editable, carries no integrity seal, and is
+  created with ordinary process permissions (`0644` under the exercised default
+  umask); whole-program loading uses cloudpickle behind explicit trusted opt-in.
+  The matched Imp execution writes an owner-only (`0600`) checksummed parameter
+  artifact, rejects edited bytes, and applies only parameters into trusted live
+  code. Separately, the clean package gate exercises that artifact through a
+  fresh release, runtime credential rebinding, concurrent calls, hot reload,
+  timeout/crash containment, and continued service. DSPy documents capable
+  FastAPI/async and MLflow deployment paths, so the earned claim is only that
+  Imp ships a tighter BEAM-native artifact-and-supervision lifecycle in its core
+  product. This is not evidence of general reliability, throughput, latency,
+  observability, ecosystem, or optimizer superiority. Evidence:
+  `scripts/current_dspy_state_boundary.py`,
+  `test/current_dspy_state_boundary_test.exs`, and `mix package.check`.
+  A second matched local probe exercises the strongest BEAM-scoped difference
+  rather than inferring it from architecture: with capacity one, a 200 ms
+  in-process job, and a 25 ms caller deadline, the packaged ProgramServer kills
+  the supervised task, prevents its late filesystem effect, serves the next
+  healthy call, and remains alive. Current DSPy `3.3.0b1`'s documented
+  `asyncify` plus caller timeout also serves the next call, but its abandoned
+  worker thread continues and performs the late effect. This earns a narrow
+  hard-timeout containment claim for these documented local serving primitives;
+  it says nothing about provider transport cancellation, an HTTP server,
+  throughput, or general BEAM/Python reliability. Evidence:
+  `scripts/current_dspy_timeout_boundary.py` and
+  `test/current_dspy_timeout_boundary_test.exs`.
 - **External benchmark program — one serious candidate, not the portfolio.**
   HoVer/PAPILLON remains a historical instrument: it measured route, usage,
   cost, cache, and format behavior, but its live HoVer comparison was invalidated
@@ -132,7 +170,10 @@ second tracking system:
    concurrent service, timeout/crash containment, and operational visibility
    against current DSPy's documented ordinary paths. Architecture alone cannot
    earn a superiority claim; keep the result scoped if only some operational
-   dimensions are better.
+   dimensions are better. The portable-state and supervised-service slice now
+   passes with the scope above; long-running recovery, overload behavior, and
+   external acceptance remain open and should be tested through ordinary use,
+   not a new operations campaign.
 3. **Ratify the representative scientific tranche.** Treat official-split,
    source-row-disjoint, treatment-unseen MuSiQue dev as a valid held-out boundary
    with the audit and semantic overlap disclosed. Keep the retained positive OA

@@ -175,10 +175,17 @@ defmodule Imp.UpstreamFidelity do
       release_blocking: false,
       ticket: "de-tt5j",
       imp: [Imp.Core.LMRequest, Imp.Core.LMResponse],
-      invariants: ["stable DSPy remains the release baseline until 3.3 is final"],
+      invariants: [
+        "stable DSPy remains the release baseline until 3.3 is final",
+        "declared normalized request and response structs are not an exercised runtime until an ordinary provider path consumes and returns them"
+      ],
       evidence: %{
-        tests: ["test/req_llm_client_test.exs"],
-        docs: ["docs/internal/UPSTREAM_FIDELITY_AUDIT.md"]
+        tests: ["test/public_surface_test.exs"],
+        docs: ["docs/internal/UPSTREAM_FIDELITY_AUDIT.md"],
+        missing: [
+          "ordinary Imp.LM/ReqLLM request-to-provider-to-response execution through LMRequest and LMResponse",
+          "LMStream normalized runtime type and ordinary streaming execution"
+        ]
       }
     },
     %{
@@ -273,12 +280,15 @@ defmodule Imp.UpstreamFidelity do
       category: :tools_agents,
       upstream: ["Tool", "ToolCalls", "ToolCallResults", "MCP"],
       source: "dspy/adapters/types/tool.py; dspy/utils/mcp.py",
-      disposition: :conformant,
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "Imp exposes validated provider-native tool schemas, call identities/results, MCP import, and separately exercised ReActV2 history rather than DSPy's Tool/ToolCalls/ToolCallResults signature-field contract and ChatAdapter use_native_function_calling switch.",
       imp: [Imp.Tool, Imp.MCP],
       invariants: [
         "tool schemas are validated before execution",
         "provider tool-call ids and results are retained",
-        "MCP discovery creates ordinary Imp tools"
+        "MCP discovery creates ordinary Imp tools",
+        "the BEAM-native provider-tool path is not described as a literal DSPy typed signature-field contract"
       ],
       evidence: %{
         tests: [
@@ -286,7 +296,11 @@ defmodule Imp.UpstreamFidelity do
           "test/mcp_import_test.exs",
           "test/protocol_mcp/provider_mcp_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "livebooks/04_tools_agents_mcp_rlm.livemd"]
+        docs: ["docs/API_GUIDE.md", "livebooks/04_tools_agents_mcp_rlm.livemd"],
+        missing: [
+          "first-class ToolCalls and ToolCallResults signature-field semantics matching DSPy",
+          "ChatAdapter use_native_function_calling compatibility switch"
+        ]
       }
     },
     %{
@@ -828,21 +842,28 @@ defmodule Imp.UpstreamFidelity do
       category: :operations,
       upstream: ["Module.save", "Module.load", "load", "dump_state", "load_state", "deployment"],
       source: "dspy/primitives/base_module.py; dspy/utils/saving.py; deployment docs",
-      disposition: :conformant,
-      imp: [Imp.Saving, Imp.Saving.Registry],
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "Supported built-in program graphs round-trip through Imp.Saving; consumer-defined modules use checksummed parameter Artifacts applied into reconstructed trusted code so runtime callbacks and credentials never come from artifact bytes.",
+      imp: [Imp.Saving, Imp.Saving.Registry, Imp.Optimizer.Artifact],
       invariants: [
         "portable state round-trips transactionally",
         "credentials are excluded",
         "compiled optimizer state remains executable",
-        "deployment from a clean package is documented and tested"
+        "deployment from a clean package is documented and tested",
+        "consumer-defined modules reconstruct trusted code and apply portable parameters rather than claiming arbitrary whole-program serialization"
       ],
       evidence: %{
         tests: [
           "test/production_adapter_persistence_test.exs",
+          "test/current_dspy_state_boundary_test.exs",
           "test/deployment_reference_test.exs",
           "test/package_contract_test.exs"
         ],
-        docs: ["docs/PRODUCTION_OPERATIONS.md", "examples/deployment/README.md"]
+        docs: ["docs/PRODUCTION_OPERATIONS.md", "examples/deployment/README.md"],
+        missing: [
+          "generic whole-program persistence for arbitrary consumer structs; the supported safe substitute is parameter Artifact plus trusted reconstruction"
+        ]
       }
     },
     %{

@@ -8,8 +8,8 @@ the ordinary consumer finish line and `tk` owns unfinished work.
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Release profile: v0.1
 Total: 26
-Conformant: 13
-Elixir-native equivalents: 7
+Conformant: 11
+Elixir-native equivalents: 9
 Tracking: 2
 Gaps: 4
 Claim-specific non-blocking gaps: 4
@@ -30,7 +30,7 @@ Conformance profile passing: true
 | adapters.xml | adapters | conformant | satisfied | XMLAdapter |
 | adapters.two_step | adapters | conformant | satisfied | TwoStepAdapter |
 | primitives.multimodal | primitives | gap | claim-specific gap | Image, Audio, File, Code, Document, Citations, Reasoning |
-| tools.typed_calls | tools_agents | conformant | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
+| tools.typed_calls | tools_agents | elixir_native_equivalent | satisfied | Tool, ToolCalls, ToolCallResults, MCP |
 | agents.react_family | tools_agents | elixir_native_equivalent | satisfied | ReAct, ReActV2, CodeAct, ProgramOfThought, PythonInterpreter |
 | agents.rlm | tools_agents | elixir_native_equivalent | satisfied | RLM, SandboxSerializable, Recursive Language Models paper |
 | composition.refinement | programming_model | conformant | satisfied | BestOfN, Refine, Assertions |
@@ -45,7 +45,7 @@ Conformance profile passing: true
 | retrieval.data | retrieval | elixir_native_equivalent | satisfied | Retrieve, Embeddings, ColBERTv2, WeaviateRM, DatabricksRM, built-in datasets, DataLoader |
 | runtime.async_stream_cache | runtime | conformant | satisfied | asyncify, syncify, ParallelExecutor, streamify, StreamListener, configure_cache, track_usage |
 | runtime.observability | runtime | conformant | satisfied | inspect_history, StatusMessage, StatusMessageProvider, disable_litellm_logging, disable_logging, enable_litellm_logging, enable_logging, optimizer tracking |
-| state.persistence_deployment | operations | conformant | satisfied | Module.save, Module.load, load, dump_state, load_state, deployment |
+| state.persistence_deployment | operations | elixir_native_equivalent | satisfied | Module.save, Module.load, load, dump_state, load_state, deployment |
 | product.learning_path | product | conformant | satisfied | getting started, tutorials, real-world examples, API reference, production guide |
 | product.release | product | tracking | tracked | installable package, versioned release, security policy, CI, clean-room consumer |
 
@@ -157,17 +157,19 @@ Imp modules: `Imp.Core.LMRequest`, `Imp.Core.LMResponse`
 Semantic invariants:
 
 - stable DSPy remains the release baseline until 3.3 is final
+- declared normalized request and response structs are not an exercised runtime until an ordinary provider path consumes and returns them
 
 Executable evidence:
 
-- test: `test/req_llm_client_test.exs`
+- test: `test/public_surface_test.exs`
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
 
 
 
 Missing evidence or behavior:
 
-- none
+- ordinary Imp.LM/ReqLLM request-to-provider-to-response execution through LMRequest and LMResponse
+- LMStream normalized runtime type and ordinary streaming execution
 
 ### `adapters.structured_io`
 
@@ -278,16 +280,19 @@ Missing evidence or behavior:
 
 ### `tools.typed_calls`
 
-Status: `conformant`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/adapters/types/tool.py; dspy/utils/mcp.py`
 
 Imp modules: `Imp.Tool`, `Imp.MCP`
+Elixir-native rationale: Imp exposes validated provider-native tool schemas, call identities/results, MCP import, and separately exercised ReActV2 history rather than DSPy's Tool/ToolCalls/ToolCallResults signature-field contract and ChatAdapter use_native_function_calling switch.
+
 Semantic invariants:
 
 - tool schemas are validated before execution
 - provider tool-call ids and results are retained
 - MCP discovery creates ordinary Imp tools
+- the BEAM-native provider-tool path is not described as a literal DSPy typed signature-field contract
 
 Executable evidence:
 
@@ -305,7 +310,8 @@ Current-profile capability evidence:
 
 Missing evidence or behavior:
 
-- none
+- first-class ToolCalls and ToolCallResults signature-field semantics matching DSPy
+- ChatAdapter use_native_function_calling compatibility switch
 
 ### `agents.react_family`
 
@@ -834,21 +840,25 @@ Missing evidence or behavior:
 
 ### `state.persistence_deployment`
 
-Status: `conformant`
+Status: `elixir_native_equivalent`
 
 Upstream source: `dspy/primitives/base_module.py; dspy/utils/saving.py; deployment docs`
 
-Imp modules: `Imp.Saving`, `Imp.Saving.Registry`
+Imp modules: `Imp.Saving`, `Imp.Saving.Registry`, `Imp.Optimizer.Artifact`
+Elixir-native rationale: Supported built-in program graphs round-trip through Imp.Saving; consumer-defined modules use checksummed parameter Artifacts applied into reconstructed trusted code so runtime callbacks and credentials never come from artifact bytes.
+
 Semantic invariants:
 
 - portable state round-trips transactionally
 - credentials are excluded
 - compiled optimizer state remains executable
 - deployment from a clean package is documented and tested
+- consumer-defined modules reconstruct trusted code and apply portable parameters rather than claiming arbitrary whole-program serialization
 
 Executable evidence:
 
 - test: `test/production_adapter_persistence_test.exs`
+- test: `test/current_dspy_state_boundary_test.exs`
 - test: `test/deployment_reference_test.exs`
 - test: `test/package_contract_test.exs`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
@@ -858,7 +868,7 @@ Executable evidence:
 
 Missing evidence or behavior:
 
-- none
+- generic whole-program persistence for arbitrary consumer structs; the supported safe substitute is parameter Artifact plus trusted reconstruction
 
 ### `product.learning_path`
 
