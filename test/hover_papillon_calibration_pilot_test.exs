@@ -329,7 +329,76 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
 
     assert output =~ ~s("status": "offline_live_transport_verified")
     assert output =~ ~s("transports": 1)
+    assert output =~ ~s("generation_404_then_200_attempts": 2)
+    assert output =~ ~s("terminal_404_attempts": 3)
+    assert output =~ ~s("terminal_next_stage_transports": 0)
     refute File.exists?(root)
+  end
+
+  test "generation records tolerate bounded eventual availability and retain terminal evidence",
+       %{
+         commit: commit
+       } do
+    generation = %{
+      "id" => "gen-delayed",
+      "model" => Pilot.model(),
+      "provider_name" => "Novita",
+      "cancelled" => false,
+      "session_id" => nil,
+      "request_id" => "req-delayed",
+      "native_tokens_prompt" => 11,
+      "native_tokens_completion" => 7,
+      "native_tokens_cached" => 0,
+      "total_cost" => 0.0000035
+    }
+
+    {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+    fetch = fn "gen-delayed", _api_key ->
+      attempt = Agent.get_and_update(attempts, &{&1 + 1, &1 + 1})
+      if attempt == 1, do: {:http, 404}, else: {:ok, generation}
+    end
+
+    assert Pilot.generation_metadata!("gen-delayed", "offline-key",
+             attempts: 3,
+             fetch: fetch,
+             sleep: fn 1_000 -> :ok end
+           ) == generation
+
+    assert Agent.get(attempts, & &1) == 2
+
+    root = temp_root("terminal-generation")
+    {:ok, transports} = Agent.start_link(fn -> 0 end)
+    {:ok, terminal_attempts} = Agent.start_link(fn -> 0 end)
+
+    terminal_fetch = fn _generation_id, _api_key ->
+      Agent.update(terminal_attempts, &(&1 + 1))
+      {:http, 404}
+    end
+
+    assert_raise Imp.OperationalSafetyError, ~r/generation metadata HTTP 404/, fn ->
+      Pilot.run_provider_disabled!(root,
+        expected_commit: commit,
+        private_pupa_fixture: @private_fixture,
+        transport_counter: transports,
+        generation_fetch: terminal_fetch,
+        generation_sleep: fn 1_000 -> :ok end,
+        generation_attempts: 3
+      )
+    end
+
+    assert Agent.get(transports, & &1) == 1
+    assert Agent.get(terminal_attempts, & &1) == 3
+    refute File.exists?(Path.join(root, "imp.json"))
+    assert [provisional] = Path.wildcard(Path.join(root, "live-evidence/provisional/*.json"))
+    assert [] = Path.wildcard(Path.join(root, "live-evidence/reconciled/*.json"))
+
+    for directory <- [root, Path.join(root, "live-evidence"), Path.dirname(provisional)] do
+      assert (File.stat!(directory).mode &&& 0o777) == 0o700
+    end
+
+    assert (File.stat!(provisional).mode &&& 0o777) == 0o600
+    File.rm_rf!(root)
   end
 
   test "event guards reject duplicates, overflow, cache, drift, cap and post-hoc cost" do

@@ -12,11 +12,13 @@ import io
 import json
 import os
 import pathlib
+import shutil
 import threading
 import subprocess
 import sys
 import time
 import types
+import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -34,6 +36,8 @@ INPUT_PRICE = 0.14
 OUTPUT_PRICE = 0.28
 MAX_OUTPUT_TOKENS = 16384
 HARD_COST_USD = 5.00
+GENERATION_ATTEMPTS = 12
+GENERATION_INTERVAL_SECONDS = 1.0
 DSPY_COMMIT = "29448ae12756abdd14bd8796c819247ebb83673c"
 GEPA_ARTIFACT_COMMIT = "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
 HOVER_COMMIT = "c0e43052759879b3461642ca6c0dd26658f47691"
@@ -153,6 +157,23 @@ def fetch_json(url, api_key=None):
         return json.loads(response.read())
 
 
+def generation_metadata(generation_url, generation_id, api_key, attempts=GENERATION_ATTEMPTS,
+                        sleep=time.sleep):
+    if not isinstance(attempts, int) or attempts <= 0:
+        raise RuntimeError("generation metadata attempts must be positive")
+    for attempt in range(attempts):
+        try:
+            return validate_generation(
+                fetch_json(f"{generation_url}?id={generation_id}", api_key), generation_id
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404 and attempt + 1 < attempts:
+                sleep(GENERATION_INTERVAL_SECONDS)
+                continue
+            raise RuntimeError(f"OpenRouter generation metadata HTTP {exc.code}") from exc
+    raise AssertionError("unreachable generation polling state")
+
+
 def current_catalog():
     catalog = validate_catalog(fetch_json(CATALOG_URL))
     catalog["zdr"] = validate_zdr(fetch_json(ZDR_URL))
@@ -244,6 +265,14 @@ def secure_json(path: pathlib.Path, value):
         stream.write("\n")
         stream.flush()
         os.fsync(stream.fileno())
+
+
+def secure_evidence(root: pathlib.Path, state, opportunity_id, value):
+    directory = root / "live-evidence" / state
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(root / "live-evidence", 0o700)
+    os.chmod(directory, 0o700)
+    secure_json(directory / (opportunity_id.replace("/", "__") + ".json"), value)
 
 
 def materialize_pupa(root: pathlib.Path, rows_payload, source_path=None):
@@ -378,10 +407,14 @@ class CalibrationOperationalAbort(RuntimeError):
 
 class Recorder:
     def __init__(self, mode="provider_disabled", api_key=None, initial_actual_cost_usd=0.0,
-                 generation_url=GENERATION_URL):
+                 generation_url=GENERATION_URL, evidence_root=None,
+                 generation_attempts=GENERATION_ATTEMPTS, generation_sleep=time.sleep):
         self.mode = mode
         self.api_key = api_key
         self.generation_url = generation_url
+        self.evidence_root = evidence_root
+        self.generation_attempts = generation_attempts
+        self.generation_sleep = generation_sleep
         self.active = None
         self.events = []
         self.actual_cost_usd = initial_actual_cost_usd
@@ -442,7 +475,7 @@ class Recorder:
         except Exception as exc:
             raise CalibrationOperationalAbort("DSPy LM transport/runtime failed") from exc
         try:
-            live = self._live_metadata(history) if self.mode == "live" else self._synthetic_metadata(item)
+            live = self._live_metadata(history, item, encoded, started) if self.mode == "live" else self._synthetic_metadata(item)
         except CalibrationOperationalAbort:
             raise
         except Exception as exc:
@@ -470,6 +503,8 @@ class Recorder:
             "error": None,
             "transport_count": 1,
         }
+        if self.mode == "live" and self.evidence_root is not None:
+            secure_evidence(self.evidence_root, "reconciled", item["id"], event)
         self.events.append(event)
         self.actual_cost_usd += live["usage"]["input_tokens"] / 1_000_000 * INPUT_PRICE + live["usage"]["output_tokens"] / 1_000_000 * OUTPUT_PRICE
         return value
@@ -488,7 +523,7 @@ class Recorder:
             "router_metadata": router,
         }
 
-    def _live_metadata(self, history):
+    def _live_metadata(self, history, item, encoded, started):
         if not history:
             raise RuntimeError("DSPy live response history is missing")
         entry = history[-1]
@@ -511,8 +546,39 @@ class Recorder:
             raise RuntimeError("OpenRouter response usage is missing")
         if total_tokens != input_tokens + output_tokens or cached != 0:
             raise RuntimeError("OpenRouter response usage/cache drift")
-        generation = validate_generation(
-            fetch_json(f"{self.generation_url}?id={generation_id}", self.api_key), generation_id
+        if self.evidence_root is not None:
+            secure_evidence(
+                self.evidence_root,
+                "provisional",
+                item["id"],
+                {
+                    "condition": CONDITION,
+                    "state": "response_received_reconciliation_pending",
+                    **event_identity(item),
+                    "generation_id": generation_id,
+                    "model_effective": model_effective,
+                    "usage_reported": {
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "cached_tokens": cached,
+                        "total_tokens": total_tokens,
+                    },
+                    "router_metadata": router,
+                    "finish_reason": finish_reason,
+                    "message_sha256": hashlib.sha256(encoded).hexdigest(),
+                    "message_bytes": len(encoded),
+                    "message_serialization": "canonical_json_utf8_v1",
+                    "latency_us": (time.monotonic_ns() - started) // 1000,
+                    "timestamp_ns": time.time_ns(),
+                    "transport_count": 1,
+                },
+            )
+        generation = generation_metadata(
+            self.generation_url,
+            generation_id,
+            self.api_key,
+            attempts=self.generation_attempts,
+            sleep=self.generation_sleep,
         )
         if generation["native_tokens_prompt"] != input_tokens or generation["native_tokens_completion"] != output_tokens:
             raise RuntimeError("OpenRouter generation usage disagrees with response usage")
@@ -550,8 +616,9 @@ def tracking_live_class(dspy, recorder):
     return TrackingLive
 
 
-def verify_live_transport_offline(dspy_root):
+def verify_live_transport_offline(dspy_root, output_root):
     requests = []
+    generation_gets = {"normal": 0, "terminal": 0}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, _format, *_args):
@@ -580,7 +647,15 @@ def verify_live_transport_offline(dspy_root):
             self.wfile.write(encoded)
 
         def do_GET(self):
+            if self.path.startswith("/api/v1/terminal-generation"):
+                generation_gets["terminal"] += 1
+                self.send_error(404)
+                return
             if not self.path.startswith("/api/v1/generation?id=gen-offline-live"):
+                self.send_error(404)
+                return
+            generation_gets["normal"] += 1
+            if generation_gets["normal"] == 1:
                 self.send_error(404)
                 return
             payload = {"data": {"id": "gen-offline-live", "model": MODEL,
@@ -599,6 +674,8 @@ def verify_live_transport_offline(dspy_root):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
+        output_root.mkdir(mode=0o700, parents=True, exist_ok=False)
+        os.chmod(output_root, 0o700)
         sys.path.insert(0, str(dspy_root))
         import dspy
 
@@ -606,7 +683,14 @@ def verify_live_transport_offline(dspy_root):
             raise RuntimeError("offline transport did not import pinned DSPy")
         base_url = f"http://127.0.0.1:{server.server_port}/api/v1"
         item = opportunity("dspy", "hover", "H0", 1, "query2", 8192)
-        recorder = Recorder("live", "offline-key", generation_url=f"{base_url}/generation")
+        recorder = Recorder(
+            "live",
+            "offline-key",
+            generation_url=f"{base_url}/generation",
+            evidence_root=output_root,
+            generation_attempts=3,
+            generation_sleep=lambda _seconds: None,
+        )
         recorder.active = [item]
         config = live_lm_kwargs("offline-key", base_url)
         model = config.pop("model")
@@ -639,11 +723,68 @@ def verify_live_transport_offline(dspy_root):
             raise RuntimeError("LiteLLM response-cache header drift")
         if request["path"] != "/api/v1/chat/completions":
             raise RuntimeError("LiteLLM OpenRouter path drift")
-        return {"status": "offline_live_transport_verified", "transports": 1}
+        provisional = list((output_root / "live-evidence" / "provisional").glob("*.json"))
+        reconciled = list((output_root / "live-evidence" / "reconciled").glob("*.json"))
+        if len(provisional) != 1 or len(reconciled) != 1 or generation_gets["normal"] != 2:
+            raise RuntimeError("delayed generation reconciliation evidence drift")
+
+        terminal = Recorder(
+            "live",
+            "offline-key",
+            generation_url=f"{base_url}/terminal-generation",
+            evidence_root=output_root,
+            generation_attempts=3,
+            generation_sleep=lambda _seconds: None,
+        )
+        first = opportunity("dspy", "hover", "H0", 1, "query3", 16384)
+        second = opportunity("dspy", "hover", "H0", 2, "summarize1", 65536)
+        terminal.active = [first, second]
+        terminal_response = {
+            "id": "gen-terminal-live",
+            "model": MODEL,
+            "openrouter_metadata": synthetic_router_metadata(),
+            "choices": [{"finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18,
+                      "prompt_tokens_details": {"cached_tokens": 0}},
+        }
+        invocations = {"count": 0}
+
+        def terminal_invoke():
+            invocations["count"] += 1
+            return ["terminal"]
+
+        try:
+            terminal.record(
+                [{"role": "user", "content": "terminal reconciliation assertion"}],
+                terminal_invoke,
+                [{"response": terminal_response}],
+            )
+            raise RuntimeError("terminal generation 404 unexpectedly reconciled")
+        except CalibrationOperationalAbort as exc:
+            if "live evidence reconciliation failed" not in str(exc):
+                raise
+        terminal_files = list((output_root / "live-evidence" / "provisional").glob("*.json"))
+        if (
+            invocations["count"] != 1
+            or generation_gets["terminal"] != 3
+            or len(terminal.active) != 1
+            or terminal.events
+            or len(terminal_files) != 2
+        ):
+            raise RuntimeError("terminal generation 404 advanced the fixed schedule")
+
+        return {
+            "status": "offline_live_transport_verified",
+            "transports": 1,
+            "generation_404_then_200_attempts": generation_gets["normal"],
+            "terminal_404_attempts": generation_gets["terminal"],
+            "terminal_next_stage_transports": 0,
+        }
     finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+        shutil.rmtree(output_root, ignore_errors=True)
 
 
 def run_calibration(root: pathlib.Path, rows_path: pathlib.Path, artifact_root: pathlib.Path,
@@ -695,7 +836,12 @@ def run_calibration(root: pathlib.Path, rows_path: pathlib.Path, artifact_root: 
     fail_on = set(filter(None, os.environ.get("IMP_CALIBRATION_DSPY_FAIL_ON", "").split(",")))
     if mode == "live" and fail_on:
         raise RuntimeError("live calibration refuses provider-disabled failure injection")
-    recorder = Recorder(mode, api_key, initial_actual_cost_usd)
+    recorder = Recorder(
+        mode,
+        api_key,
+        initial_actual_cost_usd,
+        evidence_root=root if mode == "live" else None,
+    )
 
     class TrackingDummy(DummyLM):
         def __init__(self, answers_by_opportunity):
@@ -901,7 +1047,7 @@ def main():
         raise SystemExit("choose exactly one mode")
     if args.verify_live_transport:
         dspy_root = pathlib.Path(os.environ.get("IMP_CALIBRATION_DSPY_ROOT", ROOT / "tmp/dspy-3.2.1"))
-        print(json.dumps(verify_live_transport_offline(dspy_root)))
+        print(json.dumps(verify_live_transport_offline(dspy_root, args.output_root)))
         return
     if args.materialize_pupa:
         rows_payload = json.loads(args.rows.read_text())

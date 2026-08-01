@@ -10,6 +10,8 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   @catalog_url @base_url <> "/models/" <> @model <> "/endpoints"
   @zdr_url @base_url <> "/endpoints/zdr"
   @generation_url @base_url <> "/generation"
+  @generation_attempts 12
+  @generation_interval_ms 1_000
   @input_price 0.14
   @output_price 0.28
   @hard_cost_usd 5.00
@@ -295,20 +297,30 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     {request, response}
   end
 
-  def generation_metadata!(generation_id, api_key) do
+  def generation_metadata!(generation_id, api_key, opts \\ []) do
     require_nonempty!(generation_id, "OpenRouter generation ID")
 
-    case Req.get(@generation_url,
-           params: [id: generation_id],
-           headers: [{"authorization", "Bearer " <> api_key}],
-           retry: false,
-           max_retries: 0,
-           receive_timeout: 30_000
-         ) do
-      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+    attempts = Keyword.get(opts, :attempts, @generation_attempts)
+    fetch = Keyword.get(opts, :fetch, &fetch_generation/2)
+    sleep = Keyword.get(opts, :sleep, &Process.sleep/1)
+    interval_ms = Keyword.get(opts, :interval_ms, @generation_interval_ms)
+
+    unless is_integer(attempts) and attempts > 0,
+      do: raise(ArgumentError, "generation metadata attempts must be positive")
+
+    poll_generation!(generation_id, api_key, attempts, fetch, sleep, interval_ms)
+  end
+
+  defp poll_generation!(generation_id, api_key, attempts, fetch, sleep, interval_ms) do
+    case fetch.(generation_id, api_key) do
+      {:ok, data} ->
         validate_generation!(data, generation_id)
 
-      {:ok, %Req.Response{status: status}} ->
+      {:http, 404} when attempts > 1 ->
+        sleep.(interval_ms)
+        poll_generation!(generation_id, api_key, attempts - 1, fetch, sleep, interval_ms)
+
+      {:http, status} ->
         raise Imp.OperationalSafetyError,
           kind: :transport,
           message: "OpenRouter generation metadata HTTP #{status}",
@@ -319,6 +331,25 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
           kind: :transport,
           message: "OpenRouter generation metadata unavailable",
           reason: Imp.Redaction.redact(reason)
+    end
+  end
+
+  defp fetch_generation(generation_id, api_key) do
+    case Req.get(@generation_url,
+           params: [id: generation_id],
+           headers: [{"authorization", "Bearer " <> api_key}],
+           retry: false,
+           max_retries: 0,
+           receive_timeout: 30_000
+         ) do
+      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+        {:ok, data}
+
+      {:ok, %Req.Response{status: status}} ->
+        {:http, status}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -505,7 +536,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
         counter
       end)
 
-    lm = pilot_lm(controller, evidence, budget, transports, mode, opts)
+    lm = pilot_lm(controller, evidence, budget, transports, root, mode, opts)
 
     retriever = fn _query, opts ->
       docs =
@@ -595,7 +626,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     result
   end
 
-  defp pilot_lm(controller, evidence, budget, transports, mode, opts) do
+  defp pilot_lm(controller, evidence, budget, transports, root, mode, opts) do
     {:ok, catalog_model} = ReqLLM.model("openrouter:" <> @model)
 
     chat_model = %{
@@ -682,8 +713,12 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
       controller: controller,
       evidence: evidence,
       budget: budget,
+      evidence_root: root,
       mode: mode,
       api_key: api_key,
+      generation_fetch: Keyword.get(opts, :generation_fetch),
+      generation_sleep: Keyword.get(opts, :generation_sleep),
+      generation_attempts: Keyword.get(opts, :generation_attempts),
       fail_on: List.wrap(Keyword.get(opts, :fail_on, []))
     }
   end
