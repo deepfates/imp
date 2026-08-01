@@ -42,7 +42,7 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Current frontier after `0de8b680`
+## Current frontier after `8e801d68`
 
 The product center is real but the telos is open.
 
@@ -62,7 +62,8 @@ The product center is real but the telos is open.
   completed their lifecycle but missed frozen lift bars. IFBench effectiveness
   is invalid/unverified after its scorer defect. No current realistic multi-stage
   LM condition has satisfied `imp-88sn`.
-- **External benchmark program — instrument exercised, portfolio unratified.**
+- **External benchmark program — historical instrument exercised, portfolio
+  unratified.**
   The fixed 96-opportunity HoVer/PAPILLON OpenRouter calibration completed its
   ordinary Imp and pinned-DSPy vectors with exact private route, usage, cost,
   cache, and failure evidence. PAPILLON produced scoped per-runtime format,
@@ -70,12 +71,11 @@ The product center is real but the telos is open.
   invalid because the bound Imp fixture split multi-word retriever titles while
   DSPy retained them. Prospective commit `87d6baf5` fixes that fixture and proves
   provider-free semantic input equivalence without changing the immutable live
-  result. The instrument is operable and inexpensive, but the candidate
-  portfolio is not ratified and another calibration lane is not the next
-  default action.
-- **Next-tranche mechanics — provider-free readiness only.** The adapted HoVer
-  no-merge target has source-grounded nominal/legal opportunity and its compact
-  four-stage Experiment/Artifact/fresh-service lifecycle passes. The exact
+  result. The instrument is operable and inexpensive, but it used a now-
+  historical treatment and does not authorize or predict the current candidate.
+- **Next-tranche mechanics — current-model provider-free readiness only.** The
+  adapted HoVer no-merge target has source-grounded nominal/legal opportunity,
+  and its compact four-stage Experiment/Artifact/fresh-service lifecycle passes. The exact
   released `150/300/300` rows, pinned archive, and 5,233,330-row corpus now
   materialize provider-free. Ordinary `Experiment.Data` then exposed one exact
   content duplicate across released train and validation, originating in two
@@ -89,8 +89,18 @@ The product center is real but the telos is open.
   row corpus load for every Imp retrieval. Both planned runtime entries must
   verify the same split lineage, source/config/dependency tuple, paths, build
   receipt, and fingerprint. Historical split and `c35ec786...` identities remain
-  provenance only. This is condition readiness, not universal rebuild identity,
-  effectiveness, or provider authority.
+  provenance only. Historical GPT-4.1 Mini identifies the released artifact; it
+  is not the current treatment. The current candidate uses
+  `deepseek/deepseek-v4-flash-0731` for task stages and
+  `anthropic/claude-sonnet-5` for reflection. Commit `4a0d8646` adds the generic
+  persisted OpenRouter nested-reasoning option needed to express those routes
+  without benchmark-owned request rewriting. Commit `8e801d68` exercises both
+  ordinary Imp and pinned DSPy 3.2.1/GEPA 0.1.4 lifecycles and inspects their
+  final provider-disabled HTTP bodies: task reasoning is disabled, reflection
+  effort is high, exact route/privacy/no-fallback/no-retry policy is present,
+  evaluation is serial and ordered, and selected state loads in a fresh process.
+  This is current-model condition readiness, not live provider behavior,
+  universal rebuild identity, effectiveness, or provider authority.
   Circle v1.4's exact one-metric cold probe authenticates source before imports,
   preserves the released objective and refiner context, carries Imp
   `current_best`, records upstream's cache-induced one-evaluation asymmetry, and
@@ -104,10 +114,13 @@ The product center is real but the telos is open.
 Work proceeds backward from the finish line, without turning this list into a
 second tracking system:
 
-1. **Make the measurement trustworthy.** Complete the fixed HoVer/PAPILLON
-   calibration or retain an interpretable terminal failure. It must answer
-   format reliability, repeat variability, privacy, token usage, and realistic
-   cost; another opaque receipt is not progress.
+1. **Make the current measurement trustworthy.** The historical
+   HoVer/PAPILLON calibration is complete and scoped. For the current HoVer
+   candidate, use at most one result-blind train-only calibration—if scientific
+   review finds it necessary—to measure real request sizes, format reliability,
+   route/privacy identity, latency, cache exposure, and cost in both runtimes.
+   It must not access selection/test rows, optimize, or become another permanent
+   calibration program.
 2. **Ratify or reject the representative portfolio.** Use the calibration and
    current ecosystem research to choose tasks, public programs, metrics,
    optimizer/upstream arms, seeds, data sizes, effect thresholds, statistical

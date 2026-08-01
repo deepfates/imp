@@ -18,7 +18,7 @@ Obstacle: Imp has one narrow historical positive matched result, several honest 
 
 Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
 
-## Current status after `0de8b680`
+## Current status after `8e801d68`
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
@@ -39,7 +39,7 @@ remain preserved.
 
 The current provider-free preparation establishes two narrower facts without
 advancing the usefulness criterion. The adapted HoVer no-merge target has a
-source-grounded nominal `115,248` and legal `122,520` task-transport envelope;
+source-grounded nominal `194,448` and legal `201,720` task-transport envelope;
 its compact fixture exercises all four predictors in round-robin order, accepts
 four incremental mutations, rejects a fifth, selects strictly, writes linked
 Result/Artifact state, and serves four fresh-process calls. It remains
@@ -62,9 +62,16 @@ The exact source-recipe `bm25s==0.2.12` build remains receipted as tree
 queries; the previous one-process-per-query bridge was semantically exact but
 not a credible full-study runtime. Both Imp and DSPy must verify the same split
 lineage, source/config/dependency tuple, tree receipt, and fingerprint. No test
-rows enter the fingerprint. This is condition-instance readiness, not universal
-rebuild identity, cross-build equivalence, effectiveness, parity, paper
-replication, or provider authority.
+rows enter the fingerprint. Historical GPT-4.1 Mini is provenance for the
+released artifact, not a current benchmark choice. The current candidate uses
+DeepSeek V4 Flash 0731 for the four task stages and Claude Sonnet 5 for
+reflection. Its ordinary Imp and pinned DSPy 3.2.1/GEPA 0.1.4 compact
+provider-disabled readiness entries both complete serial ordered optimization,
+strict selection, persistence, and fresh loading. Their final HTTP requests use
+task reasoning `none` and reflection effort `high`, exact route/privacy policy,
+no fallback/retry, and runtime-native rendering. This is condition-instance readiness, not live provider behavior,
+universal rebuild identity, cross-build equivalence, effectiveness, exact
+algorithm parity, paper replication, or provider authority.
 
 The exact Circle v1.4 one-metric cold probe also passes provider-free. It
 authenticates the OA source files and DSPy checkout before imports, uses the
@@ -78,38 +85,24 @@ identical refined code; that asymmetry is explicit. Released `150`-call,
 open, so this earns readiness only—not effectiveness, parity, generalization,
 or provider authority.
 
-The current work is a bounded training-only calibration of released HoVer and
-PAPILLON programs through ordinary Imp and pinned-DSPy paths. It is not an
-optimizer arm and cannot satisfy this ticket. It must measure whether the
-candidate instruments have acceptable format reliability, repetition noise,
-privacy behavior, identifiable scoring, usage, and cost before a larger study is
-designed. The first live attempt made one transport and stopped on missing
-generation evidence. The successor made ten first-stage transports and exposed
-two invented OpenRouter identity assumptions plus late failed-event persistence.
-Both are scientifically null and remain immutable. Provider-free commit
-`3b65a3e0` now binds the distinct requested alias and selected dated snapshot,
-uses existing typed route/transport/cost safety meanings, and reconciles every
-transported ordinary adapter failure before continuing the fixed schedule.
+The completed HoVer/PAPILLON calibration is historical instrument evidence. Its
+two null starts and final v2 outcome remain immutable; its GPT-4.1-era treatment
+does not roll forward. The current HoVer candidate may justify one fixed,
+train-only live calibration to measure real request sizes, format reliability,
+route identity, latency, cache exposure, and cost before a full study. That
+calibration is not an optimizer arm and cannot satisfy this ticket. It may not
+load selection/test rows, optimize, adapt after favorable observations, or grow
+into a generic campaign layer. No current-model provider call is authorized by
+this ticket; the owner must review the fixed opportunity and spend ceiling.
 
-The owner has standing authority for this exact calibration and for
-scientifically null successors required only by reproduced product-owned defects:
-same rows, programs, model, endpoint, schedule, privacy, and combined `$5` hard
-stop. Do not manufacture another permission boundary after a reviewed repair.
-Stop and ask only for a material change to the treatment, privacy or route, a
-meaningful spend increase, or another genuine owner-held choice. This standing
-authority does not authorize an optimizer portfolio, upstream benchmark tranche,
-publication, or threshold change.
-
-The calibration has one required consequence: ratify or reject a credible
-benchmark protocol. A passing instrument check must lead to a landscape-informed
-choice of representative tasks, result-blind data, ordinary public programs,
-native metrics, optimizer and upstream arms, fixed seeds, uncertainty treatment,
-artifact/service acceptance, and an explicit full-study cost. A failing check
-must lead to a bounded redesign or task replacement—not a larger calibration
-framework. The earlier HoVer/PAPILLON proposal with unconditional baseline,
-Bootstrap Random Search, MIPROv2-Heavy, and GEPA-with-merge arms across Imp and
-pinned upstream is a candidate whose lower bound exceeds 1.7M task-shaped
-transports. It is not yet the ratified next run.
+That measurement must lead to a decision: ratify a credible representative
+portfolio, revise the treatment once for a reproduced defect, or reject this
+direction. A ratified protocol must name tasks, public programs, native metrics,
+optimizer/upstream arms, fixed seeds, result-blind data, effect thresholds,
+uncertainty treatment, artifact/service acceptance, and a realistic cost. The
+earlier HoVer/PAPILLON four-arm proposal exceeds 1.7 million task-shaped
+transports and remains rejected as the default; the present HoVer-only candidate
+is not automatically the portfolio merely because its mechanics pass.
 
 Provider-free LM readiness remains valuable but insufficient: public GEPA can
 reach every named HoVer/PAPILLON predictor, reports retain reconstructable
@@ -146,8 +139,8 @@ authorized by this ticket. The full usefulness criterion remains open.
 ## Historical frozen portfolio designs (not current authority)
 
 The material below preserves earlier treatments, arithmetic, and outcomes for
-recomputation. It does not override the current status or standing calibration
-authority above.
+recomputation. It does not override the current status or any separately
+owner-ratified authority.
 
 This design binds inputs and opportunity before any new proposal or task-model
 call. It uses the ordinary public lifecycles fixed in `3adeb10` and `4f386d8`;
