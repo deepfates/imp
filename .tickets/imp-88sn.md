@@ -2339,6 +2339,47 @@ local 404-to-200 recovery and terminal three-404 refusal with no next stage.
 This closes the provider-free repair review only. Live availability remains
 unexercised, and another completion still requires separate authority.
 
+## OpenRouter calibration successor terminal stop
+
+The owner-authorized successor ran once from exact clean
+`7f0316a055e34ab36b98f9ff6e270a8ec9665922` and stopped during Imp before DSPy
+started. Its private root is
+`benchmarks/results/hover-papillon-openrouter-calibration-v1-successor-7f0316a-20260801T015652Z`.
+The zero-call preflight reauthenticated both source runtimes, the pinned private
+training row, the exact model/ZDR endpoint and prices, key capacity, and the
+complete `$0.85786624` reservation.
+
+Imp transported the first stage of each of the ten fixed whole-program
+repetitions. Every response wrote a provisional record, then an ordinary
+ReqLLM/adapter error occurred before generation reconciliation and before the
+transported failure event was appended. The repetition boundary skipped each
+remaining suffix, but the ten missing transported events caused the final
+fixed-vector validator to refuse the aggregate result. Thus there are ten
+mode-0600 provisional records, zero runtime-reconciled events, no `imp.json`,
+no DSPy root, and no retry or restart. The exact ordinary error reasons were
+lost at that pre-event boundary, so this run cannot be interpreted as measured
+format failure or model noise.
+
+After the terminal stop, read-only generation queries recovered all ten request
+identities without another task call. They bind Novita and the catalog endpoint
+snapshot `deepseek/deepseek-v4-flash-20260423`, with `4,335` input tokens,
+`3,551` output tokens, zero cached tokens, and exact attributable cost
+`$0.00160118`; the account usage delta is the same `$0.00160118`. This also
+falsified a second live assumption: the generation record's `model` is the
+endpoint snapshot identity, while the current validator requires the requested
+alias `deepseek/deepseek-v4-flash`.
+
+The mode-0600 terminal record SHA-256 is
+`6093bbfab1581359f452022019d1cf9a25950e57aba7646b3249498c92d432e6`; the failure
+log SHA-256 is
+`462f4c06da419185e7753d46906bb45036a3ab6cc8de9bec15c7d0a0ef5e001a`.
+Classification is an owning live event-ordering/persistence and generation
+snapshot-validation failure. It is not a task, format/noise, cost-feasibility,
+effectiveness, parity, or historical-reproduction result. The earlier terminal
+root remains immutable. The provider-free repair PASS remains valid for its
+fixtures but did not establish this live boundary; no further calibration run
+is implied by this record.
+
 ## Notes
 
 **2026-07-31T20:57:09Z**
