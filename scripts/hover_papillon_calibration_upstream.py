@@ -12,14 +12,28 @@ import io
 import json
 import os
 import pathlib
+import threading
 import subprocess
 import sys
 import time
 import types
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODEL = "gpt-4.1-mini-2025-04-14"
+CONDITION = "imp-88sn-hover-papillon-openrouter-calibration-v1"
+MODEL = "deepseek/deepseek-v4-flash"
+ENDPOINT_TAG = "novita/fp8"
+ENDPOINT_NAME = "Novita | deepseek/deepseek-v4-flash-20260423"
+ENDPOINT_PROVIDER = "Novita"
+BASE_URL = "https://openrouter.ai/api/v1"
+CATALOG_URL = f"{BASE_URL}/models/{MODEL}/endpoints"
+ZDR_URL = f"{BASE_URL}/endpoints/zdr"
+GENERATION_URL = f"{BASE_URL}/generation"
+INPUT_PRICE = 0.14
+OUTPUT_PRICE = 0.28
+MAX_OUTPUT_TOKENS = 16384
+HARD_COST_USD = 5.00
 DSPY_COMMIT = "29448ae12756abdd14bd8796c819247ebb83673c"
 GEPA_ARTIFACT_COMMIT = "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
 HOVER_COMMIT = "c0e43052759879b3461642ca6c0dd26658f47691"
@@ -34,6 +48,185 @@ AUTHORITIES = {
     "pupa": PUPA_COMMIT,
     "pupa_new_sha256": PUPA_SHA256,
 }
+
+
+def provider_preferences():
+    return {
+        "only": [ENDPOINT_TAG],
+        "order": [ENDPOINT_TAG],
+        "allow_fallbacks": False,
+        "require_parameters": True,
+        "data_collection": "deny",
+        "zdr": True,
+        "max_price": {"prompt": INPUT_PRICE, "completion": OUTPUT_PRICE},
+    }
+
+
+def live_lm_kwargs(api_key, api_base=BASE_URL):
+    return {
+        "model": f"openrouter/{MODEL}",
+        "api_key": api_key,
+        "api_base": api_base,
+        "temperature": 1.0,
+        "max_tokens": MAX_OUTPUT_TOKENS,
+        "cache": False,
+        "num_retries": 0,
+        "timeout": 120,
+        "reasoning_effort": "none",
+        "headers": {
+            "X-OpenRouter-Metadata": "enabled",
+            "X-OpenRouter-Cache": "false",
+        },
+        "extra_body": {
+            "provider": provider_preferences(),
+            "usage": {"include": True},
+        },
+    }
+
+
+def validate_catalog(payload):
+    data = payload.get("data", {})
+    if data.get("id") != MODEL:
+        raise RuntimeError("OpenRouter catalog model drift")
+    endpoint = next((item for item in data.get("endpoints", []) if item.get("tag") == ENDPOINT_TAG), None)
+    if endpoint is None:
+        raise RuntimeError("exact OpenRouter endpoint is absent")
+    validate_endpoint(endpoint, "catalog")
+    return {
+        "checked_url": CATALOG_URL,
+        "model": MODEL,
+        "endpoint_tag": ENDPOINT_TAG,
+        "endpoint_name": ENDPOINT_NAME,
+        "provider": ENDPOINT_PROVIDER,
+        "pricing": {"input_per_million": INPUT_PRICE, "output_per_million": OUTPUT_PRICE},
+        "supported_parameters": endpoint.get("supported_parameters", []),
+    }
+
+
+def validate_endpoint(endpoint, label):
+    expected = {
+        "name": ENDPOINT_NAME,
+        "provider_name": ENDPOINT_PROVIDER,
+        "model_id": MODEL,
+        "quantization": "fp8",
+        "status": 0,
+        "supports_implicit_caching": False,
+    }
+    for key, value in expected.items():
+        if endpoint.get(key) != value:
+            raise RuntimeError(f"OpenRouter {label} {key} drift")
+    if endpoint.get("pricing", {}).get("prompt") != "0.00000014":
+        raise RuntimeError(f"OpenRouter {label} input price drift")
+    if endpoint.get("pricing", {}).get("completion") != "0.00000028":
+        raise RuntimeError(f"OpenRouter {label} output price drift")
+    supported = endpoint.get("supported_parameters", [])
+    if not all(name in supported for name in ("reasoning_effort", "max_tokens", "temperature")):
+        raise RuntimeError(f"OpenRouter {label} parameter support drift")
+    return endpoint
+
+
+def validate_zdr(payload):
+    endpoints = payload.get("data", [])
+    endpoint = next(
+        (item for item in endpoints if item.get("tag") == ENDPOINT_TAG and item.get("model_id") == MODEL),
+        None,
+    )
+    if endpoint is None:
+        raise RuntimeError("exact endpoint is absent from ZDR catalog")
+    validate_endpoint(endpoint, "ZDR catalog")
+    return {
+        "checked_url": ZDR_URL,
+        "model": MODEL,
+        "endpoint_tag": ENDPOINT_TAG,
+        "endpoint_name": ENDPOINT_NAME,
+        "provider": ENDPOINT_PROVIDER,
+        "pricing": {"input_per_million": INPUT_PRICE, "output_per_million": OUTPUT_PRICE},
+    }
+
+
+def fetch_json(url, api_key=None):
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    request = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(request, timeout=30) as response:
+        if response.status != 200:
+            raise RuntimeError(f"read-only OpenRouter endpoint returned HTTP {response.status}")
+        return json.loads(response.read())
+
+
+def current_catalog():
+    catalog = validate_catalog(fetch_json(CATALOG_URL))
+    catalog["zdr"] = validate_zdr(fetch_json(ZDR_URL))
+    return catalog
+
+
+def field(value, name):
+    if isinstance(value, dict):
+        return value.get(name)
+    return getattr(value, name, None)
+
+
+def synthetic_router_metadata():
+    return {
+        "requested": MODEL,
+        "strategy": "direct",
+        "region": "provider-disabled",
+        "summary": "available=1, selected=Novita",
+        "attempt": 1,
+        "is_byok": False,
+        "endpoints": {"total": 1, "available": [{"model": MODEL, "provider": ENDPOINT_PROVIDER, "selected": True}]},
+    }
+
+
+def validate_router_metadata(metadata):
+    if (
+        not isinstance(metadata, dict)
+        or metadata.get("requested") != MODEL
+        or metadata.get("strategy") != "direct"
+        or metadata.get("attempt") != 1
+    ):
+        raise RuntimeError("OpenRouter routing metadata missing or drifted")
+    endpoints = metadata.get("endpoints", {})
+    available = endpoints.get("available", [])
+    if endpoints.get("total") != 1 or len(available) != 1:
+        raise RuntimeError("OpenRouter routing metadata contains multiple endpoints")
+    selected = [endpoint for endpoint in available if endpoint.get("selected") is True]
+    if len(selected) != 1 or selected[0].get("model") != MODEL or selected[0].get("provider") != ENDPOINT_PROVIDER:
+        raise RuntimeError("OpenRouter selected endpoint drift")
+    return metadata
+
+
+def admit_run(actual_cost_usd):
+    if not isinstance(actual_cost_usd, (int, float)) or actual_cost_usd < 0:
+        raise RuntimeError("initial attributable cost must be nonnegative")
+    remaining = reservation()["unbuffered_usd"]
+    if actual_cost_usd + remaining > HARD_COST_USD:
+        raise RuntimeError(
+            f"complete calibration would exceed $5.00: actual={actual_cost_usd} "
+            f"remaining_reservation={remaining}"
+        )
+
+
+def validate_generation(payload, generation_id):
+    data = payload.get("data", {})
+    exact = {
+        "id": generation_id,
+        "model": MODEL,
+        "provider_name": ENDPOINT_PROVIDER,
+        "cancelled": False,
+        "session_id": None,
+        "native_tokens_cached": 0,
+    }
+    for key, value in exact.items():
+        if data.get(key) != value:
+            raise RuntimeError(f"OpenRouter generation {key} drift")
+    if not data.get("request_id"):
+        raise RuntimeError("OpenRouter request ID is missing")
+    for key in ("native_tokens_prompt", "native_tokens_completion"):
+        if not isinstance(data.get(key), int) or data[key] < 0:
+            raise RuntimeError(f"OpenRouter generation {key} missing")
+    if not isinstance(data.get("total_cost"), (int, float)) or data["total_cost"] < 0:
+        raise RuntimeError("OpenRouter generation cost missing")
+    return data
 
 
 def canonical_bytes(value):
@@ -166,16 +359,37 @@ def opportunity(runtime, task, row, repetition, stage, cap):
     }
 
 
+def reservation():
+    opportunities = schedule("imp") + schedule("dspy")
+    input_tokens = sum(item["max_input_bytes"] for item in opportunities)
+    output_tokens = len(opportunities) * MAX_OUTPUT_TOKENS
+    unbuffered = input_tokens / 1_000_000 * INPUT_PRICE + output_tokens / 1_000_000 * OUTPUT_PRICE
+    return {
+        "opportunities": len(opportunities),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "unbuffered_usd": unbuffered,
+    }
+
+
+class CalibrationOperationalAbort(RuntimeError):
+    """Fatal transport, route, cost, identity, or evidence failure."""
+
+
 class Recorder:
-    def __init__(self):
+    def __init__(self, mode="provider_disabled", api_key=None, initial_actual_cost_usd=0.0,
+                 generation_url=GENERATION_URL):
+        self.mode = mode
+        self.api_key = api_key
+        self.generation_url = generation_url
         self.active = None
         self.events = []
-        self.actual_cost_usd = 0.0
+        self.actual_cost_usd = initial_actual_cost_usd
 
     @contextlib.contextmanager
     def repetition(self, task, row, repetition):
         if self.active is not None:
-            raise RuntimeError("DSPy calibration repetition already active")
+            raise CalibrationOperationalAbort("DSPy calibration repetition already active")
         self.active = [
             item
             for item in schedule()
@@ -190,47 +404,132 @@ class Recorder:
                                     "transport_count": 0})
             self.active = None
 
-    def record(self, messages, invoke):
+    def mark_ordinary_failure(self, task, row, repetition, failure):
+        event = next(
+            (
+                item
+                for item in reversed(self.events)
+                if item.get("task") == task
+                and item.get("row") == row
+                and item.get("repetition") == repetition
+                and item.get("transport_count") == 1
+            ),
+            None,
+        )
+        if event is None or event.get("status") != "ok":
+            raise CalibrationOperationalAbort("ordinary failure cannot be bound to an exact stage")
+        diagnostic = {
+            "type": type(failure).__name__ if isinstance(failure, BaseException) else str(failure),
+            "reason": "redacted ordinary DSPy program/adapter failure",
+        }
+        event["parse_status"] = "error"
+        event["error"] = diagnostic
+        return diagnostic
+
+    def record(self, messages, invoke, history=None):
         if not self.active:
-            raise RuntimeError("DSPy execution exceeded active repetition schedule")
+            raise CalibrationOperationalAbort("DSPy execution exceeded active repetition schedule")
         item = self.active.pop(0)
         encoded = canonical_bytes(messages)
         if len(encoded) > item["max_input_bytes"]:
-            raise RuntimeError(f"message byte cap exceeded for {item['id']}")
-        reservation = item["max_input_bytes"] / 1_000_000 * 0.40 + 16384 / 1_000_000 * 1.60
-        if self.actual_cost_usd + reservation > 5.00:
-            raise RuntimeError("next transport would exceed $5.00")
+            raise CalibrationOperationalAbort(f"message byte cap exceeded for {item['id']}")
+        reservation = item["max_input_bytes"] / 1_000_000 * INPUT_PRICE + MAX_OUTPUT_TOKENS / 1_000_000 * OUTPUT_PRICE
+        if self.actual_cost_usd + reservation > HARD_COST_USD:
+            raise CalibrationOperationalAbort("next transport would exceed $5.00")
         started = time.monotonic_ns()
         try:
             value = invoke()
-            status, error = "ok", None
         except Exception as exc:
-            status, error = "error", f"{type(exc).__name__}: {exc}"
-            value = None
+            raise CalibrationOperationalAbort("DSPy LM transport/runtime failed") from exc
+        try:
+            live = self._live_metadata(history) if self.mode == "live" else self._synthetic_metadata(item)
+        except CalibrationOperationalAbort:
+            raise
+        except Exception as exc:
+            raise CalibrationOperationalAbort("DSPy live evidence reconciliation failed") from exc
         event = {
             **event_identity(item),
             "model_requested": MODEL,
-            "model_effective": MODEL,
-            "provider": "openai",
-            "request_id": "req-" + item["id"].replace("/", "-"),
+            "model_effective": live["model_effective"],
+            "provider": "openrouter",
+            "upstream_provider": live["upstream_provider"],
+            "endpoint_tag": ENDPOINT_TAG,
+            "request_id": live["request_id"],
+            "generation_id": live["generation_id"],
             "timestamp_ns": time.time_ns(),
             "latency_us": (time.monotonic_ns() - started) // 1000,
-            "status": status,
-            "finish_reason": "stop" if status == "ok" else None,
+            "status": "ok",
+            "finish_reason": live["finish_reason"],
             "message_sha256": hashlib.sha256(encoded).hexdigest(),
             "message_bytes": len(encoded),
             "message_serialization": "canonical_json_utf8_v1",
             "max_input_bytes": item["max_input_bytes"],
-            "usage": {"input_tokens": 11, "output_tokens": 7, "cached_tokens": 0, "total_tokens": 18},
-            "parse_status": status,
-            "error": error,
+            "usage": live["usage"],
+            "router_metadata": live["router_metadata"],
+            "parse_status": "ok",
+            "error": None,
             "transport_count": 1,
         }
         self.events.append(event)
-        self.actual_cost_usd += 11 / 1_000_000 * 0.40 + 7 / 1_000_000 * 1.60
-        if error:
-            raise RuntimeError(error)
+        self.actual_cost_usd += live["usage"]["input_tokens"] / 1_000_000 * INPUT_PRICE + live["usage"]["output_tokens"] / 1_000_000 * OUTPUT_PRICE
         return value
+
+    def _synthetic_metadata(self, item):
+        generation_id = "gen-" + item["id"].replace("/", "-")
+        router = synthetic_router_metadata()
+        return {
+            "model_effective": MODEL,
+            "upstream_provider": ENDPOINT_PROVIDER,
+            "request_id": "req-" + item["id"].replace("/", "-"),
+            "generation_id": generation_id,
+            "finish_reason": "stop",
+            "usage": {"input_tokens": 11, "output_tokens": 7, "cached_tokens": 0, "total_tokens": 18,
+                      "provider_cost_usd": 11 / 1_000_000 * INPUT_PRICE + 7 / 1_000_000 * OUTPUT_PRICE},
+            "router_metadata": router,
+        }
+
+    def _live_metadata(self, history):
+        if not history:
+            raise RuntimeError("DSPy live response history is missing")
+        entry = history[-1]
+        response = entry.get("response")
+        generation_id = field(response, "id")
+        model_effective = field(response, "model")
+        usage = field(response, "usage") or {}
+        details = field(usage, "prompt_tokens_details") or {}
+        cached = field(details, "cached_tokens")
+        input_tokens = field(usage, "prompt_tokens")
+        output_tokens = field(usage, "completion_tokens")
+        total_tokens = field(usage, "total_tokens")
+        router = field(response, "openrouter_metadata")
+        choices = field(response, "choices") or []
+        finish_reason = field(choices[0], "finish_reason") if choices else None
+        validate_router_metadata(router)
+        if not generation_id or not model_effective:
+            raise RuntimeError("OpenRouter response identity is missing")
+        if not all(isinstance(value, int) and value >= 0 for value in (input_tokens, output_tokens, total_tokens, cached)):
+            raise RuntimeError("OpenRouter response usage is missing")
+        if total_tokens != input_tokens + output_tokens or cached != 0:
+            raise RuntimeError("OpenRouter response usage/cache drift")
+        generation = validate_generation(
+            fetch_json(f"{self.generation_url}?id={generation_id}", self.api_key), generation_id
+        )
+        if generation["native_tokens_prompt"] != input_tokens or generation["native_tokens_completion"] != output_tokens:
+            raise RuntimeError("OpenRouter generation usage disagrees with response usage")
+        expected_cost = input_tokens / 1_000_000 * INPUT_PRICE + output_tokens / 1_000_000 * OUTPUT_PRICE
+        if abs(generation["total_cost"] - expected_cost) > 1e-9:
+            raise RuntimeError("OpenRouter billed cost disagrees with frozen prices")
+        return {
+            "model_effective": model_effective,
+            "upstream_provider": generation["provider_name"],
+            "request_id": generation["request_id"],
+            "generation_id": generation_id,
+            "finish_reason": finish_reason,
+            "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens,
+                      "cached_tokens": cached, "total_tokens": total_tokens,
+                      "provider_cost_usd": generation["total_cost"]},
+            "router_metadata": router,
+        }
 
 
 def event_identity(item):
@@ -238,9 +537,136 @@ def event_identity(item):
             **{key: item[key] for key in ("task", "row", "repetition", "stage", "max_input_bytes")}}
 
 
-def run_provider_disabled(root: pathlib.Path, rows_path: pathlib.Path, artifact_root: pathlib.Path):
-    if os.environ.get("OPENAI_API_KEY"):
-        raise RuntimeError("provider-disabled mode refuses ambient OPENAI_API_KEY")
+def tracking_live_class(dspy, recorder):
+    class TrackingLive(dspy.LM):
+        def __call__(self, prompt=None, messages=None, **kwargs):
+            messages = messages or [{"role": "user", "content": prompt}]
+            return recorder.record(
+                messages,
+                lambda: super(TrackingLive, self).__call__(prompt=prompt, messages=messages, **kwargs),
+                self.history,
+            )
+
+    return TrackingLive
+
+
+def verify_live_transport_offline(dspy_root):
+    requests = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, _format, *_args):
+            return
+
+        def do_POST(self):
+            length = int(self.headers.get("content-length", "0"))
+            body = json.loads(self.rfile.read(length))
+            requests.append({"path": self.path, "headers": dict(self.headers), "body": body})
+            payload = {
+                "id": "gen-offline-live",
+                "object": "chat.completion",
+                "model": MODEL,
+                "provider": ENDPOINT_PROVIDER,
+                "openrouter_metadata": synthetic_router_metadata(),
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": "offline"},
+                             "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18,
+                          "prompt_tokens_details": {"cached_tokens": 0}},
+            }
+            encoded = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def do_GET(self):
+            if not self.path.startswith("/api/v1/generation?id=gen-offline-live"):
+                self.send_error(404)
+                return
+            payload = {"data": {"id": "gen-offline-live", "model": MODEL,
+                       "provider_name": ENDPOINT_PROVIDER, "cancelled": False, "session_id": None,
+                       "request_id": "req-offline-live", "native_tokens_prompt": 11,
+                       "native_tokens_completion": 7, "native_tokens_cached": 0,
+                       "total_cost": 11 / 1_000_000 * INPUT_PRICE + 7 / 1_000_000 * OUTPUT_PRICE}}
+            encoded = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        sys.path.insert(0, str(dspy_root))
+        import dspy
+
+        if not pathlib.Path(dspy.__file__).resolve().is_relative_to(dspy_root.resolve()):
+            raise RuntimeError("offline transport did not import pinned DSPy")
+        base_url = f"http://127.0.0.1:{server.server_port}/api/v1"
+        item = opportunity("dspy", "hover", "H0", 1, "query2", 8192)
+        recorder = Recorder("live", "offline-key", generation_url=f"{base_url}/generation")
+        recorder.active = [item]
+        config = live_lm_kwargs("offline-key", base_url)
+        model = config.pop("model")
+        TrackingLive = tracking_live_class(dspy, recorder)
+        lm = TrackingLive(model, **config)
+        if lm.cache is not False or lm.num_retries != 0:
+            raise RuntimeError("DSPy cache/retry configuration drift")
+        result = lm(messages=[{"role": "user", "content": "offline transport assertion"}])
+        if result != ["offline"] or len(requests) != 1 or len(recorder.events) != 1:
+            raise RuntimeError("offline TrackingLive execution drift")
+        request = requests[0]
+        body = request["body"]
+        headers = {key.lower(): value for key, value in request["headers"].items()}
+        expected = {
+            "model": MODEL,
+            "temperature": 1.0,
+            "max_tokens": MAX_OUTPUT_TOKENS,
+            "reasoning_effort": "none",
+            "provider": provider_preferences(),
+            "usage": {"include": True},
+        }
+        for key, value in expected.items():
+            if body.get(key) != value:
+                raise RuntimeError(f"LiteLLM serialized {key} drift")
+        if body.get("session_id") is not None or body.get("store") is not None:
+            raise RuntimeError("LiteLLM serialized state/storage drift")
+        if headers.get("x-openrouter-metadata") != "enabled":
+            raise RuntimeError("LiteLLM router metadata header drift")
+        if headers.get("x-openrouter-cache") != "false":
+            raise RuntimeError("LiteLLM response-cache header drift")
+        if request["path"] != "/api/v1/chat/completions":
+            raise RuntimeError("LiteLLM OpenRouter path drift")
+        return {"status": "offline_live_transport_verified", "transports": 1}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def run_calibration(root: pathlib.Path, rows_path: pathlib.Path, artifact_root: pathlib.Path,
+                    mode="provider_disabled", catalog=None):
+    if mode == "provider_disabled" and (os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENROUTER_API_KEY")):
+        raise RuntimeError("provider-disabled mode refuses ambient provider API keys")
+    if mode == "live":
+        live_preflight()
+        if (
+            not isinstance(catalog, dict)
+            or catalog.get("model") != MODEL
+            or catalog.get("endpoint_tag") != ENDPOINT_TAG
+            or catalog.get("endpoint_name") != ENDPOINT_NAME
+            or catalog.get("provider") != ENDPOINT_PROVIDER
+            or catalog.get("pricing") != {"input_per_million": INPUT_PRICE, "output_per_million": OUTPUT_PRICE}
+            or catalog.get("zdr", {}).get("model") != MODEL
+            or catalog.get("zdr", {}).get("endpoint_tag") != ENDPOINT_TAG
+            or catalog.get("zdr", {}).get("endpoint_name") != ENDPOINT_NAME
+            or catalog.get("zdr", {}).get("provider") != ENDPOINT_PROVIDER
+        ):
+            raise RuntimeError("catalog binding drift")
+    initial_actual_cost_usd = float(os.environ.get("IMP_CALIBRATION_INITIAL_COST_USD", "0"))
+    admit_run(initial_actual_cost_usd)
     rows_payload = json.loads(rows_path.read_text())
     assert rows_payload["derivation"]["heldout_loaded"] is False
     if rows_payload.get("authorities") != AUTHORITIES:
@@ -265,53 +691,107 @@ def run_provider_disabled(root: pathlib.Path, rows_path: pathlib.Path, artifact_
     rows["P0"] = {**rows["P0"], **pupa}
 
     hover_mod, pap_mod, pap_utils = load_programs(artifact_root)
-    recorder = Recorder()
+    api_key = os.environ.get("OPENROUTER_API_KEY") if mode == "live" else None
+    fail_on = set(filter(None, os.environ.get("IMP_CALIBRATION_DSPY_FAIL_ON", "").split(",")))
+    if mode == "live" and fail_on:
+        raise RuntimeError("live calibration refuses provider-disabled failure injection")
+    recorder = Recorder(mode, api_key, initial_actual_cost_usd)
 
     class TrackingDummy(DummyLM):
+        def __init__(self, answers_by_opportunity):
+            super().__init__([])
+            self.answers_by_opportunity = answers_by_opportunity
+
         def __call__(self, prompt=None, messages=None, **kwargs):
             messages = messages or [{"role": "user", "content": prompt}]
-            return recorder.record(messages, lambda: super(TrackingDummy, self).__call__(prompt, messages, **kwargs))
+            if not recorder.active:
+                raise CalibrationOperationalAbort("provider-disabled answer requested outside repetition")
+            opportunity_id = recorder.active[0]["id"]
+            if opportunity_id not in self.answers_by_opportunity:
+                raise CalibrationOperationalAbort(f"missing provider-disabled answer for {opportunity_id}")
+            dummy = DummyLM([self.answers_by_opportunity[opportunity_id]])
+            return recorder.record(messages, lambda: dummy(prompt=prompt, messages=messages, **kwargs))
 
-    hover_answers = []
-    for _ in range(6):
-        hover_answers += [
-            {"reasoning": "summarize", "summary": "Relevant evidence."},
-            {"reasoning": "query", "query": "relevant evidence"},
-            {"reasoning": "summarize", "summary": "Relevant evidence."},
-            {"reasoning": "query", "query": "relevant evidence"},
-        ]
-    hover_lm = TrackingDummy(hover_answers)
-    dspy.configure(lm=hover_lm, adapter=dspy.ChatAdapter(), track_usage=False)
+    if mode == "live":
+        config = live_lm_kwargs(api_key)
+        model = config.pop("model")
+        TrackingLive = tracking_live_class(dspy, recorder)
+        shared_lm = TrackingLive(model, **config)
+        if shared_lm.cache is not False or shared_lm.num_retries != 0:
+            raise RuntimeError("DSPy cache/retry configuration drift")
+    else:
+        shared_lm = None
+
+    def answer(opportunity_id, value):
+        return {"reasoning": "intentionally malformed"} if opportunity_id in fail_on else value
+
+    hover_answers = {}
+    hover_values = [
+        ("summarize1", {"reasoning": "summarize", "summary": "Relevant evidence."}),
+        ("query2", {"reasoning": "query", "query": "relevant evidence"}),
+        ("summarize2", {"reasoning": "summarize", "summary": "Relevant evidence."}),
+        ("query3", {"reasoning": "query", "query": "relevant evidence"}),
+    ]
+    for row_id in ("H0", "H1"):
+        for repetition in range(1, 4):
+            for stage, value in hover_values:
+                opportunity_id = f"dspy/hover/{row_id}/r{repetition}/{stage}"
+                hover_answers[opportunity_id] = answer(opportunity_id, value)
+    hover_lm = shared_lm or TrackingDummy(hover_answers)
+    dspy.configure(
+        lm=hover_lm,
+        adapter=dspy.ChatAdapter(use_json_adapter_fallback=False),
+        track_usage=False,
+    )
     docs = [f"{title} | provider-disabled training passage" for title in ["The Dinner Party", "Sojourner Truth", "Barbe de Verrue", "Akira Yoshizawa", "Hirohito", "Wet-folding"]]
     hover_mod.search = lambda _query, k: hover_mod.DotDict({"passages": docs[:k]})
     hover_program = hover_mod.HoverMultiHop()
     hover_outcomes = []
     for row_id in ("H0", "H1"):
         for repetition in range(1, 4):
-            with recorder.repetition("hover", row_id, repetition):
-                prediction = hover_program(claim=rows[row_id]["inputs"]["claim"])
-                titles = [doc.split(" | ", 1)[0] for doc in prediction.retrieved_docs]
-                gold = [fact["key"] for fact in rows[row_id]["labels"]["supporting_facts"]]
-                hover_outcomes.append({"row": row_id, "repetition": repetition, "retrieved_titles": titles, "all_gold_titles": all(title in titles for title in gold)})
+            try:
+                with recorder.repetition("hover", row_id, repetition):
+                    prediction = hover_program(claim=rows[row_id]["inputs"]["claim"])
+                    titles = [doc.split(" | ", 1)[0] for doc in prediction.retrieved_docs]
+                    gold = [fact["key"] for fact in rows[row_id]["labels"]["supporting_facts"]]
+                    hover_outcomes.append({"row": row_id, "repetition": repetition, "retrieved_titles": titles, "all_gold_titles": all(title in titles for title in gold)})
+            except CalibrationOperationalAbort:
+                raise
+            except Exception as exc:
+                diagnostic = recorder.mark_ordinary_failure("hover", row_id, repetition, exc)
+                hover_outcomes.append({"row": row_id, "repetition": repetition, "error": diagnostic})
 
-    trusted_answers = []
-    judge_answers = []
-    for _ in range(4):
-        trusted_answers += [
+    trusted_answers = {}
+    judge_answers = {}
+    for repetition in range(1, 5):
+        rewrite_id = f"dspy/papillon/P0/r{repetition}/rewrite"
+        response_id = f"dspy/papillon/P0/r{repetition}/response"
+        quality_ab_id = f"dspy/papillon/P0/r{repetition}/quality_ab"
+        quality_ba_id = f"dspy/papillon/P0/r{repetition}/quality_ba"
+        leakage_id = f"dspy/papillon/P0/r{repetition}/leakage"
+        trusted_answers[rewrite_id] = answer(
+            rewrite_id,
             {"reasoning": "redact", "llm_request": "Write a professional resume without personal identifiers."},
-            {"response": "A professional resume."},
-        ]
-        judge_answers += [
-            {"reasoning": "compare", "judgment": True},
-            {"reasoning": "compare", "judgment": True},
-            {"reasoning": "count", "num_pii_leaked": 0},
-        ]
-    trusted = TrackingDummy(trusted_answers)
-    judge = TrackingDummy(judge_answers)
+        )
+        trusted_answers[response_id] = answer(response_id, {"response": "A professional resume."})
+        judge_answers[quality_ab_id] = answer(
+            quality_ab_id, {"reasoning": "compare", "judgment": True}
+        )
+        judge_answers[quality_ba_id] = answer(
+            quality_ba_id, {"reasoning": "compare", "judgment": True}
+        )
+        judge_answers[leakage_id] = answer(
+            leakage_id, {"reasoning": "count", "num_pii_leaked": 0}
+        )
+    trusted = shared_lm or TrackingDummy(trusted_answers)
+    judge = shared_lm or TrackingDummy(judge_answers)
 
     class Untrusted:
         def __call__(self, prompt):
-            return recorder.record([{"role": "user", "content": prompt}], lambda: ["external response"])
+            messages = [{"role": "user", "content": prompt}]
+            if mode == "live":
+                return shared_lm(prompt=prompt, messages=messages)
+            return recorder.record(messages, lambda: ["external response"])
 
     pap_program = pap_mod.PAPILLON(Untrusted())
     pap_program.set_lm(trusted)
@@ -320,46 +800,57 @@ def run_provider_disabled(root: pathlib.Path, rows_path: pathlib.Path, artifact_
     p0 = rows["P0"]
     papillon_outcomes = []
     for repetition in range(1, 5):
-        with recorder.repetition("papillon", "P0", repetition):
-            prediction = pap_program(user_query=p0["inputs"]["user_query"])
-            if not prediction.llm_request and not prediction.response:
-                papillon_outcomes.append({"row": "P0", "repetition": repetition, "error": "program_failed"})
-                continue
-            quality_ab = bool(
-                pap_judge.quality_judge(
-                    user_query=p0["inputs"]["user_query"],
-                    response_A=prediction.response,
-                    response_B=p0["labels"]["target_response"],
-                ).judgment
-            )
-            quality_ba = bool(
-                pap_judge.quality_judge(
-                    user_query=p0["inputs"]["user_query"],
-                    response_A=p0["labels"]["target_response"],
-                    response_B=prediction.response,
-                ).judgment
-            )
-            pii = list(set(p0["labels"]["pii_str"].split("||")))
-            leakage_numerator = int(
-                pap_judge.fact_checker(pii=pii, prompt=prediction.llm_request).num_pii_leaked
-            )
-            leakage_denominator = len(pii)
-            quality = quality_ab or quality_ab == quality_ba
-            leakage = leakage_numerator / leakage_denominator if leakage_denominator else 0.0
-            score = (float(quality) + (1.0 - leakage)) / 2.0
-            papillon_outcomes.append(
-                {
-                    "row": "P0",
-                    "repetition": repetition,
-                    "quality_ab": quality_ab,
-                    "quality_ba": quality_ba,
-                    "quality": quality,
-                    "leakage_numerator": leakage_numerator,
-                    "leakage_denominator": leakage_denominator,
-                    "leakage": leakage,
-                    "score": score,
-                }
-            )
+        try:
+            with recorder.repetition("papillon", "P0", repetition):
+                prediction = pap_program(user_query=p0["inputs"]["user_query"])
+                if not prediction.llm_request and not prediction.response:
+                    diagnostic = recorder.mark_ordinary_failure(
+                        "papillon", "P0", repetition, "program_failed"
+                    )
+                    papillon_outcomes.append(
+                        {"row": "P0", "repetition": repetition, "error": diagnostic}
+                    )
+                    continue
+                quality_ab = bool(
+                    pap_judge.quality_judge(
+                        user_query=p0["inputs"]["user_query"],
+                        response_A=prediction.response,
+                        response_B=p0["labels"]["target_response"],
+                    ).judgment
+                )
+                quality_ba = bool(
+                    pap_judge.quality_judge(
+                        user_query=p0["inputs"]["user_query"],
+                        response_A=p0["labels"]["target_response"],
+                        response_B=prediction.response,
+                    ).judgment
+                )
+                pii = list(set(p0["labels"]["pii_str"].split("||")))
+                leakage_numerator = int(
+                    pap_judge.fact_checker(pii=pii, prompt=prediction.llm_request).num_pii_leaked
+                )
+                leakage_denominator = len(pii)
+                quality = quality_ab or quality_ab == quality_ba
+                leakage = leakage_numerator / leakage_denominator if leakage_denominator else 0.0
+                score = (float(quality) + (1.0 - leakage)) / 2.0
+                papillon_outcomes.append(
+                    {
+                        "row": "P0",
+                        "repetition": repetition,
+                        "quality_ab": quality_ab,
+                        "quality_ba": quality_ba,
+                        "quality": quality,
+                        "leakage_numerator": leakage_numerator,
+                        "leakage_denominator": leakage_denominator,
+                        "leakage": leakage,
+                        "score": score,
+                    }
+                )
+        except CalibrationOperationalAbort:
+            raise
+        except Exception as exc:
+            diagnostic = recorder.mark_ordinary_failure("papillon", "P0", repetition, exc)
+            papillon_outcomes.append({"row": "P0", "repetition": repetition, "error": diagnostic})
 
     if recorder.active is not None or len(recorder.events) != 48:
         raise RuntimeError(f"DSPy schedule incomplete: {len(recorder.events)} of 48")
@@ -367,17 +858,33 @@ def run_provider_disabled(root: pathlib.Path, rows_path: pathlib.Path, artifact_
     secure_json(
         path,
         {
-            "mode": "provider_disabled",
+            "condition": CONDITION,
+            "mode": mode,
             "runtime": "dspy",
             "imp_candidate": candidate,
             "authorities": AUTHORITIES,
             "dspy_commit": DSPY_COMMIT,
             "gepa_artifact_commit": GEPA_ARTIFACT_COMMIT,
+            "catalog": catalog,
+            "request_contract": {key: value for key, value in live_lm_kwargs("[REDACTED]").items() if key != "api_key"},
             "outcomes": {"hover": hover_outcomes, "papillon": papillon_outcomes},
             "events": recorder.events,
         },
     )
-    print(json.dumps({"status": "provider_disabled", "transports": 48}))
+    print(json.dumps({
+        "status": mode,
+        "opportunities": len(recorder.events),
+        "transports": sum(event["transport_count"] for event in recorder.events),
+    }))
+
+
+def live_preflight():
+    if os.environ.get("IMP_CALIBRATION_MODE") != "live":
+        raise RuntimeError("live mode environment drift")
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        raise RuntimeError("missing OpenRouter API key")
+    if os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OpenRouter calibration refuses ambient OPENAI_API_KEY")
 
 
 def main():
@@ -385,12 +892,17 @@ def main():
     parser.add_argument("--provider-disabled", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--materialize-pupa", action="store_true")
+    parser.add_argument("--verify-live-transport", action="store_true")
     parser.add_argument("--output-root", required=True, type=pathlib.Path)
     parser.add_argument("--rows", default=ROOT / "bench/imp/benchmark_truth/hover_papillon_calibration_rows.json", type=pathlib.Path)
     parser.add_argument("--artifact-root", default=ROOT / "tmp/gepa-artifact", type=pathlib.Path)
     args = parser.parse_args()
-    if sum([args.provider_disabled, args.live, args.materialize_pupa]) != 1:
+    if sum([args.provider_disabled, args.live, args.materialize_pupa, args.verify_live_transport]) != 1:
         raise SystemExit("choose exactly one mode")
+    if args.verify_live_transport:
+        dspy_root = pathlib.Path(os.environ.get("IMP_CALIBRATION_DSPY_ROOT", ROOT / "tmp/dspy-3.2.1"))
+        print(json.dumps(verify_live_transport_offline(dspy_root)))
+        return
     if args.materialize_pupa:
         rows_payload = json.loads(args.rows.read_text())
         materialize_pupa(
@@ -401,8 +913,10 @@ def main():
         print(json.dumps({"status": "materialized_private_pupa"}))
         return
     if args.live:
-        raise SystemExit("live execution is intentionally disabled until independent review grants provider authority")
-    run_provider_disabled(args.output_root, args.rows, args.artifact_root)
+        catalog = current_catalog()
+        run_calibration(args.output_root, args.rows, args.artifact_root, "live", catalog)
+        return
+    run_calibration(args.output_root, args.rows, args.artifact_root)
 
 
 if __name__ == "__main__":

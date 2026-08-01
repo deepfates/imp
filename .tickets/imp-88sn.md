@@ -2236,13 +2236,49 @@ digests. The default focused test is offline, while the explicit
 pinned source and completes both real provider-disabled program graphs.
 
 This checkpoint is instrument calibration only. It earns no optimizer
-effectiveness, Imp/upstream parity, or historical-artifact reproduction claim,
-and it grants no provider authority. Live execution remains blocked at a real
-owner/account boundary: this environment has no direct `OPENAI_API_KEY`, no
-dedicated `OPENAI_PROJECT`, and no current verified ZDR attestation or timestamp.
-Both runtime scripts intentionally refuse `--live`; later execution requires an
-owner-provided direct project/account with current ZDR verification and a
-separate explicit live disposition.
+effectiveness, Imp/upstream parity, or historical-artifact reproduction claim.
+
+The separately named successor
+`imp-88sn-hover-papillon-openrouter-calibration-v1` is now runnable but has not
+made a completion call. It preserves the same train-only rows, private PUPA
+handling, fixed 48+48 opportunity graph, stage byte caps, short-circuit policy,
+and prospective `$5.00` stop. Both runtimes bind
+`deepseek/deepseek-v4-flash` through the exact active OpenRouter endpoint
+`novita/fp8` / `Novita | deepseek/deepseek-v4-flash-20260423`, temperature 1,
+16,384 output tokens, reasoning disabled, and current prices `$0.14/M` input and
+`$0.28/M` output. The resulting full reservation maximum is `$0.85786624`.
+Both the model endpoint catalog and the independent live ZDR endpoint list must
+contain that exact tag/name/provider/price/parameter identity before either
+runtime starts. Accrued attributable cost plus the complete 96-opportunity
+reservation must fit under `$5.00` before the first transport; the per-call
+prospective guard remains defense in depth. Every request requires exact-provider
+only/order, ZDR, data-collection denial, parameter support,
+`X-OpenRouter-Cache: false` to override any preset response cache, no
+fallback/session/application cache/retry/JSON fallback, usage
+metadata, and router metadata. Each live response must reconcile its generation
+ID against OpenRouter's read-only generation record for exact model/provider,
+request ID, uncached native tokens, and billed cost before another task stage can
+proceed. The current catalog and key/account endpoints passed read-only checks;
+the existing process-scoped `OPENROUTER_API_KEY` remains external to Git.
+
+Provider-disabled review exercises both exact dry graphs and request contracts;
+the pinned DSPy path additionally sends one request through its actual
+TrackingLive/LiteLLM stack to an owned local HTTP endpoint and reconciles the
+synthetic response plus generation record, proving the serialized provider,
+usage, metadata-header, model, temperature, output, reasoning, cache and retry
+settings without provider authority. Live routing, response metadata, provider
+formatting, and judge noise remain unexercised until a separately authorized
+launch.
+Canonical rendered bytes are
+stable within each runtime. Across runtimes, HoVer query2/query3 and PAPILLON
+rewrite/untrusted/response match byte-for-byte; HoVer summarize1/summarize2 and
+the three PAPILLON judge requests differ because ordinary Imp and DSPy adapters
+render structured lists and judge signatures differently. Every differing call
+still contains the same row value, deterministic passage or prior-stage value,
+named inputs, cap, model/route and opportunity. This is an explicit renderer
+treatment variable, not missing task information, parity, or noise. No
+normalization or private shared prompt path was added. This treatment remains
+instrument calibration, not effectiveness, parity, or historical reproduction.
 
 ## Notes
 

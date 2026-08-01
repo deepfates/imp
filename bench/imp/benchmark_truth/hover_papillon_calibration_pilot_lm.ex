@@ -1,20 +1,22 @@
 defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
   @moduledoc false
-  defstruct [:inner, :controller, :evidence, :budget, fail_on: []]
+  defstruct [:inner, :controller, :evidence, :budget, :mode, :api_key, fail_on: []]
+
+  alias Imp.BenchmarkTruth.HoverPapillonCalibration, as: Pilot
 
   def generate(%__MODULE__{} = lm, messages, opts) do
-    opportunity = Imp.BenchmarkTruth.HoverPapillonCalibration.next_opportunity!(lm.controller)
+    opportunity = Pilot.next_opportunity!(lm.controller)
 
     if is_nil(opportunity) do
       raise "provider-disabled execution exceeded active repetition schedule"
     end
 
-    Imp.BenchmarkTruth.HoverPapillonCalibration.validate_stage_messages!(
+    Pilot.validate_stage_messages!(
       opportunity.stage,
       messages
     )
 
-    Imp.BenchmarkTruth.HoverPapillonCalibration.pretransport_guard!(lm.budget, opportunity)
+    Pilot.pretransport_guard!(lm.budget, opportunity)
 
     Process.put(:imp_calibration_opportunity, opportunity)
     started = System.monotonic_time(:microsecond)
@@ -35,14 +37,15 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
     wire = Process.get(:imp_calibration_wire) || raise "missing canonical wire evidence"
     status = if match?({:ok, _}, result), do: "ok", else: "error"
 
-    usage = %{
-      "input_tokens" => 11,
-      "output_tokens" => 7,
-      "cached_tokens" => 0,
-      "total_tokens" => 18
-    }
+    provider_response =
+      Process.get(:imp_calibration_provider_response) ||
+        raise "missing provider response evidence"
 
-    Imp.BenchmarkTruth.HoverPapillonCalibration.record_actual_cost!(lm.budget, usage)
+    metadata = response_metadata!(result)
+    generation = generation_metadata!(lm, provider_response)
+    usage = usage!(metadata, provider_response, generation)
+    validate_router_metadata!(provider_response["openrouter_metadata"])
+    Pilot.record_actual_cost!(lm.budget, usage)
 
     event = %{
       "opportunity_id" => opportunity.id,
@@ -51,19 +54,23 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
       "row" => opportunity.row,
       "repetition" => opportunity.repetition,
       "stage" => opportunity.stage,
-      "model_requested" => Imp.BenchmarkTruth.HoverPapillonCalibration.model(),
-      "model_effective" => Imp.BenchmarkTruth.HoverPapillonCalibration.model(),
-      "provider" => "openai",
-      "request_id" => "req-" <> String.replace(opportunity.id, "/", "-"),
+      "model_requested" => Pilot.model(),
+      "model_effective" => provider_response["model"],
+      "provider" => "openrouter",
+      "upstream_provider" => generation["provider_name"],
+      "endpoint_tag" => Pilot.endpoint_tag(),
+      "request_id" => generation["request_id"],
+      "generation_id" => provider_response["generation_id"],
       "timestamp_ns" => System.system_time(:nanosecond),
       "latency_us" => duration,
       "status" => status,
-      "finish_reason" => "stop",
+      "finish_reason" => provider_response["finish_reason"],
       "message_sha256" => wire.sha256,
       "message_bytes" => wire.bytes,
       "message_serialization" => wire.serialization,
       "max_input_bytes" => opportunity.max_input_bytes,
       "usage" => usage,
+      "router_metadata" => provider_response["openrouter_metadata"],
       "parse_status" => if(opportunity.id in lm.fail_on, do: "error", else: status),
       "error" =>
         if(status == "error", do: result |> Imp.Redaction.redact() |> inspect(), else: nil),
@@ -73,6 +80,124 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM do
     Agent.update(lm.evidence, &[event | &1])
     Process.delete(:imp_calibration_opportunity)
     Process.delete(:imp_calibration_wire)
+    Process.delete(:imp_calibration_provider_response)
     result
   end
+
+  defp response_metadata!({:ok, raw}) do
+    case Imp.LM.Result.split(raw) do
+      {:ok, _output, %{req_llm: metadata}} when is_map(metadata) ->
+        metadata
+
+      {:ok, _output, %{"req_llm" => metadata}} when is_map(metadata) ->
+        metadata
+
+      other ->
+        raise Imp.OperationalSafetyError,
+          kind: :identity,
+          message: "ReqLLM metadata missing",
+          reason: other
+    end
+  end
+
+  defp response_metadata!({:error, reason}) do
+    Imp.OperationalSafetyError.raise_if_present!(reason)
+    raise "provider request failed: #{inspect(Imp.Redaction.redact(reason))}"
+  end
+
+  defp generation_metadata!(%{mode: :live, api_key: api_key}, response),
+    do: Pilot.generation_metadata!(response["generation_id"], api_key)
+
+  defp generation_metadata!(%{mode: :provider_disabled}, response) do
+    %{
+      "id" => response["generation_id"],
+      "model" => Pilot.model(),
+      "provider_name" => "Novita",
+      "cancelled" => false,
+      "session_id" => nil,
+      "request_id" => "req-" <> response["generation_id"],
+      "native_tokens_prompt" => 11,
+      "native_tokens_completion" => 7,
+      "native_tokens_cached" => 0,
+      "total_cost" => 11 / 1_000_000 * 0.14 + 7 / 1_000_000 * 0.28
+    }
+  end
+
+  defp usage!(metadata, response, generation) do
+    usage = metadata[:usage] || metadata["usage"] || %{}
+    raw = response["usage"] || %{}
+    details = raw["prompt_tokens_details"] || %{}
+
+    input = map_value(usage, :input_tokens) || raw["prompt_tokens"]
+    output = map_value(usage, :output_tokens) || raw["completion_tokens"]
+    cached = map_value(usage, :cached_tokens) || details["cached_tokens"]
+    total = map_value(usage, :total_tokens) || raw["total_tokens"]
+
+    unless is_integer(input) and input >= 0 and is_integer(output) and output >= 0 and
+             is_integer(cached) and cached == 0 and is_integer(total) and total == input + output do
+      raise Imp.OperationalSafetyError,
+        kind: :cost,
+        message: "OpenRouter usage metadata missing or inconsistent",
+        reason: %{normalized: Imp.Redaction.redact(usage), raw: Imp.Redaction.redact(raw)}
+    end
+
+    unless generation["native_tokens_prompt"] == input and
+             generation["native_tokens_completion"] == output do
+      raise Imp.OperationalSafetyError,
+        kind: :cost,
+        message: "OpenRouter generation usage disagrees with response usage",
+        reason: %{response_input: input, response_output: output}
+    end
+
+    expected_cost = input / 1_000_000 * 0.14 + output / 1_000_000 * 0.28
+
+    unless is_number(generation["total_cost"]) and
+             abs(generation["total_cost"] - expected_cost) <= 1.0e-9 do
+      raise Imp.OperationalSafetyError,
+        kind: :cost,
+        message: "OpenRouter billed cost disagrees with frozen prices",
+        reason: %{provider_cost: generation["total_cost"], expected_cost: expected_cost}
+    end
+
+    %{
+      "input_tokens" => input,
+      "output_tokens" => output,
+      "cached_tokens" => cached,
+      "total_tokens" => total,
+      "provider_cost_usd" => generation["total_cost"]
+    }
+  end
+
+  defp validate_router_metadata!(%{
+         "requested" => requested,
+         "strategy" => "direct",
+         "attempt" => 1,
+         "endpoints" => %{"total" => 1, "available" => available}
+       })
+       when is_list(available) and length(available) == 1 do
+    selected = Enum.filter(available, &(&1["selected"] == true))
+
+    selected_endpoint = List.first(selected) || %{}
+
+    unless requested == Pilot.model() and length(selected) == 1 and
+             selected_endpoint["model"] == Pilot.model() and
+             selected_endpoint["provider"] == "Novita" do
+      raise Imp.OperationalSafetyError,
+        kind: :identity,
+        message: "OpenRouter routing metadata drift",
+        reason: %{requested: requested, selected: selected}
+    end
+
+    :ok
+  end
+
+  defp validate_router_metadata!(other) do
+    raise Imp.OperationalSafetyError,
+      kind: :identity,
+      message: "OpenRouter routing metadata missing",
+      reason: Imp.Redaction.redact(other)
+  end
+
+  defp map_value(map, key) when is_map(map), do: map[key] || map[to_string(key)]
+  defp map_value(_map, _key), do: nil
 end

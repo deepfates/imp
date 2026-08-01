@@ -1,9 +1,17 @@
 defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   @moduledoc false
 
-  @model "gpt-4.1-mini-2025-04-14"
-  @input_price 0.40
-  @output_price 1.60
+  @condition "imp-88sn-hover-papillon-openrouter-calibration-v1"
+  @model "deepseek/deepseek-v4-flash"
+  @endpoint_tag "novita/fp8"
+  @endpoint_name "Novita | deepseek/deepseek-v4-flash-20260423"
+  @endpoint_provider "Novita"
+  @base_url "https://openrouter.ai/api/v1"
+  @catalog_url @base_url <> "/models/" <> @model <> "/endpoints"
+  @zdr_url @base_url <> "/endpoints/zdr"
+  @generation_url @base_url <> "/generation"
+  @input_price 0.14
+  @output_price 0.28
   @hard_cost_usd 5.00
   @max_output_tokens 16_384
   @runtime_names ~w(imp dspy)
@@ -26,8 +34,25 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   }
 
   def model, do: @model
+  def condition, do: @condition
+  def endpoint_tag, do: @endpoint_tag
+  def endpoint_name, do: @endpoint_name
+  def catalog_url, do: @catalog_url
+  def zdr_url, do: @zdr_url
   def rows_path, do: @rows_path
   def authorities, do: @authorities
+
+  def provider_preferences do
+    %{
+      only: [@endpoint_tag],
+      order: [@endpoint_tag],
+      allow_fallbacks: false,
+      require_parameters: true,
+      data_collection: "deny",
+      zdr: true,
+      max_price: %{prompt: @input_price, completion: @output_price}
+    }
+  end
 
   def rows! do
     payload = @rows_path |> File.read!() |> Jason.decode!()
@@ -86,6 +111,23 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     }
   end
 
+  def admit_run!(actual_cost_usd) when is_number(actual_cost_usd) and actual_cost_usd >= 0 do
+    remaining = reservation().unbuffered_usd
+
+    if actual_cost_usd + remaining > @hard_cost_usd do
+      raise Imp.OperationalSafetyError,
+        kind: :cost,
+        message:
+          "complete calibration would exceed $5.00: actual=#{actual_cost_usd} remaining_reservation=#{remaining}",
+        reason: %{actual_cost_usd: actual_cost_usd, remaining_reservation_usd: remaining}
+    end
+
+    :ok
+  end
+
+  def admit_run!(_actual_cost_usd),
+    do: raise(ArgumentError, "initial attributable cost must be a nonnegative number")
+
   def validate_events!(events, runtime) when is_list(events) do
     expected = runtime_schedule(runtime)
     ids = Enum.map(events, &Map.fetch!(&1, "opportunity_id"))
@@ -107,7 +149,9 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
       else
         require_equal!(event["model_requested"], @model, "requested model")
         require_equal!(event["model_effective"], @model, "effective model")
-        require_equal!(event["provider"], "openai", "provider")
+        require_equal!(event["provider"], "openrouter", "provider")
+        require_equal!(event["upstream_provider"], @endpoint_provider, "upstream provider")
+        require_equal!(event["endpoint_tag"], @endpoint_tag, "endpoint tag")
         require_equal!(event["transport_count"], 1, "transport count")
         require_equal!(get_in(event, ["usage", "cached_tokens"]), 0, "cached tokens")
         require_equal!(event["message_serialization"], "canonical_json_utf8_v1", "serialization")
@@ -212,9 +256,10 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     {payload, path}
   end
 
-  def prepare_wire_request(%Req.Request{} = request) do
-    body = request.body |> IO.iodata_to_binary() |> Jason.decode!() |> Map.put("store", false)
+  def prepare_wire_request(%Req.Request{} = request, transports) do
+    body = request.body |> IO.iodata_to_binary() |> Jason.decode!()
     opportunity = Process.get(:imp_calibration_opportunity) || raise "missing opportunity"
+    assert_wire_contract!(request, body)
     messages = Map.fetch!(body, "messages")
     rendered = canonical_json(messages)
     bytes = byte_size(rendered)
@@ -228,30 +273,156 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
       serialization: "canonical_json_utf8_v1"
     })
 
+    Agent.update(transports, &(&1 + 1))
+
     %{request | body: Jason.encode!(body)}
   end
 
+  def capture_provider_response({%Req.Request{} = request, %Req.Response{} = response}) do
+    body = if is_map(response.body), do: response.body, else: %{}
+
+    Process.put(:imp_calibration_provider_response, %{
+      "http_status" => response.status,
+      "headers" => response.headers,
+      "generation_id" => body["id"],
+      "model" => body["model"],
+      "provider" => body["provider"],
+      "usage" => body["usage"],
+      "openrouter_metadata" => body["openrouter_metadata"],
+      "finish_reason" => get_in(body, ["choices", Access.at(0), "finish_reason"])
+    })
+
+    {request, response}
+  end
+
+  def generation_metadata!(generation_id, api_key) do
+    require_nonempty!(generation_id, "OpenRouter generation ID")
+
+    case Req.get(@generation_url,
+           params: [id: generation_id],
+           headers: [{"authorization", "Bearer " <> api_key}],
+           retry: false,
+           max_retries: 0,
+           receive_timeout: 30_000
+         ) do
+      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+        validate_generation!(data, generation_id)
+
+      {:ok, %Req.Response{status: status}} ->
+        raise Imp.OperationalSafetyError,
+          kind: :transport,
+          message: "OpenRouter generation metadata HTTP #{status}",
+          reason: %{generation_id: generation_id, status: status}
+
+      {:error, reason} ->
+        raise Imp.OperationalSafetyError,
+          kind: :transport,
+          message: "OpenRouter generation metadata unavailable",
+          reason: Imp.Redaction.redact(reason)
+    end
+  end
+
+  def validate_generation!(data, generation_id) when is_map(data) do
+    require_equal!(data["id"], generation_id, "generation ID")
+    require_equal!(data["model"], @model, "generation model")
+    require_equal!(data["provider_name"], @endpoint_provider, "generation provider")
+    require_equal!(data["cancelled"], false, "generation cancellation")
+    require_equal!(data["session_id"], nil, "generation session")
+    require_nonempty!(data["request_id"], "OpenRouter request ID")
+    require_nonnegative_integer!(data["native_tokens_prompt"], "native prompt tokens")
+    require_nonnegative_integer!(data["native_tokens_completion"], "native completion tokens")
+    require_nonnegative_integer!(data["native_tokens_cached"], "native cached tokens")
+    require_equal!(data["native_tokens_cached"], 0, "native cached tokens")
+    require_number!(data["total_cost"], "generation cost")
+    data
+  end
+
+  def validate_generation!(_data, _generation_id),
+    do: raise(ArgumentError, "OpenRouter generation metadata drift")
+
   def live_preflight!(env \\ System.get_env()) do
     require_equal!(env["IMP_CALIBRATION_MODE"], "live", "mode")
-    require_nonempty!(env["OPENAI_API_KEY"], "OpenAI API key")
-    require_nonempty!(env["OPENAI_PROJECT"], "dedicated OpenAI project")
-    require_equal!(env["IMP_CALIBRATION_ZDR_VERIFIED"], "true", "ZDR verification")
-    require_equal!(env["IMP_CALIBRATION_MODEL"], @model, "model")
-    require_equal!(env["IMP_CALIBRATION_INPUT_USD_PER_M"], "0.40", "input price")
-    require_equal!(env["IMP_CALIBRATION_OUTPUT_USD_PER_M"], "1.60", "output price")
-    require_equal!(env["IMP_CALIBRATION_STORE"], "false", "store")
-    require_equal!(env["IMP_CALIBRATION_RETRIES"], "0", "retries")
-    require_equal!(env["IMP_CALIBRATION_FALLBACK"], "false", "fallback")
-    require_recent_attestation!(env["IMP_CALIBRATION_ZDR_VERIFIED_AT"])
+    require_nonempty!(env["OPENROUTER_API_KEY"], "OpenRouter API key")
+
+    if nonempty?(env["OPENAI_API_KEY"]),
+      do: raise(ArgumentError, "OpenRouter calibration refuses ambient OPENAI_API_KEY")
+
     :ok
   end
 
   def provider_disabled_preflight!(env \\ System.get_env()) do
-    if nonempty?(env["OPENAI_API_KEY"]),
-      do: raise(ArgumentError, "provider-disabled mode refuses ambient OPENAI_API_KEY")
+    if nonempty?(env["OPENAI_API_KEY"]) or nonempty?(env["OPENROUTER_API_KEY"]),
+      do: raise(ArgumentError, "provider-disabled mode refuses ambient provider API keys")
 
     :ok
   end
+
+  def current_catalog! do
+    catalog = fetch_public_json!(@catalog_url, "catalog") |> validate_catalog!()
+    zdr = fetch_public_json!(@zdr_url, "ZDR catalog") |> validate_zdr!()
+    Map.put(catalog, "zdr", zdr)
+  end
+
+  def validate_catalog!(%{"data" => %{"id" => @model, "endpoints" => endpoints}})
+      when is_list(endpoints) do
+    endpoint = Enum.find(endpoints, &(&1["tag"] == @endpoint_tag))
+    unless is_map(endpoint), do: raise(ArgumentError, "exact OpenRouter endpoint is absent")
+    validate_endpoint!(endpoint, "catalog")
+    supported = endpoint["supported_parameters"]
+
+    %{
+      "checked_url" => @catalog_url,
+      "model" => @model,
+      "endpoint_tag" => @endpoint_tag,
+      "endpoint_name" => @endpoint_name,
+      "provider" => @endpoint_provider,
+      "pricing" => %{"input_per_million" => @input_price, "output_per_million" => @output_price},
+      "supported_parameters" => supported
+    }
+  end
+
+  def validate_catalog!(_body), do: raise(ArgumentError, "OpenRouter catalog response drift")
+
+  def validate_zdr!(%{"data" => endpoints}) when is_list(endpoints) do
+    endpoint = Enum.find(endpoints, &(&1["tag"] == @endpoint_tag and &1["model_id"] == @model))
+    unless is_map(endpoint), do: raise(ArgumentError, "exact endpoint is absent from ZDR catalog")
+    validate_endpoint!(endpoint, "ZDR catalog")
+
+    %{
+      "checked_url" => @zdr_url,
+      "model" => @model,
+      "endpoint_tag" => @endpoint_tag,
+      "endpoint_name" => @endpoint_name,
+      "provider" => @endpoint_provider,
+      "pricing" => %{"input_per_million" => @input_price, "output_per_million" => @output_price}
+    }
+  end
+
+  def validate_zdr!(_body), do: raise(ArgumentError, "OpenRouter ZDR catalog response drift")
+
+  defp validate_catalog_binding!(%{
+         "model" => @model,
+         "endpoint_tag" => @endpoint_tag,
+         "endpoint_name" => @endpoint_name,
+         "provider" => @endpoint_provider,
+         "pricing" => %{
+           "input_per_million" => @input_price,
+           "output_per_million" => @output_price
+         },
+         "zdr" => %{
+           "model" => @model,
+           "endpoint_tag" => @endpoint_tag,
+           "endpoint_name" => @endpoint_name,
+           "provider" => @endpoint_provider,
+           "pricing" => %{
+             "input_per_million" => @input_price,
+             "output_per_million" => @output_price
+           }
+         }
+       }),
+       do: :ok
+
+  defp validate_catalog_binding!(_catalog), do: raise(ArgumentError, "catalog binding drift")
 
   def secure_write!(path, value) do
     File.mkdir_p!(Path.dirname(path))
@@ -292,10 +463,21 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
 
   def run_provider_disabled!(root, opts \\ []) do
     provider_disabled_preflight!()
+    run!(root, :provider_disabled, opts)
+  end
 
+  def run_live!(root, catalog, opts \\ []) do
+    live_preflight!()
+    validate_catalog_binding!(catalog)
+    run!(root, :live, Keyword.put(opts, :catalog, catalog))
+  end
+
+  defp run!(root, mode, opts) do
     expected_commit =
       Keyword.get(opts, :expected_commit, System.get_env("IMP_CALIBRATION_EXPECTED_COMMIT"))
 
+    initial_actual_cost_usd = Keyword.get(opts, :initial_actual_cost_usd, 0.0)
+    admit_run!(initial_actual_cost_usd)
     candidate = candidate_identity!(expected_commit)
     payload = rows!()
     File.mkdir_p!(root)
@@ -314,7 +496,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
 
     {:ok, budget} =
       Agent.start_link(fn ->
-        %{actual_cost_usd: Keyword.get(opts, :initial_actual_cost_usd, 0.0)}
+        %{actual_cost_usd: initial_actual_cost_usd}
       end)
 
     transports =
@@ -323,7 +505,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
         counter
       end)
 
-    lm = pilot_lm(controller, evidence, budget, transports, opts)
+    lm = pilot_lm(controller, evidence, budget, transports, mode, opts)
 
     retriever = fn _query, opts ->
       docs =
@@ -397,9 +579,11 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     require_equal!(summary.transport_count, Agent.get(transports, & &1), "observed transports")
 
     result = %{
-      mode: "provider_disabled",
+      condition: @condition,
+      mode: Atom.to_string(mode),
       imp_candidate: candidate,
       authorities: @authorities,
+      catalog: opts[:catalog],
       rows: payload,
       reservation: reservation(),
       summary: summary,
@@ -411,8 +595,8 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     result
   end
 
-  defp pilot_lm(controller, evidence, budget, transports, opts) do
-    {:ok, catalog_model} = ReqLLM.model("openai:" <> @model)
+  defp pilot_lm(controller, evidence, budget, transports, mode, opts) do
+    {:ok, catalog_model} = ReqLLM.model("openrouter:" <> @model)
 
     chat_model = %{
       catalog_model
@@ -420,21 +604,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     }
 
     adapter = fn request ->
-      Agent.update(transports, &(&1 + 1))
       body = request.body |> IO.iodata_to_binary() |> Jason.decode!()
-
-      unless body["store"] == false,
-        do: raise("provider-disabled request did not disable storage")
-
-      unless body["temperature"] == 1.0, do: raise("provider-disabled request temperature drift")
-
-      unless (body["max_tokens"] || body["max_completion_tokens"]) == @max_output_tokens,
-        do:
-          raise(
-            "provider-disabled output cap drift: #{inspect(Map.take(body, ["max_tokens", "max_completion_tokens"]))}"
-          )
-
-      if body["response_format"], do: raise("JSON fallback/structured transport is forbidden")
       opportunity = Process.get(:imp_calibration_opportunity)
       content = local_content(body["messages"], opportunity, Keyword.get(opts, :fail_on, []))
 
@@ -442,6 +612,8 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
         "id" => "req-" <> String.replace(opportunity.id, "/", "-"),
         "object" => "chat.completion",
         "model" => @model,
+        "provider" => @endpoint_provider,
+        "openrouter_metadata" => synthetic_router_metadata(),
         "choices" => [
           %{
             "index" => 0,
@@ -460,34 +632,58 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
       {request, Req.Response.new(status: 200, body: response)}
     end
 
-    inner =
-      Imp.req_llm(
-        chat_model,
-        api_key: "provider-disabled",
+    http_opts = [
+      plugins: [
+        fn request ->
+          request
+          |> Req.Request.append_request_steps(
+            imp_calibration_prepare_wire: {__MODULE__, :prepare_wire_request, [transports]}
+          )
+          |> Req.Request.append_response_steps(
+            imp_calibration_capture_response: {__MODULE__, :capture_provider_response, []}
+          )
+        end
+      ],
+      headers: [
+        {"X-OpenRouter-Metadata", "enabled"},
+        {"X-OpenRouter-Cache", "false"}
+      ],
+      retry: false,
+      max_retries: 0
+    ]
+
+    http_opts =
+      if mode == :provider_disabled,
+        do: Keyword.put(http_opts, :adapter, adapter),
+        else: http_opts
+
+    api_key =
+      if mode == :live, do: System.fetch_env!("OPENROUTER_API_KEY"), else: "provider-disabled"
+
+    lm_opts =
+      [
+        api_key: api_key,
         cache: false,
         temperature: 1.0,
         max_tokens: @max_output_tokens,
         max_retries: 0,
-        provider_options: [store: false],
-        req_http_options: [
-          plugins: [
-            fn request ->
-              Req.Request.append_request_steps(request,
-                imp_calibration_prepare_wire: {__MODULE__, :prepare_wire_request, []}
-              )
-            end
-          ],
-          adapter: adapter,
-          retry: false,
-          max_retries: 0
-        ]
-      )
+        reasoning_effort: :none,
+        provider_options: [
+          openrouter_provider: provider_preferences(),
+          openrouter_usage: %{include: true}
+        ],
+        req_http_options: http_opts
+      ]
+
+    inner = Imp.req_llm(chat_model, lm_opts)
 
     %Imp.BenchmarkTruth.HoverPapillonCalibration.PilotLM{
       inner: inner,
       controller: controller,
       evidence: evidence,
       budget: budget,
+      mode: mode,
+      api_key: api_key,
       fail_on: List.wrap(Keyword.get(opts, :fail_on, []))
     }
   end
@@ -653,6 +849,57 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     }
   end
 
+  defp assert_wire_contract!(request, body) do
+    expected_provider = provider_preferences() |> stringify_keys()
+
+    headers =
+      request.headers |> Enum.into(%{}, fn {key, values} -> {String.downcase(key), values} end)
+
+    require_equal!(body["model"], @model, "serialized model")
+    require_equal!(body["provider"], expected_provider, "serialized provider preferences")
+    require_equal!(body["usage"], %{"include" => true}, "serialized usage metadata")
+    require_equal!(body["temperature"], 1.0, "serialized temperature")
+    require_equal!(body["max_tokens"], @max_output_tokens, "serialized output cap")
+    require_equal!(body["reasoning_effort"], "none", "serialized reasoning policy")
+    require_equal!(Map.get(body, "store"), nil, "serialized provider storage option")
+    require_equal!(Map.get(body, "session_id"), nil, "serialized session")
+    require_equal!(Map.get(body, "response_format"), nil, "serialized JSON fallback")
+
+    metadata_header = Map.get(headers, "x-openrouter-metadata", [])
+    cache_header = Map.get(headers, "x-openrouter-cache", [])
+
+    unless "enabled" in List.wrap(metadata_header),
+      do: raise(ArgumentError, "router metadata header drift")
+
+    unless "false" in List.wrap(cache_header),
+      do: raise(ArgumentError, "OpenRouter response-cache header drift")
+
+    :ok
+  end
+
+  defp synthetic_router_metadata do
+    %{
+      "requested" => @model,
+      "strategy" => "direct",
+      "region" => "provider-disabled",
+      "summary" => "available=1, selected=Novita",
+      "attempt" => 1,
+      "is_byok" => false,
+      "endpoints" => %{
+        "total" => 1,
+        "available" => [
+          %{"model" => @model, "provider" => @endpoint_provider, "selected" => true}
+        ]
+      }
+    }
+  end
+
+  defp stringify_keys(value) when is_map(value),
+    do: Map.new(value, fn {key, nested} -> {to_string(key), stringify_keys(nested)} end)
+
+  defp stringify_keys(value) when is_list(value), do: Enum.map(value, &stringify_keys/1)
+  defp stringify_keys(value), do: value
+
   defp verify_row!(%{"row_sha256" => expected} = row) do
     actual = row |> Map.delete("row_sha256") |> canonical_json() |> sha256()
     unless actual == expected, do: raise(ArgumentError, "calibration row checksum mismatch")
@@ -706,18 +953,6 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     end
   end
 
-  defp require_recent_attestation!(nil), do: raise(ArgumentError, "missing ZDR attestation time")
-
-  defp require_recent_attestation!(value) do
-    with {:ok, at, 0} <- DateTime.from_iso8601(value),
-         age when age in 0..900 <- DateTime.diff(DateTime.utc_now(), at, :second) do
-      :ok
-    else
-      _ ->
-        raise ArgumentError, "ZDR attestation must be an ISO-8601 time from the last 15 minutes"
-    end
-  end
-
   defp require_equal!(value, value, _label), do: :ok
   defp require_equal!(_actual, _expected, label), do: raise(ArgumentError, "#{label} drift")
 
@@ -729,5 +964,40 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
 
   defp require_nonempty!(value, _label) when is_binary(value) and byte_size(value) > 0, do: :ok
   defp require_nonempty!(_value, label), do: raise(ArgumentError, "missing #{label}")
+  defp require_number!(value, _label) when is_number(value) and value >= 0, do: :ok
+  defp require_number!(_value, label), do: raise(ArgumentError, "missing or invalid #{label}")
+
+  defp fetch_public_json!(url, label) do
+    case Req.get(url, retry: false, max_retries: 0, receive_timeout: 30_000) do
+      {:ok, %Req.Response{status: 200, body: body}} -> body
+      {:ok, %Req.Response{status: status}} -> raise ArgumentError, "#{label} HTTP #{status}"
+      {:error, reason} -> raise ArgumentError, "#{label} request failed: #{inspect(reason)}"
+    end
+  end
+
+  defp validate_endpoint!(endpoint, label) do
+    require_equal!(endpoint["name"], @endpoint_name, "#{label} endpoint name")
+    require_equal!(endpoint["provider_name"], @endpoint_provider, "#{label} provider")
+    require_equal!(endpoint["model_id"], @model, "#{label} model")
+    require_equal!(endpoint["quantization"], "fp8", "#{label} quantization")
+    require_equal!(endpoint["status"], 0, "#{label} status")
+    require_equal!(endpoint["supports_implicit_caching"], false, "#{label} implicit cache")
+    require_equal!(get_in(endpoint, ["pricing", "prompt"]), "0.00000014", "#{label} input price")
+
+    require_equal!(
+      get_in(endpoint, ["pricing", "completion"]),
+      "0.00000028",
+      "#{label} output price"
+    )
+
+    required = ~w(reasoning_effort max_tokens temperature)
+    supported = endpoint["supported_parameters"] || []
+
+    unless Enum.all?(required, &(&1 in supported)),
+      do: raise(ArgumentError, "#{label} parameter support drift")
+
+    endpoint
+  end
+
   defp nonempty?(value), do: is_binary(value) and byte_size(value) > 0
 end
