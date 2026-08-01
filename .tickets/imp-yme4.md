@@ -17,102 +17,95 @@ Carry Imp from its large implemented surface and conflicting evidence systems to
 
 Imp reaches this finish line when:
 
-- a clean consumer installs the package, defines a realistic multi-stage program, evaluates it, improves it through the public optimizer API, saves the selected parameters, restarts, and reproduces served behavior;
-- the public program, metric, dataset, optimizer, budget, report, and artifact concepts remain coherent across supported optimizer families;
-- every advertised optimizer is classified from exercised public behavior as supported and proven, supported with limited effectiveness evidence, or experimental, with misleading facades removed;
-- at least one release-defining example materially improves data excluded from selection and leaves an inspectable reusable artifact, while negative results remain visible and scoped;
-- compatibility tests compare observable behavior with coherent upstream environments and document meaningful BEAM-native differences without requiring private call-graph identity;
-- product tests, compatibility fixtures, scientific artifacts, and rare external smokes each have one clear job and one reusable execution path;
-- one generated capability view summarizes claims, while Git owns source, locks own dependencies, `tk` owns unfinished work, and historical results remain immutable without keeping every old runner active; and
-- the canonical README, learning path, API docs, package, and release procedure teach and exercise the same ordinary path from a clean checkout.
+- a clean consumer installs the package, defines and evaluates a realistic
+  multi-stage program, improves it through an ordinary public optimizer path,
+  saves the selected state, restarts, and reproduces concurrent served behavior;
+- public program, metric, dataset, optimizer, budget, report, result, and
+  artifact concepts remain coherent across the supported optimizer families;
+- every advertised family executes its defining mechanism, fails safely, and
+  is classified from exercised public behavior and representative evidence as
+  stable, useful within named limits, or experimental—without facades or canned
+  substitutes;
+- a credible, independently recomputable public benchmark portfolio across
+  materially different problem types shows where current Imp produces useful
+  held-out improvement, where it does not, and how it compares with coherent
+  pinned upstream implementations;
+- selected program and value artifacts are inspectable, private by default,
+  portable into fresh trusted code, and operable through the ordinary OTP path;
+- compatibility work compares observable semantics and useful opportunity,
+  names meaningful BEAM-native differences, and does not require private
+  call-graph identity or benchmark-owned product behavior;
+- the README, learning path, API docs, optimizer guidance, package, and release
+  procedure explain the same product from the user's problem outward; and
+- an independent adversarial consumer can install, exercise, and recompute the
+  strongest claims without relying on workshop context or maintainer machinery.
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Closure frontier at `715f24b`
+## Current frontier after `0de8b680`
 
-This is a criterion-by-criterion reading of the finish line above, not a new
-status system.
+The product center is real but the telos is open.
 
-- **Clean multi-stage consumer lifecycle — operationally satisfied.** The
-  product-only Hex payload at `1dee3f5` contains the runtime, canonical manuals
-  and Livebooks, provider-free tutorial, and explicit two-stage OTP deployment
-  path while leaving research treatments and maintainer evidence in Git. Cold
-  package gates run the ordinary typed program -> `Experiment.check` -> private
-  linked Result/Artifact -> fresh-OS concurrent `ProgramServer` lifecycle. The
-  package remains unpublished. This establishes the product path, not the
-  missing usefulness result.
-- **Coherent public concepts — satisfied for the current supported center.**
-  Program experiments use Data, metric, optimizer, explicit evaluation options,
-  Result, and parameter Artifact; Optimize Anything keeps its own value-result
-  lifecycle and exports through the same portable Artifact boundary; training
-  jobs retain their distinct artifact identity. The clean consumer and public
-  feature suites exercise those boundaries. This is product coherence, not
-  effectiveness breadth.
-- **Honest optimizer classification — satisfied.** `imp-tg2z` verified every
-  optimizer module is explicitly experimental (GEPA BatchSampler is SPI),
-  unsupported combinations fail closed, and no reproduced advertised mechanism
-  silently substitutes a canned or different algorithm. That classification
-  does not make the portfolio proven or stable.
-- **Release-defining improvement — partially satisfied.** The current-source
-  non-prompt OA retry-policy condition selected proposer-generated mutations in
-  two of three seeds, improved untouched executable behavior from `3/6` to
-  `5/6`, and loaded all three portable values fresh. Historical TREC remains a
-  narrow positive GEPA/MIPROv2 result. The realistic multi-stage LM half is
-  still open: the first Banking77 modeled-MIPRO condition averaged `+0.041667`,
-  the exposure-disjoint confirmation averaged `+0.020833`, and HotPotQA JSON
-  GEPA averaged `-0.015256`; each missed its frozen `+0.05` bar. IFBench's Imp
-  effectiveness interpretation remains invalid/unverified after the scorer
-  representation defect.
-- **Observable upstream compatibility — satisfied as a product/semantic
-  boundary.** Pinned DSPy, GEPA, Optimize Anything, Optuna, and Ax-facing gates
-  compare public inputs, opportunity, stopping, failures, outputs, and named
-  BEAM deviations without requiring private call-graph identity. The faulty
-  IFBench scorer invalidated effectiveness conclusions, not the repaired
-  provider-free compatibility regression; Imp IFBench effectiveness remains
-  invalid/unverified.
-- **Clear test/evidence jobs and reusable paths — satisfied at the package
-  boundary, still open for the research portfolio.** Public feature behavior
-  converges on Experiment or the native OA lifecycle and the portable Artifact
-  boundary. Compatibility vectors, historical runners, datasets, and immutable
-  scientific results remain repository-only and are not shipped as product
-  examples. The next portfolio must keep its environments and raw evidence
-  outside Hex without creating another campaign framework.
-- **One generated capability truth and minimal provenance — satisfied for the
-  product, still open for new external evidence.** Claims/conformance are
-  generated from the existing canonical authority, while Git, dependency locks,
-  tickets, and immutable result files own their respective facts. No new
-  manifest, dashboard, or coordinator is required for the next study.
-- **Coherent package and public teaching path — satisfied for the current
-  package center.** README, Learning Path, API Guide, deployment example,
-  unpacked package, and fresh-process checks teach the same program → measure →
-  select → Artifact → OTP shape. The package is still unpublished and its
-  SemVer/publication disposition remains an owner decision. Documentation
-  cannot substitute for the open usefulness result.
+- **Operational product center — complete as an internal milestone.** Clean
+  package consumers exercise typed programs, evaluation, `Experiment.check`,
+  private linked Result/Artifact persistence, fresh-OS application, concurrent
+  `ProgramServer`, and the native Optimize Anything value-artifact path. The
+  product-only payload excludes repository research. It remains unpublished.
+- **Advertised mechanisms — complete as an experimental prerequisite.**
+  `imp-tg2z` removed reproduced facades and exercised the named families through
+  their defining public transitions and safety boundaries. All optimizer modules
+  remain experimental; this milestone does not establish broad usefulness or
+  stable-family status.
+- **Usefulness — open.** Structured Optimize Anything has one scoped current-
+  source positive on new executable rows. Historical TREC is a narrow positive.
+  Two modeled-MIPRO Banking77 conditions and one JSON-GEPA HotPotQA condition
+  completed their lifecycle but missed frozen lift bars. IFBench effectiveness
+  is invalid/unverified after its scorer defect. No current realistic multi-stage
+  LM condition has satisfied `imp-88sn`.
+- **External benchmark program — in calibration, not execution.** HoVer and
+  PAPILLON are candidate tasks because they exercise real multi-stage retrieval,
+  delegation, quality, and privacy behavior. Their 96-opportunity training-only
+  OpenRouter calibration is meant to measure format reliability, repetition
+  noise, privacy, usage, and cost before any large optimizer portfolio. Its first
+  two live attempts were scientifically null product/evidence stops. The current
+  provider-free repair at `3b65a3e0` corrects route identity and transported-
+  failure persistence; an interpretable calibration result is still absent.
 
-Current disposition: `imp-argb` and `imp-tg2z` are completed prerequisites, not
-epic closure. Subsequent provider-free work fixed credential-rotation-safe
-optimizer resume (`7abefaa`), proved the released HoVer and PAPILLON task graphs
-through public GEPA/Result/Artifact/fresh-BEAM boundaries (`fa9f3b6`), and
-preserved typed operational-safety failures across the exercised public callback
-layers (`5475ba0`, `bbd033c`). The source-authenticated Optimize Anything v1.4
-readiness gate projects Circle Packing's 133-call warm retained state through
-the existing OA Result -> schema-3 value Artifact -> credential-free fresh-BEAM
-evaluator path and reproduces the retained geometry score (`e27b0d3`, corrected
-at `715f24b` so unknown candidate lineage is never invented). Those are real
-product capabilities and fidelity boundaries, not effectiveness evidence.
+## Backward checkpoint plan
 
-`imp-88sn` and this epic remain open because current source still lacks a
-realistic multi-stage LM result meeting its predeclared usefulness criterion and
-OA still lacks a reproducible held-out generalization result. The next external
-LM portfolio is HoVer plus PAPILLON with unconditional baseline, BootstrapRS,
-MIPROv2-Heavy, and GEPA-with-merge arms across Imp and pinned upstream. Its
-corrected lower bound is at least 1,710,400 task-shaped transports, so no paid
-pilot or full run is automatic. Circle Packing has completed only its zero-cost
-warm-state mechanism/artifact check; it is not cold optimizer replay or
-generalization evidence. The released gskill split is not exactly reconstructable
-and requires a newly pinned current-source replication design before any run.
-Historical outcomes remain immutable. No Banking77, HotPotQA, or IFBench
-successor is authorized.
+Work proceeds backward from the finish line, without turning this list into a
+second tracking system:
+
+1. **Make the measurement trustworthy.** Complete the fixed HoVer/PAPILLON
+   calibration or retain an interpretable terminal failure. It must answer
+   format reliability, repeat variability, privacy, token usage, and realistic
+   cost; another opaque receipt is not progress.
+2. **Ratify or reject the representative portfolio.** Use the calibration and
+   current ecosystem research to choose tasks, public programs, metrics,
+   optimizer/upstream arms, seeds, data sizes, effect thresholds, statistical
+   treatment, and a real cost envelope. The previously proposed 1.7M-transport
+   HoVer/PAPILLON design is a candidate, not automatic authority.
+3. **Freeze ordinary benchmark paths.** Each chosen task must use thin public
+   Imp composition, native validated metrics, result-blind splits, ordinary
+   Result/Artifact boundaries, fresh concurrent service, and pinned ordinary
+   upstream APIs. Benchmark-local code must not own missing generic behavior.
+4. **Run the first representative tranche.** Execute the predeclared seeds and
+   arms without seed shopping or threshold changes; retain row- and seed-level
+   uncertainty, exact costs, artifacts, clean negatives, and independently
+   recomputable evidence.
+5. **Improve and stabilize the product from the evidence.** Fix reusable product
+   defects, redesign invalid treatments, and learn from scientific negatives.
+   Promote optimizer families only when their semantics, operations, reports,
+   documentation, and appropriately scoped usefulness evidence support it.
+6. **Complete the user experience and external acceptance.** Rewrite remaining
+   user documentation around purpose and use, conduct a cold independent
+   install-to-optimize-to-serve review, prepare an owner-ready release, and leave
+   publication as an explicit owner action.
+
+`imp-argb` and `imp-tg2z` remain completed prerequisites, not epic closure.
+`imp-88sn` owns the current scientific frontier. Historical treatments and
+results below remain immutable evidence; they are not current authority merely
+because they are detailed.
 
 ## Notes
 

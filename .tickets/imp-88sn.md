@@ -18,7 +18,7 @@ Obstacle: Imp has one narrow historical positive matched result, several honest 
 
 Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
 
-## Current status at `bbd033c`
+## Current status after `0de8b680`
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
@@ -30,47 +30,52 @@ interpretation is invalid/unverified after a scorer representation defect. A
 complete modeled-MIPRO Banking77 condition averaged `+0.041667`; the final
 exposure-disjoint confirmation averaged `+0.020833`; and the complete HotPotQA
 JSON-GEPA condition averaged `-0.015256`. All were retained as scoped results,
-not threshold-adjusted into wins. No further Banking77 or HotPotQA treatment and
-no upstream comparator is authorized by this ticket today.
+not threshold-adjusted into wins. Banking77, HotPotQA, and IFBench are not
+available for another treatment merely to seek a positive result.
 
 Everything below is a chronological research record. Earlier recommendations,
 budgets, and runnable proposals are not current authority merely because they
-remain preserved. The next decision is a landscape-informed benchmark portfolio
-and an explicit owner-approved scientific question, not an automatic fourth
-task treatment.
+remain preserved.
 
-The landscape-informed portfolio is now concrete but no provider authority has
-been granted:
+The current work is a bounded training-only calibration of released HoVer and
+PAPILLON programs through ordinary Imp and pinned-DSPy paths. It is not an
+optimizer arm and cannot satisfy this ticket. It must measure whether the
+candidate instruments have acceptable format reliability, repetition noise,
+privacy behavior, identifiable scoring, usage, and cost before a larger study is
+designed. The first live attempt made one transport and stopped on missing
+generation evidence. The successor made ten first-stage transports and exposed
+two invented OpenRouter identity assumptions plus late failed-event persistence.
+Both are scientifically null and remain immutable. Provider-free commit
+`3b65a3e0` now binds the distinct requested alias and selected dated snapshot,
+uses existing typed route/transport/cost safety meanings, and reconciles every
+transported ordinary adapter failure before continuing the fixed schedule.
 
-- **Primary LM core:** released HoVer (`150/300/300`, four optimized retrieval
-  stages, all-gold-title scorer) and PAPILLON/PUPA (`111/111/221`, trusted
-  rewrite -> untrusted delegation -> trusted response, quality/privacy scorer).
-  Every baseline, Bootstrap Random Search, MIPROv2-Heavy, and GEPA-with-merge
-  arm runs for Imp and its pinned upstream authority regardless of interim Imp
-  results. Historical `gepa-artifact` and current DSPy 3.2.1/GEPA 0.1.4 are
-  separate authorities, not one parity claim. Five fixed seeds, paired rows,
-  seed-level and row-level uncertainty, validation-only selection, immutable
-  artifacts, and fresh service are required. The corrected lower bound is at
-  least `1,710,400` task-shaped transports before reflection/proposal overhead;
-  a result-blind training-only cost pilot and explicit owner budget decision are
-  required before a full run.
-- **Provider-free LM readiness:** complete at `fa9f3b6`. Public GEPA reaches all
-  named HoVer/PAPILLON predictors; task/scorer inputs, ordered diagnostics,
-  candidate identity, scores, and call counts remain reconstructable; selected
-  schema-3 Artifacts rebind retriever/model/judge clients and execute in a fresh
-  BEAM. Generic callback safety repairs at `5475ba0` and `bbd033c` prevent typed
-  route/cost/budget/transport/cancellation failures from becoming ordinary empty
-  predictions, scores, tool failures, or search outcomes.
-- **Optimize Anything:** released Circle Packing `n=26` is a deterministic
-  single-instance mechanism and portable-value-artifact check, not generalization
-  evidence. Its exact retained state is warm-started and must be replayed as such.
-  The released gskill evidence does not pin a dataset revision, ordered task IDs,
-  repository/base commits, or Docker image digests, so its original split cannot
-  be exactly reconstructed. A future run must be labeled a newly pinned
-  current-source replication. “Bleve + Pallets at 600 calls” is not source-exact:
-  retained Bleve and Jinja runs requested 300 calls, while the documented
-  600-call protocol belongs to Pygments. Five seeds would be a new robustness
-  protocol, not released behavior.
+The owner has standing authority for this exact calibration and for
+scientifically null successors required only by reproduced product-owned defects:
+same rows, programs, model, endpoint, schedule, privacy, and combined `$5` hard
+stop. Do not manufacture another permission boundary after a reviewed repair.
+Stop and ask only for a material change to the treatment, privacy or route, a
+meaningful spend increase, or another genuine owner-held choice. This standing
+authority does not authorize an optimizer portfolio, upstream benchmark tranche,
+publication, or threshold change.
+
+The calibration has one required consequence: ratify or reject a credible
+benchmark protocol. A passing instrument check must lead to a landscape-informed
+choice of representative tasks, result-blind data, ordinary public programs,
+native metrics, optimizer and upstream arms, fixed seeds, uncertainty treatment,
+artifact/service acceptance, and an explicit full-study cost. A failing check
+must lead to a bounded redesign or task replacement—not a larger calibration
+framework. The earlier HoVer/PAPILLON proposal with unconditional baseline,
+Bootstrap Random Search, MIPROv2-Heavy, and GEPA-with-merge arms across Imp and
+pinned upstream is a candidate whose lower bound exceeds 1.7M task-shaped
+transports. It is not yet the ratified next run.
+
+Provider-free LM readiness remains valuable but insufficient: public GEPA can
+reach every named HoVer/PAPILLON predictor, reports retain reconstructable
+identity/scores/diagnostics/calls, and selected schema-3 Artifacts rebind clients
+and execute fresh. The released Circle Packing OA state remains a deterministic
+warm retained-state/artifact check, not held-out generalization. The released
+gskill split remains unreconstructable and any future study must be newly pinned.
 
 The bounded provider-free OA readiness slice is now complete. The repository-only
 gate authenticates `gepa-ai/optimize-anything-artifact@v1.4` at
@@ -94,10 +99,14 @@ Docker image digests, dependency locks, and OS/architecture. A future five-seed
 study remains a newly pinned current-source replication, not reproduction of the
 v1.4 artifacts. No provider, dataset, Docker task, or proposal call was made.
 
-No Circle Packing, gskill, HoVer, PAPILLON, comparator, or cost-pilot provider
-call is authorized by this ticket. The full usefulness criterion remains open.
+No Circle Packing, gskill, optimizer portfolio, or comparator provider call is
+authorized by this ticket. The full usefulness criterion remains open.
 
-## Frozen portfolio design (provider authority: none)
+## Historical frozen portfolio designs (not current authority)
+
+The material below preserves earlier treatments, arithmetic, and outcomes for
+recomputation. It does not override the current status or standing calibration
+authority above.
 
 This design binds inputs and opportunity before any new proposal or task-model
 call. It uses the ordinary public lifecycles fixed in `3adeb10` and `4f386d8`;
