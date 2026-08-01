@@ -269,12 +269,33 @@ def secure_json(path: pathlib.Path, value):
         os.fsync(stream.fileno())
 
 
+def secure_replace_json(path: pathlib.Path, value):
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    try:
+        secure_json(temporary, value)
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def evidence_path(root: pathlib.Path, state, opportunity_id):
+    return root / "live-evidence" / state / (opportunity_id.replace("/", "__") + ".json")
+
+
 def secure_evidence(root: pathlib.Path, state, opportunity_id, value):
     directory = root / "live-evidence" / state
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(root / "live-evidence", 0o700)
     os.chmod(directory, 0o700)
-    secure_json(directory / (opportunity_id.replace("/", "__") + ".json"), value)
+    path = evidence_path(root, state, opportunity_id)
+    secure_json(path, value)
+    return path
 
 
 def materialize_pupa(root: pathlib.Path, rows_payload, source_path=None):
@@ -459,6 +480,13 @@ class Recorder:
         }
         event["parse_status"] = "error"
         event["error"] = diagnostic
+        if self.mode == "live" and self.evidence_root is not None:
+            path = evidence_path(self.evidence_root, "reconciled", event["opportunity_id"])
+            if not path.is_file():
+                raise CalibrationOperationalAbort(
+                    "ordinary failure has no durable reconciled transport event"
+                )
+            secure_replace_json(path, event)
         return diagnostic
 
     def record(self, messages, invoke, history=None):
@@ -764,6 +792,19 @@ def verify_live_transport_offline(dspy_root, output_root):
         if len(provisional) != 1 or len(reconciled) != 1 or generation_gets["normal"] != 2:
             raise RuntimeError("delayed generation reconciliation evidence drift")
         validate_provisional_evidence(provisional[0], item, "gen-offline-live")
+        diagnostic = recorder.mark_ordinary_failure("hover", "H0", 1, ValueError("private"))
+        reconciled_record = json.loads(reconciled[0].read_text())
+        if (
+            diagnostic != {
+                "type": "ValueError",
+                "reason": "redacted ordinary DSPy program/adapter failure",
+            }
+            or reconciled_record.get("status") != "ok"
+            or reconciled_record.get("parse_status") != "error"
+            or reconciled_record.get("error") != diagnostic
+            or reconciled[0].stat().st_mode & 0o777 != 0o600
+        ):
+            raise RuntimeError("DSPy durable ordinary-failure evidence drift")
 
         terminal = Recorder(
             "live",
