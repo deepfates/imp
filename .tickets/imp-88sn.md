@@ -47,14 +47,17 @@ Result/Artifact state, and serves four fresh-process calls. It remains
 the exact `150/300/300` rows, authenticates the pinned 608,448,121-byte archive,
 and reproduces the 5,233,330-row corpus hash. One exact source-recipe build with
 `bm25s==0.2.12`, `k1=0.9`, `b=0.4`, English stopwords, and PyStemmer produced a
-receipted index tree `d8ef9ed4...`; all three existing frozen retrieval title
-vectors match byte/order-exact. The previously frozen `c35ec786...` tree first
-appears in historical authority/generated metadata without a retained index,
-dependency lock, per-file hashes, or build receipt. It is therefore unsupported
-as a deterministic serialization authority. Because `d8ef9ed4...` does not
-match that frozen tree identity, the planner correctly remains
-`data_ready: false`. This grants no live/data readiness, effectiveness claim, or
-provider authority; a separate review must ratify semantic retrieval authority.
+receipted index tree `d8ef9ed4...`. That exact build instance now also owns a
+canonical 450-row train-then-dev top-24 retrieval fingerprint `664ebaa4...`;
+both planned Imp and DSPy entries must verify the same source/config/dependency
+tuple, paths, tree receipt, and fingerprint before this condition is data-ready.
+This is a condition-instance receipt, not universal rebuild identity or
+cross-build semantic equivalence. The legacy `c35ec786...` value remains in this
+history because it entered earlier authority/generated metadata, but it has no
+retained index, dependency lock, per-file hashes, or build receipt and is no
+longer canonical authority. No test rows enter the fingerprint. This provider-
+free authority correction grants no provider authority, effectiveness, parity,
+or paper-replication claim.
 
 The exact Circle v1.4 one-metric cold probe also passes provider-free. It
 authenticates the OA source files and DSPy checkout before imports, uses the

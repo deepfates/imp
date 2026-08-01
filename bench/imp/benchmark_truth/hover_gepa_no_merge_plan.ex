@@ -23,9 +23,32 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
     test: "cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807"
   }
 
-  @retrieval_sha256 %{
-    corpus: "c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724",
-    index: "c35ec78680306e6521110e714083998edc653926ea0641fb272908b744629d22"
+  @corpus_sha256 "c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724"
+  @index_build_instance_sha256 "d8ef9ed4d833c0f9b67ed33784864ff316ec3cfbf1ffca7b0cf2c2190f9f0548"
+  @fingerprint_sha256 "664ebaa4fb998fbd309def9716b3c485bc1983177431f0532c3d568c091f1915"
+  @dependency_lock_sha256 "8fb251bc1fedd7ca9664b6128470e43eba4e5b784ad0c4aede6168782d5f53d4"
+  @runtime_entries [:imp, :dspy]
+
+  @retrieval_build_tuple %{
+    repository: "dspy/cache",
+    revision: "ef6a5e72a98b47cef31574a400fea8fe149559a3",
+    archive_bytes: 608_448_121,
+    archive_sha256: "744183e61af986bde9b25c880b59c1502618a8b673671e189cbc0ee684fceb42",
+    corpus_bytes: 1_780_742_620,
+    corpus_rows: 5_233_330,
+    corpus_sha256: @corpus_sha256,
+    python: "3.12.8",
+    bm25s: "0.2.12",
+    numpy: "2.5.1",
+    pystemmer: "pystemmer 2.2.0.3",
+    k1: 0.9,
+    b: 0.4,
+    method: "lucene",
+    idf_method: "lucene",
+    stopwords: "en",
+    stemmer: "english",
+    platform: "Darwin 25.5.0 arm64",
+    dependency_lock_sha256: @dependency_lock_sha256
   }
 
   @source_files %{
@@ -70,7 +93,16 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
       seeds: @seeds,
       rows: %{train: @train_size, selection: @selection_size, test: @test_size},
       split_sha256: @split_sha256,
-      retrieval_sha256: @retrieval_sha256,
+      retrieval: %{
+        authority_scope: :condition_build_instance_receipt,
+        planned_runtime_entries: @runtime_entries,
+        corpus_sha256: @corpus_sha256,
+        index_build_instance_tree_sha256: @index_build_instance_sha256,
+        frozen_claim_retrieval_fingerprint_sha256: @fingerprint_sha256,
+        fingerprint_rows: 450,
+        build_tuple: @retrieval_build_tuple,
+        excluded_claims: ["universal rebuild identity", "cross-build semantic equivalence"]
+      },
       data_readiness: data_readiness(opts),
       optimizer: %{
         execution_profile: :gepa_v0_1_4,
@@ -146,22 +178,44 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
 
   def data_readiness(opts \\ []) do
     data_root = Keyword.get(opts, :data_root)
-    retrieval = Keyword.get(opts, :retrieval)
+    runtime_retrievals = Keyword.get(opts, :runtime_retrievals)
+    receipt_path = Keyword.get(opts, :receipt_path)
+    dependency_lock_path = Keyword.get(opts, :dependency_lock_path)
+    fingerprint_path = Keyword.get(opts, :fingerprint_path)
 
-    if is_binary(data_root) and is_map(retrieval) do
-      verify_materialized!(data_root, retrieval)
-      %{data_ready: true, data_root: Path.expand(data_root)}
+    if is_binary(data_root) and is_map(runtime_retrievals) and is_binary(receipt_path) and
+         is_binary(dependency_lock_path) and is_binary(fingerprint_path) do
+      verify_materialized!(
+        data_root,
+        runtime_retrievals,
+        receipt_path,
+        dependency_lock_path,
+        fingerprint_path
+      )
+
+      %{
+        data_ready: true,
+        data_root: Path.expand(data_root),
+        runtime_entries: @runtime_entries,
+        index_authority_scope: :condition_build_instance_receipt
+      }
     else
       %{
         data_ready: false,
         reason:
-          "full 150/300/300 exported rows and source-exact 5.2M-document corpus/index are not materialized on this machine"
+          "condition-specific row, build-receipt, dependency-lock, runtime-path, and retrieval-fingerprint evidence is required"
       }
     end
   end
 
-  def verify_materialized!(data_root, retrieval)
-      when is_binary(data_root) and is_map(retrieval) do
+  def verify_materialized!(
+        data_root,
+        runtime_retrievals,
+        receipt_path,
+        dependency_lock_path,
+        fingerprint_path
+      )
+      when is_binary(data_root) and is_map(runtime_retrievals) do
     expected = [
       {"train.jsonl", @train_size, @split_sha256.train},
       {"dev.jsonl", @selection_size, @split_sha256.selection},
@@ -176,13 +230,27 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
       end
     end)
 
-    verify_retrieval!(retrieval)
+    unless MapSet.new(Map.keys(runtime_retrievals)) == MapSet.new(@runtime_entries) do
+      raise ArgumentError, "HoVer retrieval paths must be supplied for Imp and DSPy"
+    end
+
+    verify_build_receipt!(receipt_path)
+
+    unless file_sha256(dependency_lock_path) == @dependency_lock_sha256 do
+      raise ArgumentError, "HoVer retrieval dependency lock does not match the build receipt"
+    end
+
+    verify_fingerprint!(fingerprint_path)
+
+    Enum.each(@runtime_entries, fn runtime ->
+      verify_retrieval!(Map.fetch!(runtime_retrievals, runtime))
+    end)
   end
 
   def verify_retrieval!(retrieval) when is_map(retrieval) do
     expected = %{
-      "corpus_checksum" => "sha256:" <> @retrieval_sha256.corpus,
-      "index_checksum" => "sha256:" <> @retrieval_sha256.index
+      "corpus_checksum" => "sha256:" <> @corpus_sha256,
+      "index_checksum" => "sha256:" <> @index_build_instance_sha256
     }
 
     unless Map.take(retrieval, Map.keys(expected)) == expected do
@@ -190,6 +258,70 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
     end
 
     Imp.BenchmarkTruth.HoverBM25.verify_source!(retrieval)
+  end
+
+  defp verify_build_receipt!(path) do
+    receipt = path |> File.read!() |> Jason.decode!()
+    build = get_in(receipt, ["retrieval", "build"])
+    extraction = get_in(receipt, ["retrieval", "extraction"])
+    archive = get_in(receipt, ["retrieval", "archive"])
+
+    expected = @retrieval_build_tuple
+
+    actual = %{
+      repository: get_in(receipt, ["retrieval", "repository"]),
+      revision: get_in(receipt, ["retrieval", "revision"]),
+      archive_bytes: archive["bytes"],
+      archive_sha256: archive["sha256"],
+      corpus_bytes:
+        get_in(extraction, ["authenticated_members"])
+        |> Enum.find_value(fn member -> member["extracted"] && member["bytes"] end),
+      corpus_rows: extraction["corpus_rows"],
+      corpus_sha256: extraction["corpus_sha256"],
+      python: build["python"],
+      bm25s: get_in(build, ["parameters", "bm25s"]),
+      numpy: build["numpy"],
+      pystemmer: build["parameters"]["stemmer"] |> String.split("/") |> hd(),
+      k1: get_in(build, ["parameters", "k1"]),
+      b: get_in(build, ["parameters", "b"]),
+      method: get_in(build, ["parameters", "method"]),
+      idf_method: get_in(build, ["parameters", "idf_method"]),
+      stopwords: get_in(build, ["parameters", "stopwords"]),
+      stemmer: build["parameters"]["stemmer"] |> String.split("/") |> List.last(),
+      platform: build["platform"],
+      dependency_lock_sha256: build["dependency_lock_sha256"]
+    }
+
+    unless actual == expected and build["actual_tree_sha256"] == @index_build_instance_sha256 do
+      raise ArgumentError, "HoVer retrieval build receipt does not match this condition"
+    end
+  end
+
+  defp verify_fingerprint!(path) do
+    unless file_sha256(path) == @fingerprint_sha256 do
+      raise ArgumentError,
+            "HoVer frozen-claim retrieval fingerprint does not match this condition"
+    end
+
+    records = path |> File.stream!() |> Enum.map(&Jason.decode!/1)
+
+    expected_positions =
+      Enum.map(0..(@train_size - 1), &{"train", &1}) ++
+        Enum.map(0..(@selection_size - 1), &{"dev", &1})
+
+    actual_positions = Enum.map(records, &{&1["split"], &1["split_position"]})
+
+    valid? =
+      actual_positions == expected_positions and
+        Enum.all?(records, fn record ->
+          Map.keys(record) |> Enum.sort() ==
+            ~w(claim_sha256 doc_ids row_sha256 split split_position titles) and
+            length(record["doc_ids"]) == 24 and length(record["titles"]) == 24
+        end)
+
+    unless valid? do
+      raise ArgumentError, "HoVer frozen-claim retrieval fingerprint shape is invalid"
+    end
   end
 
   def provider_disabled_lifecycle!(root, seed) when seed in @seeds do

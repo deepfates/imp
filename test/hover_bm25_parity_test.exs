@@ -26,6 +26,76 @@ defmodule HoverBM25ParityTest do
     end
   end
 
+  test "frozen-claim fingerprint is canonical, ordered, and excludes test" do
+    root = temporary_path("fingerprint")
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    train = Jason.encode!(%{"claim" => "Train claim"}) <> "\n"
+    dev = Jason.encode!(%{"claim" => "Dev claim"}) <> "\n"
+    File.write!(Path.join(root, "train.jsonl"), train)
+    File.write!(Path.join(root, "dev.jsonl"), dev)
+    File.write!(Path.join(root, "test.jsonl"), "must-not-be-read\n")
+    corpus = Path.join(root, "corpus.jsonl")
+
+    File.write!(
+      corpus,
+      Enum.map_join(["Zero", "One", "Two"], "\n", &Jason.encode!(%{"title" => &1})) <>
+        "\n"
+    )
+
+    python = ~S"""
+    import contextlib, importlib.util, io, pathlib, sys
+    module_path, root, corpus, train_sha, dev_sha = sys.argv[1:]
+    spec = importlib.util.spec_from_file_location("hover_eval", module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    class BM25:
+        @staticmethod
+        def tokenize(claims, **_kwargs):
+            assert claims == ["Train claim", "Dev claim"]
+            return claims
+    class Retriever:
+        def retrieve(self, _tokens, **kwargs):
+            assert kwargs == {"k": 2, "n_threads": 1, "show_progress": False}
+            return [[2, 0], [1, 2]], [[1.0, 0.5], [1.0, 0.5]]
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        module.emit_frozen_claim_retrieval_fingerprint(
+            Retriever(), object(), pathlib.Path(corpus), pathlib.Path(root), BM25,
+            split_specs=(("train", 1, train_sha), ("dev", 1, dev_sha)), k=2)
+    sys.stdout.write(output.getvalue())
+    """
+
+    args = [
+      "-c",
+      python,
+      Path.expand("scripts/hover_bm25_upstream_eval.py"),
+      root,
+      corpus,
+      sha256(train),
+      sha256(dev)
+    ]
+
+    {output, 0} = System.cmd("python3", args)
+    {repeat, 0} = System.cmd("python3", args)
+    assert repeat == output
+    assert String.ends_with?(output, "\n")
+    records = output |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
+
+    assert Enum.map(records, &{&1["split"], &1["split_position"]}) ==
+             [{"train", 0}, {"dev", 0}]
+
+    assert Enum.map(records, & &1["titles"]) == [["Two", "Zero"], ["One", "Two"]]
+    assert Enum.map(records, & &1["doc_ids"]) == [[2, 0], [1, 2]]
+    assert Enum.map(records, & &1["row_sha256"]) == [sha256(train), sha256(dev)]
+    refute Enum.any?(records, &Map.has_key?(&1, "scores"))
+
+    File.write!(Path.join(root, "train.jsonl"), train <> "changed\n")
+    {error, 1} = System.cmd("python3", args, stderr_to_stdout: true)
+    assert error =~ "HoVer frozen train bytes differ"
+  end
+
   test "source-exact HoVer adapter matches pinned upstream bm25s title order" do
     if System.get_env("IMP_HOVER_UPSTREAM_PARITY") == "1" do
       gepa_root = Path.expand(System.get_env("IMP_GEPA_ROOT") || "tmp/gepa-artifact")
@@ -109,6 +179,12 @@ defmodule HoverBM25ParityTest do
       "index_checksum" => "sha256:" <> Imp.BenchmarkTruth.HoverBM25.checksum_path(index_path)
     }
   end
+
+  defp temporary_path(name) do
+    Path.join(System.tmp_dir!(), "imp-hover-#{name}-#{System.unique_integer([:positive])}")
+  end
+
+  defp sha256(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
 
   defp upstream_title_fixtures do
     [

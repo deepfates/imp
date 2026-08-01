@@ -79,10 +79,13 @@ The product center is real but the telos is open.
   `150/300/300` rows, pinned archive, and 5,233,330-row corpus now materialize
   provider-free and match their frozen hashes. The one authorized source-recipe
   BM25S build is receipted as tree `d8ef9ed4...` and reproduces all three frozen
-  retrieval title vectors, but it does not match the historical `c35ec786...`
-  tree. That older value has no retained build receipt or dependency lock and is
-  unsupported as a deterministic serialization authority, so retrieval and
-  `data_ready` remain false pending a separate semantic-authority disposition.
+  retrieval title vectors. It now owns a condition-specific train+dev top-24
+  retrieval fingerprint `664ebaa4...`; both planned runtime entries must verify
+  its exact source/config/dependency tuple, paths, `d8ef9ed4...` tree receipt,
+  and fingerprint. The historical `c35ec786...` value remains legacy provenance
+  but has no retained build receipt and is demoted from canonical authority.
+  This makes the exact private artifact data-ready for this condition only, not
+  a universal rebuild or cross-build semantic-equivalence authority.
   Circle v1.4's exact one-metric cold probe authenticates source before imports,
   preserves the released objective and refiner context, carries Imp
   `current_best`, records upstream's cache-induced one-evaluation asymmetry, and

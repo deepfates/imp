@@ -10,7 +10,16 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
 
     assert plan.status == :readiness_only
     assert plan.data_readiness.data_ready == false
-    assert plan.data_readiness.reason =~ "not materialized"
+    assert plan.data_readiness.reason =~ "build-receipt"
+    assert plan.retrieval.authority_scope == :condition_build_instance_receipt
+    assert plan.retrieval.planned_runtime_entries == [:imp, :dspy]
+
+    assert plan.retrieval.index_build_instance_tree_sha256 ==
+             "d8ef9ed4d833c0f9b67ed33784864ff316ec3cfbf1ffca7b0cf2c2190f9f0548"
+
+    assert plan.retrieval.frozen_claim_retrieval_fingerprint_sha256 ==
+             "664ebaa4fb998fbd309def9716b3c485bc1983177431f0532c3d568c091f1915"
+
     assert plan.rows == %{train: 150, selection: 300, test: 300}
     assert plan.optimizer.execution_profile == :gepa_v0_1_4
     refute plan.optimizer.use_merge
@@ -25,6 +34,79 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
     assert plan.transports.legal_total == 122_520
     assert plan.transports.logical_reflections_all_runtimes_seeds == 1_800
     assert plan.transports.legal_reflection_transports_all_runtimes_seeds == 3_600
+  end
+
+  @tag :evidence_infrastructure
+  test "condition receipt requires both runtimes, exact receipt, and exact fingerprint" do
+    root = Path.expand("tmp/hover-materialization-v1")
+    data_root = Path.join(root, "export/hoverBench")
+    receipt_path = Path.join(root, "materialization.json")
+    lock_path = Path.join(root, "dependency-lock.txt")
+    fingerprint_path = Path.join(root, "retrieval/frozen-claim-retrieval-fingerprint.jsonl")
+    corpus_path = Path.join(root, "retrieval/extracted/wiki.abstracts.2017.jsonl")
+    index_path = Path.join(root, "retrieval/index/bm25s_retriever")
+
+    retrieval = %{
+      "kind" => "bm25s_wiki_abstracts_2017",
+      "corpus_path" => corpus_path,
+      "index_path" => index_path,
+      "corpus_checksum" =>
+        "sha256:c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724",
+      "index_checksum" =>
+        "sha256:d8ef9ed4d833c0f9b67ed33784864ff316ec3cfbf1ffca7b0cf2c2190f9f0548"
+    }
+
+    common = [
+      data_root: data_root,
+      receipt_path: receipt_path,
+      dependency_lock_path: lock_path,
+      fingerprint_path: fingerprint_path
+    ]
+
+    assert_raise ArgumentError, ~r/Imp and DSPy/, fn ->
+      HoverGepaNoMergePlan.data_readiness(
+        Keyword.put(common, :runtime_retrievals, %{imp: retrieval})
+      )
+    end
+
+    altered_receipt = temporary_path("altered-receipt")
+
+    File.write!(
+      altered_receipt,
+      File.read!(receipt_path)
+      |> String.replace(
+        "d8ef9ed4d833c0f9b67ed33784864ff316ec3cfbf1ffca7b0cf2c2190f9f0548",
+        String.duplicate("0", 64),
+        global: false
+      )
+    )
+
+    on_exit(fn -> File.rm_rf!(altered_receipt) end)
+
+    assert_raise ArgumentError, ~r/build receipt/, fn ->
+      HoverGepaNoMergePlan.data_readiness(
+        common
+        |> Keyword.put(:receipt_path, altered_receipt)
+        |> Keyword.put(:runtime_retrievals, %{imp: retrieval, dspy: retrieval})
+      )
+    end
+
+    altered_fingerprint = temporary_path("altered-fingerprint")
+    File.write!(altered_fingerprint, File.read!(fingerprint_path) <> "{}\n")
+    on_exit(fn -> File.rm_rf!(altered_fingerprint) end)
+
+    assert_raise ArgumentError, ~r/fingerprint/, fn ->
+      HoverGepaNoMergePlan.data_readiness(
+        common
+        |> Keyword.put(:fingerprint_path, altered_fingerprint)
+        |> Keyword.put(:runtime_retrievals, %{imp: retrieval, dspy: retrieval})
+      )
+    end
+
+    assert %{data_ready: true, runtime_entries: [:imp, :dspy]} =
+             HoverGepaNoMergePlan.data_readiness(
+               Keyword.put(common, :runtime_retrievals, %{imp: retrieval, dspy: retrieval})
+             )
   end
 
   test "constructs only the frozen public pinned profile" do
