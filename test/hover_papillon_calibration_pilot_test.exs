@@ -80,6 +80,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       assert vectors(imp["events"]) == vectors(Pilot.runtime_schedule("imp"))
 
       assert length(imp["outcomes"]["hover"]) == 6
+      assert_exact_retriever_outcomes!(imp["outcomes"]["hover"])
       assert Enum.all?(imp["outcomes"]["papillon"], &papillon_components_complete?/1)
 
       {output, 0} = run_dspy(dspy_root, commit, source)
@@ -110,6 +111,11 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       assert_renderer_boundary!(imp["events"], upstream["events"])
 
       assert Enum.all?(upstream["events"], &(&1["status"] == "ok" and &1["parse_status"] == "ok"))
+      assert_exact_retriever_outcomes!(upstream["outcomes"]["hover"])
+
+      assert Enum.map(imp["outcomes"]["hover"], & &1["retrieved_titles"]) ==
+               Enum.map(upstream["outcomes"]["hover"], & &1["retrieved_titles"])
+
       assert Enum.all?(upstream["outcomes"]["papillon"], &papillon_components_complete?/1)
 
       failed_root = Path.join(root, "dspy-format-failure")
@@ -726,6 +732,23 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
     )
   end
 
+  defp assert_exact_retriever_outcomes!(outcomes) do
+    expected = Enum.flat_map(1..3, fn _hop -> Pilot.retriever_titles() end)
+
+    assert Pilot.retriever_titles() == [
+             "The Dinner Party",
+             "Sojourner Truth",
+             "Barbe de Verrue",
+             "Akira Yoshizawa",
+             "Hirohito",
+             "Wet-folding"
+           ]
+
+    assert Enum.all?(outcomes, fn outcome ->
+             outcome["retrieved_titles"] == expected and outcome["all_gold_titles"] == true
+           end)
+  end
+
   defp assert_runtime_message_stability!(events) do
     events
     |> Enum.group_by(&{&1["task"], &1["row"], &1["stage"]})
@@ -740,20 +763,19 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
 
     assert Map.keys(imp) |> Enum.sort() == Map.keys(dspy) |> Enum.sort()
 
-    # The ordinary Imp and DSPy Chain-of-Thought adapters render HoVer
-    # differently even though the signatures, row inputs, deterministic
-    # passages, prior-stage values, caps and opportunities are the same. The
-    # direct query and PAPILLON program calls happen to match; structured list
-    # and judge rendering remain runtime-specific treatment variables.
+    # The ordinary Imp and DSPy HoVer calls currently match after correcting
+    # the fixture's title values. PAPILLON's structured judge rendering remains
+    # a runtime-specific treatment variable; this records the observed boundary
+    # and does not impose a shared private renderer.
     matches =
       Map.new(imp, fn {{task, _row, _repetition, stage} = key, hash} ->
         {{task, stage}, hash == Map.fetch!(dspy, key)}
       end)
 
     assert matches == %{
-             {"hover", "summarize1"} => false,
+             {"hover", "summarize1"} => true,
              {"hover", "query2"} => true,
-             {"hover", "summarize2"} => false,
+             {"hover", "summarize2"} => true,
              {"hover", "query3"} => true,
              {"papillon", "rewrite"} => true,
              {"papillon", "untrusted"} => true,

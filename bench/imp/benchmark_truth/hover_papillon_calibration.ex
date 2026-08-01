@@ -27,6 +27,14 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     quality_ba: 32_768,
     leakage: 16_384
   ]
+  @retriever_titles [
+    "The Dinner Party",
+    "Sojourner Truth",
+    "Barbe de Verrue",
+    "Akira Yoshizawa",
+    "Hirohito",
+    "Wet-folding"
+  ]
   @rows_path Path.expand("hover_papillon_calibration_rows.json", __DIR__)
   @authorities %{
     "gepa_artifact" => "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
@@ -45,6 +53,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
   def zdr_url, do: @zdr_url
   def rows_path, do: @rows_path
   def authorities, do: @authorities
+  def retriever_titles, do: @retriever_titles
 
   def provider_preferences do
     %{
@@ -580,8 +589,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
 
     retriever = fn _query, opts ->
       docs =
-        ~w(The\ Dinner\ Party Sojourner\ Truth Barbe\ de\ Verrue Akira\ Yoshizawa Hirohito Wet-folding)
-        |> Enum.map(&%{title: &1, text: "provider-disabled training passage"})
+        Enum.map(@retriever_titles, &%{title: &1, text: "provider-disabled training passage"})
 
       {:ok, Enum.take(docs, Keyword.get(opts, :k, 10))}
     end
