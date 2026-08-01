@@ -601,6 +601,21 @@
       "notes": "The source revisions, construction, and exported full split digests are pinned; live optimization evidence remains a separate requirement."
     },
     {
+      "id": "family.benchmark_musique_ans",
+      "name": "MuSiQue-Ans",
+      "kind": "benchmark",
+      "surface_tokens": ["MuSiQue-Ans"],
+      "upstream_surface_ids": [],
+      "coverage_matrix_concepts": ["Multi-stage optimizer usefulness candidate"],
+      "parity_lanes": ["Lane 3: Optimizer Lift Parity"],
+      "upstream_repository": {"status": "commit_pinned", "repository": "https://github.com/StonyBrookNLP/musique", "version": "v1.0", "git_ref": "922ac98f19a201998dbdae6d7f2887a5258dbdeb", "commit": "922ac98f19a201998dbdae6d7f2887a5258dbdeb", "source_paths": ["experiment_configs/select_and_answer_model_selector_for_musique_ans.jsonnet", "experiment_configs/select_and_answer_model_answerer_for_musique_ans.jsonnet", "allennlp_lib/predictors/inplace_text_ranker.py", "allennlp_lib/models/text_ranker.py", "allennlp_lib/data/dataset_readers/transformer_rc.py", "raw_predictions_to_official_format.py", "evaluate_v1.0.py", "metrics/answer.py", "metrics/support.py"], "source_manifest": {"path": "benchmarks/authority_sources/musique-ans-922ac98.json", "sha256": "7f43249133164695cfd63f42a5f06bd6414a780511f71c53b8150523bc3f6220", "file_count": 12}},
+      "primary_authority": {"status": "pinned", "locator": "https://arxiv.org/abs/2108.00573v3", "revision": "v3", "title": "MuSiQue: Multihop Questions via Single-hop Question Composition"},
+      "upstream_tests": {"status": "not_applicable", "references": []},
+      "dataset_protocol": {"status": "pinned", "references": ["official Google Drive object 1tGdADlNjWFaHLeZZGShh2IRcpO6Lv24h via pinned download_data.sh", "archive 272049578 bytes", "train 19938 rows", "dev 2417 rows audit-exposed with gold", "test 2459 inputs audit-exposed; labels hidden and excluded"], "immutable_digests": ["sha256:98f839bf2fd5319f5c688aed77901a6d5c30b3b9f9f691ab9a8ecafb045ee0cd", "sha256:83a75b1e11e4e9bb8f8308e72ac40ca617ae4431b3a0d955b61cab259248490a", "sha256:15fa63794d18a94ce12411aca6e2327e65b6e83b0b1490efab3f1962e48abf3b", "sha256:92ee3067957b8ebce885baa71156a7c0c29f3bc72cca04510aef506911dd768f"]},
+      "local_differential": {"status": "present", "artifacts": ["test/musique_ans_product_fit_test.exs", "scripts/musique_ans_product_fit_upstream.py"]},
+      "notes": "Provider-free feasibility only. Imp and pinned DSPy exercise an adapted LM Select-to-Answer topology, not official Longformer or prompt parity. All 2417 dev gold rows were previously loaded solely for deterministic scorer comparison; no model, optimizer, candidate selection, or treatment score used them. Test inputs were previously audit-exposed, labels remain hidden. No treatment split, objective, model, price, or paid-run authority is frozen."
+    },
+    {
       "id": "family.benchmark_hover",
       "name": "HoVer / hoverBench",
       "kind": "benchmark",

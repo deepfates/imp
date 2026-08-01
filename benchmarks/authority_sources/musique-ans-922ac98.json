@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "authority": "MuSiQue-Ans source, Select+Answer topology, and official scorer",
+  "repository": "https://github.com/StonyBrookNLP/musique",
+  "commit": "922ac98f19a201998dbdae6d7f2887a5258dbdeb",
+  "license": "CC-BY-4.0",
+  "dataset_receipts": {"official_drive_id": "1tGdADlNjWFaHLeZZGShh2IRcpO6Lv24h", "archive": {"bytes": 272049578, "sha256": "98f839bf2fd5319f5c688aed77901a6d5c30b3b9f9f691ab9a8ecafb045ee0cd"}, "train": {"rows": 19938, "sha256": "83a75b1e11e4e9bb8f8308e72ac40ca617ae4431b3a0d955b61cab259248490a"}, "dev": {"rows": 2417, "sha256": "15fa63794d18a94ce12411aca6e2327e65b6e83b0b1490efab3f1962e48abf3b", "status": "audit-exposed gold; model/optimizer/treatment-unseen"}, "test": {"rows": 2459, "sha256": "92ee3067957b8ebce885baa71156a7c0c29f3bc72cca04510aef506911dd768f", "hash_scope": "locally measured archive member", "status": "audit-exposed inputs only; labels hidden; treatment-excluded"}},
+  "source_paths": ["allennlp_lib/data/dataset_readers/transformer_rc.py", "allennlp_lib/models/text_ranker.py", "allennlp_lib/predictors/inplace_text_ranker.py", "evaluate_v1.0.py", "experiment_configs/select_and_answer_model_answerer_for_musique_ans.jsonnet", "experiment_configs/select_and_answer_model_selector_for_musique_ans.jsonnet", "metrics/answer.py", "metrics/support.py", "raw_predictions_to_official_format.py"],
+  "files": [
+    {"path": "LICENSE", "sha256": "cce5d01fa4a83b794271bd2c28cffdf99afd43c803e6ddefddae39b591ea7448"},
+    {"path": "README.md", "sha256": "7a3fb6a960f3fa122d2a1a81b73b9cf5a39ac983b11735d158490947960b9359"},
+    {"path": "allennlp_lib/data/dataset_readers/transformer_rc.py", "sha256": "485ce12f61b4a22ce68c21b0d7fd27a8b910d862a47d156d2179fe184f0264e2"},
+    {"path": "allennlp_lib/models/text_ranker.py", "sha256": "9134affba47c8b2f511eabc7d066f30242411d0b7de217cdfae4c68d720fcfe9"},
+    {"path": "allennlp_lib/predictors/inplace_text_ranker.py", "sha256": "e3ae5366b896b7e6c7d01d2b8153e0d065c4923e346b1c1fc7bc462db6b97bd2"},
+    {"path": "download_data.sh", "sha256": "3242f928d7c0f8db885296872397af33ce19014e6edab62bbd44bab3d73a09d2"},
+    {"path": "evaluate_v1.0.py", "sha256": "f5fe66ae61dbea5172cba9d428d9924a5811f3457edc945fc1d81369c30e74b7"},
+    {"path": "experiment_configs/select_and_answer_model_answerer_for_musique_ans.jsonnet", "sha256": "f24f79cc26b669acd5472afe7e688353a0d7dd5f1a709aa2b188ff72e4e2622f"},
+    {"path": "experiment_configs/select_and_answer_model_selector_for_musique_ans.jsonnet", "sha256": "ac8ca80799a6d6d2fbde103d745d79240a8388aa259073e47ffdda553f5b6f58"},
+    {"path": "metrics/answer.py", "sha256": "10368f619b4d5ef5d83748c05a96c0afd332a14ab5c010740c98d58dfaefe974"},
+    {"path": "metrics/support.py", "sha256": "ac16c0daf458a6a4d6db97682c2340fe5b5936a947bf32c04dc3bf16406077c6"},
+    {"path": "raw_predictions_to_official_format.py", "sha256": "a26db4a2ea8b95ab3078dc6d6ddef68f4997c908ee4511a7dc1e3886a536e22a"}
+  ]
+}

@@ -37,6 +37,15 @@ Everything below is a chronological research record. Earlier recommendations,
 budgets, and runnable proposals are not current authority merely because they
 remain preserved.
 
+MuSiQue-Ans is a provider-free feasibility candidate, not an authorized treatment.
+The pinned source, official answer/support scorers, adapted LM
+selector-to-answerer topology, real ReqLLM/LiteLLM request boundaries, both
+predictor mutations, schema-3 Artifact, and fresh ProgramServer lifecycle pass.
+All 2,417 dev gold rows were previously loaded only for deterministic scorer
+comparison; dev is audit-exposed but model/optimizer/treatment-unseen. Test
+inputs were also previously audit-exposed; labels remain hidden and excluded.
+No split, scientific objective, model, price, budget, or provider run is frozen.
+
 The current provider-free preparation establishes two narrower facts without
 advancing the usefulness criterion. The adapted HoVer no-merge target has a
 source-grounded nominal `194,448` and legal `201,720` task-transport envelope;

@@ -95,6 +95,7 @@ open.
 | HotPotQA and HotpotQABench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | partial |
 | Color and structured classification tasks | benchmark | n/a | no_primary_authority | not_applicable | partial | partial |
 | AIMEBench | benchmark | paper-artifact @ cbefbc1aa0f4 | no_primary_authority | not_applicable | pinned | gap |
+| MuSiQue-Ans | benchmark | v1.0 @ 922ac98f19a2 | pinned | not_applicable | pinned | present |
 | HoVer / hoverBench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | present |
 | IFBench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | present |
 | LiveBenchMathBench | benchmark | paper-artifact @ cbefbc1aa0f4 | pinned | not_applicable | pinned | gap |
