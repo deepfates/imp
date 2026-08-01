@@ -69,6 +69,21 @@ HOVER_FROZEN_SPLITS = {
     },
 }
 
+HOVER_IDENTITY_DISJOINT_SPLITS = {
+    "train": {
+        "count": 150,
+        "sha256": "448048cc80de7982b344ef3c8767816164eeabe3d2a1ad4f776245e3dff39370",
+    },
+    "dev": {
+        "count": 300,
+        "sha256": "052fdda83d8e7fff83c7f4db67cd1a2a8cb66047e6cd68ecfe14310dcbf93602",
+    },
+    "test": {
+        "count": 300,
+        "sha256": "cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807",
+    },
+}
+
 
 FAMILY_SPECS: Dict[str, Dict[str, Any]] = {
     "AIMEBench": {
@@ -141,6 +156,7 @@ def main() -> int:
     parser.add_argument("--max-per-split", type=int)
     parser.add_argument("--family", choices=sorted(FAMILY_SPECS))
     parser.add_argument("--hover-source-root")
+    parser.add_argument("--hover-identity-disjoint", action="store_true")
     args = parser.parse_args()
     dataset_scope = "full" if args.max_per_split is None else "capped"
 
@@ -160,6 +176,8 @@ def main() -> int:
         hover_raw_authority = verify_hover_raw_source(
             Path(args.hover_source_root).resolve()
         )
+    elif args.hover_identity_disjoint:
+        raise RuntimeError("--hover-identity-disjoint requires --family hoverBench")
 
     sys.path.insert(0, str(gepa_root))
     install_dataset_compatibility_shims()
@@ -174,12 +192,16 @@ def main() -> int:
 
         split_counts = {}
         split_checksums = {}
-        for split_name, examples in [
-            ("train", benchmark.train_set),
-            ("dev", benchmark.val_set),
-            ("test", benchmark.test_set),
-        ]:
-            records = [example_to_record(example) for example in list(examples)]
+        split_records = benchmark_split_records(benchmark)
+        split_lineage = None
+
+        if args.family == "hoverBench" and args.hover_identity_disjoint:
+            split_records, split_lineage = identity_disjoint_hover_records(
+                benchmark, split_records
+            )
+
+        for split_name in ["train", "dev", "test"]:
+            records = split_records[split_name]
             if args.max_per_split is not None:
                 records = records[: args.max_per_split]
 
@@ -189,7 +211,14 @@ def main() -> int:
             split_checksums[split_name] = "sha256:" + sha256(path)
 
         if args.family == "hoverBench":
-            verify_frozen_hover_export(family_dir, split_counts, split_checksums)
+            expected = (
+                HOVER_IDENTITY_DISJOINT_SPLITS
+                if args.hover_identity_disjoint
+                else HOVER_FROZEN_SPLITS
+            )
+            verify_frozen_hover_export(
+                family_dir, split_counts, split_checksums, expected
+            )
 
         exported_specs.append(
             {
@@ -204,6 +233,14 @@ def main() -> int:
                     gepa_root, family, source, hover_raw_authority
                 ),
                 **family_extra_metadata(gepa_root, family),
+                **(
+                    {
+                        "split_policy": "released_split_with_content_identity_overlap_removed",
+                        "split_lineage": split_lineage,
+                    }
+                    if split_lineage is not None
+                    else {}
+                ),
                 "metric_fidelity": (
                     "upstream_metric_named_for_adapter; Imp campaign runner ports "
                     "deterministic adapters, Papillon judge scoring, IFBench registry "
@@ -286,8 +323,9 @@ def verify_frozen_hover_export(
     family_dir: Path,
     split_counts: Dict[str, int],
     split_checksums: Dict[str, str],
+    expected_splits: Dict[str, Dict[str, Any]] = HOVER_FROZEN_SPLITS,
 ) -> None:
-    for split, expected in HOVER_FROZEN_SPLITS.items():
+    for split, expected in expected_splits.items():
         actual_count = split_counts.get(split)
         actual_sha256 = split_checksums.get(split)
         expected_sha256 = "sha256:" + expected["sha256"]
@@ -297,6 +335,114 @@ def verify_frozen_hover_export(
                 f"expected {expected['count']} rows/{expected_sha256}, got "
                 f"{actual_count}/{actual_sha256}"
             )
+
+
+def benchmark_split_records(benchmark) -> Dict[str, List[Dict[str, Any]]]:
+    return {
+        "train": [example_to_record(example) for example in list(benchmark.train_set)],
+        "dev": [example_to_record(example) for example in list(benchmark.val_set)],
+        "test": [example_to_record(example) for example in list(benchmark.test_set)],
+    }
+
+
+def identity_disjoint_hover_records(
+    benchmark, released: Dict[str, List[Dict[str, Any]]]
+) -> tuple[Dict[str, List[Dict[str, Any]]], Dict[str, Any]]:
+    """Remove source duplicates without using model outputs or task scores."""
+    for split, expected in HOVER_FROZEN_SPLITS.items():
+        actual = jsonl_sha256(released[split])
+        if len(released[split]) != expected["count"] or actual != expected["sha256"]:
+            raise RuntimeError(
+                f"released HoVer {split} lineage differs before identity reconciliation"
+            )
+
+    dataset = list(benchmark.dataset)
+    total = len(dataset)
+    pools = {
+        "test": dataset[: int(0.4 * total)],
+        "dev": dataset[int(0.4 * total) : int(0.8 * total)],
+        "train": dataset[int(0.8 * total) :],
+    }
+    pool_records = {
+        split: [example_to_record(example) for example in examples]
+        for split, examples in pools.items()
+    }
+    forbidden = {
+        record_identity(record)
+        for records in released.values()
+        for record in records
+    }
+    seen: set[str] = set()
+    reconciled: Dict[str, List[Dict[str, Any]]] = {}
+    skipped: Dict[str, List[Dict[str, Any]]] = {}
+    replacements: Dict[str, List[Dict[str, Any]]] = {}
+
+    for split in ["train", "dev", "test"]:
+        kept = []
+        skipped[split] = []
+
+        for position, record in enumerate(released[split]):
+            identity = record_identity(record)
+            if identity in seen:
+                skipped[split].append(
+                    {"released_position": position, "content_sha256": identity}
+                )
+            else:
+                kept.append(record)
+                seen.add(identity)
+
+        needed = HOVER_FROZEN_SPLITS[split]["count"] - len(kept)
+        candidates = sorted(
+            (
+                record_identity(record),
+                source_position,
+                record,
+            )
+            for source_position, record in enumerate(pool_records[split])
+            if record_identity(record) not in forbidden
+            and record_identity(record) not in seen
+        )
+        chosen = candidates[:needed]
+
+        if len(chosen) != needed:
+            raise RuntimeError(f"HoVer {split} has no finite identity-disjoint replacement")
+
+        replacements[split] = [
+            {"source_pool_position": position, "content_sha256": identity}
+            for identity, position, _record in chosen
+        ]
+
+        for identity, _position, record in chosen:
+            kept.append(record)
+            seen.add(identity)
+
+        reconciled[split] = kept
+
+    return reconciled, {
+        "released_split_sha256": {
+            split: expected["sha256"] for split, expected in HOVER_FROZEN_SPLITS.items()
+        },
+        "identity": "sha256(canonical compact sorted-key JSON record)",
+        "precedence": ["train", "dev", "test"],
+        "replacement_policy": (
+            "lowest unused content identity from the same released source pool; "
+            "append after retained released rows"
+        ),
+        "skipped": skipped,
+        "replacements": replacements,
+    }
+
+
+def record_identity(record: Dict[str, Any]) -> str:
+    source = json.dumps(record, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+def jsonl_sha256(records: List[Dict[str, Any]]) -> str:
+    digest = hashlib.sha256()
+    for record in records:
+        digest.update(json.dumps(record, sort_keys=True).encode("utf-8") + b"\n")
+    return digest.hexdigest()
 
 
 def install_dataset_compatibility_shims() -> None:

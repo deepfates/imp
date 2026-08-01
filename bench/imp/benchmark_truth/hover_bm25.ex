@@ -207,7 +207,7 @@ defmodule Imp.BenchmarkTruth.HoverBM25.UpstreamPython do
   @upstream_commit "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
   @bm25s_version "0.2.12"
 
-  defstruct [:gepa_root, :python, :metadata, k: 24]
+  defstruct [:gepa_root, :python, :corpus_path, :index_path, :server, :metadata, k: 24]
 
   def new(retrieval, opts \\ []) do
     Imp.BenchmarkTruth.HoverBM25.verify_source!(retrieval)
@@ -231,6 +231,9 @@ defmodule Imp.BenchmarkTruth.HoverBM25.UpstreamPython do
     %__MODULE__{
       gepa_root: Path.expand(gepa_root),
       python: python,
+      corpus_path: Path.expand(corpus_path),
+      index_path: Path.expand(index_path),
+      server: Keyword.get(opts, :server),
       k: Keyword.get(opts, :k, 24),
       metadata:
         retrieval
@@ -242,6 +245,16 @@ defmodule Imp.BenchmarkTruth.HoverBM25.UpstreamPython do
           "bm25s_version" => @bm25s_version
         })
     }
+  end
+
+  @doc "Starts one source-exact BM25S worker for repeated benchmark retrieval."
+  def start_link(retrieval, opts \\ []) do
+    retriever = new(retrieval, Keyword.delete(opts, :server))
+
+    __MODULE__.Server.start_link(
+      retriever,
+      Keyword.take(opts, [:name, :startup_timeout, :request_timeout])
+    )
   end
 
   @impl true
@@ -258,12 +271,24 @@ defmodule Imp.BenchmarkTruth.HoverBM25.UpstreamPython do
   end
 
   def search(%__MODULE__{} = retriever, query) do
+    if is_pid(retriever.server) do
+      __MODULE__.Server.search(retriever.server, query, retriever.k)
+    else
+      search_once(retriever, query)
+    end
+  end
+
+  defp search_once(%__MODULE__{} = retriever, query) do
     script = Path.expand("scripts/hover_bm25_upstream_eval.py")
 
     args = [
       script,
       "--gepa-root",
       retriever.gepa_root,
+      "--corpus-path",
+      retriever.corpus_path,
+      "--index-path",
+      retriever.index_path,
       "--query",
       query,
       "--k",
@@ -276,6 +301,151 @@ defmodule Imp.BenchmarkTruth.HoverBM25.UpstreamPython do
 
       {output, status} ->
         {:error, {:hover_upstream_bm25_failed, status, output}}
+    end
+  end
+
+  defmodule Server do
+    @moduledoc false
+
+    use GenServer
+
+    @default_startup_timeout 180_000
+    @default_request_timeout 120_000
+    @max_line_bytes 4_000_000
+
+    def start_link(%Imp.BenchmarkTruth.HoverBM25.UpstreamPython{} = retriever, opts) do
+      {genserver_opts, server_opts} = Keyword.split(opts, [:name])
+      GenServer.start_link(__MODULE__, {retriever, server_opts}, genserver_opts)
+    end
+
+    def search(server, query, k) when is_binary(query) and is_integer(k) and k > 0 do
+      GenServer.call(server, {:search, query, k}, :infinity)
+    end
+
+    @impl true
+    def init({retriever, opts}) do
+      executable =
+        System.find_executable(retriever.python) ||
+          raise ArgumentError, "HoVer Python executable not found: #{retriever.python}"
+
+      script = Path.expand("scripts/hover_bm25_upstream_eval.py")
+
+      args = [
+        script,
+        "--gepa-root",
+        retriever.gepa_root,
+        "--corpus-path",
+        retriever.corpus_path,
+        "--index-path",
+        retriever.index_path,
+        "--server"
+      ]
+
+      port =
+        Port.open({:spawn_executable, executable}, [
+          :binary,
+          :exit_status,
+          :use_stdio,
+          {:args, args},
+          {:line, @max_line_bytes}
+        ])
+
+      timeout = Keyword.get(opts, :startup_timeout, @default_startup_timeout)
+
+      receive do
+        {^port, {:data, {:eol, line}}} ->
+          case Jason.decode(line) do
+            {:ok, %{"status" => "ready", "corpus_rows" => rows}}
+            when is_integer(rows) and rows > 0 ->
+              {:ok,
+               %{
+                 port: port,
+                 request_id: 0,
+                 pending: nil,
+                 request_timeout: Keyword.get(opts, :request_timeout, @default_request_timeout)
+               }}
+
+            _other ->
+              Port.close(port)
+              {:stop, {:invalid_hover_bm25_worker_handshake, line}}
+          end
+
+        {^port, {:exit_status, status}} ->
+          {:stop, {:hover_bm25_worker_start_failed, status}}
+      after
+        timeout ->
+          Port.close(port)
+          {:stop, :hover_bm25_worker_start_timeout}
+      end
+    end
+
+    @impl true
+    def handle_call({:search, query, k}, from, %{pending: nil} = state) do
+      request_id = state.request_id + 1
+      payload = Jason.encode!(%{id: request_id, query: query, k: k}) <> "\n"
+
+      if Port.command(state.port, payload) do
+        timer = Process.send_after(self(), {:request_timeout, request_id}, state.request_timeout)
+        {:noreply, %{state | request_id: request_id, pending: {request_id, from, timer}}}
+      else
+        {:reply, {:error, {:hover_bm25_worker_closed, :command_rejected}}, state}
+      end
+    end
+
+    def handle_call({:search, _query, _k}, _from, state) do
+      {:reply, {:error, {:hover_bm25_worker_busy, state.request_id}}, state}
+    end
+
+    @impl true
+    def handle_info(
+          {port, {:data, {:eol, line}}},
+          %{port: port, pending: {request_id, from, timer}} = state
+        ) do
+      Process.cancel_timer(timer)
+
+      reply =
+        case Jason.decode(line) do
+          {:ok, %{"id" => ^request_id, "retrieved_docs" => docs}} when is_list(docs) ->
+            {:ok, docs}
+
+          {:ok, %{"id" => ^request_id, "error" => error}} ->
+            {:error, {:hover_bm25_worker_failed, error}}
+
+          {:ok, response} ->
+            {:error, {:invalid_hover_bm25_worker_response, response}}
+
+          {:error, error} ->
+            {:error, {:invalid_hover_bm25_worker_json, Exception.message(error)}}
+        end
+
+      GenServer.reply(from, reply)
+      {:noreply, %{state | pending: nil}}
+    end
+
+    def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
+      if state.pending do
+        {_request_id, from, timer} = state.pending
+        Process.cancel_timer(timer)
+        GenServer.reply(from, {:error, {:hover_bm25_worker_exited, status}})
+      end
+
+      {:stop, {:hover_bm25_worker_exited, status}, %{state | pending: nil}}
+    end
+
+    def handle_info(
+          {:request_timeout, request_id},
+          %{pending: {request_id, from, _timer}} = state
+        ) do
+      GenServer.reply(from, {:error, {:hover_bm25_worker_timeout, request_id}})
+      {:stop, {:hover_bm25_worker_timeout, request_id}, %{state | pending: nil}}
+    end
+
+    def handle_info(_message, state), do: {:noreply, state}
+
+    @impl true
+    def terminate(_reason, %{port: port}) do
+      if Port.info(port), do: Port.close(port)
+      :ok
     end
   end
 

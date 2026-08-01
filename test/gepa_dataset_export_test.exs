@@ -41,6 +41,57 @@ defmodule GepaDatasetExportTest do
     refute File.exists?(Path.join(out, "hoverBench/train.jsonl"))
   end
 
+  @tag :evidence_infrastructure
+  test "authenticated HoVer export removes the released cross-split content duplicate without scores" do
+    material = Path.expand("tmp/hover-materialization-v1")
+    out = tmp_dir("hover-identity-disjoint")
+
+    {output, 0} =
+      System.cmd(
+        Path.join(material, ".venv/bin/python"),
+        [
+          "scripts/gepa_export_dataset_root.py",
+          "--gepa-root",
+          "tmp/gepa-artifact",
+          "--out",
+          out,
+          "--family",
+          "hoverBench",
+          "--hover-source-root",
+          Path.join(material, "hover-source"),
+          "--hover-identity-disjoint"
+        ],
+        env: [{"HF_HOME", Path.join(material, "hf-home")}],
+        stderr_to_stdout: true
+      )
+
+    assert output =~ out
+    family = out |> Path.join("families.json") |> File.read!() |> Jason.decode!()
+    [hover] = family["families"]
+
+    assert hover["split_checksums"] == %{
+             "train" => "sha256:448048cc80de7982b344ef3c8767816164eeabe3d2a1ad4f776245e3dff39370",
+             "dev" => "sha256:052fdda83d8e7fff83c7f4db67cd1a2a8cb66047e6cd68ecfe14310dcbf93602",
+             "test" => "sha256:cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807"
+           }
+
+    assert get_in(hover, ["split_lineage", "skipped", "dev"]) == [
+             %{
+               "content_sha256" =>
+                 "ef899c595acd9714480791fe7d15e929dab4799308e0c67bab5756a16a141c17",
+               "released_position" => 57
+             }
+           ]
+
+    assert get_in(hover, ["split_lineage", "replacements", "dev"]) == [
+             %{
+               "content_sha256" =>
+                 "00213c2cde2b65017097d21be6a77fe2a46ba6f053227a677b148130da1e2e5c",
+               "source_pool_position" => 1_101
+             }
+           ]
+  end
+
   test "GEPA dataset exporter writes campaign dataset root from upstream-shaped package" do
     gepa_root = tmp_dir("gepa-export-source")
     out = tmp_dir("gepa-export-out")

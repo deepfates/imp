@@ -18,9 +18,14 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
              "d8ef9ed4d833c0f9b67ed33784864ff316ec3cfbf1ffca7b0cf2c2190f9f0548"
 
     assert plan.retrieval.frozen_claim_retrieval_fingerprint_sha256 ==
-             "664ebaa4fb998fbd309def9716b3c485bc1983177431f0532c3d568c091f1915"
+             "2662ef6b6a4f8f80b9d348992f14ca04d3007c84b13252825dc38a55ace22099"
 
     assert plan.rows == %{train: 150, selection: 300, test: 300}
+    assert plan.split_policy.output_blind
+
+    assert plan.split_policy.kind ==
+             :released_split_with_content_identity_overlap_removed
+
     assert plan.optimizer.execution_profile == :gepa_v0_1_4
     refute plan.optimizer.use_merge
     assert plan.optimizer.semantic_max_metric_calls == 1_200
@@ -39,10 +44,14 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
   @tag :evidence_infrastructure
   test "condition receipt requires both runtimes, exact receipt, and exact fingerprint" do
     root = Path.expand("tmp/hover-materialization-v1")
-    data_root = Path.join(root, "export/hoverBench")
+    data_root = Path.join(root, "export-disjoint-v1/hoverBench")
     receipt_path = Path.join(root, "materialization.json")
+    split_receipt_path = Path.join(root, "export-disjoint-v1/families.json")
     lock_path = Path.join(root, "dependency-lock.txt")
-    fingerprint_path = Path.join(root, "retrieval/frozen-claim-retrieval-fingerprint.jsonl")
+
+    fingerprint_path =
+      Path.join(root, "retrieval/frozen-disjoint-claim-retrieval-fingerprint.jsonl")
+
     corpus_path = Path.join(root, "retrieval/extracted/wiki.abstracts.2017.jsonl")
     index_path = Path.join(root, "retrieval/index/bm25s_retriever")
 
@@ -59,6 +68,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
     common = [
       data_root: data_root,
       receipt_path: receipt_path,
+      split_receipt_path: split_receipt_path,
       dependency_lock_path: lock_path,
       fingerprint_path: fingerprint_path
     ]
@@ -133,6 +143,24 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
   end
 
   @tag :evidence_infrastructure
+  test "loads the exact source splits and keeps one resident source-exact retriever" do
+    root = Path.expand("tmp/hover-materialization-v1")
+    data = HoverGepaNoMergePlan.data!(root)
+
+    assert length(data.train) == 150
+    assert length(data.selection) == 300
+    assert length(data.test) == 300
+
+    assert HoverGepaNoMergePlan.source_exact_retrieval_probe!(root) == %{
+             queries: 2,
+             top_k: 24,
+             repeat_exact: true,
+             fingerprint_exact: true,
+             implementation: "resident_upstream_python_bm25s"
+           }
+  end
+
+  @tag :evidence_infrastructure
   test "compact provider-disabled lifecycle exercises four mutations, rejection, selection, and fresh service" do
     root = temporary_path("lifecycle")
     on_exit(fn -> File.rm_rf!(root) end)
@@ -171,13 +199,32 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
     {output, 0} =
       System.cmd(
         "mix",
-        ["run", "scripts/hover_gepa_no_merge_current.exs", "--output-root", root],
+        [
+          "run",
+          "scripts/hover_gepa_no_merge_current.exs",
+          "--output-root",
+          root,
+          "--material-root",
+          Path.expand("tmp/hover-materialization-v1")
+        ],
         env: [{"OPENAI_API_KEY", ""}, {"ANTHROPIC_API_KEY", ""}],
         stderr_to_stdout: true
       )
 
     payload = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
-    assert get_in(payload, ["plan", "condition"]) == "imp-88sn-hover-gepa-no-merge-current-v1"
+
+    assert get_in(payload, ["plan", "condition"]) ==
+             "imp-88sn-hover-gepa-no-merge-identity-disjoint-v1"
+
+    assert get_in(payload, ["plan", "data_readiness", "data_ready"]) == true
+
+    assert payload["source_exact_retrieval_probe"] == %{
+             "queries" => 2,
+             "top_k" => 24,
+             "repeat_exact" => true,
+             "fingerprint_exact" => true,
+             "implementation" => "resident_upstream_python_bm25s"
+           }
 
     assert Enum.map(payload["provider_disabled_results"], & &1["seed"]) ==
              [2_026_080_201, 2_026_080_202, 2_026_080_203]

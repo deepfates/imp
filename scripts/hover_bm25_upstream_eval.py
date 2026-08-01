@@ -24,7 +24,7 @@ FROZEN_SPLITS = (
     (
         "dev",
         300,
-        "b342dbaaa4516e55b7f4f7ac046828c2201952e69de5b97751173238674a74a7",
+        "052fdda83d8e7fff83c7f4db67cd1a2a8cb66047e6cd68ecfe14310dcbf93602",
     ),
 )
 FINGERPRINT_K = 24
@@ -36,14 +36,26 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--query")
     mode.add_argument("--frozen-claim-retrieval-fingerprint", action="store_true")
+    mode.add_argument("--server", action="store_true")
     parser.add_argument("--k", type=int, default=24)
     parser.add_argument("--data-root")
+    parser.add_argument("--corpus-path")
+    parser.add_argument("--index-path")
+    parser.add_argument("--output")
     args = parser.parse_args()
 
     gepa_root = Path(args.gepa_root).resolve()
     hover_dir = gepa_root / "gepa_artifact" / "benchmarks" / "hover"
-    corpus_path = hover_dir / "wiki.abstracts.2017.jsonl"
-    index_path = hover_dir / "bm25s_retriever"
+    corpus_path = (
+        Path(args.corpus_path).resolve()
+        if args.corpus_path
+        else hover_dir / "wiki.abstracts.2017.jsonl"
+    )
+    index_path = (
+        Path(args.index_path).resolve()
+        if args.index_path
+        else hover_dir / "bm25s_retriever"
+    )
     verify_upstream_source(hover_dir / "hover_program.py")
     verify_index(index_path / "params.index.json")
 
@@ -58,18 +70,29 @@ def main() -> int:
     stemmer = Stemmer.Stemmer("english")
     retriever = bm25s.BM25.load(index_path, mmap=True)
 
+    if args.server:
+        serve(retriever, stemmer, corpus_path, bm25s)
+        return 0
+
     if args.frozen_claim_retrieval_fingerprint:
         if args.data_root is None:
             raise RuntimeError(
                 "--frozen-claim-retrieval-fingerprint requires --data-root"
             )
-        emit_frozen_claim_retrieval_fingerprint(
-            retriever,
-            stemmer,
-            corpus_path,
-            Path(args.data_root).resolve(),
-            bm25s,
-        )
+        output = open(args.output, "w") if args.output else sys.stdout
+        try:
+            emit_frozen_claim_retrieval_fingerprint(
+                retriever,
+                stemmer,
+                corpus_path,
+                Path(args.data_root).resolve(),
+                bm25s,
+                output=output,
+            )
+        finally:
+            if output is not sys.stdout:
+                output.close()
+                Path(args.output).chmod(0o600)
         return 0
 
     tokens = bm25s.tokenize(
@@ -99,6 +122,66 @@ def main() -> int:
     return 0
 
 
+def serve(retriever, stemmer, corpus_path: Path, bm25s) -> None:
+    """Serve source-exact retrieval without reloading the 5.2M-row corpus per query."""
+    corpus = load_corpus(corpus_path)
+    emit({"status": "ready", "corpus_rows": len(corpus)})
+
+    for raw_line in sys.stdin:
+        request = None
+        try:
+            request = json.loads(raw_line)
+            request_id = request["id"]
+            query = request["query"]
+            k = request["k"]
+
+            if not isinstance(request_id, int) or request_id < 0:
+                raise ValueError("id must be a non-negative integer")
+            if not isinstance(query, str):
+                raise ValueError("query must be a string")
+            if not isinstance(k, int) or k <= 0:
+                raise ValueError("k must be a positive integer")
+
+            tokens = bm25s.tokenize(
+                query, stopwords="en", stemmer=stemmer, show_progress=False
+            )
+            results, scores = retriever.retrieve(
+                tokens, k=k, n_threads=1, show_progress=False
+            )
+            doc_ids = [int(doc_id) for doc_id in results[0]]
+            docs = [corpus[doc_id] for doc_id in doc_ids]
+            emit(
+                {
+                    "id": request_id,
+                    "retrieved_docs": docs,
+                    "titles": [doc.split(" | ", 1)[0] for doc in docs],
+                    "scores": [float(score) for score in scores[0]],
+                }
+            )
+        except Exception as exc:  # keep the fixed request stream diagnosable
+            emit(
+                {
+                    "id": request.get("id") if isinstance(request, dict) else None,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            )
+
+
+def emit(value: dict) -> None:
+    json.dump(value, sys.stdout, ensure_ascii=False, separators=(",", ":"))
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+def load_corpus(corpus_path: Path) -> list[str]:
+    corpus = []
+    with corpus_path.open() as source:
+        for line in source:
+            row = json.loads(line)
+            corpus.append(f"{row['title']} | {' '.join(row['text'])}")
+    return corpus
+
+
 def emit_frozen_claim_retrieval_fingerprint(
     retriever,
     stemmer,
@@ -107,7 +190,9 @@ def emit_frozen_claim_retrieval_fingerprint(
     bm25s,
     split_specs=FROZEN_SPLITS,
     k=FINGERPRINT_K,
+    output=None,
 ) -> None:
+    output = output or sys.stdout
     rows = load_frozen_claim_rows(data_root, split_specs)
     claims = [row["claim"] for row in rows]
     tokens = bm25s.tokenize(
@@ -132,7 +217,7 @@ def emit_frozen_claim_retrieval_fingerprint(
             "split_position": row["split_position"],
             "titles": [titles[doc_id] for doc_id in doc_ids],
         }
-        sys.stdout.write(
+        output.write(
             json.dumps(record, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
             + "\n"
         )

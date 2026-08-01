@@ -19,13 +19,22 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
 
   @split_sha256 %{
     train: "448048cc80de7982b344ef3c8767816164eeabe3d2a1ad4f776245e3dff39370",
+    selection: "052fdda83d8e7fff83c7f4db67cd1a2a8cb66047e6cd68ecfe14310dcbf93602",
+    test: "cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807"
+  }
+
+  @released_split_sha256 %{
+    train: "448048cc80de7982b344ef3c8767816164eeabe3d2a1ad4f776245e3dff39370",
     selection: "b342dbaaa4516e55b7f4f7ac046828c2201952e69de5b97751173238674a74a7",
     test: "cf1b51ca6ed32c21355a954624d88b396d3e963585549cea68308b519c5a8807"
   }
 
+  @removed_duplicate_sha256 "ef899c595acd9714480791fe7d15e929dab4799308e0c67bab5756a16a141c17"
+  @replacement_sha256 "00213c2cde2b65017097d21be6a77fe2a46ba6f053227a677b148130da1e2e5c"
+
   @corpus_sha256 "c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724"
   @index_build_instance_sha256 "d8ef9ed4d833c0f9b67ed33784864ff316ec3cfbf1ffca7b0cf2c2190f9f0548"
-  @fingerprint_sha256 "664ebaa4fb998fbd309def9716b3c485bc1983177431f0532c3d568c091f1915"
+  @fingerprint_sha256 "2662ef6b6a4f8f80b9d348992f14ca04d3007c84b13252825dc38a55ace22099"
   @dependency_lock_sha256 "8fb251bc1fedd7ca9664b6128470e43eba4e5b784ad0c4aede6168782d5f53d4"
   @runtime_entries [:imp, :dspy]
 
@@ -80,7 +89,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
       @stages * (envelope.max_metric_calls + outer_program_evaluations)
 
     %{
-      condition: "imp-88sn-hover-gepa-no-merge-current-v1",
+      condition: "imp-88sn-hover-gepa-no-merge-identity-disjoint-v1",
       status: :readiness_only,
       target_claim: "adapted current-source matched-information/opportunity noninferiority",
       excluded_claims: ["paper replication", "runtime parity", "GEPA-with-merge"],
@@ -93,6 +102,13 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
       seeds: @seeds,
       rows: %{train: @train_size, selection: @selection_size, test: @test_size},
       split_sha256: @split_sha256,
+      split_policy: %{
+        kind: :released_split_with_content_identity_overlap_removed,
+        released_split_sha256: @released_split_sha256,
+        removed_duplicate_sha256: @removed_duplicate_sha256,
+        replacement_sha256: @replacement_sha256,
+        output_blind: true
+      },
       retrieval: %{
         authority_scope: :condition_build_instance_receipt,
         planned_runtime_entries: @runtime_entries,
@@ -163,6 +179,115 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
     raise ArgumentError, "unfrozen HoVer seed: #{inspect(seed)}"
   end
 
+  def materialization_options(root) when is_binary(root) do
+    root = Path.expand(root)
+
+    retrieval = %{
+      "kind" => "bm25s_wiki_abstracts_2017",
+      "corpus_path" => Path.join(root, "retrieval/extracted/wiki.abstracts.2017.jsonl"),
+      "index_path" => Path.join(root, "retrieval/index/bm25s_retriever"),
+      "corpus_checksum" => "sha256:" <> @corpus_sha256,
+      "index_checksum" => "sha256:" <> @index_build_instance_sha256
+    }
+
+    [
+      data_root: Path.join(root, "export-disjoint-v1/hoverBench"),
+      receipt_path: Path.join(root, "materialization.json"),
+      split_receipt_path: Path.join(root, "export-disjoint-v1/families.json"),
+      dependency_lock_path: Path.join(root, "dependency-lock.txt"),
+      fingerprint_path:
+        Path.join(
+          root,
+          "retrieval/frozen-disjoint-claim-retrieval-fingerprint.jsonl"
+        ),
+      runtime_retrievals: %{imp: retrieval, dspy: retrieval}
+    ]
+  end
+
+  def data!(materialization_root) when is_binary(materialization_root) do
+    opts = materialization_options(materialization_root)
+    %{data_ready: true} = data_readiness(opts)
+    data_root = Keyword.fetch!(opts, :data_root)
+
+    Imp.Experiment.Data.new(
+      train: Imp.Datasets.jsonl(Path.join(data_root, "train.jsonl"), [:claim]),
+      selection: Imp.Datasets.jsonl(Path.join(data_root, "dev.jsonl"), [:claim]),
+      test: Imp.Datasets.jsonl(Path.join(data_root, "test.jsonl"), [:claim])
+    )
+  end
+
+  def metric(example, prediction) do
+    gold =
+      example
+      |> Imp.Example.get(:supporting_facts, [])
+      |> Enum.map(&Map.get(&1, "key", Map.get(&1, :key)))
+      |> Enum.map(&Imp.Metrics.normalize_text/1)
+      |> MapSet.new()
+
+    found =
+      prediction
+      |> Imp.Prediction.get(:retrieved_docs, [])
+      |> Enum.map(fn passage -> passage |> String.split(" | ", parts: 2) |> hd() end)
+      |> Enum.map(&Imp.Metrics.normalize_text/1)
+      |> MapSet.new()
+
+    MapSet.subset?(gold, found)
+  end
+
+  def source_exact_retrieval_probe!(materialization_root, opts \\ []) do
+    materialization = materialization_options(materialization_root)
+    %{data_ready: true} = data_readiness(materialization)
+    retrieval = materialization |> Keyword.fetch!(:runtime_retrievals) |> Map.fetch!(:imp)
+    data_root = Keyword.fetch!(materialization, :data_root)
+    fingerprint_path = Keyword.fetch!(materialization, :fingerprint_path)
+    gepa_root = Keyword.get(opts, :gepa_root, "tmp/gepa-artifact")
+
+    python =
+      Keyword.get(
+        opts,
+        :python,
+        Path.join(Path.expand(materialization_root), ".venv/bin/python")
+      )
+
+    {:ok, server} =
+      Imp.BenchmarkTruth.HoverBM25.UpstreamPython.start_link(retrieval,
+        python: python,
+        gepa_root: gepa_root,
+        startup_timeout: Keyword.get(opts, :startup_timeout, 240_000)
+      )
+
+    try do
+      row = data_root |> Path.join("train.jsonl") |> first_jsonl!()
+      expected = fingerprint_path |> first_jsonl!() |> Map.fetch!("titles")
+
+      retriever =
+        Imp.BenchmarkTruth.HoverBM25.UpstreamPython.new(retrieval,
+          python: python,
+          gepa_root: gepa_root,
+          server: server,
+          k: 24
+        )
+
+      {:ok, first} = Imp.BenchmarkTruth.HoverBM25.UpstreamPython.search(retriever, row["claim"])
+      {:ok, second} = Imp.BenchmarkTruth.HoverBM25.UpstreamPython.search(retriever, row["claim"])
+      titles = Enum.map(first, &(String.split(&1, " | ", parts: 2) |> hd()))
+
+      unless first == second and titles == expected do
+        raise "resident HoVer retrieval differs from its exact frozen fingerprint"
+      end
+
+      %{
+        queries: 2,
+        top_k: 24,
+        repeat_exact: true,
+        fingerprint_exact: true,
+        implementation: "resident_upstream_python_bm25s"
+      }
+    after
+      GenServer.stop(server)
+    end
+  end
+
   def verify_authorities!(opts \\ []) do
     artifact_root = Keyword.get(opts, :artifact_root, "tmp/gepa-artifact")
     gepa_root = Keyword.get(opts, :gepa_root, "tmp/gepa-v0.1.4")
@@ -180,15 +305,18 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
     data_root = Keyword.get(opts, :data_root)
     runtime_retrievals = Keyword.get(opts, :runtime_retrievals)
     receipt_path = Keyword.get(opts, :receipt_path)
+    split_receipt_path = Keyword.get(opts, :split_receipt_path)
     dependency_lock_path = Keyword.get(opts, :dependency_lock_path)
     fingerprint_path = Keyword.get(opts, :fingerprint_path)
 
     if is_binary(data_root) and is_map(runtime_retrievals) and is_binary(receipt_path) and
-         is_binary(dependency_lock_path) and is_binary(fingerprint_path) do
+         is_binary(split_receipt_path) and is_binary(dependency_lock_path) and
+         is_binary(fingerprint_path) do
       verify_materialized!(
         data_root,
         runtime_retrievals,
         receipt_path,
+        split_receipt_path,
         dependency_lock_path,
         fingerprint_path
       )
@@ -203,7 +331,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
       %{
         data_ready: false,
         reason:
-          "condition-specific row, build-receipt, dependency-lock, runtime-path, and retrieval-fingerprint evidence is required"
+          "condition-specific row, split-lineage, build-receipt, dependency-lock, runtime-path, and retrieval-fingerprint evidence is required"
       }
     end
   end
@@ -212,6 +340,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
         data_root,
         runtime_retrievals,
         receipt_path,
+        split_receipt_path,
         dependency_lock_path,
         fingerprint_path
       )
@@ -229,6 +358,9 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
         raise ArgumentError, "HoVer materialized split does not match the frozen source: #{path}"
       end
     end)
+
+    verify_identity_disjoint!(data_root)
+    verify_split_receipt!(split_receipt_path)
 
     unless MapSet.new(Map.keys(runtime_retrievals)) == MapSet.new(@runtime_entries) do
       raise ArgumentError, "HoVer retrieval paths must be supplied for Imp and DSPy"
@@ -294,6 +426,62 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
 
     unless actual == expected and build["actual_tree_sha256"] == @index_build_instance_sha256 do
       raise ArgumentError, "HoVer retrieval build receipt does not match this condition"
+    end
+  end
+
+  defp verify_split_receipt!(path) do
+    receipt = path |> File.read!() |> Jason.decode!()
+
+    family =
+      case receipt["families"] do
+        [%{"family" => "hoverBench"} = family] -> family
+        _other -> raise ArgumentError, "HoVer split receipt must contain exactly hoverBench"
+      end
+
+    expected_checksums = %{
+      "train" => "sha256:" <> @split_sha256.train,
+      "dev" => "sha256:" <> @split_sha256.selection,
+      "test" => "sha256:" <> @split_sha256.test
+    }
+
+    lineage = family["split_lineage"] || %{}
+
+    valid? =
+      family["split_policy"] ==
+        "released_split_with_content_identity_overlap_removed" and
+        family["split_checksums"] == expected_checksums and
+        get_in(lineage, ["released_split_sha256", "dev"]) ==
+          @released_split_sha256.selection and
+        get_in(lineage, ["skipped", "dev"]) == [
+          %{
+            "content_sha256" => @removed_duplicate_sha256,
+            "released_position" => 57
+          }
+        ] and
+        get_in(lineage, ["replacements", "dev"]) == [
+          %{
+            "content_sha256" => @replacement_sha256,
+            "source_pool_position" => 1_101
+          }
+        ]
+
+    unless valid? do
+      raise ArgumentError, "HoVer identity-disjoint split receipt does not match this condition"
+    end
+  end
+
+  defp verify_identity_disjoint!(data_root) do
+    identities =
+      for split <- ~w(train dev test),
+          line <- Path.join(data_root, "#{split}.jsonl") |> File.stream!() do
+        line
+        |> Jason.decode!()
+        |> Imp.Optimizer.Report.encode_term()
+        |> Imp.Experiment.Data.digest()
+      end
+
+    unless length(identities) == MapSet.size(MapSet.new(identities)) do
+      raise ArgumentError, "HoVer train, selection, and test rows are not content-disjoint"
     end
   end
 
@@ -622,6 +810,10 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
 
   defp line_count(path) do
     path |> File.stream!([], :line) |> Enum.count()
+  end
+
+  defp first_jsonl!(path) do
+    path |> File.stream!() |> Enum.at(0) |> Jason.decode!()
   end
 
   defp verify_git!(root, expected) do

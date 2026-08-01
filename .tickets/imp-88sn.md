@@ -43,21 +43,28 @@ source-grounded nominal `115,248` and legal `122,520` task-transport envelope;
 its compact fixture exercises all four predictors in round-robin order, accepts
 four incremental mutations, rejects a fifth, selects strictly, writes linked
 Result/Artifact state, and serves four fresh-process calls. It remains
-`readiness_only`. A provider-free materialization now authenticates and exports
-the exact `150/300/300` rows, authenticates the pinned 608,448,121-byte archive,
-and reproduces the 5,233,330-row corpus hash. One exact source-recipe build with
-`bm25s==0.2.12`, `k1=0.9`, `b=0.4`, English stopwords, and PyStemmer produced a
-receipted index tree `d8ef9ed4...`. That exact build instance now also owns a
-canonical 450-row train-then-dev top-24 retrieval fingerprint `664ebaa4...`;
-both planned Imp and DSPy entries must verify the same source/config/dependency
-tuple, paths, tree receipt, and fingerprint before this condition is data-ready.
-This is a condition-instance receipt, not universal rebuild identity or
-cross-build semantic equivalence. The legacy `c35ec786...` value remains in this
-history because it entered earlier authority/generated metadata, but it has no
-retained index, dependency lock, per-file hashes, or build receipt and is no
-longer canonical authority. No test rows enter the fingerprint. This provider-
-free authority correction grants no provider authority, effectiveness, parity,
-or paper-replication claim.
+`readiness_only`. Provider-free materialization authenticated the released
+`150/300/300` rows, pinned 608,448,121-byte archive, and 5,233,330-row corpus.
+Loading those rows through the ordinary public experiment boundary then found
+one exact train/validation content duplicate: the raw HoVer source contains the
+same claim and supporting facts twice under different UIDs, and the released
+split sampled one copy into each split. The adapted condition does not bypass
+that guard. It keeps 749 released rows, removes validation position 57, and
+appends the lowest unused canonical-content identity from the same validation
+source pool, without model outputs or scores. Active train/dev/test hashes are
+`448048cc...` / `052fdda8...` / `cf1b51ca...`; the released dev hash
+`b342dbaa...` remains lineage only.
+
+The exact source-recipe `bm25s==0.2.12` build remains receipted as tree
+`d8ef9ed4...`. Its corrected 450-row train-then-dev top-24 fingerprint is
+`2662ef6b...`. A repository-only resident Python worker now loads the exact
+5.2-million-row corpus/index once and matches that fingerprint on repeated
+queries; the previous one-process-per-query bridge was semantically exact but
+not a credible full-study runtime. Both Imp and DSPy must verify the same split
+lineage, source/config/dependency tuple, tree receipt, and fingerprint. No test
+rows enter the fingerprint. This is condition-instance readiness, not universal
+rebuild identity, cross-build equivalence, effectiveness, parity, paper
+replication, or provider authority.
 
 The exact Circle v1.4 one-metric cold probe also passes provider-free. It
 authenticates the OA source files and DSPy checkout before imports, uses the
