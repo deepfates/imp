@@ -136,20 +136,27 @@ The product center is real but the telos is open.
   applies a schema-3 Artifact through a fresh `ProgramServer` process. Commit
   `51b46ef0` freezes a result-blind normalized-question-group receipt with 700
   optimizer-train and 300 selection rows and all 2,417 official dev rows held
-  out from the treatment. The full modeled-MIPRO plan is three seeds, 40
-  objective trials, outer mean over three repetitions, and symmetric fresh
-  service; its declared opportunity is 46,412 task plus 47 proposer transports
-  per runtime/seed. Compact Imp and pinned-DSPy selected-state/fresh-process
+  out from the treatment. Compact Imp and pinned-DSPy selected-state/fresh-process
   lifecycles pass, but explicitly do not claim the full opportunity. This is a
   credible candidate for the missing realistic multi-stage result, not by
-  itself the broad portfolio required to close this epic.
-- **MuSiQue scientific meaning — decided; operational admission — open.** The condition remains
-  `executable: false`. Pinned DSPy still needs a complete C6 demo-bearing
-  task/proposer serializer census, exact-route single-transport proof, and
-  equivalent pretransport guards. Both runtimes need one canonical wire-byte
-  accounting boundary, and generated accepted bootstrap outputs must be bounded
-  before they become later demos. Therefore `$2,192.04012144` remains planning
-  arithmetic, not a legal ceiling or spend authority. Official train/dev have
+  itself the broad portfolio required to close this epic. The earlier
+  three-seed/global-three-repeat plan is no longer current authority. Commit
+  `da725f56` adds a general public Experiment policy that can repeat artifact
+  admission more than final held-out evaluation; it is independently exercised
+  with a public optimizer, durable schema, unpacked package, and fresh release.
+  A five-seed MuSiQue draft is preserved for inspection on local branch
+  `codex/musique-admission-candidate` at `4b2bba5d`, but remains an unratified
+  candidate rather than the roadmap.
+- **MuSiQue scientific value — scoped; exact treatment and operational admission — open.**
+  No current MuSiQue condition is executable or provider-authorized. The
+  five-seed draft's pinned-DSPy census used a short synthetic instruction: its
+  observed task maximum left only `2,590` bytes under the proposed guard while
+  the admitted live instruction could use up to `8,192` bytes. It therefore
+  proves the fixture path, not the full live opportunity or a legal cost bound.
+  Its added route/census probes also grew toward a benchmark controller without
+  containing a thin full upstream runner. Preserve the source receipt, scorer,
+  program, compact lifecycles, and the scientific option; do not promote the
+  draft machinery or either planning total. Official train/dev have
   zero row-ID, normalized composed-question, and decomposition-ID overlap, but
   95 normalized decomposition-question and 3,697 exact paragraph overlaps.
   Dev was loaded previously only for provider-free scorer auditing; no model,
@@ -186,10 +193,9 @@ second tracking system:
    current-source study rather than a paper
    replication, but it preserves the central MIPRO construct: joint instruction
    and demonstration optimization across a real two-stage program with only a
-   program-level metric. Its `700/300/2,417` train/selection/held-out scale,
-   three optimizer seeds, and repeated paired outer measurement are comparable
-   in seriousness to the MIPRO paper's `500/500/up-to-2,000` splits and five
-   runs per method, rather than a tiny fixture. Treat official-split,
+   program-level metric. Its `700/300/2,417` train/selection/held-out scale is
+   serious rather than a tiny fixture, but the exact seed/repetition allocation
+   is not currently ratified. Treat official-split,
    source-row-disjoint, treatment-unseen dev as the held-out boundary with the
    scorer audit and semantic overlap disclosed. Keep the retained positive OA
    condition and clean Banking77/HotPot negatives separate. Run the matched Imp
@@ -207,9 +213,10 @@ second tracking system:
    scoped operational probes once an independent consumer validates the cold
    path. That milestone does not satisfy the missing multi-stage usefulness
    criterion and does not make MuSiQue mandatory. Before paying for MuSiQue,
-   justify held-out size and inference repetitions against the intended
-   precision; a preregistered discovery/reserve-confirmation design remains a
-   valid alternative to evaluating every dev row three times.
+   justify optimizer seeds, held-out size, and inference repetitions against the
+   intended precision and the exact claim. The public stage-specific repetition
+   policy makes repeated selection plus a single full held-out pass possible
+   without choosing that design by inertia.
 4. **Authenticate the chosen arm before spend.** Finish
    both runtimes' complete serializer census, exact route/fallback behavior,
    canonical pretransport input/output guards (including bootstrap demos), and

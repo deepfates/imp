@@ -49,10 +49,10 @@ All 2,417 dev gold rows were previously loaded only for deterministic scorer
 comparison; dev is audit-exposed but model/optimizer/treatment-unseen. Test
 inputs were also previously audit-exposed; labels remain hidden and excluded.
 At the earlier product-fit checkpoint no split, objective, model, price, budget,
-or provider run was frozen. The current candidate now freezes the receipt,
-adapted objective, current task/proposer models, and exact mechanism for review;
-price/catalog revalidation, an owner spend cap, and provider authority remain
-absent. Official train and dev are source-file/source-row disjoint: they have no
+or provider run was frozen. The committed provider-free work freezes the source
+receipt and adapted program for review; it does not ratify an exact live
+treatment. Price/catalog revalidation, an owner spend cap, and provider authority
+remain absent. Official train and dev are source-file/source-row disjoint: they have no
 row-ID, normalized composed-question, or decomposition-ID overlap. They are not
 semantic-content disjoint: 95 normalized decomposition questions and 3,697 exact
 title-plus-paragraph values overlap. Dev is treatment-unseen but not globally
@@ -78,9 +78,11 @@ matched pinned DSPy, and the ordinary Result/Artifact/fresh-service lifecycle.
 The proposed scale is serious rather than automatically mandatory. The MIPRO
 paper used `500` training, `500` development, and up to `2,000` test rows,
 optimizer budgets of `20–50` full evaluations, and five runs per method. This
-adapted condition uses `700/300/2,417`, forty modeled objectives, three seeds,
-and repeated paired outer evaluation. It can support an externally legible
-current-source result; a cheap smoke alone cannot satisfy this ticket. If the
+adapted condition uses `700/300/2,417` and forty modeled objectives. The exact
+seed and repetition allocation is under review after the public Experiment
+boundary gained independent selection/test repetition counts in `da725f56`.
+It can support an externally legible current-source result; a cheap smoke alone
+cannot satisfy this ticket. If the
 intended claim is a matched comparison, the Imp and DSPy arms must remain
 unconditional because launching the comparator only after an Imp pass would
 make the comparison result-conditioned. A differently scoped discovery claim
@@ -105,6 +107,38 @@ production-readiness. Fund MuSiQue only for the additional claim that Imp
 improves a realistic multi-stage program, after a precision/power review shows
 that its scale is warranted; release-story credibility alone does not require
 the full current MuSiQue opportunity.
+
+### Principal disposition after stage-specific Experiment repetitions (`da725f56`)
+
+The general product capability is accepted: an ordinary user may repeat
+selection more than final test, persist the unequal counts and paired outcomes,
+and retain the former uniform policy unchanged. Focused lifecycle, public API,
+docs/Livebooks, unpacked package, clean-room Artifact, release, and concurrent
+service gates pass. This repairs a real noisy-admission boundary independently
+of MuSiQue and does not reinterpret prior results.
+
+The five-seed MuSiQue admission draft preserved on local branch
+`codex/musique-admission-candidate` at `4b2bba5d` is not accepted into `main`.
+Its proposed `270,760` task plus `470` proposer opportunity and approximately
+`$2,357` full-price planning exposure would buy one narrow claim: whether the
+named Imp MIPRO treatment improves its own baseline on this adapted two-stage
+MuSiQue condition, with pinned DSPy as a descriptive matched comparison. It
+would not establish broad MIPRO effectiveness, general multi-hop reasoning, or
+Imp superiority, and it could not close `imp-yme4` alone.
+
+The draft also failed its own guard argument. The pinned-DSPy census used a
+29-byte synthetic instruction; its measured task maximum was `50,154` bytes
+against a `52,744` guard, while the admitted live instruction may use up to
+`8,192` bytes. The fixture therefore fits, but the full live opportunity is not
+proved. Most of the added Python route/census modes duplicate a prospective
+benchmark controller and there is still no thin full upstream runner. Preserve
+the verified `47`-call proposer fact, source/scorer/program, compact lifecycles,
+and scientific option; reduce or reject the machinery before any spend request.
+The owner choice is claim and appetite, not whether another proof mode can be
+added: fund one terminal MuSiQue hero tranche after a thin executable path and
+legal bound exist, or ship the cheaper honest experimental evidence while the
+larger usefulness ticket remains open. A negative MuSiQue result ends the lane.
+
 Generic
 pinned-minibatch search
 fidelity was repaired at `f2711d2`: the exact DSPy 3.2.1 size-35/full-every-5
