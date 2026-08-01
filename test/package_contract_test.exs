@@ -25,6 +25,7 @@ defmodule PackageContractTest do
                    "LICENSE",
                    "RELEASE_NOTES.md",
                    "README.md",
+                   "docs/CASE_STUDY_TREC.md",
                    "docs/API_GUIDE.md",
                    "examples/provider_free_ticket_router/README.md",
                    "examples/provider_free_ticket_router/mix.exs",

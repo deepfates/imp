@@ -46,6 +46,20 @@ process reads the result and artifact, reconstructs the trusted program,
 reapplies the selected parameters, starts `ProgramServer`, and serves four
 concurrent predictions before the parent removes its temporary files.
 
+To inspect or reuse the exact files instead of removing them, choose private
+paths and set the retention flag:
+
+```sh
+IMP_PATH=../.. \
+IMP_WORKFLOW_ARTIFACT_PATH="$PWD/private-selected-artifact.json" \
+IMP_WORKFLOW_RESULT_PATH="$PWD/private-experiment-result.json" \
+IMP_WORKFLOW_KEEP_ARTIFACT=1 \
+mix run --no-start run_workflow.exs
+```
+
+Both files are written with mode `0600`. The workflow refuses an incompatible
+Result/Artifact pair before applying parameters.
+
 The scripted model has planted routing rules, so the deterministic selection
 score moves from `0.25` to `1.0`. That number proves the application lifecycle,
 not model effectiveness. Replace the scripted model and datasets before using

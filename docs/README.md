@@ -34,6 +34,9 @@ and selected program rather than presenting optimization as a magic button.
 - [Architecture](ARCHITECTURE.md) is for readers who need to understand the
   library's internal shape.
 - [Prior Art](PRIOR_ART.md) covers DSPy, GEPA, Ax, and Optimize Anything.
+- [TREC optimizer case study](CASE_STUDY_TREC.md) presents one matched positive
+  result, its limits, and the source-repository command that recomputes it from
+  committed scored rows without provider calls.
 
 ## Build the part your application needs
 
@@ -71,8 +74,10 @@ reload, and contained worker failure.
 
 ## Read research evidence separately from product guidance
 
-Most users do not need Imp's compatibility records or scientific results to
-build an application. They remain reviewable in the source repository's
+Most users do not need Imp's compatibility records to build an application.
+The manual includes the compact TREC case study so the strongest result and its
+limitations are visible. The underlying scored rows, compatibility records, and
+research control programs remain reviewable in the source repository's
 [conformance report](https://github.com/deepfates/imp/blob/main/docs/CONFORMANCE.md)
 and [evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md),
-but are deliberately not part of the packaged manual or learning path.
+but are deliberately not runtime or learning-path dependencies.

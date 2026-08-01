@@ -101,9 +101,11 @@ publish the already-earned scoped experimental story from matched TREC, the
 small retry-policy OA result, the clean Banking77/HotPot negatives, and the
 exact artifact/timeout probes. TREC now has committed compact scored-row inputs
 that the ordinary aggregator recomputes directly without the 181 MB private raw
-provider traces. That story still requires a genuinely independent cold
-consumer and must not be inflated into broad usefulness, DSPy superiority, or
-production-readiness. Fund MuSiQue only for the additional claim that Imp
+provider traces. `docs/CASE_STUDY_TREC.md` now gives ordinary readers the exact
+source-checkout command, public input hashes, result, and limitations; the Hex
+product payload does not absorb the research runner or scored rows. That story
+still requires a fresh independent claim-recomputation review and must not be
+inflated into broad usefulness, DSPy superiority, or production-readiness. Fund MuSiQue only for the additional claim that Imp
 improves a realistic multi-stage program, after a precision/power review shows
 that its scale is warranted; release-story credibility alone does not require
 the full current MuSiQue opportunity.

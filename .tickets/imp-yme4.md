@@ -54,7 +54,19 @@ The product center is real but the telos is open.
   The packaged deployment front door now performs its Artifact reload and
   four-call concurrent service proof in a child OS process from the same
   ordinary command. This remains maintainer-authored internal evidence, not the
-  independent consumer acceptance required below.
+  independent consumer acceptance required below. A first uncoached cold
+  consumer then installed package digest
+  `d07aaf6e6388466c0a1ab6522056b1f25adb6fac3492f6040b19506d25495608`
+  from source commit `5618b651af538b44f72abc336a165235fbda0b43`, ran the
+  packaged two-stage workflow, improved selection `0.25 -> 1.0` through public
+  `LabeledFewShot`, verified four demos on both named predictors, retained
+  linked `0600` Result/Artifact files, loaded them in a fresh OS process, served
+  four concurrent calls, and observed crash/timeout containment with continued
+  service. That establishes the deployable provider-free lifecycle for that
+  exact package. It also exposed two public-boundary gaps: retention environment
+  variables were implemented but undocumented, and the package narrated TREC
+  without a discoverable recomputation path. The docs repair after that review
+  requires a fresh cold check before external acceptance is complete.
 - **Advertised mechanisms — complete as an experimental prerequisite.**
   `imp-tg2z` removed reproduced facades and exercised the named families through
   their defining public transitions and safety boundaries. All optimizer modules
@@ -243,15 +255,19 @@ second tracking system:
    publication as an explicit owner action. Independence here is an observed
    user boundary, not another maintainer gate: the reviewer must not have
    implemented Imp, the deployment example, or the retained claims; receives
-   only an exact source/package identity and the public user documentation; and
+   an exact source checkout, exact package identity, and the public user
+   documentation; and
    works from a clean directory without workshop tickets, internal docs,
    benchmark-maintainer commands, or live coaching. The review must install the
    candidate, declare and evaluate a realistic multi-stage program, improve both
    named stages through an ordinary public optimizer, persist the selected
    Artifact privately, reconstruct trusted code in a fresh OS process, and serve
-   concurrent calls. Separately, the reviewer must run the documented compact
-   TREC scoring/aggregation command from committed public inputs and obtain the
-   frozen statistics. Record the unedited commands, observed friction, and any
+   concurrent calls. Separately, the reviewer must use the exact source
+   checkout—not expect the product-only Hex payload to contain benchmark
+   runners—and run the documented compact TREC scoring/aggregation command from
+   committed public inputs to obtain the frozen statistics. The packaged case
+   study must make that source boundary and command discoverable. Record the
+   unedited commands, observed friction, and any
    maintainer intervention; intervention invalidates cold acceptance until the
    resulting product or documentation repair is retested by a fresh reviewer.
    This review can establish usability, packaging, lifecycle coherence, and

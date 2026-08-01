@@ -117,6 +117,8 @@ optimizer effectiveness.
   optimizers, experiments, and artifacts.
 - [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md) — a complete
   measured optimization example with real outputs and costs.
+- [TREC optimizer case study](docs/CASE_STUDY_TREC.md) — the strongest matched
+  result, its limitations, and the exact provider-free recomputation command.
 - [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) — map familiar DSPy
   concepts to Imp and see the intentional BEAM differences.
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md) — credentials,

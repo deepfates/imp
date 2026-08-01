@@ -223,6 +223,7 @@ defmodule Imp.MixProject do
       "docs/README.md",
       "docs/LEARNING_PATH.md",
       "docs/TUTORIAL_TICKET_ROUTING.md",
+      "docs/CASE_STUDY_TREC.md",
       "docs/GLOSSARY.md",
       "docs/PHILOSOPHY.md",
       "docs/IMP_FOR_DSPY_USERS.md",

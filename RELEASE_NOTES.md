@@ -59,6 +59,9 @@ its baseline by `+0.4000` and cleared the preregistered noninferiority margin
 against pinned DSPy GEPA; MIPROv2 improved its own baseline by `+0.1458`.
 The committed compact scored-row inputs let a third party rerun the frozen
 scoring and aggregation without publishing the 181 MB private provider traces.
+The packaged [TREC case study](docs/CASE_STUDY_TREC.md) gives the exact
+source-checkout command, input hashes, and limitations. The rows and research
+program remain source-repository evidence rather than Hex runtime contents.
 Neither result is a general optimizer-effectiveness claim.
 
 **Borrowed honestly — with the gap named.** The optimization *algorithms'*
