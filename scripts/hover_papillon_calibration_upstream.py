@@ -256,6 +256,13 @@ def canonical_bytes(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
+def evidence_value(value):
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json", exclude_none=False)
+    encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    return json.loads(encoded)
+
+
 def sha256(value):
     return hashlib.sha256(value).hexdigest()
 
@@ -572,12 +579,7 @@ class Recorder:
         router = field(response, "openrouter_metadata")
         choices = field(response, "choices") or []
         finish_reason = field(choices[0], "finish_reason") if choices else None
-        if not generation_id or not model_effective:
-            raise RuntimeError("OpenRouter response identity is missing")
-        if not all(isinstance(value, int) and value >= 0 for value in (input_tokens, output_tokens, total_tokens, cached)):
-            raise RuntimeError("OpenRouter response usage is missing")
-        if total_tokens != input_tokens + output_tokens or cached != 0:
-            raise RuntimeError("OpenRouter response usage/cache drift")
+        usage_reported = evidence_value(usage)
         if self.evidence_root is not None:
             secure_evidence(
                 self.evidence_root,
@@ -590,12 +592,7 @@ class Recorder:
                     "generation_id": generation_id,
                     "model_effective": model_effective,
                     "provider_reported": provider_reported,
-                    "usage_reported": {
-                        "input_tokens": input_tokens,
-                        "output_tokens": output_tokens,
-                        "cached_tokens": cached,
-                        "total_tokens": total_tokens,
-                    },
+                    "usage_reported": usage_reported,
                     "router_metadata": router,
                     "finish_reason": finish_reason,
                     "message_sha256": hashlib.sha256(encoded).hexdigest(),
@@ -606,6 +603,12 @@ class Recorder:
                     "transport_count": 1,
                 },
             )
+        if not generation_id or not model_effective:
+            raise RuntimeError("OpenRouter response identity is missing")
+        if not all(isinstance(value, int) and value >= 0 for value in (input_tokens, output_tokens, total_tokens, cached)):
+            raise RuntimeError("OpenRouter response usage is missing")
+        if total_tokens != input_tokens + output_tokens or cached != 0:
+            raise RuntimeError("OpenRouter response usage/cache drift")
         validate_router_metadata(router)
         if model_effective != MODEL or provider_reported != ENDPOINT_PROVIDER:
             raise RuntimeError("OpenRouter response provider missing or drifted")
@@ -673,7 +676,12 @@ def validate_provisional_evidence(path, item, generation_id):
         raise RuntimeError("DSPy provisional message byte count missing")
     validate_router_metadata(record.get("router_metadata"))
     usage = record.get("usage_reported", {})
-    if usage != {"input_tokens": 11, "output_tokens": 7, "cached_tokens": 0, "total_tokens": 18}:
+    if (
+        usage.get("prompt_tokens") != 11
+        or usage.get("completion_tokens") != 7
+        or usage.get("total_tokens") != 18
+        or usage.get("prompt_tokens_details", {}).get("cached_tokens") != 0
+    ):
         raise RuntimeError("DSPy provisional reported usage drift")
     if path.stat().st_mode & 0o777 != 0o600:
         raise RuntimeError("DSPy provisional evidence mode drift")
@@ -853,6 +861,59 @@ def verify_live_transport_offline(dspy_root, output_root):
             raise RuntimeError("terminal generation 404 advanced the fixed schedule")
         terminal_file = next(path for path in terminal_files if "query3" in path.name)
         validate_provisional_evidence(terminal_file, first, "gen-terminal-live")
+
+        drift = Recorder(
+            "live",
+            "offline-key",
+            generation_url=f"{base_url}/generation",
+            evidence_root=output_root,
+            generation_attempts=3,
+            generation_sleep=lambda _seconds: None,
+        )
+        drift_item = opportunity("dspy", "hover", "H0", 2, "query2", 8192)
+        drift.active = [drift_item]
+        drift_response = {
+            "id": "gen-usage-drift",
+            "model": MODEL,
+            "provider": ENDPOINT_PROVIDER,
+            "openrouter_metadata": synthetic_router_metadata(),
+            "choices": [{"finish_reason": "stop"}],
+            "usage": {
+                "prompt_tokens": 11,
+                "completion_tokens": 7,
+                "total_tokens": 19,
+                "prompt_tokens_details": {"cached_tokens": 0},
+                "completion_tokens_details": {"reasoning_tokens": 3},
+            },
+        }
+        drift_invocations = {"count": 0}
+
+        def drift_invoke():
+            drift_invocations["count"] += 1
+            return ["drift"]
+
+        try:
+            drift.record(
+                [{"role": "user", "content": "usage drift persistence assertion"}],
+                drift_invoke,
+                [{"response": drift_response}],
+            )
+            raise RuntimeError("usage drift unexpectedly reconciled")
+        except CalibrationOperationalAbort as exc:
+            if "live evidence reconciliation failed" not in str(exc):
+                raise
+        drift_path = evidence_path(output_root, "provisional", drift_item["id"])
+        drift_record = json.loads(drift_path.read_text())
+        if (
+            drift_invocations["count"] != 1
+            or len(drift.active) != 0
+            or drift.events
+            or (output_root / "live-evidence" / "reconciled" / drift_path.name).exists()
+            or drift_record.get("usage_reported", {}).get("total_tokens") != 19
+            or drift_record.get("usage_reported", {}).get("completion_tokens_details", {}).get("reasoning_tokens") != 3
+            or drift_path.stat().st_mode & 0o777 != 0o600
+        ):
+            raise RuntimeError("usage drift provisional evidence was not retained exactly")
         for directory in (
             output_root,
             output_root / "live-evidence",
@@ -868,6 +929,7 @@ def verify_live_transport_offline(dspy_root, output_root):
             "generation_404_then_200_attempts": generation_gets["normal"],
             "terminal_404_attempts": generation_gets["terminal"],
             "terminal_next_stage_transports": 0,
+            "usage_drift_provisional_retained": True,
         }
     finally:
         server.shutdown()

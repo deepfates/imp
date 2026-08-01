@@ -364,6 +364,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
     assert output =~ ~s("generation_404_then_200_attempts": 2)
     assert output =~ ~s("terminal_404_attempts": 3)
     assert output =~ ~s("terminal_next_stage_transports": 0)
+    assert output =~ ~s("usage_drift_provisional_retained": true)
     refute File.exists?(root)
   end
 
