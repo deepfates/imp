@@ -42,7 +42,7 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Current frontier after `08f59ec6`
+## Current frontier
 
 The product center is real but the telos is open.
 
@@ -75,7 +75,10 @@ The product center is real but the telos is open.
   persistence, and supervised deployment capabilities are broadly present and
   one representative complete packaged lifecycle has been exercised. The
   granular upstream exam now has no retained executable FAIL after repairing
-  split Chat-marker streaming. That does not imply complete parity: provider-native
+  split Chat-marker streaming. Commit `91a0de3d` additionally makes
+  language-aware Code inputs and typed outputs ordinary signature fields across
+  Chat, JSON, and XML, with strict validation and fresh persisted demos. That
+  does not imply complete parity: provider-native
   Document/Citations behavior, typed citation streaming, ecosystem breadth,
   current DSPy's first-class typed tool-call field contract,
   and several advanced ergonomic surfaces remain real gaps. The prerelease
