@@ -39,6 +39,15 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
     assert plan.transports.legal_total == 122_520
     assert plan.transports.logical_reflections_all_runtimes_seeds == 1_800
     assert plan.transports.legal_reflection_transports_all_runtimes_seeds == 3_600
+    assert plan.historical_artifact.task_model == "openai:gpt-4.1-mini-2025-04-14"
+    assert plan.historical_artifact.treatment_status == :provenance_only
+
+    assert plan.current_treatment == %{
+             status: :unratified,
+             task_model: nil,
+             reflection_model: nil,
+             route: nil
+           }
   end
 
   @tag :evidence_infrastructure

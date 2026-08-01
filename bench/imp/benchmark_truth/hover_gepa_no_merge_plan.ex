@@ -6,7 +6,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
   @gepa_artifact_commit "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
   @dspy_commit "29448ae12756abdd14bd8796c819247ebb83673c"
   @gepa_commit "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
-  @model "openai:gpt-4.1-mini-2025-04-14"
+  @historical_task_model "openai:gpt-4.1-mini-2025-04-14"
   @seeds [2_026_080_201, 2_026_080_202, 2_026_080_203]
   @train_size 150
   @selection_size 300
@@ -98,7 +98,16 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
         dspy: @dspy_commit,
         gepa: @gepa_commit
       },
-      model: @model,
+      historical_artifact: %{
+        task_model: @historical_task_model,
+        treatment_status: :provenance_only
+      },
+      current_treatment: %{
+        status: :unratified,
+        task_model: nil,
+        reflection_model: nil,
+        route: nil
+      },
       seeds: @seeds,
       rows: %{train: @train_size, selection: @selection_size, test: @test_size},
       split_sha256: @split_sha256,
