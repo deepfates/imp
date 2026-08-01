@@ -43,6 +43,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAns do
 
   def new(lm, opts \\ []) do
     adapter = Keyword.get(opts, :adapter, Imp.Adapter.Chat)
+    config = Keyword.get(opts, :config, cache: false, json_fallback: false)
 
     %__MODULE__{
       selector:
@@ -53,7 +54,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAns do
           ),
           lm: lm,
           adapter: adapter,
-          config: [cache: false, json_fallback: false]
+          config: config
         ),
       answerer:
         Imp.predict(
@@ -63,7 +64,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAns do
           ),
           lm: lm,
           adapter: adapter,
-          config: [cache: false, json_fallback: false]
+          config: config
         )
     }
   end

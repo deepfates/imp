@@ -75,14 +75,16 @@ defmodule Imp.FailureCampaignTest do
       artifact,
       "mipro_v2_durable_resume_and_tamper",
       "mipro_v2",
-      "imp_mipro_v2_run"
+      "imp_mipro_v2_run",
+      2
     )
 
     assert_optimizer_evidence(
       artifact,
       "simba_durable_resume_and_tamper",
       "simba",
-      "imp_simba_run"
+      "imp_simba_run",
+      1
     )
   end
 
@@ -188,14 +190,21 @@ defmodule Imp.FailureCampaignTest do
 
   defp case_by_id(artifact, id), do: Enum.find(artifact["cases"], &(&1["id"] == id))
 
-  defp assert_optimizer_evidence(artifact, lane, optimizer, checkpoint_type) do
+  defp assert_optimizer_evidence(
+         artifact,
+         lane,
+         optimizer,
+         checkpoint_type,
+         checkpoint_schema_version
+       ) do
     campaign_case = case_by_id(artifact, lane)
 
     assert Enum.all?(campaign_case["outcomes"], fn outcome ->
              evidence = outcome["evidence"]
 
              evidence["optimizer"] == optimizer and evidence["checkpoint_type"] == checkpoint_type and
-               evidence["checkpoint_schema_version"] == 1 and evidence["exact_resume"] and
+               evidence["checkpoint_schema_version"] == checkpoint_schema_version and
+               evidence["exact_resume"] and
                evidence["tamper_rejected"] and evidence["checkpoint_payload_included"] == false
            end)
   end

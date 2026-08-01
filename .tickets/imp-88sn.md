@@ -44,7 +44,53 @@ predictor mutations, schema-3 Artifact, and fresh ProgramServer lifecycle pass.
 All 2,417 dev gold rows were previously loaded only for deterministic scorer
 comparison; dev is audit-exposed but model/optimizer/treatment-unseen. Test
 inputs were also previously audit-exposed; labels remain hidden and excluded.
-No split, scientific objective, model, price, budget, or provider run is frozen.
+At the earlier product-fit checkpoint no split, objective, model, price, budget,
+or provider run was frozen. The current candidate now freezes the receipt,
+adapted objective, current task/proposer models, and exact mechanism for review;
+price/catalog revalidation, an owner spend cap, and provider authority remain
+absent. Because official dev is treatment-unseen but not globally untouched or
+source-disjoint, even a passing result could not silently satisfy this ticket's
+strongest literal evidence wording.
+
+The MuSiQue current-MIPRO design is frozen for provider-free review, not yet a
+reviewed executable, owner-accepted, or provider-authorized treatment. Generic
+pinned-minibatch search
+fidelity was repaired at `f2711d2`: the exact DSPy 3.2.1 size-35/full-every-5
+schedule is now admitted through ordinary pinned MIPRO and independently matches
+the modeled Optuna trajectory. The candidate's specified six-arm opportunity is
+278,472 task plus 282 proposer transports. Its acceptance headline is frozen as
+mean held-out `J=(answer_f1 + support_f1)/2` lift at least `0.05`, positive lift
+in at least two of three seeds, and nonnegative mean lift on each component;
+exact match is secondary. Remaining provider-free work must prove complete
+prompt/cost admission and symmetric selected-state/fresh-consumer lifecycles for
+Imp and pinned DSPy. The reduced planted lifecycle now proves both runtimes can
+perform modeled minibatch search, strictly select an optimized two-predictor
+state, persist it safely (schema-3 Artifact for Imp; state-only JSON with pickle
+and unsafe LM state disabled for DSPy), and execute four fresh two-stage calls.
+This is mechanics, not MuSiQue effectiveness or full-opportunity evidence.
+
+Imp's exact full C6 setup now censes 47 proposer calls and the actual pinned demo
+arms, whose configured bootstrapped/labeled maxima share a combined per-arm cap
+of two rather than four. Accepted-bootstrap task maxima are 44,552 selector and
+21,994 answerer bytes; the shared task guard is 52,744. Proposer min/P50/P95/max
+are 1,198/30,777/111,395/124,867 bytes; the provisional 149,443 guard reserves
+three 8,192-byte dynamic inputs. The current six-arm full-price byte-as-token
+planning arithmetic is `$2,192.04012144`, explicitly without prompt-cache savings.
+It is not a legal ceiling, including for Imp: the census measures canonical JSON
+message bytes while ReqLLM's input envelope counts rendered string content, so
+wire framing is not yet priced or capped on the same boundary. Live accepted
+bootstrap traces can also become demos; their generated answer values are not
+bounded by the planted-demo census or the current dynamic-value helper. Pinned
+DSPy still needs its own full C6 serializer census, exact frozen route-body and
+single-transport proof, and equivalent enforced pretransport guards. Its pinned
+JSONAdapter permissively repairs JSON and can fall back from structured-schema
+mode to plain `json_object`; it does not retry a failed JSON parse using the
+Chat marker format. The actual task-owned runner must cap/account canonical wire
+framing and admit generated bootstrap-demo values as well as dynamic
+summary/program/module/instruction outputs before embedding them in later
+prompts.
+Current catalog revalidation and an owner spend cap also remain absent. No
+provider authority follows.
 
 The current provider-free preparation establishes two narrower facts without
 advancing the usefulness criterion. The adapted HoVer no-merge target has a

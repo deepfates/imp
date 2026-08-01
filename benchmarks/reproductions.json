@@ -1521,6 +1521,31 @@
       }
     },
     {
+      "id": "benchmark_musique_ans",
+      "name": "MuSiQue-Ans adapted Select-to-Answer",
+      "authority_family": "family.benchmark_musique_ans",
+      "surface_tokens": [
+        "MuSiQue-Ans"
+      ],
+      "public_surfaces": [
+        "Imp.BenchmarkTruth.MusiqueAns",
+        "Imp.BenchmarkTruth.MusiqueAnsMiproCurrent"
+      ],
+      "implementation_paths": [
+        "bench/imp/benchmark_truth/musique_ans.ex",
+        "bench/imp/benchmark_truth/musique_ans_mipro_current.ex"
+      ],
+      "classification": "adaptation",
+      "protocol_ids": [
+        "optimizer_lift"
+      ],
+      "admitted_evidence": {
+        "tier": "none",
+        "artifact": null,
+        "protocol_id": null
+      }
+    },
+    {
       "id": "benchmark_hover",
       "name": "HoVer and hoverBench",
       "authority_family": "family.benchmark_hover",

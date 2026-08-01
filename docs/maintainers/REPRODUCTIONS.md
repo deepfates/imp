@@ -48,6 +48,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | HotPotQA and HotpotQABench | replication | parity<br>gepa_live | NONE | none |
 | Color and structured classification fixtures | native_extension | benchmark_run | NONE | none |
 | AIMEBench | replication | gepa_dataset<br>gepa_live | NONE | none |
+| MuSiQue-Ans adapted Select-to-Answer | adaptation | optimizer_lift | NONE | none |
 | HoVer and hoverBench | adaptation | gepa_dataset<br>gepa_live | NONE | none |
 | IFBench | replication | gepa_dataset<br>gepa_live | NONE | none |
 | LiveBenchMathBench | replication | gepa_dataset<br>gepa_live | NONE | none |

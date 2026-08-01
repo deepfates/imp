@@ -15,6 +15,7 @@
 /benchmarks/data/
 !/benchmarks/data/
 /benchmarks/data/*
+!/benchmarks/data/musique-ans-mipro-current-v1.receipt.json
 !/benchmarks/data/hotpotqa-validation-0-10.jsonl
 !/benchmarks/data/hotpotqa-validation-0-10.manifest.json
 !/benchmarks/data/HOTPOTQA_ATTRIBUTION.md
