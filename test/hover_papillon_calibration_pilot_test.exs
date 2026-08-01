@@ -392,6 +392,47 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
     refute File.exists?(Path.join(root, "imp.json"))
     assert [provisional] = Path.wildcard(Path.join(root, "live-evidence/provisional/*.json"))
     assert [] = Path.wildcard(Path.join(root, "live-evidence/reconciled/*.json"))
+    record = provisional |> File.read!() |> Jason.decode!()
+    [first | _] = Pilot.runtime_schedule("imp")
+    first_id = first.id
+    first_task = first.task
+    first_row = first.row
+    first_repetition = first.repetition
+    first_stage = first.stage
+
+    assert %{
+             "state" => "response_received_reconciliation_pending",
+             "opportunity_id" => ^first_id,
+             "runtime" => "imp",
+             "task" => ^first_task,
+             "row" => ^first_row,
+             "repetition" => ^first_repetition,
+             "stage" => ^first_stage,
+             "generation_id" => generation_id,
+             "model_effective" => model,
+             "provider_reported" => "Novita",
+             "router_metadata" => %{
+               "strategy" => "direct",
+               "attempt" => 1,
+               "endpoints" => %{"total" => 1}
+             },
+             "usage_reported" => %{
+               "prompt_tokens" => 11,
+               "completion_tokens" => 7,
+               "total_tokens" => 18,
+               "prompt_tokens_details" => %{"cached_tokens" => 0}
+             },
+             "finish_reason" => "stop",
+             "message_sha256" => message_sha,
+             "message_bytes" => message_bytes,
+             "message_serialization" => "canonical_json_utf8_v1",
+             "transport_count" => 1
+           } = record
+
+    assert is_binary(generation_id) and generation_id != ""
+    assert model == Pilot.model()
+    assert String.length(message_sha) == 64
+    assert is_integer(message_bytes) and message_bytes > 0
 
     for directory <- [root, Path.join(root, "live-evidence"), Path.dirname(provisional)] do
       assert (File.stat!(directory).mode &&& 0o777) == 0o700

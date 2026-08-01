@@ -530,6 +530,7 @@ class Recorder:
         response = entry.get("response")
         generation_id = field(response, "id")
         model_effective = field(response, "model")
+        provider_reported = field(response, "provider")
         usage = field(response, "usage") or {}
         details = field(usage, "prompt_tokens_details") or {}
         cached = field(details, "cached_tokens")
@@ -557,6 +558,7 @@ class Recorder:
                     **event_identity(item),
                     "generation_id": generation_id,
                     "model_effective": model_effective,
+                    "provider_reported": provider_reported,
                     "usage_reported": {
                         "input_tokens": input_tokens,
                         "output_tokens": output_tokens,
@@ -573,6 +575,8 @@ class Recorder:
                     "transport_count": 1,
                 },
             )
+        if provider_reported != ENDPOINT_PROVIDER:
+            raise RuntimeError("OpenRouter response provider missing or drifted")
         generation = generation_metadata(
             self.generation_url,
             generation_id,
@@ -614,6 +618,33 @@ def tracking_live_class(dspy, recorder):
             )
 
     return TrackingLive
+
+
+def validate_provisional_evidence(path, item, generation_id):
+    record = json.loads(path.read_text())
+    expected = {
+        "state": "response_received_reconciliation_pending",
+        "opportunity_id": item["id"],
+        "generation_id": generation_id,
+        "model_effective": MODEL,
+        "provider_reported": ENDPOINT_PROVIDER,
+        "finish_reason": "stop",
+        "message_serialization": "canonical_json_utf8_v1",
+        "transport_count": 1,
+    }
+    if any(record.get(key) != value for key, value in expected.items()):
+        raise RuntimeError("DSPy provisional response identity drift")
+    if not isinstance(record.get("message_sha256"), str) or len(record["message_sha256"]) != 64:
+        raise RuntimeError("DSPy provisional message hash missing")
+    if not isinstance(record.get("message_bytes"), int) or record["message_bytes"] <= 0:
+        raise RuntimeError("DSPy provisional message byte count missing")
+    validate_router_metadata(record.get("router_metadata"))
+    usage = record.get("usage_reported", {})
+    if usage != {"input_tokens": 11, "output_tokens": 7, "cached_tokens": 0, "total_tokens": 18}:
+        raise RuntimeError("DSPy provisional reported usage drift")
+    if path.stat().st_mode & 0o777 != 0o600:
+        raise RuntimeError("DSPy provisional evidence mode drift")
+    return record
 
 
 def verify_live_transport_offline(dspy_root, output_root):
@@ -727,6 +758,7 @@ def verify_live_transport_offline(dspy_root, output_root):
         reconciled = list((output_root / "live-evidence" / "reconciled").glob("*.json"))
         if len(provisional) != 1 or len(reconciled) != 1 or generation_gets["normal"] != 2:
             raise RuntimeError("delayed generation reconciliation evidence drift")
+        validate_provisional_evidence(provisional[0], item, "gen-offline-live")
 
         terminal = Recorder(
             "live",
@@ -742,6 +774,7 @@ def verify_live_transport_offline(dspy_root, output_root):
         terminal_response = {
             "id": "gen-terminal-live",
             "model": MODEL,
+            "provider": ENDPOINT_PROVIDER,
             "openrouter_metadata": synthetic_router_metadata(),
             "choices": [{"finish_reason": "stop"}],
             "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18,
@@ -772,6 +805,16 @@ def verify_live_transport_offline(dspy_root, output_root):
             or len(terminal_files) != 2
         ):
             raise RuntimeError("terminal generation 404 advanced the fixed schedule")
+        terminal_file = next(path for path in terminal_files if "query3" in path.name)
+        validate_provisional_evidence(terminal_file, first, "gen-terminal-live")
+        for directory in (
+            output_root,
+            output_root / "live-evidence",
+            output_root / "live-evidence" / "provisional",
+            output_root / "live-evidence" / "reconciled",
+        ):
+            if directory.stat().st_mode & 0o777 != 0o700:
+                raise RuntimeError("DSPy private evidence directory mode drift")
 
         return {
             "status": "offline_live_transport_verified",
