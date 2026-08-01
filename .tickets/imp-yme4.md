@@ -42,7 +42,7 @@ Imp reaches this finish line when:
 
 Package gates, research rungs, comparator receipts, and dashboards are supporting checks. None can close this epic without the user-facing finish line above, and no new tracking mechanism is accepted unless it replaces an older source of truth.
 
-## Current frontier after `01e5c4d3`
+## Current frontier after `08f59ec6`
 
 The product center is real but the telos is open.
 
@@ -51,6 +51,10 @@ The product center is real but the telos is open.
   private linked Result/Artifact persistence, fresh-OS application, concurrent
   `ProgramServer`, and the native Optimize Anything value-artifact path. The
   product-only payload excludes repository research. It remains unpublished.
+  The packaged deployment front door now performs its Artifact reload and
+  four-call concurrent service proof in a child OS process from the same
+  ordinary command. This remains maintainer-authored internal evidence, not the
+  independent consumer acceptance required below.
 - **Advertised mechanisms — complete as an experimental prerequisite.**
   `imp-tg2z` removed reproduced facades and exercised the named families through
   their defining public transitions and safety boundaries. All optimizer modules
@@ -226,7 +230,26 @@ second tracking system:
 8. **Complete the user experience and external acceptance.** Rewrite remaining
    user documentation around purpose and use, conduct a cold independent
    install-to-optimize-to-serve review, prepare an owner-ready release, and leave
-   publication as an explicit owner action.
+   publication as an explicit owner action. Independence here is an observed
+   user boundary, not another maintainer gate: the reviewer must not have
+   implemented Imp, the deployment example, or the retained claims; receives
+   only an exact source/package identity and the public user documentation; and
+   works from a clean directory without workshop tickets, internal docs,
+   benchmark-maintainer commands, or live coaching. The review must install the
+   candidate, declare and evaluate a realistic multi-stage program, improve both
+   named stages through an ordinary public optimizer, persist the selected
+   Artifact privately, reconstruct trusted code in a fresh OS process, and serve
+   concurrent calls. Separately, the reviewer must run the documented compact
+   TREC scoring/aggregation command from committed public inputs and obtain the
+   frozen statistics. Record the unedited commands, observed friction, and any
+   maintainer intervention; intervention invalidates cold acceptance until the
+   resulting product or documentation repair is retested by a fresh reviewer.
+   This review can establish usability, packaging, lifecycle coherence, and
+   claim recomputability. It cannot establish broad optimizer effectiveness,
+   production reliability, or scientific independence of the original provider
+   runs. A Codex peer, clean-room CI job, or maintainer-authored subprocess test
+   remains valuable adversarial evidence but does not satisfy this external
+   acceptance criterion by itself.
 
 `imp-argb` and `imp-tg2z` remain completed prerequisites, not epic closure.
 `imp-88sn` owns the current scientific frontier. Historical treatments and
