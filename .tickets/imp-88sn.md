@@ -147,17 +147,51 @@ added: fund one terminal MuSiQue hero tranche after a thin executable path and
 legal bound exist, or ship the cheaper honest experimental evidence while the
 larger usefulness ticket remains open. A negative MuSiQue result ends the lane.
 
-Generic
-pinned-minibatch search
-fidelity was repaired at `f2711d2`: the exact DSPy 3.2.1 size-35/full-every-5
-schedule is now admitted through ordinary pinned MIPRO and independently matches
-the modeled Optuna trajectory. The candidate's specified six-arm opportunity is
-278,472 task plus 282 proposer transports. Its acceptance headline is frozen as
-mean held-out `J=(answer_f1 + support_f1)/2` lift at least `0.05`, positive lift
-in at least two of three seeds, and nonnegative mean lift on each component;
-exact match is secondary. Remaining provider-free work must prove complete
-prompt/cost admission and symmetric selected-state/fresh-consumer lifecycles for
-Imp and pinned DSPy. The reduced planted lifecycle now proves both runtimes can
+### Principal reduction after independent cold acceptance (`118ae24f`)
+
+MuSiQue remains a serious scientific candidate, not a mandatory continuation
+of its readiness work. Its official train/dev scale, real two-stage
+Select-to-Answer program, joint instruction-and-demonstration search, full held-out
+dev evaluation, and multi-seed matched comparison are recognizably shaped like
+the original MIPRO evaluation rather than a planted fixture. The preserved
+five-seed draft fixes an exact opportunity of `270,760` task and `470` proposer
+transports across Imp and pinned DSPy. Even a clean positive would earn one
+scoped current-model result on an adapted MuSiQue program; it would not by
+itself establish broad MIPRO usefulness or Imp superiority.
+
+Do not complete admission by predicting every possible serialized prompt or by
+growing the benchmark-local census into another controller. A thinner ordinary
+path can bound money without pretending to know future prompt lengths: before
+each transport, reserve the maximum configured input context and output
+allowance for that role at the authenticated route's full price; dispatch only
+when reconciled accrued cost plus that reservation remains below one
+owner-ratified condition cap; then join and retain the provider's actual usage
+and cost before the next dispatch. Missing usage, route drift, cache/retry or
+fallback, reconciliation failure, or safety failure stops the condition. If the
+cap prevents the fixed opportunity from completing, the result is
+`inconclusive` and no truncated arm is scored. This is deliberately
+conservative and may reserve far more than a typical call; it is an enforceable
+spend boundary, not an expected-cost estimate or a guarantee that the study
+fits beneath the selected cap.
+
+The remaining owner decision is therefore material and plain: ratify this
+MuSiQue protocol and a hard condition-level spend appetite, or retain the
+already-accepted experimental package story while broad multi-stage usefulness
+stays open. Provider-free implementation, if ratified, is limited to thin Imp
+and pinned-DSPy ordinary runners plus this prospective admission/reconciliation
+rule. Reject the lane if that requires a generic coordinator, evidence
+framework, or treatment change. No provider authority follows from this
+disposition.
+
+Generic pinned-minibatch search fidelity was repaired at `f2711d2`: the exact
+DSPy 3.2.1 size-35/full-every-5 schedule is now admitted through ordinary pinned
+MIPRO and independently matches the modeled Optuna trajectory. The earlier
+three-seed design specified 278,472 task plus 282 proposer transports and a
+two-of-three positive-seed headline; it is superseded as an active proposal by
+the preserved five-seed draft described above, not a second condition awaiting
+execution. Both use mean held-out `J=(answer_f1 + support_f1)/2` lift at least
+`0.05`, with nonnegative mean lift on each component; exact match is secondary.
+The reduced planted lifecycle proves both runtimes can
 perform modeled minibatch search, strictly select an optimized two-predictor
 state, persist it safely (schema-3 Artifact for Imp; state-only JSON with pickle
 and unsafe LM state disabled for DSPy), and execute four fresh two-stage calls.
@@ -175,15 +209,18 @@ message bytes while ReqLLM's input envelope counts rendered string content, so
 wire framing is not yet priced or capped on the same boundary. Live accepted
 bootstrap traces can also become demos; their generated answer values are not
 bounded by the planted-demo census or the current dynamic-value helper. Pinned
-DSPy still needs its own full C6 serializer census, exact frozen route-body and
-single-transport proof, and equivalent enforced pretransport guards. Its pinned
-JSONAdapter permissively repairs JSON and can fall back from structured-schema
-mode to plain `json_object`; it does not retry a failed JSON parse using the
-Chat marker format. The actual task-owned runner must cap/account canonical wire
-framing and admit generated bootstrap-demo values as well as dynamic
-summary/program/module/instruction outputs before embedding them in later
-prompts.
-Current catalog revalidation and an owner spend cap also remain absent. No
+DSPy still needs the exact frozen route-body and single-transport proof. Its
+pinned JSONAdapter permissively repairs JSON and can fall back from
+structured-schema mode to plain `json_object`; it does not retry a failed JSON
+parse using the Chat marker format. Imp's ordinary content envelope may reject
+a later prompt containing a large generated bootstrap demo; that is a safe
+pretransport stop and makes the condition inconclusive rather than silently
+changing its opportunity. The prospective full-context reservation above
+accounts for framing and generated values without claiming the diagnostic
+census enumerates every live prompt.
+Current catalog revalidation and an owner spend cap also remain absent. The
+prompt-census numbers remain diagnostic planning evidence, not prerequisites
+for the thinner prospective spend rule above and not a legal ceiling. No
 provider authority follows.
 
 The current provider-free preparation establishes two narrower facts without
