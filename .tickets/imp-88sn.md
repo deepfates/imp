@@ -2380,6 +2380,50 @@ root remains immutable. The provider-free repair PASS remains valid for its
 fixtures but did not establish this live boundary; no further calibration run
 is implied by this record.
 
+Provider-free primary-source reconstruction corrected that initial
+classification. OpenRouter's router-metadata contract defines `requested` as
+the client slug or alias and explicitly permits it to differ from the provider
+model that served the request. It defines `endpoints` as the routing-candidate
+snapshot, but does not define `endpoints.total` as the count remaining after
+eligibility filters. All ten retained responses consistently report
+`total=22`, exactly one available and selected endpoint, Novita, and
+`deepseek/deepseek-v4-flash-20260423`; the generation records report that same
+snapshot and provider, while the response and router `requested` fields retain
+the requested `deepseek/deepseek-v4-flash` alias. Joined generation/request
+identities plus the exact catalog and ZDR `novita/fp8` binding establish the
+intended route. There is no evidence of provider drift.
+
+The ten calls also did not reach the false router or generation validators.
+Each ordinary ReqLLM/adapter failure occurred after the raw response was
+provisionally persisted but before router/generation reconciliation and event
+construction. The repetition boundary correctly skipped only the failed
+repetition's suffix and continued the fixed schedule; the owning defect was
+that the exact transported-stage error and reconciled usage/route evidence were
+lost. Separately, the latent identity guards attempted to construct unsupported
+`OperationalSafetyError kind: :identity`, which would itself have become an
+ordinary `ArgumentError` instead of a fatal safety error.
+
+Commit `3b65a3e0` repairs only that repository-local evidence boundary. The
+requested alias, response alias, selected endpoint snapshot, generation
+snapshot, provider, and joined identities now retain their distinct roles.
+Exact-route validation requires `strategy=direct`, `attempt=1`, one available
+and selected catalog-bound snapshot/provider, and a positive endpoint-candidate
+total no smaller than the available set; it no longer invents `total=1` or
+generation-model-equals-alias contracts. Route/model/provider drift uses the
+existing fatal `:route` safety kind, missing reconciliation identity uses
+`:transport`, and usage/cache/cost drift uses `:cost`. Every transported
+ordinary adapter failure is reconciled and durably recorded with its redacted
+cause before it is returned to the program boundary, so only its repetition
+suffix is skipped; safety/evidence failures remain fatal before another task
+stage. The same alias/snapshot contract is applied to the pinned-DSPy runner.
+
+Focused offline tests pass 9/9; the opt-in pinned-source, exact Imp/DSPy graph
+passes 10/10; the owned local TrackingLive transport proves bounded 404-to-200
+reconciliation and terminal 404 refusal; and `mix fast.check` passes. These are
+provider-free product/evidence proofs. They do not rehabilitate the stopped
+run, establish live format/noise behavior, earn any scientific claim, or imply
+authority for another completion.
+
 ## Notes
 
 **2026-07-31T20:57:09Z**
