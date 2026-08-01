@@ -51,30 +51,31 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
     assert plan.current_treatment.reflection_route.endpoint_tag == "google-vertex/global"
 
     assert plan.current_treatment.concurrency == %{
-             status: :pending_matched_policy,
+             status: :matched_serial_within_lane,
              imp_optimizer: 1,
-             upstream_threads: :pending,
-             candidate_task_and_outer: 16,
+             upstream_threads: 1,
+             outer_evaluation: 1,
              reflection: 1,
              result_order: :source_row_order,
-             blocker:
-               "pinned Imp GEPA v0.1.4 requires serial optimizer evaluation; a matched operational policy is not yet proven"
+             independent_lane_parallelism: :separate_processes_only_not_implemented,
+             rationale:
+               "the pinned Imp profile is serial; DSPy num_threads=1 matches it and both retain source-row order"
            }
 
     assert plan.current_treatment.matched_contract == %{
              rows: :exact,
              information: :same,
              optimizer_opportunity: :same,
-             generation_policies: :target_pending_both_serializers,
+             generation_policies: :provider_disabled_both_serializers_exercised,
              renderer: :runtime_native,
              result_order: :source_row_order
            }
 
     assert plan.current_treatment.readiness == %{
              imp_provider_disabled_lifecycle: :exercised,
-             dspy_provider_disabled_lifecycle: :pending_repository_only_entry,
-             imp_live_request_serialization: :pending,
-             dspy_live_request_serialization: :pending,
+             dspy_provider_disabled_lifecycle: :exercised_repository_only_entry,
+             imp_live_request_serialization: :provider_disabled_wire_exercised,
+             dspy_live_request_serialization: :provider_disabled_wire_exercised,
              exact_route_cost_calibration: :pending,
              provider_authority: false
            }
@@ -102,6 +103,36 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
     assert plan.reservation.prospective_spend_cap == :pending_train_only_calibration
     assert_in_delta plan.reservation.nominal_usd, 15_377.81661696, 1.0e-9
     assert_in_delta plan.reservation.legal_usd, 27_213.60445440, 1.0e-9
+  end
+
+  test "Imp real request serializer binds exact task and reflection role policies" do
+    task = HoverGepaNoMergePlan.provider_disabled_request_serialization!(:task)
+    reflection = HoverGepaNoMergePlan.provider_disabled_request_serialization!(:reflection)
+
+    assert task.body["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert task.body["max_tokens"] == 2_048
+    assert task.body["temperature"] == 1.0
+    assert task.body["top_p"] == 1.0
+    assert task.body["reasoning"] == %{"effort" => "none"}
+    refute Map.has_key?(task.body, "reasoning_effort")
+
+    assert task.body["provider"] ==
+             stringify_keys(HoverGepaNoMergePlan.candidate_provider_preferences(:task))
+
+    assert reflection.body["model"] == "anthropic/claude-sonnet-5"
+    assert reflection.body["max_tokens"] == 8_192
+    assert reflection.body["reasoning"] == %{"effort" => "high"}
+    refute Map.has_key?(reflection.body, "reasoning_effort")
+    refute Map.has_key?(reflection.body, "temperature")
+    refute Map.has_key?(reflection.body, "verbosity")
+    refute Map.has_key?(reflection.body, "top_p")
+
+    for request <- [task, reflection] do
+      assert request.body["usage"] == %{"include" => true}
+      assert request.headers["x-openrouter-cache"] == ["false"]
+      assert request.headers["x-openrouter-metadata"] == ["enabled"]
+      assert request.rendered_messages_bytes <= request.max_input_bytes
+    end
   end
 
   test "candidate task and reflection routes are exact, ZDR-listed, and fail closed" do
@@ -373,10 +404,112 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlanTest do
                result["proposal_components"] ==
                  ~w(summarize1 create_query_hop2 summarize2 create_query_hop3 summarize1)
            end)
+
+    assert get_in(payload, ["provider_disabled_request_serializers", "task", "body", "model"]) ==
+             "deepseek/deepseek-v4-flash-0731"
+
+    assert get_in(payload, [
+             "provider_disabled_request_serializers",
+             "reflection",
+             "body",
+             "model"
+           ]) ==
+             "anthropic/claude-sonnet-5"
+  end
+
+  @tag :evidence_infrastructure
+  test "pinned DSPy entry compiles serial ordered GEPA and reloads selected state fresh" do
+    root = temporary_path("dspy-entry")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    {output, 0} =
+      System.cmd(
+        Path.expand("tmp/dspy-parity-venv/bin/python"),
+        [
+          "scripts/hover_gepa_no_merge_upstream.py",
+          "--dspy-root",
+          "tmp/dspy-3.2.1",
+          "--gepa-root",
+          "tmp/gepa-v0.1.4",
+          "--output-root",
+          root
+        ],
+        env: [{"OPENROUTER_API_KEY", ""}, {"OPENAI_API_KEY", ""}, {"ANTHROPIC_API_KEY", ""}],
+        stderr_to_stdout: true
+      )
+
+    payload = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
+    assert payload["status"] == "provider_disabled_lifecycle_pass"
+    assert payload["num_threads"] == 1
+    assert payload["result_order"] == "source_row_order"
+    assert payload["ordered_val_source_ids"] == ~w(row-0 row-1 row-2 row-3)
+    assert payload["baseline_val_subscores"] == [0.0, 0.001, 0.002, 0.003]
+    assert payload["selected_val_subscores"] == [0.8, 0.801, 0.802, 0.803]
+    refute payload["use_merge"]
+
+    assert payload["proposal_components"] ==
+             ~w(summarize1 create_query_hop2 summarize2 create_query_hop3 summarize1)
+
+    assert payload["candidate_count"] == 5
+    assert payload["total_metric_calls"] == 50
+    assert payload["strictly_selected"]
+    assert payload["fresh"]["loaded"]
+    assert payload["fresh"]["selected_instructions"] == payload["selected_instructions"]
+  end
+
+  @tag :evidence_infrastructure
+  test "pinned DSPy real serializer binds both role policies through LiteLLM loopback" do
+    {output, 0} =
+      System.cmd(
+        Path.expand("tmp/dspy-parity-venv/bin/python"),
+        [
+          "scripts/hover_gepa_no_merge_upstream.py",
+          "--dspy-root",
+          "tmp/dspy-3.2.1",
+          "--gepa-root",
+          "tmp/gepa-v0.1.4",
+          "--serializer-proof"
+        ],
+        env: [{"OPENROUTER_API_KEY", ""}, {"OPENAI_API_KEY", ""}, {"ANTHROPIC_API_KEY", ""}],
+        stderr_to_stdout: true
+      )
+
+    payload = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
+    task = payload["task"]
+    reflection = payload["reflection"]
+
+    assert task["body"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert task["body"]["temperature"] == 1.0
+    assert task["body"]["top_p"] == 1.0
+    assert task["body"]["reasoning"] == %{"effort" => "none"}
+    refute Map.has_key?(task["body"], "reasoning_effort")
+    assert reflection["body"]["model"] == "anthropic/claude-sonnet-5"
+    assert reflection["body"]["reasoning"] == %{"effort" => "high"}
+    refute Map.has_key?(reflection["body"], "reasoning_effort")
+    refute Map.has_key?(reflection["body"], "temperature")
+    refute Map.has_key?(reflection["body"], "verbosity")
+
+    for request <- [task, reflection] do
+      assert request["headers"] == %{
+               "x-openrouter-cache" => "false",
+               "x-openrouter-metadata" => "enabled"
+             }
+
+      assert request["rendered_messages_bytes"] <= request["max_input_bytes"]
+      assert request["body"]["usage"] == %{"include" => true}
+      assert request["body"]["provider"]["allow_fallbacks"] == false
+      assert request["body"]["provider"]["zdr"] == true
+    end
   end
 
   defp temporary_path(name) do
     Path.join(System.tmp_dir!(), "imp-hover-plan-#{System.unique_integer([:positive])}-#{name}")
+  end
+
+  defp stringify_keys(map) do
+    Map.new(map, fn {key, value} ->
+      {to_string(key), if(is_map(value), do: stringify_keys(value), else: value)}
+    end)
   end
 
   defp task_endpoint do

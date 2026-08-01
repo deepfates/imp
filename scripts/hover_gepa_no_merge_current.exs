@@ -38,6 +38,11 @@ train_only_reflection_census =
     gepa_root: "tmp/gepa-artifact"
   )
 
+provider_disabled_request_serializers = %{
+  task: HoverGepaNoMergePlan.provider_disabled_request_serialization!(:task),
+  reflection: HoverGepaNoMergePlan.provider_disabled_request_serialization!(:reflection)
+}
+
 results =
   Enum.map(plan.seeds, fn seed ->
     seed_root = Path.join(output_root, Integer.to_string(seed))
@@ -53,6 +58,7 @@ IO.puts(
       census_data_access: "train_only",
       invocation_preflight: "all_split_identity_authentication"
     },
+    provider_disabled_request_serializers: provider_disabled_request_serializers,
     provider_disabled_results: results
   })
 )

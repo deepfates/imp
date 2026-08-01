@@ -35,10 +35,9 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
     reservation_tokens: 655_360,
     max_output_tokens: 8_192,
     max_output_bytes: @reflection_output_byte_cap,
-    enforcement: :pending_real_request_builders
+    enforcement: :candidate_request_serializers_exercised
   }
   @task_concurrency 1
-  @candidate_task_concurrency 16
   @reflection_concurrency 1
   @seeds [2_026_080_201, 2_026_080_202, 2_026_080_203]
   @train_size 150
@@ -155,14 +154,15 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
         task_route: candidate_route(:task),
         reflection_route: candidate_route(:reflection),
         concurrency: %{
-          status: :pending_matched_policy,
+          status: :matched_serial_within_lane,
           imp_optimizer: @task_concurrency,
-          upstream_threads: :pending,
-          candidate_task_and_outer: @candidate_task_concurrency,
+          upstream_threads: 1,
+          outer_evaluation: 1,
           reflection: @reflection_concurrency,
           result_order: :source_row_order,
-          blocker:
-            "pinned Imp GEPA v0.1.4 requires serial optimizer evaluation; a matched operational policy is not yet proven"
+          independent_lane_parallelism: :separate_processes_only_not_implemented,
+          rationale:
+            "the pinned Imp profile is serial; DSPy num_threads=1 matches it and both retain source-row order"
         },
         policies: %{
           task: %{
@@ -193,15 +193,15 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
           rows: :exact,
           information: :same,
           optimizer_opportunity: :same,
-          generation_policies: :target_pending_both_serializers,
+          generation_policies: :provider_disabled_both_serializers_exercised,
           renderer: :runtime_native,
           result_order: :source_row_order
         },
         readiness: %{
           imp_provider_disabled_lifecycle: :exercised,
-          dspy_provider_disabled_lifecycle: :pending_repository_only_entry,
-          imp_live_request_serialization: :pending,
-          dspy_live_request_serialization: :pending,
+          dspy_provider_disabled_lifecycle: :exercised_repository_only_entry,
+          imp_live_request_serialization: :provider_disabled_wire_exercised,
+          dspy_live_request_serialization: :provider_disabled_wire_exercised,
           exact_route_cost_calibration: :pending,
           provider_authority: false
         }
@@ -264,7 +264,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
         legal_usd: reservation_usd(legal_task_total, legal_reflections),
         prospective_spend_cap: :pending_train_only_calibration,
         caveat:
-          "planning ceiling, not an enforced context or spend bound until both real request builders apply the candidate guards; provider prompt-cache tariff is never assumed"
+          "planning ceiling, not a prospective spend cap; both provider-disabled request serializers exercise the per-request byte guards, while live distribution and spend calibration remain pending and provider prompt-cache tariff is never assumed"
       }
     }
   end
@@ -284,6 +284,105 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
         completion: route.output_price_per_million
       }
     }
+  end
+
+  def provider_disabled_request_serialization!(role) when role in [:task, :reflection] do
+    owner = self()
+    route = candidate_route(role)
+    guard = if role == :task, do: @task_guard, else: @reflection_guard
+    requested_model = if role == :task, do: @candidate_model, else: @reflection_model
+
+    adapter = fn request ->
+      body = request.body |> IO.iodata_to_binary() |> Jason.decode!()
+      headers = Map.new(request.headers, fn {key, values} -> {String.downcase(key), values} end)
+      messages = Jason.encode!(Map.fetch!(body, "messages"))
+
+      if byte_size(messages) > guard.max_input_bytes do
+        raise Imp.OperationalSafetyError,
+          kind: :budget,
+          message: "serialized HoVer #{role} request exceeds the candidate byte guard",
+          reason: %{actual_bytes: byte_size(messages), max_bytes: guard.max_input_bytes}
+      end
+
+      send(owner, {:hover_serialized_request, role, body, headers, messages})
+
+      response = %{
+        "id" => "provider-disabled-#{role}",
+        "object" => "chat.completion",
+        "model" => route.endpoint_model,
+        "provider" => route.provider,
+        "choices" => [
+          %{
+            "index" => 0,
+            "message" => %{"role" => "assistant", "content" => "provider-disabled"},
+            "finish_reason" => "stop"
+          }
+        ],
+        "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+      }
+
+      {request, Req.Response.new(status: 200, body: response)}
+    end
+
+    role_options =
+      case role do
+        :task -> [temperature: 1.0, top_p: 1.0, openrouter_reasoning: %{effort: :none}]
+        :reflection -> [openrouter_reasoning: %{effort: :high}]
+      end
+
+    lm =
+      Imp.req_llm(
+        %{
+          provider: :openrouter,
+          id: requested_model,
+          model: requested_model,
+          base_url: "https://openrouter.ai/api/v1"
+        },
+        [
+          api_key: "provider-disabled",
+          cache: false,
+          max_tokens: guard.max_output_tokens,
+          max_retries: 0,
+          input_envelope: [
+            max_bytes: guard.max_input_bytes,
+            reservation_tokens: guard.reservation_tokens
+          ],
+          provider_options: [
+            openrouter_provider: candidate_provider_preferences(role),
+            openrouter_usage: %{include: true}
+          ],
+          req_http_options: [
+            adapter: adapter,
+            headers: [
+              {"X-OpenRouter-Metadata", "enabled"},
+              {"X-OpenRouter-Cache", "false"}
+            ],
+            retry: false,
+            max_retries: 0
+          ]
+        ] ++ role_options
+      )
+
+    {:ok, _response} =
+      Imp.Clients.ReqLLM.generate(
+        lm,
+        [%{role: :user, content: "provider-disabled #{role} serializer assertion"}],
+        []
+      )
+
+    receive do
+      {:hover_serialized_request, ^role, body, headers, messages} ->
+        %{
+          role: role,
+          body: body,
+          headers: headers,
+          rendered_messages_bytes: byte_size(messages),
+          rendered_messages_sha256: sha256(messages),
+          max_input_bytes: guard.max_input_bytes
+        }
+    after
+      1_000 -> raise "HoVer #{role} serializer did not reach the provider-disabled transport"
+    end
   end
 
   def validate_candidate_catalog!(task_catalog, task_zdr, reflection_catalog, reflection_zdr)
