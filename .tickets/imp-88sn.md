@@ -415,6 +415,19 @@ defect: matched preflight must require `response_format` and prove one exact
 JSON-object route before a full pair. It is not a framework score, capacity
 result, or reason to alter the task.
 
+The next endpoint is not admitted from catalog fields alone. A one-call exact
+route proof from clean `108d0336` sent the real JSON-object parameter surface to
+`siliconflow/fp8` with the frozen alias, temperature, reasoning effort,
+max-token, ZDR/data-deny/no-fallback/no-retry, and response-cache-off policy.
+OpenRouter selected SiliconFlow and returned HTTP 200 from the dated fp8
+snapshot with 35 prompt tokens, five completion tokens, zero cached tokens, and
+`$0.0000063` provider-reported cost. Private result SHA-256 is
+`fbe45871517d9decf9ae9b9b988ad546aea4da9fab9543950c76e2bb209aa3d2`.
+SiliconFlow currently advertises every parameter used by both runtimes and the
+same `$0.14/M` / `$0.28/M` maxima. This proves route/parameter admission, not
+task quality or sustained capacity; the full matched pair remains the next
+meaningful measurement.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program

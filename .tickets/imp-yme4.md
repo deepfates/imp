@@ -188,6 +188,12 @@ Endpoint admission now must require the union of both runtimes' actual request
 parameters and prove one exact JSON-object route before another full pair; no
 partial outcome is table evidence.
 
+A separately retained exact JSON-object request then succeeded once through
+the currently healthy ZDR `siliconflow/fp8` route with all frozen request
+parameters, no fallback/cache/retry, zero cached tokens, and provider-reported
+cost. That is the bounded route-admission proof required before the next full
+pair; it is not a benchmark datum or capacity claim.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent
