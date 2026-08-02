@@ -2,6 +2,7 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseProductFitTest do
   use ExUnit.Case, async: false
 
   alias Imp.BenchmarkTruth.LangProBeHeartDisease, as: Heart
+  alias Imp.BenchmarkTruth.LangProBeHeartDiseaseMiproCurrent, as: Plan
 
   defp row do
     %{
@@ -91,6 +92,160 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseProductFitTest do
 
     assert get_in(data.receipt, ["splits", "train", "ordered_canonical_jsonl_sha256"]) ==
              "3923fc709c3ba8349d50f6617cab8553da2b50117965dfc195bcc7698bdef362"
+  end
+
+  test "current matched preregistration binds the exact hidden MIPRO opportunity" do
+    plan = Plan.call_plan()
+
+    assert plan.executable == false
+    assert plan.full_opportunity_claimed == false
+    assert plan.task.periodic_full_evaluations == 5_440
+    assert plan.per_runtime_run == %{task: 15_904, proposer: 147}
+    assert plan.study == %{task: 159_040, proposer: 1_470}
+    assert length(Plan.seeds()) == 5
+    assert Plan.acceptance().test == :two_sided_wilcoxon_signed_rank
+    assert Plan.historical_context().mipro_lift == 0.0526
+
+    assert Plan.historical_context().scope ==
+             :single_historical_run_context_not_acceptance_standard
+
+    assert Plan.adapter_semantics().dspy.use_json_adapter_fallback == false
+    assert_in_delta Plan.planning_reservation().total_usd, 588.0225792, 1.0e-9
+    assert Plan.planning_reservation().status == :planning_only_not_legal_ceiling
+  end
+
+  @tag :evidence_infrastructure
+  test "exact C12 setup executes all 147 grounded proposer calls" do
+    data = Heart.data!()
+
+    task_calls =
+      start_supervised!(
+        {Agent, fn -> [] end},
+        id: {:heart_task_calls, System.unique_integer([:positive])}
+      )
+
+    captured_task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          Agent.update(task_calls, &(&1 ++ [messages]))
+          %{reasoning: "provider-free clinical reasoning", answer: "no"}
+        end
+      )
+
+    calls =
+      start_supervised!(
+        {Agent, fn -> [] end},
+        id: {:heart_proposer_calls, System.unique_integer([:positive])}
+      )
+
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          Agent.update(calls, &(&1 ++ [messages]))
+
+          %{
+            observations: "provider-free Heart Disease observations",
+            summary: "provider-free Heart Disease summary",
+            program_description: "three opinions followed by one vote",
+            module_description: "one named stage in the four-call program",
+            proposed_instruction: "provider-free candidate instruction"
+          }
+        end
+      )
+
+    compiled =
+      Plan.optimizer(captured_task_lm, prompt_lm, hd(Plan.seeds()))
+      |> Imp.Optimizer.MIPROv2.compile(
+        Plan.program(captured_task_lm),
+        data.train,
+        data.selection,
+        max_trials: 0
+      )
+
+    recorded_calls = Agent.get(calls, & &1)
+
+    assert length(recorded_calls) == 147
+
+    assert Plan.proposer_prompt_census!(recorded_calls) == %{
+             calls: 147,
+             max_bytes: 5_165,
+             min_bytes: 978,
+             ordered_sha256: "4c367dfa9eb821ae48a4996e14d5aee2e238a23b7e74e5df926d3be846d60f24",
+             p95_bytes: 4_278
+           }
+
+    report = Imp.Optimizer.Report.fetch(compiled)
+
+    artifacts =
+      report.metadata.resume_state["payload"]["artifacts"] |> Imp.Optimizer.Report.decode_term()
+
+    assert Plan.task_prompt_census!(artifacts.search_demos) == %{
+             calls: 14_544,
+             demo_arm_sizes: %{
+               opinion_1: [0, 2, 4, 2, 3, 2, 2, 3, 4, 2, 3, 2],
+               opinion_2: [0, 2, 4, 2, 3, 2, 2, 3, 4, 2, 3, 2],
+               opinion_3: [0, 2, 4, 2, 3, 2, 2, 3, 4, 2, 3, 2],
+               vote: [0, 2, 4, 2, 3, 2, 2, 3, 4, 2, 3, 2]
+             },
+             max_bytes: 5_462,
+             min_bytes: 1_622,
+             ordered_sha256: "f57a00f05f27a00ccebdd9f4472ca1f8e9a0b1f268e4d54af909e4b6bd315236",
+             p95_bytes: 4_616,
+             source: :actual_pinned_search_demo_arms
+           }
+
+    task_sizes = Agent.get(task_calls, & &1) |> Enum.map(&byte_size(Jason.encode!(&1)))
+    assert length(task_sizes) == 652
+    assert Enum.min(task_sizes) == 1_633
+    assert Enum.max(task_sizes) == 3_368
+  end
+
+  @tag :evidence_infrastructure
+  test "pinned DSPy separately censes every C12 demo-bearing task and proposer wire" do
+    python = Path.expand("tmp/dspy-parity-venv/bin/python")
+    dspy_root = Path.expand("tmp/dspy-3.2.1")
+    script = Path.expand("scripts/langprobe_heart_disease_product_fit_upstream.py")
+
+    {output, status} =
+      System.cmd(
+        python,
+        [
+          script,
+          "--prereg-census",
+          "--dspy-root",
+          dspy_root,
+          "--dataset",
+          Path.expand(Heart.dataset_path()),
+          "--split",
+          Path.expand(Heart.split_path())
+        ],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+    result = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
+
+    assert result["proposer"] == %{
+             "calls" => 147,
+             "max_bytes" => 10_927,
+             "min_bytes" => 978,
+             "ordered_sha256" =>
+               "7b3d48a902452bb05d668520e100981848eab36336565e8bd0d201743abc0e17",
+             "p95_bytes" => 10_881
+           }
+
+    assert result["task"] == %{
+             "calls" => 14_544,
+             "demo_arm_sizes" =>
+               Map.new(0..3, &{Integer.to_string(&1), [0, 2, 4, 2, 3, 2, 2, 3, 4, 2, 3, 2]}),
+             "max_bytes" => 6_187,
+             "min_bytes" => 2_311,
+             "ordered_sha256" =>
+               "ae53916c489da54baec12bc0e48aa2b296ca1e79052bc1dfc83c40e4537d4e88",
+             "p95_bytes" => 5_341
+           }
+
+    refute result["full_opportunity_claimed"]
   end
 
   @tag :evidence_infrastructure

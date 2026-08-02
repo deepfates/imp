@@ -33,6 +33,22 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
     :ca,
     :thal
   ]
+  @field_descriptions %{
+    age: "Age in years",
+    sex: "Sex (male or female)",
+    cp: "Chest pain type (typical angina, atypical angina, non-anginal pain, asymptomatic)",
+    trestbps: "Resting blood pressure (in mm Hg on admission to the hospital)",
+    chol: "Serum cholestoral in mg/dl",
+    fbs: "Fasting blood sugar > 120 mg/dl (true or false)",
+    restecg:
+      "Resting electrocardiographic results (normal, ST-T wave abnormality, left ventricular hypertrophy)",
+    thalach: "Maximum heart rate achieved",
+    exang: "Exercise induced angina (yes or no)",
+    oldpeak: "ST depression induced by exercise relative to rest",
+    slope: "The slope of the peak exercise ST segment (upsloping, flat, downsloping)",
+    ca: "Number of major vessels (0-3) colored by flourosopy",
+    thal: "Thalassemia (normal, fixed defect, reversible defect)"
+  }
 
   defstruct @components
 
@@ -183,20 +199,51 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
   end
 
   defp opinion_signature do
-    Imp.signature(
-      "#{input_spec()} -> answer",
-      "Given patient information, predict the presence of heart disease. Answer yes or no."
+    Imp.Signature.new(
+      %{
+        inputs: signature_inputs(),
+        outputs: [
+          %{
+            name: :answer,
+            type: :string,
+            description: "Does this patient have heart disease? Just yes or no."
+          }
+        ]
+      },
+      "Given patient information, predict the presence of heart disease."
     )
   end
 
   defp vote_signature do
-    Imp.signature(
-      "#{input_spec()}, context: array[string] -> answer",
-      "Given patient information, predict the presence of heart disease. Critically assess the trainee opinions and answer yes or no."
+    Imp.Signature.new(
+      %{
+        inputs:
+          signature_inputs() ++
+            [
+              %{
+                name: :context,
+                type: "array[string]",
+                description: "A list of opinions from trainee doctors."
+              }
+            ],
+        outputs: [
+          %{
+            name: :answer,
+            type: :string,
+            description: "Does this patient have heart disease? Just yes or no."
+          }
+        ]
+      },
+      "Given patient information, predict the presence of heart disease. I can critically assess the provided trainee opinions."
     )
   end
 
-  defp input_spec, do: Enum.join(@input_fields, ", ")
+  defp signature_inputs do
+    Enum.map(
+      @input_fields,
+      &%{name: &1, type: :string, description: Map.fetch!(@field_descriptions, &1)}
+    )
+  end
 
   defp clinical_inputs(inputs) do
     missing = Enum.reject(@input_fields, &Map.has_key?(inputs, &1))
@@ -211,7 +258,7 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
          reasoning when is_binary(reasoning) <- Imp.Prediction.get(prediction, :reasoning),
          answer when is_binary(answer) <- Imp.Prediction.get(prediction, :answer) do
       {:ok,
-       "I'm a trainee doctor, reasoning that #{String.trim(reasoning, ".")}. Hence, my answer is #{String.trim(answer, ".")}."}
+       "I'm a trainee doctor, trying to #{String.trim(reasoning, ".")}. Hence, my answer is #{String.trim(answer, ".")}."}
     else
       {:error, reason} -> {:error, reason}
       _ -> {:error, :invalid_opinion}

@@ -2811,6 +2811,82 @@ order, and all-gold outcomes; the opted-in calibration suite passes 11/11 and
 unchanged. No provider rerun follows from this correction, and none of the
 invalid HoVer outcomes above are reinterpreted.
 
+## LangProBe Heart Disease matched-current preregistration
+
+Provider-free commits `5f054cc2` and `a1888d18` establish a materially cleaner
+candidate literature anchor, not an effectiveness result. The consumer-owned
+Imp program and pinned DSPy 3.2.1 program now reproduce LangProBe's current
+four-call Heart Disease topology and task wording: three independently
+temperatured clinical opinions followed by a vote over the same thirteen
+fields and the three rendered opinions. Both compact paths select, persist,
+fresh-load, and serve their selected state. The published 303-row
+`buio/heart-disease` CSV is retained locally by exact source identity and its
+Python `Random(0)` transformation reproduces the exact 15 train / 136 selection
+/ 152 test partition with ordered split hashes.
+
+The source audit also bounds the claim. Of the 303 benchmark rows, 297 match
+official UCI Cleveland rows on the first twelve features and six replace the
+six official rows containing missing values. On matched rows the benchmark's
+positive label means UCI severity at least two; severity one is labeled
+negative despite the task prose saying presence of disease. This is a valid
+matched software benchmark when both runtimes use the identical bytes. It is
+not official-UCI equivalence, clinical validation, or an exact reproduction of
+the MIPRO paper's different 120/183 Heart Disease condition.
+
+The separately named current-source plan uses the current LangProBe MIPRO
+opportunity (C12 instructions/demo arms, 50 minibatch objectives, size 35,
+full evaluation every five, four bootstrapped and two labeled maxima) and five
+fixed matched runs, following the MIPRO paper's run count and its per-example
+Wilcoxon comparison rather than inventing another +0.05 task threshold. The
+primary estimand is selected-test accuracy Imp minus pinned DSPy; absolute
+scores and each runtime's own-baseline lift remain mandatory. A positive
+contrast with two-sided Wilcoxon p<0.05 is classified Imp-superior, a negative
+one DSPy-superior, and all other outcomes inconclusive; paired per-example
+bootstrap intervals are reported in addition.
+
+The executable pinned schedule proves that each runtime/run has a legal maximum
+of 15,904 task transports: 600 bootstrap, 544 internal baseline, 7,000
+minibatch, ten inserted full evaluations totaling 5,440, 1,088 outer selection,
+1,216 paired test, and 16 four-call fresh-service stages. Across five runs and
+two runtimes that is 159,040 task transports. The exact C12 provider-disabled
+setup executes 147 proposer calls/run (three dataset-grounding plus 144
+program-aware candidate calls), or 1,470 study-wide; the generic estimator's
+smaller number is not used.
+
+This plan remains deliberately non-executable. The provider-free Imp census
+proves the exact proposer graph and real search-demo artifacts, but the full
+Imp and DSPy demo-bearing task/proposer serializers still need matched
+pretransport envelopes, exact single-transport route checks, and a legal cost
+ceiling. Current catalog candidates are dated DeepSeek V4 Flash 0731 for task
+work and Qwen 3.7 Max for proposals; route/privacy/price identity and owner
+spend remain live preflight/owner boundaries. Claude Sonnet 5 was rejected for
+this exact treatment because its current Google endpoint does not advertise the
+`temperature` parameter that pinned MIPRO always sends; fail-closed parameter
+admission must not be weakened to make a preferred model fit. No provider authority, full
+opportunity execution, result, superiority claim, or broad telos closure is
+implied.
+
+The exact planted-output serializer census covers all twelve actual demo arms
+and all 303 rows separately in both runtimes. Imp's largest task/proposer
+messages are 5,462/5,165 bytes; pinned DSPy's are 6,187/10,927 bytes. A
+conservative planning proposal of 16,384/65,536 content-byte guards plus
+1,024/4,096 explicit framing reservations yields `$588.0225792` at the current
+full-price catalog and full legal call opportunity. This is deliberately not a
+legal ceiling yet: the guards are not wired symmetrically, live generated demo
+and proposer values can be larger than planted values, and exact route/privacy
+identity still needs immediate preflight. Oversized later prompts would stop
+before transport, protecting spend but scientifically nulling that lane.
+
+The pinned LangProBe result table provides context rather than a pass bar. Its
+single GPT-4o `CoTBasedVote` row reports baseline test accuracy `63.16%` and
+DSPy MIPROv2 `68.42%` (`+5.26` points), with `$71.1028225` recorded optimizer
+cost. The source CSV is bound at commit `f006191...` and SHA-256
+`d1952622...4a`. Because this is one historical run with a different model and
+runtime vintage, it is neither a direct comparator for the new treatment nor
+evidence that Imp should be accepted at +5 points. The new study directly runs
+both current Imp and pinned DSPy under the same rows, models, seeds, and nominal
+opportunity instead.
+
 ## Notes
 
 **2026-07-31T20:57:09Z**
