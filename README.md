@@ -109,8 +109,12 @@ scorer was wrong; the repaired source-exact scorer makes a new comparison
 valid, but does not rehabilitate the old result. These outcomes show that the
 product can optimize, select, persist, and serve honestly; they do not establish
 broad optimizer effectiveness. The next research milestone is a matched
-current-model Imp-versus-DSPy table across the official six-task GEPA suite,
-followed by a stateful-agent proof in Grue's real Z-machine environment.
+current-model Imp-versus-DSPy table across the official six-task GEPA suite.
+The complementary Grue stateful-agent condition has now completed the real
+optimizer, Artifact, fresh-restart, and concurrent OTP lifecycle; its three
+fixed local-model seeds all retained baseline with zero causal lift, so it is a
+product-path proof and an honest narrow scientific negative rather than a
+usefulness result.
 
 ## Read next
 

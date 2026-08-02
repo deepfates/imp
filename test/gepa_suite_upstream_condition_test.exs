@@ -210,9 +210,10 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       )
 
     [row | _] = Imp.BenchmarkTruth.GepaSuite.load_test!(prepared.loaded)
+    problem = Imp.Example.fetch!(row, :problem)
 
     assert {:ok, _prediction} =
-             Imp.Module.call(prepared.program, %{"problem" => row.fields["problem"]})
+             Imp.Module.call(prepared.program, %{"problem" => problem})
 
     actual =
       for _ <- 1..2 do
@@ -307,7 +308,8 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       )
 
     [row | _] = Imp.BenchmarkTruth.GepaSuite.load_test!(prepared.loaded)
-    assert {:ok, _} = Imp.Module.call(prepared.program, %{"problem" => row.fields["problem"]})
+    problem = Imp.Example.fetch!(row, :problem)
+    assert {:ok, _} = Imp.Module.call(prepared.program, %{"problem" => problem})
     assert_receive {:aime_wire, imp_body, imp_headers}
 
     probe = ~S'''
