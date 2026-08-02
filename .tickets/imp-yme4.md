@@ -105,6 +105,12 @@ identity and a byte-reproducible receipt. It also removes a mutating post-restor
 This is the prerequisite for the live Grue optimizer proof, not that proof or
 a usefulness claim.
 
+Grue commit `7ed50d6` also adds the thin ordinary public treatment over that
+freeze and proves provider-free Experiment selection across all three splits.
+Its fixed three-seed plan is bounded at 236 native task calls and eight
+reflections per seed. The remaining Grue step is now the live model outcome and
+fresh service of each selected Artifact, not more benchmark infrastructure.
+
 The first live-run audit found and repaired a real opportunity mismatch before
 spend: both entrances had evaluated baseline and selected programs inside every
 arm even though the source-derived plan declares one held-out score per arm,

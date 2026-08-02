@@ -127,6 +127,18 @@ at save time. Grue's integration gate and the focused real-action check pass.
 The historical routes themselves are not claimed unseen; this is a result-blind
 new save/split freeze and still has no live optimizer outcome.
 
+Grue commit `7ed50d6` now supplies the thin ordinary experiment over that
+freeze. `SavedFrontierExperiment.check/5` runs public `Imp.Experiment` with a
+single real policy predictor, BEAM-native instruction-only GEPA, eight
+generations, four-row minibatches, strict selection, three repeated outer
+evaluations, paired baseline test, and schema-3 Artifact. Each of the three
+fixed seeds permits at most 236 native task calls plus eight reflection calls,
+including the planned four-call fresh service acceptance. A provider-free
+planted instruction crosses the real 8/8/8 split and is selected through the
+ordinary Experiment boundary; existing fresh-OS `ProgramServer` coverage owns
+the Artifact/restart mechanism. This is executable product-path readiness, not
+the still-missing live Grue result or provider authority.
+
 Provider-free audit has now exercised the actual six-task source boundary
 rather than trusting the old campaign manifest. All six official exports
 reproduce byte-for-byte from `gepa-ai/gepa-artifact@cbefbc1`: AIME
