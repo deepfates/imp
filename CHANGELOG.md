@@ -8,12 +8,15 @@ Versioning once the first public package is released.
 The unpublished `0.3.0` candidate continues to receive corrections before its
 first public tag. Since the initial release-candidate checkpoint, Artifact
 fresh-process portability, finite Experiment error budgets, fixed repeated
-outer evaluation, OpenRouter request/evidence handling, and pinned MIPROv2
-minibatch/Optuna fidelity have been strengthened. Repository-only benchmark
-work added independently recomputable Optimize Anything evidence and
-provider-free MuSiQue readiness without adding those research surfaces to the
-Hex payload. These changes remain part of the unpublished candidate until an
-owner-approved release cut decides otherwise.
+outer evaluation with independent selection/test repetition counts, OpenRouter
+request/evidence handling, and pinned MIPROv2 minibatch/Optuna fidelity have
+been strengthened. Unequal outer repetition counts persist in backward-
+compatible Experiment Result schema 4; the existing integer shorthand and
+uniform-result schemas remain unchanged. Repository-only benchmark work added
+independently recomputable Optimize Anything evidence and provider-free
+MuSiQue readiness without adding those research surfaces to the Hex payload.
+These changes remain part of the unpublished candidate until an owner-approved
+release cut decides otherwise.
 
 Signature fields can now use `type: :code` with explicit `language:` metadata.
 Chat, JSON, and XML adapters emit language-aware guidance, render source inputs,

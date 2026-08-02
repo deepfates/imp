@@ -50,11 +50,18 @@ differential, an Elixir-native equivalent, or an honest gap for each tracked
 surface. The source repository's
 [evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
 and [conformance report](https://github.com/deepfates/imp/blob/main/docs/CONFORMANCE.md)
-retain those research records separately from the packaged manual. Several
-scoped effectiveness results remain reviewable with source-repository artifacts: the
-[ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s router improves
-from 25–30% to 85% on held-out data across three committed live runs, for
-about a cent. On a separately frozen matched TREC contract, Imp GEPA improved
+retain those research records separately from the packaged manual.
+`Imp.Experiment.check/5` can repeat noisy selection independently from final
+test estimation (`repetitions: [selection: n, test: m]`), selects on the
+selection mean, preserves strict baseline ties, and persists the per-stage runs
+and paired deltas. The original integer repetition form remains the uniform
+shorthand.
+
+Several scoped effectiveness results remain reviewable with source-repository
+artifacts: the [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s
+router improves from 25–30% to 85% on held-out data across three committed live
+runs, for about a cent. On a separately frozen matched TREC contract, Imp GEPA
+improved
 its baseline by `+0.4000` and cleared the preregistered noninferiority margin
 against pinned DSPy GEPA; MIPROv2 improved its own baseline by `+0.1458`.
 The committed compact scored-row inputs let a third party rerun the frozen
