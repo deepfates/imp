@@ -111,6 +111,18 @@ Its fixed three-seed plan is bounded at 236 native task calls and eight
 reflections per seed. The remaining Grue step is now the live model outcome and
 fresh service of each selected Artifact, not more benchmark infrastructure.
 
+That Grue step is now exercised through the ordinary local-model path at Grue
+commit `e713ff4`, with the terminal interpretation recorded at `dfcb726`. The
+three fixed seeds each evaluated the baseline plus eight BEAM-native GEPA
+candidates, tied baseline on repeated selection (`0.0 -> 0.0`), retained the
+baseline strictly, and produced causal held-out lifts of `0.0, 0.0, 0.0` at a
+shared test score of `0.0125`. Every private Result/schema-3 Artifact pair
+survived a fresh BEAM and served four concurrent real Zork forks through the
+ordinary ProgramServer. This closes the missing stateful product-lifecycle
+exercise and is a valid narrow negative for the pinned local 3B model and
+eight-reflection opportunity. It does not establish useful Zork optimization
+or substitute for the matched six-task table.
+
 The first live-run audit found and repaired a real opportunity mismatch before
 spend: both entrances had evaluated baseline and selected programs inside every
 arm even though the source-derived plan declares one held-out score per arm,

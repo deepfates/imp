@@ -139,6 +139,19 @@ ordinary Experiment boundary; existing fresh-OS `ProgramServer` coverage owns
 the Artifact/restart mechanism. This is executable product-path readiness, not
 the still-missing live Grue result or provider authority.
 
+The real local-model condition is now complete at Grue commit `e713ff4` and
+recorded in its owning bench README at `dfcb726`. Across seeds
+`2026080201/02/03`, the baseline plus eight GEPA candidates were evaluated, but
+optimized and baseline selection tied at `0.0` in every seed. Strict outer
+selection therefore retained baseline three times; baseline and selected test
+scores were `0.0125`, for causal lifts `0.0, 0.0, 0.0`. All three private
+Result/Artifact pairs wrote mode `0600`, applied in fresh BEAM processes, and
+served four concurrent real Zork forks successfully through ProgramServer.
+This is the previously missing BEAM-native stateful lifecycle under a real
+model and a scientific negative for this exact small local model/budget. It
+does not satisfy useful-optimization acceptance or weaken the requirement for
+the current-model six-task table.
+
 Provider-free audit has now exercised the actual six-task source boundary
 rather than trusting the old campaign manifest. All six official exports
 reproduce byte-for-byte from `gepa-ai/gepa-artifact@cbefbc1`: AIME
