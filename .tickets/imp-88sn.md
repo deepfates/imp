@@ -166,13 +166,30 @@ each transport, reserve the maximum configured input context and output
 allowance for that role at the authenticated route's full price; dispatch only
 when reconciled accrued cost plus that reservation remains below one
 owner-ratified condition cap; then join and retain the provider's actual usage
-and cost before the next dispatch. Missing usage, route drift, cache/retry or
-fallback, reconciliation failure, or safety failure stops the condition. If the
-cap prevents the fixed opportunity from completing, the result is
+and cost before the next dispatch. Missing usage, route drift, cache/fallback,
+reconciliation failure, or safety failure stops the condition. If the cap
+prevents the fixed opportunity from completing, the result is
 `inconclusive` and no truncated arm is scored. This is deliberately
 conservative and may reserve far more than a typical call; it is an enforceable
 spend boundary, not an expected-cost estimate or a guarantee that the study
 fits beneath the selected cap.
+
+The draft's blanket `retries: 0` is not credible at this scale. Across `270,760`
+task transports, even independent `99.99%` transport success implies about 27
+failures and only about `1.7e-12` probability of a completely failure-free
+study. The ratified condition therefore needs one small, symmetric operational
+policy: a fixed bounded number of same-route attempts for transport failures
+that produced no usable model response. Preserve the logical opportunity ID
+and exact request body; never retry a successfully returned malformed model
+output, parse/program/metric failure, or safety rejection. Every attempt
+consumes the prospective reservation until its exact cost is reconciled; an
+attempt with unavailable cost retains the full reservation. Record attempts
+separately for Imp and DSPy, and make exhausted retries
+terminal/inconclusive. This is
+transport fault tolerance, not replacement-row sampling, fallback, or an
+adaptive scientific decision. Reject any implementation that requires a
+benchmark controller rather than the existing runtime clients' bounded retry
+surface.
 
 The remaining owner decision is therefore material and plain: ratify this
 MuSiQue protocol and a hard condition-level spend appetite, or retain the
@@ -180,8 +197,8 @@ already-accepted experimental package story while broad multi-stage usefulness
 stays open. Provider-free implementation, if ratified, is limited to thin Imp
 and pinned-DSPy ordinary runners plus this prospective admission/reconciliation
 rule. Reject the lane if that requires a generic coordinator, evidence
-framework, or treatment change. No provider authority follows from this
-disposition.
+framework, or unratified treatment change. No provider authority follows from
+this disposition.
 
 Generic pinned-minibatch search fidelity was repaired at `f2711d2`: the exact
 DSPy 3.2.1 size-35/full-every-5 schedule is now admitted through ordinary pinned

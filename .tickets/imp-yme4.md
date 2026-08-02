@@ -243,7 +243,7 @@ second tracking system:
    policy makes repeated selection plus a single full held-out pass possible
    without choosing that design by inertia.
 4. **Authenticate the chosen arm before spend.** Bind both runtimes to the
-   exact route, model, privacy, cache, retry, fallback, and fixed scientific
+   exact route, model, privacy, cache, fallback, and fixed scientific
    opportunity through existing task-owned paths. Use one prospective spend
    rule rather than an exhaustive future-prompt census: before every transport,
    reserve the role's full configured context and output allowance at the
@@ -254,7 +254,12 @@ second tracking system:
    Reject the lane if enforcing it requires another generic benchmark
    controller or changes the treatment. Present the exact call opportunity,
    conservative admission rule, likely runtime, unknown actual cost, scoped
-   claim, and hard cap as one explicit owner decision.
+   claim, and hard cap as one explicit owner decision. At large call volumes,
+   `retries: 0` is not rigor: predeclare the same small bounded exact-route
+   transport retry policy for both runtimes, preserve logical opportunity IDs,
+   charge every attempt against the cap, and never retry usable malformed model
+   output or ordinary program/metric failures. Exhaustion makes the condition
+   inconclusive. Do not turn that policy into a benchmark controller.
 5. **Freeze ordinary benchmark paths.** Each chosen task must use thin public
    Imp composition, native validated metrics, result-blind splits, ordinary
    Result/Artifact boundaries, fresh concurrent service, and pinned ordinary
