@@ -159,6 +159,13 @@ the already-healthy eight-request envelope; it changes no scientific input,
 metric, model, route, output limit, or seed. Repeated throttling will reject
 the endpoint rather than trigger another concurrency ratchet.
 
+The corrected pair then reproduced the same Novita shared-pool `429` failure:
+Imp completed a censored `30/126` run with 49 request failures and pinned DSPy
+had 29 retained errors when the pair was stopped. Novita is therefore rejected
+for the remaining table. These partial outcomes are excluded, and the next
+table arm must use a separately frozen currently healthy ZDR endpoint rather
+than another concurrency reduction or retry of this route.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent

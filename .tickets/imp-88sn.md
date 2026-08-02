@@ -351,6 +351,25 @@ rows, model, endpoint, prompts, metric, output cap, seed, or no-retry policy.
 If material throttling recurs, stop this endpoint rather than reducing the
 scientific workload again.
 
+That capacity repair also failed, so Novita is rejected for the remaining
+table rather than ratcheted down again. From clean `2464ef74`, the corrected
+pair allowed four concurrent requests per runtime, but Novita again returned
+shared-pool `429` responses. Imp completed with `30/126`, 96 retained errors,
+and 49 request failures; pinned DSPy had already retained 29 errors when the
+pair was stopped under the preregistered endpoint-rejection rule. No DSPy
+Result exists and neither partial score is admissible. The immutable Imp
+Result/progress hashes are
+`612020a4e9a5449543f23f04a43bed84f58a57ad34db1a57c5c970b26c132719` /
+`6e668fbd4ec7103b274d292c543abe572158c69cdf051046630798ae5535a5bd`;
+the DSPy progress/log hashes are
+`ac48c5d268d54e281a453a19eb4f82a6c6ee8bd3af72d6712f719a20ba9822b8` /
+`a35eb464550d0d7074eb8638a6860bafd570e153938230050e966c988e100256`.
+The account window moved `$0.140515060`. The provider error names Novita's
+`upstream_provider_shared_pool` as the limit source. This is a second null
+capacity treatment, not a scientific result. Continuing the table now requires
+a separately frozen healthy ZDR endpoint; it does not permit another Novita
+retry or a hidden concurrency reduction.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program
