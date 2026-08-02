@@ -206,13 +206,32 @@ defmodule Imp.Predict.SearchTest do
   end
 
   test "concurrent threshold accounting includes speculation that already completed" do
+    fast_completed = :atomics.new(1, signed: false)
+
+    await_fast = fn await_fast ->
+      if :atomics.get(fast_completed, 1) == 1 do
+        :ok
+      else
+        Process.sleep(1)
+        await_fast.(await_fast)
+      end
+    end
+
     result =
       Search.run(
-        [Candidate.new(:threshold, 40, %{calls: 1}), Candidate.new(:fast, 1, %{calls: 1})],
-        fn candidate, _context ->
-          Process.sleep(candidate.value)
-          score = if candidate.id == :threshold, do: 1.0, else: 0.5
-          {:ok, candidate.id, score}
+        [
+          Candidate.new(:threshold, :threshold, %{calls: 1}),
+          Candidate.new(:fast, :fast, %{calls: 1})
+        ],
+        fn
+          %Candidate{id: :fast}, _context ->
+            :atomics.put(fast_completed, 1, 1)
+            {:ok, :fast, 0.5}
+
+          %Candidate{id: :threshold}, _context ->
+            await_fast.(await_fast)
+            Process.sleep(5)
+            {:ok, :threshold, 1.0}
         end,
         mode: :concurrent,
         max_concurrency: 2,
