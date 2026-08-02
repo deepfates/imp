@@ -218,16 +218,22 @@ second tracking system:
    OA as the existing scoped non-prompt positive. Treat Banking77 and HotPotQA
    as terminal outcomes for their exact Imp treatments, not matched DSPy losses
    or exhausted tasks; only IFBench's Imp effectiveness interpretation is
-   invalid/unverified. Evaluate one cheap current LangProBe/MIPRO anchor. Heart
-   Disease is the current candidate because it is a recognized four-call
-   compositional program over only 303 public benchmark rows. Do not merge two
+   invalid/unverified. The cheap LangProBe/MIPRO Heart Disease candidate was
+   reviewed provider-free and rejected before live spend. It is a recognized
+   four-call compositional program over only 303 public benchmark rows, but its
+   frozen test majority baseline is `113/152 = 74.34%`; all five retained
+   LangProBe MIPRO rows for that program finish below it, including GPT-4o at
+   `68.42%`. Relative optimizer lift is real but does not make the resulting
+   classifier useful. Do not merge two
    different precedents into a fictional exact reproduction: the MIPRO paper
    reports `120/183`, LangProBe uses `15/136/152`, and LangProBe's retained
    result grid does not supply a multi-run uncertainty protocol. The actual
    LangProBe/TensorFlow file is not equivalent to official UCI labels: matched
    rows encode severity 2--4 as positive while the prompt says generic disease
    presence, and six incomplete official rows are replaced. Pin and disclose
-   those actual benchmark bytes and run unconditional multi-run Imp/DSPy arms.
+   those actual benchmark bytes. The exact split, schedule, matched program,
+   serializer census, and hypothetical unconditional analysis are preserved,
+   but do not build the live runner or run the arms.
    A provider-free proof now exercises the real four-predictor Imp program and
    pinned DSPy shape through MIPRO selection, persistence, fresh loading, and
    fresh service, establishing product fit but not effectiveness or full-budget

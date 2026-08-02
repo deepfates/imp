@@ -2883,9 +2883,22 @@ DSPy MIPROv2 `68.42%` (`+5.26` points), with `$71.1028225` recorded optimizer
 cost. The source CSV is bound at commit `f006191...` and SHA-256
 `d1952622...4a`. Because this is one historical run with a different model and
 runtime vintage, it is neither a direct comparator for the new treatment nor
-evidence that Imp should be accepted at +5 points. The new study directly runs
-both current Imp and pinned DSPy under the same rows, models, seeds, and nominal
-opportunity instead.
+an adequate reason to fund it. The frozen test split contains `113/152`
+negative labels, so a constant-negative classifier scores `74.34%`. Every
+retained LangProBe MIPRO result for this four-call program—GPT-4o, GPT-4o Mini,
+Llama 3.1 8B, Llama 3.2 3B, and Llama 3.3 70B—finishes below that trivial
+baseline despite positive optimizer lift in all five rows. This does not erase
+the measured lifts; it shows that the benchmark rewards relative movement
+without demonstrating a useful classifier. Together with the disclosed label
+semantics, that makes Heart a valid provider-free compatibility and accounting
+anchor but a poor live portfolio investment or external quality claim. Stop
+before building the live runner or spending the `$588.0225792` planning
+reservation. Preserve the exact split, matched program, schedule, census, and
+preregistration as a falsified candidate design rather than deleting the work.
+
+The hypothetical matched analysis remains useful design evidence, but it no
+longer names a study awaiting execution and cannot support a `+5`-point Imp
+acceptance claim.
 
 ## Notes
 

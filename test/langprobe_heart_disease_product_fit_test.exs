@@ -109,6 +109,12 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseProductFitTest do
     assert Plan.historical_context().scope ==
              :single_historical_run_context_not_acceptance_standard
 
+    assert_in_delta Plan.benchmark_sanity().frozen_test_majority_accuracy, 0.7434210526, 1.0e-9
+    assert Plan.benchmark_sanity().all_retained_mipro_results_below_majority
+
+    assert Plan.benchmark_sanity().implication ==
+             :useful_as_matched_software_anchor_but_not_worth_live_portfolio_spend_or_external_quality_claim
+
     assert Plan.adapter_semantics().dspy.use_json_adapter_fallback == false
     assert_in_delta Plan.planning_reservation().total_usd, 588.0225792, 1.0e-9
     assert Plan.planning_reservation().status == :planning_only_not_legal_ceiling

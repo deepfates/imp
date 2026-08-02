@@ -10,7 +10,7 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseMiproCurrent do
 
   def condition, do: @condition
   def seeds, do: @seeds
-  def status, do: :provider_free_preregistration_in_progress
+  def status, do: :provider_free_preregistration_complete_live_not_recommended
   def program_grounding, do: @program_grounding
 
   def study_identity do
@@ -35,6 +35,25 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseMiproCurrent do
       mipro_lift: 0.0526,
       recorded_optimizer_cost_usd: 71.10282250000006,
       scope: :single_historical_run_context_not_acceptance_standard
+    }
+  end
+
+  def benchmark_sanity do
+    %{
+      frozen_test_rows: 152,
+      frozen_test_majority_label: "no",
+      frozen_test_majority_count: 113,
+      frozen_test_majority_accuracy: 113 / 152,
+      retained_langprobe_cot_vote_mipro_accuracies: %{
+        gpt_4o: 0.6842,
+        gpt_4o_mini: 0.5526,
+        llama_3_1_8b: 0.7171,
+        llama_3_2_3b: 0.4803,
+        llama_3_3_70b: 0.5921
+      },
+      all_retained_mipro_results_below_majority: true,
+      implication:
+        :useful_as_matched_software_anchor_but_not_worth_live_portfolio_spend_or_external_quality_claim
     }
   end
 
