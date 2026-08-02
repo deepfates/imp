@@ -91,85 +91,75 @@ reports answer F1 and support F1 separately. The current
 `(answer_f1 + support_f1) / 2` optimizer objective and component floors are an
 adapted candidate design, not the official MuSiQue headline.
 
-The prepared condition uses `700/300/2,417` and forty modeled objectives. Its
-exact metric, smallest effect of interest, seed count, and repetition allocation
-remain unratified after the public Experiment boundary gained independent
-selection/test repetition counts in `da725f56`. A serious study should normally
-use five runs, repeat selection only as justified by admission noise, evaluate
-the complete held-out split once per run, report answer/support outcomes
-separately, and compare absolute scores, own-baseline lifts, and
-Imp-minus-DSPy difference-in-lifts with row and run uncertainty. These are
-design recommendations to ratify, not authority encoded by this paragraph. A
-cheap smoke cannot satisfy this ticket. If the
-intended claim is a matched comparison, the Imp and DSPy arms must remain
-unconditional because launching the comparator only after an Imp pass would
-make the comparison result-conditioned. A differently scoped discovery claim
-may justify a smaller tranche if it is preregistered honestly and followed by
-independent confirmation. If the remaining admission work grows
-into another generic benchmark controller or changes the scientific
-opportunity, reject the lane rather than treating that machinery as progress.
+The LangProBe Heart candidate has now failed its significance-first review
+before provider spend. Its exact `15/136/152` split and four-call program are
+useful compatibility anchors, but the frozen test set is `113/152` negative: a
+constant-negative classifier scores `74.34%`. Every retained LangProBe MIPRO
+result for that program finishes below this trivial baseline. The label audit
+also found that matched UCI severity-one rows are called negative despite the
+prompt asking about disease presence. Preserve the exact provider-free path and
+falsified design; do not build or fund the proposed live arm.
 
-The next portfolio should be staged by claim rather than by accumulated
-readiness. Preserve matched TREC as the existing direct optimizer comparison and
-the retry-policy OA result as the existing scoped non-prompt positive. Before a
-large multi-stage spend, evaluate one cheap current LangProBe/MIPRO anchor.
-Heart Disease is the current candidate because both primary sources use the
-same four-call clinical-opinion program over a 303-row TensorFlow-derived task.
-They do not, however, define one exact study: the MIPRO paper reports `120/183`, while
-LangProBe code uses a deterministic `15/136/152` train/validation/test split and
-different optimizer settings. LangProBe retains one result per configuration
-across several models and optimizers but does not report a multi-run uncertainty
-protocol. A credible Imp study should pin the actual published benchmark bytes
-and program, run current Imp and DSPy unconditionally over multiple fixed runs,
-and call the result an
-adapted current-source matched comparison rather than an exact paper replay.
-The provider-free product-fit proof now implements all four named predictors,
-exercises ordinary MIPRO selection, writes and applies a schema-3 Artifact, and
-serves four concurrent calls from a fresh OS process; a pinned DSPy 3.2.1
-counterpart independently saves, reloads, and executes the same program shape.
-This establishes a thin ordinary path, not model effectiveness, full-budget
-optimizer parity, or source-data validity. Then use MuSiQue, or a demonstrably
-better alternative, for the serious current-source multi-stage comparison. A GEPA
-paper-family HoVer/HotPotQA arm follows only if a real cost pilot justifies its
-larger retrieval and reflection opportunity. This sequence is a portfolio
-strategy, not four mandatory campaigns; a failed thinness or cost check removes
-an arm without shrinking the intended external claim.
+This leaves MuSiQue as the strongest prepared serious comparison, not by
+readiness inertia but because it survives the same questions Heart did not. It
+has an official source-row-disjoint held-out split, a nontrivial two-stage
+information bottleneck, separate native answer/support metrics, no trivial
+label-majority escape, current stable DSPy `3.2.1` as an ordinary upstream, and
+the full Result/Artifact/fresh-service product boundary. The prepared
+`700/300/2,417` condition and forty modeled objectives are recognizably at the
+scale of the MIPRO paper's `500/500/up-to-2,000`, `20–50`-full-evaluation,
+five-run studies. They remain an adapted current-source study, not a paper
+replication or official MuSiQue leaderboard entry.
 
-The source check behind that candidate is concrete. LangProBe commit
-`f0061917f0e33ad141013d720c2ddea89c245da9` implements three independent
-Chain-of-Thought opinions plus a final Chain-of-Thought vote, points to
-`buio/heart-disease` without a revision, and retains the broad benchmark's
-single-run CSV results. The current Hugging Face dataset resolves to commit
-`4e539bff1729a7a4fd72fcdbb2dfbfcff71574fe`, whose LF-normalized `heart.csv`
-SHA-256 is `3369f450...`. It is byte-equivalent after line-ending normalization
-to TensorFlow's tutorial file, not to the official UCI processed Cleveland
-table (CC BY 4.0, DOI `10.24432/C52P4X`, audited archive SHA-256
-`b17cd273...`). A provider-free row-identity audit matched 297 benchmark rows
-to official rows by the first twelve features: `target=1` means official
-severity 2--4, while severity 1 is labeled `0`; six benchmark rows replace the
-six official rows with missing values. The source and program describe this as
-generic disease presence, so exact UCI equivalence and clean clinical label
-semantics are falsified. This does not invalidate a matched software comparison
-on the published bytes, but it limits the earned claim to that benchmark and
-must be disclosed. It is not the serious real-world usefulness task. No
-provider call or benchmark authority follows from this source audit.
+The direct claim must not be framed as difference-in-lifts alone: a weaker
+baseline can manufacture an attractive relative improvement. The recommended
+primary estimand is the five-run mean **selected-program answer F1 difference,
+Imp minus DSPy** on all `2,417` dev rows. Imp's own-baseline answer-F1 lift is a
+co-primary product requirement; support F1 may not decline against Imp's
+baseline or the selected DSPy program. Difference-in-lifts, exact match, joint
+adapted score, per-hop results, parse failures, cost, and latency remain
+diagnostics. The transparent joint mean may still drive optimizer search so
+both stages receive credit, but it is not presented as an official MuSiQue
+metric or the external headline.
 
-The audit is independently recomputable with
-`scripts/langprobe_heart_data_audit.py`; the product-fit boundary is exercised by
-`test/langprobe_heart_disease_product_fit_test.exs`. The next step for this arm
-is therefore a compact preregistration over the exact LangProBe snapshot and
-split, current task/proposer routes, five unconditional runs per runtime (the
-MIPRO paper's actual repetition count), matched optimizer opportunity, strict
-outer selection, per-example results, Artifact/fresh-service acceptance, and a
-real cost ceiling. It should report each runtime's baseline and optimized score,
-own-baseline lift, the direct Imp-minus-DSPy contrast, dispersion, and the
-paper's per-example run-average Wilcoxon analysis. No locally invented `+.05`
-headline should replace those quantities.
+A ratified study should use five unconditional matched runs, three repeated
+selection evaluations to reduce artifact-admission noise, and one complete dev
+evaluation per baseline/selected program per run. Report absolute scores,
+own-baseline lifts, and direct selected-program differences for every run;
+report a two-level seed/row bootstrap interval as the main uncertainty summary
+and the MIPRO paper's per-example run-average Wilcoxon test as a named
+sensitivity analysis. A practical superiority margin, positive-run rule, and
+condition spend cap still require explicit owner ratification; none should be
+smuggled in as an ecosystem standard. The previous `>=0.05`/two-of-three rule
+was local, not sourced.
 
-The MuSiQue current-MIPRO design is therefore neither the only allowed tranche,
-executable, nor provider-authorized. It targets this ticket's missing realistic
-multi-stage result, not a complete external benchmark portfolio. A materially
-better task/claim/model/scale design may supersede it before spend.
+Current route research supports a coherent modern treatment: dated DeepSeek V4
+Flash 0731 on the exact SiliconFlow ZDR endpoint for task calls, and Gemini 3.5
+Flash on Google Vertex ZDR for proposals. Both accept the parameters required
+by their roles. The prior Claude Sonnet 5 proposal route does not advertise the
+`temperature` parameter pinned MIPRO sends, and Qwen 3.7 Max currently has no
+listed ZDR endpoint; neither should be forced into this treatment. Provider
+prompt caching, if observed, is retained as a treatment variable under
+OpenRouter's ZDR definition; response caching remains disabled. These are
+current catalog findings and must be revalidated immediately before any run.
+
+The preserved five-run opportunity is `270,760` task plus `470` proposer
+transports. Provider-free zero-demo prompt census across all `3,417` prepared
+rows gives task medians of `12,402` selector bytes and `7,216` answerer bytes;
+accepted demos and live instructions can enlarge them. That makes the existing
+byte-as-token `$2k+` arithmetic a deliberately loose safety bound, not a useful
+expected-cost claim. The next design decision should pair a hard prospective
+condition cap with actual joined usage; a cap stop is inconclusive, never a
+truncated result. Do not build another census/controller to manufacture false
+precision.
+
+This is still one serious multi-stage datum, not the whole portfolio. Preserve
+matched TREC as the existing direct optimizer comparison, retry-policy OA as
+the scoped non-prompt positive, and the Banking77/HotPot negatives. If MuSiQue
+is ratified, complete only thin ordinary Imp and DSPy runners plus the bounded
+spend/error policy. Reject the lane if that requires a generic campaign system
+or materially changes the program, metric, opportunity, or matched comparison.
+No provider authority follows from this recommendation.
 There is also a legitimate cheaper milestone that does not close this ticket:
 document and present the already-earned scoped experimental story from matched TREC, the
 small retry-policy OA result, the clean Banking77/HotPot negatives, and the

@@ -89,9 +89,11 @@ The sampling harness must preserve:
    multi-stage comparison, with MuSiQue as the strongest prepared candidate but
    not a mandatory choice. Evaluate a GEPA paper-family HoVer/HotPotQA arm only
    after an outcome-blind cost pilot justifies its much larger opportunity. For
-   every matched study, report absolute performance, each runtime's own-baseline
-   lift, and Imp-minus-DSPy difference-in-lifts; preserve negative outcomes and
-   do not replace them with more catalog or dashboard machinery.
+   every matched study, make the selected Imp-versus-DSPy outcome the direct
+   comparison, separately require Imp to improve its own baseline, and retain
+   difference-in-lifts as a diagnostic rather than a flattering substitute for
+   final quality. Preserve negative outcomes and do not replace them with more
+   catalog or dashboard machinery.
 2. **Classification/factuality sampler.** Support Colors, Iris/Iris-Typo,
    Heart Disease, PubMedQA/CovidQA-like binary or multiclass rows, and macro-F1
    metrics.
