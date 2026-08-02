@@ -49,6 +49,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       do: raise(ArgumentError, "invalid GEPA suite arguments: #{inspect(positional ++ invalid)}")
 
     config = config!(opts)
+    if config.run? or config.fresh?, do: configure_req_llm_pool!(config)
     prepared = prepare!(config)
 
     cond do
@@ -159,6 +160,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       seed: config.seed,
       outer_max_concurrency: config.max_concurrency,
       request_timeout_ms: @request_timeout_ms,
+      req_llm_pool: req_llm_pool(config),
       heldout_decoded: false,
       split_counts: prepared.loaded.spec["split_counts"],
       treatments: treatments,
@@ -208,6 +210,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       progress_sha256: sha256(progress),
       wall_time_us: wall_time_us,
       request_timeout_ms: @request_timeout_ms,
+      req_llm_pool: req_llm_pool(config),
       spend_admission: reservation,
       heldout_decoded: true,
       retrieval: retrieval_disclosure(config, prepared.loaded.spec)
@@ -419,6 +422,21 @@ defmodule Imp.GepaSuiteConditionCLI do
       ]
     )
   end
+
+  defp configure_req_llm_pool!(config) do
+    if Process.whereis(ReqLLM.Supervisor) do
+      raise ArgumentError,
+            "GEPA suite live entrance must configure the ReqLLM pool before ReqLLM starts"
+    end
+
+    pool = req_llm_pool(config)
+    Application.put_env(:req_llm, :stream_pool_protocols, pool.protocols)
+    Application.put_env(:req_llm, :stream_pool_size, pool.size)
+    Application.put_env(:req_llm, :stream_pool_count, pool.count)
+    :ok
+  end
+
+  defp req_llm_pool(config), do: %{protocols: [:http1], size: config.max_concurrency, count: 1}
 
   defp optimizer_receipt(:mipro_v2_heavy, optimizer) do
     %{
