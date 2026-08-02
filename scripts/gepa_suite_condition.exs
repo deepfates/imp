@@ -482,6 +482,7 @@ defmodule Imp.GepaSuiteConditionCLI do
   end
 
   defp capture_runtime(fun) do
+    {:ok, _started} = Application.ensure_all_started(:telemetry)
     id = {__MODULE__, :runtime_usage, make_ref()}
     {:ok, usage} = Agent.start_link(fn -> empty_runtime() end)
 
