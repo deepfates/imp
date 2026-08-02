@@ -122,6 +122,10 @@ single-condition entrances now exist at `fd110664` for pinned DSPy and
 declared treatments provider-free, and keep held-out JSON undecoded until after
 optimization. The Imp entrance also exercises schema-3 Artifact application
 and four concurrent calls through the ordinary `ProgramServer` in a fresh BEAM.
+The live Imp and DSPy entrances now require symmetric exact providers,
+temperature, disabled cache/retry/fallback policy, output-token limits, and
+pretransport nested UTF-8 content-byte envelopes; neither mislabels that
+content boundary as a complete serialized-wire ceiling.
 The retrieval-bearing tasks use the authenticated current build of the official
 Wiki17/BM25S source (`d8ef9ed4...`) and explicitly do not claim historical byte
 reproduction of the unretained `c35ec786...` index. The remaining capability is

@@ -87,7 +87,10 @@ complete opportunity, construct the exact Imp treatments, and provide thin
 single-condition Imp and pinned-DSPy entrances. Provider-disabled checks cover
 all six tasks without held-out decode; the Imp entrance additionally applies a
 schema-3 Artifact into trusted code and serves four concurrent calls from a
-fresh BEAM. Grue commit `d36e022` independently proves the real forked-save,
+fresh BEAM. Both live entrances now require the same explicit per-role model,
+endpoint, output-token limit, and nested UTF-8 content-byte envelope before
+transport, while naming that envelope honestly as content rather than full
+wire bytes. Grue commit `d36e022` independently proves the real forked-save,
 native-progress, Artifact, and fresh-restart mechanics with a planted
 instruction improvement. These are readiness and product-mechanism facts, not
 the missing current-model comparative results. The immediate frontier is now

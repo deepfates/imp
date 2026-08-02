@@ -35,4 +35,51 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       assert receipt["heldout_decoded"] == false
     end
   end
+
+  test "upstream entrance enforces the same nested content-byte envelope before transport" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition_upstream.py")
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+
+    probe = """
+    import argparse, asyncio, importlib.util, pathlib, sys
+    path = pathlib.Path(sys.argv[1])
+    sys.path.insert(0, str(path.parent))
+    spec = importlib.util.spec_from_file_location("condition", path)
+    condition = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(condition)
+
+    class FakeLM:
+        def __init__(self, **kwargs): self.kwargs = kwargs
+        def forward(self, prompt=None, messages=None, **kwargs): return "transported"
+        async def aforward(self, prompt=None, messages=None, **kwargs): return "transported"
+    dspy = type("DSPy", (), {"LM": FakeLM})
+    args = argparse.Namespace(
+        task_model="model", task_provider="provider", task_max_input_bytes=2,
+        task_max_output_tokens=16, api_base="https://example.invalid", api_key_env="TEST_KEY"
+    )
+    lm = condition.make_lm(dspy, "task", args)
+    assert lm.forward(messages=[{"role": "user", "content": "é"}]) == "transported"
+    try:
+        lm.forward(messages=[{"role": "user", "content": "abc"}])
+    except RuntimeError as error:
+        assert "before transport" in str(error)
+    else:
+        raise AssertionError("oversized input reached transport")
+    try:
+        asyncio.run(lm.aforward(messages=[{"role": "user", "content": "abc"}]))
+    except RuntimeError as error:
+        assert "before transport" in str(error)
+    else:
+        raise AssertionError("oversized async input reached transport")
+    """
+
+    {output, 0} =
+      System.cmd(python, ["-c", probe, script],
+        env: [{"TEST_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert output == ""
+  end
 end

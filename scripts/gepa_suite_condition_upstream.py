@@ -61,6 +61,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--task-provider")
     parser.add_argument("--reflection-provider")
     parser.add_argument("--judge-provider")
+    parser.add_argument("--task-max-input-bytes", type=int)
+    parser.add_argument("--reflection-max-input-bytes", type=int)
+    parser.add_argument("--judge-max-input-bytes", type=int)
+    parser.add_argument("--task-max-output-tokens", type=int)
+    parser.add_argument("--reflection-max-output-tokens", type=int)
+    parser.add_argument("--judge-max-output-tokens", type=int)
     parser.add_argument("--api-base")
     parser.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
     parser.add_argument("--output", type=Path)
@@ -193,16 +199,51 @@ def gepa_metric(dspy: Any, meta: Any):
     return metric
 
 
+def rendered_message_bytes(value: Any) -> int:
+    """Match ReqLLM's documented nested string-content input envelope."""
+    if isinstance(value, str):
+        return len(value.encode("utf-8"))
+    if isinstance(value, dict):
+        return sum(rendered_message_bytes(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return sum(rendered_message_bytes(item) for item in value)
+    return 0
+
+
 def make_lm(dspy: Any, role: str, args: argparse.Namespace):
     model = getattr(args, f"{role}_model")
     provider = getattr(args, f"{role}_provider")
+    max_input_bytes = getattr(args, f"{role}_max_input_bytes")
+    max_output_tokens = getattr(args, f"{role}_max_output_tokens")
     if not model:
         raise RuntimeError("live execution requires every declared model role")
     if not provider:
         raise RuntimeError("live execution requires every declared provider endpoint")
+    if not isinstance(max_input_bytes, int) or max_input_bytes <= 0:
+        raise RuntimeError("live execution requires every positive input byte envelope")
+    if not isinstance(max_output_tokens, int) or max_output_tokens <= 0:
+        raise RuntimeError("live execution requires every positive output token envelope")
     import os
 
-    return dspy.LM(
+    class InputBoundLM(dspy.LM):
+        def _admit(self, prompt, messages):
+            rendered = messages or [{"role": "user", "content": prompt}]
+            actual = rendered_message_bytes(rendered)
+            if actual > max_input_bytes:
+                raise RuntimeError(
+                    f"{role} input envelope exceeded before transport: "
+                    f"{actual} > {max_input_bytes} UTF-8 content bytes"
+                )
+
+        def forward(self, prompt=None, messages=None, **kwargs):
+            self._admit(prompt, messages)
+            return super().forward(prompt=prompt, messages=messages, **kwargs)
+
+        async def aforward(self, prompt=None, messages=None, **kwargs):
+            self._admit(prompt, messages)
+            return await super().aforward(prompt=prompt, messages=messages, **kwargs)
+
+    return InputBoundLM(
         model="openrouter/" + model,
         api_base=args.api_base,
         api_key=os.environ[args.api_key_env],
@@ -210,7 +251,7 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
         cache=False,
         num_retries=0,
         timeout=120,
-        max_tokens=16_384,
+        max_tokens=max_output_tokens,
         extra_body={
             "provider": {
                 "only": [provider],
@@ -331,6 +372,7 @@ def main() -> None:
         "runtime": {"bridge": bridge.as_dict(), "gepa": runtime},
         "heldout_decoded": False,
         "retrieval": retrieval,
+        "input_envelope_semantics": "nested_utf8_string_content_bytes_not_full_wire_bytes",
     }
     if not args.run and not args.fresh:
         print(json.dumps(preflight, sort_keys=True))
@@ -381,6 +423,12 @@ def main() -> None:
         "--task-model", args.task_model, "--reflection-model", args.reflection_model,
         "--judge-model", args.judge_model, "--task-provider", args.task_provider,
         "--reflection-provider", args.reflection_provider, "--judge-provider", args.judge_provider,
+        "--task-max-input-bytes", str(args.task_max_input_bytes),
+        "--reflection-max-input-bytes", str(args.reflection_max_input_bytes),
+        "--judge-max-input-bytes", str(args.judge_max_input_bytes),
+        "--task-max-output-tokens", str(args.task_max_output_tokens),
+        "--reflection-max-output-tokens", str(args.reflection_max_output_tokens),
+        "--judge-max-output-tokens", str(args.judge_max_output_tokens),
         "--api-key-env", args.api_key_env,
         "--state", str(state_path), "--output", str(fresh_path),
     ]
