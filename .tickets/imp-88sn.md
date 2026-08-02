@@ -143,6 +143,32 @@ seed as `9,180` total transports (`7,854` task and `1,326` PAPILLON judge).
 Those baseline outcomes are table evidence and do not decide whether later
 optimizer arms run.
 
+The owner then authorized exactly one matched all-six baseline seed with a
+combined incremental hard cap of `$20`. The current task model is the dated
+`deepseek/deepseek-v4-flash-0731` snapshot at temperature `1`; both runtimes use
+one exact ZDR endpoint, response cache disabled, no fallback or retry, the same
+content-byte/output envelopes, provider maximum prices, and prospective
+condition admission against the remaining cap. The first endpoint candidate,
+`siliconflow/fp8`, became unavailable before any valid table result. Because no
+scientific outcome exists, the still-unstarted table is refrozen to the active
+same-price, same-snapshot, no-implicit-cache `novita/fp8` endpoint for both
+runtimes rather than silently falling back inside a condition.
+
+Two paid Imp AIME baseline attempts under the SiliconFlow predecessor treatment
+are scientifically null product stops, not table rows. Two earlier zero-call
+front-door stops exposed a fresh-BEAM baseline atom admission bug and an
+unstarted Telemetry registry. The first paid attempt then exposed an evidence
+sanitizer that assumed every diagnostic list was proper; the second exposed the
+generic `Imp.OperationalSafetyError.find/1` use of `Enum` on an improper
+provider diagnostic. Commits `bbba5ff3`, `5a2ef3f7`, `ef1aa093`, and `37582c8e`
+repair those owning boundaries and add direct improper-list evaluation
+coverage. No score or result was retained. Private terminal stops charge the
+full aggregate key-window
+deltas conservatively: `$1.53793672 + $0.013921208 = $1.551857928`; those deltas
+are not exact treatment attribution because the shared key moved during
+provider-free work. The remaining study cap is `$18.448142072`. No DSPy or
+other-family condition has started.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program
