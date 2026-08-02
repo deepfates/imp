@@ -10,10 +10,12 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
     assert length(receipt["splits"]["selection"]) == 300
     assert MapSet.disjoint?(ids(receipt, "train"), ids(receipt, "selection"))
     plan = Plan.call_plan()
-    assert plan.per_runtime_seed == %{task: 46_412, proposer: 47}
-    assert plan.study == %{task: 278_472, proposer: 282}
+    assert plan.per_runtime_seed == %{task: 27_076, proposer: 47}
+    assert plan.study == %{task: 270_760, proposer: 470}
     assert plan.task.fresh_service == 8
-    assert Float.round(plan.reservation.total_usd, 8) == 2_192.04012144
+    assert plan.task.outer_selection == 3_600
+    assert plan.task.outer_dev == 9_668
+    assert Float.round(plan.reservation.total_usd, 8) == 2_160.8347102
     assert plan.reservation.accounting == :full_price_byte_as_token_planning_arithmetic
     assert plan.reservation.owner_spend_authority == :not_granted
     assert plan.reservation.current_catalog_revalidation_required
@@ -21,23 +23,58 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
     refute plan.executable
 
     assert plan.remaining_evidence == [
-             :pinned_upstream_complete_census_exact_route_single_transport_and_pretransport_guards,
-             :task_owned_wire_framing_and_dynamic_output_guard_wiring_including_bootstrap_demos,
-             :current_catalog_revalidation_and_owner_spend_cap
+             :owner_ratification_of_practical_margin_positive_run_rule_and_spend_cap,
+             :thin_symmetric_full_runners_and_transport_failure_policy,
+             :exact_route_single_transport_and_current_catalog_revalidation
            ]
 
-    assert Plan.status() == :provider_free_readiness_in_progress
+    assert Plan.status() == :provider_free_scientific_candidate_not_ratified
+    assert length(Plan.seeds()) == 5
+
+    assert Plan.experiment_options()
+           |> Keyword.fetch!(:evaluation_options)
+           |> Keyword.fetch!(:repetitions) == [selection: 3, test: 1]
+
+    assert Plan.routes().task == %{
+             model: "deepseek/deepseek-v4-flash-0731",
+             endpoint_model: "deepseek/deepseek-v4-flash-20260731",
+             snapshot: "20260731",
+             provider: "siliconflow/fp8",
+             input_price_per_million: 0.14,
+             output_price_per_million: 0.28,
+             reasoning: :none,
+             temperature: 1.0,
+             top_p: 1.0,
+             max_tokens: 512
+           }
+
+    assert Plan.routes().proposer == %{
+             model: "google/gemini-3.5-flash",
+             endpoint_model: "google/gemini-3.5-flash-20260519",
+             snapshot: "20260519",
+             provider: "google-vertex/global",
+             input_price_per_million: 1.5,
+             output_price_per_million: 9.0,
+             reasoning: :high,
+             temperature: 1.0,
+             top_p: 1.0,
+             max_tokens: 4_096
+           }
 
     assert Plan.acceptance() == %{
-             aggregate: :mean,
+             aggregate: :five_run_mean,
              artifact_required: true,
-             component_floors: %{mean_answer_f1_lift: 0.0, mean_support_f1_lift: 0.0},
+             co_primary: :imp_own_baseline_answer_f1_lift,
              evidence_scope:
                :official_source_row_disjoint_treatment_unseen_semantic_overlap_disclosed,
              fresh_service_calls_per_seed: 4,
-             minimum_mean_lift: 0.05,
-             minimum_positive_seeds: 2,
-             primary: :mean_answer_support_f1,
+             optimization_metric: :mean_answer_support_f1_adapted,
+             owner_ratification_required: [
+               :practical_superiority_margin,
+               :positive_run_rule,
+               :condition_spend_cap
+             ],
+             primary: :selected_answer_f1_imp_minus_dspy,
              reporting: %{
                every_seed_and_component: true,
                joint_metric_scope: :adapted_not_official,
@@ -45,8 +82,13 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
                per_hop: [:answer_f1, :support_f1, :joint_adapted, :exact_match],
                prohibited_claims: [:broad_mipro_effectiveness, :modeled_tpe_causation]
              },
-             secondary: :exact_match,
-             seed_count: 3
+             secondary: [:difference_in_lifts, :exact_match],
+             seed_count: 5,
+             support_guards: [:imp_selected_vs_baseline, :imp_selected_vs_dspy_selected],
+             uncertainty: %{
+               primary: :two_level_seed_row_bootstrap,
+               sensitivity: :per_example_run_average_wilcoxon
+             }
            }
   end
 
@@ -191,13 +233,8 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
       assert "x-openrouter-cache" in header_names
       assert "x-openrouter-metadata" in header_names
 
-      if role == :task do
-        assert body["temperature"] == 1.0
-        assert body["top_p"] == 1.0
-      else
-        refute Map.has_key?(body, "temperature")
-        refute Map.has_key?(body, "top_p")
-      end
+      assert body["temperature"] == 1.0
+      assert body["top_p"] == 1.0
     end
 
     assert Plan.prompt_guards().task.max_input_bytes == 52_744

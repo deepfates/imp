@@ -7,14 +7,14 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
   @condition "imp-88sn-musique-ans-mipro-current-v1"
   @receipt "benchmarks/data/musique-ans-mipro-current-v1.receipt.json"
   @receipt_sha "df91cf92c123bdaab3dca9943dd0d47188498d4d99488bad9bc215ecd66d7b36"
-  @seeds [2_026_080_201, 2_026_080_202, 2_026_080_203]
+  @seeds [2_026_080_201, 2_026_080_202, 2_026_080_203, 2_026_080_204, 2_026_080_205]
   @program_grounding "MuSiQue adapted LM Select-to-Answer: selector ranks exactly seven original paragraph indices; answerer returns an answer and unique supporting positions within those seven; positions map back to original indices."
   @dynamic_output_allowance 8_192
   @task_input_guard 52_744
   @proposer_input_guard 149_443
 
   def condition, do: @condition
-  def status, do: :provider_free_readiness_in_progress
+  def status, do: :provider_free_scientific_candidate_not_ratified
   def seeds, do: @seeds
   def receipt_path, do: @receipt
   def program_grounding, do: @program_grounding
@@ -70,13 +70,22 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
 
   def acceptance do
     %{
-      primary: :mean_answer_support_f1,
-      aggregate: :mean,
-      minimum_mean_lift: 0.05,
-      minimum_positive_seeds: 2,
-      seed_count: 3,
-      component_floors: %{mean_answer_f1_lift: 0.0, mean_support_f1_lift: 0.0},
-      secondary: :exact_match,
+      primary: :selected_answer_f1_imp_minus_dspy,
+      co_primary: :imp_own_baseline_answer_f1_lift,
+      aggregate: :five_run_mean,
+      seed_count: 5,
+      support_guards: [:imp_selected_vs_baseline, :imp_selected_vs_dspy_selected],
+      uncertainty: %{
+        primary: :two_level_seed_row_bootstrap,
+        sensitivity: :per_example_run_average_wilcoxon
+      },
+      owner_ratification_required: [
+        :practical_superiority_margin,
+        :positive_run_rule,
+        :condition_spend_cap
+      ],
+      optimization_metric: :mean_answer_support_f1_adapted,
+      secondary: [:difference_in_lifts, :exact_match],
       artifact_required: true,
       fresh_service_calls_per_seed: 4,
       reporting: %{
@@ -105,15 +114,16 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
         max_tokens: 512
       },
       proposer: %{
-        model: "anthropic/claude-sonnet-5",
-        endpoint_model: "anthropic/claude-sonnet-5-20260630",
-        snapshot: "20260630",
+        model: "google/gemini-3.5-flash",
+        endpoint_model: "google/gemini-3.5-flash-20260519",
+        snapshot: "20260519",
         provider: "google-vertex/global",
-        input_price_per_million: 2.0,
-        output_price_per_million: 10.0,
+        input_price_per_million: 1.5,
+        output_price_per_million: 9.0,
         reasoning: :high,
-        max_tokens: 4_096,
-        omitted: [:temperature, :top_p, :verbosity]
+        temperature: 1.0,
+        top_p: 1.0,
+        max_tokens: 4_096
       },
       policy: %{
         zdr: true,
@@ -159,7 +169,11 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
           ]
 
         :proposer ->
-          [openrouter_reasoning: %{effort: :high}]
+          [
+            temperature: route.temperature,
+            top_p: route.top_p,
+            openrouter_reasoning: %{effort: :high}
+          ]
       end
 
     Imp.req_llm(
@@ -197,7 +211,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
       minibatch_objectives: 40 * 35 * 2,
       periodic_full_evaluations: full * 300 * 2,
       outer_selection: 2 * 3 * 300 * 2,
-      outer_dev: 2 * 3 * 2_417 * 2,
+      outer_dev: 2 * 1 * 2_417 * 2,
       fresh_service: 4 * 2
     }
 
@@ -206,9 +220,9 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
     plan = %{
       executable: false,
       remaining_evidence: [
-        :pinned_upstream_complete_census_exact_route_single_transport_and_pretransport_guards,
-        :task_owned_wire_framing_and_dynamic_output_guard_wiring_including_bootstrap_demos,
-        :current_catalog_revalidation_and_owner_spend_cap
+        :owner_ratification_of_practical_margin_positive_run_rule_and_spend_cap,
+        :thin_symmetric_full_runners_and_transport_failure_policy,
+        :exact_route_single_transport_and_current_catalog_revalidation
       ],
       per_runtime_seed: %{
         task: Enum.sum(Map.values(task)),
@@ -216,7 +230,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
       },
       task: task,
       proposer: proposer,
-      study: %{task: 278_472, proposer: 282}
+      study: %{task: 270_760, proposer: 470}
     }
 
     Map.put(plan, :reservation, reservation(plan.study))
@@ -370,7 +384,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
       metric_identity: %{"kind" => "mean_answer_support_f1", "version" => 1},
       compare_baseline_on_test: true,
       evaluation_options: [
-        repetitions: 3,
+        repetitions: [selection: 3, test: 1],
         aggregation: :mean,
         max_errors: 10,
         failure_score: 0.0,
