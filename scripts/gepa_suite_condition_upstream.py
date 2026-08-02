@@ -58,6 +58,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--task-model")
     parser.add_argument("--reflection-model")
     parser.add_argument("--judge-model")
+    parser.add_argument("--task-provider")
+    parser.add_argument("--reflection-provider")
+    parser.add_argument("--judge-provider")
     parser.add_argument("--api-base")
     parser.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
     parser.add_argument("--output", type=Path)
@@ -190,18 +193,39 @@ def gepa_metric(dspy: Any, meta: Any):
     return metric
 
 
-def make_lm(dspy: Any, model: str | None, args: argparse.Namespace):
+def make_lm(dspy: Any, role: str, args: argparse.Namespace):
+    model = getattr(args, f"{role}_model")
+    provider = getattr(args, f"{role}_provider")
     if not model:
         raise RuntimeError("live execution requires every declared model role")
+    if not provider:
+        raise RuntimeError("live execution requires every declared provider endpoint")
     import os
 
     return dspy.LM(
-        model=model,
+        model="openrouter/" + model,
         api_base=args.api_base,
         api_key=os.environ[args.api_key_env],
         temperature=1.0,
         cache=False,
+        num_retries=0,
+        timeout=120,
         max_tokens=16_384,
+        extra_body={
+            "provider": {
+                "only": [provider],
+                "order": [provider],
+                "allow_fallbacks": False,
+                "require_parameters": True,
+                "data_collection": "deny",
+                "zdr": True,
+            },
+            "usage": {"include": True},
+        },
+        extra_headers={
+            "X-OpenRouter-Metadata": "enabled",
+            "X-OpenRouter-Cache": "false",
+        },
     )
 
 
@@ -312,9 +336,9 @@ def main() -> None:
         print(json.dumps(preflight, sort_keys=True))
         return
 
-    task_lm = make_lm(dspy, args.task_model, args)
-    reflection_lm = make_lm(dspy, args.reflection_model, args)
-    judge_lm = make_lm(dspy, args.judge_model, args)
+    task_lm = make_lm(dspy, "task", args)
+    reflection_lm = make_lm(dspy, "reflection", args)
+    judge_lm = make_lm(dspy, "judge", args)
     program = copy.deepcopy(meta.program[0])
     configure_program(program, task_lm, judge_lm, args.family)
 
@@ -355,7 +379,9 @@ def main() -> None:
         "--artifact-root", str(args.artifact_root), "--dataset-root", str(args.dataset_root),
         "--family", args.family, "--arm", args.arm, "--seed", str(args.seed),
         "--task-model", args.task_model, "--reflection-model", args.reflection_model,
-        "--judge-model", args.judge_model, "--api-key-env", args.api_key_env,
+        "--judge-model", args.judge_model, "--task-provider", args.task_provider,
+        "--reflection-provider", args.reflection_provider, "--judge-provider", args.judge_provider,
+        "--api-key-env", args.api_key_env,
         "--state", str(state_path), "--output", str(fresh_path),
     ]
     if args.api_base:

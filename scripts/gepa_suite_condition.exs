@@ -324,6 +324,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       %{provider: :openrouter, id: model, model: model, base_url: "https://openrouter.ai/api/v1"},
       api_key: api_key,
       cache: false,
+      temperature: 1.0,
       max_tokens: output_tokens,
       max_retries: 0,
       input_envelope: [max_bytes: input_bytes, reservation_tokens: input_bytes],
