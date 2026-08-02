@@ -400,6 +400,21 @@ no-retry policy, and balanced four-per-runtime concurrency. The conservative
 study charge entering this run is `$10.750422894`; the full fallback-aware
 LiveBench pair remains below the owner's combined `$20` cap.
 
+The Io Net continuation stopped scientifically null after 21 Imp responses and
+30 DSPy responses. The endpoint catalog advertised temperature, max tokens,
+and reasoning effort, but not `response_format`; pinned DSPy's ordinary
+JSONAdapter sends `response_format=json_object`, and OpenRouter returned seven
+pretransport 404s stating that no endpoint could handle the requested
+parameters. The principal stopped both lanes as soon as the repeated mismatch
+was classified. No Result exists. The private root is
+`benchmarks/results/gepa-suite-livebenchmath-baseline-ionet-d64a59d8-20260802T173212Z`;
+terminal SHA-256 is
+`e4df4800db2377bbbc1911e06a701f948491ebf0b3fcc30b75b03588b59644c9`.
+The account window moved `$0.037865020`. This is an owning endpoint-admission
+defect: matched preflight must require `response_format` and prove one exact
+JSON-object route before a full pair. It is not a framework score, capacity
+result, or reason to alter the task.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program

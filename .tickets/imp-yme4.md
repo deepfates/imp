@@ -181,6 +181,13 @@ rows, prompts, metric, seed, envelopes, no-retry rule, and matched
 four-per-runtime concurrency. This is a named provider treatment change after
 two null capacity failures, not a hidden fallback.
 
+That route was also null: Io Net does not advertise `response_format`, so
+pinned DSPy's ordinary JSON-object calls were rejected before provider
+selection while Imp Chat calls continued. The pair was stopped with no Result.
+Endpoint admission now must require the union of both runtimes' actual request
+parameters and prove one exact JSON-object route before another full pair; no
+partial outcome is table evidence.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent
