@@ -99,12 +99,15 @@ episodes through an ordinary OTP owner after a fresh OS restart. This is a new
 clean treatment, not a reinterpretation of the old negative and not a reason to
 add another campaign controller.
 
-The provider-free Grue product boundary is now exercised at Grue commit
-`d36e022`: an actual Zork II save is forked immediately before a native
+The provider-free Grue product boundary is now exercised through Grue commit
+`b71071b`: an actual Zork II save is forked immediately before a native
 checkpoint, the baseline instruction chooses `look`, a planted GEPA instruction
 chooses `pour water in bucket` and raises native marginal checkpoint progress,
-and the selected parameter Artifact reproduces the action and progress in a
-fresh BEAM. This proves the real fork/evaluator/Artifact/restart mechanics, not
+and the selected parameter Artifact reproduces the action and progress in four
+concurrent calls through the existing ordinary `ImpDeployment.ProgramServer`
+after a fresh OS start. Each call independently restores the same digest-bound
+save and advances a real native interpreter; Grue's full integration gate also
+passes. This proves the real fork/evaluator/Artifact/restart/OTP mechanics, not
 live-model usefulness, generalization across held-out saves, or the eventual
 preregistered optimizer result.
 
