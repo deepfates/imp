@@ -180,6 +180,82 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert output =~ "owner cap before transport"
   end
 
+  test "LiveBench live entrance authenticates the symbolic scorer before transport" do
+    root = File.cwd!()
+    output_path = Path.join(System.tmp_dir!(), "imp-livebench-scorer-must-not-exist.json")
+    File.rm(output_path)
+
+    args =
+      [
+        "run",
+        "--no-start",
+        Path.join(root, "scripts/gepa_suite_condition.exs"),
+        "--run",
+        "--dataset-root",
+        Path.join(root, "tmp/gepa-six-task-current-root"),
+        "--family",
+        "LiveBenchMathBench",
+        "--arm",
+        "baseline",
+        "--output",
+        output_path,
+        "--livebench-math-python",
+        "/usr/bin/false",
+        "--input-price-per-million",
+        "0.14",
+        "--output-price-per-million",
+        "0.28",
+        "--initial-cost-usd",
+        "0.0",
+        "--max-cost-usd",
+        "20.0"
+      ] ++
+        Enum.flat_map(["task", "reflection", "judge"], fn role ->
+          [
+            "--#{role}-model",
+            "provider-disabled/model",
+            "--#{role}-provider",
+            "provider/endpoint",
+            "--#{role}-max-input-bytes",
+            "65536",
+            "--#{role}-max-output-tokens",
+            "4096"
+          ]
+        end)
+
+    {output, status} =
+      System.cmd("mix", args,
+        env: [{"MIX_ENV", "test"}, {"OPENROUTER_API_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert status != 0
+    assert output =~ "symbolic scorer preflight failed"
+    refute File.exists?(output_path)
+
+    admitted =
+      List.replace_at(
+        args,
+        Enum.find_index(args, &(&1 == "/usr/bin/false")),
+        Path.join(root, "tmp/dspy-parity-venv/bin/python")
+      )
+      |> then(fn values ->
+        index = Enum.find_index(values, &(&1 == "20.0"))
+        List.replace_at(values, index, "0.000001")
+      end)
+
+    {output, status} =
+      System.cmd("mix", admitted,
+        env: [{"MIX_ENV", "test"}, {"OPENROUTER_API_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert status != 0
+    assert output =~ "owner cap before transport"
+    refute output =~ "symbolic scorer preflight"
+    refute File.exists?(output_path)
+  end
+
   test "runtime observer persists nested usage and adapter fallback progress" do
     root = File.cwd!()
     script = Path.join(root, "scripts/gepa_suite_condition.exs")

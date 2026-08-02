@@ -3343,3 +3343,33 @@ acceptance claim.
 **2026-07-31T20:57:09Z**
 
 Provider-free builder-readiness checkpoint (2026-07-31): HoVer public GEPA round-robin reflection exercised all four source-named predictors with component feedback; PAPILLON exercised both predictor-scoped reflective datasets. Repaired benchmark-local PAPILLON failure handling so released empty-field outputs and numeric scoring remain unchanged while redacted stage/judge diagnostics are reconstructable, and typed operational-safety errors remain fatal. GEPA accepted-candidate reports now retain ordered per-row scores alongside candidate identity, diagnostics, and metric/reflection call counts. Public GEPA compiled both benchmark-local graphs to schema-3 Artifacts; a fresh BEAM reconstructed and rebound HoVer retriever/task LM and PAPILLON trusted/untrusted/judge clients, applied each Artifact, and executed both tasks. Authority/config already pin HoVer 150/300/300 with budget 7051 and PAPILLON 111/111/221 with budget 2426 to gepa-artifact cbefbc1; bench/benchmarks remain excluded from Hex. Arithmetic correction for the proposed 4-arm x 2-runtime x 5-seed core: those are program/evaluator invocations, not LM transports; task-specific expansion is at least 1,710,400 LM/judge transports (HoVer 7051*4*40 + PAPILLON 2426*6*40), before conservative reservation/framing. This is $0 lifecycle readiness, not effectiveness or budget authorization.
+
+## Current-model table: SiliconFlow LiveBench baseline stop and repair
+
+The exact matched baseline pair at clean `b6125c7d` completed on
+`deepseek/deepseek-v4-flash-0731` through the current SiliconFlow fp8 endpoint.
+The private root is
+`benchmarks/results/gepa-suite-livebenchmath-baseline-siliconflow-b6125c7d-20260802T174544Z`.
+Its terminal record binds Imp Result SHA-256 `3f335814...bcff`, DSPy Result
+`556d48f7...e8a1`, and exact progress/log hashes. Every request transport
+returned successfully: Imp made 166 transports (`$0.1261550000`) including 40
+Chat-to-JSON fallbacks; DSPy made 165 (`$0.1218133840`). The account snapshot
+delta was `$0.2406715080`.
+
+Pinned DSPy scored `47/126` (`0.3730158730`) with 29 adapter errors. Imp's
+stored `43/126` (`0.3412698413`) and 82 errors are not a valid whole-family
+score: the live entry failed to bind `IMP_LIVEBENCH_MATH_PYTHON`, so every one
+of the 52 AMPS_Hard rows failed locally when the system Python could not import
+SymPy/Lark. On the other 74 rows, Imp scored 43 and DSPy 47; paired outcomes are
+one Imp win, five DSPy wins, and 68 ties. That slice is descriptive only because
+the preregistered family is the full 126 rows. The route/capacity instrument is
+valid; the Imp family result is scientifically null from a treatment defect.
+
+The owner boundary is repaired provider-free at the ordinary entry. LiveBench
+now requires `--livebench-math-python`, runs the exact symbolic scorer on an
+identity expression before constructing any provider work, sets the scorer
+environment explicitly, and records the interpreter and bridge hashes plus the
+preflight outcome. Focused CLI tests prove a missing scorer refuses before
+transport and the pinned dependency environment reaches the existing spend
+guard. No provider rerun, threshold change, hidden row subset, or result
+reinterpretation follows automatically.

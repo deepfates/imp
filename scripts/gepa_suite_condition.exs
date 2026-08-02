@@ -15,6 +15,7 @@ defmodule Imp.GepaSuiteConditionCLI do
           retrieval_root: :string,
           retrieval_receipt: :string,
           retrieval_python: :string,
+          livebench_math_python: :string,
           family: :string,
           arm: :string,
           seed: :integer,
@@ -48,7 +49,7 @@ defmodule Imp.GepaSuiteConditionCLI do
     if positional != [] or invalid != [],
       do: raise(ArgumentError, "invalid GEPA suite arguments: #{inspect(positional ++ invalid)}")
 
-    config = config!(opts)
+    config = opts |> config!() |> configure_livebench_metric!()
     if config.run? or config.fresh?, do: configure_req_llm_pool!(config)
     prepared = prepare!(config)
 
@@ -79,6 +80,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       retrieval_root: expand(opts[:retrieval_root]),
       retrieval_receipt: expand(opts[:retrieval_receipt]),
       retrieval_python: Keyword.get(opts, :retrieval_python, "python3"),
+      livebench_math_python: expand(opts[:livebench_math_python]),
       family: family,
       arm:
         Map.fetch!(
@@ -117,6 +119,52 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
     |> validate_live!()
   end
+
+  defp configure_livebench_metric!(%{family: "LiveBenchMathBench", run?: true} = config) do
+    python =
+      config.livebench_math_python ||
+        raise(ArgumentError, "LiveBenchMathBench live execution requires --livebench-math-python")
+
+    bridge = Path.expand("scripts/livebench_math_score.py", File.cwd!())
+
+    payload =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-livebench-preflight-#{System.unique_integer([:positive])}.json"
+      )
+
+    File.write!(
+      payload,
+      Jason.encode!(%{
+        "task" => "amps_hard",
+        "ground_truth" => "x^2",
+        "answer" => "\\boxed{x^2}"
+      })
+    )
+
+    try do
+      case System.cmd(python, [bridge, payload], stderr_to_stdout: true) do
+        {output, 0} ->
+          unless match?({:ok, %{"score" => score}} when score in [1, 1.0], Jason.decode(output)) do
+            raise ArgumentError,
+                  "LiveBenchMath symbolic scorer preflight returned an invalid result"
+          end
+
+        {output, status} ->
+          raise ArgumentError,
+                "LiveBenchMath symbolic scorer preflight failed with status #{status}: " <>
+                  String.trim(output)
+      end
+    after
+      File.rm(payload)
+    end
+
+    System.put_env("IMP_LIVEBENCH_MATH_PYTHON", python)
+    System.put_env("IMP_LIVEBENCH_MATH_BRIDGE", bridge)
+    %{config | livebench_math_python: python}
+  end
+
+  defp configure_livebench_metric!(config), do: config
 
   defp prepare!(config) do
     lms =
@@ -165,6 +213,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       split_counts: prepared.loaded.spec["split_counts"],
       treatments: treatments,
       retrieval: retrieval_disclosure(config, prepared.loaded.spec),
+      metric_runtime: metric_runtime(config),
       provider_calls_authorized: false
     })
   end
@@ -214,6 +263,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       req_llm_pool: req_llm_pool(config),
       spend_admission: reservation,
       heldout_decoded: true,
+      metric_runtime: metric_runtime(config),
       retrieval: retrieval_disclosure(config, prepared.loaded.spec)
     })
   end
@@ -832,6 +882,21 @@ defmodule Imp.GepaSuiteConditionCLI do
   end
 
   defp retrieval_disclosure(_config, _spec), do: nil
+
+  defp metric_runtime(%{family: "LiveBenchMathBench", livebench_math_python: python})
+       when is_binary(python) do
+    bridge = Path.expand("scripts/livebench_math_score.py", File.cwd!())
+
+    %{
+      symbolic_bridge_python: python,
+      symbolic_bridge_python_sha256: sha256(python),
+      symbolic_bridge_path: bridge,
+      symbolic_bridge_sha256: sha256(bridge),
+      preflight: :exact_symbolic_identity_score_passed_before_transport
+    }
+  end
+
+  defp metric_runtime(_config), do: nil
 
   defp validate_live!(config) do
     required_positive!(config, :max_concurrency)

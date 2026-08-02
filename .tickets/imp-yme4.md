@@ -953,3 +953,23 @@ non-launchable and the existing instruction-family/GEPA gaps remain open.
 **2026-07-30T22:14:41Z**
 
 2026-07-30 principal strategy correction after owner, Behold-principal, Imp-principal, and adversarial review: retain this epic as the full telos. An early installable release is a milestone, not closure. The graph now has exactly three composition children: imp-argb owns the safe coherent cold-package center; imp-tg2z owns substantive named optimizer semantics and honest stable/experimental boundaries; imp-88sn owns current-source usefulness across a realistic multi-stage LM problem and a non-prompt problem. Tickets are accepted by observable product behavior and must name what would falsify success. Tests protect ordered invariants; a small number of real experiments answer uncertain usefulness questions. Evidence, receipts, generated reports, package gates, and clean commits support these claims but cannot complete them. Do not create family-by-family ticket boards, new campaign coordinators, or scope reductions by profile. Preserve the existing epic criteria verbatim, especially the coherent public concepts, release-defining held-out improvement with reusable artifact, observable upstream comparisons without private call-graph identity, and the warning that supporting gates cannot close the epic.
+
+**2026-08-02T18:00:17Z**
+
+The first capacity-clean current-model matched table attempt completed both
+LiveBenchMath baseline lanes on the exact SiliconFlow `siliconflow/fp8` route.
+All transports returned HTTP 200; pinned DSPy scored `47/126` with 29 retained
+adapter errors. Imp's recorded `43/126` with 82 errors is not a valid whole-set
+comparison: 52 AMPS_Hard rows invoked the symbolic scorer through the ambient
+system Python, which lacked the required SymPy/Lark dependencies. The remaining
+74-row descriptive slice is Imp `43/74` versus DSPy `47/74`; it is not promoted
+into the table headline. Exact joined runtime costs were `$0.1261550000` Imp and
+`$0.1218133840` DSPy; the account snapshot moved `$0.2406715080`.
+
+This is an owning benchmark-entry defect, not a scientific loss or a reason to
+remove LiveBench. The ordinary entry now requires an explicit symbolic Python,
+executes an exact AMPS identity check before any provider transport, binds the
+interpreter/bridge hashes into the result, and refuses execution if the bridge
+is unavailable. The retained live root remains immutable. The epic stays open;
+the next table cell must use the repaired entry and preserve this invalid first
+attempt rather than reinterpret it.
