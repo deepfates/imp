@@ -74,6 +74,31 @@ IFBench. Together with the retained structured Optimize Anything result, it
 tests capability that a static benchmark table does not. Neither Grue nor OA
 substitutes for the matched standard table.
 
+Provider-free inspection of the current Grue checkout removes a large imagined
+build from this plan. Grue already supplies the real bundled Zork interpreter,
+verified full-state `Save` values, deterministic `fork/1`, TextQuests-derived
+checkpoint progress, and an Imp `FrontierProgram` whose policy instruction is a
+real optimizer parameter. The earlier preregistered Zork II experiment is a
+legitimate negative for its exact treatments: LabeledFewShot and
+BootstrapFewShot improved training-frontier game-score deltas but reduced the
+held-out mean, and GEPA was not run at the declared scale. A later transfer
+experiment also found that downstream golden-route demos embedded held-out
+walkthrough slices; its apparent positive was withdrawn and the scrubbed result
+was null. Those facts do not exhaust Grue, but they prohibit reusing the old
+demo treatments or their contaminated evidence as the new proof.
+
+The smallest clean Grue tranche is therefore instruction-only GEPA over
+verified saved frontiers, with every candidate episode created by
+`Grue.Session.fork/1` and policy history beginning at the fork rather than
+carrying the replay prefix. Freeze distinct optimization, selection, and
+held-out save identities before calls; use native marginal checkpoint progress
+and retain game score, death, malformed actions, loops, calls, latency, and cost
+as diagnostics. The selected instruction must become a schema-3 parameter
+Artifact, apply to fresh trusted `FrontierProgram` code, and serve concurrent
+episodes through an ordinary OTP owner after a fresh OS restart. This is a new
+clean treatment, not a reinterpretation of the old negative and not a reason to
+add another campaign controller.
+
 Provider-free audit has now exercised the actual six-task source boundary
 rather than trusting the old campaign manifest. All six official exports
 reproduce byte-for-byte from `gepa-ai/gepa-artifact@cbefbc1`: AIME
