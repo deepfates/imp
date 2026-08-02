@@ -200,11 +200,15 @@ def gepa_metric(dspy: Any, meta: Any):
 
 
 def rendered_message_bytes(value: Any) -> int:
-    """Match ReqLLM's documented nested string-content input envelope."""
+    """Match ReqLLM's nested payload-string envelope; role labels are structural."""
     if isinstance(value, str):
         return len(value.encode("utf-8"))
     if isinstance(value, dict):
-        return sum(rendered_message_bytes(item) for item in value.values())
+        return sum(
+            rendered_message_bytes(item)
+            for key, item in value.items()
+            if key != "role"
+        )
     if isinstance(value, (list, tuple)):
         return sum(rendered_message_bytes(item) for item in value)
     return 0
@@ -326,6 +330,21 @@ def predictor_state(program: Any) -> dict[str, str]:
     return {name: predictor.signature.instructions for name, predictor in program.named_predictors()}
 
 
+def arm_program(arm: str, baseline: Any, selected: Any) -> Any:
+    return baseline if arm == "baseline" else selected
+
+
+def arm_requires_fresh_state(arm: str) -> bool:
+    return arm != "baseline"
+
+
+def write_private_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.chmod(0o700)
+    path.write_text(json.dumps(payload, sort_keys=True, default=str) + "\n")
+    path.chmod(0o600)
+
+
 def main() -> None:
     args = parse_args()
     for name in ("dspy_root", "gepa_root", "artifact_root", "dataset_root", "retrieval_root", "retrieval_receipt", "output", "state"):
@@ -396,7 +415,7 @@ def main() -> None:
                 calls.append(dict(prediction))
         payload = {**preflight, "status": "fresh_ok", "calls": calls, "heldout_decoded": True}
         if args.output:
-            args.output.write_text(json.dumps(payload, sort_keys=True, default=str))
+            write_private_json(args.output, payload)
         else:
             print(json.dumps(payload, sort_keys=True, default=str))
         return
@@ -404,6 +423,7 @@ def main() -> None:
     if args.output is None:
         raise RuntimeError("live run requires --output")
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.parent.chmod(0o700)
     state_path = args.output.with_suffix(".state.json")
     fresh_path = args.output.with_suffix(".fresh.json")
     train = load_rows(dspy, train_path, spec["input_keys"])
@@ -411,46 +431,51 @@ def main() -> None:
     with dspy.context(lm=task_lm):
         selected = optimize(dspy, program, meta, train, dev, args, task_lm, reflection_lm, spec["metric_calls"])
         test = load_rows(dspy, test_path, spec["input_keys"])
-        baseline_result = evaluate(dspy, program, test, source_metric(meta))
-        selected_result = evaluate(dspy, selected, test, source_metric(meta))
-    selected.save(state_path, save_program=False)
+        heldout_result = evaluate(dspy, arm_program(args.arm, program, selected), test, source_metric(meta))
 
-    child_args = [
-        sys.executable, "-P", str(Path(__file__).resolve()), "--fresh", "--run",
-        "--dspy-root", str(args.dspy_root), "--gepa-root", str(args.gepa_root),
-        "--artifact-root", str(args.artifact_root), "--dataset-root", str(args.dataset_root),
-        "--family", args.family, "--arm", args.arm, "--seed", str(args.seed),
-        "--task-model", args.task_model, "--reflection-model", args.reflection_model,
-        "--judge-model", args.judge_model, "--task-provider", args.task_provider,
-        "--reflection-provider", args.reflection_provider, "--judge-provider", args.judge_provider,
-        "--task-max-input-bytes", str(args.task_max_input_bytes),
-        "--reflection-max-input-bytes", str(args.reflection_max_input_bytes),
-        "--judge-max-input-bytes", str(args.judge_max_input_bytes),
-        "--task-max-output-tokens", str(args.task_max_output_tokens),
-        "--reflection-max-output-tokens", str(args.reflection_max_output_tokens),
-        "--judge-max-output-tokens", str(args.judge_max_output_tokens),
-        "--api-key-env", args.api_key_env,
-        "--state", str(state_path), "--output", str(fresh_path),
-    ]
-    if args.api_base:
-        child_args += ["--api-base", args.api_base]
-    if args.retrieval_root:
-        child_args += ["--retrieval-root", str(args.retrieval_root)]
-    if args.retrieval_receipt:
-        child_args += ["--retrieval-receipt", str(args.retrieval_receipt)]
-    subprocess.run(child_args, check=True)
+    state_sha = None
+    fresh_sha = None
+    if arm_requires_fresh_state(args.arm):
+        selected.save(state_path, save_program=False)
+        state_path.chmod(0o600)
+
+        child_args = [
+            sys.executable, "-P", str(Path(__file__).resolve()), "--fresh", "--run",
+            "--dspy-root", str(args.dspy_root), "--gepa-root", str(args.gepa_root),
+            "--artifact-root", str(args.artifact_root), "--dataset-root", str(args.dataset_root),
+            "--family", args.family, "--arm", args.arm, "--seed", str(args.seed),
+            "--task-model", args.task_model, "--reflection-model", args.reflection_model,
+            "--judge-model", args.judge_model, "--task-provider", args.task_provider,
+            "--reflection-provider", args.reflection_provider, "--judge-provider", args.judge_provider,
+            "--task-max-input-bytes", str(args.task_max_input_bytes),
+            "--reflection-max-input-bytes", str(args.reflection_max_input_bytes),
+            "--judge-max-input-bytes", str(args.judge_max_input_bytes),
+            "--task-max-output-tokens", str(args.task_max_output_tokens),
+            "--reflection-max-output-tokens", str(args.reflection_max_output_tokens),
+            "--judge-max-output-tokens", str(args.judge_max_output_tokens),
+            "--api-key-env", args.api_key_env,
+            "--state", str(state_path), "--output", str(fresh_path),
+        ]
+        if args.api_base:
+            child_args += ["--api-base", args.api_base]
+        if args.retrieval_root:
+            child_args += ["--retrieval-root", str(args.retrieval_root)]
+        if args.retrieval_receipt:
+            child_args += ["--retrieval-receipt", str(args.retrieval_receipt)]
+        subprocess.run(child_args, check=True)
+        state_sha = sha256(state_path)
+        fresh_sha = sha256(fresh_path)
+
     payload = {
         **preflight,
         "status": "complete",
         "heldout_decoded": True,
-        "baseline": baseline_result,
-        "selected": selected_result,
-        "causal_lift": selected_result["mean"] - baseline_result["mean"],
+        "heldout": heldout_result,
         "predictors": predictor_state(selected),
-        "state_sha256": sha256(state_path),
-        "fresh_sha256": sha256(fresh_path),
+        "state_sha256": state_sha,
+        "fresh_sha256": fresh_sha,
     }
-    args.output.write_text(json.dumps(payload, sort_keys=True, default=str))
+    write_private_json(args.output, payload)
 
 
 if __name__ == "__main__":

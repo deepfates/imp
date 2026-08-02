@@ -59,6 +59,12 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
         task_max_output_tokens=16, api_base="https://example.invalid", api_key_env="TEST_KEY"
     )
     lm = condition.make_lm(dspy, "task", args)
+    baseline = object()
+    selected = object()
+    assert condition.arm_program("baseline", baseline, selected) is baseline
+    assert condition.arm_program("mipro_v2_heavy", baseline, selected) is selected
+    assert condition.arm_requires_fresh_state("baseline") is False
+    assert condition.arm_requires_fresh_state("gepa_v0_1_4_no_merge") is True
     assert lm.forward(messages=[{"role": "user", "content": "é"}]) == "transported"
     try:
         lm.forward(messages=[{"role": "user", "content": "abc"}])

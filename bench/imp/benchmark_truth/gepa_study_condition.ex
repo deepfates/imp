@@ -120,13 +120,14 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     )
   end
 
-  @doc "Opens held-out rows only after optimization and evaluates baseline and selected programs."
-  def heldout!(prepared, optimized, opts \\ []) do
+  @doc "Opens held-out rows only after optimization and evaluates exactly the declared arm."
+  def heldout!(arm, prepared, optimized, opts \\ []) do
     test = GepaSuite.load_test!(prepared.loaded)
+    program = if arm == :baseline, do: prepared.program, else: optimized.selected
 
     %{
-      baseline: evaluate!(prepared.program, test, prepared.metric, opts),
-      selected: evaluate!(optimized.selected, test, prepared.metric, opts),
+      arm: arm,
+      result: evaluate!(program, test, prepared.metric, opts),
       test_count: length(test)
     }
   end

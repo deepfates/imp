@@ -149,7 +149,7 @@ defmodule Imp.GepaSuiteConditionCLI do
     for key <- [:output], do: required_config!(config, key)
 
     optimized = GepaStudyCondition.optimize!(config.arm, prepared, config.seed)
-    heldout = GepaStudyCondition.heldout!(prepared, optimized)
+    heldout = GepaStudyCondition.heldout!(config.arm, prepared, optimized)
 
     {artifact_sha, fresh_sha} =
       case optimized.artifact do
@@ -168,9 +168,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       family: config.family,
       arm: config.arm,
       seed: config.seed,
-      baseline: evaluation(heldout.baseline),
-      selected: evaluation(heldout.selected),
-      causal_lift: heldout.selected.score - heldout.baseline.score,
+      heldout: evaluation(heldout.result),
       artifact_sha256: artifact_sha,
       fresh_sha256: fresh_sha,
       heldout_decoded: true,
@@ -428,6 +426,7 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   defp write_private!(path, payload) do
     File.mkdir_p!(Path.dirname(path))
+    File.chmod!(Path.dirname(path), 0o700)
     File.write!(path, Jason.encode!(json_safe(payload), pretty: true) <> "\n")
     File.chmod!(path, 0o600)
   end

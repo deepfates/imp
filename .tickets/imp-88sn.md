@@ -132,6 +132,17 @@ reproduction of the unretained `c35ec786...` index. The remaining capability is
 full-table execution under a ratified current model/route/cost design, not
 another optimizer implementation, task adapter, or campaign controller.
 
+Provider-free launch review then caught an opportunity defect in the thin
+entrances themselves: they evaluated baseline and selected programs inside
+each arm while the recomputed table plan counted one held-out result per arm,
+and the DSPy baseline alone performed selected-state/fresh-service work. The
+repair makes each declared arm emit exactly one held-out score and performs
+Artifact/fresh service only for MIPROv2 and GEPA in both runtimes. The plan now
+decomposes every family by arm and recomputes the first all-six matched baseline
+seed as `9,180` total transports (`7,854` task and `1,326` PAPILLON judge).
+Those baseline outcomes are table evidence and do not decide whether later
+optimizer arms run.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program

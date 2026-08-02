@@ -34,6 +34,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
     families = Enum.map(GepaSuite.families(), &family_plan!(dataset_root, &1))
     lanes = seeds * runtimes
     per_lane = sum_families(families)
+    per_lane_by_arm = sum_arms(families)
 
     %{
       kind: :matched_current_model_gepa_suite,
@@ -43,7 +44,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       lanes: lanes,
       families: families,
       per_runtime_seed: per_lane,
+      per_runtime_seed_by_arm: per_lane_by_arm,
       full_study: multiply(per_lane, lanes),
+      full_study_by_arm:
+        Map.new(per_lane_by_arm, fn {arm, totals} -> {arm, multiply(totals, lanes)} end),
       boundaries: %{
         heldout_loaded_after_optimizer: true,
         official_mipro_reference_opportunity: true,
@@ -81,6 +85,33 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       summary_calls +
         shape.predictors * @mipro_heavy_instruction_candidates *
           @mipro_program_aware_calls_per_candidate
+
+    arms = %{
+      baseline:
+        arm_totals(
+          test,
+          test * shape.task_stages,
+          test * shape.judge_stages,
+          0,
+          0
+        ),
+      mipro_v2_heavy:
+        arm_totals(
+          mipro_metric_calls + test,
+          (mipro_metric_calls + test + @fresh_examples_per_selected_arm) * shape.task_stages,
+          (mipro_metric_calls + test) * shape.judge_stages,
+          mipro_proposer_transports,
+          0
+        ),
+      gepa_v0_1_4_no_merge:
+        arm_totals(
+          gepa.max_metric_calls + test,
+          (gepa.max_metric_calls + test + @fresh_examples_per_selected_arm) * shape.task_stages,
+          (gepa.max_metric_calls + test) * shape.judge_stages,
+          0,
+          gepa.max_reflection_calls
+        )
+    }
 
     %{
       family: family,
@@ -123,8 +154,26 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         instruction_candidates: @mipro_heavy_instruction_candidates,
         dataset_summary_calls: summary_calls,
         legal_proposer_transports: mipro_proposer_transports
-      }
+      },
+      arms: arms
     }
+  end
+
+  defp arm_totals(program_evaluations, task, judge, mipro_proposer, gepa_reflection) do
+    %{
+      program_evaluations: program_evaluations,
+      task_transports: task,
+      judge_transports: judge,
+      mipro_proposer_transports: mipro_proposer,
+      gepa_reflection_transports: gepa_reflection,
+      total_transports: task + judge + mipro_proposer + gepa_reflection
+    }
+  end
+
+  defp sum_arms(families) do
+    Enum.reduce(families, %{}, fn family, arms ->
+      Map.merge(arms, family.arms, fn _arm, left, right -> add_totals(left, right) end)
+    end)
   end
 
   defp sum_families(families) do
@@ -151,6 +200,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       gepa_reflection_transports: 0,
       total_transports: 0
     }
+  end
+
+  defp add_totals(left, right) do
+    Map.new(left, fn {key, value} -> {key, value + Map.fetch!(right, key)} end)
   end
 
   defp multiply(totals, lanes) do
