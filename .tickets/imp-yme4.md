@@ -46,6 +46,41 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 
 The product center is real but the telos is open.
 
+### Owner-ratified benchmark and product direction (2026-08-01)
+
+The next central scientific move is no longer a succession of locally defined
+single-task lift gates. Imp should complete a recognizable matched benchmark
+table against pinned upstream DSPy across the official six-task GEPA suite:
+HotPotQA, instruction-following IFBench, HoVer, PAPILLON/PUPA, AIME, and
+LiveBench Math. Use the same current task/reflection models, official data and
+metrics, optimizer opportunity, and preregistered repeated runs for both
+runtimes. Report baseline, GEPA, and MIPROv2 held-out scores, uncertainty,
+cost, latency, and failures directly; do not convert the table into another
+private `>= 0.05`, positive-seed, or task-shopping rule. Historical-model
+reproduction may calibrate fidelity, but the current-model matched table is the
+headline product question.
+
+The earlier Imp IFBench outcomes remain unusable as effectiveness evidence
+because optimization and selection ran against a scorer representation that
+later reversed the retained MIPRO selection under the pinned scorer. That
+invalidates those outcomes, not IFBench. The repaired source-exact scorer makes
+a new frozen IFBench arm scientifically valid. Banking77 and HotPotQA remain
+honest negatives for their exact completed treatments, not exhausted tasks.
+MuSiQue remains a prepared adapted case-study option, but it no longer owns the
+central benchmark direction merely because readiness work accumulated around
+it.
+
+In parallel, Grue's real Z-machine environment is the distinctive stateful
+agent proof rather than another row mislabeled as the GEPA IFBench. The standard
+six-task table establishes recognizable optimizer quality; Grue/Zork should
+then show Imp optimizing an agent in deterministic forkable episodes and
+carrying the selected program through Artifact, fresh restart, and ordinary OTP
+operation. Structured Optimize Anything remains the non-prompt proof. Reuse
+the existing task programs, scorers, source pins, and Artifact boundaries, but
+reduce the historical GEPA campaign/controller machinery to thin ordinary
+Imp/DSPy per-task execution. A full-table failure is a product, treatment, or
+scientific finding to classify and act on, not a reason to redefine the table.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent
@@ -147,7 +182,7 @@ The product center is real but the telos is open.
   throughput, or general BEAM/Python reliability. Evidence:
   `scripts/current_dspy_timeout_boundary.py` and
   `test/current_dspy_timeout_boundary_test.exs`.
-- **External benchmark program — one serious candidate, not the portfolio.**
+- **Prepared adapted case study — useful option, not the central benchmark.**
   HoVer/PAPILLON remains a historical instrument: it measured route, usage,
   cost, cache, and format behavior, but its live HoVer comparison was invalidated
   by a task-fixture information asymmetry. The corrected HoVer and Circle probes
@@ -213,67 +248,27 @@ second tracking system:
    passes with the scope above; long-running recovery, overload behavior, and
    external acceptance remain open and should be tested through ordinary use,
    not a new operations campaign.
-3. **Ratify a staged representative scientific portfolio.** Preserve matched
-   TREC as the existing direct optimizer comparison and structured retry-policy
-   OA as the existing scoped non-prompt positive. Treat Banking77 and HotPotQA
-   as terminal outcomes for their exact Imp treatments, not matched DSPy losses
-   or exhausted tasks; only IFBench's Imp effectiveness interpretation is
-   invalid/unverified. The cheap LangProBe/MIPRO Heart Disease candidate was
-   reviewed provider-free and rejected before live spend. It is a recognized
-   four-call compositional program over only 303 public benchmark rows, but its
-   frozen test majority baseline is `113/152 = 74.34%`; all five retained
-   LangProBe MIPRO rows for that program finish below it, including GPT-4o at
-   `68.42%`. Relative optimizer lift is real but does not make the resulting
-   classifier useful. Do not merge two
-   different precedents into a fictional exact reproduction: the MIPRO paper
-   reports `120/183`, LangProBe uses `15/136/152`, and LangProBe's retained
-   result grid does not supply a multi-run uncertainty protocol. The actual
-   LangProBe/TensorFlow file is not equivalent to official UCI labels: matched
-   rows encode severity 2--4 as positive while the prompt says generic disease
-   presence, and six incomplete official rows are replaced. Pin and disclose
-   those actual benchmark bytes. The exact split, schedule, matched program,
-   serializer census, and hypothetical unconditional analysis are preserved,
-   but do not build the live runner or run the arms.
-   A provider-free proof now exercises the real four-predictor Imp program and
-   pinned DSPy shape through MIPRO selection, persistence, fresh loading, and
-   fresh service, establishing product fit but not effectiveness or full-budget
-   parity. Treat this as a literature-anchored software
-   comparison, not clinical validity or the broad usefulness result. Use MuSiQue,
-   or a demonstrably better alternative, for the serious current-source
-   multi-stage matched comparison. Defer a much larger GEPA paper-family
-   HoVer/HotPotQA arm until an outcome-blind cost pilot justifies it. This is a
-   claim sequence, not a four-campaign checklist.
+3. **Complete the standard comparative benchmark table.** Preserve matched TREC,
+   the structured retry-policy OA positive, and the Banking77/HotPot negatives
+   as historical context, but do not use them to replace the recognized study.
+   Freeze the official six-task GEPA suite for current matched Imp and pinned
+   DSPy baseline, GEPA, and MIPROv2 arms. Use official data, metrics, and
+   optimizer opportunity; preregister repeated runs; complete every arm; and
+   report direct scores, uncertainty, cost, latency, and failures without a
+   private universal win threshold. The old Imp IFBench result is invalid, not
+   the task; include a new correctly scored IFBench arm. Reuse the existing
+   six-family programs, scorers, authorities, and artifact contracts while
+   reducing the old campaign controller to thin ordinary per-task paths.
+   Historical-model reproduction is optional calibration; the current-model
+   table is the headline comparison. MuSiQue and Heart remain preserved
+   adapted-case-study records rather than the active center.
 
-   MuSiQue is an adapted current-source study rather than a paper replication,
-   but it preserves the central MIPRO construct: joint instruction and
-   demonstration optimization across a real two-stage program with a
-   program-level metric. Its `700/300/2,417` train/selection/held-out scale is
-   serious rather than a tiny fixture. Treat official-split, source-row-disjoint,
-   treatment-unseen dev as the held-out boundary with the scorer audit and
-   semantic overlap disclosed. Run matched Imp and pinned-DSPy arms
-   unconditionally if the intended claim is comparative; result-conditioned
-   comparator spend would weaken it. A passing MuSiQue result can satisfy
-   `imp-88sn`'s missing realistic multi-stage condition, but remains one arm
-   rather than broad epic-level portfolio completion. Before spend, retain
-   explicit freedom over claim, task, optimizer, comparator, scale, model, and
-   provider. Prefer another lane if primary-source review shows it can answer a
-   more important question through a thinner ordinary path or a materially
-   better cost/credibility tradeoff.
-   Keep a separate cheaper release milestone available: the matched TREC row
-   outcomes are now compact and independently recomputable, and can support an
-   honest experimental package story alongside OA, clean negatives, and the
-   scoped operational probes once an independent consumer validates the cold
-   path. That milestone does not satisfy the missing multi-stage usefulness
-   criterion and does not make MuSiQue mandatory. The MIPRO paper's five runs,
-   task-specific `20–50` full-evaluation budgets, and paired analysis are
-   precedent, not proof that the local `>= 0.05` / three-seed / two-positive
-   heuristic is a standard. Before paying for MuSiQue, ratify a task-native
-   primary outcome, smallest effect worth caring about, run count, held-out
-   size, and inference repetitions against the exact claim. MuSiQue officially
-   reports answer F1 and support F1 separately; any combined optimizer scalar
-   must remain an explicitly adapted objective. The public stage-specific
-   repetition policy makes repeated selection plus a single full held-out pass
-   possible without choosing that design by inertia.
+   In parallel, use Grue/Zork for the deeper stateful-agent proof: optimize a
+   real agent over deterministic forkable episodes, select without held-out
+   leakage, persist the selected parameters, restart, and operate them through
+   OTP. Keep structured Optimize Anything as the non-prompt proof. The table,
+   Grue, and OA answer different parts of the telos and none substitutes for the
+   others.
 4. **Authenticate the chosen arm before spend.** Bind both runtimes to the
    exact route, model, privacy, cache, fallback, and fixed scientific
    opportunity through existing task-owned paths. Use one prospective spend

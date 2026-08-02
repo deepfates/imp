@@ -103,11 +103,14 @@ found positive held-out gains for GEPA and MIPROv2 on one task. A structured
 Optimize Anything retry-policy condition improved new executable cases in two
 of three seeds. Two modeled-MIPRO Banking77 conditions and one JSON-GEPA
 HotPotQA condition completed their real multi-stage Artifact and fresh-service
-lifecycles but missed their preregistered mean-lift bars. IFBench remains a
-compatibility regression, not Imp effectiveness evidence, after its scorer bug
-invalidated the earlier interpretation. These outcomes show that the product
-can optimize, select, persist, and serve honestly; they do not establish broad
-optimizer effectiveness.
+lifecycles but missed their preregistered mean-lift bars. The earlier Imp
+IFBench effectiveness interpretation is invalid because its optimization-time
+scorer was wrong; the repaired source-exact scorer makes a new comparison
+valid, but does not rehabilitate the old result. These outcomes show that the
+product can optimize, select, persist, and serve honestly; they do not establish
+broad optimizer effectiveness. The next research milestone is a matched
+current-model Imp-versus-DSPy table across the official six-task GEPA suite,
+followed by a stateful-agent proof in Grue's real Z-machine environment.
 
 ## Read next
 

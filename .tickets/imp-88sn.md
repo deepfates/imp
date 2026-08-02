@@ -12,13 +12,67 @@ tags: [experiments, effectiveness, multi-stage, optimize-anything]
 ---
 # Demonstrate current-source usefulness across different problems
 
-Obstacle: Imp has one narrow historical positive matched result, several honest negative results, and strong lifecycle evidence, but not enough current-source evidence that its ordinary optimizer product is useful across materially different problem types. Answer that question with a small high-information portfolio, not a new campaign framework.
+Obstacle: Imp has one narrow historical positive matched result, several honest
+negative results, and strong lifecycle evidence, but not enough current-source
+evidence that its ordinary optimizer product is useful across materially
+different problem types or competitive with DSPy. Answer that question with a
+recognizable standard benchmark table plus a distinctive stateful-agent proof,
+not another private campaign framework or success definition.
 
 ## Acceptance Criteria
 
-Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
+Before provider calls, freeze the official six-task GEPA suite with current
+models and matched Imp/pinned-DSPy baseline, GEPA, and MIPROv2 arms. Use official
+data and task metrics, the same information and optimizer opportunity in both
+runtimes, preregistered repeated runs sufficient to expose instability, and
+selection that never reads held-out outcomes. Complete every declared arm and
+report the direct per-task and aggregate table, uncertainty, calls, cost,
+latency, parse failures, and clean negatives without a private universal lift
+or positive-seed victory rule. Every selected Imp program must produce a
+portable parameter Artifact that applies to fresh trusted code and serves
+through the ordinary OTP path.
+
+Separately, exercise a Grue/Zork agent through a real optimizer and the same
+Artifact/fresh-operation boundary, using deterministic forkable episodes and a
+task-native progress measure. Retain the already-earned proposer-generated
+Optimize Anything mutation on untouched executable behavior as the non-prompt
+problem class. The standard table establishes recognizable comparative quality;
+Grue and OA establish stateful-agent and non-prompt breadth. Unit fixtures,
+historical-source results, controller completion, and lifecycle-only execution
+cannot satisfy this ticket, and a failed table may not be converted into success
+by changing tasks or thresholds after seeing outcomes.
 
 ## Current status
+
+### Owner-ratified correction and next evidence tranche (2026-08-01)
+
+This ticket's central multi-stage question will be answered through the
+recognizable official six-task GEPA benchmark table, not by promoting one
+adapted task or a local material-lift threshold into the definition of success.
+The matched current-model study should run HotPotQA, instruction-following
+IFBench, HoVer, PAPILLON/PUPA, AIME, and LiveBench Math through thin ordinary
+Imp and pinned-DSPy paths with identical official data, metrics, model roles,
+optimizer opportunity, and preregistered repeated runs. Report baseline, GEPA,
+and MIPROv2 results and their uncertainty directly. The historical
+`>= 0.05`/positive-seed gates remain facts about earlier frozen treatments, not
+ecosystem standards or future victory conditions.
+
+The old Imp IFBench effectiveness interpretation is invalid because its
+optimization-time scorer was wrong; IFBench itself is not invalid or exhausted.
+The repaired source-exact scorer permits a clean new arm. Banking77 and HotPotQA
+remain terminal only for their exact completed treatments. MuSiQue remains a
+credible adapted case study but is superseded as the central evidence tranche.
+The existing six-family task programs, metrics, source identities, and
+replication contracts should be retained while the private campaign controller
+is reduced to ordinary per-task execution rather than extended.
+
+The second, complementary proof is Grue/Zork: a real deterministic, forkable,
+stateful interactive-fiction environment in which an Imp optimizer improves an
+agent and the selected program survives Artifact persistence, fresh restart,
+and OTP operation. This is distinct from the GEPA suite's instruction-following
+IFBench. Together with the retained structured Optimize Anything result, it
+tests capability that a static benchmark table does not. Neither Grue nor OA
+substitutes for the matched standard table.
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
@@ -29,13 +83,16 @@ schema-3 Artifacts are retained under
 checkpoints bind the historical 8/6 train/selection assignment, and the ordinary
 evidence test recomputes all three test outcomes and fresh-process outputs.
 
-The realistic multi-stage LM half has not passed. IFBench's Imp effectiveness
-interpretation is invalid/unverified after a scorer representation defect. A
+The realistic multi-stage LM half has not passed. The old IFBench Imp
+effectiveness interpretation is invalid/unverified after a scorer
+representation defect, while a new correctly scored IFBench comparison remains
+valid work. A
 complete modeled-MIPRO Banking77 condition averaged `+0.041667`; the final
 exposure-disjoint confirmation averaged `+0.020833`; and the complete HotPotQA
 JSON-GEPA condition averaged `-0.015256`. All were retained as scoped results,
-not threshold-adjusted into wins. Banking77, HotPotQA, and IFBench are not
-available for another treatment merely to seek a positive result.
+not threshold-adjusted into wins. Their exact treatments will not be rerun or
+retuned merely to seek a positive result; this does not remove any task from a
+predeclared standard-suite comparison.
 
 Everything below is a chronological research record. Earlier recommendations,
 budgets, and runnable proposals are not current authority merely because they
