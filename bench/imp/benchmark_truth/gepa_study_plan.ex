@@ -10,6 +10,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
   @mipro_program_aware_calls_per_candidate 3
   @fresh_examples_per_selected_arm 4
   @selected_arms 2
+  @chat_json_fallback_transport_factor 2
 
   @family_shape %{
     "AIMEBench" => %{predictors: 1, task_stages: 1, judge_stages: 0},
@@ -55,6 +56,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         mipro_proposer_calls_are_legal_maximum: true,
         fresh_examples_per_selected_arm: @fresh_examples_per_selected_arm,
         selected_arms: @selected_arms,
+        task_transport_bound: :initial_chat_call_plus_at_most_one_ordinary_json_adapter_fallback,
         provider_calls_authorized: false
       }
     }
@@ -72,11 +74,13 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
     program_evaluations =
       test + mipro_metric_calls + test + gepa.max_metric_calls + test
 
-    task_transports = program_evaluations * shape.task_stages
+    task_transports = legal_task_transports(program_evaluations, shape.task_stages)
     judge_transports = program_evaluations * shape.judge_stages
 
     fresh_program_evaluations = @fresh_examples_per_selected_arm * @selected_arms
-    fresh_task_transports = fresh_program_evaluations * shape.task_stages
+
+    fresh_task_transports =
+      legal_task_transports(fresh_program_evaluations, shape.task_stages)
 
     summary_batches = div(train + @dataset_summary_batch_size - 1, @dataset_summary_batch_size)
     summary_calls = min(summary_batches, @dataset_summary_batch_limit) + 1
@@ -90,7 +94,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       baseline:
         arm_totals(
           test,
-          test * shape.task_stages,
+          legal_task_transports(test, shape.task_stages),
           test * shape.judge_stages,
           0,
           0
@@ -98,7 +102,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       mipro_v2_heavy:
         arm_totals(
           mipro_metric_calls + test,
-          (mipro_metric_calls + test + @fresh_examples_per_selected_arm) * shape.task_stages,
+          legal_task_transports(
+            mipro_metric_calls + test + @fresh_examples_per_selected_arm,
+            shape.task_stages
+          ),
           (mipro_metric_calls + test) * shape.judge_stages,
           mipro_proposer_transports,
           0
@@ -106,7 +113,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       gepa_v0_1_4_no_merge:
         arm_totals(
           gepa.max_metric_calls + test,
-          (gepa.max_metric_calls + test + @fresh_examples_per_selected_arm) * shape.task_stages,
+          legal_task_transports(
+            gepa.max_metric_calls + test + @fresh_examples_per_selected_arm,
+            shape.task_stages
+          ),
           (gepa.max_metric_calls + test) * shape.judge_stages,
           0,
           gepa.max_reflection_calls
@@ -121,6 +131,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       test: test,
       predictors: shape.predictors,
       task_stages: shape.task_stages,
+      task_transport_factor: @chat_json_fallback_transport_factor,
       judge_stages: shape.judge_stages,
       program_evaluations: %{
         baseline_test: test,
@@ -157,6 +168,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       },
       arms: arms
     }
+  end
+
+  defp legal_task_transports(program_evaluations, task_stages) do
+    program_evaluations * task_stages * @chat_json_fallback_transport_factor
   end
 
   defp arm_totals(program_evaluations, task, judge, mipro_proposer, gepa_reflection) do

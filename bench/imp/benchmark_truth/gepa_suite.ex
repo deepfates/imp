@@ -83,13 +83,8 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
     end
   end
 
-  def program!(%{"program" => "IFBenchCoT2StageProgram"}, lm, execution) do
-    config =
-      if get_in(execution, ["lm", "json_fallback"]) == false,
-        do: [json_fallback: false],
-        else: []
-
-    IFBenchTwoStage.new(lm, adapter: Chat, config: config)
+  def program!(%{"program" => "IFBenchCoT2StageProgram"}, lm, _execution) do
+    IFBenchTwoStage.new(lm, adapter: Chat)
   end
 
   def program!(%{"program" => "PAPILLON"}, lm, _execution) do

@@ -103,8 +103,11 @@ arm even though the source-derived plan declares one held-out score per arm,
 and pinned DSPy alone had fresh-served the baseline. The ordinary entrances now
 execute exactly one held-out program per declared arm and reserve Artifact/fresh
 service for the two optimized arms. The plan exposes per-arm totals and proves
-that one baseline seed over all six tasks is `4,590` transports per runtime
-(`3,927` task plus `663` PAPILLON judge), or `9,180` for matched Imp and DSPy.
+that one baseline seed over all six tasks is `8,517` legal transports per
+runtime (`7,854` task plus `663` PAPILLON judge), or `17,034` for matched Imp
+and DSPy. The task maximum includes the initial Chat call plus at most one
+ordinary JSON-adapter fallback per task stage; observed fallback rates remain
+separate treatment evidence.
 This is the first table tranche, not a pilot or success gate.
 
 - **Operational product center — complete as an internal milestone.** Clean

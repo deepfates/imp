@@ -139,7 +139,8 @@ and the DSPy baseline alone performed selected-state/fresh-service work. The
 repair makes each declared arm emit exactly one held-out score and performs
 Artifact/fresh service only for MIPROv2 and GEPA in both runtimes. The plan now
 decomposes every family by arm and recomputes the first all-six matched baseline
-seed as `9,180` total transports (`7,854` task and `1,326` PAPILLON judge).
+seed as `17,034` legal total transports (`15,708` task and `1,326` PAPILLON
+judge), including at most one ordinary JSON-adapter fallback per task stage.
 Those baseline outcomes are table evidence and do not decide whether later
 optimizer arms run.
 
@@ -190,19 +191,46 @@ runtime/safety failure, or the prospective spend guard; socket counts and
 elapsed time are not intervention signals. The matched table still contains
 zero valid rows; no DSPy or other-family condition has started.
 
+The next Imp AIME baseline did complete from clean `9c02f0bf`; it is retained as
+a diagnostic pilot rather than admitted table evidence. The private `0600`
+Result at
+`benchmarks/results/gepa-suite-baseline-current-v1-9c02f0bf-20260801T070201Z/result.json`
+has SHA-256 `a284c67114f9f216ef72c7efc21a939124e5961f0d98863cd2003a9b4705bbed`.
+It scored `0.5` over all `150` AIME rows and retained `72` row errors. The run
+made `231` request attempts (`226` completed HTTP responses and `5` request
+exceptions); finish reasons were `146` length, `80` stop, and `5` error. The
+ordinary DSPy-compatible Chat-to-JSON fallback accounts for the legal
+opportunity mismatch: the frozen admission counted one task transport per row,
+but a failed Chat parse may make one additional JSON-adapter transport. The
+same mismatch existed in the pinned-DSPy entrance, while the Imp IFBench path
+alone had disabled fallback, so this was both an accounting defect and a
+treatment mismatch. Provider usage was decoded in responses but not retained
+by ReqLLM because the custom live model omitted pricing metadata; the result's
+zero token/cost fields are therefore not evidence of zero usage. Exact cost is
+unrecoverable from this Result. Charge the corrected full legal AIME reservation
+of `$3.096576`, making the cumulative conservative study upper
+`$6.196721928` and leaving `$13.803278072` under the owner's earlier `$20` cap.
+Do not compare or reinterpret the score until a corrected matched Imp/DSPy
+canary proves fallback-aware admission, durable progress, and usage capture.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program
 evaluations. The official graphs plus four fresh calls for each selected arm
-expand that into `163,128` task-model transports and `16,890` PAPILLON judge
+expand that into `326,256` legal task-model transports and `16,890` PAPILLON judge
 transports. Pinned Heavy MIPRO program-aware grounding permits another `439`
 proposal transports, while GEPA's boundary-checked batch-to-single failure
 policy permits `14,966` reflection transports. Three fixed seeds across Imp and
-DSPy therefore permit exactly `1,172,538` total transports: `978,768` task,
+DSPy therefore permit exactly `2,151,306` total transports: `1,957,536` task,
 `101,340` judge, `2,634` MIPRO proposal, and `89,796` GEPA reflection. The
 provider-free `GepaStudyPlan` recomputes this from the source receipts and
-optimizer budget functions; these are legal opportunities, not observed calls
-or spend authority. The thin provider-free paths now pass. Model assignment is
+optimizer budget functions. The task maximum includes the initial Chat call
+plus at most one ordinary JSON-adapter fallback per task stage; fallback counts
+must be reported separately because they are treatment behavior, not retries.
+The corrected all-six matched baseline seed permits `17,034` total transports
+(`15,708` task plus `1,326` judge), rather than the earlier `9,180`. These are
+legal opportunities, not observed calls or spend authority. The thin
+provider-free paths now pass. Model assignment is
 still deliberately unfrozen: the historical suite used GPT-4.1 Mini, which is
 not a relevant current headline, while current candidates trade off capability,
 format behavior, reflection quality, and a potentially order-of-magnitude cost

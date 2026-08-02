@@ -10,6 +10,12 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     task_lm = fetch_lm!(lms, :task)
     judge_lm = Map.get(lms, :judge, task_lm)
     execution = Keyword.get(opts, :execution, %{})
+    max_concurrency = Keyword.get(opts, :max_concurrency, 1)
+
+    unless is_integer(max_concurrency) and max_concurrency > 0 do
+      raise ArgumentError, "GEPA study max_concurrency must be a positive integer"
+    end
+
     metric_opts = Keyword.get(opts, :metric_opts, []) |> Keyword.put_new(:judge_lm, judge_lm)
     program = GepaSuite.program!(loaded.spec, task_lm, execution)
     metric = GepaSuite.metric!(loaded.spec, metric_opts)
@@ -22,6 +28,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
       feedback_metric: feedback_metric,
       component_feedback: GepaSuite.component_feedback!(loaded.spec, program, feedback_metric),
       lms: %{task: task_lm, reflection: fetch_lm!(lms, :reflection), judge: judge_lm},
+      outer_max_concurrency: max_concurrency,
       program_grounding: program_grounding(loaded.spec, program)
     }
   end
@@ -124,6 +131,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
   def heldout!(arm, prepared, optimized, opts \\ []) do
     test = GepaSuite.load_test!(prepared.loaded)
     program = if arm == :baseline, do: prepared.program, else: optimized.selected
+    opts = Keyword.put_new(opts, :max_concurrency, prepared.outer_max_concurrency)
 
     %{
       arm: arm,

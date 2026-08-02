@@ -35,6 +35,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
       assert receipt["status"] == "provider_disabled_ready"
       assert receipt["heldout_decoded"] == false
       assert receipt["provider_calls_authorized"] == false
+      assert receipt["outer_max_concurrency"] == 1
       assert receipt["treatments"]["mipro_v2_heavy"]["auto"] == "heavy"
 
       assert receipt["treatments"]["gepa_v0_1_4_no_merge"]["execution_profile"] ==
@@ -106,10 +107,16 @@ defmodule Imp.GepaSuiteConditionCLITest do
                "output_tokens" => 0,
                "request_duration_us" => 0,
                "request_attempts" => 0,
+               "json_fallbacks" => 0,
                "usage_events" => 0
              }
            }
 
+    progress_path = fresh_path <> ".progress.jsonl"
+    assert receipt["progress_sha256"] == sha256(progress_path)
+    assert File.stat!(progress_path).mode |> Bitwise.band(0o777) == 0o600
+    assert [header] = progress_path |> File.read!() |> String.split("\n", trim: true)
+    assert Jason.decode!(header)["event"] == "start"
     assert is_integer(receipt["wall_time_us"])
     assert receipt["wall_time_us"] >= 0
   end
@@ -161,5 +168,79 @@ defmodule Imp.GepaSuiteConditionCLITest do
 
     assert status != 0
     assert output =~ "owner cap before transport"
+  end
+
+  test "runtime observer persists nested usage and adapter fallback progress" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition.exs")
+    source = File.read!(script)
+
+    body =
+      String.replace_suffix(
+        source,
+        "Imp.GepaSuiteConditionCLI.main(System.argv())\n",
+        ""
+      )
+
+    Code.compile_string(body, script)
+
+    output_root =
+      Path.join(System.tmp_dir!(), "imp-gepa-observer-#{System.unique_integer([:positive])}")
+
+    progress_path = Path.join(output_root, "progress.jsonl")
+    File.mkdir_p!(output_root)
+    File.write!(progress_path, "")
+    on_exit(fn -> File.rm_rf!(output_root) end)
+
+    {:ok, usage} =
+      Agent.start_link(fn ->
+        %{
+          "summary" => %{
+            "usage_events" => 0,
+            "request_attempts" => 0,
+            "json_fallbacks" => 0,
+            "request_duration_us" => 0,
+            "input_tokens" => 0,
+            "output_tokens" => 0,
+            "cost_usd" => 0.0
+          },
+          "events" => [],
+          "progress_path" => progress_path,
+          "next_sequence" => 1
+        }
+      end)
+
+    apply(Imp.GepaSuiteConditionCLI, :handle_runtime_event, [
+      [:req_llm, :request, :stop],
+      %{duration: 1_000},
+      %{
+        usage: %{tokens: %{input: 7, output: 3}, total_cost: 0.001},
+        request_id: "request-1"
+      },
+      usage
+    ])
+
+    apply(Imp.GepaSuiteConditionCLI, :handle_runtime_event, [
+      [:imp, :adapter, :parse, :json_fallback],
+      %{count: 1},
+      %{adapter: Imp.Adapter.Chat, error: "strict marker parse failed"},
+      usage
+    ])
+
+    state = Agent.get(usage, & &1)
+    Agent.stop(usage)
+
+    assert state["summary"]["request_attempts"] == 1
+    assert state["summary"]["usage_events"] == 1
+    assert state["summary"]["json_fallbacks"] == 1
+    assert state["summary"]["input_tokens"] == 7
+    assert state["summary"]["output_tokens"] == 3
+    assert state["summary"]["cost_usd"] == 0.001
+
+    assert progress_path |> File.read!() |> String.split("\n", trim: true) |> length() == 2
+  end
+
+  defp sha256(path) do
+    :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
   end
 end

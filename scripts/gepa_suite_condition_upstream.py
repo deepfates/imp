@@ -21,6 +21,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from typing import Any
 
@@ -52,6 +53,8 @@ FAMILY_SHAPES = {
     "Papillon": {"task": 3, "judge": 3},
 }
 RUNTIME_EVENTS: list[dict[str, Any]] = []
+RUNTIME_LOCK = threading.Lock()
+PROGRESS_PATH: Path | None = None
 ACTIVE_ARGS: argparse.Namespace | None = None
 ACTIVE_STAGE = "preflight"
 RUN_STARTED_NS: int | None = None
@@ -82,6 +85,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--judge-max-output-tokens", type=int)
     parser.add_argument("--input-price-per-million", type=float)
     parser.add_argument("--output-price-per-million", type=float)
+    parser.add_argument("--max-concurrency", type=int, default=1)
     parser.add_argument("--initial-cost-usd", type=float)
     parser.add_argument("--max-cost-usd", type=float)
     parser.add_argument("--api-base")
@@ -259,7 +263,7 @@ def response_usage(response: Any) -> dict[str, Any]:
 
 def record_runtime_response(role: str, messages: Any, started_ns: int, response: Any) -> None:
     choice = (value_field(response, "choices", []) or [None])[0]
-    RUNTIME_EVENTS.append(
+    append_runtime_event(
         {
             "role": role,
             "status": "ok",
@@ -274,7 +278,7 @@ def record_runtime_response(role: str, messages: Any, started_ns: int, response:
 
 
 def record_runtime_error(role: str, messages: Any, started_ns: int, error: BaseException) -> None:
-    RUNTIME_EVENTS.append(
+    append_runtime_event(
         {
             "role": role,
             "status": "error",
@@ -285,10 +289,40 @@ def record_runtime_error(role: str, messages: Any, started_ns: int, error: BaseE
     )
 
 
+def append_runtime_event(event: dict[str, Any]) -> None:
+    with RUNTIME_LOCK:
+        event = {**event, "sequence": len(RUNTIME_EVENTS) + 1}
+        RUNTIME_EVENTS.append(event)
+        if PROGRESS_PATH is not None:
+            with PROGRESS_PATH.open("a") as handle:
+                handle.write(json.dumps(event, sort_keys=True, default=str) + "\n")
+
+
+def init_progress(args: argparse.Namespace) -> Path:
+    global PROGRESS_PATH
+    if args.output is None:
+        raise RuntimeError("live progress requires --output")
+    PROGRESS_PATH = args.output.with_suffix(args.output.suffix + ".progress.jsonl")
+    PROGRESS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROGRESS_PATH.parent.chmod(0o700)
+    header = {
+        "event": "start",
+        "family": args.family,
+        "arm": args.arm,
+        "seed": args.seed,
+        "max_concurrency": args.max_concurrency,
+    }
+    PROGRESS_PATH.write_text(json.dumps(header, sort_keys=True) + "\n")
+    PROGRESS_PATH.chmod(0o600)
+    return PROGRESS_PATH
+
+
 def runtime_usage() -> dict[str, Any]:
+    with RUNTIME_LOCK:
+        runtime_events = [dict(event) for event in RUNTIME_EVENTS]
     by_role = {}
     for role in ("task", "reflection", "judge"):
-        events = [event for event in RUNTIME_EVENTS if event["role"] == role]
+        events = [event for event in runtime_events if event["role"] == role]
         successful = [event for event in events if event["status"] == "ok"]
         by_role[role] = {
             "request_attempts": len(events),
@@ -299,7 +333,7 @@ def runtime_usage() -> dict[str, Any]:
             "output_tokens": sum(event["usage"]["output_tokens"] for event in successful),
             "cost_usd": sum(event["usage"]["cost_usd"] for event in successful),
         }
-    return {"summary": by_role, "events": [{**event, "sequence": index} for index, event in enumerate(RUNTIME_EVENTS, 1)]}
+    return {"summary": by_role, "events": runtime_events}
 
 
 def merge_runtime_usage(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
@@ -419,7 +453,10 @@ def baseline_spend_admission(args: argparse.Namespace, spec: dict[str, Any]) -> 
         raise RuntimeError("live baseline requires positive --max-cost-usd")
     shape = FAMILY_SHAPES[args.family]
     test = spec["split_counts"]["test"]
-    calls = {"task_transports": test * shape["task"], "judge_transports": test * shape["judge"]}
+    calls = {
+        "task_transports": test * shape["task"] * 2,
+        "judge_transports": test * shape["judge"],
+    }
 
     def role_reservation(role: str) -> float:
         return (
@@ -452,7 +489,13 @@ def configure_program(program: Any, task_lm: Any, judge_lm: Any, family: str) ->
         utils.llm_judge.set_lm(judge_lm)
 
 
-def evaluate(dspy: Any, program: Any, rows: list[Any], metric: Any) -> dict[str, Any]:
+def evaluate(
+    dspy: Any,
+    program: Any,
+    rows: list[Any],
+    metric: Any,
+    max_concurrency: int,
+) -> dict[str, Any]:
     failures: dict[str, list[str]] = {}
 
     class ObservedProgram:
@@ -467,7 +510,7 @@ def evaluate(dspy: Any, program: Any, rows: list[Any], metric: Any) -> dict[str,
     result = dspy.Evaluate(
         devset=rows,
         metric=metric,
-        num_threads=1,
+        num_threads=max_concurrency,
         return_all_scores=True,
         failure_score=0.0,
         max_errors=10_000,
@@ -547,6 +590,8 @@ def write_private_json(path: Path, payload: dict[str, Any]) -> None:
 def main() -> None:
     global ACTIVE_ARGS, ACTIVE_STAGE, RUN_STARTED_NS
     args = parse_args()
+    if args.max_concurrency <= 0:
+        raise RuntimeError("--max-concurrency must be a positive integer")
     ACTIVE_ARGS = args
     RUN_STARTED_NS = time.monotonic_ns()
     for name in ("dspy_root", "gepa_root", "artifact_root", "dataset_root", "retrieval_root", "retrieval_receipt", "output", "state"):
@@ -588,6 +633,7 @@ def main() -> None:
         "family": args.family,
         "arm": args.arm,
         "seed": args.seed,
+        "outer_max_concurrency": args.max_concurrency,
         "splits": spec["split_counts"],
         "metric_calls": spec["metric_calls"],
         "runtime": {"bridge": bridge.as_dict(), "gepa": runtime},
@@ -600,6 +646,7 @@ def main() -> None:
         return
 
     spend_admission = None if args.fresh else baseline_spend_admission(args, spec)
+    progress_path = init_progress(args)
 
     task_lm = make_lm(dspy, "task", args)
     reflection_lm = make_lm(dspy, "reflection", args)
@@ -625,6 +672,7 @@ def main() -> None:
             "calls": calls,
             "heldout_decoded": True,
             "usage": runtime_usage(),
+            "progress_sha256": sha256(progress_path),
             "wall_time_us": (time.monotonic_ns() - started) // 1_000,
         }
         if args.output:
@@ -647,7 +695,13 @@ def main() -> None:
         selected = optimize(dspy, program, meta, train, dev, args, task_lm, reflection_lm, spec["metric_calls"])
         ACTIVE_STAGE = "heldout"
         test = load_rows(dspy, test_path, spec["input_keys"])
-        heldout_result = evaluate(dspy, arm_program(args.arm, program, selected), test, source_metric(meta))
+        heldout_result = evaluate(
+            dspy,
+            arm_program(args.arm, program, selected),
+            test,
+            source_metric(meta),
+            args.max_concurrency,
+        )
 
     state_sha = None
     fresh_sha = None
@@ -673,6 +727,7 @@ def main() -> None:
             "--judge-max-output-tokens", str(args.judge_max_output_tokens),
             "--input-price-per-million", str(args.input_price_per_million),
             "--output-price-per-million", str(args.output_price_per_million),
+            "--max-concurrency", str(args.max_concurrency),
             "--api-key-env", args.api_key_env,
             "--state", str(state_path), "--output", str(fresh_path),
         ]
@@ -696,6 +751,7 @@ def main() -> None:
         "state_sha256": state_sha,
         "fresh_sha256": fresh_sha,
         "usage": merge_runtime_usage(runtime_usage(), fresh_usage),
+        "progress_sha256": sha256(progress_path),
         "wall_time_us": (time.monotonic_ns() - started) // 1_000,
         "spend_admission": spend_admission,
     }
@@ -716,6 +772,8 @@ def retain_terminal_failure(error: BaseException) -> None:
         "error_type": type(error).__name__,
         "error_sha256": hashlib.sha256(str(error).encode()).hexdigest(),
         "usage": runtime_usage(),
+        "progress_sha256":
+            sha256(PROGRESS_PATH) if PROGRESS_PATH is not None and PROGRESS_PATH.exists() else None,
         "wall_time_us": elapsed,
     }
     write_private_json(args.output, payload)

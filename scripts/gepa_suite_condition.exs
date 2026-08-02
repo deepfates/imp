@@ -34,6 +34,7 @@ defmodule Imp.GepaSuiteConditionCLI do
           judge_max_output_tokens: :integer,
           input_price_per_million: :float,
           output_price_per_million: :float,
+          max_concurrency: :integer,
           initial_cost_usd: :float,
           max_cost_usd: :float,
           api_key_env: :string,
@@ -104,6 +105,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       judge_max_output_tokens: opts[:judge_max_output_tokens],
       input_price_per_million: opts[:input_price_per_million],
       output_price_per_million: opts[:output_price_per_million],
+      max_concurrency: Keyword.get(opts, :max_concurrency, 1),
       initial_cost_usd: opts[:initial_cost_usd],
       max_cost_usd: opts[:max_cost_usd],
       api_key_env: Keyword.get(opts, :api_key_env, "OPENROUTER_API_KEY"),
@@ -137,7 +139,8 @@ defmodule Imp.GepaSuiteConditionCLI do
       end
 
     GepaStudyCondition.prepare!(config.dataset_root, config.family, lms,
-      execution: execution!(config)
+      execution: execution!(config),
+      max_concurrency: config.max_concurrency
     )
   end
 
@@ -153,6 +156,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       family: config.family,
       arm: config.arm,
       seed: config.seed,
+      outer_max_concurrency: config.max_concurrency,
       heldout_decoded: false,
       split_counts: prepared.loaded.spec["split_counts"],
       treatments: treatments,
@@ -164,12 +168,16 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp run!(config, prepared) do
     for key <- [:output], do: required_config!(config, key)
     reservation = admit_spend!(config)
+    progress = init_progress!(config)
 
     {wall_time_us, outcome, usage} =
-      capture_runtime(fn ->
-        optimized = GepaStudyCondition.optimize!(config.arm, prepared, config.seed)
-        {optimized, GepaStudyCondition.heldout!(config.arm, prepared, optimized)}
-      end)
+      capture_runtime(
+        fn ->
+          optimized = GepaStudyCondition.optimize!(config.arm, prepared, config.seed)
+          {optimized, GepaStudyCondition.heldout!(config.arm, prepared, optimized)}
+        end,
+        progress
+      )
 
     {optimized, heldout} = unwrap_run!(outcome, config, reservation, wall_time_us, usage)
 
@@ -195,6 +203,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       artifact_sha256: artifact_sha,
       fresh_sha256: fresh_sha,
       usage: merge_runtime(usage, fresh_usage),
+      progress_sha256: sha256(progress),
       wall_time_us: wall_time_us,
       spend_admission: reservation,
       heldout_decoded: true,
@@ -204,6 +213,7 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   defp fresh!(config, prepared) do
     for key <- [:artifact, :fresh_output], do: required_config!(config, key)
+    progress = init_progress!(config)
 
     for file <- ~w(support_pipeline.ex callbacks.ex workflow.ex program_server.ex) do
       Code.require_file(
@@ -226,23 +236,26 @@ defmodule Imp.GepaSuiteConditionCLI do
     {:ok, server} = apply(ImpDeployment.ProgramServer, :start_link, [server_options])
 
     {wall_time_us, outcome, usage} =
-      capture_runtime(fn ->
-        test
-        |> Task.async_stream(
-          fn example ->
-            inputs = example |> Imp.Example.inputs() |> Imp.Example.to_map()
-            apply(ImpDeployment.ProgramServer, :call, [server, inputs, :infinity])
-          end,
-          ordered: true,
-          max_concurrency: 4,
-          timeout: :infinity
-        )
-        |> Enum.map(fn
-          {:ok, {:ok, prediction}} -> %{status: :ok, prediction: json_safe(prediction)}
-          {:ok, {:error, reason}} -> %{status: :error, reason: json_safe(reason)}
-          {:exit, reason} -> %{status: :exit, reason: json_safe(reason)}
-        end)
-      end)
+      capture_runtime(
+        fn ->
+          test
+          |> Task.async_stream(
+            fn example ->
+              inputs = example |> Imp.Example.inputs() |> Imp.Example.to_map()
+              apply(ImpDeployment.ProgramServer, :call, [server, inputs, :infinity])
+            end,
+            ordered: true,
+            max_concurrency: 4,
+            timeout: :infinity
+          )
+          |> Enum.map(fn
+            {:ok, {:ok, prediction}} -> %{status: :ok, prediction: json_safe(prediction)}
+            {:ok, {:error, reason}} -> %{status: :error, reason: json_safe(reason)}
+            {:exit, reason} -> %{status: :exit, reason: json_safe(reason)}
+          end)
+        end,
+        progress
+      )
 
     outcomes = unwrap_fresh!(outcome, config, wall_time_us, usage)
 
@@ -257,6 +270,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       seed: config.seed,
       calls: outcomes,
       usage: usage,
+      progress_sha256: sha256(progress),
       wall_time_us: wall_time_us
     })
   end
@@ -311,7 +325,9 @@ defmodule Imp.GepaSuiteConditionCLI do
         "--input-price-per-million",
         to_string(config.input_price_per_million),
         "--output-price-per-million",
-        to_string(config.output_price_per_million)
+        to_string(config.output_price_per_million),
+        "--max-concurrency",
+        to_string(config.max_concurrency)
       ]
   end
 
@@ -341,12 +357,11 @@ defmodule Imp.GepaSuiteConditionCLI do
         "authenticated_receipt" => config.retrieval_receipt |> File.read!() |> Jason.decode!(),
         "hover_upstream_bm25" => true,
         "python" => config.retrieval_python
-      },
-      "lm" => %{"json_fallback" => false}
+      }
     }
   end
 
-  defp execution!(_config), do: %{"lm" => %{"json_fallback" => false}}
+  defp execution!(_config), do: %{}
 
   defp live_lm!(config, role) do
     model = required_config!(config, String.to_existing_atom("#{role}_model"))
@@ -359,7 +374,16 @@ defmodule Imp.GepaSuiteConditionCLI do
     api_key = System.fetch_env!(config.api_key_env)
 
     Imp.req_llm(
-      %{provider: :openrouter, id: model, model: model, base_url: "https://openrouter.ai/api/v1"},
+      %{
+        provider: :openrouter,
+        id: model,
+        model: model,
+        base_url: "https://openrouter.ai/api/v1",
+        cost: %{
+          input: config.input_price_per_million,
+          output: config.output_price_per_million
+        }
+      },
       api_key: api_key,
       cache: false,
       temperature: 1.0,
@@ -395,6 +419,7 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp optimizer_receipt(:mipro_v2_heavy, optimizer) do
     %{
       auto: optimizer.config.auto,
+      max_concurrency: optimizer.max_concurrency,
       proposer_fidelity: optimizer.config.proposer_fidelity,
       search_fidelity: optimizer.config.search_fidelity,
       max_errors: optimizer.max_errors
@@ -404,6 +429,7 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp optimizer_receipt(:gepa_v0_1_4_no_merge, optimizer) do
     %{
       execution_profile: optimizer.execution_profile,
+      max_concurrency: optimizer.max_concurrency,
       max_metric_calls: optimizer.max_metric_calls,
       max_reflection_calls: optimizer.max_reflection_calls,
       minibatch_size: optimizer.minibatch_size,
@@ -481,17 +507,24 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
   end
 
-  defp capture_runtime(fun) do
+  defp capture_runtime(fun, progress_path) do
     {:ok, _started} = Application.ensure_all_started(:telemetry)
     id = {__MODULE__, :runtime_usage, make_ref()}
-    {:ok, usage} = Agent.start_link(fn -> empty_runtime() end)
+
+    {:ok, usage} =
+      Agent.start_link(fn ->
+        empty_runtime()
+        |> Map.put("progress_path", progress_path)
+        |> Map.put("next_sequence", 1)
+      end)
 
     :ok =
       :telemetry.attach_many(
         id,
         [
           [:req_llm, :request, :stop],
-          [:req_llm, :request, :exception]
+          [:req_llm, :request, :exception],
+          [:imp, :adapter, :parse, :json_fallback]
         ],
         &__MODULE__.handle_runtime_event/4,
         usage
@@ -526,6 +559,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       stage: :optimize_or_heldout,
       error: redacted_error(error),
       usage: usage,
+      progress_sha256: existing_sha256(progress_path(config)),
       wall_time_us: wall_time_us,
       spend_admission: reservation
     })
@@ -544,6 +578,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       stage: :fresh_service,
       error: redacted_error(error),
       usage: usage,
+      progress_sha256: existing_sha256(progress_path(config)),
       wall_time_us: wall_time_us
     })
 
@@ -555,14 +590,15 @@ defmodule Imp.GepaSuiteConditionCLI do
       when event in [[:req_llm, :request, :stop], [:req_llm, :request, :exception]] do
     duration = Map.get(measurements, :duration, 0)
     provider_usage = Map.get(metadata, :usage, %{}) || %{}
+    token_usage = field(provider_usage, :tokens) || provider_usage
     successful? = event == [:req_llm, :request, :stop]
 
     delta = %{
       "usage_events" => if(successful?, do: 1, else: 0),
       "request_attempts" => 1,
       "request_duration_us" => System.convert_time_unit(duration, :native, :microsecond),
-      "input_tokens" => number(provider_usage, [:input_tokens, :input]) |> trunc(),
-      "output_tokens" => number(provider_usage, [:output_tokens, :output]) |> trunc(),
+      "input_tokens" => number(token_usage, [:input_tokens, :input]) |> trunc(),
+      "output_tokens" => number(token_usage, [:output_tokens, :output]) |> trunc(),
       "cost_usd" => number(provider_usage, [:total_cost, :cost])
     }
 
@@ -583,12 +619,26 @@ defmodule Imp.GepaSuiteConditionCLI do
       "error" => if(successful?, do: nil, else: redacted_error(Map.get(metadata, :error)))
     }
 
-    Agent.update(usage, fn state ->
-      %{
-        "summary" => add_usage(state["summary"], delta),
-        "events" => [event_record | state["events"]]
-      }
-    end)
+    record_runtime_event(usage, event_record, delta)
+  end
+
+  def handle_runtime_event(
+        [:imp, :adapter, :parse, :json_fallback],
+        measurements,
+        metadata,
+        usage
+      ) do
+    count = Map.get(measurements, :count, 1)
+
+    event_record = %{
+      "sequence" => nil,
+      "status" => "adapter_json_fallback",
+      "adapter" => metadata |> Map.get(:adapter) |> json_safe(),
+      "error_fingerprint_sha256" =>
+        metadata |> Map.get(:error) |> redacted_error() |> field("fingerprint_sha256")
+    }
+
+    record_runtime_event(usage, event_record, %{"json_fallbacks" => count})
   end
 
   defp empty_runtime, do: %{"summary" => empty_usage(), "events" => []}
@@ -600,13 +650,16 @@ defmodule Imp.GepaSuiteConditionCLI do
       |> Enum.with_index(1)
       |> Enum.map(fn {event, index} -> %{event | "sequence" => index} end)
 
-    %{runtime | "events" => events}
+    runtime
+    |> Map.put("events", events)
+    |> Map.drop(["progress_path", "next_sequence"])
   end
 
   defp empty_usage do
     %{
       "usage_events" => 0,
       "request_attempts" => 0,
+      "json_fallbacks" => 0,
       "request_duration_us" => 0,
       "input_tokens" => 0,
       "output_tokens" => 0,
@@ -616,6 +669,19 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   defp add_usage(left, right) do
     Map.new(left, fn {key, value} -> {key, value + Map.get(right || %{}, key, 0)} end)
+  end
+
+  defp record_runtime_event(usage, event_record, delta) do
+    Agent.update(usage, fn state ->
+      sequence = state["next_sequence"]
+      event_record = Map.put(event_record, "sequence", sequence)
+      append_progress!(state["progress_path"], event_record)
+
+      state
+      |> Map.put("summary", add_usage(state["summary"], delta))
+      |> Map.put("events", [event_record | state["events"]])
+      |> Map.put("next_sequence", sequence + 1)
+    end)
   end
 
   defp merge_runtime(left, right) do
@@ -643,6 +709,14 @@ defmodule Imp.GepaSuiteConditionCLI do
       if is_number(value), do: value
     end)
   end
+
+  defp field(nil, _key), do: nil
+
+  defp field(map, key) when is_map(map) do
+    Map.get(map, key, Map.get(map, to_string(key)))
+  end
+
+  defp field(_value, _key), do: nil
 
   defp redacted_error(nil), do: nil
 
@@ -684,6 +758,8 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp retrieval_disclosure(_config, _spec), do: nil
 
   defp validate_live!(config) do
+    required_positive!(config, :max_concurrency)
+
     if config.provider_disabled_fixture? and not config.fresh? do
       raise ArgumentError, "--provider-disabled-fixture is restricted to fresh lifecycle tests"
     end
@@ -750,8 +826,36 @@ defmodule Imp.GepaSuiteConditionCLI do
     File.chmod!(path, 0o600)
   end
 
+  defp init_progress!(config) do
+    progress_path = progress_path(config)
+    File.mkdir_p!(Path.dirname(progress_path))
+    File.chmod!(Path.dirname(progress_path), 0o700)
+
+    header = %{
+      "event" => "start",
+      "family" => config.family,
+      "arm" => config.arm,
+      "seed" => config.seed,
+      "max_concurrency" => config.max_concurrency
+    }
+
+    File.write!(progress_path, Jason.encode!(json_safe(header)) <> "\n")
+    File.chmod!(progress_path, 0o600)
+    progress_path
+  end
+
+  defp progress_path(config) do
+    output = if config.fresh?, do: config.fresh_output, else: config.output
+    output <> ".progress.jsonl"
+  end
+
+  defp append_progress!(path, event) do
+    File.write!(path, Jason.encode!(json_safe(event)) <> "\n", [:append])
+  end
+
   defp emit(payload), do: IO.puts(Jason.encode!(json_safe(payload)))
   defp sha256(path), do: :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
+  defp existing_sha256(path), do: if(File.exists?(path), do: sha256(path), else: nil)
 
   defp canonical_sha256(value) do
     value

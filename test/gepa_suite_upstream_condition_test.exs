@@ -24,7 +24,9 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       "--retrieval-receipt",
       Path.join(root, "tmp/hover-materialization-v1/materialization.json"),
       "--arm",
-      "baseline"
+      "baseline",
+      "--max-concurrency",
+      "8"
     ]
 
     for family <- Imp.BenchmarkTruth.GepaSuite.families() do
@@ -33,6 +35,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       assert receipt["family"] == family
       assert receipt["status"] == "provider_disabled_ready"
       assert receipt["heldout_decoded"] == false
+      assert receipt["outer_max_concurrency"] == 8
     end
   end
 
@@ -42,7 +45,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
 
     probe = """
-    import argparse, asyncio, importlib.util, pathlib, sys
+    import argparse, asyncio, importlib.util, json, pathlib, sys, tempfile
     path = pathlib.Path(sys.argv[1])
     sys.path.insert(0, str(path.parent))
     spec = importlib.util.spec_from_file_location("condition", path)
@@ -59,8 +62,12 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     args = argparse.Namespace(
         task_model="model", task_provider="provider", task_max_input_bytes=2,
         task_max_output_tokens=16, input_price_per_million=0.14,
-        output_price_per_million=0.28, api_base="https://example.invalid", api_key_env="TEST_KEY"
+        output_price_per_million=0.28, api_base="https://example.invalid", api_key_env="TEST_KEY",
+        family="AIMEBench", arm="baseline", seed=17, max_concurrency=8
     )
+    tmp = tempfile.TemporaryDirectory()
+    args.output = pathlib.Path(tmp.name) / "result.json"
+    progress = condition.init_progress(args)
     lm = condition.make_lm(dspy, "task", args)
     baseline = object()
     selected = object()
@@ -75,15 +82,17 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert usage["input_tokens"] == 1
     assert usage["output_tokens"] == 1
     assert usage["cost_usd"] == 0.0
+    progress_lines = progress.read_text().splitlines()
+    assert len(progress_lines) == 2
+    assert progress.stat().st_mode & 0o777 == 0o600
+    assert json.loads(progress_lines[1])["sequence"] == 1
     spec = {"split_counts":{"test":1}}
-    args.family = "AIMEBench"
-    args.arm = "baseline"
     args.initial_cost_usd = 0.0
     args.max_cost_usd = 1.0
     args.judge_max_input_bytes = 2
     args.judge_max_output_tokens = 16
     admission = condition.baseline_spend_admission(args, spec)
-    assert admission["calls"] == {"task_transports":1, "judge_transports":0}
+    assert admission["calls"] == {"task_transports":2, "judge_transports":0}
     args.max_cost_usd = 0.000001
     try:
         condition.baseline_spend_admission(args, spec)

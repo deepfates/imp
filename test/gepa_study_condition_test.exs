@@ -17,11 +17,12 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
     lm = %NeverLM{}
 
     prepared =
-      GepaStudyCondition.prepare!(@root, "AIMEBench", %{
-        task: lm,
-        reflection: lm,
-        judge: lm
-      })
+      GepaStudyCondition.prepare!(
+        @root,
+        "AIMEBench",
+        %{task: lm, reflection: lm, judge: lm},
+        max_concurrency: 8
+      )
 
     mipro = GepaStudyCondition.optimizer!(:mipro_v2_heavy, prepared, 17)
     assert mipro.config.auto == :heavy
@@ -29,6 +30,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
     assert mipro.config.search_fidelity == :dspy_3_2_1_optuna_4_9_0
     assert mipro.config.program_aware_proposer
     assert mipro.max_errors == 10_000
+    assert mipro.max_concurrency == 1
 
     gepa = GepaStudyCondition.optimizer!(:gepa_v0_1_4_no_merge, prepared, 17)
     assert gepa.execution_profile == :gepa_v0_1_4
@@ -37,6 +39,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
     assert gepa.minibatch_size == 3
     assert gepa.module_selector == :round_robin
     refute gepa.use_merge
+    assert gepa.max_concurrency == 1
+    assert prepared.outer_max_concurrency == 8
 
     assert prepared.loaded.test_count == 150
     refute Map.has_key?(prepared.loaded, :test)
