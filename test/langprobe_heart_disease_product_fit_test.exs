@@ -72,6 +72,27 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseProductFitTest do
            }
   end
 
+  test "pinned LangProBe split is a disjoint exact-source partition" do
+    data = Heart.data!()
+
+    assert Enum.map([:train, :selection, :test], &length(data[&1])) == [15, 136, 152]
+
+    ids =
+      Enum.flat_map(
+        [:train, :selection, :test],
+        &Enum.map(data[&1], fn row -> Imp.get(row, :id) end)
+      )
+
+    assert length(ids) == 303
+    assert MapSet.size(MapSet.new(ids)) == 303
+    assert Imp.get(hd(data.train), :id) == "heart-source-203"
+    assert Imp.get(hd(data.selection), :id) == "heart-source-231"
+    assert Imp.get(hd(data.test), :id) == "heart-source-201"
+
+    assert get_in(data.receipt, ["splits", "train", "ordered_canonical_jsonl_sha256"]) ==
+             "3923fc709c3ba8349d50f6617cab8553da2b50117965dfc195bcc7698bdef362"
+  end
+
   @tag :evidence_infrastructure
   test "pinned DSPy 3.2.1 runs the same four-predictor product shape and fresh state" do
     python = Path.expand("tmp/dspy-parity-venv/bin/python")

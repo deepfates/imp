@@ -15,6 +15,8 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
   @uci_doi "10.24432/C52P4X"
   @uci_license "CC BY 4.0"
   @uci_archive_sha256 "b17cd273da9ce1caa4710fce80227ea454d4dbf9fcbc8e6a9121672751563adc"
+  @dataset_path Path.join(__DIR__, "langprobe_heart_disease.csv")
+  @split_path Path.join(__DIR__, "langprobe_heart_disease_split.json")
   @components [:opinion_1, :opinion_2, :opinion_3, :vote]
   @input_fields [
     :age,
@@ -78,6 +80,43 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
     }
   end
 
+  def data!(dataset_path \\ @dataset_path, split_path \\ @split_path) do
+    assert_sha256!(dataset_path, @langprobe_dataset_sha256, "LangProBe Heart Disease dataset")
+    receipt = split_path |> File.read!() |> Jason.decode!()
+
+    unless get_in(receipt, ["authority", "source_lf_sha256"]) == @langprobe_dataset_sha256 do
+      raise ArgumentError,
+            "LangProBe Heart Disease split receipt does not bind the pinned dataset"
+    end
+
+    examples =
+      dataset_path
+      |> Imp.Datasets.csv(@input_fields)
+      |> Enum.with_index()
+      |> Map.new(fn {example, index} -> {index, normalize_source_example(example, index)} end)
+
+    splits =
+      Map.new(["train", "selection", "test"], fn name ->
+        indices = get_in(receipt, ["splits", name, "source_indices"])
+        expected_count = get_in(receipt, ["splits", name, "count"])
+
+        unless is_list(indices) and length(indices) == expected_count do
+          raise ArgumentError, "invalid #{name} split in LangProBe Heart Disease receipt"
+        end
+
+        {String.to_existing_atom(name), Enum.map(indices, &Map.fetch!(examples, &1))}
+      end)
+
+    all_ids = splits |> Map.values() |> List.flatten() |> Enum.map(&Imp.Example.fetch!(&1, :id))
+
+    unless length(all_ids) == 303 and MapSet.size(MapSet.new(all_ids)) == 303 do
+      raise ArgumentError,
+            "LangProBe Heart Disease split receipt is not a disjoint full partition"
+    end
+
+    Map.put(splits, :receipt, receipt)
+  end
+
   @impl true
   def optimizer_predictors(%__MODULE__{} = program) do
     Enum.map(@components, fn name -> {name, Map.fetch!(program, name).predict} end)
@@ -127,6 +166,9 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
   end
 
   def input_fields, do: @input_fields
+
+  def dataset_path, do: @dataset_path
+  def split_path, do: @split_path
 
   defp predictor(signature, lm, adapter, config, name, temperature) do
     config =
@@ -182,5 +224,59 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
     |> String.downcase()
     |> String.trim()
     |> String.trim_trailing(".")
+  end
+
+  defp normalize_source_example(example, index) do
+    mappings = %{
+      sex: %{"0" => "female", "1" => "male"},
+      cp: %{
+        "1" => "typical angina",
+        "2" => "atypical angina",
+        "3" => "non-anginal pain",
+        "4" => "asymptomatic"
+      },
+      restecg: %{
+        "0" => "normal",
+        "1" => "ST-T wave abnormality",
+        "2" => "left ventricular hypertrophy"
+      },
+      exang: %{"0" => "no", "1" => "yes"},
+      slope: %{"1" => "upsloping", "2" => "flat", "3" => "downsloping"},
+      thal: %{"3" => "normal", "6" => "fixed defect", "7" => "reversible defect"}
+    }
+
+    normalized =
+      Enum.reduce(mappings, example, fn {field, mapping}, current ->
+        Imp.Example.put(
+          current,
+          field,
+          Map.get(mapping, Imp.Example.fetch!(current, field), Imp.Example.fetch!(current, field))
+        )
+      end)
+
+    answer = Map.fetch!(%{"0" => "no", "1" => "yes"}, Imp.Example.fetch!(normalized, :target))
+
+    normalized
+    |> Imp.Example.delete(:target)
+    |> Imp.Example.put(:answer, answer)
+    |> Imp.Example.put(:id, "heart-source-#{index}")
+    |> Imp.Example.with_inputs(@input_fields)
+  end
+
+  defp assert_sha256!(path, expected, label) do
+    bytes = File.read!(path)
+
+    # Git keeps the repository mirror newline-terminated. The pinned
+    # Hugging Face LFS object is the same CSV without that final byte.
+    source_bytes =
+      if String.ends_with?(bytes, "\n"),
+        do: binary_part(bytes, 0, byte_size(bytes) - 1),
+        else: bytes
+
+    actual = source_bytes |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
+
+    unless actual == expected do
+      raise ArgumentError, "#{label} SHA-256 drift: expected #{expected}, got #{actual}"
+    end
   end
 end

@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import random
 import zipfile
 
 
@@ -50,7 +51,37 @@ def feature_key(values) -> tuple[str, ...]:
     return tuple(normalized_number(value) for value in values)
 
 
-def audit(langprobe_path: Path, tensorflow_path: Path, uci_archive_path: Path) -> dict:
+def canonical_row(row: dict[str, str]) -> bytes:
+    return json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+
+
+def ordered_split_receipt(benchmark_rows: list[dict[str, str]]) -> dict:
+    indices = list(range(len(benchmark_rows)))
+    random.Random(0).shuffle(indices)
+    split_indices = {
+        "train": indices[:15],
+        "selection": indices[15:151],
+        "test": indices[151:],
+    }
+
+    return {
+        name: {
+            "count": len(selected),
+            "source_indices": selected,
+            "ordered_canonical_jsonl_sha256": sha256(
+                b"".join(canonical_row(benchmark_rows[index]) + b"\n" for index in selected)
+            ),
+        }
+        for name, selected in split_indices.items()
+    }
+
+
+def audit(
+    langprobe_path: Path,
+    tensorflow_path: Path,
+    uci_archive_path: Path,
+    split_receipt_path: Path | None = None,
+) -> dict:
     langprobe_bytes = langprobe_path.read_bytes()
     tensorflow_bytes = tensorflow_path.read_bytes()
     uci_bytes = uci_archive_path.read_bytes()
@@ -86,6 +117,12 @@ def audit(langprobe_path: Path, tensorflow_path: Path, uci_archive_path: Path) -
     assert sum("?" in row for row in official_rows) == 6
     assert all(int(benchmark["target"]) == (int(official[13]) >= 2) for benchmark, official in matched)
 
+    splits = ordered_split_receipt(benchmark_rows)
+    if split_receipt_path is not None:
+        frozen = json.loads(split_receipt_path.read_text())
+        assert frozen["authority"]["source_lf_sha256"] == LANGPROBE_LF_SHA256
+        assert frozen["splits"] == splits
+
     target_cross = {}
     for benchmark, official in matched:
         key = f"uci_{official[13]}__benchmark_{benchmark['target']}"
@@ -103,6 +140,7 @@ def audit(langprobe_path: Path, tensorflow_path: Path, uci_archive_path: Path) -
         "langprobe_lf_sha256": sha256(langprobe_bytes),
         "tensorflow_crlf_sha256": sha256(tensorflow_bytes),
         "uci_archive_sha256": sha256(uci_bytes),
+        "splits": splits,
     }
 
 
@@ -111,8 +149,14 @@ def main() -> None:
     parser.add_argument("--langprobe-csv", required=True, type=Path)
     parser.add_argument("--tensorflow-csv", required=True, type=Path)
     parser.add_argument("--uci-archive", required=True, type=Path)
+    parser.add_argument("--split-receipt", type=Path)
     args = parser.parse_args()
-    print(json.dumps(audit(args.langprobe_csv, args.tensorflow_csv, args.uci_archive), sort_keys=True))
+    print(
+        json.dumps(
+            audit(args.langprobe_csv, args.tensorflow_csv, args.uci_archive, args.split_receipt),
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":
