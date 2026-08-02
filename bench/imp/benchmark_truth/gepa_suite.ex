@@ -191,10 +191,11 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
     label = "Imp GEPA #{spec["family"]} row"
     validate_retrieval!(spec, label)
     root = get_in(execution, ["retrieval", "root"])
+    receipt = get_in(execution, ["retrieval", "authenticated_receipt"])
 
     retrieval =
       if is_binary(root) do
-        spec["retrieval"]
+        (receipt || spec["retrieval"])
         |> Map.update!("corpus_path", &Path.expand(&1, root))
         |> Map.update!("index_path", &Path.expand(&1, root))
       else
