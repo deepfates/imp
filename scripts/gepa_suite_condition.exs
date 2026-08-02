@@ -469,7 +469,7 @@ defmodule Imp.GepaSuiteConditionCLI do
           index: index,
           input_sha256: canonical_sha256(inputs),
           score: row.score,
-          error: if(is_nil(row.error), do: nil, else: Imp.Redaction.redact(row.error))
+          error: redacted_error(row.error)
         }
       end)
 
@@ -524,7 +524,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       arm: config.arm,
       seed: config.seed,
       stage: :optimize_or_heldout,
-      error: Imp.Redaction.redact(error),
+      error: redacted_error(error),
       usage: usage,
       wall_time_us: wall_time_us,
       spend_admission: reservation
@@ -542,7 +542,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       arm: config.arm,
       seed: config.seed,
       stage: :fresh_service,
-      error: Imp.Redaction.redact(error),
+      error: redacted_error(error),
       usage: usage,
       wall_time_us: wall_time_us
     })
@@ -580,7 +580,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       "input_tokens" => delta["input_tokens"],
       "output_tokens" => delta["output_tokens"],
       "cost_usd" => delta["cost_usd"],
-      "error" => if(successful?, do: nil, else: Imp.Redaction.redact(Map.get(metadata, :error)))
+      "error" => if(successful?, do: nil, else: redacted_error(Map.get(metadata, :error)))
     }
 
     Agent.update(usage, fn state ->
@@ -643,6 +643,31 @@ defmodule Imp.GepaSuiteConditionCLI do
       if is_number(value), do: value
     end)
   end
+
+  defp redacted_error(nil), do: nil
+
+  defp redacted_error(error) do
+    redacted = Imp.Redaction.redact(error)
+
+    type =
+      case error do
+        %{__struct__: module} -> inspect(module)
+        _ -> error |> elem_type() |> inspect()
+      end
+
+    %{
+      "type" => type,
+      "fingerprint_sha256" =>
+        :crypto.hash(:sha256, :erlang.term_to_binary(redacted)) |> Base.encode16(case: :lower)
+    }
+  end
+
+  defp elem_type(value) when is_atom(value), do: :atom
+  defp elem_type(value) when is_binary(value), do: :binary
+  defp elem_type(value) when is_list(value), do: :list
+  defp elem_type(value) when is_tuple(value), do: :tuple
+  defp elem_type(value) when is_map(value), do: :map
+  defp elem_type(_value), do: :term
 
   defp retrieval_disclosure(config, %{"retrieval" => historical}) do
     receipt = config.retrieval_receipt |> File.read!() |> Jason.decode!()
@@ -755,7 +780,14 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp json_safe(value) when is_map(value),
     do: Map.new(value, fn {key, item} -> {to_string(key), json_safe(item)} end)
 
-  defp json_safe(value) when is_list(value), do: Enum.map(value, &json_safe/1)
+  defp json_safe(value) when is_list(value) do
+    try do
+      Enum.map(value, &json_safe/1)
+    rescue
+      FunctionClauseError -> inspect(Imp.Redaction.redact(value), limit: 50, printable_limit: 500)
+    end
+  end
+
   defp json_safe(value) when is_tuple(value), do: value |> Tuple.to_list() |> json_safe()
   defp json_safe(nil), do: nil
   defp json_safe(value) when is_boolean(value), do: value
