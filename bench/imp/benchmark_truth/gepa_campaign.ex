@@ -1,17 +1,11 @@
 defmodule Imp.BenchmarkTruth.GepaCampaign do
   @moduledoc false
 
-  alias Imp.Adapter.Chat
-
   alias Imp.BenchmarkTruth.{
     ArtifactFile,
     GepaComponentFeedback,
     GepaMetrics,
-    HotpotMultiHop,
-    HoverBM25,
-    HoverMultiHop,
-    IFBenchTwoStage,
-    Papillon,
+    GepaSuite,
     RunContext
   }
 
@@ -636,7 +630,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
       trainset = Imp.Datasets.jsonl(paths.train, input_keys)
       devset = Imp.Datasets.jsonl(paths.dev, input_keys)
       test_count = jsonl_row_count!(paths.test)
-      validate_family_spec!(spec)
+      GepaSuite.validate_spec!(spec)
 
       seed_context = %{
         spec: spec,
@@ -980,7 +974,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
     } = context
 
     metric = GepaMetrics.metric(spec, judge_lm: judge_lm)
-    program = program_for(spec, lm, execution)
+    program = GepaSuite.program!(spec, lm, execution)
 
     feedback_metric =
       GepaMetrics.metric_with_feedback(spec,
@@ -1284,76 +1278,6 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
   defp generation_limit(:metric_budget, metric_budget), do: metric_budget
   defp generation_limit(generations, _metric_budget), do: generations
-
-  defp program_for(
-         %{"upstream_metric" => "hover_utils.discrete_retrieval_eval"} = spec,
-         lm,
-         execution
-       ) do
-    retrieval = Map.fetch!(spec, "retrieval")
-
-    if get_in(execution, ["retrieval", "hover_upstream_bm25"]) == true do
-      HoverMultiHop.new(lm, retrieval, upstream_python: true)
-    else
-      HoverMultiHop.new(lm, retrieval)
-    end
-  end
-
-  defp program_for(%{"program" => "HotpotMultiHop"} = spec, lm, execution) do
-    retrieval = Map.fetch!(spec, "retrieval")
-
-    if get_in(execution, ["retrieval", "hover_upstream_bm25"]) == true do
-      python = get_in(execution, ["retrieval", "python"]) || "python3"
-      HotpotMultiHop.integration(lm, retrieval, python: python)
-    else
-      retriever = HoverBM25.new(retrieval, k: 7)
-      HotpotMultiHop.new(lm, retriever)
-    end
-  end
-
-  defp program_for(%{"program" => "IFBenchCoT2StageProgram"}, lm, execution) do
-    config =
-      if get_in(execution, ["lm", "json_fallback"]) == false,
-        do: [json_fallback: false],
-        else: []
-
-    IFBenchTwoStage.new(lm, adapter: Chat, config: config)
-  end
-
-  defp program_for(%{"program" => "PAPILLON"}, lm, _execution) do
-    Papillon.new(lm, lm: lm, adapter: Chat)
-  end
-
-  defp program_for(%{"program" => "CoT"} = spec, lm, _execution) do
-    spec["signature"]
-    |> Imp.signature(spec["instructions"])
-    |> Imp.chain_of_thought(lm: lm, adapter: Chat)
-  end
-
-  defp program_for(spec, _lm, _execution) do
-    raise ArgumentError,
-          "unsupported GEPA campaign program #{inspect(spec["program"])} for #{inspect(spec["family"])}"
-  end
-
-  defp validate_family_spec!(%{"upstream_metric" => "hover_utils.discrete_retrieval_eval"} = spec) do
-    unless hover_retrieval_provenance?(spec["retrieval"]) do
-      raise ArgumentError,
-            "Imp GEPA hoverBench row requires source-exact BM25/wiki retrieval provenance"
-    end
-
-    Imp.BenchmarkTruth.HoverBM25.verify_source!(spec["retrieval"])
-  end
-
-  defp validate_family_spec!(%{"program" => "HotpotMultiHop"} = spec) do
-    unless hover_retrieval_provenance?(spec["retrieval"]) do
-      raise ArgumentError,
-            "Imp GEPA HotpotQABench row requires source-exact BM25/wiki retrieval provenance"
-    end
-
-    Imp.BenchmarkTruth.HoverBM25.verify_source!(spec["retrieval"])
-  end
-
-  defp validate_family_spec!(_spec), do: :ok
 
   defp checkpoint_path(checkpoint_dir, campaign_id, family) do
     Path.join(checkpoint_dir, stable_slug("#{campaign_id}-#{family}") <> ".json")

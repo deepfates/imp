@@ -74,6 +74,32 @@ IFBench. Together with the retained structured Optimize Anything result, it
 tests capability that a static benchmark table does not. Neither Grue nor OA
 substitutes for the matched standard table.
 
+Provider-free audit has now exercised the actual six-task source boundary
+rather than trusting the old campaign manifest. All six official exports
+reproduce byte-for-byte from `gepa-ai/gepa-artifact@cbefbc1`: AIME
+`45/45/150`, HotPotQA `150/300/300`, HoVer `150/300/300`, IFBench
+`150/300/294`, LiveBench Math `121/121/126`, and PAPILLON `111/111/221`.
+The current stable upstream is DSPy `3.2.1@29448ae`; its native MIPROv2 heavy
+path and the explicitly authenticated standalone GEPA `0.1.4@8b0ce6c` path
+are both provider-free executable. Imp already implements the corresponding
+heavy MIPRO settings and pinned GEPA no-merge execution profile. The missing
+capability is therefore a symmetric thin condition runner and full-table
+execution, not another optimizer implementation or task adapter.
+
+The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
+official metric-call opportunities; legal GEPA iteration completion; and one
+held-out evaluation per arm, one runtime/seed permits at most `52,614` program
+evaluations, expanding through the official graphs to `163,008` task-model
+transports plus `16,890` PAPILLON judge transports. Three fixed seeds across
+Imp and DSPy therefore permit `978,048` task transports and `101,340` judge
+transports before optimizer-model proposals/reflections. These are derived
+opportunities, not observed calls or a spend authorization. A current dated
+DeepSeek V4 Flash route is the leading single-model treatment candidate because
+active ZDR endpoints support the required temperature and structured-output
+parameters at a price compatible with completing the table; exact endpoint,
+request envelope, repetition contract, and spend cap remain to be frozen after
+the thin provider-free paths pass.
+
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
 new untouched executable rows from `3/6` to `5/6`, retained baseline in the
