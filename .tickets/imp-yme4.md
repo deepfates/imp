@@ -150,6 +150,15 @@ labels frozen-catalog request cost from explicit LLMDB pricing components;
 the immutable run keeps exact tokens plus the `$0.452989096` shared-account
 window delta rather than inventing an exact Imp bill.
 
+The next LiveBench Math pair completed under an invalid shared-capacity
+treatment: the concurrent launcher permitted eight requests per runtime and
+the exact route rate-limited 31 Imp transports and 61 DSPy rows. Its apparent
+`38/126` versus `26/126` difference is excluded from the table. The separately
+retained correction caps each runtime at four so the combined pair stays at
+the already-healthy eight-request envelope; it changes no scientific input,
+metric, model, route, output limit, or seed. Repeated throttling will reject
+the endpoint rather than trigger another concurrency ratchet.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent

@@ -332,6 +332,25 @@ telemetry `frozen_catalog_calculated`; it does not rewrite this result or claim
 provider-billed cost. This bounded accounting repair must not delay the next
 baseline family.
 
+The first LiveBench Math pair from `b13bba9a` completed but is scientifically
+null because the concurrent launch exceeded the exact route's realized burst
+capacity. Imp scored `38/126` and DSPy `26/126`, with 13 Imp-only wins, one
+DSPy-only win, and 112 ties, but Imp retained 31 request exceptions while 61
+DSPy rows failed with `RateLimitError`. Another 57 Imp rows and 15 DSPy rows
+failed ordinary parsing. The unequal provider throttling is a treatment-level
+information/opportunity difference, not framework quality. Preserve Result
+hashes `cac40c92...be38` / `259a382a...6525` and progress hashes
+`e32d0a2d...7bde` / `73b74ef0...d9ed`; the account window moved
+`$0.152668544`. Do not admit the scores into the table.
+
+The owning correction is operational and result-independent: the AIME pair
+showed that eight total concurrent requests are healthy, while this launch
+allowed eight per runtime. A separately retained successor therefore uses
+four per runtime, keeping the combined envelope at eight without changing
+rows, model, endpoint, prompts, metric, output cap, seed, or no-retry policy.
+If material throttling recurs, stop this endpoint rather than reducing the
+scientific workload again.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program
