@@ -89,16 +89,20 @@ execution, not another optimizer implementation or task adapter.
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program
-evaluations, expanding through the official graphs to `163,008` task-model
-transports plus `16,890` PAPILLON judge transports. Three fixed seeds across
-Imp and DSPy therefore permit `978,048` task transports and `101,340` judge
-transports before optimizer-model proposals/reflections. These are derived
-opportunities, not observed calls or a spend authorization. A current dated
-DeepSeek V4 Flash route is the leading single-model treatment candidate because
-active ZDR endpoints support the required temperature and structured-output
-parameters at a price compatible with completing the table; exact endpoint,
-request envelope, repetition contract, and spend cap remain to be frozen after
-the thin provider-free paths pass.
+evaluations. The official graphs plus four fresh calls for each selected arm
+expand that into `163,128` task-model transports and `16,890` PAPILLON judge
+transports. Pinned Heavy MIPRO program-aware grounding permits another `439`
+proposal transports, while GEPA's boundary-checked batch-to-single failure
+policy permits `14,966` reflection transports. Three fixed seeds across Imp and
+DSPy therefore permit exactly `1,172,538` total transports: `978,768` task,
+`101,340` judge, `2,634` MIPRO proposal, and `89,796` GEPA reflection. The
+provider-free `GepaStudyPlan` recomputes this from the source receipts and
+optimizer budget functions; these are legal opportunities, not observed calls
+or spend authority. The dated `deepseek/deepseek-v4-flash-0731` model remains
+the leading single-model treatment candidate. The live ZDR catalog currently
+shows Fireworks as the active endpoint with the required temperature and
+structured-output parameters; exact request envelopes and spend cap remain to
+be frozen after the thin provider-free paths pass.
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
