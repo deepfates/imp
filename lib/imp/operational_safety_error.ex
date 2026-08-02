@@ -33,7 +33,11 @@ defmodule Imp.OperationalSafetyError do
     Enum.find_value(map, fn {_key, value} -> find(value) end)
   end
 
-  def find(list) when is_list(list), do: Enum.find_value(list, &find/1)
+  # Provider and adapter failures may contain improper lists. Traverse cons
+  # cells directly so classifying an ordinary failure cannot itself crash at
+  # the operational-safety boundary.
+  def find([]), do: nil
+  def find([head | tail]), do: find(head) || find(tail)
   def find(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> Enum.find_value(&find/1)
   def find(_value), do: nil
 
