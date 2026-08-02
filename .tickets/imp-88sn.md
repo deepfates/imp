@@ -386,6 +386,20 @@ capacity treatment, not a scientific result. Continuing the table now requires
 a separately frozen healthy ZDR endpoint; it does not permit another Novita
 retry or a hidden concurrency reduction.
 
+The separately frozen continuation uses OpenRouter's `io-net/fp8` endpoint for
+both runtimes. At the 2026-08-02 preflight it serves the same dated
+`deepseek/deepseek-v4-flash-20260731` snapshot, is present in the ZDR catalog,
+reports status 0, no implicit caching, fp8 quantization, 100% five-minute and
+99.83% thirty-minute uptime, and supports the required temperature,
+reasoning-effort, and output-token parameters. Its maximum prices are
+`$0.18/M` input and `$0.34/M` output. This is an explicit provider treatment
+change caused by two null Novita capacity failures, not an in-condition
+fallback or a score-conditioned choice. LiveBench remains the same ordered
+126 rows, prompts, metric, model alias, seed, output/content envelopes,
+no-retry policy, and balanced four-per-runtime concurrency. The conservative
+study charge entering this run is `$10.750422894`; the full fallback-aware
+LiveBench pair remains below the owner's combined `$20` cap.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program

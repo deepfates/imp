@@ -174,6 +174,13 @@ for the remaining table. These partial outcomes are excluded, and the next
 table arm must use a separately frozen currently healthy ZDR endpoint rather
 than another concurrency reduction or retry of this route.
 
+The continuation is explicitly refrozen to the currently healthy ZDR
+`io-net/fp8` endpoint at `$0.18/M` input and `$0.34/M` output. It serves the
+same dated model snapshot with no implicit cache and preserves the frozen
+rows, prompts, metric, seed, envelopes, no-retry rule, and matched
+four-per-runtime concurrency. This is a named provider treatment change after
+two null capacity failures, not a hidden fallback.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent
