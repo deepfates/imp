@@ -111,6 +111,22 @@ passes. This proves the real fork/evaluator/Artifact/restart/OTP mechanics, not
 live-model usefulness, generalization across held-out saves, or the eventual
 preregistered optimizer result.
 
+Grue commit `dc3d756` now freezes the corresponding real condition rather than
+another planted single frontier. It deterministically derives 24 native saves
+one command before noninitial checkpoints across Zork I, II, and III and assigns
+per-game hash-ordered thirds: 8 train, 8 selection, and 8 test. Every row binds
+the exact story digest, route digest, save bytes, pre-save observation, banked
+progress, and one-action horizon; the gold suffix is used only to verify that
+the native checkpoint is reachable and is never an optimizer input. The local
+canonical receipt SHA-256 is
+`838734688374979b7d44fc254d2bff9ed7480746038e4cf69caf46012bc812b0`
+and reproduces byte-for-byte in a separate materialization. This work also
+fixed a real evaluator defect: issuing `LOOK` after restore can consume a move
+and alter timed or combat state, so new rows use the exact observation captured
+at save time. Grue's integration gate and the focused real-action check pass.
+The historical routes themselves are not claimed unseen; this is a result-blind
+new save/split freeze and still has no live optimizer outcome.
+
 Provider-free audit has now exercised the actual six-task source boundary
 rather than trusting the old campaign manifest. All six official exports
 reproduce byte-for-byte from `gepa-ai/gepa-artifact@cbefbc1`: AIME

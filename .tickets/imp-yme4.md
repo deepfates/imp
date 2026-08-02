@@ -97,6 +97,14 @@ the missing current-model comparative results. The immediate frontier is now
 model/route/envelope/cost ratification followed by the preregistered table—not
 more adapters, benchmark controllers, or packaging work.
 
+Grue commit `dc3d756` additionally turns the planted mechanism into a real
+provider-free condition substrate: 24 authenticated native saves across Zork
+I–III, split 8/8/8 by a result-blind per-game rule, with exact story/route/save
+identity and a byte-reproducible receipt. It also removes a mutating post-restore
+`LOOK` from the new evaluator path by binding the observation at save time.
+This is the prerequisite for the live Grue optimizer proof, not that proof or
+a usefulness claim.
+
 The first live-run audit found and repaired a real opportunity mismatch before
 spend: both entrances had evaluated baseline and selected programs inside every
 arm even though the source-derived plan declares one held-out score per arm,
