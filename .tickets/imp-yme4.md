@@ -213,35 +213,51 @@ second tracking system:
    passes with the scope above; long-running recovery, overload behavior, and
    external acceptance remain open and should be tested through ordinary use,
    not a new operations campaign.
-3. **Choose the representative scientific tranche.** MuSiQue is the leading
-   reference design, not an irreversible task commitment. It is an adapted
-   current-source study rather than a paper
-   replication, but it preserves the central MIPRO construct: joint instruction
-   and demonstration optimization across a real two-stage program with only a
+3. **Ratify a staged representative scientific portfolio.** Preserve matched
+   TREC as the existing direct optimizer comparison and structured retry-policy
+   OA as the existing scoped non-prompt positive. Treat Banking77 and HotPotQA
+   as terminal outcomes for their exact Imp treatments, not matched DSPy losses
+   or exhausted tasks; only IFBench's Imp effectiveness interpretation is
+   invalid/unverified. Evaluate one cheap original-MIPRO paper anchor. Heart
+   Disease is the current candidate because the paper used a `120/183` split
+   and four-predictor program, but Imp currently has only a four-row
+   single-predictor smoke; proceed only if the exact source and program remain
+   an ordinary thin matched path. Use MuSiQue,
+   or a demonstrably better alternative, for the serious current-source
+   multi-stage matched comparison. Defer a much larger GEPA paper-family
+   HoVer/HotPotQA arm until an outcome-blind cost pilot justifies it. This is a
+   claim sequence, not a four-campaign checklist.
+
+   MuSiQue is an adapted current-source study rather than a paper replication,
+   but it preserves the central MIPRO construct: joint instruction and
+   demonstration optimization across a real two-stage program with a
    program-level metric. Its `700/300/2,417` train/selection/held-out scale is
-   serious rather than a tiny fixture, but the exact seed/repetition allocation
-   is not currently ratified. Treat official-split,
-   source-row-disjoint, treatment-unseen dev as the held-out boundary with the
-   scorer audit and semantic overlap disclosed. Keep the retained positive OA
-   condition and clean Banking77/HotPot negatives separate. Run the matched Imp
-   and pinned-DSPy arms unconditionally if the intended claim is a matched
-   comparison; result-conditioned comparator spend would weaken that claim. A
-   passing MuSiQue result can satisfy `imp-88sn`'s missing realistic multi-stage
-   condition, but remains one arm rather than broad epic-level portfolio
-   completion. Before spend, retain explicit freedom over claim, task,
-   optimizer, comparator, scale, model, and provider. Prefer another lane if
-   primary-source review shows it can answer a more important question through
-   a thinner ordinary path or a materially better cost/credibility tradeoff.
+   serious rather than a tiny fixture. Treat official-split, source-row-disjoint,
+   treatment-unseen dev as the held-out boundary with the scorer audit and
+   semantic overlap disclosed. Run matched Imp and pinned-DSPy arms
+   unconditionally if the intended claim is comparative; result-conditioned
+   comparator spend would weaken it. A passing MuSiQue result can satisfy
+   `imp-88sn`'s missing realistic multi-stage condition, but remains one arm
+   rather than broad epic-level portfolio completion. Before spend, retain
+   explicit freedom over claim, task, optimizer, comparator, scale, model, and
+   provider. Prefer another lane if primary-source review shows it can answer a
+   more important question through a thinner ordinary path or a materially
+   better cost/credibility tradeoff.
    Keep a separate cheaper release milestone available: the matched TREC row
    outcomes are now compact and independently recomputable, and can support an
    honest experimental package story alongside OA, clean negatives, and the
    scoped operational probes once an independent consumer validates the cold
    path. That milestone does not satisfy the missing multi-stage usefulness
-   criterion and does not make MuSiQue mandatory. Before paying for MuSiQue,
-   justify optimizer seeds, held-out size, and inference repetitions against the
-   intended precision and the exact claim. The public stage-specific repetition
-   policy makes repeated selection plus a single full held-out pass possible
-   without choosing that design by inertia.
+   criterion and does not make MuSiQue mandatory. The MIPRO paper's five runs,
+   task-specific `20–50` full-evaluation budgets, and paired analysis are
+   precedent, not proof that the local `>= 0.05` / three-seed / two-positive
+   heuristic is a standard. Before paying for MuSiQue, ratify a task-native
+   primary outcome, smallest effect worth caring about, run count, held-out
+   size, and inference repetitions against the exact claim. MuSiQue officially
+   reports answer F1 and support F1 separately; any combined optimizer scalar
+   must remain an explicitly adapted objective. The public stage-specific
+   repetition policy makes repeated selection plus a single full held-out pass
+   possible without choosing that design by inertia.
 4. **Authenticate the chosen arm before spend.** Bind both runtimes to the
    exact route, model, privacy, cache, fallback, and fixed scientific
    opportunity through existing task-owned paths. Use one prospective spend

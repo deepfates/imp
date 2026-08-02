@@ -18,7 +18,7 @@ Obstacle: Imp has one narrow historical positive matched result, several honest 
 
 Freeze a small current-source portfolio before provider calls. A realistic multi-stage language-model program materially improves its own baseline on source-disjoint untouched test data across enough seeds to expose instability, with at least three seeds, selection-only choice, and a reusable artifact that loads and serves in a fresh process. A genuinely proposer-generated non-prompt artifact mutation also improves untouched executable behavior. Each problem class uses its ordinary public optimizer lifecycle, and both converge on the shared portable Artifact and fresh-consumer boundary. Where a named algorithm has an upstream equivalent, matched arms receive the same information, opportunity, and budget. Report row and seed uncertainty separately, retain clean negative outcomes, and preserve enough raw evidence for independent recomputation. Unit fixtures, historical-source results, and harness completion cannot satisfy this ticket.
 
-## Current status after `51b46ef0`
+## Current status
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the
@@ -63,26 +63,44 @@ with the scorer audit and semantic overlap disclosed. It does not mean globally
 unread bytes or semantic-content disjointness. This resolves the claim meaning;
 it does not authorize provider work or spend.
 
-Principal review now treats MuSiQue as the leading hero-tranche reference after
-the meaningful DSPy capability audit, direct operational comparison, and an
-outside-view comparison with the MIPRO benchmark. This is not ratification by
-readiness momentum. Banking77 and HotPot are exhausted clean negatives; IFBench
-is invalid; BFCL lacks an official optimization split and thin native scorer;
-Circle is a single deterministic mechanism instance; GSM8K is not a realistic
-multi-stage program; and HoVer's credible lane is larger and carries a
-retrieval-fixture history. MuSiQue supplies the smallest current repository path
-that combines an official source split, meaningful work in two named stages,
+Primary-source review corrects the earlier candidate ranking. Banking77 and
+HotPotQA are terminal results for their exact Imp treatments, not scientific
+exhaustion of the tasks and not matched evidence against DSPy. IFBench's Imp
+effectiveness interpretation is invalid/unverified; that does not invalidate
+the task or the retained upstream rows. GSM8K is not presently implemented as a
+realistic multi-stage optimizer program, which is a repository fact rather than
+a judgment that it could not become one. BFCL, Circle, and HoVer retain the
+specific limitations recorded below without becoming permanently disqualified
+alternatives through repetition.
+
+MuSiQue remains the strongest currently prepared multi-stage candidate because
+it combines an official source split, meaningful work in two named stages,
 native answer and support metrics, modeled joint instruction/demo search,
 matched pinned DSPy, and the ordinary Result/Artifact/fresh-service lifecycle.
+It is not a mandatory hero tranche. Readiness investment gives it no priority
+over a materially better claim/task/cost design.
 
 The proposed scale is serious rather than automatically mandatory. The MIPRO
 paper used `500` training, `500` development, and up to `2,000` test rows,
-optimizer budgets of `20–50` full evaluations, and five runs per method. This
-adapted condition uses `700/300/2,417` and forty modeled objectives. The exact
-seed and repetition allocation is under review after the public Experiment
-boundary gained independent selection/test repetition counts in `da725f56`.
-It can support an externally legible current-source result; a cheap smoke alone
-cannot satisfy this ticket. If the
+optimizer budgets of `20–50` full evaluations, five runs per method, and paired
+significance analysis. That is relevant precedent, not a universal standard.
+The earlier `>= 0.05` mean lift, three seeds, and two-positive-seed rule was a
+local materiality heuristic introduced for small conditions; it did not come
+from DSPy, MIPRO, GEPA, Banking77, HotPotQA, or MuSiQue. MuSiQue officially
+reports answer F1 and support F1 separately. The current
+`(answer_f1 + support_f1) / 2` optimizer objective and component floors are an
+adapted candidate design, not the official MuSiQue headline.
+
+The prepared condition uses `700/300/2,417` and forty modeled objectives. Its
+exact metric, smallest effect of interest, seed count, and repetition allocation
+remain unratified after the public Experiment boundary gained independent
+selection/test repetition counts in `da725f56`. A serious study should normally
+use five runs, repeat selection only as justified by admission noise, evaluate
+the complete held-out split once per run, report answer/support outcomes
+separately, and compare absolute scores, own-baseline lifts, and
+Imp-minus-DSPy difference-in-lifts with row and run uncertainty. These are
+design recommendations to ratify, not authority encoded by this paragraph. A
+cheap smoke cannot satisfy this ticket. If the
 intended claim is a matched comparison, the Imp and DSPy arms must remain
 unconditional because launching the comparator only after an Imp pass would
 make the comparison result-conditioned. A differently scoped discovery claim
@@ -91,13 +109,26 @@ independent confirmation. If the remaining admission work grows
 into another generic benchmark controller or changes the scientific
 opportunity, reject the lane rather than treating that machinery as progress.
 
-The MuSiQue current-MIPRO design is the leading scientific reference, but is not
-the only allowed tranche, executable, or provider-authorized. It targets this
-ticket's missing realistic multi-stage result, not a complete external
-benchmark portfolio. A materially better task/claim/model/scale design may
-supersede it before spend; readiness investment alone gives it no priority.
+The next portfolio should be staged by claim rather than by accumulated
+readiness. Preserve matched TREC as the existing direct optimizer comparison and
+the retry-policy OA result as the existing scoped non-prompt positive. Before a
+large multi-stage spend, evaluate one cheap original-MIPRO paper anchor. Heart
+Disease is the current candidate because the paper used a `120/183` split and a
+four-predictor clinical-opinion program, but the repository presently has only a
+four-row single-predictor smoke. It qualifies only after the exact dataset and
+program can use ordinary matched paths without new framework work. Then use MuSiQue, or a demonstrably better
+alternative, for the serious current-source multi-stage comparison. A GEPA
+paper-family HoVer/HotPotQA arm follows only if a real cost pilot justifies its
+larger retrieval and reflection opportunity. This sequence is a portfolio
+strategy, not four mandatory campaigns; a failed thinness or cost check removes
+an arm without shrinking the intended external claim.
+
+The MuSiQue current-MIPRO design is therefore neither the only allowed tranche,
+executable, nor provider-authorized. It targets this ticket's missing realistic
+multi-stage result, not a complete external benchmark portfolio. A materially
+better task/claim/model/scale design may supersede it before spend.
 There is also a legitimate cheaper milestone that does not close this ticket:
-publish the already-earned scoped experimental story from matched TREC, the
+document and present the already-earned scoped experimental story from matched TREC, the
 small retry-policy OA result, the clean Banking77/HotPot negatives, and the
 exact artifact/timeout probes. TREC now has committed compact scored-row inputs
 that the ordinary aggregator recomputes directly without the 181 MB private raw
@@ -142,10 +173,12 @@ proved. Most of the added Python route/census modes duplicate a prospective
 benchmark controller and there is still no thin full upstream runner. Preserve
 the verified `47`-call proposer fact, source/scorer/program, compact lifecycles,
 and scientific option; reduce or reject the machinery before any spend request.
-The owner choice is claim and appetite, not whether another proof mode can be
-added: fund one terminal MuSiQue hero tranche after a thin executable path and
-legal bound exist, or ship the cheaper honest experimental evidence while the
-larger usefulness ticket remains open. A negative MuSiQue result ends the lane.
+At this checkpoint the choice was framed as funding one terminal MuSiQue tranche
+after a thin executable path and legal bound existed, or retaining the cheaper
+experimental evidence while the larger usefulness ticket remained open. The
+primary-source correction above supersedes that binary framing with a staged
+portfolio decision. A future negative MuSiQue result would still end that exact
+lane rather than trigger treatment shopping.
 
 ### Principal reduction after independent cold acceptance (`118ae24f`)
 

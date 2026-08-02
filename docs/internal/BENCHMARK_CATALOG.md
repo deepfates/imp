@@ -14,9 +14,11 @@ The commands in this document are source-checkout evidence commands for Imp
 maintainers. They are not part of the Hex package API or a normal application
 install path.
 
-The goal is broad, cheap, repeatable sanity first. Full campaigns are reserved
-for lanes where the smoke and research tiers show that Imp is in the same
-effectiveness ballpark as Python DSPy.
+The goal is a small representative portfolio whose evidence matches the public
+claim. Cheap checks falsify mechanics, source, metric, and cost assumptions; they
+must not become a permanent ladder or screen tasks by whether early outcomes
+look favorable. A full study is justified by claim value and a thin ordinary
+path, not by accumulating harness tiers.
 
 ## Workflow
 
@@ -72,12 +74,18 @@ The sampling harness must preserve:
 
 ## Prioritized Additions
 
-1. **Representative multi-stage optimizer tranche.** Use MuSiQue as the leading
-   reference design while comparing credible alternatives by claim value,
-   ordinary-path thinness, task representativeness, and enforceable cost. Run a
-   chosen lane only after its Imp and comparator paths have bounded transport
-   and owner spend authority. Preserve the result whether positive or negative;
-   do not replace it with more catalog or dashboard machinery.
+1. **Staged matched optimizer portfolio.** Preserve the existing matched TREC
+   result. Evaluate a cheap original-MIPRO paper anchor, with Heart Disease as
+   the current candidate because its paper-scale `120/183` four-predictor
+   condition is small. The existing repository path is only a four-row
+   single-predictor smoke, so first falsify whether the exact source and program
+   remain a thin matched path. Then run one serious current-source
+   multi-stage comparison, with MuSiQue as the strongest prepared candidate but
+   not a mandatory choice. Evaluate a GEPA paper-family HoVer/HotPotQA arm only
+   after an outcome-blind cost pilot justifies its much larger opportunity. For
+   every matched study, report absolute performance, each runtime's own-baseline
+   lift, and Imp-minus-DSPy difference-in-lifts; preserve negative outcomes and
+   do not replace them with more catalog or dashboard machinery.
 2. **Classification/factuality sampler.** Support Colors, Iris/Iris-Typo,
    Heart Disease, PubMedQA/CovidQA-like binary or multiclass rows, and macro-F1
    metrics.
