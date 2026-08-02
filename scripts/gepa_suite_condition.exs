@@ -77,7 +77,15 @@ defmodule Imp.GepaSuiteConditionCLI do
       retrieval_receipt: expand(opts[:retrieval_receipt]),
       retrieval_python: Keyword.get(opts, :retrieval_python, "python3"),
       family: family,
-      arm: String.to_existing_atom(arm),
+      arm:
+        Map.fetch!(
+          %{
+            "baseline" => :baseline,
+            "mipro_v2_heavy" => :mipro_v2_heavy,
+            "gepa_v0_1_4_no_merge" => :gepa_v0_1_4_no_merge
+          },
+          arm
+        ),
       seed: Keyword.get(opts, :seed, 2_026_080_101),
       output: expand(opts[:output]),
       artifact: expand(opts[:artifact]),
@@ -393,6 +401,17 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
   end
 
+  defp optimizer_receipt(:gepa_v0_1_4_no_merge, optimizer) do
+    %{
+      execution_profile: optimizer.execution_profile,
+      max_metric_calls: optimizer.max_metric_calls,
+      max_reflection_calls: optimizer.max_reflection_calls,
+      minibatch_size: optimizer.minibatch_size,
+      module_selector: optimizer.module_selector,
+      use_merge: optimizer.use_merge
+    }
+  end
+
   defp admit_spend!(config) do
     family =
       config.dataset_root
@@ -437,17 +456,6 @@ defmodule Imp.GepaSuiteConditionCLI do
 
     (input * config.input_price_per_million + output * config.output_price_per_million) /
       1_000_000
-  end
-
-  defp optimizer_receipt(:gepa_v0_1_4_no_merge, optimizer) do
-    %{
-      execution_profile: optimizer.execution_profile,
-      max_metric_calls: optimizer.max_metric_calls,
-      max_reflection_calls: optimizer.max_reflection_calls,
-      minibatch_size: optimizer.minibatch_size,
-      module_selector: optimizer.module_selector,
-      use_merge: optimizer.use_merge
-    }
   end
 
   defp evaluation(result) do

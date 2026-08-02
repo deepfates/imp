@@ -20,7 +20,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
       "--retrieval-python",
       Path.join(root, "tmp/dspy-parity-venv/bin/python"),
       "--arm",
-      "gepa_v0_1_4_no_merge"
+      "baseline"
     ]
 
     for family <- Imp.BenchmarkTruth.GepaSuite.families() do
