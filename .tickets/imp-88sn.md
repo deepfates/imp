@@ -99,6 +99,15 @@ episodes through an ordinary OTP owner after a fresh OS restart. This is a new
 clean treatment, not a reinterpretation of the old negative and not a reason to
 add another campaign controller.
 
+The provider-free Grue product boundary is now exercised at Grue commit
+`d36e022`: an actual Zork II save is forked immediately before a native
+checkpoint, the baseline instruction chooses `look`, a planted GEPA instruction
+chooses `pour water in bucket` and raises native marginal checkpoint progress,
+and the selected parameter Artifact reproduces the action and progress in a
+fresh BEAM. This proves the real fork/evaluator/Artifact/restart mechanics, not
+live-model usefulness, generalization across held-out saves, or the eventual
+preregistered optimizer result.
+
 Provider-free audit has now exercised the actual six-task source boundary
 rather than trusting the old campaign manifest. All six official exports
 reproduce byte-for-byte from `gepa-ai/gepa-artifact@cbefbc1`: AIME
@@ -107,9 +116,17 @@ reproduce byte-for-byte from `gepa-ai/gepa-artifact@cbefbc1`: AIME
 The current stable upstream is DSPy `3.2.1@29448ae`; its native MIPROv2 heavy
 path and the explicitly authenticated standalone GEPA `0.1.4@8b0ce6c` path
 are both provider-free executable. Imp already implements the corresponding
-heavy MIPRO settings and pinned GEPA no-merge execution profile. The missing
-capability is therefore a symmetric thin condition runner and full-table
-execution, not another optimizer implementation or task adapter.
+heavy MIPRO settings and pinned GEPA no-merge execution profile. Thin
+single-condition entrances now exist at `fd110664` for pinned DSPy and
+`dc95d028` for Imp. Both authenticate the official six families, construct the
+declared treatments provider-free, and keep held-out JSON undecoded until after
+optimization. The Imp entrance also exercises schema-3 Artifact application
+and four concurrent calls through the ordinary `ProgramServer` in a fresh BEAM.
+The retrieval-bearing tasks use the authenticated current build of the official
+Wiki17/BM25S source (`d8ef9ed4...`) and explicitly do not claim historical byte
+reproduction of the unretained `c35ec786...` index. The remaining capability is
+full-table execution under a ratified current model/route/cost design, not
+another optimizer implementation, task adapter, or campaign controller.
 
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
@@ -123,11 +140,13 @@ DSPy therefore permit exactly `1,172,538` total transports: `978,768` task,
 `101,340` judge, `2,634` MIPRO proposal, and `89,796` GEPA reflection. The
 provider-free `GepaStudyPlan` recomputes this from the source receipts and
 optimizer budget functions; these are legal opportunities, not observed calls
-or spend authority. The dated `deepseek/deepseek-v4-flash-0731` model remains
-the leading single-model treatment candidate. The live ZDR catalog currently
-shows Fireworks as the active endpoint with the required temperature and
-structured-output parameters; exact request envelopes and spend cap remain to
-be frozen after the thin provider-free paths pass.
+or spend authority. The thin provider-free paths now pass. Model assignment is
+still deliberately unfrozen: the historical suite used GPT-4.1 Mini, which is
+not a relevant current headline, while current candidates trade off capability,
+format behavior, reflection quality, and a potentially order-of-magnitude cost
+difference at this scale. Exact dated model aliases, providers, request
+envelopes, a usage pilot if needed, and a prospective condition spend cap must
+be ratified before any table call.
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the

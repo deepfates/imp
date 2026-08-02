@@ -81,6 +81,19 @@ reduce the historical GEPA campaign/controller machinery to thin ordinary
 Imp/DSPy per-task execution. A full-table failure is a product, treatment, or
 scientific finding to classify and act on, not a reason to redefine the table.
 
+The implementation frontier now matches that direction. Commits `17ce87bc`
+through `dc95d028` bind the official six-family source boundary, recompute the
+complete opportunity, construct the exact Imp treatments, and provide thin
+single-condition Imp and pinned-DSPy entrances. Provider-disabled checks cover
+all six tasks without held-out decode; the Imp entrance additionally applies a
+schema-3 Artifact into trusted code and serves four concurrent calls from a
+fresh BEAM. Grue commit `d36e022` independently proves the real forked-save,
+native-progress, Artifact, and fresh-restart mechanics with a planted
+instruction improvement. These are readiness and product-mechanism facts, not
+the missing current-model comparative results. The immediate frontier is now
+model/route/envelope/cost ratification followed by the preregistered table—not
+more adapters, benchmark controllers, or packaging work.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent
