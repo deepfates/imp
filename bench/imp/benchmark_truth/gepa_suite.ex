@@ -62,7 +62,10 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
     retrieval = resolved_retrieval!(spec, execution)
 
     if get_in(execution, ["retrieval", "hover_upstream_bm25"]) == true do
-      HoverMultiHop.new(lm, retrieval, upstream_python: true)
+      HoverMultiHop.new(lm, retrieval,
+        upstream_python: true,
+        python: get_in(execution, ["retrieval", "python"]) || "python3"
+      )
     else
       HoverMultiHop.new(lm, retrieval)
     end
@@ -195,7 +198,8 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
 
     retrieval =
       if is_binary(root) do
-        (receipt || spec["retrieval"])
+        spec["retrieval"]
+        |> authenticated_retrieval(receipt)
         |> Map.update!("corpus_path", &Path.expand(&1, root))
         |> Map.update!("index_path", &Path.expand(&1, root))
       else
@@ -204,6 +208,27 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
 
     HoverBM25.verify_source!(retrieval)
     retrieval
+  end
+
+  defp authenticated_retrieval(retrieval, nil), do: retrieval
+
+  defp authenticated_retrieval(retrieval, %{
+         "retrieval" => %{
+           "extraction" => %{"corpus_sha256" => corpus_sha},
+           "build" => %{"actual_tree_sha256" => index_sha}
+         }
+       }) do
+    retrieval
+    |> Map.put("corpus_checksum", "sha256:" <> corpus_sha)
+    |> Map.put("index_checksum", "sha256:" <> index_sha)
+  end
+
+  defp authenticated_retrieval(_retrieval, receipt) when is_map(receipt) do
+    unless valid_retrieval?(receipt) do
+      raise ArgumentError, "Imp GEPA retrieval receipt is not an authenticated retrieval map"
+    end
+
+    receipt
   end
 
   defp valid_retrieval?(%{
