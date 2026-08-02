@@ -107,6 +107,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
                "output_tokens" => 0,
                "request_duration_us" => 0,
                "request_attempts" => 0,
+               "request_starts" => 0,
                "json_fallbacks" => 0,
                "usage_events" => 0
              }
@@ -198,6 +199,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
           "summary" => %{
             "usage_events" => 0,
             "request_attempts" => 0,
+            "request_starts" => 0,
             "json_fallbacks" => 0,
             "request_duration_us" => 0,
             "input_tokens" => 0,
@@ -209,6 +211,13 @@ defmodule Imp.GepaSuiteConditionCLITest do
           "next_sequence" => 1
         }
       end)
+
+    apply(Imp.GepaSuiteConditionCLI, :handle_runtime_event, [
+      [:req_llm, :request, :start],
+      %{system_time: 1},
+      %{request_id: "request-1", provider: :openrouter, model: %{id: "model"}},
+      usage
+    ])
 
     apply(Imp.GepaSuiteConditionCLI, :handle_runtime_event, [
       [:req_llm, :request, :stop],
@@ -231,13 +240,14 @@ defmodule Imp.GepaSuiteConditionCLITest do
     Agent.stop(usage)
 
     assert state["summary"]["request_attempts"] == 1
+    assert state["summary"]["request_starts"] == 1
     assert state["summary"]["usage_events"] == 1
     assert state["summary"]["json_fallbacks"] == 1
     assert state["summary"]["input_tokens"] == 7
     assert state["summary"]["output_tokens"] == 3
     assert state["summary"]["cost_usd"] == 0.001
 
-    assert progress_path |> File.read!() |> String.split("\n", trim: true) |> length() == 2
+    assert progress_path |> File.read!() |> String.split("\n", trim: true) |> length() == 3
   end
 
   defp sha256(path) do

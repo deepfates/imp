@@ -110,6 +110,22 @@ ordinary JSON-adapter fallback per task stage; observed fallback rates remain
 separate treatment evidence.
 This is the first table tranche, not a pilot or success gate.
 
+The first corrected matched AIME baseline pair is now complete at `6655ef58`
+and exposes a large realized score gap: Imp scored `0.22`
+with 116 errors versus pinned DSPy `0.4666667` with 80 errors on the same 150
+ordered rows. Parsed answers were almost uniformly correct in both runtimes;
+the material difference is format/adapter survival under a reasoning-heavy
+model and 4096-token cap. The run also exposed incomplete concurrent terminal
+telemetry in the Imp observer, although all rows were scored and provider
+usage is retained for part of the opportunity. Exact provider-free replay now
+proves byte-identical Imp/DSPy primary and fallback messages, so the sequential,
+unseeded temperature-1 cohorts cannot support a causal framework-quality claim
+from this pair alone. This is a real measurement frontier, not a reason to skip
+AIME or redefine success. Pause the optimizer arms while response extraction,
+finish-reason handling, telemetry, and runtime-order confounding are classified;
+then run only the smallest balanced matched canary needed before continuing the
+table.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent

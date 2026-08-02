@@ -213,6 +213,60 @@ of `$3.096576`, making the cumulative conservative study upper
 Do not compare or reinterpret the score until a corrected matched Imp/DSPy
 canary proves fallback-aware admission, durable progress, and usage capture.
 
+The corrected matched AIME baseline pair then completed from clean
+`6655ef5860cfd1426a9f7f63bbc8197d87e8b829` on the identical ordered 150 rows,
+seed `2026080101`, DeepSeek V4 Flash 0731 alias and Novita fp8 endpoint,
+temperature `1`, output cap `4096`, and outer concurrency `8`. This completed
+matched canary exposes a large realized baseline score gap rather than
+optimizer effectiveness. Imp scored `0.22`
+(`33/150`) with `116` row errors; pinned DSPy 3.2.1 scored `0.4666667`
+(`70/150`) with `80` AdapterParseErrors. On exact paired row identities DSPy
+won 42, Imp won 5, and 103 tied, for mean Imp-minus-DSPy `-0.2466667`.
+Every non-error DSPy row and 33 of Imp's 34 non-error rows were correct, so the
+observed gap is dominated by response/adapter survival rather than wrong
+parsed mathematics.
+
+A provider-free exact differential now proves that the ordinary Imp and pinned
+DSPy AIME primary Chat messages and their Chat-to-JSON fallback messages are
+byte-identical for the same official row, and that both accept the same planted
+fallback response. The live runs were sequential and the route exposes no
+request seed, so runtime identity is confounded with two independent,
+time-separated temperature-1 completion cohorts. The realized score gap must
+be reported; it cannot yet be attributed to different prompt semantics or
+treated as a causal Imp-versus-DSPy quality estimate. Response extraction and
+finish-reason behavior still require a provider-free vector differential, and
+later comparative execution must balance or interleave runtime order rather
+than relying on one sequential pair.
+
+The private mode-0600 evidence root is
+`benchmarks/results/gepa-suite-aime-baseline-matched-6655ef58-20260802T093217Z`.
+Imp Result/progress SHA-256 values are
+`86670705f66bf0e501ad1b57e236b99b07cc684f95f7b2f9926047b3b2effea0` and
+`80d2f37aa73f8d208368747f493ba00743450694dde4202405fc39bcdb095265`;
+DSPy Result/progress values are
+`af5fde66d81d0989ad68a5b087905f96aac73be5e055322f1f41117d9fd9425e` and
+`404a7b1f25670b280f52c2e04df1f8d6cb1ec77a5930a974948e42c9d07db8fb`.
+DSPy retained 236 exact provider
+transports, 103,618 input tokens, 803,255 output tokens, and `$0.23067296`
+joined provider cost. The shared-key account window moved `$0.914186514`
+across the pair and remains only an aggregate corroboration. Imp's progress
+observer retained only 81 terminal request events and 34 fallback events even
+though the evaluator returned an ordered outcome for all 150 rows with
+`cache: false` configured. ReqLLM request IDs are process-global monotonic
+identities, so the highest observed value is not a valid transport count.
+Exact Imp transport attempts, terminal-event completeness, and attributable
+cost therefore remain unresolved; the concurrent observer is not adequate
+accounting evidence for this run. That evidence defect must be repaired
+prospectively and does not change the retained paired scores.
+
+Do not launch GEPA or MIPROv2 from this checkpoint. Provider-free work must
+first classify the baseline gap at the ordinary response/adapter boundary,
+including reasoning-heavy `finish_reason=length`, Chat-to-JSON fallback, and
+concurrent terminal telemetry. The current facts reject baseline parity for
+this one sequential canary; they do not establish that Imp's baseline
+implementation or optimizer is worse, nor justify changing the official task,
+metric, model, or output cap after seeing the result.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program

@@ -522,6 +522,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       :telemetry.attach_many(
         id,
         [
+          [:req_llm, :request, :start],
           [:req_llm, :request, :stop],
           [:req_llm, :request, :exception],
           [:imp, :adapter, :parse, :json_fallback]
@@ -586,6 +587,19 @@ defmodule Imp.GepaSuiteConditionCLI do
   end
 
   @doc false
+  def handle_runtime_event([:req_llm, :request, :start], _measurements, metadata, usage) do
+    event_record = %{
+      "sequence" => nil,
+      "status" => "started",
+      "request_id" => Map.get(metadata, :request_id),
+      "provider" => json_safe(Map.get(metadata, :provider)),
+      "model" => model_id(Map.get(metadata, :model)),
+      "request_summary" => json_safe(Map.get(metadata, :request_summary))
+    }
+
+    record_runtime_event(usage, event_record, %{"request_starts" => 1})
+  end
+
   def handle_runtime_event(event, measurements, metadata, usage)
       when event in [[:req_llm, :request, :stop], [:req_llm, :request, :exception]] do
     duration = Map.get(measurements, :duration, 0)
@@ -659,6 +673,7 @@ defmodule Imp.GepaSuiteConditionCLI do
     %{
       "usage_events" => 0,
       "request_attempts" => 0,
+      "request_starts" => 0,
       "json_fallbacks" => 0,
       "request_duration_us" => 0,
       "input_tokens" => 0,
