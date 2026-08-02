@@ -1,7 +1,7 @@
 defmodule Imp.GepaSuiteConditionCLI do
   @moduledoc false
 
-  alias Imp.BenchmarkTruth.{GepaStudyCondition, GepaSuite}
+  alias Imp.BenchmarkTruth.{GepaStudyCondition, GepaStudyPlan, GepaSuite}
   alias Imp.Optimizer.Artifact
 
   @arms ~w(baseline mipro_v2_heavy gepa_v0_1_4_no_merge)
@@ -32,6 +32,10 @@ defmodule Imp.GepaSuiteConditionCLI do
           task_max_output_tokens: :integer,
           reflection_max_output_tokens: :integer,
           judge_max_output_tokens: :integer,
+          input_price_per_million: :float,
+          output_price_per_million: :float,
+          initial_cost_usd: :float,
+          max_cost_usd: :float,
           api_key_env: :string,
           provider_disabled_fixture: :boolean,
           run: :boolean,
@@ -90,6 +94,10 @@ defmodule Imp.GepaSuiteConditionCLI do
       task_max_output_tokens: opts[:task_max_output_tokens],
       reflection_max_output_tokens: opts[:reflection_max_output_tokens],
       judge_max_output_tokens: opts[:judge_max_output_tokens],
+      input_price_per_million: opts[:input_price_per_million],
+      output_price_per_million: opts[:output_price_per_million],
+      initial_cost_usd: opts[:initial_cost_usd],
+      max_cost_usd: opts[:max_cost_usd],
       api_key_env: Keyword.get(opts, :api_key_env, "OPENROUTER_API_KEY"),
       provider_disabled_fixture?: Keyword.get(opts, :provider_disabled_fixture, false),
       run?: run?,
@@ -147,20 +155,27 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   defp run!(config, prepared) do
     for key <- [:output], do: required_config!(config, key)
+    reservation = admit_spend!(config)
 
-    optimized = GepaStudyCondition.optimize!(config.arm, prepared, config.seed)
-    heldout = GepaStudyCondition.heldout!(config.arm, prepared, optimized)
+    {wall_time_us, outcome, usage} =
+      capture_runtime(fn ->
+        optimized = GepaStudyCondition.optimize!(config.arm, prepared, config.seed)
+        {optimized, GepaStudyCondition.heldout!(config.arm, prepared, optimized)}
+      end)
 
-    {artifact_sha, fresh_sha} =
+    {optimized, heldout} = unwrap_run!(outcome, config, reservation, wall_time_us, usage)
+
+    {artifact_sha, fresh_sha, fresh_usage} =
       case optimized.artifact do
         nil ->
-          {nil, nil}
+          {nil, nil, empty_runtime()}
 
         artifact ->
           for key <- [:artifact, :fresh_output], do: required_config!(config, key)
           Artifact.write!(artifact, config.artifact)
           fresh_child!(config)
-          {sha256(config.artifact), sha256(config.fresh_output)}
+          fresh = config.fresh_output |> File.read!() |> Jason.decode!()
+          {sha256(config.artifact), sha256(config.fresh_output), fresh["usage"]}
       end
 
     write_private!(config.output, %{
@@ -171,6 +186,9 @@ defmodule Imp.GepaSuiteConditionCLI do
       heldout: evaluation(heldout.result),
       artifact_sha256: artifact_sha,
       fresh_sha256: fresh_sha,
+      usage: merge_runtime(usage, fresh_usage),
+      wall_time_us: wall_time_us,
+      spend_admission: reservation,
       heldout_decoded: true,
       retrieval: retrieval_disclosure(config, prepared.loaded.spec)
     })
@@ -199,22 +217,26 @@ defmodule Imp.GepaSuiteConditionCLI do
 
     {:ok, server} = apply(ImpDeployment.ProgramServer, :start_link, [server_options])
 
-    outcomes =
-      test
-      |> Task.async_stream(
-        fn example ->
-          inputs = example |> Imp.Example.inputs() |> Imp.Example.to_map()
-          apply(ImpDeployment.ProgramServer, :call, [server, inputs, :infinity])
-        end,
-        ordered: true,
-        max_concurrency: 4,
-        timeout: :infinity
-      )
-      |> Enum.map(fn
-        {:ok, {:ok, prediction}} -> %{status: :ok, prediction: json_safe(prediction)}
-        {:ok, {:error, reason}} -> %{status: :error, reason: json_safe(reason)}
-        {:exit, reason} -> %{status: :exit, reason: json_safe(reason)}
+    {wall_time_us, outcome, usage} =
+      capture_runtime(fn ->
+        test
+        |> Task.async_stream(
+          fn example ->
+            inputs = example |> Imp.Example.inputs() |> Imp.Example.to_map()
+            apply(ImpDeployment.ProgramServer, :call, [server, inputs, :infinity])
+          end,
+          ordered: true,
+          max_concurrency: 4,
+          timeout: :infinity
+        )
+        |> Enum.map(fn
+          {:ok, {:ok, prediction}} -> %{status: :ok, prediction: json_safe(prediction)}
+          {:ok, {:error, reason}} -> %{status: :error, reason: json_safe(reason)}
+          {:exit, reason} -> %{status: :exit, reason: json_safe(reason)}
+        end)
       end)
+
+    outcomes = unwrap_fresh!(outcome, config, wall_time_us, usage)
 
     unless length(outcomes) == 4 and Enum.all?(outcomes, &(&1.status == :ok)) do
       raise "fresh GEPA suite service did not complete all four calls: #{inspect(outcomes)}"
@@ -225,7 +247,9 @@ defmodule Imp.GepaSuiteConditionCLI do
       family: config.family,
       arm: config.arm,
       seed: config.seed,
-      calls: outcomes
+      calls: outcomes,
+      usage: usage,
+      wall_time_us: wall_time_us
     })
   end
 
@@ -272,7 +296,15 @@ defmodule Imp.GepaSuiteConditionCLI do
         "--#{role}-max-output-tokens",
         config |> Map.fetch!(String.to_existing_atom("#{role}_max_output_tokens")) |> to_string()
       ]
-    end) ++ ["--api-key-env", config.api_key_env]
+    end) ++
+      [
+        "--api-key-env",
+        config.api_key_env,
+        "--input-price-per-million",
+        to_string(config.input_price_per_million),
+        "--output-price-per-million",
+        to_string(config.output_price_per_million)
+      ]
   end
 
   defp retrieval_args(%{retrieval_root: nil}), do: []
@@ -333,7 +365,11 @@ defmodule Imp.GepaSuiteConditionCLI do
           allow_fallbacks: false,
           require_parameters: true,
           data_collection: "deny",
-          zdr: true
+          zdr: true,
+          max_price: %{
+            prompt: config.input_price_per_million,
+            completion: config.output_price_per_million
+          }
         },
         openrouter_usage: %{include: true}
       ],
@@ -357,6 +393,52 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
   end
 
+  defp admit_spend!(config) do
+    family =
+      config.dataset_root
+      |> GepaStudyPlan.plan!(seeds: 1, runtimes: 1)
+      |> Map.fetch!(:families)
+      |> Enum.find(&(&1.family == config.family))
+
+    calls = Map.fetch!(family.arms, config.arm)
+    task = role_reservation(config, :task)
+    reflection = role_reservation(config, :reflection)
+    judge = role_reservation(config, :judge)
+
+    reserved =
+      calls.task_transports * task +
+        (calls.mipro_proposer_transports + calls.gepa_reflection_transports) * reflection +
+        calls.judge_transports * judge
+
+    projected = config.initial_cost_usd + reserved
+
+    if projected > config.max_cost_usd + 1.0e-9 do
+      raise Imp.OperationalSafetyError,
+        kind: :budget,
+        message:
+          "GEPA suite condition reservation would exceed the owner cap before transport: " <>
+            "$#{projected} > $#{config.max_cost_usd}"
+    end
+
+    %{
+      "initial_cost_usd" => config.initial_cost_usd,
+      "condition_reservation_usd" => reserved,
+      "projected_max_usd" => projected,
+      "owner_cap_usd" => config.max_cost_usd,
+      "calls" => json_safe(calls),
+      "accounting" =>
+        "content-byte-as-token plus configured maximum output at route max_price; no cache discount"
+    }
+  end
+
+  defp role_reservation(config, role) do
+    input = Map.fetch!(config, String.to_existing_atom("#{role}_max_input_bytes"))
+    output = Map.fetch!(config, String.to_existing_atom("#{role}_max_output_tokens"))
+
+    (input * config.input_price_per_million + output * config.output_price_per_million) /
+      1_000_000
+  end
+
   defp optimizer_receipt(:gepa_v0_1_4_no_merge, optimizer) do
     %{
       execution_profile: optimizer.execution_profile,
@@ -369,7 +451,188 @@ defmodule Imp.GepaSuiteConditionCLI do
   end
 
   defp evaluation(result) do
-    %{score: result.score, row_count: length(result.rows), error_count: length(result.errors)}
+    rows =
+      result.rows
+      |> Enum.with_index()
+      |> Enum.map(fn {row, index} ->
+        inputs = row.example |> Imp.Example.inputs() |> Imp.Example.to_map()
+
+        %{
+          index: index,
+          input_sha256: canonical_sha256(inputs),
+          score: row.score,
+          error: if(is_nil(row.error), do: nil, else: Imp.Redaction.redact(row.error))
+        }
+      end)
+
+    %{
+      score: result.score,
+      row_count: length(rows),
+      error_count: length(result.errors),
+      rows: rows
+    }
+  end
+
+  defp capture_runtime(fun) do
+    id = {__MODULE__, :runtime_usage, make_ref()}
+    {:ok, usage} = Agent.start_link(fn -> empty_runtime() end)
+
+    :ok =
+      :telemetry.attach_many(
+        id,
+        [
+          [:req_llm, :request, :stop],
+          [:req_llm, :request, :exception]
+        ],
+        &__MODULE__.handle_runtime_event/4,
+        usage
+      )
+
+    started = System.monotonic_time(:microsecond)
+
+    try do
+      result =
+        try do
+          {:ok, fun.()}
+        rescue
+          error -> {:error, error, __STACKTRACE__}
+        end
+
+      runtime = Agent.get(usage, &finalize_runtime/1)
+      {System.monotonic_time(:microsecond) - started, result, runtime}
+    after
+      :telemetry.detach(id)
+      Agent.stop(usage)
+    end
+  end
+
+  defp unwrap_run!({:ok, result}, _config, _reservation, _wall_time_us, _usage), do: result
+
+  defp unwrap_run!({:error, error, stacktrace}, config, reservation, wall_time_us, usage) do
+    write_private!(config.output, %{
+      status: :failed,
+      family: config.family,
+      arm: config.arm,
+      seed: config.seed,
+      stage: :optimize_or_heldout,
+      error: Imp.Redaction.redact(error),
+      usage: usage,
+      wall_time_us: wall_time_us,
+      spend_admission: reservation
+    })
+
+    reraise error, stacktrace
+  end
+
+  defp unwrap_fresh!({:ok, result}, _config, _wall_time_us, _usage), do: result
+
+  defp unwrap_fresh!({:error, error, stacktrace}, config, wall_time_us, usage) do
+    write_private!(config.fresh_output, %{
+      status: :failed,
+      family: config.family,
+      arm: config.arm,
+      seed: config.seed,
+      stage: :fresh_service,
+      error: Imp.Redaction.redact(error),
+      usage: usage,
+      wall_time_us: wall_time_us
+    })
+
+    reraise error, stacktrace
+  end
+
+  @doc false
+  def handle_runtime_event(event, measurements, metadata, usage)
+      when event in [[:req_llm, :request, :stop], [:req_llm, :request, :exception]] do
+    duration = Map.get(measurements, :duration, 0)
+    provider_usage = Map.get(metadata, :usage, %{}) || %{}
+    successful? = event == [:req_llm, :request, :stop]
+
+    delta = %{
+      "usage_events" => if(successful?, do: 1, else: 0),
+      "request_attempts" => 1,
+      "request_duration_us" => System.convert_time_unit(duration, :native, :microsecond),
+      "input_tokens" => number(provider_usage, [:input_tokens, :input]) |> trunc(),
+      "output_tokens" => number(provider_usage, [:output_tokens, :output]) |> trunc(),
+      "cost_usd" => number(provider_usage, [:total_cost, :cost])
+    }
+
+    event_record = %{
+      "sequence" => nil,
+      "status" => if(successful?, do: "ok", else: "error"),
+      "request_id" => Map.get(metadata, :request_id),
+      "provider" => json_safe(Map.get(metadata, :provider)),
+      "model" => model_id(Map.get(metadata, :model)),
+      "http_status" => Map.get(metadata, :http_status),
+      "finish_reason" => json_safe(Map.get(metadata, :finish_reason)),
+      "request_summary" => json_safe(Map.get(metadata, :request_summary)),
+      "response_summary" => json_safe(Map.get(metadata, :response_summary)),
+      "duration_us" => delta["request_duration_us"],
+      "input_tokens" => delta["input_tokens"],
+      "output_tokens" => delta["output_tokens"],
+      "cost_usd" => delta["cost_usd"],
+      "error" => if(successful?, do: nil, else: Imp.Redaction.redact(Map.get(metadata, :error)))
+    }
+
+    Agent.update(usage, fn state ->
+      %{
+        "summary" => add_usage(state["summary"], delta),
+        "events" => [event_record | state["events"]]
+      }
+    end)
+  end
+
+  defp empty_runtime, do: %{"summary" => empty_usage(), "events" => []}
+
+  defp finalize_runtime(runtime) do
+    events =
+      runtime["events"]
+      |> Enum.reverse()
+      |> Enum.with_index(1)
+      |> Enum.map(fn {event, index} -> %{event | "sequence" => index} end)
+
+    %{runtime | "events" => events}
+  end
+
+  defp empty_usage do
+    %{
+      "usage_events" => 0,
+      "request_attempts" => 0,
+      "request_duration_us" => 0,
+      "input_tokens" => 0,
+      "output_tokens" => 0,
+      "cost_usd" => 0.0
+    }
+  end
+
+  defp add_usage(left, right) do
+    Map.new(left, fn {key, value} -> {key, value + Map.get(right || %{}, key, 0)} end)
+  end
+
+  defp merge_runtime(left, right) do
+    left = left || empty_runtime()
+    right = right || empty_runtime()
+
+    events =
+      (Map.get(left, "events", []) ++ Map.get(right, "events", []))
+      |> Enum.with_index(1)
+      |> Enum.map(fn {event, index} -> Map.put(event, "sequence", index) end)
+
+    %{
+      "summary" => add_usage(Map.get(left, "summary", %{}), Map.get(right, "summary", %{})),
+      "events" => events
+    }
+  end
+
+  defp model_id(%{id: id}) when is_binary(id), do: id
+  defp model_id(%{"id" => id}) when is_binary(id), do: id
+  defp model_id(value), do: json_safe(value)
+
+  defp number(map, keys) do
+    Enum.find_value(keys, 0, fn key ->
+      value = Map.get(map, key, Map.get(map, Atom.to_string(key)))
+      if is_number(value), do: value
+    end)
   end
 
   defp retrieval_disclosure(config, %{"retrieval" => historical}) do
@@ -400,6 +663,14 @@ defmodule Imp.GepaSuiteConditionCLI do
           suffix <- [:max_input_bytes, :max_output_tokens] do
         required_positive!(config, String.to_existing_atom("#{role}_#{suffix}"))
       end
+
+      required_nonnegative_number!(config, :input_price_per_million)
+      required_nonnegative_number!(config, :output_price_per_million)
+
+      if config.run? do
+        required_nonnegative_number!(config, :initial_cost_usd)
+        required_positive_number!(config, :max_cost_usd)
+      end
     end
 
     config
@@ -421,6 +692,20 @@ defmodule Imp.GepaSuiteConditionCLI do
     end
   end
 
+  defp required_nonnegative_number!(config, key) do
+    case Map.get(config, key) do
+      value when is_number(value) and value >= 0 -> value
+      _ -> raise ArgumentError, "#{key} must be a nonnegative number"
+    end
+  end
+
+  defp required_positive_number!(config, key) do
+    case Map.get(config, key) do
+      value when is_number(value) and value > 0 -> value
+      _ -> raise ArgumentError, "#{key} must be a positive number"
+    end
+  end
+
   defp expand(nil), do: nil
   defp expand(path), do: Path.expand(path)
 
@@ -433,6 +718,27 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   defp emit(payload), do: IO.puts(Jason.encode!(json_safe(payload)))
   defp sha256(path), do: :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
+
+  defp canonical_sha256(value) do
+    value
+    |> json_safe()
+    |> canonical_json_value()
+    |> Jason.encode!()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
+  defp canonical_json_value(map) when is_map(map) and not is_struct(map) do
+    values =
+      map
+      |> Enum.map(fn {key, value} -> {to_string(key), canonical_json_value(value)} end)
+      |> Enum.sort_by(&elem(&1, 0))
+
+    %Jason.OrderedObject{values: values}
+  end
+
+  defp canonical_json_value(list) when is_list(list), do: Enum.map(list, &canonical_json_value/1)
+  defp canonical_json_value(value), do: value
   defp json_safe(%Imp.Example{} = value), do: value |> Imp.Example.to_map() |> json_safe()
   defp json_safe(%Imp.Prediction{} = value), do: value |> Imp.Prediction.to_map() |> json_safe()
   defp json_safe(%_{} = value), do: value |> Map.from_struct() |> json_safe()

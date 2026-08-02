@@ -97,5 +97,69 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert receipt["status"] == "fresh_ok"
     assert length(receipt["calls"]) == 4
     assert Enum.all?(receipt["calls"], &(&1["status"] == "ok"))
+
+    assert receipt["usage"] == %{
+             "events" => [],
+             "summary" => %{
+               "cost_usd" => 0.0,
+               "input_tokens" => 0,
+               "output_tokens" => 0,
+               "request_duration_us" => 0,
+               "request_attempts" => 0,
+               "usage_events" => 0
+             }
+           }
+
+    assert is_integer(receipt["wall_time_us"])
+    assert receipt["wall_time_us"] >= 0
+  end
+
+  test "live entrance refuses an over-cap condition before transport" do
+    root = File.cwd!()
+
+    args =
+      [
+        "run",
+        "--no-start",
+        Path.join(root, "scripts/gepa_suite_condition.exs"),
+        "--run",
+        "--dataset-root",
+        Path.join(root, "tmp/gepa-six-task-current-root"),
+        "--family",
+        "AIMEBench",
+        "--arm",
+        "baseline",
+        "--output",
+        Path.join(System.tmp_dir!(), "imp-gepa-must-not-exist.json"),
+        "--input-price-per-million",
+        "0.14",
+        "--output-price-per-million",
+        "0.28",
+        "--initial-cost-usd",
+        "0.0",
+        "--max-cost-usd",
+        "0.000001"
+      ] ++
+        Enum.flat_map(["task", "reflection", "judge"], fn role ->
+          [
+            "--#{role}-model",
+            "provider-disabled/model",
+            "--#{role}-provider",
+            "provider/endpoint",
+            "--#{role}-max-input-bytes",
+            "2",
+            "--#{role}-max-output-tokens",
+            "16"
+          ]
+        end)
+
+    {output, status} =
+      System.cmd("mix", args,
+        env: [{"MIX_ENV", "test"}, {"OPENROUTER_API_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert status != 0
+    assert output =~ "owner cap before transport"
   end
 end

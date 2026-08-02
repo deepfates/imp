@@ -51,12 +51,15 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
 
     class FakeLM:
         def __init__(self, **kwargs): self.kwargs = kwargs
-        def forward(self, prompt=None, messages=None, **kwargs): return "transported"
-        async def aforward(self, prompt=None, messages=None, **kwargs): return "transported"
+        def forward(self, prompt=None, messages=None, **kwargs):
+            return {"id":"id", "model":"model", "choices":[{"finish_reason":"stop"}],
+                    "usage":{"prompt_tokens":1,"completion_tokens":1,"cost":0.0}}
+        async def aforward(self, prompt=None, messages=None, **kwargs): return self.forward(prompt, messages, **kwargs)
     dspy = type("DSPy", (), {"LM": FakeLM})
     args = argparse.Namespace(
         task_model="model", task_provider="provider", task_max_input_bytes=2,
-        task_max_output_tokens=16, api_base="https://example.invalid", api_key_env="TEST_KEY"
+        task_max_output_tokens=16, input_price_per_million=0.14,
+        output_price_per_million=0.28, api_base="https://example.invalid", api_key_env="TEST_KEY"
     )
     lm = condition.make_lm(dspy, "task", args)
     baseline = object()
@@ -65,7 +68,29 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert condition.arm_program("mipro_v2_heavy", baseline, selected) is selected
     assert condition.arm_requires_fresh_state("baseline") is False
     assert condition.arm_requires_fresh_state("gepa_v0_1_4_no_merge") is True
-    assert lm.forward(messages=[{"role": "user", "content": "é"}]) == "transported"
+    assert lm.forward(messages=[{"role": "user", "content": "é"}])["id"] == "id"
+    usage = condition.runtime_usage()["summary"]["task"]
+    assert usage["request_attempts"] == 1
+    assert usage["usage_events"] == 1
+    assert usage["input_tokens"] == 1
+    assert usage["output_tokens"] == 1
+    assert usage["cost_usd"] == 0.0
+    spec = {"split_counts":{"test":1}}
+    args.family = "AIMEBench"
+    args.arm = "baseline"
+    args.initial_cost_usd = 0.0
+    args.max_cost_usd = 1.0
+    args.judge_max_input_bytes = 2
+    args.judge_max_output_tokens = 16
+    admission = condition.baseline_spend_admission(args, spec)
+    assert admission["calls"] == {"task_transports":1, "judge_transports":0}
+    args.max_cost_usd = 0.000001
+    try:
+        condition.baseline_spend_admission(args, spec)
+    except RuntimeError as error:
+        assert "owner cap before transport" in str(error)
+    else:
+        raise AssertionError("oversized condition reservation was admitted")
     try:
         lm.forward(messages=[{"role": "user", "content": "abc"}])
     except RuntimeError as error:

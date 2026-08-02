@@ -21,6 +21,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -42,6 +43,18 @@ FAMILIES = {
     "Papillon": "gepa_artifact.benchmarks.papillon",
 }
 ARMS = ("baseline", "mipro_v2_heavy", "gepa_v0_1_4_no_merge")
+FAMILY_SHAPES = {
+    "AIMEBench": {"task": 1, "judge": 0},
+    "HotpotQABench": {"task": 4, "judge": 0},
+    "hoverBench": {"task": 4, "judge": 0},
+    "IFBench": {"task": 2, "judge": 0},
+    "LiveBenchMathBench": {"task": 1, "judge": 0},
+    "Papillon": {"task": 3, "judge": 3},
+}
+RUNTIME_EVENTS: list[dict[str, Any]] = []
+ACTIVE_ARGS: argparse.Namespace | None = None
+ACTIVE_STAGE = "preflight"
+RUN_STARTED_NS: int | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,6 +80,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--task-max-output-tokens", type=int)
     parser.add_argument("--reflection-max-output-tokens", type=int)
     parser.add_argument("--judge-max-output-tokens", type=int)
+    parser.add_argument("--input-price-per-million", type=float)
+    parser.add_argument("--output-price-per-million", type=float)
+    parser.add_argument("--initial-cost-usd", type=float)
+    parser.add_argument("--max-cost-usd", type=float)
     parser.add_argument("--api-base")
     parser.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
     parser.add_argument("--output", type=Path)
@@ -214,6 +231,101 @@ def rendered_message_bytes(value: Any) -> int:
     return 0
 
 
+def canonical_bytes(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+
+
+def value_field(value: Any, name: str, default=None):
+    if isinstance(value, dict):
+        return value.get(name, default)
+    return getattr(value, name, default)
+
+
+def response_usage(response: Any) -> dict[str, Any]:
+    usage = value_field(response, "usage")
+    input_tokens = value_field(usage, "prompt_tokens")
+    output_tokens = value_field(usage, "completion_tokens")
+    cost = value_field(usage, "cost")
+    if cost is None:
+        cost = value_field(value_field(response, "_hidden_params", {}), "response_cost")
+    if not isinstance(input_tokens, int) or input_tokens < 0:
+        raise RuntimeError("provider response is missing prompt-token usage")
+    if not isinstance(output_tokens, int) or output_tokens < 0:
+        raise RuntimeError("provider response is missing completion-token usage")
+    if not isinstance(cost, (int, float)) or cost < 0:
+        raise RuntimeError("provider response is missing nonnegative cost usage")
+    return {"input_tokens": input_tokens, "output_tokens": output_tokens, "cost_usd": cost}
+
+
+def record_runtime_response(role: str, messages: Any, started_ns: int, response: Any) -> None:
+    choice = (value_field(response, "choices", []) or [None])[0]
+    RUNTIME_EVENTS.append(
+        {
+            "role": role,
+            "status": "ok",
+            "message_bytes": rendered_message_bytes(messages),
+            "latency_us": (time.monotonic_ns() - started_ns) // 1_000,
+            "response_id": value_field(response, "id"),
+            "response_model": value_field(response, "model"),
+            "finish_reason": value_field(choice, "finish_reason"),
+            "usage": response_usage(response),
+        }
+    )
+
+
+def record_runtime_error(role: str, messages: Any, started_ns: int, error: BaseException) -> None:
+    RUNTIME_EVENTS.append(
+        {
+            "role": role,
+            "status": "error",
+            "message_bytes": rendered_message_bytes(messages),
+            "latency_us": (time.monotonic_ns() - started_ns) // 1_000,
+            "error_type": type(error).__name__,
+        }
+    )
+
+
+def runtime_usage() -> dict[str, Any]:
+    by_role = {}
+    for role in ("task", "reflection", "judge"):
+        events = [event for event in RUNTIME_EVENTS if event["role"] == role]
+        successful = [event for event in events if event["status"] == "ok"]
+        by_role[role] = {
+            "request_attempts": len(events),
+            "usage_events": len(successful),
+            "error_count": len(events) - len(successful),
+            "request_duration_us": sum(event["latency_us"] for event in events),
+            "input_tokens": sum(event["usage"]["input_tokens"] for event in successful),
+            "output_tokens": sum(event["usage"]["output_tokens"] for event in successful),
+            "cost_usd": sum(event["usage"]["cost_usd"] for event in successful),
+        }
+    return {"summary": by_role, "events": [{**event, "sequence": index} for index, event in enumerate(RUNTIME_EVENTS, 1)]}
+
+
+def merge_runtime_usage(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    summary = {
+        role: {
+            key: left.get("summary", {}).get(role, {}).get(key, 0)
+            + right.get("summary", {}).get(role, {}).get(key, 0)
+            for key in (
+                "request_attempts",
+                "usage_events",
+                "error_count",
+                "request_duration_us",
+                "input_tokens",
+                "output_tokens",
+                "cost_usd",
+            )
+        }
+        for role in ("task", "reflection", "judge")
+    }
+    events = [*left.get("events", []), *right.get("events", [])]
+    return {
+        "summary": summary,
+        "events": [{**event, "sequence": index} for index, event in enumerate(events, 1)],
+    }
+
+
 def make_lm(dspy: Any, role: str, args: argparse.Namespace):
     model = getattr(args, f"{role}_model")
     provider = getattr(args, f"{role}_provider")
@@ -227,6 +339,10 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
         raise RuntimeError("live execution requires every positive input byte envelope")
     if not isinstance(max_output_tokens, int) or max_output_tokens <= 0:
         raise RuntimeError("live execution requires every positive output token envelope")
+    if not isinstance(args.input_price_per_million, (int, float)) or args.input_price_per_million < 0:
+        raise RuntimeError("live execution requires a nonnegative input price")
+    if not isinstance(args.output_price_per_million, (int, float)) or args.output_price_per_million < 0:
+        raise RuntimeError("live execution requires a nonnegative output price")
     import os
 
     class InputBoundLM(dspy.LM):
@@ -241,11 +357,27 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
 
         def forward(self, prompt=None, messages=None, **kwargs):
             self._admit(prompt, messages)
-            return super().forward(prompt=prompt, messages=messages, **kwargs)
+            rendered = messages or [{"role": "user", "content": prompt}]
+            started = time.monotonic_ns()
+            try:
+                response = super().forward(prompt=prompt, messages=messages, **kwargs)
+                record_runtime_response(role, rendered, started, response)
+                return response
+            except BaseException as error:
+                record_runtime_error(role, rendered, started, error)
+                raise
 
         async def aforward(self, prompt=None, messages=None, **kwargs):
             self._admit(prompt, messages)
-            return await super().aforward(prompt=prompt, messages=messages, **kwargs)
+            rendered = messages or [{"role": "user", "content": prompt}]
+            started = time.monotonic_ns()
+            try:
+                response = await super().aforward(prompt=prompt, messages=messages, **kwargs)
+                record_runtime_response(role, rendered, started, response)
+                return response
+            except BaseException as error:
+                record_runtime_error(role, rendered, started, error)
+                raise
 
     return InputBoundLM(
         model="openrouter/" + model,
@@ -264,6 +396,10 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
                 "require_parameters": True,
                 "data_collection": "deny",
                 "zdr": True,
+                "max_price": {
+                    "prompt": args.input_price_per_million,
+                    "completion": args.output_price_per_million,
+                },
             },
             "usage": {"include": True},
         },
@@ -272,6 +408,40 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
             "X-OpenRouter-Cache": "false",
         },
     )
+
+
+def baseline_spend_admission(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, Any]:
+    if args.arm != "baseline":
+        raise RuntimeError("this bounded live tranche admits baseline only; optimizer arms need separate spend review")
+    if not isinstance(args.initial_cost_usd, (int, float)) or args.initial_cost_usd < 0:
+        raise RuntimeError("live baseline requires nonnegative --initial-cost-usd")
+    if not isinstance(args.max_cost_usd, (int, float)) or args.max_cost_usd <= 0:
+        raise RuntimeError("live baseline requires positive --max-cost-usd")
+    shape = FAMILY_SHAPES[args.family]
+    test = spec["split_counts"]["test"]
+    calls = {"task_transports": test * shape["task"], "judge_transports": test * shape["judge"]}
+
+    def role_reservation(role: str) -> float:
+        return (
+            getattr(args, f"{role}_max_input_bytes") * args.input_price_per_million
+            + getattr(args, f"{role}_max_output_tokens") * args.output_price_per_million
+        ) / 1_000_000
+
+    reserved = calls["task_transports"] * role_reservation("task") + calls["judge_transports"] * role_reservation("judge")
+    projected = args.initial_cost_usd + reserved
+    if projected > args.max_cost_usd + 1e-9:
+        raise RuntimeError(
+            f"GEPA suite condition reservation would exceed the owner cap before transport: "
+            f"${projected} > ${args.max_cost_usd}"
+        )
+    return {
+        "initial_cost_usd": args.initial_cost_usd,
+        "condition_reservation_usd": reserved,
+        "projected_max_usd": projected,
+        "owner_cap_usd": args.max_cost_usd,
+        "calls": calls,
+        "accounting": "content-byte-as-token plus configured maximum output at route max_price; no cache discount",
+    }
 
 
 def configure_program(program: Any, task_lm: Any, judge_lm: Any, family: str) -> None:
@@ -283,6 +453,17 @@ def configure_program(program: Any, task_lm: Any, judge_lm: Any, family: str) ->
 
 
 def evaluate(dspy: Any, program: Any, rows: list[Any], metric: Any) -> dict[str, Any]:
+    failures: dict[str, list[str]] = {}
+
+    class ObservedProgram:
+        def __call__(self, **kwargs):
+            identity = hashlib.sha256(canonical_bytes(kwargs)).hexdigest()
+            try:
+                return program(**kwargs)
+            except BaseException as error:
+                failures.setdefault(identity, []).append(type(error).__name__)
+                raise
+
     result = dspy.Evaluate(
         devset=rows,
         metric=metric,
@@ -290,9 +471,27 @@ def evaluate(dspy: Any, program: Any, rows: list[Any], metric: Any) -> dict[str,
         return_all_scores=True,
         failure_score=0.0,
         max_errors=10_000,
-    )(program)
-    scores = [float(item[2]) for item in result.results]
-    return {"mean": sum(scores) / len(scores), "count": len(scores), "scores": scores}
+    )(ObservedProgram())
+    output_rows = []
+    for index, (example, _prediction, score) in enumerate(result.results):
+        inputs = example.inputs().toDict()
+        identity = hashlib.sha256(canonical_bytes(inputs)).hexdigest()
+        errors = failures.get(identity, [])
+        output_rows.append(
+            {
+                "index": index,
+                "input_sha256": identity,
+                "score": float(score),
+                "error": errors.pop(0) if errors else None,
+            }
+        )
+    scores = [row["score"] for row in output_rows]
+    return {
+        "mean": sum(scores) / len(scores),
+        "count": len(scores),
+        "error_count": sum(row["error"] is not None for row in output_rows),
+        "rows": output_rows,
+    }
 
 
 def optimize(dspy: Any, program: Any, meta: Any, train: list[Any], dev: list[Any], args: argparse.Namespace, task_lm: Any, reflection_lm: Any, metric_calls: int):
@@ -346,7 +545,10 @@ def write_private_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def main() -> None:
+    global ACTIVE_ARGS, ACTIVE_STAGE, RUN_STARTED_NS
     args = parse_args()
+    ACTIVE_ARGS = args
+    RUN_STARTED_NS = time.monotonic_ns()
     for name in ("dspy_root", "gepa_root", "artifact_root", "dataset_root", "retrieval_root", "retrieval_receipt", "output", "state"):
         value = getattr(args, name)
         if value is not None:
@@ -397,6 +599,8 @@ def main() -> None:
         print(json.dumps(preflight, sort_keys=True))
         return
 
+    spend_admission = None if args.fresh else baseline_spend_admission(args, spec)
+
     task_lm = make_lm(dspy, "task", args)
     reflection_lm = make_lm(dspy, "reflection", args)
     judge_lm = make_lm(dspy, "judge", args)
@@ -406,14 +610,23 @@ def main() -> None:
     if args.fresh:
         if args.state is None:
             raise RuntimeError("fresh mode requires --state")
+        ACTIVE_STAGE = "fresh_load_and_service"
         program.load(args.state)
         test = load_rows(dspy, test_path, spec["input_keys"])
         calls = []
+        started = time.monotonic_ns()
         with dspy.context(lm=task_lm):
             for row in test[:4]:
                 prediction = program(**row.inputs())
                 calls.append(dict(prediction))
-        payload = {**preflight, "status": "fresh_ok", "calls": calls, "heldout_decoded": True}
+        payload = {
+            **preflight,
+            "status": "fresh_ok",
+            "calls": calls,
+            "heldout_decoded": True,
+            "usage": runtime_usage(),
+            "wall_time_us": (time.monotonic_ns() - started) // 1_000,
+        }
         if args.output:
             write_private_json(args.output, payload)
         else:
@@ -428,14 +641,19 @@ def main() -> None:
     fresh_path = args.output.with_suffix(".fresh.json")
     train = load_rows(dspy, train_path, spec["input_keys"])
     dev = load_rows(dspy, dev_path, spec["input_keys"])
+    started = time.monotonic_ns()
+    ACTIVE_STAGE = "optimize"
     with dspy.context(lm=task_lm):
         selected = optimize(dspy, program, meta, train, dev, args, task_lm, reflection_lm, spec["metric_calls"])
+        ACTIVE_STAGE = "heldout"
         test = load_rows(dspy, test_path, spec["input_keys"])
         heldout_result = evaluate(dspy, arm_program(args.arm, program, selected), test, source_metric(meta))
 
     state_sha = None
     fresh_sha = None
+    fresh_usage = {}
     if arm_requires_fresh_state(args.arm):
+        ACTIVE_STAGE = "persist_and_fresh_service"
         selected.save(state_path, save_program=False)
         state_path.chmod(0o600)
 
@@ -453,6 +671,8 @@ def main() -> None:
             "--task-max-output-tokens", str(args.task_max_output_tokens),
             "--reflection-max-output-tokens", str(args.reflection_max_output_tokens),
             "--judge-max-output-tokens", str(args.judge_max_output_tokens),
+            "--input-price-per-million", str(args.input_price_per_million),
+            "--output-price-per-million", str(args.output_price_per_million),
             "--api-key-env", args.api_key_env,
             "--state", str(state_path), "--output", str(fresh_path),
         ]
@@ -465,6 +685,7 @@ def main() -> None:
         subprocess.run(child_args, check=True)
         state_sha = sha256(state_path)
         fresh_sha = sha256(fresh_path)
+        fresh_usage = json.loads(fresh_path.read_text())["usage"]
 
     payload = {
         **preflight,
@@ -474,9 +695,35 @@ def main() -> None:
         "predictors": predictor_state(selected),
         "state_sha256": state_sha,
         "fresh_sha256": fresh_sha,
+        "usage": merge_runtime_usage(runtime_usage(), fresh_usage),
+        "wall_time_us": (time.monotonic_ns() - started) // 1_000,
+        "spend_admission": spend_admission,
+    }
+    write_private_json(args.output, payload)
+
+
+def retain_terminal_failure(error: BaseException) -> None:
+    args = ACTIVE_ARGS
+    if args is None or args.output is None:
+        return
+    elapsed = 0 if RUN_STARTED_NS is None else (time.monotonic_ns() - RUN_STARTED_NS) // 1_000
+    payload = {
+        "status": "failed",
+        "family": args.family,
+        "arm": args.arm,
+        "seed": args.seed,
+        "stage": ACTIVE_STAGE,
+        "error_type": type(error).__name__,
+        "error_sha256": hashlib.sha256(str(error).encode()).hexdigest(),
+        "usage": runtime_usage(),
+        "wall_time_us": elapsed,
     }
     write_private_json(args.output, payload)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BaseException as error:
+        retain_terminal_failure(error)
+        raise
