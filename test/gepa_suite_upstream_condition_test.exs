@@ -225,4 +225,146 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
 
     assert actual == upstream
   end
+
+  test "AIME live-route request bodies differ only by explicit protocol defaults" do
+    root = File.cwd!()
+    parent = self()
+    model = "deepseek/deepseek-v4-flash-0731"
+    provider = "novita/fp8"
+
+    base_url =
+      Imp.Test.LocalHTTP.start(fn request ->
+        send(parent, {:aime_wire, Jason.decode!(request.body), request.headers})
+
+        {200,
+         %{
+           "id" => "provider-disabled-aime",
+           "object" => "chat.completion",
+           "model" => model,
+           "choices" => [
+             %{
+               "index" => 0,
+               "message" => %{
+                 "role" => "assistant",
+                 "content" =>
+                   "[[ ## reasoning ## ]]\nx\n\n[[ ## answer ## ]]\n0\n\n[[ ## completed ## ]]"
+               },
+               "finish_reason" => "stop"
+             }
+           ],
+           "usage" => %{
+             "prompt_tokens" => 1,
+             "completion_tokens" => 1,
+             "total_tokens" => 2,
+             "cost" => 0.0
+           }
+         }}
+      end)
+
+    lm =
+      Imp.req_llm(
+        %{
+          provider: :openrouter,
+          id: model,
+          model: model,
+          base_url: base_url <> "/v1",
+          cost: %{input: 0.14, output: 0.28}
+        },
+        api_key: "provider-disabled",
+        cache: false,
+        temperature: 1.0,
+        max_tokens: 4096,
+        timeout: 120_000,
+        max_retries: 0,
+        input_envelope: [max_bytes: 65_536, reservation_tokens: 65_536],
+        provider_options: [
+          openrouter_provider: %{
+            only: [provider],
+            order: [provider],
+            allow_fallbacks: false,
+            require_parameters: true,
+            data_collection: "deny",
+            zdr: true,
+            max_price: %{prompt: 0.14, completion: 0.28}
+          },
+          openrouter_usage: %{include: true}
+        ],
+        req_http_options: [
+          headers: [
+            {"X-OpenRouter-Metadata", "enabled"},
+            {"X-OpenRouter-Cache", "false"}
+          ],
+          retry: false,
+          max_retries: 0
+        ]
+      )
+
+    prepared =
+      Imp.BenchmarkTruth.GepaStudyCondition.prepare!(
+        Path.join(root, "tmp/gepa-six-task-current-root"),
+        "AIMEBench",
+        %{task: lm, reflection: lm, judge: lm}
+      )
+
+    [row | _] = Imp.BenchmarkTruth.GepaSuite.load_test!(prepared.loaded)
+    assert {:ok, _} = Imp.Module.call(prepared.program, %{"problem" => row.fields["problem"]})
+    assert_receive {:aime_wire, imp_body, imp_headers}
+
+    probe = ~S'''
+    import copy, importlib, json, pathlib, sys
+    root, base_url, model, provider = sys.argv[1:]
+    root = pathlib.Path(root)
+    sys.path.insert(0, str(root / "scripts"))
+    from dspy_gepa_version_bridge import install_source_bridge
+    install_source_bridge(root / "tmp/dspy-3.2.1", root / "tmp/gepa-v0.1.4")
+    import dspy
+    sys.path.insert(0, str(root / "tmp/gepa-artifact"))
+    program = copy.deepcopy(importlib.import_module("gepa_artifact.benchmarks.AIME").benchmark[0].program[0])
+    lm = dspy.LM(
+        model="openrouter/" + model,
+        api_base=base_url + "/v1",
+        api_key="provider-disabled",
+        temperature=1.0,
+        cache=False,
+        num_retries=0,
+        timeout=120,
+        max_tokens=4096,
+        extra_body={
+            "provider": {
+                "only": [provider], "order": [provider], "allow_fallbacks": False,
+                "require_parameters": True, "data_collection": "deny", "zdr": True,
+                "max_price": {"prompt": 0.14, "completion": 0.28},
+            },
+            "usage": {"include": True},
+        },
+        extra_headers={"X-OpenRouter-Metadata": "enabled", "X-OpenRouter-Cache": "false"},
+    )
+    program.set_lm(lm)
+    with (root / "tmp/gepa-six-task-current-root/AIMEBench/test.jsonl").open() as handle:
+        row = json.loads(next(handle))
+    with dspy.context(lm=lm):
+        program(problem=row["problem"])
+    '''
+
+    assert {"", 0} =
+             System.cmd(
+               Path.join(root, "tmp/dspy-parity-venv/bin/python"),
+               ["-P", "-c", probe, root, base_url, model, provider],
+               stderr_to_stdout: true
+             )
+
+    assert_receive {:aime_wire, dspy_body, dspy_headers}
+    assert Map.drop(imp_body, ["n", "stream"]) == dspy_body
+    assert Map.take(imp_body, ["n", "stream"]) == %{"n" => 1, "stream" => false}
+
+    for headers <- [imp_headers, dspy_headers] do
+      assert Enum.any?(headers, fn {key, value} ->
+               String.downcase(key) == "x-openrouter-cache" and value == "false"
+             end)
+
+      assert Enum.any?(headers, fn {key, value} ->
+               String.downcase(key) == "x-openrouter-metadata" and value == "enabled"
+             end)
+    end
+  end
 end

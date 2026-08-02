@@ -36,6 +36,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
       assert receipt["heldout_decoded"] == false
       assert receipt["provider_calls_authorized"] == false
       assert receipt["outer_max_concurrency"] == 1
+      assert receipt["request_timeout_ms"] == 120_000
       assert receipt["treatments"]["mipro_v2_heavy"]["auto"] == "heavy"
 
       assert receipt["treatments"]["gepa_v0_1_4_no_merge"]["execution_profile"] ==

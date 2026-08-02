@@ -172,8 +172,8 @@ provider-free work.
 The first Novita successor is also scientifically null, but it is not a product
 defect. The principal manually interrupted the ordinary Imp AIME baseline after
 about 30 minutes after incorrectly treating six observed open HTTPS sockets as
-proof of an unbounded provider hang. ReqLLM already applies a finite 120-second
-receive timeout to each OpenRouter request, while this condition deliberately
+proof of an unbounded provider hang. The intended matched condition had a
+finite 120-second per-request receive timeout, while this condition deliberately
 uses serial evaluation and had no preregistered condition-level wall deadline.
 No score or Result was retained. The shared-key window moved by `$19.1756927`,
 but concurrent account activity made that value impossible to attribute and it
@@ -266,6 +266,41 @@ concurrent terminal telemetry. The current facts reject baseline parity for
 this one sequential canary; they do not establish that Imp's baseline
 implementation or optimizer is worse, nor justify changing the official task,
 metric, model, or output cap after seeing the result.
+
+The balanced-time successor from clean `9563d1ab` then ran Imp and pinned DSPy
+concurrently over the same ordered AIME rows. It reproduced and enlarged the
+gap: Imp scored `0.14` (`21/150`) with 126 errors while DSPy scored
+`0.4866667` (`73/150`) with 76 errors. DSPy won 54 paired rows, Imp won 2, and
+94 tied. The private root is
+`benchmarks/results/gepa-suite-aime-baseline-concurrent-9563d1ab-20260802T160700Z`.
+Imp Result/progress SHA-256 values are `82c76f745eec254637b881b0bee90a3ecabc6702c0214be329c21ad3877af8b6`
+and `6ed6459b6aabb7890e3367c4d98b856f5ba47d2a21c4c028843768c8934680b6`;
+DSPy values are `7746057b105fb52b02a69fa354d02d10b0f78e8b121a8eef5f77bbb527e293f3`
+and `54ff1583a5579078b62910f55470db073873c83d26560b749f1091de2e4b56b8`.
+The repaired start observer retained all 184 Imp transports (150 primary plus
+34 fallback) and proved the earlier terminal-only observer incomplete; only 70
+terminal ReqLLM events survived. DSPy retained 233 terminal transports and
+`$0.227317804` joined cost. The shared-key window moved `$0.28521794` and is
+corroboration only.
+
+The owning treatment defect is now concrete. Pinned DSPy explicitly set a
+120-second request timeout. The Imp live entrance omitted the timeout and
+therefore inherited ReqLLM's 30-second ordinary chat default. Exact local wire
+capture proves the request bodies otherwise differ only because Imp spells the
+default `n=1` and `stream=false` explicitly; the messages, model, provider,
+temperature, output cap, and route policy match. The missing Imp terminal events
+and the concentration of successful rows among completed `finish_reason=stop`
+responses are consistent with that timeout mismatch. The entrance now pins and
+reports `120000` milliseconds, matches the upstream lane, and retains nested
+redacted cause types prospectively. This is a treatment/integration defect;
+the two concurrency-8 score gaps are not admissible framework-quality or
+optimizer negatives until a clean matched successor verifies the repair.
+
+No successor was launched immediately because the exact Novita endpoint moved
+from healthy status `0` to degraded status `-2` after the concurrent run. Hold
+the frozen rows, model, endpoint, cap, and concurrency unchanged and retry only
+after the same endpoint returns healthy. No optimizer arm is admitted before
+the repaired baseline comparison completes.
 
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one

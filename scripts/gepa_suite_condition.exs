@@ -5,6 +5,7 @@ defmodule Imp.GepaSuiteConditionCLI do
   alias Imp.Optimizer.Artifact
 
   @arms ~w(baseline mipro_v2_heavy gepa_v0_1_4_no_merge)
+  @request_timeout_ms 120_000
 
   def main(argv) do
     {opts, positional, invalid} =
@@ -157,6 +158,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       arm: config.arm,
       seed: config.seed,
       outer_max_concurrency: config.max_concurrency,
+      request_timeout_ms: @request_timeout_ms,
       heldout_decoded: false,
       split_counts: prepared.loaded.spec["split_counts"],
       treatments: treatments,
@@ -205,6 +207,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       usage: merge_runtime(usage, fresh_usage),
       progress_sha256: sha256(progress),
       wall_time_us: wall_time_us,
+      request_timeout_ms: @request_timeout_ms,
       spend_admission: reservation,
       heldout_decoded: true,
       retrieval: retrieval_disclosure(config, prepared.loaded.spec)
@@ -388,6 +391,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       cache: false,
       temperature: 1.0,
       max_tokens: output_tokens,
+      timeout: @request_timeout_ms,
       max_retries: 0,
       input_envelope: [max_bytes: input_bytes, reservation_tokens: input_bytes],
       provider_options: [
@@ -738,19 +742,27 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp redacted_error(error) do
     redacted = Imp.Redaction.redact(error)
 
-    type =
-      case error do
-        %{__struct__: module} -> inspect(module)
-        _ -> error |> elem_type() |> inspect()
-      end
-
     %{
-      "type" => type,
+      "type" => error |> elem_type() |> inspect(),
+      "cause_types" => error |> cause_types() |> Enum.uniq(),
       "fingerprint_sha256" =>
         :crypto.hash(:sha256, :erlang.term_to_binary(redacted)) |> Base.encode16(case: :lower)
     }
   end
 
+  defp cause_types(%{__struct__: module}), do: [inspect(module)]
+
+  defp cause_types(tuple) when is_tuple(tuple) do
+    [inspect(:tuple) | tuple |> Tuple.to_list() |> Enum.flat_map(&cause_types/1)]
+  end
+
+  # Provider diagnostics may be improper lists. Do not enumerate them while
+  # producing evidence; the outer type is sufficient and cannot expose values.
+  defp cause_types(list) when is_list(list), do: [inspect(:list)]
+
+  defp cause_types(value), do: [value |> elem_type() |> inspect()]
+
+  defp elem_type(%{__struct__: module}), do: module
   defp elem_type(value) when is_atom(value), do: :atom
   defp elem_type(value) when is_binary(value), do: :binary
   defp elem_type(value) when is_list(value), do: :list

@@ -126,6 +126,19 @@ finish-reason handling, telemetry, and runtime-order confounding are classified;
 then run only the smallest balanced matched canary needed before continuing the
 table.
 
+That balanced-time canary has now reproduced the gap but also found its owning
+treatment defect. From clean `9563d1ab`, concurrent Imp and DSPy baselines
+scored `0.14` and `0.4866667`; the repaired observer retained all 184 Imp
+request starts. Full local wire capture then showed matched messages and route
+semantics, while source inspection showed DSPy explicitly used a 120-second
+request timeout and the Imp entrance silently inherited ReqLLM's 30-second chat
+default. The Imp entrance now pins and reports the same 120-second timeout and
+retains nested redacted error types. The two concurrency-8 gaps are therefore
+treatment-defect evidence, not admissible framework-quality negatives. The
+exact Novita endpoint degraded to status `-2` after the run, so verification is
+provider-free green but the unchanged live successor must wait for healthy
+route status. Optimizer arms remain paused.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent
