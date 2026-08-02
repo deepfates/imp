@@ -181,10 +181,14 @@ The study therefore charges the full legal reservation, not the contaminated
 account delta. Its conservative cumulative upper is `$3.100145928`, leaving
 `$16.899854072` under the owner's cap. The retained stop is classified
 `principal_protocol_intervention`; it must not be rewritten as an Imp failure.
-No automatic successor is authorized until the execution protocol either
-preregisters a condition-level deadline or explicitly accepts completion under
-the existing per-request timeout. The matched table still contains zero valid
-rows; no DSPy or other-family condition has started.
+The corrected protocol explicitly accepts full condition completion under the
+existing finite 120-second per-request receive timeout. It adds no shorter
+condition-level wall deadline: AIME has 150 serial held-out opportunities, so a
+deadline materially below the five-hour request-time envelope could censor a
+valid slow run. A successor may stop only on ordinary completion, a typed
+runtime/safety failure, or the prospective spend guard; socket counts and
+elapsed time are not intervention signals. The matched table still contains
+zero valid rows; no DSPy or other-family condition has started.
 
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
