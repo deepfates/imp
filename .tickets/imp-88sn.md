@@ -166,8 +166,25 @@ coverage. No score or result was retained. Private terminal stops charge the
 full aggregate key-window
 deltas conservatively: `$1.53793672 + $0.013921208 = $1.551857928`; those deltas
 are not exact treatment attribution because the shared key moved during
-provider-free work. The remaining study cap is `$18.448142072`. No DSPy or
-other-family condition has started.
+provider-free work.
+
+The first Novita successor is also scientifically null, but it is not a product
+defect. The principal manually interrupted the ordinary Imp AIME baseline after
+about 30 minutes after incorrectly treating six observed open HTTPS sockets as
+proof of an unbounded provider hang. ReqLLM already applies a finite 120-second
+receive timeout to each OpenRouter request, while this condition deliberately
+uses serial evaluation and had no preregistered condition-level wall deadline.
+No score or Result was retained. The shared-key window moved by `$19.1756927`,
+but concurrent account activity made that value impossible to attribute and it
+exceeded the source-derived `$1.548288` legal reservation for the condition.
+The study therefore charges the full legal reservation, not the contaminated
+account delta. Its conservative cumulative upper is `$3.100145928`, leaving
+`$16.899854072` under the owner's cap. The retained stop is classified
+`principal_protocol_intervention`; it must not be rewritten as an Imp failure.
+No automatic successor is authorized until the execution protocol either
+preregisters a condition-level deadline or explicitly accepts completion under
+the existing per-request timeout. The matched table still contains zero valid
+rows; no DSPy or other-family condition has started.
 
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
