@@ -104,6 +104,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert output == ""
     receipt = fresh_path |> File.read!() |> Jason.decode!()
     assert receipt["status"] == "fresh_ok"
+    assert receipt["usage_cost_basis"] == "frozen_catalog_calculated"
     assert length(receipt["calls"]) == 4
     assert Enum.all?(receipt["calls"], &(&1["status"] == "ok"))
 
@@ -256,6 +257,36 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert state["summary"]["cost_usd"] == 0.001
 
     assert progress_path |> File.read!() |> String.split("\n", trim: true) |> length() == 3
+  end
+
+  test "live model prices produce catalog-calculated request costs" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition.exs")
+    source = File.read!(script)
+
+    body =
+      String.replace_suffix(
+        source,
+        "Imp.GepaSuiteConditionCLI.main(System.argv())\n",
+        ""
+      )
+
+    Code.compile_string(body, script)
+
+    spec =
+      apply(Imp.GepaSuiteConditionCLI, :priced_model_spec, [
+        "provider-disabled/model",
+        0.14,
+        0.28
+      ])
+
+    assert {:ok, model} = ReqLLM.model(spec)
+
+    assert {:ok, %{total_cost: 0.000002}} =
+             ReqLLM.Usage.Cost.breakdown(
+               %{input_tokens: 10, output_tokens: 3, total_tokens: 13},
+               model
+             )
   end
 
   defp sha256(path) do

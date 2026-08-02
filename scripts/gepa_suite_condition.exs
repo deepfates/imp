@@ -207,6 +207,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       artifact_sha256: artifact_sha,
       fresh_sha256: fresh_sha,
       usage: merge_runtime(usage, fresh_usage),
+      usage_cost_basis: :frozen_catalog_calculated,
       progress_sha256: sha256(progress),
       wall_time_us: wall_time_us,
       request_timeout_ms: @request_timeout_ms,
@@ -276,6 +277,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       seed: config.seed,
       calls: outcomes,
       usage: usage,
+      usage_cost_basis: :frozen_catalog_calculated,
       progress_sha256: sha256(progress),
       wall_time_us: wall_time_us
     })
@@ -380,16 +382,11 @@ defmodule Imp.GepaSuiteConditionCLI do
     api_key = System.fetch_env!(config.api_key_env)
 
     Imp.req_llm(
-      %{
-        provider: :openrouter,
-        id: model,
-        model: model,
-        base_url: "https://openrouter.ai/api/v1",
-        cost: %{
-          input: config.input_price_per_million,
-          output: config.output_price_per_million
-        }
-      },
+      priced_model_spec(
+        model,
+        config.input_price_per_million,
+        config.output_price_per_million
+      ),
       api_key: api_key,
       cache: false,
       temperature: 1.0,
@@ -421,6 +418,40 @@ defmodule Imp.GepaSuiteConditionCLI do
         max_retries: 0
       ]
     )
+  end
+
+  @doc false
+  def priced_model_spec(model, input_price_per_million, output_price_per_million) do
+    %{
+      provider: :openrouter,
+      id: model,
+      model: model,
+      base_url: "https://openrouter.ai/api/v1",
+      cost: %{
+        input: input_price_per_million,
+        output: output_price_per_million
+      },
+      pricing: %{
+        currency: "USD",
+        merge: "replace",
+        components: [
+          %{
+            id: "token.input",
+            kind: "token",
+            unit: "token",
+            per: 1_000_000,
+            rate: input_price_per_million
+          },
+          %{
+            id: "token.output",
+            kind: "token",
+            unit: "token",
+            per: 1_000_000,
+            rate: output_price_per_million
+          }
+        ]
+      }
+    }
   end
 
   defp configure_req_llm_pool!(config) do

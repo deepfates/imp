@@ -139,6 +139,17 @@ exact Novita endpoint degraded to status `-2` after the run, so verification is
 provider-free green but the unchanged live successor must wait for healthy
 route status. Optimizer arms remain paused.
 
+The unchanged healthy-route successor then completed and falsified the apparent
+framework gap. With matched 120-second timeouts, Imp scored `75/150` and pinned
+DSPy `70/150`; paired outcomes were 14 Imp-only wins, 9 DSPy-only wins, and 127
+ties, with comparable transport and finish-reason opportunity. The earlier
+large gap is excluded as a treatment defect. The successor is the first
+admitted current AIME baseline table datum, not an optimizer result or a broad
+superiority claim. A prospective runner-only correction now computes and
+labels frozen-catalog request cost from explicit LLMDB pricing components;
+the immutable run keeps exact tokens plus the `$0.452989096` shared-account
+window delta rather than inventing an exact Imp bill.
+
 - **Operational product center — complete as an internal milestone.** Clean
   package consumers exercise typed programs, evaluation, `Experiment.check`,
   private linked Result/Artifact persistence, fresh-OS application, concurrent

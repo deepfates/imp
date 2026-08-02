@@ -305,6 +305,33 @@ the frozen rows, model, endpoint, cap, and concurrency unchanged and retry only
 after the same endpoint returns healthy. No optimizer arm is admitted before
 the repaired baseline comparison completes.
 
+The healthy-route successor completed from clean `fab44da4` and decisively
+closed that diagnosis. On the same ordered 150 AIME rows, dated DeepSeek V4
+Flash snapshot, exact Novita endpoint, temperature 1, output envelope, and
+concurrency 8, Imp scored `75/150` (`0.5`) and pinned DSPy scored `70/150`
+(`0.466667`). Paired outcomes were 14 Imp-only wins, 9 DSPy-only wins, and 127
+ties. Both runtimes retained nearly identical transport opportunity and finish
+mixes: Imp 234 starts/234 terminals, DSPy 237 attempts/236 usage records with
+one transport error. The former `0.14` versus `0.486667` gap does not survive
+the matched timeout and is excluded from the table as a treatment defect; this
+successor is the admitted current AIME baseline datum, with ordinary
+temperature-1 sampling uncertainty reported rather than hidden.
+
+The private mode-0600 Imp Result/progress hashes are
+`d6e0c5b9fb4968b39b7630fde6e0f98f067cb0276ff876d90315fea754ecc4b9` /
+`c239a300ae9e90d8ae4cebbc7717be4cfc9aeb41f6d739aab64d8cb0ccdb141c`;
+DSPy's are
+`7863f9c3695ca5d694ca27cb40a1b190e94a028da4ae052fb04ee301b7713c60` /
+`8162302a3ce7aad162b58206d9b4931d2879e4d3a54deb5b3bdc1ca4cd700977`.
+The shared account snapshot moved `$0.452989096`, which is corroborating window
+evidence rather than exact lane attribution. Imp retained exact token counts
+but reported zero calculated dollars because the runner supplied legacy model
+cost fields that current ReqLLM/LLMDB does not convert for ad-hoc model specs.
+The prospective runner now supplies explicit pricing components and labels its
+telemetry `frozen_catalog_calculated`; it does not rewrite this result or claim
+provider-billed cost. This bounded accounting repair must not delay the next
+baseline family.
+
 The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program
