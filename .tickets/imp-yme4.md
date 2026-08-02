@@ -218,11 +218,21 @@ second tracking system:
    OA as the existing scoped non-prompt positive. Treat Banking77 and HotPotQA
    as terminal outcomes for their exact Imp treatments, not matched DSPy losses
    or exhausted tasks; only IFBench's Imp effectiveness interpretation is
-   invalid/unverified. Evaluate one cheap original-MIPRO paper anchor. Heart
-   Disease is the current candidate because the paper used a `120/183` split
-   and four-predictor program, but Imp currently has only a four-row
-   single-predictor smoke; proceed only if the exact source and program remain
-   an ordinary thin matched path. Use MuSiQue,
+   invalid/unverified. Evaluate one cheap current LangProBe/MIPRO anchor. Heart
+   Disease is the current candidate because it is a recognized four-call
+   compositional program over only 303 public benchmark rows. Do not merge two
+   different precedents into a fictional exact reproduction: the MIPRO paper
+   reports `120/183`, LangProBe uses `15/136/152`, and LangProBe's retained
+   result grid does not supply a multi-run uncertainty protocol. The actual
+   LangProBe/TensorFlow file is not equivalent to official UCI labels: matched
+   rows encode severity 2--4 as positive while the prompt says generic disease
+   presence, and six incomplete official rows are replaced. Pin and disclose
+   those actual benchmark bytes and run unconditional multi-run Imp/DSPy arms.
+   A provider-free proof now exercises the real four-predictor Imp program and
+   pinned DSPy shape through MIPRO selection, persistence, fresh loading, and
+   fresh service, establishing product fit but not effectiveness or full-budget
+   parity. Treat this as a literature-anchored software
+   comparison, not clinical validity or the broad usefulness result. Use MuSiQue,
    or a demonstrably better alternative, for the serious current-source
    multi-stage matched comparison. Defer a much larger GEPA paper-family
    HoVer/HotPotQA arm until an outcome-blind cost pilot justifies it. This is a

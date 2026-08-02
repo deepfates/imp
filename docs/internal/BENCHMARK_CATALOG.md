@@ -61,7 +61,7 @@ The sampling harness must preserve:
 | Optimize Anything non-prompt artifacts | Optimize Anything and GEPA generalize reflective optimization from prompts to measurable text artifacts. | Production Imp runner plus executable code, agent-configuration, and scheduling evaluators exist. The live campaign requires three seeds, positive mean lift, a majority of improving runs, provider usage/cost, embedded checksummed final budget evidence, and explicit request/token/dollar ceilings enforced by pre-request reservation. The local checkpoint uses sync-write plus rename and is neither resumable spend state nor a power-loss guarantee. | `mix benchmark.optimize_anything.check`, `mix imp.benchmark.optimize_anything --live ... --max-cost-usd ... --max-requests ... --max-input-tokens ... --max-output-tokens ... --max-output-tokens-per-request ...` | Broaden to matched public upstream artifact tasks only when making a paper-scale or implementation-comparison claim; never treat a configured ceiling as observed cost. |
 | GEPA paper replication | GEPA artifact repo covers AIMEBench, HotpotQABench, hoverBench, IFBench, LiveBenchMathBench, and Papillon. | Artifact contract, dataset exporter, upstream artifact ingestion, pinned source-exact HoVer Python BM25S retrieval, explicitly approximate native HoVer BM25, HoVer LM query generation, and Imp-side capped live campaign rows exist; full claims remain blocked on uncapped Imp rows. The contract rejects capped dataset roots for full research claims. | `mix benchmark.gepa_replication.check`, `mix imp.benchmark.gepa_dataset`, `mix imp.benchmark.gepa_campaign`, `mix imp.benchmark.gepa_replication --from-gepa-artifact ...` | Run full uncapped Imp-vs-DSPy GEPA campaigns with exact model, budget, cost, seed, and split-gap metadata. |
 | Hallucination/factuality classification | DSPy optimizer comparison papers use CovidQA, PubMedQA, DROP, FinanceBench, and similar labeled QA/factuality tasks. | Not implemented as fetchable benchmark lanes. | None | Add a generic classification/QA sampler and metric adapters for exact/F1/macro-F1. |
-| MIPRO tabular classification | MIPRO optimizer benchmarks include Iris, Iris-Typo, and Heart Disease. | Tiny provider-free samplers and runner smoke exist; MIPRO-specific scaled optimizer evidence is still missing. | `mix imp.benchmark.fetch --tasks iris,iris_typo,heart_disease --full --out benchmarks/data`, `mix imp.benchmark.run --iris benchmarks/data/iris-test-0-6.jsonl --iris-typo benchmarks/data/iris_typo-test-0-3.jsonl --heart-disease benchmarks/data/heart_disease-test-0-4.jsonl` | Add optimizer-lift runs and larger pinned slices when making MIPRO tabular claims. |
+| MIPRO / LangProBe tabular classification | The MIPRO paper uses a 4-call Heart Disease clinical-opinion ensemble on 120 train / 183 test rows. LangProBe independently adapts the same program and TensorFlow-derived 303-row file into a 15-train / 136-validation / 152-test optimizer benchmark, with retained results across six model families and several optimizers. | A provider-free four-predictor Imp and pinned-DSPy product-fit proof exercises MIPRO selection, state/Artifact persistence, fresh loading, and fresh service; it does not claim full optimizer opportunity or effectiveness. The LangProBe file is not equivalent to official UCI processed Cleveland labels: its matched rows classify severity 2--4 as positive, the prompt says generic disease presence, and six incomplete official rows are replaced. | `mix test test/langprobe_heart_disease_product_fit_test.exs --include evidence_infrastructure`, `python3 scripts/langprobe_heart_data_audit.py ...` | Use the exact published benchmark bytes for a disclosed five-run matched software comparison; report baselines, lifts, direct runtime contrast, per-example uncertainty, and Artifact/service acceptance. Do not claim official-UCI equivalence or clinical validity. |
 | ScoNe logical classification | MIPRO optimizer benchmarks include ScoNe. | Not implemented as benchmark lane. | None | Pin a public dataset source and add accuracy metric. |
 | HoVer claim verification | MIPRO and GEPA benchmark lineage includes HoVer multi-hop verification. | GEPA exporter and metric adapter use the upstream `retrieved_docs` contract; source-exact BM25/wiki corpus and index are reproducible locally, with an upstream-python campaign path to avoid loading the full corpus in the BEAM. Imp HoVer campaign rows now generate LM queries and report positive usage accounting, but full GEPA claims still require uncapped rows. | `mix imp.benchmark.gepa_dataset`, `IMP_HOVER_UPSTREAM_BM25=1 mix imp.benchmark.gepa_campaign` | Run uncapped HoVer GEPA campaign rows with source-exact upstream BM25 retrieval and positive usage accounting. |
 | IFBench instruction following | GEPA benchmark lineage includes verifiable instruction following. | Provider-free local verifier smoke exists with executable constraint scoring. | `mix imp.benchmark.fetch --tasks ifbench_instruction_following --full --out benchmarks/data`, `mix imp.benchmark.run --ifbench-instruction-following benchmarks/data/ifbench_instruction_following-test-0-3.jsonl`, `mix benchmark.truth.check` | Scale to a pinned IFBench snapshot when research-tier evidence is required. |
@@ -75,11 +75,20 @@ The sampling harness must preserve:
 ## Prioritized Additions
 
 1. **Staged matched optimizer portfolio.** Preserve the existing matched TREC
-   result. Evaluate a cheap original-MIPRO paper anchor, with Heart Disease as
-   the current candidate because its paper-scale `120/183` four-predictor
-   condition is small. The existing repository path is only a four-row
-   single-predictor smoke, so first falsify whether the exact source and program
-   remain a thin matched path. Then run one serious current-source
+   result. Evaluate a cheap current LangProBe/MIPRO anchor, with Heart Disease
+   as the current candidate because the recognized program is four compositional
+   LM calls over only 303 public benchmark rows. The original MIPRO paper
+   (`120/183`) and LangProBe (`15/136/152`) use different study splits. A provider-free
+   ordinary product-fit proof now exercises the four-predictor program in Imp
+   and pinned DSPy through optimization, persistence, and fresh use. Pin the
+   actual LangProBe/TensorFlow bytes, program, split, and current
+   optimizer/runtime versions, then use multiple
+   runs in both Imp and DSPy, following the MIPRO paper's five-run convention
+   and per-example run-average analysis. This would be a stronger current-source
+   matched replication of the task/program pattern, not an exact replay of either
+   paper's headline. The benchmark file's disclosed UCI-label mismatch prevents
+   clinical-validity claims but does not prevent a matched implementation study.
+   Then run one serious current-source
    multi-stage comparison, with MuSiQue as the strongest prepared candidate but
    not a mandatory choice. Evaluate a GEPA paper-family HoVer/HotPotQA arm only
    after an outcome-blind cost pilot justifies its much larger opportunity. For
@@ -119,6 +128,11 @@ Primary sources to keep the catalog grounded:
   <https://dspy.ai/api/optimizers/MIPROv2/>
 - MIPRO paper:
   <https://arxiv.org/abs/2406.11695>
+- LangProBe paper and source benchmark:
+  <https://arxiv.org/abs/2502.20315>,
+  <https://github.com/Shangyint/langProBe>
+- UCI Heart Disease dataset authority:
+  <https://doi.org/10.24432/C52P4X>
 - GEPA paper:
   <https://arxiv.org/abs/2507.19457>
 - Demonstrate-Search-Predict paper:

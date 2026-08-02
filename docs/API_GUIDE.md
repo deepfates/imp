@@ -256,7 +256,7 @@ When the admission decision needs more replication than the final test
 estimate, declare both counts explicitly:
 
 ```elixir
-evaluation_options: [
+evaluation_options = [
   repetitions: [selection: 3, test: 1],
   aggregation: :mean
 ]
