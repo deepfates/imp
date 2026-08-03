@@ -1002,3 +1002,20 @@ semantics on 104 boundary cases spanning all 52 frozen AMPS rows. Non-AMPS
 metrics remain source-native. This closes the reproduced treatment defect but
 does not create a valid table datum or reduce the epic; a clean matched
 successor remains the meaningful next measurement under the existing cap.
+
+**2026-08-03T16:32:00Z**
+
+The clean matched LiveBench Math baseline successor completed both ordinary
+public paths with the same authenticated portable AMPS scorer. Pinned DSPy
+scored `81/126` (`0.6428571429`) and Imp scored `77/126` (`0.6111111111`);
+paired outcomes were five DSPy-only wins, one Imp-only win, and 120 ties. The
+one DSPy provider `APIError` occurred on a row where both systems scored zero,
+so it did not create the observed margin; it remained an ordinary score-zero
+diagnostic without retry. Exact joined cost was `$0.238719568`.
+
+This is a real current-model baseline table datum and a narrow DSPy advantage,
+not an optimizer result or evidence that the larger epic is complete. The
+preceding relative-path launch is preserved separately as a null invocation
+mistake: DSPy refused before provider work and Imp was stopped after ten
+completed transports (`$0.006992`). The conservative table-study charge is now
+`$11.527815442` under the existing `$20` cap.

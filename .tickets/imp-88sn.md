@@ -3416,3 +3416,38 @@ pinned scorer's synchronous semantics for correct and invalid predictions on
 all 52 frozen AMPS rows (104 comparisons). Missing dependencies fail before
 provider work. This is a prospective treatment repair, not a reinterpretation
 of either retained pair.
+
+## Current-model table: matched LiveBench baseline datum
+
+The first launch from clean `e15cc616` was scientifically null because the
+upstream command received the scorer interpreter as a relative path, then
+changed its working directory before preflight. DSPy refused before provider
+work; Imp was stopped after ten completed transports (`$0.006992`). The private
+root
+`benchmarks/results/gepa-suite-livebenchmath-baseline-matched-scorer-e15cc616-20260803T160341Z`
+and terminal record preserve the mistake; no score is inferred from it.
+
+The clean successor from the same code and unchanged treatment used the exact
+absolute scorer interpreter and completed both ordinary baseline lanes. The
+private root is
+`benchmarks/results/gepa-suite-livebenchmath-baseline-matched-scorer-e15cc616-20260803T160530Z`.
+Pinned DSPy scored `81/126` (`0.6428571429`) and Imp scored `77/126`
+(`0.6111111111`). Paired outcomes were five DSPy-only wins, one Imp-only win,
+and 120 ties. By official subtask the scores were AMPS_Hard `33/52` DSPy versus
+`32/52` Imp, math_comp `43/50` versus `41/50`, and olympiad `5/24` versus
+`4/24`.
+
+Both results authenticate the same portable AMPS scorer runtime. Imp retained
+47 strict adapter diagnostics and DSPy retained 30. DSPy also recorded one
+provider `APIError`; it belongs to row 1, on which both systems scored zero, so
+it changes neither the paired wins nor the four-point margin. It was retained
+under the predeclared ordinary failure-score policy with no retry or replacement.
+This is an admitted current-model baseline product-path datum, not optimizer
+effectiveness and not prompt/adapter identity: the ordinary Imp and DSPy
+adapters remain their respective public paths.
+
+Exact joined lane cost was `$0.238719568` (`$0.121853000` Imp and
+`$0.116866568` DSPy); the account window moved `$0.230530272`. Result SHA-256
+values are `c0b5a425...e8bdf` Imp and `d4a0de71...a30b1` DSPy. Including the
+null launch's completed work, the conservative study charge is now
+`$11.527815442` against the unchanged combined `$20` cap.
