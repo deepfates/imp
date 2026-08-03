@@ -3451,3 +3451,22 @@ Exact joined lane cost was `$0.238719568` (`$0.121853000` Imp and
 values are `c0b5a425...e8bdf` Imp and `d4a0de71...a30b1` DSPy. Including the
 null launch's completed work, the conservative study charge is now
 `$11.527815442` against the unchanged combined `$20` cap.
+
+The next IFBench baseline preflight from clean `da67d26a` made zero provider
+calls. Both runtimes independently refused because the existing full-condition
+reservation would project each lane to `$23.666393362`, above the shared `$20`
+study cap; the endpoint catalog also reported SiliconFlow degraded (`-2`). The
+private root is
+`benchmarks/results/gepa-suite-ifbench-baseline-matched-da67d26a-20260803T162518Z`
+and the account usage was byte-for-byte unchanged.
+
+This exposes an owner-held budget-policy boundary rather than an IFBench or Imp
+failure. The reservation prices every legal call at the complete configured
+content-byte and output-token maxima. Under that rule the two-runtime IFBench
+baseline alone reserves `$24.277155840`; the remaining IFBench, HotPotQA,
+HoVer, and PAPILLON baseline pairs reserve `$163.287613440`, projecting the
+study to `$174.815428882`. The completed matched LiveBench pair, by contrast,
+actually cost `$0.238719568`. Do not silently weaken the rule, raise the owner
+cap, or launch on a degraded endpoint. The next disposition must choose between
+a larger worst-case reservation and a separately ratified finite actual-spend
+policy that may stop a condition scientifically null if its hard cap is reached.

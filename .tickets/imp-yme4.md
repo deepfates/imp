@@ -1019,3 +1019,15 @@ preceding relative-path launch is preserved separately as a null invocation
 mistake: DSPy refused before provider work and Imp was stopped after ten
 completed transports (`$0.006992`). The conservative table-study charge is now
 `$11.527815442` under the existing `$20` cap.
+
+**2026-08-03T16:38:00Z**
+
+The following IFBench baseline preflight made zero calls. SiliconFlow reported
+degraded status `-2`, and both ordinary runtimes independently rejected the
+condition because the full configured-envelope reservation projected each lane
+above the existing `$20` study cap. Usage remained unchanged. Completing the
+four remaining matched baseline families under the current every-call-at-maximum
+reservation would project the study to `$174.815428882`, despite the completed
+LiveBench pair's `$0.238719568` realized cost. This is a genuine owner choice
+about worst-case reservation versus a finite actual-spend policy; it is not
+permission to weaken the cap silently or another product-readiness task.
