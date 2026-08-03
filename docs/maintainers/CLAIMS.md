@@ -127,6 +127,13 @@ comparator sources, distinct split digests, and positive live token/cost
 accounting are required. Capped `--max-per-split` dataset roots are explicitly
 rejected for full GEPA claims. SIMBA may be reported as extra comparator
 evidence when present, but it is not required by the upstream GEPA artifact.
+The active current-model six-family table is deliberately separate: it uses
+the official task families and scorers but current models/runtime policies and
+Imp's GEPA 0.1.4 no-merge profile. It can earn a scoped C3 matched reference
+differential, not this lane's exact C4 paper-replication claim. Do not feed its
+artifact to `gepa_replication` admission or describe it as paper reproduction;
+an exact C4 attempt requires its own paper-authority protocol, including merge
+where used by the original arm.
 
 Optimize Anything non-prompt effectiveness uses its own `optimize_anything`
 lane. Full evidence requires executable code, agent-configuration, and

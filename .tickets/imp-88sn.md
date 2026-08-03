@@ -44,6 +44,38 @@ by changing tasks or thresholds after seeing outcomes.
 
 ## Current status
 
+### Restart snapshot (2026-08-03, clean `76c58f3b`)
+
+The recognized six-task endpoint remains ratified, but horizontal baseline
+completion is no longer the immediate execution order. The current table has
+two admitted baseline cells (AIME and LiveBench Math), zero current GEPA cells,
+and zero current MIPROv2 cells. Its complete three-seed/two-runtime legal plan
+contains `2,151,306` transports. Continuing through four more baselines before
+testing either optimizer would postpone the ticket's central question.
+
+The significance-first sequence is therefore:
+
+1. complete the already-started AIME vertical through matched GEPA and MIPROv2;
+2. complete repaired IFBench baseline/GEPA/MIPROv2 as the central realistic
+   multi-stage vertical; and
+3. after classifying those results, scale the preregistered unchanged arms for
+   HotPotQA, HoVer, LiveBench Math, and PAPILLON.
+
+Both verticals are run-to-completion scientific tranches, not pilots that must
+pass before negatives are disclosed. The review between them and the remaining
+four tasks may repair reusable product defects or invalid treatments; it may
+not task-shop, change observed thresholds, or reinterpret clean negatives.
+Every selected Imp optimizer arm still owes schema-3 Artifact application in a
+fresh BEAM and four-call concurrent `ProgramServer` service.
+
+This study earns a current-model matched reference differential. It uses the
+official six paper families and scorers but Imp's GEPA `0.1.4` no-merge profile,
+current models, and current runtime policies; therefore it does not earn the
+separate exact C4 paper-replication target. No provider call is currently active
+or authorized by this snapshot. The next spend decision must bind the exact two
+vertical opportunities and their cumulative cap rather than reuse the stopped
+horizontal-baseline reservation.
+
 ### Owner-ratified correction and next evidence tranche (2026-08-01)
 
 This ticket's central multi-stage question will be answered through the

@@ -4,10 +4,17 @@ This note records the outside view used to shape Imp. It separates scientific
 authorities, implementation comparators, production complements, and recent
 work that is promising but too new to become a release claim.
 
-The review was refreshed on 2026-07-25. Moving repositories must still be
+The review was refreshed on 2026-08-03. Moving repositories must still be
 re-pinned before their behavior is used in a differential gate.
 
 ## Current GEPA And Optimize Anything Snapshot
+
+DSPy `3.2.1` remains the latest stable tag. `3.3.0b1` is the current immutable
+prerelease and adds experimental ReActV2/native tool history, a typed
+provider-neutral LM boundary, shared BaseLM save/load and normalized errors,
+and GEPA `0.1.1` integration. Imp therefore keeps stable compatibility claims
+anchored to `3.2.1` while tracking the beta surfaces separately; prerelease
+tracking is not evidence that those runtime seams are complete in Imp.
 
 The current released implementation authority is GEPA `v0.1.4` at
 `8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`. That tag still reports package
@@ -36,6 +43,14 @@ richer callbacks and experiment tracking, `ConfidenceAdapter`, and a LangChain
 adapter. The exact `v0.1.1` checkout remains a historical executable contract
 for the existing provider-free differential; it no longer defines the current
 public compatibility horizon.
+
+The moving GEPA documentation now centers the engine-pluggable
+`optimize_anything` API and lists adapters for full DSPy programs, RAG, MCP,
+and terminal agents in addition to predictor-level prompt optimization. Those
+development docs are landscape evidence, not a new immutable release pin. They
+do change the strategic interpretation: the historical six-family table is a
+recognizable and valuable optimizer comparison, but it is not a census of the
+current GEPA ecosystem or evidence of whole-framework superiority.
 
 ## Where The Work Comes From
 
@@ -243,8 +258,12 @@ measurable against pinned authorities.
 P0 work on the current finish line:
 
 1. Finish and execute the MIPROv2/SIMBA structural differential.
-2. Complete the six-family GEPA campaign with exact release, artifact, dataset,
-   model, metric, budget, seed, cost, and uncertainty metadata.
+2. Preserve the complete six-family current-model table, but execute it
+   significance-first: matched baseline/GEPA/MIPROv2 on AIME, then repaired
+   multi-stage IFBench, before scaling the unchanged remaining families. Report
+   it as an adapted reference differential. A separate C4 paper reproduction
+   must restore paper-authority models and optimizer semantics, including merge
+   where applicable.
 3. Make GEPA's parameter identities, Pareto state, merge lineage, checkpoints,
    and immutable results reusable below DSPy-shaped adapters.
 4. Establish one canonical typed trajectory for text, multimodal values,

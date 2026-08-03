@@ -46,6 +46,55 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 
 The product center is real but the telos is open.
 
+### Principal restart snapshot (2026-08-03, clean `76c58f3b`)
+
+Start here after compaction or a cold handoff. The chronological evidence below
+is retained for audit, but it does not define priority.
+
+- **Intended endpoint:** an owner-ready Elixir optimization system whose normal
+  public path can improve realistic programs, persist selected parameters, and
+  operate them after a fresh restart; whose advertised optimizer families are
+  honestly classified; and whose strongest comparative claims are
+  independently recomputable.
+- **Implemented:** a broad stable-DSPy-compatible BEAM product center with typed
+  programs, evaluation, public optimizers, parameter/value Artifacts, and OTP
+  operation. The product-only `0.3.0` candidate is unpublished. Current DSPy
+  `3.3.0b1` tracking is explicit and partial rather than silently folded into
+  the stable `3.2.1` compatibility claim.
+- **Actually exercised:** unpacked-package and uncoached install-to-optimize-to-
+  Artifact-to-fresh-service lifecycles; scoped operational advantages for
+  owner-only checksummed Artifacts and supervised hard-timeout containment;
+  narrow positive TREC and structured Optimize Anything results; clean
+  Banking77, HotPotQA, and Grue negatives; and admitted current matched
+  baselines for AIME (`Imp 75/150`, DSPy `70/150`) and LiveBench Math
+  (`Imp 77/126`, DSPy `81/126`).
+- **Unknown/open:** no current matched GEPA or MIPROv2 arm has completed; broad
+  optimizer effectiveness and blanket Imp-over-DSPy superiority are unproved;
+  several current DSPy beta surfaces remain tracking/gaps; public release and
+  truly external adoption remain owner-held future steps.
+- **Protocol truth:** the declared six-family study is an adapted current-model
+  reference differential using Imp's pinned GEPA `0.1.4` no-merge profile. It
+  preserves the official paper families and scorers, but it is not an exact C4
+  paper reproduction and must never be admitted as one. The exact full plan is
+  large (`2,151,306` legal transports across three seeds and two runtimes).
+- **Next sequence:** preserve the complete table endpoint but test the central
+  optimizer risk vertically. Complete matched baseline/GEPA/MIPROv2 on AIME,
+  then the repaired multi-stage IFBench arm. Review product/treatment/science
+  evidence after those two preregistered verticals, then scale the unchanged
+  remaining HotPotQA, HoVer, LiveBench Math, and PAPILLON arms. This sequencing
+  is not a success gate and may not be used to abandon negative tasks or change
+  outcomes after inspection.
+- **Current operation:** no provider process is active. The previous `$20`
+  baseline tranche stopped before IFBench transport because its conservative
+  full-condition reservation exceeded the remaining cap. A new provider call
+  requires a newly explicit vertical-slice opportunity and spend disposition;
+  it is not implied by this repository reconciliation.
+
+Primary restart coordinates are this epic, `imp-88sn`, `README.md`,
+`docs/CONFORMANCE.md`, `benchmarks/claims.json`, and the executable
+`Imp.BenchmarkTruth.GepaStudyPlan`. Tests, gates, receipts, and the chronology
+below are evidence for those owners, not alternative roadmaps.
+
 ### Owner-ratified benchmark and product direction (2026-08-01)
 
 The next central scientific move is no longer a succession of locally defined
@@ -379,7 +428,7 @@ second tracking system:
    passes with the scope above; long-running recovery, overload behavior, and
    external acceptance remain open and should be tested through ordinary use,
    not a new operations campaign.
-3. **Complete the standard comparative benchmark table.** Preserve matched TREC,
+3. **Complete the standard comparative benchmark table, vertically first.** Preserve matched TREC,
    the structured retry-policy OA positive, and the Banking77/HotPot negatives
    as historical context, but do not use them to replace the recognized study.
    Freeze the official six-task GEPA suite for current matched Imp and pinned
@@ -391,8 +440,13 @@ second tracking system:
    six-family programs, scorers, authorities, and artifact contracts while
    reducing the old campaign controller to thin ordinary per-task paths.
    Historical-model reproduction is optional calibration; the current-model
-   table is the headline comparison. MuSiQue and Heart remain preserved
-   adapted-case-study records rather than the active center.
+   table is the headline comparison. Preserve the full six-family endpoint,
+   but complete AIME baseline/GEPA/MIPROv2 and then repaired IFBench
+   baseline/GEPA/MIPROv2 before scaling the unchanged remaining four families.
+   This ordering tests optimizer capability earlier; it is not a pass gate,
+   task-shopping rule, or permission to suppress either vertical's negative
+   result. MuSiQue and Heart remain preserved adapted-case-study records rather
+   than the active center.
 
    In parallel, use Grue/Zork for the deeper stateful-agent proof: optimize a
    real agent over deterministic forkable episodes, select without held-out
@@ -404,11 +458,14 @@ second tracking system:
    exact route, model, privacy, cache, fallback, and fixed scientific
    opportunity through existing task-owned paths. Use one prospective spend
    rule rather than an exhaustive future-prompt census: before every transport,
-   reserve the role's full configured context and output allowance at the
-   authenticated full price; dispatch only below an owner-ratified condition
-   cap; reconcile actual provider usage and cost before continuing. A cap stop
-   makes the condition inconclusive and never licenses a truncated score. This
-   bounds spend without claiming an expected cost or guaranteed completion.
+   require reconciled cumulative actual spend plus the authenticated worst-case
+   price of the next request to remain below the owner-ratified vertical-slice
+   cap. Do not require the sum of every legal maximum-sized request in the whole
+   condition to fit before the first call; that stopped the prior IFBench
+   baseline despite much smaller observed costs and is a planning bound, not a
+   useful admission policy. A cap stop makes the condition inconclusive and
+   never licenses a truncated score. This bounds spend without claiming an
+   expected cost or guaranteed completion.
    Reject the lane if enforcing it requires another generic benchmark
    controller or changes the treatment. Present the exact call opportunity,
    conservative admission rule, likely runtime, unknown actual cost, scoped

@@ -509,7 +509,7 @@
       "target_rung": "C4",
       "release": "telos",
       "scope": "Telos research replication across the six named GEPA paper families; excludes a claim for unlisted datasets or optimizer families.",
-      "limitations": ["Papillon and HoVer full-scope artifacts are incomplete."],
+      "limitations": ["Papillon and HoVer full-scope artifacts are incomplete.", "The active current-model six-family table uses Imp's GEPA 0.1.4 no-merge profile and current runtime/model policies. It is an adapted reference differential and cannot satisfy this exact C4 paper-replication target. C4 requires a separately frozen protocol that reproduces the paper-authority optimizer semantics, including merge where the paper arm uses it."],
       "statement": "The telos research target is a six-family GEPA replication artifact comparing baseline, DSPy GEPA, Imp GEPA, and MIPROv2 with cost, budget, seed, and split-gap metadata; SIMBA may be reported as extra comparator evidence when present.",
       "category": "optimizer",
       "surface": ["GEPA", "MIPROv2", "SIMBA", "AIMEBench", "HotpotQABench", "hoverBench", "IFBench", "LiveBenchMathBench", "Papillon"],

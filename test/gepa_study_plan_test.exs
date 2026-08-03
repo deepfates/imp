@@ -10,6 +10,16 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
     plan = GepaStudyPlan.plan!(@root, seeds: 3, runtimes: 2)
 
     assert plan.arms == [:baseline, :mipro_v2_heavy, :gepa_v0_1_4_no_merge]
+    assert plan.protocol_classification == :adapted_current_model_reference_differential
+    refute plan.paper_replication_claimed
+
+    assert plan.execution_sequence == [
+             {:vertical, "AIMEBench", [:baseline, :gepa_v0_1_4_no_merge, :mipro_v2_heavy]},
+             {:vertical, "IFBench", [:baseline, :gepa_v0_1_4_no_merge, :mipro_v2_heavy]},
+             {:scale_remaining_after_review,
+              ["HotpotQABench", "hoverBench", "LiveBenchMathBench", "Papillon"]}
+           ]
+
     assert plan.lanes == 6
 
     assert plan.per_runtime_seed == %{
@@ -64,6 +74,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
 
     assert Enum.find(plan.families, &(&1.family == "Papillon")).transports.judge == 16_890
     assert plan.boundaries.provider_calls_authorized == false
+    assert plan.boundaries.preserves_full_six_family_endpoint
+    assert plan.boundaries.vertical_sequence_is_not_a_success_gate
+    assert plan.boundaries.current_gepa_profile == :gepa_v0_1_4_no_merge
+    assert plan.boundaries.exact_paper_replication_requires_separate_protocol
 
     assert plan.boundaries.task_transport_bound ==
              :initial_chat_call_plus_at_most_one_ordinary_json_adapter_fallback

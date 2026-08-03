@@ -39,7 +39,15 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
 
     %{
       kind: :matched_current_model_gepa_suite,
+      protocol_classification: :adapted_current_model_reference_differential,
+      paper_replication_claimed: false,
       arms: [:baseline, :mipro_v2_heavy, :gepa_v0_1_4_no_merge],
+      execution_sequence: [
+        {:vertical, "AIMEBench", [:baseline, :gepa_v0_1_4_no_merge, :mipro_v2_heavy]},
+        {:vertical, "IFBench", [:baseline, :gepa_v0_1_4_no_merge, :mipro_v2_heavy]},
+        {:scale_remaining_after_review,
+         ["HotpotQABench", "hoverBench", "LiveBenchMathBench", "Papillon"]}
+      ],
       seeds: seeds,
       runtimes: runtimes,
       lanes: lanes,
@@ -50,6 +58,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       full_study_by_arm:
         Map.new(per_lane_by_arm, fn {arm, totals} -> {arm, multiply(totals, lanes)} end),
       boundaries: %{
+        preserves_full_six_family_endpoint: true,
+        vertical_sequence_is_not_a_success_gate: true,
+        current_gepa_profile: :gepa_v0_1_4_no_merge,
+        exact_paper_replication_requires_separate_protocol: true,
         heldout_loaded_after_optimizer: true,
         official_mipro_reference_opportunity: true,
         gepa_boundary_checked_legal_completion: true,

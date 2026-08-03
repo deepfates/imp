@@ -199,9 +199,15 @@
       ],
       "benchmark_views": [
         {
+          "name": "Current-model six-family matched table",
+          "construct": "cross-task optimizer quality under current matched Imp and DSPy conditions",
+          "protocol": "Official paper-family data and scorers; current matched model roles and opportunity; Imp GEPA 0.1.4 no-merge; three seeds; direct baseline, GEPA, and MIPROv2 reporting. Execute AIME and IFBench verticals first, then scale the unchanged remaining families. This is not exact paper replication and is not success-gated task selection.",
+          "evidence_tier": "reference_differential"
+        },
+        {
           "name": "GEPA six-family campaign",
           "construct": "cross-task reflective optimization and Pareto search",
-          "protocol": "Pinned paper-family manifests, exact scorers, matched model roles and budgets, and actual GEPA comparator artifacts.",
+          "protocol": "Separately frozen paper-authority manifests, models, optimizer semantics including merge where applicable, exact scorers, matched budgets, and actual GEPA comparator artifacts. Current-model no-merge table artifacts cannot satisfy this view.",
           "evidence_tier": "exact_replication"
         },
         {
