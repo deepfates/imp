@@ -303,11 +303,15 @@ metric-level feedback rather than a custom component map. Campaign metadata
 records the installed component-feedback identity.
 
 For source-checkout campaigns, use `mix imp.benchmark.gepa_replication
---from-gepa-artifact ... --upstream-evidence ... --imp-input ...` to convert upstream GEPA artifact
+--from-gepa-artifact ... --upstream-evidence ... --imp-input ...
+--protocol-classification exact_paper_replication` to convert upstream GEPA artifact
 `Baseline`, `GEPA`, and `MIPROv2-Heavy` outputs into dashboard rows. The
 `--imp-input` file must come from Imp's own GEPA run and provide the
 `imp_gepa` result plus provenance fields; the converter does not synthesize
 Imp scores.
+The explicit classification is reserved for a separately frozen
+paper-authority protocol. The adapted current-model no-merge table must omit it
+and cannot enter the exact C4 lane.
 
 Produce canonical Imp input with `mix imp.benchmark.gepa_campaign --manifest
 benchmarks/config/gepa-paper-campaign-v2.json`. The immutable manifest binds the

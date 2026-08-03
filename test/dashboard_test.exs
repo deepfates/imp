@@ -113,6 +113,7 @@ defmodule DashboardTest do
     write_json!(Path.join(gepa_dir, "gepa-replication-20260707T000000Z.json"), %{
       "schema_version" => 1,
       "runner" => "imp-gepa-replication",
+      "protocol_classification" => "exact_paper_replication",
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
       "source" => %{"mode" => "input"},
@@ -1056,6 +1057,7 @@ defmodule DashboardTest do
     write_json!(Path.join(dirs.gepa_dir, "gepa-replication-forged.json"), %{
       "schema_version" => 1,
       "runner" => "imp-gepa-replication",
+      "protocol_classification" => "exact_paper_replication",
       "generated_at" => "2026-07-07T00:00:00Z",
       "git_sha" => "abc",
       "source" => %{"mode" => "input"},

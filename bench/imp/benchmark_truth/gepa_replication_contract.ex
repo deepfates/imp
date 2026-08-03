@@ -92,6 +92,7 @@ defmodule Imp.BenchmarkTruth.GepaReplicationContract do
 
     validation.passing and
       artifact["runner"] == "imp-gepa-replication" and
+      artifact["protocol_classification"] == "exact_paper_replication" and
       get_in(artifact, ["source", "mode"]) == "input" and
       get_in(artifact, ["summary", "all_passing"]) == true and
       get_in(artifact, ["summary", "full_gepa_replication"]) == true and

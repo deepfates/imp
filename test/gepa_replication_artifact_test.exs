@@ -16,6 +16,8 @@ defmodule GepaReplicationArtifactTest do
       GepaReplicationTask.run([
         "--input",
         input_path,
+        "--protocol-classification",
+        "exact_paper_replication",
         "--out",
         out_dir
       ])
@@ -26,6 +28,7 @@ defmodule GepaReplicationArtifactTest do
 
     assert artifact["summary"]["all_passing"]
     assert artifact["summary"]["full_gepa_replication"]
+    assert artifact["protocol_classification"] == "exact_paper_replication"
     assert artifact["summary"]["missing_families"] == []
     assert artifact["summary"]["missing_fields"] == []
 
@@ -52,6 +55,15 @@ defmodule GepaReplicationArtifactTest do
                is_map(row["optimizer_budgets"]) and
                is_map(row["source_commits"])
            end)
+  end
+
+  test "complete adapted current-model rows cannot authorize exact paper replication" do
+    artifact =
+      full_rows()
+      |> full_artifact()
+      |> Map.put("protocol_classification", "adapted_current_model_reference_differential")
+
+    refute GepaReplicationContract.full_artifact?(artifact)
   end
 
   test "GEPA replication task rejects forged full rows with placeholder comparator evidence" do
@@ -278,6 +290,8 @@ defmodule GepaReplicationArtifactTest do
         "gepa-conversion-test",
         "--artifact-model",
         "gpt-41-mini",
+        "--protocol-classification",
+        "exact_paper_replication",
         "--out",
         out_dir
       ])
@@ -423,6 +437,7 @@ defmodule GepaReplicationArtifactTest do
   defp full_artifact(rows) do
     %{
       "runner" => "imp-gepa-replication",
+      "protocol_classification" => "exact_paper_replication",
       "source" => %{"mode" => "input"},
       "summary" => %{
         "all_passing" => true,
@@ -559,6 +574,8 @@ defmodule GepaReplicationArtifactTest do
       "gepa-adversarial-test",
       "--artifact-model",
       "gpt-41-mini",
+      "--protocol-classification",
+      "exact_paper_replication",
       "--out",
       tmp_dir("gepa-adversarial-output")
     ]

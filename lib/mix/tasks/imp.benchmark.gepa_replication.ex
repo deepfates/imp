@@ -3,15 +3,20 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
   Validate and emit GEPA paper-replication evidence artifacts.
 
       mix imp.benchmark.gepa_replication --smoke --out tmp/gepa-replication
-      mix imp.benchmark.gepa_replication --input path/to/rows.json --out tmp/gepa-replication
+      mix imp.benchmark.gepa_replication --input path/to/rows.json \\
+        --protocol-classification exact_paper_replication --out tmp/gepa-replication
       mix imp.benchmark.gepa_replication --from-gepa-artifact path/to/experiment_runs_data \\
         --upstream-evidence path/to/upstream-evidence.json \\
-        --imp-input path/to/imp-gepa-rows.json --campaign-id gepa-full-YYYYMMDD
+        --imp-input path/to/imp-gepa-rows.json --campaign-id gepa-full-YYYYMMDD \\
+        --protocol-classification exact_paper_replication
 
   The task does not fabricate benchmark results. It packages fresh GEPA
   replication rows produced by a campaign runner into the dashboard contract and
   fails unless every row includes the optimizer, budget, cost, seed, and split
-  metadata needed for paper-level GEPA claims. `--smoke` runs a deterministic
+  metadata needed for paper-level GEPA claims. Complete rows authorize C4 only
+  when the caller explicitly classifies the separately frozen protocol as
+  `exact_paper_replication`; current-model adapted rows remain non-full.
+  `--smoke` runs a deterministic
   local Imp campaign over tiny task-shaped rows so the source-checkout gate
   exercises real code without paid provider calls.
   """
@@ -37,6 +42,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
           imp_input: :string,
           campaign_id: :string,
           artifact_model: :string,
+          protocol_classification: :string,
           out: :string,
           smoke: :boolean
         ]
@@ -59,13 +65,24 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
       )
 
     passing = validation.passing
-    full_research = passing and not smoke?
+    protocol_classification = Keyword.get(opts, :protocol_classification, "unclassified")
+
+    full_research =
+      passing and not smoke? and protocol_classification == "exact_paper_replication"
+
+    evidence_level =
+      cond do
+        full_research -> "research_campaign"
+        smoke? -> "smoke"
+        true -> "complete_non_c4"
+      end
 
     artifact = %{
       "schema_version" => 1,
       "runner" => "imp-gepa-replication",
       "generated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       "git_sha" => git_sha(),
+      "protocol_classification" => protocol_classification,
       "source" => artifact_source(opts, input, artifact_dir),
       "summary" => %{
         "total" => length(rows),
@@ -76,7 +93,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
         "duplicate_families" => validation.duplicate_families,
         "unknown_families" => validation.unknown_families,
         "missing_fields" => validation.missing_fields,
-        "evidence_level" => if(full_research, do: "research_campaign", else: "smoke")
+        "evidence_level" => evidence_level
       },
       "rows" => rows
     }

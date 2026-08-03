@@ -505,8 +505,13 @@ mix imp.benchmark.gepa_replication \
   --upstream-evidence benchmarks/runs/gepa-replication/gepa-upstream-evidence.json \
   --imp-input benchmarks/runs/gepa-campaign/imp-gepa-rows-*.json \
   --campaign-id gepa-full-YYYYMMDD \
-  --artifact-model gpt-41-mini
+  --artifact-model gpt-41-mini \
+  --protocol-classification exact_paper_replication
 ```
+
+That classification is an explicit C4 assertion for this paper-authority
+protocol. Do not pass it to the adapted current-model no-merge table; complete
+rows without it remain non-full and cannot authorize paper-replication claims.
 
 The canonical manifest independently binds the task, reflection, and Papillon
 judge model roles, even when they share the same dated model identifier. This
