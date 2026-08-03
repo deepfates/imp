@@ -985,3 +985,20 @@ interpreter/bridge hashes into the result, and refuses execution if the bridge
 is unavailable. The retained live root remains immutable. The epic stays open;
 the next table cell must use the repaired entry and preserve this invalid first
 attempt rather than reinterpret it.
+
+**2026-08-03T16:05:00Z**
+
+The next matched LiveBench baseline pair completed with a healthy route but is
+also scientifically null. Imp's portable symbolic scorer executed while pinned
+DSPy's AMPS helper used a local multiprocessing target that macOS `spawn`
+cannot pickle; the apparent `79/126` versus `47/126` gap therefore contains 31
+points of scorer-runtime information asymmetry. Exact joined cost was
+`$0.245841276`; the retained root is
+`benchmarks/results/gepa-suite-livebenchmath-baseline-scorer-repair-421dc021-20260803T153704Z`.
+
+The upstream ordinary entry now authenticates and uses the same source-derived
+portable AMPS scorer as Imp before any provider work. It matches pinned scorer
+semantics on 104 boundary cases spanning all 52 frozen AMPS rows. Non-AMPS
+metrics remain source-native. This closes the reproduced treatment defect but
+does not create a valid table datum or reduce the epic; a clean matched
+successor remains the meaningful next measurement under the existing cap.

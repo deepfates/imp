@@ -44,6 +44,7 @@ FAMILIES = {
     "Papillon": "gepa_artifact.benchmarks.papillon",
 }
 ARMS = ("baseline", "mipro_v2_heavy", "gepa_v0_1_4_no_merge")
+LIVEBENCH_MATH_BRIDGE = Path(__file__).resolve().with_name("livebench_math_score.py")
 FAMILY_SHAPES = {
     "AIMEBench": {"task": 1, "judge": 0},
     "HotpotQABench": {"task": 4, "judge": 0},
@@ -90,6 +91,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-cost-usd", type=float)
     parser.add_argument("--api-base")
     parser.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
+    parser.add_argument("--livebench-math-python", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--state", type=Path)
     parser.add_argument("--run", action="store_true")
@@ -112,6 +114,46 @@ def authenticate_clean_tree(root: Path, commit: str, label: str) -> None:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def configure_livebench_metric(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.family != "LiveBenchMathBench" or (not args.run and not args.fresh):
+        return None
+    if args.livebench_math_python is None:
+        raise RuntimeError(
+            "LiveBenchMathBench live execution requires --livebench-math-python"
+        )
+    # Preserve the virtual-environment entry path. Resolving its symlink would
+    # invoke the base interpreter and silently drop the scorer dependencies.
+    python = Path(os.path.abspath(args.livebench_math_python))
+    payload = {
+        "task": "amps_hard",
+        "ground_truth": "x^2",
+        "answer": "\\boxed{x^2}",
+    }
+    completed = subprocess.run(
+        [str(python), str(LIVEBENCH_MATH_BRIDGE)],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "LiveBenchMath symbolic scorer preflight failed: "
+            + (completed.stdout or completed.stderr).strip()
+        )
+    result = json.loads(completed.stdout)
+    if result.get("score") not in (1, 1.0):
+        raise RuntimeError("LiveBenchMath symbolic scorer preflight returned an invalid result")
+    args.livebench_math_python = python
+    return {
+        "preflight": "exact_symbolic_identity_score_passed_before_transport",
+        "symbolic_bridge_python": str(python),
+        "symbolic_bridge_python_sha256": sha256(python),
+        "symbolic_bridge_path": str(LIVEBENCH_MATH_BRIDGE),
+        "symbolic_bridge_sha256": sha256(LIVEBENCH_MATH_BRIDGE),
+    }
 
 
 def specs(dataset_root: Path) -> dict[str, dict[str, Any]]:
@@ -188,18 +230,56 @@ def install_retrieval(retrieval_root: Path | None, receipt_path: Path | None, sp
     }
 
 
-def source_metric(meta: Any):
-    return meta.metric
+def livebench_symbolic_score(
+    args: argparse.Namespace, meta: Any, gold: Any, pred: Any
+) -> tuple[float, str | None]:
+    question = gold["question_d"]
+    if question.get("task") != "AMPS_Hard":
+        score = meta.metric(gold, pred, None)
+        if hasattr(score, "score"):
+            score = score.score
+        return float(score), None
+
+    payload = {
+        "task": "amps_hard",
+        "ground_truth": str(question.get("ground_truth", "")),
+        "answer": str(pred.answer),
+    }
+    completed = subprocess.run(
+        [str(args.livebench_math_python), str(LIVEBENCH_MATH_BRIDGE)],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "LiveBenchMath symbolic scorer failed: "
+            + (completed.stdout or completed.stderr).strip()
+        )
+    result = json.loads(completed.stdout)
+    return float(result["score"]), result.get("parsed_answer")
 
 
-def gepa_metric(dspy: Any, meta: Any):
+def source_metric(meta: Any, args: argparse.Namespace):
+    if args.family != "LiveBenchMathBench":
+        return meta.metric
+
+    def metric(gold, pred, trace=None):
+        score, _parsed = livebench_symbolic_score(args, meta, gold, pred)
+        return score
+
+    return metric
+
+
+def gepa_metric(dspy: Any, meta: Any, args: argparse.Namespace):
     feedback_map = (meta.feedback_fn_maps or [{}])[0]
 
     def lookup(name: str):
         return feedback_map.get(name) or feedback_map.get(f"{name}.predict")
 
     def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
-        overall = meta.metric(gold, pred, trace)
+        overall = source_metric(meta, args)(gold, pred, trace)
         if hasattr(overall, "score"):
             overall = overall.score
         if pred_name is not None and pred_trace and lookup(pred_name):
@@ -212,7 +292,16 @@ def gepa_metric(dspy: Any, meta: Any):
                 captured_trace=trace,
             )
             return dspy.Prediction(score=overall, feedback=detail["feedback_text"])
-        result = meta.metric_with_feedback(gold, pred, trace)
+        if args.family == "LiveBenchMathBench" and gold["question_d"].get("task") == "AMPS_Hard":
+            _score, parsed = livebench_symbolic_score(args, meta, gold, pred)
+            result = dspy.Prediction(
+                score=overall,
+                feedback=(
+                    f"The symbolic scorer parsed {parsed!r}; the answer scored {overall}."
+                ),
+            )
+        else:
+            result = meta.metric_with_feedback(gold, pred, trace)
         if hasattr(result, "feedback"):
             return dspy.Prediction(score=overall, feedback=result.feedback)
         return dspy.Prediction(score=overall, feedback=f"This trajectory scored {overall}.")
@@ -542,7 +631,7 @@ def optimize(dspy: Any, program: Any, meta: Any, train: list[Any], dev: list[Any
         return program
     if args.arm == "mipro_v2_heavy":
         optimizer = dspy.MIPROv2(
-            metric=source_metric(meta),
+            metric=source_metric(meta, args),
             prompt_model=reflection_lm,
             task_model=task_lm,
             auto="heavy",
@@ -553,7 +642,7 @@ def optimize(dspy: Any, program: Any, meta: Any, train: list[Any], dev: list[Any
         )
         return optimizer.compile(program, trainset=train, valset=dev, requires_permission_to_run=False)
     optimizer = dspy.GEPA(
-        metric=gepa_metric(dspy, meta),
+        metric=gepa_metric(dspy, meta, args),
         max_metric_calls=metric_calls,
         reflection_minibatch_size=3,
         reflection_lm=reflection_lm,
@@ -627,6 +716,7 @@ def main() -> None:
     module = importlib.import_module(FAMILIES[args.family])
     meta = module.benchmark[0]
     retrieval = install_retrieval(args.retrieval_root, args.retrieval_receipt, spec)
+    metric_runtime = configure_livebench_metric(args)
 
     preflight = {
         "status": "provider_disabled_ready" if not args.run and not args.fresh else "running",
@@ -640,6 +730,7 @@ def main() -> None:
         "heldout_decoded": False,
         "retrieval": retrieval,
         "input_envelope_semantics": "nested_utf8_string_content_bytes_not_full_wire_bytes",
+        "metric_runtime": metric_runtime,
     }
     if not args.run and not args.fresh:
         print(json.dumps(preflight, sort_keys=True))
@@ -699,7 +790,7 @@ def main() -> None:
             dspy,
             arm_program(args.arm, program, selected),
             test,
-            source_metric(meta),
+            source_metric(meta, args),
             args.max_concurrency,
         )
 
@@ -733,6 +824,8 @@ def main() -> None:
         ]
         if args.api_base:
             child_args += ["--api-base", args.api_base]
+        if args.livebench_math_python:
+            child_args += ["--livebench-math-python", str(args.livebench_math_python)]
         if args.retrieval_root:
             child_args += ["--retrieval-root", str(args.retrieval_root)]
         if args.retrieval_receipt:

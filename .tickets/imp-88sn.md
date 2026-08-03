@@ -3386,3 +3386,33 @@ preflight outcome. Focused CLI tests prove a missing scorer refuses before
 transport and the pinned dependency environment reaches the existing spend
 guard. No provider rerun, threshold change, hidden row subset, or result
 reinterpretation follows automatically.
+
+## Current-model table: matched LiveBench scorer-runtime repair
+
+The separately retained matched pair from clean `421dc021` completed both
+baseline lanes without route errors under the frozen SiliconFlow treatment.
+The private root is
+`benchmarks/results/gepa-suite-livebenchmath-baseline-scorer-repair-421dc021-20260803T153704Z`.
+Imp recorded `79/126` and pinned DSPy recorded `47/126`; paired outcomes were 34
+Imp-only wins, two DSPy-only wins, and 90 ties. Those numbers are not admitted
+as a framework comparison. The result exposed a second scorer treatment
+defect: pinned LiveBench's AMPS helper launches a multiprocessing target defined
+inside `run_with_timeout`; macOS `spawn` cannot pickle that local function, so
+DSPy's symbolic comparisons silently returned zero after one suppressed warning.
+Imp's portable bridge did execute, producing a non-matched 31-point AMPS
+advantage. The full-family headline is therefore scientifically null.
+
+Every provider transport returned successfully. Exact joined lane costs were
+`$0.121735000` Imp and `$0.124106276` DSPy; the account window moved
+`$0.235450124`. Result SHA-256 values are `bd0b8f02...c7d13` Imp and
+`140c86e5...0b88` DSPy. The conservative study charge is now `$11.282103874`
+against the unchanged combined `$20` cap.
+
+The matched boundary is repaired provider-free in the ordinary upstream entry.
+Both runtimes now require and authenticate the same explicit symbolic Python
+and source-derived bridge before transport, and both use it for every AMPS
+score; non-AMPS rows retain the pinned source metric. The bridge matches the
+pinned scorer's synchronous semantics for correct and invalid predictions on
+all 52 frozen AMPS rows (104 comparisons). Missing dependencies fail before
+provider work. This is a prospective treatment repair, not a reinterpretation
+of either retained pair.

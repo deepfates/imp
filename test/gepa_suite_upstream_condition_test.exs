@@ -123,6 +123,135 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert output == ""
   end
 
+  test "LiveBench upstream entrance authenticates the shared symbolic scorer before transport" do
+    root = File.cwd!()
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+
+    output_root =
+      Path.join(System.tmp_dir!(), "dspy-livebench-scorer-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(output_root)
+    File.chmod!(output_root, 0o700)
+    output = Path.join(output_root, "result.json")
+    on_exit(fn -> File.rm_rf!(output_root) end)
+
+    common =
+      [
+        "-P",
+        Path.join(root, "scripts/gepa_suite_condition_upstream.py"),
+        "--run",
+        "--dspy-root",
+        Path.join(root, "tmp/dspy-3.2.1"),
+        "--gepa-root",
+        Path.join(root, "tmp/gepa-v0.1.4"),
+        "--artifact-root",
+        Path.join(root, "tmp/gepa-artifact"),
+        "--dataset-root",
+        Path.join(root, "tmp/gepa-six-task-current-root"),
+        "--family",
+        "LiveBenchMathBench",
+        "--arm",
+        "baseline",
+        "--output",
+        output,
+        "--input-price-per-million",
+        "0.14",
+        "--output-price-per-million",
+        "0.28",
+        "--initial-cost-usd",
+        "0.0",
+        "--max-cost-usd",
+        "20.0"
+      ] ++
+        Enum.flat_map(["task", "reflection", "judge"], fn role ->
+          [
+            "--#{role}-model",
+            "provider-disabled/model",
+            "--#{role}-provider",
+            "provider/endpoint",
+            "--#{role}-max-input-bytes",
+            "65536",
+            "--#{role}-max-output-tokens",
+            "4096"
+          ]
+        end)
+
+    {missing_output, missing_status} =
+      System.cmd(python, common,
+        env: [{"OPENROUTER_API_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert missing_status != 0
+    assert missing_output =~ "requires --livebench-math-python"
+
+    assert %{"stage" => "preflight", "status" => "failed"} =
+             output |> File.read!() |> Jason.decode!()
+
+    File.rm!(output)
+
+    admitted =
+      common ++
+        [
+          "--livebench-math-python",
+          python,
+          "--max-cost-usd",
+          "0.000001"
+        ]
+
+    {admitted_output, admitted_status} =
+      System.cmd(python, admitted,
+        env: [{"OPENROUTER_API_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert admitted_status != 0
+    assert admitted_output =~ "owner cap before transport"
+    refute admitted_output =~ "symbolic scorer preflight"
+
+    assert %{"stage" => "preflight", "status" => "failed"} =
+             output |> File.read!() |> Jason.decode!()
+  end
+
+  test "portable LiveBench AMPS bridge matches pinned scorer semantics on every frozen row" do
+    root = File.cwd!()
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+
+    probe = ~S'''
+    import importlib, json, pathlib, sys
+    root = pathlib.Path(sys.argv[1])
+    sys.path.insert(0, str(root / "tmp/gepa-artifact"))
+    sys.path.insert(0, str(root / "scripts"))
+    official = importlib.import_module(
+        "gepa_artifact.benchmarks.livebench_math.livebenchmath_utils.AMPS_Hard.utils"
+    )
+    bridge = importlib.import_module("livebench_math_score")
+    official.run_with_timeout = lambda func, args=(), timeout=8: func(*args)
+    rows = [
+        json.loads(line)
+        for line in (root / "tmp/gepa-six-task-current-root/LiveBenchMathBench/test.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    compared = 0
+    for row in rows:
+        question = row["question_d"]
+        if question["task"] != "AMPS_Hard":
+            continue
+        gold = str(question["ground_truth"])
+        for answer in (rf"\boxed{{{gold}}}", "not a symbolic answer"):
+            expected = official.amps_hard_process_results(gold, answer)[0]
+            actual = bridge.amps_hard_process_results(gold, answer)[0]
+            assert actual == expected, (question["question_id"], answer, expected, actual)
+            compared += 1
+    assert compared == 104
+    print(json.dumps({"rows": compared // 2, "predictions": compared}))
+    '''
+
+    {output, 0} = System.cmd(python, ["-P", "-c", probe, root], stderr_to_stdout: true)
+    receipt = output |> String.split("\n", trim: true) |> List.last() |> Jason.decode!()
+    assert receipt == %{"predictions" => 104, "rows" => 52}
+  end
+
   test "AIME primary and Chat-to-JSON fallback messages match pinned DSPy exactly" do
     root = File.cwd!()
     python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
