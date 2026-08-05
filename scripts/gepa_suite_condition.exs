@@ -1,7 +1,202 @@
+defmodule Imp.GepaSuiteSpendGuard do
+  @moduledoc false
+
+  @behaviour Imp.LM
+
+  defstruct [:inner, :guard, :role, :reservation_usd, :input_price, :output_price]
+
+  def start_link!(initial_cost_usd, max_cost_usd)
+      when is_number(initial_cost_usd) and initial_cost_usd >= 0 and
+             is_number(max_cost_usd) and max_cost_usd > 0 do
+    if initial_cost_usd > max_cost_usd + 1.0e-9 do
+      raise Imp.OperationalSafetyError,
+        kind: :budget,
+        message:
+          "GEPA suite initial actual spend already exceeds the owner cap: " <>
+            "$#{initial_cost_usd} > $#{max_cost_usd}"
+    end
+
+    {:ok, guard} =
+      Agent.start_link(fn ->
+        %{
+          initial_actual_cost_usd: initial_cost_usd * 1.0,
+          reconciled_accounted_cost_usd: 0.0,
+          retained_reservation_usd: 0.0,
+          active: %{},
+          owner_cap_usd: max_cost_usd * 1.0,
+          next_id: 1
+        }
+      end)
+
+    guard
+  end
+
+  def start_link!(initial_cost_usd, max_cost_usd) do
+    raise ArgumentError,
+          "GEPA suite spend guard requires nonnegative initial actual spend and a positive owner cap, " <>
+            "got: #{inspect(initial_cost_usd)}, #{inspect(max_cost_usd)}"
+  end
+
+  def wrap(inner, guard, role, reservation_usd, input_price, output_price)
+      when is_pid(guard) and is_atom(role) and is_number(reservation_usd) and
+             reservation_usd >= 0 and is_number(input_price) and input_price >= 0 and
+             is_number(output_price) and output_price >= 0 do
+    %__MODULE__{
+      inner: inner,
+      guard: guard,
+      role: role,
+      reservation_usd: reservation_usd * 1.0,
+      input_price: input_price * 1.0,
+      output_price: output_price * 1.0
+    }
+  end
+
+  def snapshot(guard) do
+    Agent.get(guard, fn state ->
+      active_reservation = state.active |> Map.values() |> Enum.sum()
+
+      state
+      |> Map.drop([:active, :next_id])
+      |> Map.put(:active_reservation_usd, active_reservation)
+      |> Map.put(:active_requests, map_size(state.active))
+      |> Map.put(
+        :accounted_total_usd,
+        state.initial_actual_cost_usd + state.reconciled_accounted_cost_usd +
+          state.retained_reservation_usd + active_reservation
+      )
+    end)
+  end
+
+  @impl true
+  def generate(_messages, _opts), do: {:error, :gepa_suite_spend_guard_instance_required}
+
+  def generate(%__MODULE__{} = lm, messages, opts) do
+    with {:ok, reservation_id} <- reserve(lm) do
+      case generate_inner(lm.inner, messages, opts) do
+        {:ok, value} = success ->
+          case response_cost(value, lm) do
+            {:ok, cost} ->
+              settle(lm.guard, reservation_id, cost)
+              success
+
+            {:error, reason} ->
+              retain(lm.guard, reservation_id)
+
+              {:error,
+               %Imp.OperationalSafetyError{
+                 kind: :budget,
+                 message: "provider response did not retain an authenticated nonnegative cost",
+                 reason: reason
+               }}
+          end
+
+        {:error, _reason} = error ->
+          retain(lm.guard, reservation_id)
+          error
+      end
+    end
+  end
+
+  def response_format_capability(%__MODULE__{inner: inner}),
+    do: Imp.LM.response_format_capability(inner)
+
+  defp generate_inner(%module{} = inner, messages, opts) do
+    apply(module, :generate, [inner, messages, opts])
+  end
+
+  defp reserve(lm) do
+    Agent.get_and_update(lm.guard, fn state ->
+      active = state.active |> Map.values() |> Enum.sum()
+
+      projected =
+        state.initial_actual_cost_usd + state.reconciled_accounted_cost_usd +
+          state.retained_reservation_usd + active + lm.reservation_usd
+
+      if projected <= state.owner_cap_usd + 1.0e-9 do
+        id = state.next_id
+
+        {{:ok, id},
+         %{state | active: Map.put(state.active, id, lm.reservation_usd), next_id: id + 1}}
+      else
+        error =
+          %Imp.OperationalSafetyError{
+            kind: :budget,
+            message:
+              "next #{lm.role} transport would exceed the owner cap: " <>
+                "$#{projected} > $#{state.owner_cap_usd}",
+            reason: %{
+              role: lm.role,
+              next_reservation_usd: lm.reservation_usd,
+              projected_usd: projected,
+              owner_cap_usd: state.owner_cap_usd
+            }
+          }
+
+        {{:error, error}, state}
+      end
+    end)
+  end
+
+  defp settle(guard, id, actual_cost) do
+    Agent.update(guard, fn state ->
+      case Map.pop(state.active, id) do
+        {nil, _active} ->
+          state
+
+        {_reservation, active} ->
+          %{
+            state
+            | active: active,
+              reconciled_accounted_cost_usd: state.reconciled_accounted_cost_usd + actual_cost
+          }
+      end
+    end)
+  end
+
+  defp retain(guard, id) do
+    Agent.update(guard, fn state ->
+      case Map.pop(state.active, id) do
+        {nil, _active} ->
+          state
+
+        {reservation, active} ->
+          %{
+            state
+            | active: active,
+              retained_reservation_usd: state.retained_reservation_usd + reservation
+          }
+      end
+    end)
+  end
+
+  defp response_cost(value, lm) do
+    with {:ok, metadata} <- Imp.LM.Result.metadata(value),
+         provider when is_map(provider) <- metadata[:req_llm] || metadata["req_llm"],
+         usage when is_map(usage) <- provider[:usage] || provider["usage"],
+         input when is_integer(input) and input >= 0 <-
+           usage[:input_tokens] || usage["input_tokens"] || usage[:prompt_tokens] ||
+             usage["prompt_tokens"],
+         output when is_integer(output) and output >= 0 <-
+           usage[:output_tokens] || usage["output_tokens"] || usage[:completion_tokens] ||
+             usage["completion_tokens"] do
+      reported = usage[:total_cost] || usage["total_cost"] || usage[:cost] || usage["cost"]
+
+      if is_nil(reported) or (is_number(reported) and reported >= 0) do
+        calculated = (input * lm.input_price + output * lm.output_price) / 1_000_000
+        {:ok, max((reported || 0) * 1.0, calculated)}
+      else
+        {:error, {:invalid_provider_cost, reported}}
+      end
+    else
+      value -> {:error, {:missing_provider_cost, value}}
+    end
+  end
+end
+
 defmodule Imp.GepaSuiteConditionCLI do
   @moduledoc false
 
-  alias Imp.BenchmarkTruth.{GepaStudyCondition, GepaStudyPlan, GepaSuite}
+  alias Imp.BenchmarkTruth.{GepaStudyCondition, GepaSuite}
   alias Imp.Optimizer.Artifact
 
   @arms ~w(baseline mipro_v2_heavy gepa_v0_1_4_merge)
@@ -49,14 +244,20 @@ defmodule Imp.GepaSuiteConditionCLI do
     if positional != [] or invalid != [],
       do: raise(ArgumentError, "invalid GEPA suite arguments: #{inspect(positional ++ invalid)}")
 
-    config = opts |> config!() |> configure_livebench_metric!()
-    if config.run? or config.fresh?, do: configure_req_llm_pool!(config)
-    prepared = prepare!(config)
+    config = opts |> config!() |> configure_livebench_metric!() |> start_spend_guard!()
 
-    cond do
-      config.fresh? -> fresh!(config, prepared)
-      config.run? -> run!(config, prepared)
-      true -> preflight!(config, prepared)
+    try do
+      if config.run? or config.fresh?, do: configure_req_llm_pool!(config)
+      prepared = prepare!(config)
+
+      cond do
+        config.fresh? -> fresh!(config, prepared)
+        config.run? -> run!(config, prepared)
+        true -> preflight!(config, prepared)
+      end
+    after
+      if is_pid(config.spend_guard) and Process.alive?(config.spend_guard),
+        do: Agent.stop(config.spend_guard)
     end
   end
 
@@ -119,6 +320,19 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
     |> validate_live!()
   end
+
+  defp start_spend_guard!(%{provider_disabled_fixture?: true} = config),
+    do: Map.put(config, :spend_guard, nil)
+
+  defp start_spend_guard!(%{run?: active, fresh?: fresh} = config) when active or fresh do
+    Map.put(
+      config,
+      :spend_guard,
+      Imp.GepaSuiteSpendGuard.start_link!(config.initial_cost_usd, config.max_cost_usd)
+    )
+  end
+
+  defp start_spend_guard!(config), do: Map.put(config, :spend_guard, nil)
 
   defp configure_livebench_metric!(%{family: "LiveBenchMathBench", run?: true} = config) do
     python =
@@ -220,7 +434,7 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   defp run!(config, prepared) do
     for key <- [:output], do: required_config!(config, key)
-    reservation = admit_spend!(config)
+    admission = spend_admission(config)
     progress = init_progress!(config)
 
     {wall_time_us, outcome, usage} =
@@ -232,19 +446,26 @@ defmodule Imp.GepaSuiteConditionCLI do
         progress
       )
 
-    {optimized, heldout} = unwrap_run!(outcome, config, reservation, wall_time_us, usage)
+    {optimized, heldout} = unwrap_run!(outcome, config, admission, wall_time_us, usage)
 
-    {artifact_sha, fresh_sha, fresh_usage} =
+    accounted_total =
+      config.spend_guard
+      |> Imp.GepaSuiteSpendGuard.snapshot()
+      |> Map.fetch!(:accounted_total_usd)
+
+    {artifact_sha, fresh_sha, fresh_usage, fresh_spend} =
       case optimized.artifact do
         nil ->
-          {nil, nil, empty_runtime()}
+          {nil, nil, empty_runtime(), nil}
 
         artifact ->
           for key <- [:artifact, :fresh_output], do: required_config!(config, key)
           Artifact.write!(artifact, config.artifact)
-          fresh_child!(config)
+          fresh_child!(config, accounted_total)
           fresh = config.fresh_output |> File.read!() |> Jason.decode!()
-          {sha256(config.artifact), sha256(config.fresh_output), fresh["usage"]}
+
+          {sha256(config.artifact), sha256(config.fresh_output), fresh["usage"],
+           fresh["spend_admission"]}
       end
 
     write_private!(config.output, %{
@@ -261,7 +482,8 @@ defmodule Imp.GepaSuiteConditionCLI do
       wall_time_us: wall_time_us,
       request_timeout_ms: @request_timeout_ms,
       req_llm_pool: req_llm_pool(config),
-      spend_admission: reservation,
+      spend_admission: Map.put(admission, "final", spend_snapshot(config)),
+      fresh_spend_admission: fresh_spend,
       heldout_decoded: true,
       metric_runtime: metric_runtime(config),
       retrieval: retrieval_disclosure(config, prepared.loaded.spec)
@@ -328,12 +550,15 @@ defmodule Imp.GepaSuiteConditionCLI do
       calls: outcomes,
       usage: usage,
       usage_cost_basis: :frozen_catalog_calculated,
+      spend_admission:
+        spend_admission(config)
+        |> Map.put("final", spend_snapshot(config)),
       progress_sha256: sha256(progress),
       wall_time_us: wall_time_us
     })
   end
 
-  defp fresh_child!(config) do
+  defp fresh_child!(config, initial_cost_usd) do
     args =
       [
         "run",
@@ -353,7 +578,7 @@ defmodule Imp.GepaSuiteConditionCLI do
         config.artifact,
         "--fresh-output",
         config.fresh_output
-      ] ++ live_args(config) ++ retrieval_args(config)
+      ] ++ live_args(config, initial_cost_usd) ++ retrieval_args(config)
 
     case System.cmd("mix", args,
            env: [{"MIX_ENV", "test"}],
@@ -364,7 +589,7 @@ defmodule Imp.GepaSuiteConditionCLI do
     end
   end
 
-  defp live_args(config) do
+  defp live_args(config, initial_cost_usd) do
     Enum.flat_map([:task, :reflection, :judge], fn role ->
       [
         "--#{role}-model",
@@ -385,7 +610,11 @@ defmodule Imp.GepaSuiteConditionCLI do
         "--output-price-per-million",
         to_string(config.output_price_per_million),
         "--max-concurrency",
-        to_string(config.max_concurrency)
+        to_string(config.max_concurrency),
+        "--initial-cost-usd",
+        to_string(initial_cost_usd),
+        "--max-cost-usd",
+        to_string(config.max_cost_usd)
       ]
   end
 
@@ -431,42 +660,52 @@ defmodule Imp.GepaSuiteConditionCLI do
 
     api_key = System.fetch_env!(config.api_key_env)
 
-    Imp.req_llm(
-      priced_model_spec(
-        model,
-        config.input_price_per_million,
-        config.output_price_per_million
-      ),
-      api_key: api_key,
-      cache: false,
-      temperature: 1.0,
-      max_tokens: output_tokens,
-      timeout: @request_timeout_ms,
-      max_retries: 0,
-      input_envelope: [max_bytes: input_bytes, reservation_tokens: input_bytes],
-      provider_options: [
-        openrouter_provider: %{
-          only: [provider],
-          order: [provider],
-          allow_fallbacks: false,
-          require_parameters: true,
-          data_collection: "deny",
-          zdr: true,
-          max_price: %{
-            prompt: config.input_price_per_million,
-            completion: config.output_price_per_million
-          }
-        },
-        openrouter_usage: %{include: true}
-      ],
-      req_http_options: [
-        headers: [
-          {"X-OpenRouter-Metadata", "enabled"},
-          {"X-OpenRouter-Cache", "false"}
+    inner =
+      Imp.req_llm(
+        priced_model_spec(
+          model,
+          config.input_price_per_million,
+          config.output_price_per_million
+        ),
+        api_key: api_key,
+        cache: false,
+        temperature: 1.0,
+        max_tokens: output_tokens,
+        timeout: @request_timeout_ms,
+        max_retries: 0,
+        input_envelope: [max_bytes: input_bytes, reservation_tokens: input_bytes],
+        provider_options: [
+          openrouter_provider: %{
+            only: [provider],
+            order: [provider],
+            allow_fallbacks: false,
+            require_parameters: true,
+            data_collection: "deny",
+            zdr: true,
+            max_price: %{
+              prompt: config.input_price_per_million,
+              completion: config.output_price_per_million
+            }
+          },
+          openrouter_usage: %{include: true}
         ],
-        retry: false,
-        max_retries: 0
-      ]
+        req_http_options: [
+          headers: [
+            {"X-OpenRouter-Metadata", "enabled"},
+            {"X-OpenRouter-Cache", "false"}
+          ],
+          retry: false,
+          max_retries: 0
+        ]
+      )
+
+    Imp.GepaSuiteSpendGuard.wrap(
+      inner,
+      config.spend_guard,
+      role,
+      role_reservation(config, role),
+      config.input_price_per_million,
+      config.output_price_per_million
     )
   end
 
@@ -541,42 +780,19 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
   end
 
-  defp admit_spend!(config) do
-    family =
-      config.dataset_root
-      |> GepaStudyPlan.plan!(seeds: 1, runtimes: 1)
-      |> Map.fetch!(:families)
-      |> Enum.find(&(&1.family == config.family))
-
-    calls = Map.fetch!(family.arms, config.arm)
-    task = role_reservation(config, :task)
-    reflection = role_reservation(config, :reflection)
-    judge = role_reservation(config, :judge)
-
-    reserved =
-      calls.task_transports * task +
-        (calls.mipro_proposer_transports + calls.gepa_reflection_transports) * reflection +
-        calls.judge_transports * judge
-
-    projected = config.initial_cost_usd + reserved
-
-    if projected > config.max_cost_usd + 1.0e-9 do
-      raise Imp.OperationalSafetyError,
-        kind: :budget,
-        message:
-          "GEPA suite condition reservation would exceed the owner cap before transport: " <>
-            "$#{projected} > $#{config.max_cost_usd}"
-    end
-
+  defp spend_admission(config) do
     %{
       "initial_cost_usd" => config.initial_cost_usd,
-      "condition_reservation_usd" => reserved,
-      "projected_max_usd" => projected,
       "owner_cap_usd" => config.max_cost_usd,
-      "calls" => json_safe(calls),
       "accounting" =>
-        "content-byte-as-token plus configured maximum output at route max_price; no cache discount"
+        "before each transport: initial actual spend plus the greater of provider-reported or conservative full-price token cost for completed calls, active/unreconciled reservations, and this request's full envelope reservation must remain within the owner cap; no cache discount"
     }
+  end
+
+  defp spend_snapshot(%{spend_guard: nil}), do: nil
+
+  defp spend_snapshot(config) do
+    config.spend_guard |> Imp.GepaSuiteSpendGuard.snapshot() |> json_safe()
   end
 
   defp role_reservation(config, role) do

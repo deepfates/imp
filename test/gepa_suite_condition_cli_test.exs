@@ -134,6 +134,13 @@ defmodule Imp.GepaSuiteConditionCLITest do
   test "live entrance refuses an over-cap condition before transport" do
     root = File.cwd!()
 
+    output_root =
+      Path.join(System.tmp_dir!(), "imp-gepa-cap-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(output_root)
+    File.chmod!(output_root, 0o700)
+    on_exit(fn -> File.rm_rf!(output_root) end)
+
     args =
       [
         "run",
@@ -147,7 +154,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
         "--arm",
         "baseline",
         "--output",
-        Path.join(System.tmp_dir!(), "imp-gepa-must-not-exist.json"),
+        Path.join(output_root, "result.json"),
         "--input-price-per-million",
         "0.14",
         "--output-price-per-million",
@@ -177,12 +184,22 @@ defmodule Imp.GepaSuiteConditionCLITest do
       )
 
     assert status != 0
-    assert output =~ "owner cap before transport"
+    assert output =~ "next task transport would exceed the owner cap"
+    receipt = output_root |> Path.join("result.json") |> File.read!() |> Jason.decode!()
+    assert receipt["status"] == "failed"
+    assert receipt["usage"]["summary"]["request_starts"] == 0
   end
 
   test "LiveBench live entrance authenticates the symbolic scorer before transport" do
     root = File.cwd!()
-    output_path = Path.join(System.tmp_dir!(), "imp-livebench-scorer-must-not-exist.json")
+
+    output_root =
+      Path.join(System.tmp_dir!(), "imp-livebench-cap-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(output_root)
+    File.chmod!(output_root, 0o700)
+    on_exit(fn -> File.rm_rf!(output_root) end)
+    output_path = Path.join(output_root, "result.json")
     File.rm(output_path)
 
     args =
@@ -251,9 +268,11 @@ defmodule Imp.GepaSuiteConditionCLITest do
       )
 
     assert status != 0
-    assert output =~ "owner cap before transport"
+    assert output =~ "next task transport would exceed the owner cap"
     refute output =~ "symbolic scorer preflight"
-    refute File.exists?(output_path)
+    receipt = output_path |> File.read!() |> Jason.decode!()
+    assert receipt["status"] == "failed"
+    assert receipt["usage"]["summary"]["request_starts"] == 0
   end
 
   test "runtime observer persists nested usage and adapter fallback progress" do
@@ -363,6 +382,135 @@ defmodule Imp.GepaSuiteConditionCLITest do
                %{input_tokens: 10, output_tokens: 3, total_tokens: 13},
                model
              )
+  end
+
+  test "prospective guard admits useful work, reconciles actual cost, and stops the next request" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition.exs")
+    source = File.read!(script)
+
+    body =
+      String.replace_suffix(
+        source,
+        "Imp.GepaSuiteConditionCLI.main(System.argv())\n",
+        ""
+      )
+
+    Code.compile_string(body, script)
+    guard = apply(Imp.GepaSuiteSpendGuard, :start_link!, [0.5, 1.0])
+
+    inner =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{
+            __imp_lm_output__: %{answer: "ok"},
+            __imp_lm_metadata__: %{
+              req_llm: %{usage: %{input_tokens: 1, output_tokens: 1, total_cost: 0.1}}
+            }
+          }
+        end
+      )
+
+    lm = apply(Imp.GepaSuiteSpendGuard, :wrap, [inner, guard, :task, 0.4, 1.0, 1.0])
+    assert {:ok, _} = Imp.LM.generate(lm, [%{role: :user, content: "one"}])
+    assert {:ok, _} = Imp.LM.generate(lm, [%{role: :user, content: "two"}])
+
+    assert {:error, %Imp.OperationalSafetyError{kind: :budget}} =
+             Imp.LM.generate(lm, [%{role: :user, content: "three"}])
+
+    assert %{
+             initial_actual_cost_usd: 0.5,
+             reconciled_accounted_cost_usd: reconciled,
+             accounted_total_usd: accounted,
+             active_requests: 0
+           } = apply(Imp.GepaSuiteSpendGuard, :snapshot, [guard])
+
+    assert_in_delta reconciled, 0.2, 1.0e-12
+    assert_in_delta accounted, 0.7, 1.0e-12
+    Agent.stop(guard)
+
+    zero_reported =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{
+            __imp_lm_output__: %{answer: "ok"},
+            __imp_lm_metadata__: %{
+              req_llm: %{usage: %{input_tokens: 100, output_tokens: 100, total_cost: 0.0}}
+            }
+          }
+        end
+      )
+
+    guard = apply(Imp.GepaSuiteSpendGuard, :start_link!, [0.0, 1.0])
+
+    lm =
+      apply(Imp.GepaSuiteSpendGuard, :wrap, [
+        zero_reported,
+        guard,
+        :task,
+        0.5,
+        1_000.0,
+        2_000.0
+      ])
+
+    assert {:ok, _} = Imp.LM.generate(lm, [%{role: :user, content: "priced"}])
+
+    assert %{reconciled_accounted_cost_usd: zero_accounted} =
+             apply(Imp.GepaSuiteSpendGuard, :snapshot, [guard])
+
+    assert_in_delta zero_accounted, 0.3, 1.0e-12
+
+    Agent.stop(guard)
+  end
+
+  test "prospective guard atomically accounts for concurrent reservations" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition.exs")
+    source = File.read!(script)
+
+    body =
+      String.replace_suffix(
+        source,
+        "Imp.GepaSuiteConditionCLI.main(System.argv())\n",
+        ""
+      )
+
+    Code.compile_string(body, script)
+    guard = apply(Imp.GepaSuiteSpendGuard, :start_link!, [0.0, 0.5])
+    parent = self()
+
+    inner =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          send(parent, {:reserved, self()})
+
+          receive do
+            :continue -> :ok
+          end
+
+          %{
+            __imp_lm_output__: %{answer: "ok"},
+            __imp_lm_metadata__: %{
+              req_llm: %{usage: %{input_tokens: 1, output_tokens: 1, total_cost: 0.1}}
+            }
+          }
+        end
+      )
+
+    lm = apply(Imp.GepaSuiteSpendGuard, :wrap, [inner, guard, :task, 0.4, 1.0, 1.0])
+    first = Task.async(fn -> Imp.LM.generate(lm, [%{role: :user, content: "one"}]) end)
+    assert_receive {:reserved, first_pid}
+
+    assert {:error, %Imp.OperationalSafetyError{kind: :budget}} =
+             Imp.LM.generate(lm, [%{role: :user, content: "two"}])
+
+    send(first_pid, :continue)
+    assert {:ok, _} = Task.await(first)
+
+    assert %{active_requests: 0, accounted_total_usd: 0.1} =
+             apply(Imp.GepaSuiteSpendGuard, :snapshot, [guard])
+
+    Agent.stop(guard)
   end
 
   defp sha256(path) do

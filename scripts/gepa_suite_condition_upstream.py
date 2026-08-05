@@ -59,6 +59,70 @@ PROGRESS_PATH: Path | None = None
 ACTIVE_ARGS: argparse.Namespace | None = None
 ACTIVE_STAGE = "preflight"
 RUN_STARTED_NS: int | None = None
+SPEND_GUARD = None
+
+
+class OperationalSafetyAbort(BaseException):
+    """Fatal pretransport budget/input/route safety refusal; never a task score."""
+
+
+class ProspectiveSpendGuard:
+    """One shared hard cap over concurrent requests using actual cost when known."""
+
+    def __init__(self, initial_cost_usd: float, owner_cap_usd: float):
+        if not isinstance(initial_cost_usd, (int, float)) or initial_cost_usd < 0:
+            raise OperationalSafetyAbort("live execution requires nonnegative --initial-cost-usd")
+        if not isinstance(owner_cap_usd, (int, float)) or owner_cap_usd <= 0:
+            raise OperationalSafetyAbort("live execution requires positive --max-cost-usd")
+        if initial_cost_usd > owner_cap_usd + 1e-9:
+            raise OperationalSafetyAbort("initial actual spend already exceeds the owner cap")
+        self.initial_actual = float(initial_cost_usd)
+        self.accounted = 0.0
+        self.retained = 0.0
+        self.active: dict[int, float] = {}
+        self.owner_cap = float(owner_cap_usd)
+        self.next_id = 1
+        self.lock = threading.Lock()
+
+    def reserve(self, role: str, reservation: float) -> int:
+        with self.lock:
+            projected = self.initial_actual + self.accounted + self.retained + sum(self.active.values()) + reservation
+            if projected > self.owner_cap + 1e-9:
+                raise OperationalSafetyAbort(
+                    f"next {role} transport would exceed the owner cap: "
+                    f"${projected} > ${self.owner_cap}"
+                )
+            identity = self.next_id
+            self.next_id += 1
+            self.active[identity] = reservation
+            return identity
+
+    def settle(self, identity: int, actual_cost: float) -> None:
+        if not isinstance(actual_cost, (int, float)) or actual_cost < 0:
+            self.retain(identity)
+            raise OperationalSafetyAbort("provider response did not retain an authenticated nonnegative cost")
+        with self.lock:
+            if self.active.pop(identity, None) is not None:
+                self.accounted += float(actual_cost)
+
+    def retain(self, identity: int) -> None:
+        with self.lock:
+            reservation = self.active.pop(identity, None)
+            if reservation is not None:
+                self.retained += reservation
+
+    def snapshot(self) -> dict[str, Any]:
+        with self.lock:
+            active = sum(self.active.values())
+            return {
+                "initial_actual_cost_usd": self.initial_actual,
+                "reconciled_accounted_cost_usd": self.accounted,
+                "retained_reservation_usd": self.retained,
+                "active_reservation_usd": active,
+                "active_requests": len(self.active),
+                "owner_cap_usd": self.owner_cap,
+                "accounted_total_usd": self.initial_actual + self.accounted + self.retained + active,
+            }
 
 
 def parse_args() -> argparse.Namespace:
@@ -468,12 +532,17 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
         raise RuntimeError("live execution requires a nonnegative output price")
     import os
 
+    reservation = (
+        max_input_bytes * args.input_price_per_million
+        + max_output_tokens * args.output_price_per_million
+    ) / 1_000_000
+
     class InputBoundLM(dspy.LM):
         def _admit(self, prompt, messages):
             rendered = messages or [{"role": "user", "content": prompt}]
             actual = rendered_message_bytes(rendered)
             if actual > max_input_bytes:
-                raise RuntimeError(
+                raise OperationalSafetyAbort(
                     f"{role} input envelope exceeded before transport: "
                     f"{actual} > {max_input_bytes} UTF-8 content bytes"
                 )
@@ -481,24 +550,40 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
         def forward(self, prompt=None, messages=None, **kwargs):
             self._admit(prompt, messages)
             rendered = messages or [{"role": "user", "content": prompt}]
+            reservation_id = SPEND_GUARD.reserve(role, reservation)
             started = time.monotonic_ns()
             try:
                 response = super().forward(prompt=prompt, messages=messages, **kwargs)
+                usage = response_usage(response)
+                conservative = (
+                    usage["input_tokens"] * args.input_price_per_million
+                    + usage["output_tokens"] * args.output_price_per_million
+                ) / 1_000_000
+                SPEND_GUARD.settle(reservation_id, max(usage["cost_usd"], conservative))
                 record_runtime_response(role, rendered, started, response)
                 return response
             except BaseException as error:
+                SPEND_GUARD.retain(reservation_id)
                 record_runtime_error(role, rendered, started, error)
                 raise
 
         async def aforward(self, prompt=None, messages=None, **kwargs):
             self._admit(prompt, messages)
             rendered = messages or [{"role": "user", "content": prompt}]
+            reservation_id = SPEND_GUARD.reserve(role, reservation)
             started = time.monotonic_ns()
             try:
                 response = await super().aforward(prompt=prompt, messages=messages, **kwargs)
+                usage = response_usage(response)
+                conservative = (
+                    usage["input_tokens"] * args.input_price_per_million
+                    + usage["output_tokens"] * args.output_price_per_million
+                ) / 1_000_000
+                SPEND_GUARD.settle(reservation_id, max(usage["cost_usd"], conservative))
                 record_runtime_response(role, rendered, started, response)
                 return response
             except BaseException as error:
+                SPEND_GUARD.retain(reservation_id)
                 record_runtime_error(role, rendered, started, error)
                 raise
 
@@ -533,40 +618,20 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
     )
 
 
-def baseline_spend_admission(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, Any]:
-    if args.arm != "baseline":
-        raise RuntimeError("this bounded live tranche admits baseline only; optimizer arms need separate spend review")
+def spend_admission(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(args.initial_cost_usd, (int, float)) or args.initial_cost_usd < 0:
         raise RuntimeError("live baseline requires nonnegative --initial-cost-usd")
     if not isinstance(args.max_cost_usd, (int, float)) or args.max_cost_usd <= 0:
         raise RuntimeError("live baseline requires positive --max-cost-usd")
-    shape = FAMILY_SHAPES[args.family]
-    test = spec["split_counts"]["test"]
-    calls = {
-        "task_transports": test * shape["task"] * 2,
-        "judge_transports": test * shape["judge"],
-    }
-
-    def role_reservation(role: str) -> float:
-        return (
-            getattr(args, f"{role}_max_input_bytes") * args.input_price_per_million
-            + getattr(args, f"{role}_max_output_tokens") * args.output_price_per_million
-        ) / 1_000_000
-
-    reserved = calls["task_transports"] * role_reservation("task") + calls["judge_transports"] * role_reservation("judge")
-    projected = args.initial_cost_usd + reserved
-    if projected > args.max_cost_usd + 1e-9:
-        raise RuntimeError(
-            f"GEPA suite condition reservation would exceed the owner cap before transport: "
-            f"${projected} > ${args.max_cost_usd}"
-        )
     return {
         "initial_cost_usd": args.initial_cost_usd,
-        "condition_reservation_usd": reserved,
-        "projected_max_usd": projected,
         "owner_cap_usd": args.max_cost_usd,
-        "calls": calls,
-        "accounting": "content-byte-as-token plus configured maximum output at route max_price; no cache discount",
+        "accounting": (
+            "before each transport: initial actual spend plus the greater of provider-reported "
+            "or conservative full-price token cost for completed calls, active/unreconciled "
+            "reservations, and this request's full envelope reservation must remain within "
+            "the owner cap; no cache discount"
+        ),
     }
 
 
@@ -677,7 +742,7 @@ def write_private_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def main() -> None:
-    global ACTIVE_ARGS, ACTIVE_STAGE, RUN_STARTED_NS
+    global ACTIVE_ARGS, ACTIVE_STAGE, RUN_STARTED_NS, SPEND_GUARD
     args = parse_args()
     if args.max_concurrency <= 0:
         raise RuntimeError("--max-concurrency must be a positive integer")
@@ -736,7 +801,8 @@ def main() -> None:
         print(json.dumps(preflight, sort_keys=True))
         return
 
-    spend_admission = None if args.fresh else baseline_spend_admission(args, spec)
+    admission = spend_admission(args)
+    SPEND_GUARD = ProspectiveSpendGuard(args.initial_cost_usd, args.max_cost_usd)
     progress_path = init_progress(args)
 
     task_lm = make_lm(dspy, "task", args)
@@ -763,6 +829,7 @@ def main() -> None:
             "calls": calls,
             "heldout_decoded": True,
             "usage": runtime_usage(),
+            "spend_admission": {**admission, "final": SPEND_GUARD.snapshot()},
             "progress_sha256": sha256(progress_path),
             "wall_time_us": (time.monotonic_ns() - started) // 1_000,
         }
@@ -830,6 +897,11 @@ def main() -> None:
             child_args += ["--retrieval-root", str(args.retrieval_root)]
         if args.retrieval_receipt:
             child_args += ["--retrieval-receipt", str(args.retrieval_receipt)]
+        parent_accounted_total = SPEND_GUARD.snapshot()["accounted_total_usd"]
+        child_args += [
+            "--initial-cost-usd", str(parent_accounted_total),
+            "--max-cost-usd", str(args.max_cost_usd),
+        ]
         subprocess.run(child_args, check=True)
         state_sha = sha256(state_path)
         fresh_sha = sha256(fresh_path)
@@ -846,7 +918,7 @@ def main() -> None:
         "usage": merge_runtime_usage(runtime_usage(), fresh_usage),
         "progress_sha256": sha256(progress_path),
         "wall_time_us": (time.monotonic_ns() - started) // 1_000,
-        "spend_admission": spend_admission,
+        "spend_admission": {**admission, "final": SPEND_GUARD.snapshot()},
     }
     write_private_json(args.output, payload)
 

@@ -78,9 +78,15 @@ fit cost. Once frozen, run every declared GEPA/MIPROv2 arm and retain schema-3
 Artifact application plus four-call fresh concurrent `ProgramServer` service
 for each selected Imp optimizer arm.
 
-No provider process is active. The next provider action is the complete
-baseline sweep under a spend admission rule that separates whole-condition
-planning maxima from cumulative actual cost plus the next authenticated call.
+No provider process is active. The ordinary Imp and pinned-DSPy entrances now
+enforce the corrected spend rule provider-free: before each transport, initial
+actual spend plus the greater of provider-reported or conservative full-price
+token cost for completed calls, active or unreconciled reservations, and that
+request's full-price envelope must remain under the owner cap. A refusal is
+fatal operational safety, never a zero-scored task failure, and is retained
+as an inconclusive stop. The next provider action remains the complete baseline
+sweep; its giant whole-condition planning maximum no longer blocks useful work
+before call one.
 
 ### Owner-ratified correction and next evidence tranche (2026-08-01)
 

@@ -93,9 +93,13 @@ is retained for audit, but it does not define priority.
   results, or let the legal failure ceiling masquerade as planned opportunity.
 - **Current operation:** no provider process is active. The previous `$20`
   baseline tranche stopped before IFBench transport because its conservative
-  full-condition reservation exceeded the remaining cap. The admission policy
-  must distinguish a whole-condition planning ceiling from cumulative actual
-  spend plus the next authenticated call before another provider launch.
+  full-condition reservation exceeded the remaining cap. Both ordinary study
+  entrances now enforce a shared prospective rule instead: initial actual spend
+  plus the greater of provider-reported or conservative full-price token cost
+  for completed calls, active/unreconciled reservations, and the next request's
+  full-price envelope must remain under the cap. Provider-free tests
+  prove useful calls are admitted, concurrent reservations cannot oversubscribe
+  the cap, and a refusal is fatal safety rather than a benchmark score.
 
 Primary restart coordinates are this epic, `imp-88sn`, `README.md`,
 `docs/CONFORMANCE.md`, `benchmarks/claims.json`, and the executable

@@ -63,11 +63,13 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
         task_model="model", task_provider="provider", task_max_input_bytes=2,
         task_max_output_tokens=16, input_price_per_million=0.14,
         output_price_per_million=0.28, api_base="https://example.invalid", api_key_env="TEST_KEY",
-        family="AIMEBench", arm="baseline", seed=17, max_concurrency=8
+        family="AIMEBench", arm="baseline", seed=17, max_concurrency=8,
+        initial_cost_usd=0.0, max_cost_usd=1.0
     )
     tmp = tempfile.TemporaryDirectory()
     args.output = pathlib.Path(tmp.name) / "result.json"
     progress = condition.init_progress(args)
+    condition.SPEND_GUARD = condition.ProspectiveSpendGuard(0.0, 1.0)
     lm = condition.make_lm(dspy, "task", args)
     baseline = object()
     selected = object()
@@ -82,33 +84,42 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert usage["input_tokens"] == 1
     assert usage["output_tokens"] == 1
     assert usage["cost_usd"] == 0.0
+    assert condition.SPEND_GUARD.snapshot()["reconciled_accounted_cost_usd"] > 0
     progress_lines = progress.read_text().splitlines()
     assert len(progress_lines) == 2
     assert progress.stat().st_mode & 0o777 == 0o600
     assert json.loads(progress_lines[1])["sequence"] == 1
-    spec = {"split_counts":{"test":1}}
-    args.initial_cost_usd = 0.0
-    args.max_cost_usd = 1.0
     args.judge_max_input_bytes = 2
     args.judge_max_output_tokens = 16
-    admission = condition.baseline_spend_admission(args, spec)
-    assert admission["calls"] == {"task_transports":2, "judge_transports":0}
-    args.max_cost_usd = 0.000001
+    admission = condition.spend_admission(args)
+    assert admission["owner_cap_usd"] == 1.0
+    active_guard = condition.ProspectiveSpendGuard(0.0, 0.5)
+    active_id = active_guard.reserve("task", 0.4)
     try:
-        condition.baseline_spend_admission(args, spec)
-    except RuntimeError as error:
-        assert "owner cap before transport" in str(error)
+        active_guard.reserve("task", 0.4)
+    except condition.OperationalSafetyAbort:
+        pass
     else:
-        raise AssertionError("oversized condition reservation was admitted")
+        raise AssertionError("active reservations oversubscribed the owner cap")
+    active_guard.settle(active_id, 0.1)
+    assert active_guard.snapshot()["accounted_total_usd"] == 0.1
+    condition.SPEND_GUARD = condition.ProspectiveSpendGuard(0.0, 0.000001)
+    try:
+        lm.forward(messages=[{"role": "user", "content": "a"}])
+    except condition.OperationalSafetyAbort as error:
+        assert "next task transport would exceed the owner cap" in str(error)
+    else:
+        raise AssertionError("over-cap next transport was admitted")
+    condition.SPEND_GUARD = condition.ProspectiveSpendGuard(0.0, 1.0)
     try:
         lm.forward(messages=[{"role": "user", "content": "abc"}])
-    except RuntimeError as error:
+    except condition.OperationalSafetyAbort as error:
         assert "before transport" in str(error)
     else:
         raise AssertionError("oversized input reached transport")
     try:
         asyncio.run(lm.aforward(messages=[{"role": "user", "content": "abc"}]))
-    except RuntimeError as error:
+    except condition.OperationalSafetyAbort as error:
         assert "before transport" in str(error)
     else:
         raise AssertionError("oversized async input reached transport")
@@ -206,10 +217,10 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       )
 
     assert admitted_status != 0
-    assert admitted_output =~ "owner cap before transport"
+    assert admitted_output =~ "next task transport would exceed the owner cap"
     refute admitted_output =~ "symbolic scorer preflight"
 
-    assert %{"stage" => "preflight", "status" => "failed"} =
+    assert %{"stage" => "heldout", "status" => "failed"} =
              output |> File.read!() |> Jason.decode!()
   end
 
