@@ -3550,3 +3550,37 @@ before transport because ReqLLM was already started, and DSPy was stopped after
 one successful transport (`$0.000372820`). It is an operator invocation error,
 not a scientific result. Including that work, the conservative table-study
 charge is `$12.401855142` against the unchanged combined `$20` cap.
+
+## Current-model table: admitted HotPotQA baseline datum
+
+The matched HotPotQA baseline pair from clean `d1a70ceb` completed both
+ordinary four-stage current-model paths against the same official 300 held-out
+rows and authenticated current Wiki17/BM25s retrieval. The private root is
+`benchmarks/results/gepa-suite-hotpot-baseline-d1a70ceb-python-path-repair-20260805-8lVP1z`.
+Imp and pinned DSPy each scored exactly `166/300` (`0.5533333333`). Paired
+outcomes were 16 Imp-higher rows, 16 DSPy-higher rows, and 268 equal rows; all
+300 input hashes match. This is a clean current-source baseline tie, not
+optimizer lift or prompt/adapter identity.
+
+Imp retained 17 ordinary row errors across 1,179 task transports, including 28
+declared Chat-to-JSON fallbacks. DSPy retained 10 row errors across 1,206 task
+transports. Both lanes bind corpus SHA-256
+`c006527c7c600f85ed594afa36d2a34d0598996405f560474227738342463724`
+and current index-tree SHA-256
+`d8ef9ed4d833c0f9b67ed33784864ff316ec3cfbf1ffca7b0cf2c2190f9f0548`.
+The historical index checksum was never retained; this is an authenticated
+current build of the official retrieval, not historical byte reproduction.
+
+Result SHA-256 values are
+`5e342a0e199a32ec0c3d34bf1e21ff58cf773afc726136b42cf8dc8cbe31cdff`
+for Imp and
+`ac2bd4650c7b91aa875d85bb57de4c07adf22bce1c6d3c1256d7d86e99c3efff`
+for DSPy. Provider-reported pair cost was `$0.507243428`; conservative
+prospective accounting charged `$0.531042200`.
+
+Two preceding invocations are scientifically null. The first misspelled the
+frozen family key and refused before transport. The second passed the retriever
+Python as a relative path; Imp refused before transport and DSPy was stopped
+after 34 successful calls (`$0.005058956`). Conservatively retaining four
+possibly active full request envelopes, the table-study charge is now
+`$12.979243978` under the same `$20` cap.

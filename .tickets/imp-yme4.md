@@ -1118,3 +1118,20 @@ the JSON escape for the same vertical-tab character; decoded data and scoring
 input are identical. Preserve the exact Results and repair only prospective
 evidence canonicalization. The epic remains open for the other baseline cells
 and the optimizer table.
+
+**2026-08-05T16:28:00Z**
+
+The matched official HotPotQA baseline completed both ordinary four-stage
+paths. Imp and pinned DSPy each scored `166/300` (`0.5533333333`), with 16
+row wins each and 268 ties across 300 identical input hashes. Imp retained 17
+row errors over 1,179 transports; DSPy retained 10 over 1,206. Both bind the
+same authenticated current Wiki17 corpus and BM25s index tree. This is a
+current-source baseline tie, not optimizer effectiveness or historical index
+byte reproduction.
+
+The completed pair conservatively charged `$0.531042200`. A preceding
+relative-Python-path invocation made 34 DSPy calls before coordinated stop;
+with four full request envelopes retained conservatively, total study charge is
+`$12.979243978` under the unchanged `$20` cap. HotPotQA is now an admitted
+baseline row; HoVer and PAPILLON remain missing before optimizer scale is
+ratified.
