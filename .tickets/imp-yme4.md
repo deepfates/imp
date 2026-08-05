@@ -1098,3 +1098,23 @@ reservation would project the study to `$174.815428882`, despite the completed
 LiveBench pair's `$0.238719568` realized cost. This is a genuine owner choice
 about worst-case reservation versus a finite actual-spend policy; it is not
 permission to weaken the cap silently or another product-readiness task.
+
+**2026-08-05T15:51:00Z**
+
+The next corrected matched cell completed the official 294-row IFBench
+baseline through both ordinary runtimes at clean `fa970bd6`. Imp scored
+`0.6360544218`; pinned DSPy scored `0.6003401361`. Paired rows were 31
+Imp-higher, 21 DSPy-higher, and 242 equal. This is an admitted current-model
+baseline datum, not optimizer effectiveness. Imp retained 76 row errors over
+632 transports and DSPy retained 80 over 640; the strict public adapter paths
+and declared fallback opportunities remained unchanged.
+
+Conservative prospective accounting charged `$0.873666880` for the completed
+pair. A preceding invocation mistake made one DSPy transport (`$0.000372820`)
+before both lanes were stopped and restarted from scratch; including it, the
+study charge is `$12.401855142` under the same `$20` owner cap. One input hash
+differs solely because Jason and Python use uppercase versus lowercase hex in
+the JSON escape for the same vertical-tab character; decoded data and scoring
+input are identical. Preserve the exact Results and repair only prospective
+evidence canonicalization. The epic remains open for the other baseline cells
+and the optimizer table.

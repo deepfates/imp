@@ -3514,3 +3514,39 @@ actually cost `$0.238719568`. Do not silently weaken the rule, raise the owner
 cap, or launch on a degraded endpoint. The next disposition must choose between
 a larger worst-case reservation and a separately ratified finite actual-spend
 policy that may stop a condition scientifically null if its hard cap is reached.
+
+## Current-model table: admitted IFBench baseline datum
+
+The corrected matched baseline pair from clean `fa970bd6` completed both
+ordinary current-model paths on the exact SiliconFlow fp8 route. The private
+root is
+`benchmarks/results/gepa-suite-ifbench-baseline-fa970bd6-corrected-20260805-0yPadg`.
+Imp scored `187/294`-equivalent (`0.6360544218`) and pinned DSPy scored
+`176.5/294` (`0.6003401361`). Paired row scores were 31 Imp-higher, 21
+DSPy-higher, and 242 equal, for an absolute mean difference of `+0.0357142857`
+in Imp's favor. This is a current-model baseline/runtime datum, not optimizer
+lift, superiority, or rehabilitation of the invalid historical IFBench
+optimizer treatment.
+
+Imp retained 76 ordinary row errors across 632 transports, including 115
+declared Chat-to-JSON fallbacks; DSPy retained 80 row errors across 640
+transports. The immutable Result SHA-256 values are
+`575347923d1d0f26bf322faae487b70643db3157dbf12b0d3107157ca787c1b2`
+for Imp and
+`eba11954dbb89fa8d937d8cbe3860320a8ce367b6ebe31da2c0e55077476e4be`
+for DSPy. Conservative prospective accounting charged `$0.429406840` and
+`$0.444260040`; provider-reported costs were `$0.423025000` and
+`$0.437377724`. The account snapshot moved `$0.862974`, corroborative only.
+
+Exactly one of 294 cross-runtime input hashes differs at row 82 because the
+same source vertical-tab byte is serialized as lowercase `\\u000b` by Python
+and uppercase `\\u000B` by Jason. Decoded source, row order, prompt, and metric
+input are identical; the other 293 hashes match. Treat this as a prospective
+cross-language evidence-canonicalization defect, not data or treatment drift,
+and preserve both live Results unchanged.
+
+The first launch from the same commit omitted Mix's `--no-start`; Imp refused
+before transport because ReqLLM was already started, and DSPy was stopped after
+one successful transport (`$0.000372820`). It is an operator invocation error,
+not a scientific result. Including that work, the conservative table-study
+charge is `$12.401855142` against the unchanged combined `$20` cap.
