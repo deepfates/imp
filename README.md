@@ -110,11 +110,12 @@ valid, but does not rehabilitate the old result. These outcomes show that the
 product can optimize, select, persist, and serve honestly; they do not establish
 broad optimizer effectiveness. The next research milestone is a matched
 current-model Imp-versus-DSPy table across the official six-task GEPA suite.
-That endpoint is being executed significance-first: complete baseline, GEPA,
-and MIPROv2 on AIME, then on the repaired multi-stage IFBench task, before
-scaling the unchanged protocol to the other four families. This is an adapted
-current-model comparison using official task families and metrics, not an exact
-historical GEPA paper reproduction or a success-gated task search.
+The two admitted baseline cells are only the beginning of that table. The
+remaining baselines should be completed across all six families; then the GEPA
+treatment must be reconciled with current DSPy's merge-enabled public default
+before the full GEPA and MIPROv2 sweep. This is an adapted current-model
+comparison using official task families and metrics, not an exact historical
+GEPA paper reproduction or a success-gated task search.
 The complementary Grue stateful-agent condition has now completed the real
 optimizer, Artifact, fresh-restart, and concurrent OTP lifecycle; its three
 fixed local-model seeds all retained baseline with zero causal lift, so it is a

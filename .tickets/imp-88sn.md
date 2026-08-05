@@ -44,37 +44,37 @@ by changing tasks or thresholds after seeing outcomes.
 
 ## Current status
 
-### Restart snapshot (2026-08-03, clean `76c58f3b`)
+### Principal protocol audit (2026-08-05, after clean `440d003a`)
 
-The recognized six-task endpoint remains ratified, but horizontal baseline
-completion is no longer the immediate execution order. The current table has
-two admitted baseline cells (AIME and LiveBench Math), zero current GEPA cells,
-and zero current MIPROv2 cells. Its complete three-seed/two-runtime legal plan
-contains `2,151,306` transports. Continuing through four more baselines before
-testing either optimizer would postpone the ticket's central question.
+The recognized six-task endpoint remains ratified. The current table has two
+admitted baseline cells (AIME and LiveBench Math), zero current GEPA cells, and
+zero current MIPROv2 cells. Complete the remaining matched baselines across all
+six families; they are breadth data, not a success gate or a substitute for the
+optimizer comparison.
 
-The significance-first sequence is therefore:
+The exact current three-seed/two-runtime plan has two deliberately different
+accounting views. Its no-failure/no-JSON-fallback nominal schedule is
+`1,104,168` transports. Its `2,151,306` legal ceiling additionally allows one
+ordinary task-adapter fallback, GEPA budget-boundary overshoot, and the pinned
+batch-to-single reflection failure path. The latter is a safety envelope, not
+the planned experimental opportunity, an expected cost, or evidence that the
+table must be reduced.
 
-1. complete the already-started AIME vertical through matched GEPA and MIPROv2;
-2. complete repaired IFBench baseline/GEPA/MIPROv2 as the central realistic
-   multi-stage vertical; and
-3. after classifying those results, scale the preregistered unchanged arms for
-   HotPotQA, HoVer, LiveBench Math, and PAPILLON.
+The official artifact generated one seed, evaluated heldout once per arm,
+included MIPROv2-Heavy plus merge and no-merge GEPA, and sourced each GEPA
+metric budget from observed MIPROv2-Heavy work. Current pinned DSPy GEPA enables
+merge by default, but Imp's authenticated `:gepa_v0_1_4` profile requires
+`use_merge: false`. Therefore the present no-merge optimizer plan is not yet an
+honest ordinary-treatment comparison. Preserve it as an ablation; before paid
+optimizer work, either implement and authenticate the missing merge-enabled
+profile or explicitly ratify a differently scoped no-merge study and its
+budget. Then run every declared GEPA/MIPROv2 arm and retain schema-3 Artifact
+application plus four-call fresh concurrent `ProgramServer` service for each
+selected Imp optimizer arm.
 
-Both verticals are run-to-completion scientific tranches, not pilots that must
-pass before negatives are disclosed. The review between them and the remaining
-four tasks may repair reusable product defects or invalid treatments; it may
-not task-shop, change observed thresholds, or reinterpret clean negatives.
-Every selected Imp optimizer arm still owes schema-3 Artifact application in a
-fresh BEAM and four-call concurrent `ProgramServer` service.
-
-This study earns a current-model matched reference differential. It uses the
-official six paper families and scorers but Imp's GEPA `0.1.4` no-merge profile,
-current models, and current runtime policies; therefore it does not earn the
-separate exact C4 paper-replication target. No provider call is currently active
-or authorized by this snapshot. The next spend decision must bind the exact two
-vertical opportunities and their cumulative cap rather than reuse the stopped
-horizontal-baseline reservation.
+No provider process is active. The next provider action is the complete
+baseline sweep under a spend admission rule that separates whole-condition
+planning maxima from cumulative actual cost plus the next authenticated call.
 
 ### Owner-ratified correction and next evidence tranche (2026-08-01)
 

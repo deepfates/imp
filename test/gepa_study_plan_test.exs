@@ -12,13 +12,26 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
     assert plan.arms == [:baseline, :mipro_v2_heavy, :gepa_v0_1_4_no_merge]
     assert plan.protocol_classification == :adapted_current_model_reference_differential
     refute plan.paper_replication_claimed
+    assert plan.baseline_protocol_status == :executable
+    assert plan.optimizer_protocol_status == :requires_merge_and_budget_ratification
 
     assert plan.execution_sequence == [
-             {:vertical, "AIMEBench", [:baseline, :gepa_v0_1_4_no_merge, :mipro_v2_heavy]},
-             {:vertical, "IFBench", [:baseline, :gepa_v0_1_4_no_merge, :mipro_v2_heavy]},
-             {:scale_remaining_after_review,
-              ["HotpotQABench", "hoverBench", "LiveBenchMathBench", "Papillon"]}
+             {:complete_full_baseline_sweep,
+              ~w(AIMEBench HotpotQABench hoverBench IFBench LiveBenchMathBench Papillon)},
+             {:repair_or_ratify_merge_enabled_gepa,
+              ~w(AIMEBench HotpotQABench hoverBench IFBench LiveBenchMathBench Papillon)},
+             {:run_full_optimizer_sweep,
+              ~w(AIMEBench HotpotQABench hoverBench IFBench LiveBenchMathBench Papillon)}
            ]
+
+    assert plan.reference_artifact == %{
+             source_commit: "cbefbc1aa0f43dd39874ec4bf42211365dbda42e",
+             generated_seed_count: 1,
+             generated_seed: 0,
+             heldout_evaluations_per_arm: 1,
+             optimizer_arms: [:mipro_v2_heavy, :gepa_merge, :gepa_no_merge],
+             gepa_budget_source: :observed_mipro_v2_heavy_metric_calls
+           }
 
     assert plan.lanes == 6
 
@@ -38,6 +51,24 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
              mipro_proposer_transports: 2_634,
              gepa_reflection_transports: 89_796,
              total_transports: 2_151_306
+           }
+
+    assert plan.nominal_per_runtime_seed == %{
+             program_evaluations: 51_411,
+             task_transports: 159_561,
+             judge_transports: 16_545,
+             mipro_proposer_transports: 439,
+             gepa_reflection_transports: 7_483,
+             total_transports: 184_028
+           }
+
+    assert plan.nominal_study == %{
+             program_evaluations: 308_466,
+             task_transports: 957_366,
+             judge_transports: 99_270,
+             mipro_proposer_transports: 2_634,
+             gepa_reflection_transports: 44_898,
+             total_transports: 1_104_168
            }
 
     assert plan.per_runtime_seed_by_arm.baseline == %{
@@ -75,8 +106,10 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
     assert Enum.find(plan.families, &(&1.family == "Papillon")).transports.judge == 16_890
     assert plan.boundaries.provider_calls_authorized == false
     assert plan.boundaries.preserves_full_six_family_endpoint
-    assert plan.boundaries.vertical_sequence_is_not_a_success_gate
+    assert plan.boundaries.baseline_sweep_is_not_a_success_gate
     assert plan.boundaries.current_gepa_profile == :gepa_v0_1_4_no_merge
+    assert plan.boundaries.pinned_dspy_gepa_default_uses_merge
+    assert plan.boundaries.current_no_merge_arm_is_not_the_default_dspy_gepa_treatment
     assert plan.boundaries.exact_paper_replication_requires_separate_protocol
 
     assert plan.boundaries.task_transport_bound ==
