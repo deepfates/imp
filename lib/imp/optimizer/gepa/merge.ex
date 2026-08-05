@@ -14,7 +14,7 @@ defmodule Imp.Optimizer.GEPA.Merge do
   lineage as accepted attempts.
   """
 
-  alias Imp.Optimizer.GEPA.Candidate
+  alias Imp.Optimizer.GEPA.{Candidate, Random}
 
   @type attempt_log :: %{
           optional(:ancestors) => [{candidate_id(), candidate_id(), candidate_id()}],
@@ -88,11 +88,11 @@ defmodule Imp.Optimizer.GEPA.Merge do
           %{optional(candidate_id()) => number()},
           [candidate_id()],
           attempt_log(),
-          :rand.state(),
+          Random.state(),
           keyword()
         ) ::
-          {:ok, proposal(), attempt_log(), :rand.state()}
-          | {:none, attempt_log(), :rand.state()}
+          {:ok, proposal(), attempt_log(), Random.state()}
+          | {:none, attempt_log(), Random.state()}
   def propose_source(
         candidates,
         lineage,
@@ -542,8 +542,8 @@ defmodule Imp.Optimizer.GEPA.Merge do
         {right, right_id, rng_state}
 
       true ->
-        {choice, rng_state} = :rand.uniform_s(2, rng_state)
-        if choice == 1, do: {left, left_id, rng_state}, else: {right, right_id, rng_state}
+        {choice, rng_state} = Random.integer(2, rng_state)
+        if choice == 0, do: {left, left_id, rng_state}, else: {right, right_id, rng_state}
     end
   end
 
@@ -584,34 +584,23 @@ defmodule Imp.Optimizer.GEPA.Merge do
 
   defp sample_pair(ids, rng_state) do
     ids = Enum.sort_by(ids, &inspect/1)
-    {left, rest, rng_state} = take_random(ids, rng_state)
-    {right, _rest, rng_state} = take_random(rest, rng_state)
-    {:ok, Enum.sort_by([left, right], &inspect/1), rng_state}
+    {sampled, rng_state} = Random.sample(ids, 2, rng_state)
+    {:ok, Enum.sort_by(sampled, &inspect/1), rng_state}
   end
 
   defp sample_without_replacement(_items, 0, rng_state), do: {[], rng_state}
 
   defp sample_without_replacement(items, count, rng_state) do
-    Enum.reduce(1..count, {[], items, rng_state}, fn _, {selected, remaining, rng_state} ->
-      {item, remaining, rng_state} = take_random(remaining, rng_state)
-      {selected ++ [item], remaining, rng_state}
-    end)
-    |> then(fn {selected, _remaining, rng_state} -> {selected, rng_state} end)
+    Random.sample(items, count, rng_state)
   end
 
   defp sample_with_replacement(_items, 0, rng_state), do: {[], rng_state}
 
   defp sample_with_replacement(items, count, rng_state) do
     Enum.map_reduce(1..count, rng_state, fn _, rng_state ->
-      {index, rng_state} = :rand.uniform_s(length(items), rng_state)
-      {Enum.at(items, index - 1), rng_state}
+      {index, rng_state} = Random.integer(length(items), rng_state)
+      {Enum.at(items, index), rng_state}
     end)
-  end
-
-  defp take_random(items, rng_state) do
-    {index, rng_state} = :rand.uniform_s(length(items), rng_state)
-    {item, remaining} = List.pop_at(items, index - 1)
-    {item, remaining, rng_state}
   end
 
   defp weighted_choice(ids, scores, rng_state) do
@@ -619,10 +608,10 @@ defmodule Imp.Optimizer.GEPA.Merge do
     total = Enum.sum(weights)
 
     if total == 0 do
-      {index, rng_state} = :rand.uniform_s(length(ids), rng_state)
-      {Enum.at(ids, index - 1), rng_state}
+      {index, rng_state} = Random.integer(length(ids), rng_state)
+      {Enum.at(ids, index), rng_state}
     else
-      {draw, rng_state} = :rand.uniform_s(rng_state)
+      {draw, rng_state} = Random.float(rng_state)
       threshold = draw * total
 
       {chosen, _sum} =

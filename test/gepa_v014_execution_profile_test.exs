@@ -130,6 +130,39 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
     end
   end
 
+  defmodule MergeProfileAdapter do
+    @behaviour Adapter
+    defstruct []
+
+    @impl true
+    def evaluate(_adapter, batch, candidate, opts) do
+      scores =
+        Enum.map(batch, fn
+          :planner -> if candidate.planner == "left planner", do: 1.0, else: 0.0
+          :writer -> if candidate.writer == "right writer", do: 1.0, else: 0.0
+          _tie -> 0.5
+        end)
+
+      trajectories =
+        if Keyword.get(opts, :capture_traces, false),
+          do:
+            Map.new(candidate, fn {component, _} ->
+              {component, List.duplicate(nil, length(batch))}
+            end),
+          else: %{}
+
+      Result.new(scores, scores,
+        trajectories: trajectories,
+        side_information: Map.new(candidate, fn {component, _} -> {component, []} end),
+        metadata: %{metric_calls: length(batch)}
+      )
+    end
+
+    @impl true
+    def make_reflective_dataset(_adapter, _candidate, _result, components),
+      do: Map.new(components, &{&1, []})
+  end
+
   test "pinned profile reproduces the four-iteration CPython parent and minibatch schedule" do
     Enum.each(@seeds, fn seed ->
       state = run_profile(seed)
@@ -201,6 +234,142 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
     assert report.metadata.metric_calls == 280
     assert report.metadata.reflection_calls == 0
     assert report.candidate_count == 1
+  end
+
+  test "public merge profile changes only the authenticated merge treatment" do
+    reflection_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{__imp_lm_output__: %{"instruction" => "Answer exactly."}}
+        end
+      )
+
+    no_merge =
+      GEPA.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :gepa_v0_1_4,
+        max_metric_calls: 80,
+        reflection_lm: reflection_lm
+      )
+
+    merge =
+      GEPA.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :gepa_v0_1_4_merge,
+        max_metric_calls: 80,
+        reflection_lm: reflection_lm
+      )
+
+    refute no_merge.use_merge
+    assert merge.use_merge
+
+    for optimizer <- [no_merge, merge] do
+      assert optimizer.reflection_record_mode == :gepa_v0_1_4
+      assert optimizer.candidate_selection_strategy == :pareto
+      assert optimizer.module_selector == :round_robin
+      assert optimizer.sampling_strategy == :single
+      assert optimizer.selection_strategy == :all_improvements
+      assert optimizer.proposal_concurrency == 1
+      assert optimizer.max_concurrency == 1
+      assert optimizer.frontier_type == :instance
+      assert optimizer.acceptance_policy == :strict_improvement
+      assert optimizer.merge_acceptance_policy == :equal_or_better
+      assert optimizer.rng_algorithm == :python_v3
+      refute optimizer.cache_evaluation
+    end
+
+    assert_raise ArgumentError, ~r/requires :use_merge: true/, fn ->
+      GEPA.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :gepa_v0_1_4_merge,
+        use_merge: false,
+        max_metric_calls: 80,
+        reflection_lm: reflection_lm
+      )
+    end
+  end
+
+  test "merge profile executes the source-shaped scheduled merge path" do
+    root = %{planner: "base planner", writer: "base writer"}
+    left = %{planner: "left planner", writer: "base writer"}
+    right = %{planner: "base planner", writer: "right writer"}
+    valset = [:planner, :writer, :tie_one, :tie_two, :tie_three]
+
+    common_opts = [
+      execution_profile: :gepa_v0_1_4_merge,
+      rng_algorithm: :python_v3,
+      reflection_failure_policy: :gepa_v0_1_4_batch_then_single_retry,
+      minibatch_size: 1,
+      candidate_selection_strategy: :pareto,
+      module_selector: :round_robin,
+      sampling_strategy: :single,
+      selection_strategy: :all_improvements,
+      proposal_concurrency: 1,
+      acceptance_policy: :strict_improvement,
+      use_merge: true,
+      cache_evaluation: false,
+      skip_perfect_score: true,
+      perfect_score: 1.0,
+      max_metric_calls: 100,
+      max_reflection_calls: 10,
+      seed: 5
+    ]
+
+    %Engine.State{} =
+      initial =
+      Engine.run(
+        %MergeProfileAdapter{},
+        root,
+        [:planner],
+        valset,
+        fn _, _, _, _ -> flunk("zero iterations must not propose") end,
+        Keyword.put(common_opts, :max_iterations, 0)
+      )
+
+    validation = fn candidate ->
+      MergeProfileAdapter.evaluate(%MergeProfileAdapter{}, valset, candidate, [])
+    end
+
+    state = %Engine.State{
+      initial
+      | iteration: 2,
+        candidates: [
+          %Engine.Entry{id: 0, candidate: root, validation: validation.(root)},
+          %Engine.Entry{
+            id: 1,
+            candidate: left,
+            validation: validation.(left),
+            parent_ids: [0]
+          },
+          %Engine.Entry{
+            id: 2,
+            candidate: right,
+            validation: validation.(right),
+            parent_ids: [0]
+          }
+        ],
+        merge_due: 1,
+        last_iteration_found_candidate: true
+    }
+
+    merged =
+      Engine.run(
+        %MergeProfileAdapter{},
+        root,
+        [:planner],
+        valset,
+        fn _, _, _, _ -> flunk("scheduled merge must preempt reflection") end,
+        common_opts
+        |> Keyword.put(:max_iterations, 3)
+        |> Keyword.put(:resume_state, Engine.dump_state(state) |> json_round_trip())
+      )
+
+    assert merged.total_merges_tested == 1
+
+    assert List.last(merged.candidates).candidate == %{
+             planner: "left planner",
+             writer: "right writer"
+           }
+
+    assert %{operation: :merge, status: :accepted, parent_ids: [1, 2], ancestor: 0} =
+             List.last(merged.history)
   end
 
   test "public pinned profile derives legal execution from a finite semantic metric budget" do

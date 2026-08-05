@@ -4,7 +4,7 @@ defmodule Imp.GepaSuiteConditionCLI do
   alias Imp.BenchmarkTruth.{GepaStudyCondition, GepaStudyPlan, GepaSuite}
   alias Imp.Optimizer.Artifact
 
-  @arms ~w(baseline mipro_v2_heavy gepa_v0_1_4_no_merge)
+  @arms ~w(baseline mipro_v2_heavy gepa_v0_1_4_merge)
   @request_timeout_ms 120_000
 
   def main(argv) do
@@ -87,7 +87,7 @@ defmodule Imp.GepaSuiteConditionCLI do
           %{
             "baseline" => :baseline,
             "mipro_v2_heavy" => :mipro_v2_heavy,
-            "gepa_v0_1_4_no_merge" => :gepa_v0_1_4_no_merge
+            "gepa_v0_1_4_merge" => :gepa_v0_1_4_merge
           },
           arm
         ),
@@ -196,7 +196,7 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   defp preflight!(config, prepared) do
     treatments =
-      for arm <- [:mipro_v2_heavy, :gepa_v0_1_4_no_merge], into: %{} do
+      for arm <- [:mipro_v2_heavy, :gepa_v0_1_4_merge], into: %{} do
         optimizer = GepaStudyCondition.optimizer!(arm, prepared, config.seed)
         {arm, optimizer_receipt(arm, optimizer)}
       end
@@ -529,7 +529,7 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
   end
 
-  defp optimizer_receipt(:gepa_v0_1_4_no_merge, optimizer) do
+  defp optimizer_receipt(:gepa_v0_1_4_merge, optimizer) do
     %{
       execution_profile: optimizer.execution_profile,
       max_concurrency: optimizer.max_concurrency,

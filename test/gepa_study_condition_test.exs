@@ -13,7 +13,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
   @root "tmp/gepa-six-task-current-root"
 
   @tag :evidence_infrastructure
-  test "constructs exact Heavy MIPRO and pinned no-merge GEPA treatments without providers" do
+  test "constructs exact Heavy MIPRO and pinned merge GEPA treatments without providers" do
     lm = %NeverLM{}
 
     prepared =
@@ -32,13 +32,13 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
     assert mipro.max_errors == 10_000
     assert mipro.max_concurrency == 1
 
-    gepa = GepaStudyCondition.optimizer!(:gepa_v0_1_4_no_merge, prepared, 17)
-    assert gepa.execution_profile == :gepa_v0_1_4
+    gepa = GepaStudyCondition.optimizer!(:gepa_v0_1_4_merge, prepared, 17)
+    assert gepa.execution_profile == :gepa_v0_1_4_merge
     assert gepa.max_metric_calls == 1_839
     assert gepa.max_reflection_calls == 1_196
     assert gepa.minibatch_size == 3
     assert gepa.module_selector == :round_robin
-    refute gepa.use_merge
+    assert gepa.use_merge
     assert gepa.max_concurrency == 1
     assert prepared.outer_max_concurrency == 8
 

@@ -30,7 +30,8 @@ defmodule Imp.Optimizer.GEPA do
   same information as upstream.
 
   `:execution_profile` defaults to `:beam_native`. The opt-in
-  `:gepa_v0_1_4` profile seals the pinned single-proposal search semantics:
+  `:gepa_v0_1_4` and `:gepa_v0_1_4_merge` profiles seal the pinned
+  single-proposal search semantics:
   CPython's persisted MT19937 stream is shared by Pareto selection and
   Fisher-Yates minibatch sampling, perfect minibatches are skipped at `1.0`,
   evaluation caching is disabled, and one failed batched reflection is retried
@@ -41,6 +42,9 @@ defmodule Imp.Optimizer.GEPA do
   `:max_metric_calls` is the pinned profile's authoritative semantic budget and
   supersedes the BEAM-native `:generations` knob. When the metric budget is
   `:infinity`, `:generations` retains its legacy budget-derivation behavior.
+  The first profile is the released no-merge ablation. The second enables the
+  same source-authenticated common-ancestor merge path used by DSPy's ordinary
+  GEPA treatment.
 
   `:proposal_concurrency` enables first-party GEPA speculative parallel
   proposals. Contexts are sampled sequentially from one archive and RNG
@@ -126,7 +130,10 @@ defmodule Imp.Optimizer.GEPA do
   ]
 
   @option_schema [
-    execution_profile: [type: {:in, [:beam_native, :gepa_v0_1_4]}, default: :beam_native],
+    execution_profile: [
+      type: {:in, [:beam_native, :gepa_v0_1_4, :gepa_v0_1_4_merge]},
+      default: :beam_native
+    ],
     callbacks: [type: {:custom, Callback, :validate, []}, default: []],
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     reflection_record_mode: [
@@ -673,7 +680,7 @@ defmodule Imp.Optimizer.GEPA do
         |> Keyword.put(:rng_algorithm, :beam_native)
         |> Keyword.put(:reflection_failure_policy, :single_attempt_fail_closed)
 
-      :gepa_v0_1_4 ->
+      profile when profile in [:gepa_v0_1_4, :gepa_v0_1_4_merge] ->
         requirements = [
           reflection_record_mode: :gepa_v0_1_4,
           candidate_selection_strategy: :pareto,
@@ -683,7 +690,7 @@ defmodule Imp.Optimizer.GEPA do
           selection_strategy: :all_improvements,
           proposal_concurrency: 1,
           max_concurrency: 1,
-          use_merge: false,
+          use_merge: profile == :gepa_v0_1_4_merge,
           frontier_type: :instance,
           evaluation_policy: :full,
           acceptance_policy: :strict_improvement
@@ -692,7 +699,8 @@ defmodule Imp.Optimizer.GEPA do
         Enum.each(requirements, fn {key, expected} ->
           if Keyword.has_key?(requested, key) and Keyword.fetch!(requested, key) != expected do
             raise ArgumentError,
-                  ":execution_profile :gepa_v0_1_4 requires #{inspect(key)}: #{inspect(expected)}"
+                  ":execution_profile #{inspect(profile)} requires " <>
+                    "#{inspect(key)}: #{inspect(expected)}"
           end
         end)
 
@@ -719,10 +727,11 @@ defmodule Imp.Optimizer.GEPA do
   end
 
   defp profile_budget_envelope(
-         %__MODULE__{execution_profile: :gepa_v0_1_4} = optimizer,
+         %__MODULE__{execution_profile: profile} = optimizer,
          trainset,
          devset
-       ) do
+       )
+       when profile in [:gepa_v0_1_4, :gepa_v0_1_4_merge] do
     minibatch_size = optimizer.minibatch_size || min(3, length(trainset))
 
     semantic_max_metric_calls =
@@ -739,7 +748,7 @@ defmodule Imp.Optimizer.GEPA do
 
     unless optimizer.max_reflection_calls in [:infinity, envelope.max_reflection_calls] do
       raise ArgumentError,
-            ":execution_profile :gepa_v0_1_4 requires :max_reflection_calls " <>
+            ":execution_profile #{inspect(profile)} requires :max_reflection_calls " <>
               "#{envelope.max_reflection_calls} for every legally started iteration; got: " <>
               inspect(optimizer.max_reflection_calls)
     end

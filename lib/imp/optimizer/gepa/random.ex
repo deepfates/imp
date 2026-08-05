@@ -22,6 +22,26 @@ defmodule Imp.Optimizer.GEPA.Random do
     {value - 1, state}
   end
 
+  @spec float(state()) :: {float(), state()}
+  def float(%PythonRandom{} = state), do: PythonRandom.random(state)
+  def float(state), do: :rand.uniform_s(state)
+
+  @spec sample(list(), non_neg_integer(), state()) :: {list(), state()}
+  def sample(values, count, %PythonRandom{} = state),
+    do: PythonRandom.sample(state, values, count)
+
+  def sample(values, 0, state) when is_list(values), do: {[], state}
+
+  def sample(values, count, state)
+      when is_list(values) and is_integer(count) and count >= 0 and count <= length(values) do
+    Enum.reduce(1..count, {[], values, state}, fn _, {selected, remaining, state} ->
+      {index, state} = integer(length(remaining), state)
+      {item, remaining} = List.pop_at(remaining, index)
+      {selected ++ [item], remaining, state}
+    end)
+    |> then(fn {selected, _remaining, state} -> {selected, state} end)
+  end
+
   @spec shuffle(list(), state()) :: {list(), state()}
   def shuffle(values, %PythonRandom{} = state), do: PythonRandom.shuffle(state, values)
 

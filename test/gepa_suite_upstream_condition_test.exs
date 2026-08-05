@@ -74,7 +74,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert condition.arm_program("baseline", baseline, selected) is baseline
     assert condition.arm_program("mipro_v2_heavy", baseline, selected) is selected
     assert condition.arm_requires_fresh_state("baseline") is False
-    assert condition.arm_requires_fresh_state("gepa_v0_1_4_no_merge") is True
+    assert condition.arm_requires_fresh_state("gepa_v0_1_4_merge") is True
     assert lm.forward(messages=[{"role": "user", "content": "é"}])["id"] == "id"
     usage = condition.runtime_usage()["summary"]["task"]
     assert usage["request_attempts"] == 1

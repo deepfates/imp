@@ -63,14 +63,20 @@ table must be reduced.
 The official artifact generated one seed, evaluated heldout once per arm,
 included MIPROv2-Heavy plus merge and no-merge GEPA, and sourced each GEPA
 metric budget from observed MIPROv2-Heavy work. Current pinned DSPy GEPA enables
-merge by default, but Imp's authenticated `:gepa_v0_1_4` profile requires
-`use_merge: false`. Therefore the present no-merge optimizer plan is not yet an
-honest ordinary-treatment comparison. Preserve it as an ablation; before paid
-optimizer work, either implement and authenticate the missing merge-enabled
-profile or explicitly ratify a differently scoped no-merge study and its
-budget. Then run every declared GEPA/MIPROv2 arm and retain schema-3 Artifact
-application plus four-call fresh concurrent `ProgramServer` service for each
-selected Imp optimizer arm.
+merge by default. Imp now exposes `:gepa_v0_1_4_merge`, composing the pinned
+schedule and CPython RNG with the source-authenticated common-ancestor merge
+path. A composed provider-free test found and repaired the prior RNG-state
+incompatibility, executed an accepted two-parent merge, and preserved its
+lineage. The ordinary Imp and pinned-DSPy study entrances now both construct
+the merge-enabled treatment; no-merge remains an ablation.
+
+The remaining protocol choice is scientific scale: whether the current-model
+comparison uses the official artifact's single generated seed and
+MIPROv2-Heavy-derived task budgets, or adds a clearly labeled robustness layer.
+Do not silently multiply paper opportunity into a requirement or shrink it to
+fit cost. Once frozen, run every declared GEPA/MIPROv2 arm and retain schema-3
+Artifact application plus four-call fresh concurrent `ProgramServer` service
+for each selected Imp optimizer arm.
 
 No provider process is active. The next provider action is the complete
 baseline sweep under a spend admission rule that separates whole-condition

@@ -9,11 +9,11 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
   test "derives the complete three-seed two-runtime opportunity from official receipts" do
     plan = GepaStudyPlan.plan!(@root, seeds: 3, runtimes: 2)
 
-    assert plan.arms == [:baseline, :mipro_v2_heavy, :gepa_v0_1_4_no_merge]
+    assert plan.arms == [:baseline, :mipro_v2_heavy, :gepa_v0_1_4_merge]
     assert plan.protocol_classification == :adapted_current_model_reference_differential
     refute plan.paper_replication_claimed
     assert plan.baseline_protocol_status == :executable
-    assert plan.optimizer_protocol_status == :requires_merge_and_budget_ratification
+    assert plan.optimizer_protocol_status == :requires_budget_ratification
 
     assert plan.execution_sequence == [
              {:complete_full_baseline_sweep,
@@ -107,9 +107,9 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
     assert plan.boundaries.provider_calls_authorized == false
     assert plan.boundaries.preserves_full_six_family_endpoint
     assert plan.boundaries.baseline_sweep_is_not_a_success_gate
-    assert plan.boundaries.current_gepa_profile == :gepa_v0_1_4_no_merge
+    assert plan.boundaries.current_gepa_profile == :gepa_v0_1_4_merge
     assert plan.boundaries.pinned_dspy_gepa_default_uses_merge
-    assert plan.boundaries.current_no_merge_arm_is_not_the_default_dspy_gepa_treatment
+    assert plan.boundaries.no_merge_retained_as_ablation_only
     assert plan.boundaries.exact_paper_replication_requires_separate_protocol
 
     assert plan.boundaries.task_transport_bound ==

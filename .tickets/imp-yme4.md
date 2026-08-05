@@ -79,16 +79,16 @@ is retained for audit, but it does not define priority.
   failure envelopes. Its `2,151,306` transports are therefore a legal ceiling,
   not scheduled work; the corresponding no-failure/no-fallback nominal plan is
   `1,104,168` transports. Neither number is an observed cost.
-- **Product/treatment mismatch:** pinned DSPy `3.2.1` enables GEPA merge by
-  default, while Imp's authenticated `:gepa_v0_1_4` profile requires
-  `use_merge: false`. The existing no-merge plan is a legitimate ablation but
-  is not current DSPy's ordinary GEPA treatment or the paper's GEPA+Merge arm.
-  The baseline protocol is executable. The optimizer protocol is not ratified
-  until Imp either supplies an authenticated merge-enabled profile or the
-  study explicitly chooses and labels the no-merge ablation.
+- **Product/treatment repair:** pinned DSPy `3.2.1` enables GEPA merge by
+  default, while Imp previously authenticated only a no-merge profile. The new
+  `:gepa_v0_1_4_merge` profile composes pinned scheduling, CPython RNG,
+  source-authenticated common-ancestor merge, budget accounting, checkpoint
+  persistence, and the ordinary six-family entrances. Its first composed test
+  exposed and repaired a real BEAM-RNG/Python-RNG incompatibility in merge.
+  No-merge remains an ablation rather than the headline treatment.
 - **Next sequence:** complete the full six-family baseline sweep without using
-  outcomes as a success gate; repair or explicitly ratify the GEPA treatment
-  and its scientific budget; then run the complete GEPA/MIPROv2 table. Do not
+  outcomes as a success gate; ratify the scientific optimizer budget; then run
+  the complete merge-enabled GEPA/MIPROv2 table. Do not
   replace the ratified table with AIME/IFBench verticals, task-shop after
   results, or let the legal failure ceiling masquerade as planned opportunity.
 - **Current operation:** no provider process is active. The previous `$20`

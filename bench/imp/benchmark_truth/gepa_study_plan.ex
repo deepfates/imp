@@ -44,8 +44,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       protocol_classification: :adapted_current_model_reference_differential,
       paper_replication_claimed: false,
       baseline_protocol_status: :executable,
-      optimizer_protocol_status: :requires_merge_and_budget_ratification,
-      arms: [:baseline, :mipro_v2_heavy, :gepa_v0_1_4_no_merge],
+      optimizer_protocol_status: :requires_budget_ratification,
+      arms: [:baseline, :mipro_v2_heavy, :gepa_v0_1_4_merge],
       execution_sequence: [
         {:complete_full_baseline_sweep, GepaSuite.families()},
         {:repair_or_ratify_merge_enabled_gepa, GepaSuite.families()},
@@ -85,9 +85,9 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
       boundaries: %{
         preserves_full_six_family_endpoint: true,
         baseline_sweep_is_not_a_success_gate: true,
-        current_gepa_profile: :gepa_v0_1_4_no_merge,
+        current_gepa_profile: :gepa_v0_1_4_merge,
         pinned_dspy_gepa_default_uses_merge: true,
-        current_no_merge_arm_is_not_the_default_dspy_gepa_treatment: true,
+        no_merge_retained_as_ablation_only: true,
         exact_paper_replication_requires_separate_protocol: true,
         heldout_loaded_after_optimizer: true,
         official_mipro_reference_opportunity: true,
@@ -149,7 +149,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
           mipro_proposer_transports,
           0
         ),
-      gepa_v0_1_4_no_merge:
+      gepa_v0_1_4_merge:
         arm_totals(
           gepa.max_metric_calls + test,
           legal_task_transports(
@@ -179,7 +179,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
           mipro_proposer_transports,
           0
         ),
-      gepa_v0_1_4_no_merge:
+      gepa_v0_1_4_merge:
         arm_totals(
           mipro_metric_calls + test,
           (mipro_metric_calls + test + @fresh_examples_per_selected_arm) * shape.task_stages,

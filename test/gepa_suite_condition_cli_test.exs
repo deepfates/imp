@@ -46,8 +46,8 @@ defmodule Imp.GepaSuiteConditionCLITest do
 
       assert receipt["treatments"]["mipro_v2_heavy"]["auto"] == "heavy"
 
-      assert receipt["treatments"]["gepa_v0_1_4_no_merge"]["execution_profile"] ==
-               "gepa_v0_1_4"
+      assert receipt["treatments"]["gepa_v0_1_4_merge"]["execution_profile"] ==
+               "gepa_v0_1_4_merge"
     end
   end
 
@@ -91,7 +91,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
           "--family",
           "AIMEBench",
           "--arm",
-          "gepa_v0_1_4_no_merge",
+          "gepa_v0_1_4_merge",
           "--artifact",
           artifact_path,
           "--fresh-output",

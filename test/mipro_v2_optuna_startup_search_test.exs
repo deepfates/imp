@@ -36,6 +36,15 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
     end
   end
 
+  test "Python-compatible floating draws reproduce CPython Random.random" do
+    {draws, _rng} =
+      Enum.map_reduce(1..3, PythonRandom.new(5), fn _, rng ->
+        PythonRandom.random(rng)
+      end)
+
+    assert draws == [0.6229016948897019, 0.7417869892607294, 0.7951935655656966]
+  end
+
   test "Python-compatible RNG checkpoint resumes the exact sample stream" do
     {first, rng} = PythonRandom.sample(PythonRandom.new(9), Enum.to_list(0..19), 7)
 

@@ -463,7 +463,10 @@ defmodule Imp.Optimizer.GEPA.Engine do
   defp runtime_profile?(_policy), do: false
 
   defp strategy_path?(opts, proposal_policy) do
-    if Keyword.get(opts, :execution_profile, :beam_native) == :gepa_v0_1_4 do
+    if Keyword.get(opts, :execution_profile, :beam_native) in [
+         :gepa_v0_1_4,
+         :gepa_v0_1_4_merge
+       ] do
       false
     else
       strategy_path_for_beam?(opts, proposal_policy)
@@ -5556,8 +5559,10 @@ defmodule Imp.Optimizer.GEPA.Engine do
     ProposalSelection.validate!(selection_strategy)
     ReflectionStrategy.validate!(reflection_strategy)
 
-    unless execution_profile in [:beam_native, :gepa_v0_1_4],
-      do: raise(ArgumentError, ":execution_profile must be :beam_native or :gepa_v0_1_4")
+    unless execution_profile in [:beam_native, :gepa_v0_1_4, :gepa_v0_1_4_merge] do
+      raise ArgumentError,
+            ":execution_profile must be :beam_native, :gepa_v0_1_4, or :gepa_v0_1_4_merge"
+    end
 
     unless rng_algorithm in [:beam_native, :python_v3],
       do: raise(ArgumentError, ":rng_algorithm must be :beam_native or :python_v3")
@@ -5568,13 +5573,16 @@ defmodule Imp.Optimizer.GEPA.Engine do
            ],
            do: raise(ArgumentError, "invalid :reflection_failure_policy")
 
-    if execution_profile == :gepa_v0_1_4 do
+    if execution_profile in [:gepa_v0_1_4, :gepa_v0_1_4_merge] do
+      expected_merge? = execution_profile == :gepa_v0_1_4_merge
+
       unless rng_algorithm == :python_v3 and
                reflection_failure_policy == :gepa_v0_1_4_batch_then_single_retry and
                Keyword.get(opts, :candidate_selection_strategy, :pareto) == :pareto and
                ModuleSelector.round_robin?(Keyword.get(opts, :module_selector, :round_robin)) and
                sampling_strategy == :single and selection_strategy == :all_improvements and
-               proposal_concurrency == 1 and not use_merge and not cache_evaluation and
+               proposal_concurrency == 1 and use_merge == expected_merge? and
+               not cache_evaluation and
                skip_perfect_score and perfect_score == 1.0 and frontier_type == :instance and
                Keyword.get(opts, :evaluation_policy, :full) == :full do
         raise ArgumentError, "GEPA v0.1.4 execution profile options are inconsistent"

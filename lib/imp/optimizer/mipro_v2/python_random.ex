@@ -62,6 +62,15 @@ defmodule Imp.Optimizer.MIPROv2.PythonRandom do
     {lower + offset, rng}
   end
 
+  @doc false
+  @spec random(%__MODULE__{}) :: {float(), %__MODULE__{}}
+  def random(%__MODULE__{} = rng) do
+    {first, rng} = next_word(rng)
+    {second, rng} = next_word(rng)
+    value = ((first >>> 5) * 67_108_864 + (second >>> 6)) / 9_007_199_254_740_992
+    {value, rng}
+  end
+
   @spec shuffle(%__MODULE__{}, list(term())) :: {list(term()), %__MODULE__{}}
   def shuffle(%__MODULE__{} = rng, values) when length(values) < 2, do: {values, rng}
 

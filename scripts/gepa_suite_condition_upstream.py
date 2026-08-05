@@ -43,7 +43,7 @@ FAMILIES = {
     "LiveBenchMathBench": "gepa_artifact.benchmarks.livebench_math",
     "Papillon": "gepa_artifact.benchmarks.papillon",
 }
-ARMS = ("baseline", "mipro_v2_heavy", "gepa_v0_1_4_no_merge")
+ARMS = ("baseline", "mipro_v2_heavy", "gepa_v0_1_4_merge")
 LIVEBENCH_MATH_BRIDGE = Path(__file__).resolve().with_name("livebench_math_score.py")
 FAMILY_SHAPES = {
     "AIMEBench": {"task": 1, "judge": 0},
@@ -647,7 +647,7 @@ def optimize(dspy: Any, program: Any, meta: Any, train: list[Any], dev: list[Any
         reflection_minibatch_size=3,
         reflection_lm=reflection_lm,
         component_selector="round_robin",
-        use_merge=False,
+        use_merge=True,
         num_threads=1,
         failure_score=0.0,
         track_stats=True,

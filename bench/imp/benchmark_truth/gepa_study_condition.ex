@@ -54,19 +54,19 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     )
   end
 
-  def optimizer!(:gepa_v0_1_4_no_merge, prepared, seed) do
+  def optimizer!(:gepa_v0_1_4_merge, prepared, seed) do
     spec = prepared.loaded.spec
     dev_size = get_in(spec, ["split_counts", "dev"])
     semantic_metric_calls = Map.fetch!(spec, "metric_calls")
     envelope = GEPA.v014_budget_envelope(dev_size, 3, semantic_metric_calls)
 
     GEPA.new(prepared.metric,
-      execution_profile: :gepa_v0_1_4,
+      execution_profile: :gepa_v0_1_4_merge,
       reflection_lm: prepared.lms.reflection,
       component_feedback: prepared.component_feedback,
       minibatch_size: 3,
       module_selector: :round_robin,
-      use_merge: false,
+      use_merge: true,
       seed: seed,
       max_concurrency: 1,
       max_metric_calls: semantic_metric_calls,
@@ -100,16 +100,16 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     }
   end
 
-  def optimize!(:gepa_v0_1_4_no_merge, prepared, seed) do
+  def optimize!(:gepa_v0_1_4_merge, prepared, seed) do
     {selected, report, artifact} =
       prepared
-      |> optimizer!(:gepa_v0_1_4_no_merge, seed)
+      |> optimizer!(:gepa_v0_1_4_merge, seed)
       |> GEPA.compile_with_artifact(
         prepared.program,
         prepared.loaded.train,
         prepared.loaded.dev,
-        artifact_id: artifact_id(prepared.loaded.spec, :gepa_v0_1_4_no_merge, seed),
-        provenance: provenance(prepared.loaded.spec, :gepa_v0_1_4_no_merge, seed)
+        artifact_id: artifact_id(prepared.loaded.spec, :gepa_v0_1_4_merge, seed),
+        provenance: provenance(prepared.loaded.spec, :gepa_v0_1_4_merge, seed)
       )
 
     %{selected: selected, report: report, artifact: artifact}
