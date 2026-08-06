@@ -30,7 +30,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
     assert mipro.config.search_fidelity == :dspy_3_2_1_optuna_4_9_0
     assert mipro.config.program_aware_proposer
     assert mipro.max_errors == 10_000
-    assert mipro.max_concurrency == 1
+    assert mipro.max_concurrency == 8
 
     gepa = GepaStudyCondition.optimizer!(:gepa_v0_1_4_merge, prepared, 17)
     assert gepa.execution_profile == :gepa_v0_1_4_merge

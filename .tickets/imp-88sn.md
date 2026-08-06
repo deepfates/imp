@@ -86,9 +86,10 @@ The source artifact evaluates GEPA rows concurrently even though candidate
 proposal order is serial. Imp's authenticated pinned profile previously sealed
 both dimensions to one. It now permits bounded concurrent row evaluation while
 preserving the pinned proposal/RNG/archive semantics; both study entrances use
-the same declared concurrency. Pinned modeled MIPRO search remains serial. This
-is an ordinary product/profile repair that reduces wall time without changing
-metric budgets or optimizer opportunity.
+the same declared concurrency. MIPRO's modeled trial sequence remains serial,
+but its ordered row evaluations now accept the same source-default concurrency
+as DSPy. This is an ordinary product/profile repair that reduces wall time
+without changing metric budgets or optimizer opportunity.
 
 No provider process is active. The baseline tranche conservatively charged
 `$15.155289378` of the owner's `$20` authority. The ordinary Imp and pinned-DSPy

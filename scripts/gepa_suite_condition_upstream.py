@@ -700,7 +700,7 @@ def optimize(dspy: Any, program: Any, meta: Any, train: list[Any], dev: list[Any
             prompt_model=reflection_lm,
             task_model=task_lm,
             auto="heavy",
-            num_threads=1,
+            num_threads=args.max_concurrency,
             max_errors=10_000,
             seed=args.seed,
             track_stats=True,
@@ -797,7 +797,7 @@ def main() -> None:
         "input_envelope_semantics": "nested_utf8_string_content_bytes_not_full_wire_bytes",
         "metric_runtime": metric_runtime,
         "treatments": {
-            "mipro_v2_heavy": {"max_concurrency": 1},
+            "mipro_v2_heavy": {"max_concurrency": args.max_concurrency},
             "gepa_v0_1_4_merge": {"max_concurrency": args.max_concurrency},
         },
     }

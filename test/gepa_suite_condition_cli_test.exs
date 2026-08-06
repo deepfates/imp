@@ -47,7 +47,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
              }
 
       assert receipt["treatments"]["mipro_v2_heavy"]["auto"] == "heavy"
-      assert receipt["treatments"]["mipro_v2_heavy"]["max_concurrency"] == 1
+      assert receipt["treatments"]["mipro_v2_heavy"]["max_concurrency"] == 8
 
       assert receipt["treatments"]["gepa_v0_1_4_merge"]["execution_profile"] ==
                "gepa_v0_1_4_merge"

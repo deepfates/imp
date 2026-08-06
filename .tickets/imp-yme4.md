@@ -89,7 +89,8 @@ is retained for audit, but it does not define priority.
   No-merge remains an ablation rather than the headline treatment. The profile
   now also permits the source artifact's concurrent row evaluation while
   retaining serial proposal order; the matched entrances bind that concurrency
-  symmetrically. Pinned modeled MIPRO search remains serial by design.
+  symmetrically. MIPRO's modeled trial sequence remains serial while each
+  trial's ordered row evaluation may use the same bounded concurrency as DSPy.
 - **Evidence repair:** identical compact cross-runtime JSON inputs now receive
   one canonical SHA-256 identity even when control-character escapes contain
   hexadecimal letters. Immutable live Results remain unchanged.

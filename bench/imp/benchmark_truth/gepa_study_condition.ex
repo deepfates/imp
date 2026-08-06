@@ -42,7 +42,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
       prompt_lm: prepared.lms.reflection,
       task_lm: prepared.lms.task,
       max_errors: 10_000,
-      max_concurrency: 1,
+      max_concurrency: prepared.outer_max_concurrency,
       seed: seed,
       proposer_fidelity: :dspy_3_2_1,
       search_fidelity: :dspy_3_2_1_optuna_4_9_0,

@@ -1099,10 +1099,6 @@ defmodule Imp.Optimizer.MIPROv2 do
                   "#{optimizer.startup_trials - 1} objective trials after the baseline; " <>
                   "modeled TPE is not implemented"
 
-        optimizer.max_concurrency != 1 ->
-          raise ArgumentError,
-                "pinned DSPy 3.2.1/Optuna 4.9.0 search requires max_concurrency: 1"
-
         config.seed > 0xFFFFFFFF ->
           raise ArgumentError,
                 "pinned NumPy RandomState search seed must be at most 4294967295"

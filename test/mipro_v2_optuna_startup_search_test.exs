@@ -237,11 +237,6 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
       |> MIPROv2.compile(program(task_lm), trainset(), valset())
     end
 
-    assert_raise ArgumentError, ~r/requires max_concurrency: 1/, fn ->
-      exact_optimizer(prompt_lm, task_lm, max_concurrency: 2)
-      |> MIPROv2.compile(program(task_lm), trainset(), valset())
-    end
-
     assert_raise ArgumentError, ~r/seed must be at most/, fn ->
       exact_optimizer(prompt_lm, task_lm, seed: 4_294_967_296)
       |> MIPROv2.compile(program(task_lm), trainset(), valset())
@@ -249,6 +244,42 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
 
     refute_received :unexpected_prompt_call
     refute_received :unexpected_task_call
+  end
+
+  test "pinned modeled search permits DSPy's concurrent ordered evaluation" do
+    {:ok, counter} = Agent.start_link(fn -> %{active: 0, maximum: 0} end)
+    {prompt_lm, _prompt_agent} = prompt_lm(2)
+
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Agent.update(counter, fn state ->
+            active = state.active + 1
+            %{active: active, maximum: max(state.maximum, active)}
+          end)
+
+          Process.sleep(20)
+          Agent.update(counter, &%{&1 | active: &1.active - 1})
+          %{route: "K11"}
+        end
+      )
+
+    validation =
+      Enum.map(0..7, fn index ->
+        Imp.example(text: "validation-#{index}", route: "K11") |> Imp.with_inputs(:text)
+      end)
+
+    selected =
+      exact_optimizer(prompt_lm, task_lm,
+        num_candidates: 2,
+        num_trials: 0,
+        max_concurrency: 4,
+        search_fidelity: :dspy_3_2_1_optuna_4_9_0
+      )
+      |> MIPROv2.compile(program(task_lm), trainset(), validation)
+
+    assert Agent.get(counter, & &1.maximum) > 1
+    assert Report.fetch(selected).metadata.evaluation_calls == 8
   end
 
   test "public MIPRO compile crosses from startup into pinned modeled TPE" do
