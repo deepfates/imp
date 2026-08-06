@@ -160,6 +160,77 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert {"", 0} = System.cmd(python, ["-P", "-c", probe, script], stderr_to_stdout: true)
   end
 
+  test "pinned DSPy optimizer binds the exact source-sized baseline and rejects 4k evidence" do
+    root = File.cwd!()
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+    script = Path.join(root, "scripts/gepa_suite_condition_upstream.py")
+
+    probe = ~S'''
+    import argparse, importlib.util, json, os, pathlib, sys, tempfile
+    path = pathlib.Path(sys.argv[1])
+    spec = importlib.util.spec_from_file_location("condition", path)
+    condition = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(condition)
+    root = pathlib.Path(tempfile.mkdtemp())
+    baseline = root / "baseline.json"
+    args = argparse.Namespace(
+        arm="mipro_v2_heavy", baseline_result=baseline,
+        baseline_source_commit="0000000000000000000000000000000000000001",
+        family="IFBench", seed=2026080101,
+        api_base="https://openrouter.ai/api/v1", max_concurrency=8,
+        input_price_per_million=None, output_price_per_million=None,
+    )
+    for role in ("task", "reflection", "judge"):
+        setattr(args, f"{role}_model", "model")
+        setattr(args, f"{role}_provider", "provider")
+        setattr(args, f"{role}_max_input_bytes", 900000)
+        setattr(args, f"{role}_max_output_tokens", 16384)
+        setattr(args, f"{role}_input_price_per_million", 0.14)
+        setattr(args, f"{role}_output_price_per_million", 0.28)
+    identity = {"commit": args.baseline_source_commit, "tracked_clean": True}
+    source = {
+        "source": "source",
+        "split_counts": {"train": 150, "dev": 300, "test": 294},
+        "split_checksums": {"train": "a", "dev": "b", "test": "c"},
+    }
+    baseline_condition = condition.condition_receipt(args, identity) | {"arm": "baseline"}
+    payload = {
+        "status": "complete", "family": "IFBench", "arm": "baseline", "seed": 2026080101,
+        "heldout_decoded": True,
+        "heldout": {"score": 0.75, "row_count": 294, "error_count": 3},
+        "progress_sha256": "0" * 64,
+        "condition": baseline_condition,
+        "data": condition.data_receipt(source),
+    }
+    baseline.write_text(json.dumps(payload))
+    os.chmod(baseline, 0o600)
+    binding = condition.matched_baseline(args, source, {"commit": "optimizer-source", "tracked_clean": True})
+    assert binding["result_sha256"] == condition.sha256(baseline)
+    assert binding["source_commit"] == args.baseline_source_commit
+    assert binding["heldout_score"] == 0.75
+
+    args.baseline_source_commit = "f" * 40
+    try:
+        condition.matched_baseline(args, source, {"commit": "optimizer-source", "tracked_clean": True})
+    except RuntimeError as error:
+        assert "source-sized condition" in str(error)
+    else:
+        raise AssertionError("unreviewed baseline source commit was accepted")
+    args.baseline_source_commit = identity["commit"]
+
+    payload["condition"]["roles"]["task"]["max_output_tokens"] = 4096
+    baseline.write_text(json.dumps(payload))
+    try:
+        condition.matched_baseline(args, source, {"commit": "optimizer-source", "tracked_clean": True})
+    except RuntimeError as error:
+        assert "source-sized condition" in str(error)
+    else:
+        raise AssertionError("4k baseline was accepted for a 16k optimizer")
+    '''
+
+    assert {"", 0} = System.cmd(python, ["-P", "-c", probe, script], stderr_to_stdout: true)
+  end
+
   test "pinned DSPy atomically publishes receipts and reauthenticates heldout decode bytes" do
     root = File.cwd!()
     python = Path.join(root, "tmp/dspy-parity-venv/bin/python")

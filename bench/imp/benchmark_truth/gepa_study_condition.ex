@@ -83,10 +83,12 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
   end
 
   @doc "Runs optimization only; held-out rows remain unopened until this returns."
-  def optimize!(:baseline, prepared, _seed),
+  def optimize!(arm, prepared, seed, opts \\ [])
+
+  def optimize!(:baseline, prepared, _seed, _opts),
     do: %{selected: prepared.program, artifact: nil, report: nil}
 
-  def optimize!(:mipro_v2_heavy, prepared, seed) do
+  def optimize!(:mipro_v2_heavy, prepared, seed, opts) do
     selected =
       prepared
       |> optimizer!(:mipro_v2_heavy, seed)
@@ -98,12 +100,12 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
       artifact:
         Artifact.from_optimized_program(selected,
           artifact_id: artifact_id(prepared.loaded.spec, :mipro_v2_heavy, seed),
-          provenance: provenance(prepared.loaded.spec, :mipro_v2_heavy, seed)
+          provenance: provenance(prepared.loaded.spec, :mipro_v2_heavy, seed, opts)
         )
     }
   end
 
-  def optimize!(:gepa_v0_1_4_merge, prepared, seed) do
+  def optimize!(:gepa_v0_1_4_merge, prepared, seed, opts) do
     {selected, report, artifact} =
       prepared
       |> optimizer!(:gepa_v0_1_4_merge, seed)
@@ -112,7 +114,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
         prepared.loaded.train,
         prepared.loaded.dev,
         artifact_id: artifact_id(prepared.loaded.spec, :gepa_v0_1_4_merge, seed),
-        provenance: provenance(prepared.loaded.spec, :gepa_v0_1_4_merge, seed)
+        provenance: provenance(prepared.loaded.spec, :gepa_v0_1_4_merge, seed, opts)
       )
 
     %{selected: selected, report: report, artifact: artifact}
@@ -156,8 +158,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     "Official #{spec["family"]} #{spec["program"]} program\n" <> predictors
   end
 
-  defp provenance(spec, arm, seed) do
-    %{
+  defp provenance(spec, arm, seed, opts) do
+    base = %{
       study: "matched-current-model-gepa-suite-v1",
       family: spec["family"],
       arm: Atom.to_string(arm),
@@ -165,6 +167,12 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
       source: spec["source"] || spec["source_commit"],
       split_checksums: spec["split_checksums"] || spec["checksums"]
     }
+
+    case Keyword.get(opts, :matched_baseline) do
+      nil -> base
+      receipt when is_map(receipt) -> Map.put(base, :matched_baseline, receipt)
+      other -> raise ArgumentError, "matched_baseline must be a map, got: #{inspect(other)}"
+    end
   end
 
   defp artifact_id(spec, arm, seed),

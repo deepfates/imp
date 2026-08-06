@@ -116,10 +116,18 @@ is retained for audit, but it does not define priority.
   invalid IFBench optimizer direction with the corrected scorer and matched
   pinned DSPy. A valid negative remains a real table cell; it may not be hidden
   by task-shopping or threshold changes.
-- **Current operation:** no provider process is active. The completed baseline
-  tranche conservatively charged `$15.155289378` of its prior `$20` authority.
-  The owner has separately authorized up to `$100` for this one pre-benchmark
-  tranche. Both
+- **Current operation:** no provider process is active. The first matched 16k
+  IFBench baseline attempt at clean `e507f7d3` is scientifically inconclusive:
+  Imp completed at `.75` but retained seven transported failures and 21 row
+  errors; DSPy retained 27 provider rate-limit failures and stopped under its
+  prospective `$5` cap before a held-out Result. The pair exposed shared-route
+  capacity at sixteen combined in-flight calls, not framework quality. Preserve
+  both receipts, exclude `.75` from the table, and rerun both runtimes at
+  matched concurrency two; never rerun DSPy alone against the contaminated Imp
+  result. The stopped pair is conservatively debited at `$6.52465722`; the
+  successor receives `$2` per baseline lane and each Heavy lane `$44.50`, for a
+  worst-case cumulative `$99.52465722`. The owner has authorized up to `$100`
+  for this one pre-benchmark tranche. Both
   ordinary study entrances enforce the same prospective rule: initial actual
   spend plus the greater of provider-reported or conservative full-price token
   cost for completed calls, active/unreconciled reservations, and the next
@@ -133,7 +141,9 @@ is retained for audit, but it does not define priority.
   nested-content-byte fail-closed input guard under the current `1048576`
   context limit. The combined `$100` is split prospectively into four
   non-transferable lane caps: `$5` per baseline runtime and `$45` per MIPRO
-  runtime. No provider call begins until exact catalog/ZDR/privacy/route checks,
+  runtime. The evidence-only repair also requires the exact reviewed baseline
+  source commit and Result SHA before any optimizer transport and carries them
+  through terminal Result, Artifact/state, and fresh evidence. No provider call begins until exact catalog/ZDR/privacy/route checks,
   clean provider-free construction, and the prospective guard pass.
 
 The provider-free scale audit gives that decision concrete units. One complete

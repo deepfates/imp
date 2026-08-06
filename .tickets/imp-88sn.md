@@ -90,8 +90,8 @@ matched IFBench baseline plus MIPROv2-Heavy cell under a fresh `$100`
 prospective cap. This is not a reduced canary: it uses the official
 `150/300/294` train/selection/test splits, seed `2026080101`, the substantive
 modeled heavy search, both ordinary Imp and pinned-DSPy runtimes, and
-Artifact/state plus fresh four-call service. It is the first real optimizer
-cell in the frozen table and directly tests the previously invalid IFBench
+Artifact/state plus fresh four-call service. It is the first raw one-seed optimizer
+cell in the frozen three-seed table and directly tests the previously invalid IFBench
 direction after the scorer repair.
 
 The admitted baseline Results remain immutable and useful evidence for their
@@ -137,7 +137,7 @@ can be rerun or the larger table should proceed. A later merge-GEPA decision
 may use only operational call/cost evidence from this cell to determine whether
 it fits the remaining `$100` risk budget, never favorable MIPRO scores.
 
-The combined cap is enforced without a benchmark coordinator by a fixed
+The first attempt's combined cap was enforced without a benchmark coordinator by a fixed
 pre-outcome allocation: at most `$5` for each matched baseline lane and `$45`
 for each MIPRO lane, totaling `$100`. Each ordinary entrance already refuses a
 transport prospectively when completed cost, retained/active reservations, and
@@ -146,6 +146,60 @@ not transferred after outcomes. Run the two baseline lanes before either
 optimizer lane; do not start MIPRO if the supposedly identical baseline
 treatment exposes a product/treatment asymmetry that invalidates the
 denominator.
+
+### Source-sized baseline attempt and capacity correction (2026-08-06)
+
+The first `16384` baseline pair at clean `e507f7d3` is **inconclusive as a
+matched scientific denominator**. Both runtimes began together at concurrency
+eight per runtime against the exact SiliconFlow route, creating up to sixteen
+shared in-flight task calls. Imp completed all 294 held-out rows with score
+`0.75`, 21 row errors, 621 task attempts, 614 usage-bearing completions, and
+seven transported request failures. DSPy made 455 attempts with 428
+usage-bearing completions and 27 provider `RateLimitError`s, then stopped during
+held-out evaluation when the next request's conservative reservation would
+have exceeded its `$5` lane cap. DSPy produced no held-out score.
+
+The guard behaved correctly. Each unknown task call retained its full
+`$0.13058752` envelope. Imp ended with `$0.71972942` reconciled plus
+`$0.91411264` retained (`$1.63384206` accounted). DSPy ended with
+`$0.45083948` reconciled, `$3.52586304` retained, and `$0.91411264` still
+active at terminal capture (`$4.89081516` accounted); the next reservation
+would have projected `$5.02140268`. These are conservative treatment-safety
+amounts, not a claim that the provider billed the unresolved reservations.
+
+Imp's `.75` remains operational evidence that the 16k source cap is materially
+different—the run retained 36 length stops rather than the old 4k treatment's
+185—but it is not admitted to the table or used as an optimizer denominator.
+The unequal shared-pool throttling changed runtime opportunity and is a
+treatment/integration failure, not framework quality or an IFBench negative.
+The private mode-0600 Result/progress identities are Imp
+`04d58a622500c25613a7997ac8aeef35290ea8e5661eb135662ee9d6599f164b` /
+`91833a2089673cf9d1a364eaede70d81daf44976a2de000db9dae5b7c5884311`
+and DSPy
+`3df1628f7153473765c32a6eacf169314b0e4094508c9d0ef0cffedf0cce7ab6` /
+`63447df85dff8fafc8f857ad2ff2fef8d640dbe63993a7c9ee57bd12eee2263f`.
+
+Do not rerun DSPy alone. The result-independent successor reruns both baselines
+concurrently at `max_concurrency=2` per runtime (aggregate four), with every
+other row, seed, model/route, temperature, prompt, 16k cap, timeout, and
+no-retry setting unchanged. This is an adapted source-sized treatment, not
+reproduction of the artifact launcher's concurrency 32. Both later Heavy arms
+must also use concurrency two. Another provider rate-limit failure or cap stop
+makes the pair inconclusive; do not preserve whichever lane looks favorable or
+ratchet one runtime independently.
+
+The stopped pair is conservatively debited at its full terminal accounted
+amounts, `$6.52465722`, because the unknown-cost reservations cannot be
+reconciled from retained evidence. The successor receives `$2` per baseline
+lane and each Heavy lane receives `$44.50`; the resulting worst-case cumulative
+exposure is `$99.52465722`, leaving `$0.47534278` unallocated.
+
+Before any optimizer transport, both ordinary entrances must accept the exact
+completed successor baseline Result, validate its family/seed/data and full
+treatment identity plus an explicit reviewed baseline source commit, and carry
+its SHA-256 through the optimizer Result, Imp Artifact or DSPy selected-state
+receipt, and fresh-process evidence. This prevents the historical 4k baseline,
+or an unreviewed code-identical-looking Result, from becoming the denominator.
 
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 

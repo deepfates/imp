@@ -237,6 +237,8 @@ defmodule Imp.GepaSuiteConditionCLI do
           arm: :string,
           seed: :integer,
           output: :string,
+          baseline_result: :string,
+          baseline_source_commit: :string,
           artifact: :string,
           fresh_output: :string,
           task_model: :string,
@@ -323,6 +325,8 @@ defmodule Imp.GepaSuiteConditionCLI do
         ),
       seed: Keyword.get(opts, :seed, 2_026_080_101),
       output: expand(opts[:output]),
+      baseline_result: expand(opts[:baseline_result]),
+      baseline_source_commit: opts[:baseline_source_commit],
       artifact: expand(opts[:artifact]),
       fresh_output: expand(opts[:fresh_output]),
       task_model: opts[:task_model],
@@ -471,6 +475,9 @@ defmodule Imp.GepaSuiteConditionCLI do
   end
 
   defp preflight!(config, prepared) do
+    matched_baseline =
+      if is_binary(config.baseline_result), do: matched_baseline!(config, prepared), else: nil
+
     treatments =
       for arm <- [:mipro_v2_heavy, :gepa_v0_1_4_merge], into: %{} do
         optimizer = GepaStudyCondition.optimizer!(arm, prepared, config.seed)
@@ -492,6 +499,8 @@ defmodule Imp.GepaSuiteConditionCLI do
       retrieval: retrieval_disclosure(config, prepared.loaded.spec),
       metric_runtime: metric_runtime(config),
       condition: condition_receipt(config),
+      matched_baseline: matched_baseline,
+      matched_baseline_required_for_live_optimizer: config.arm != :baseline,
       provider_calls_authorized: false
     })
   end
@@ -511,19 +520,33 @@ defmodule Imp.GepaSuiteConditionCLI do
         )
     )
 
+    matched_baseline = matched_baseline!(config, prepared)
     admission = spend_admission(config)
     progress = init_progress!(config)
 
     {wall_time_us, outcome, usage} =
       capture_runtime(
         fn ->
-          optimized = GepaStudyCondition.optimize!(config.arm, prepared, config.seed)
+          optimized =
+            GepaStudyCondition.optimize!(config.arm, prepared, config.seed,
+              matched_baseline: matched_baseline
+            )
+
           {optimized, GepaStudyCondition.heldout!(config.arm, prepared, optimized)}
         end,
         progress
       )
 
-    {optimized, heldout} = unwrap_run!(outcome, config, prepared, admission, wall_time_us, usage)
+    {optimized, heldout} =
+      unwrap_run!(
+        outcome,
+        config,
+        prepared,
+        admission,
+        wall_time_us,
+        usage,
+        matched_baseline
+      )
 
     accounted_total =
       config.spend_guard
@@ -551,6 +574,10 @@ defmodule Imp.GepaSuiteConditionCLI do
               raise "fresh GEPA suite receipt does not bind the selected Artifact and condition"
             end
 
+            unless fresh["matched_baseline"] == json_safe(matched_baseline) do
+              raise "fresh GEPA suite receipt does not bind the matched baseline"
+            end
+
             {artifact_sha, sha256(config.fresh_output), fresh["usage"], fresh["spend_admission"]}
         end
 
@@ -574,7 +601,8 @@ defmodule Imp.GepaSuiteConditionCLI do
         metric_runtime: metric_runtime(config),
         retrieval: retrieval_disclosure(config, prepared.loaded.spec),
         condition: condition_receipt(config),
-        data: data_receipt(prepared.loaded.spec)
+        data: data_receipt(prepared.loaded.spec),
+        matched_baseline: matched_baseline
       })
     rescue
       error ->
@@ -585,6 +613,7 @@ defmodule Imp.GepaSuiteConditionCLI do
           wall_time_us: wall_time_us,
           progress_sha256: existing_sha256(progress),
           spend_admission: Map.put(admission, "final", spend_snapshot(config)),
+          matched_baseline: matched_baseline,
           fresh_failure_evidence: child.evidence,
           fresh_spend_admission: child.spend
         })
@@ -604,8 +633,16 @@ defmodule Imp.GepaSuiteConditionCLI do
       )
     end
 
+    matched_baseline = matched_baseline!(config, prepared)
     loaded_artifact_sha256 = sha256(config.artifact)
-    program = config.artifact |> Artifact.read!() |> Artifact.apply(prepared.program)
+    artifact = Artifact.read!(config.artifact)
+
+    unless get_in(Artifact.inspect(artifact), [:provenance, "matched_baseline"]) ==
+             json_safe(matched_baseline) do
+      raise "selected Artifact does not bind the matched baseline"
+    end
+
+    program = Artifact.apply(artifact, prepared.program)
     test = GepaSuite.load_test!(prepared.loaded) |> Enum.take(4)
     supervisor = Module.concat([ImpGepaSuiteFresh, TaskSupervisor])
     {:ok, _supervisor} = Task.Supervisor.start_link(name: supervisor)
@@ -660,7 +697,8 @@ defmodule Imp.GepaSuiteConditionCLI do
           |> Map.put("final", spend_snapshot(config)),
         loaded_artifact_sha256: loaded_artifact_sha256,
         condition: condition_receipt(config),
-        data: data_receipt(prepared.loaded.spec)
+        data: data_receipt(prepared.loaded.spec),
+        matched_baseline: matched_baseline
       })
 
       raise "fresh GEPA suite service did not complete all four calls: #{inspect(outcomes)}"
@@ -681,6 +719,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       wall_time_us: wall_time_us,
       condition: condition_receipt(config),
       data: data_receipt(prepared.loaded.spec),
+      matched_baseline: matched_baseline,
       loaded_artifact_sha256: loaded_artifact_sha256
     })
   end
@@ -701,6 +740,10 @@ defmodule Imp.GepaSuiteConditionCLI do
         Atom.to_string(config.arm),
         "--seed",
         Integer.to_string(config.seed),
+        "--baseline-result",
+        config.baseline_result,
+        "--baseline-source-commit",
+        config.baseline_source_commit,
         "--artifact",
         config.artifact,
         "--fresh-output",
@@ -1036,6 +1079,64 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
   end
 
+  def matched_baseline!(%{arm: :baseline}, _prepared), do: nil
+
+  def matched_baseline!(config, prepared) do
+    path = required_config!(config, :baseline_result)
+    expected_source_commit = required_config!(config, :baseline_source_commit)
+
+    unless Regex.match?(~r/\A[0-9a-f]{40}\z/, expected_source_commit) do
+      raise ArgumentError, "matched baseline source commit must be a full lowercase Git SHA"
+    end
+
+    stat = File.stat!(path)
+
+    unless Bitwise.band(stat.mode, 0o777) == 0o600 do
+      raise ArgumentError, "matched baseline Result must be owner-readable only"
+    end
+
+    receipt = path |> File.read!() |> Jason.decode!()
+    expected_condition = config |> Map.put(:arm, :baseline) |> condition_receipt() |> json_safe()
+    actual_condition = receipt["condition"] || %{}
+
+    comparable = fn condition -> Map.drop(condition, ["source_commit"]) end
+
+    checks = %{
+      status: receipt["status"] == "complete",
+      family: receipt["family"] == config.family,
+      arm: receipt["arm"] == "baseline",
+      seed: receipt["seed"] == config.seed,
+      heldout_decoded: receipt["heldout_decoded"] == true,
+      heldout_score: is_number(get_in(receipt, ["heldout", "score"])),
+      heldout_rows:
+        get_in(receipt, ["heldout", "row_count"]) ==
+          prepared.loaded.spec["split_counts"]["test"],
+      tracked_clean_identity:
+        actual_condition["source_tracked_clean"] == expected_condition["source_tracked_clean"],
+      live_source_clean:
+        config.provider_disabled_fixture? or actual_condition["source_tracked_clean"] == true,
+      source_commit: actual_condition["source_commit"] == expected_source_commit,
+      condition: comparable.(actual_condition) == comparable.(expected_condition),
+      data: receipt["data"] == data_receipt(prepared.loaded.spec) |> json_safe()
+    }
+
+    unless Enum.all?(checks, fn {_name, passed?} -> passed? end) do
+      failed = for {name, false} <- checks, do: name
+
+      raise ArgumentError,
+            "matched baseline Result does not match the completed source-sized condition: " <>
+              inspect(Enum.sort(failed))
+    end
+
+    %{
+      result_sha256: sha256(path),
+      source_commit: expected_source_commit,
+      heldout_score: get_in(receipt, ["heldout", "score"]),
+      heldout_error_count: get_in(receipt, ["heldout", "error_count"]),
+      progress_sha256: receipt["progress_sha256"]
+    }
+  end
+
   defp data_receipt(spec) do
     %{
       source: spec["source"] || spec["dataset_source"] || spec["source_commit"],
@@ -1166,8 +1267,16 @@ defmodule Imp.GepaSuiteConditionCLI do
     end
   end
 
-  defp unwrap_run!({:ok, result}, _config, _prepared, _reservation, _wall_time_us, _usage),
-    do: result
+  defp unwrap_run!(
+         {:ok, result},
+         _config,
+         _prepared,
+         _reservation,
+         _wall_time_us,
+         _usage,
+         _matched_baseline
+       ),
+       do: result
 
   defp unwrap_run!(
          {:error, error, stacktrace},
@@ -1175,7 +1284,8 @@ defmodule Imp.GepaSuiteConditionCLI do
          prepared,
          reservation,
          wall_time_us,
-         usage
+         usage,
+         matched_baseline
        ) do
     write_private!(config.output, %{
       status: :failed,
@@ -1189,7 +1299,8 @@ defmodule Imp.GepaSuiteConditionCLI do
       wall_time_us: wall_time_us,
       spend_admission: Map.put(reservation, "final", spend_snapshot(config)),
       condition: condition_receipt(config),
-      data: data_receipt(prepared.loaded.spec)
+      data: data_receipt(prepared.loaded.spec),
+      matched_baseline: matched_baseline
     })
 
     reraise error, stacktrace

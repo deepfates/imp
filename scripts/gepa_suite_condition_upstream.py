@@ -18,6 +18,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -162,6 +163,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
     parser.add_argument("--livebench-math-python", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--baseline-result", type=Path)
+    parser.add_argument("--baseline-source-commit")
     parser.add_argument("--state", type=Path)
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--fresh", action="store_true", help=argparse.SUPPRESS)
@@ -872,6 +875,44 @@ def data_receipt(spec: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def matched_baseline(args: argparse.Namespace, spec: dict[str, Any], imp_identity: dict[str, Any]):
+    if args.arm == "baseline":
+        return None
+    if args.baseline_result is None:
+        raise RuntimeError("optimizer execution requires --baseline-result")
+    if not args.baseline_source_commit or not re.fullmatch(r"[0-9a-f]{40}", args.baseline_source_commit):
+        raise RuntimeError("optimizer execution requires a full lowercase --baseline-source-commit")
+    stat = args.baseline_result.stat()
+    if stat.st_mode & 0o777 != 0o600:
+        raise RuntimeError("matched baseline Result must be owner-readable only")
+    receipt = json.loads(args.baseline_result.read_text())
+    expected = condition_receipt(args, imp_identity) | {"arm": "baseline"}
+    actual = receipt.get("condition") or {}
+    comparable = lambda condition: {key: value for key, value in condition.items() if key != "source_commit"}
+    heldout = receipt.get("heldout") or {}
+    if not (
+        receipt.get("status") == "complete"
+        and receipt.get("family") == args.family
+        and receipt.get("arm") == "baseline"
+        and receipt.get("seed") == args.seed
+        and receipt.get("heldout_decoded") is True
+        and isinstance(heldout.get("score"), (int, float))
+        and heldout.get("row_count") == spec["split_counts"]["test"]
+        and actual.get("source_tracked_clean") is True
+        and actual.get("source_commit") == args.baseline_source_commit
+        and comparable(actual) == comparable(expected)
+        and receipt.get("data") == data_receipt(spec)
+    ):
+        raise RuntimeError("matched baseline Result does not match the completed source-sized condition")
+    return {
+        "result_sha256": sha256(args.baseline_result),
+        "source_commit": args.baseline_source_commit,
+        "heldout_score": heldout["score"],
+        "heldout_error_count": heldout.get("error_count"),
+        "progress_sha256": receipt.get("progress_sha256"),
+    }
+
+
 def main() -> None:
     global ACTIVE_ARGS, ACTIVE_STAGE, ACTIVE_PREFLIGHT, RUN_STARTED_NS, SPEND_GUARD
     args = parse_args()
@@ -882,7 +923,7 @@ def main() -> None:
         raise RuntimeError(f"seed must be one of the frozen study seeds: {STUDY_SEEDS}")
     ACTIVE_ARGS = args
     RUN_STARTED_NS = time.monotonic_ns()
-    for name in ("dspy_root", "gepa_root", "artifact_root", "dataset_root", "retrieval_root", "retrieval_receipt", "output", "state"):
+    for name in ("dspy_root", "gepa_root", "artifact_root", "dataset_root", "retrieval_root", "retrieval_receipt", "output", "baseline_result", "state"):
         value = getattr(args, name)
         if value is not None:
             setattr(args, name, value.resolve())
@@ -939,10 +980,16 @@ def main() -> None:
     }
     ACTIVE_PREFLIGHT = preflight
     if not args.run and not args.fresh:
+        baseline_receipt = matched_baseline(args, spec, imp_identity) if args.baseline_result else None
+        preflight["matched_baseline"] = baseline_receipt
+        preflight["matched_baseline_required_for_live_optimizer"] = args.arm != "baseline"
         print(json.dumps(preflight, sort_keys=True))
         return
 
     ensure_new_targets(args)
+    baseline_receipt = matched_baseline(args, spec, imp_identity)
+    preflight["matched_baseline"] = baseline_receipt
+    ACTIVE_PREFLIGHT = preflight
     admission = spend_admission(args)
     SPEND_GUARD = ProspectiveSpendGuard(args.initial_cost_usd, args.max_cost_usd)
     progress_path = init_progress(args)
@@ -976,6 +1023,7 @@ def main() -> None:
             "progress_sha256": sha256(progress_path),
             "wall_time_us": (time.monotonic_ns() - started) // 1_000,
             "loaded_state_sha256": loaded_state_sha256,
+            "matched_baseline": baseline_receipt,
         }
         if args.output:
             write_private_json(args.output, payload)
@@ -1018,6 +1066,8 @@ def main() -> None:
             "--dspy-root", str(args.dspy_root), "--gepa-root", str(args.gepa_root),
             "--artifact-root", str(args.artifact_root), "--dataset-root", str(args.dataset_root),
             "--family", args.family, "--arm", args.arm, "--seed", str(args.seed),
+            "--baseline-result", str(args.baseline_result),
+            "--baseline-source-commit", args.baseline_source_commit,
             "--task-model", args.task_model, "--reflection-model", args.reflection_model,
             "--judge-model", args.judge_model, "--task-provider", args.task_provider,
             "--reflection-provider", args.reflection_provider, "--judge-provider", args.judge_provider,
@@ -1062,6 +1112,7 @@ def main() -> None:
             and fresh_receipt.get("loaded_state_sha256") == state_sha
             and fresh_receipt.get("condition") == preflight["condition"]
             and fresh_receipt.get("data") == preflight["data"]
+            and fresh_receipt.get("matched_baseline") == baseline_receipt
         ):
             raise RuntimeError("fresh DSPy receipt does not bind the selected state and condition")
         fresh_usage = fresh_receipt["usage"]
@@ -1080,6 +1131,7 @@ def main() -> None:
         "progress_sha256": sha256(progress_path),
         "wall_time_us": (time.monotonic_ns() - started) // 1_000,
         "spend_admission": {**admission, "final": SPEND_GUARD.snapshot()},
+        "matched_baseline": baseline_receipt,
     }
     write_private_json(args.output, payload)
 
