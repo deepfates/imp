@@ -68,7 +68,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
       module_selector: :round_robin,
       use_merge: true,
       seed: seed,
-      max_concurrency: 1,
+      max_concurrency: prepared.outer_max_concurrency,
       max_metric_calls: semantic_metric_calls,
       max_reflection_calls: envelope.max_reflection_calls,
       raise_on_exception: false

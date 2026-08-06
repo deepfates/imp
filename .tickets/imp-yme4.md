@@ -86,7 +86,10 @@ is retained for audit, but it does not define priority.
   source-authenticated common-ancestor merge, budget accounting, checkpoint
   persistence, and the ordinary six-family entrances. Its first composed test
   exposed and repaired a real BEAM-RNG/Python-RNG incompatibility in merge.
-  No-merge remains an ablation rather than the headline treatment.
+  No-merge remains an ablation rather than the headline treatment. The profile
+  now also permits the source artifact's concurrent row evaluation while
+  retaining serial proposal order; the matched entrances bind that concurrency
+  symmetrically. Pinned modeled MIPRO search remains serial by design.
 - **Evidence repair:** identical compact cross-runtime JSON inputs now receive
   one canonical SHA-256 identity even when control-character escapes contain
   hexadecimal letters. Immutable live Results remain unchanged.
@@ -102,6 +105,18 @@ is retained for audit, but it does not define priority.
   request's full-price envelope must remain under the cap. The remaining
   `$4.844710622` does not authorize optimizer calls; their experimental scale
   and a new spend boundary are an explicit owner decision.
+
+The provider-free scale audit gives that decision concrete units. One complete
+generated seed across both runtimes and both remaining optimizer arms is
+`358,876` nominal transports (`700,068` legal with ordinary task fallback and
+GEPA boundary/failure envelopes). Extending the whole table to three seeds,
+including two additional matched baseline rows, leaves `1,094,988` nominal
+transports (`2,134,272` legal). The completed baseline row's realized task and
+PAPILLON-judge costs extrapolate to about `$135.95` for the one-seed optimizer
+program evaluations, but that is not a ceiling: demo-bearing task prompts and
+MIPRO/GEPA proposal traffic are larger and unobserved. A new condition cap must
+therefore use prospective per-request admission and report a cap stop as
+inconclusive rather than quietly reducing opportunity.
 
 Primary restart coordinates are this epic, `imp-88sn`, `README.md`,
 `docs/CONFORMANCE.md`, `benchmarks/claims.json`, and the executable

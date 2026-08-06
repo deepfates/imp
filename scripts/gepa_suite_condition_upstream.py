@@ -713,7 +713,7 @@ def optimize(dspy: Any, program: Any, meta: Any, train: list[Any], dev: list[Any
         reflection_lm=reflection_lm,
         component_selector="round_robin",
         use_merge=True,
-        num_threads=1,
+        num_threads=args.max_concurrency,
         failure_score=0.0,
         track_stats=True,
         seed=args.seed,
@@ -796,6 +796,10 @@ def main() -> None:
         "retrieval": retrieval,
         "input_envelope_semantics": "nested_utf8_string_content_bytes_not_full_wire_bytes",
         "metric_runtime": metric_runtime,
+        "treatments": {
+            "mipro_v2_heavy": {"max_concurrency": 1},
+            "gepa_v0_1_4_merge": {"max_concurrency": args.max_concurrency},
+        },
     }
     if not args.run and not args.fresh:
         print(json.dumps(preflight, sort_keys=True))

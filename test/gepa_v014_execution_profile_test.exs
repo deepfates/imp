@@ -286,6 +286,47 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
     end
   end
 
+  test "pinned profile permits source-shaped concurrent row evaluation" do
+    {:ok, counter} = Agent.start_link(fn -> %{active: 0, maximum: 0} end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Agent.update(counter, fn state ->
+            active = state.active + 1
+            %{active: active, maximum: max(state.maximum, active)}
+          end)
+
+          Process.sleep(20)
+          Agent.update(counter, &%{&1 | active: &1.active - 1})
+          %{answer: "ok"}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: lm)
+
+    optimizer =
+      GEPA.new(fn _example, _prediction -> 0.0 end,
+        execution_profile: :gepa_v0_1_4,
+        generations: 0,
+        minibatch_size: 2,
+        max_concurrency: 4
+      )
+
+    {_selected, report} =
+      GEPA.compile_with_report(
+        optimizer,
+        program,
+        Enum.map(0..7, &example/1),
+        Enum.map(100..107, &example/1)
+      )
+
+    assert optimizer.max_concurrency == 4
+    assert Agent.get(counter, & &1.maximum) > 1
+    assert report.candidate_count == 1
+    assert report.metadata.metric_calls == 8
+  end
+
   test "merge profile executes the source-shaped scheduled merge path" do
     root = %{planner: "base planner", writer: "base writer"}
     left = %{planner: "left planner", writer: "base writer"}

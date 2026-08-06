@@ -20,7 +20,9 @@ defmodule Imp.GepaSuiteConditionCLITest do
       "--retrieval-python",
       Path.join(root, "tmp/dspy-parity-venv/bin/python"),
       "--arm",
-      "baseline"
+      "baseline",
+      "--max-concurrency",
+      "8"
     ]
 
     for family <- Imp.BenchmarkTruth.GepaSuite.families() do
@@ -35,19 +37,22 @@ defmodule Imp.GepaSuiteConditionCLITest do
       assert receipt["status"] == "provider_disabled_ready"
       assert receipt["heldout_decoded"] == false
       assert receipt["provider_calls_authorized"] == false
-      assert receipt["outer_max_concurrency"] == 1
+      assert receipt["outer_max_concurrency"] == 8
       assert receipt["request_timeout_ms"] == 120_000
 
       assert receipt["req_llm_pool"] == %{
                "protocols" => ["http1"],
-               "size" => 1,
+               "size" => 8,
                "count" => 1
              }
 
       assert receipt["treatments"]["mipro_v2_heavy"]["auto"] == "heavy"
+      assert receipt["treatments"]["mipro_v2_heavy"]["max_concurrency"] == 1
 
       assert receipt["treatments"]["gepa_v0_1_4_merge"]["execution_profile"] ==
                "gepa_v0_1_4_merge"
+
+      assert receipt["treatments"]["gepa_v0_1_4_merge"]["max_concurrency"] == 8
     end
   end
 

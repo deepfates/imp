@@ -82,6 +82,14 @@ fit cost. Once frozen, run every declared GEPA/MIPROv2 arm and retain schema-3
 Artifact application plus four-call fresh concurrent `ProgramServer` service
 for each selected Imp optimizer arm.
 
+The source artifact evaluates GEPA rows concurrently even though candidate
+proposal order is serial. Imp's authenticated pinned profile previously sealed
+both dimensions to one. It now permits bounded concurrent row evaluation while
+preserving the pinned proposal/RNG/archive semantics; both study entrances use
+the same declared concurrency. Pinned modeled MIPRO search remains serial. This
+is an ordinary product/profile repair that reduces wall time without changing
+metric budgets or optimizer opportunity.
+
 No provider process is active. The baseline tranche conservatively charged
 `$15.155289378` of the owner's `$20` authority. The ordinary Imp and pinned-DSPy
 entrances now enforce the corrected spend rule provider-free: before each
@@ -94,6 +102,15 @@ as an inconclusive stop. The remaining `$4.844710622` does not authorize an
 optimizer arm. The next provider action requires explicit ratification of the
 optimizer study's scientific scale and spend; the legal failure ceiling must
 not be mistaken for planned opportunity or expected cost.
+
+For one generated seed, the two-runtime MIPROv2-Heavy arm is `172,394` nominal
+transports and the merge-enabled GEPA arm is `186,482`, or `358,876` together;
+their legal completion envelope is `700,068`. The completed baseline row's
+realized per-family task/judge costs extrapolate to roughly `$67.97` per
+optimizer arm before larger demo/instruction prompts and proposal/reflection
+traffic. This is a planning estimate, not a price claim or spend authority.
+Three-seed completion, including the two missing baseline repetitions, would
+leave `1,094,988` nominal transports and a `2,134,272` legal envelope.
 
 ### Owner-ratified correction and next evidence tranche (2026-08-01)
 

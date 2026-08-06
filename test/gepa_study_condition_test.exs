@@ -39,7 +39,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
     assert gepa.minibatch_size == 3
     assert gepa.module_selector == :round_robin
     assert gepa.use_merge
-    assert gepa.max_concurrency == 1
+    assert gepa.max_concurrency == 8
     assert prepared.outer_max_concurrency == 8
 
     assert prepared.loaded.test_count == 150

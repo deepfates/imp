@@ -35,10 +35,12 @@ defmodule Imp.Optimizer.GEPA do
   CPython's persisted MT19937 stream is shared by Pareto selection and
   Fisher-Yates minibatch sampling, perfect minibatches are skipped at `1.0`,
   evaluation caching is disabled, and one failed batched reflection is retried
-  once as the corresponding single task. Like pinned GEPA, `max_metric_calls`
-  is checked between iterations: an iteration that legally starts is allowed
-  to finish. Separate internal metric/reflection envelopes bound that legal
-  overshoot; they are not alternate stopping rules. A finite
+  once as the corresponding single task. Candidate proposal remains serial,
+  while `:max_concurrency` may bound the same concurrent row evaluation used by
+  the source artifact. Like pinned GEPA, `max_metric_calls` is checked between
+  iterations: an iteration that legally starts is allowed to finish. Separate
+  internal metric/reflection envelopes bound that legal overshoot; they are not
+  alternate stopping rules. A finite
   `:max_metric_calls` is the pinned profile's authoritative semantic budget and
   supersedes the BEAM-native `:generations` knob. When the metric budget is
   `:infinity`, `:generations` retains its legacy budget-derivation behavior.
@@ -689,7 +691,6 @@ defmodule Imp.Optimizer.GEPA do
           sampling_strategy: :single,
           selection_strategy: :all_improvements,
           proposal_concurrency: 1,
-          max_concurrency: 1,
           use_merge: profile == :gepa_v0_1_4_merge,
           frontier_type: :instance,
           evaluation_policy: :full,

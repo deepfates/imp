@@ -36,6 +36,11 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       assert receipt["status"] == "provider_disabled_ready"
       assert receipt["heldout_decoded"] == false
       assert receipt["outer_max_concurrency"] == 8
+
+      assert receipt["treatments"] == %{
+               "mipro_v2_heavy" => %{"max_concurrency" => 1},
+               "gepa_v0_1_4_merge" => %{"max_concurrency" => 8}
+             }
     end
   end
 
