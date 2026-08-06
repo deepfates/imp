@@ -253,6 +253,12 @@ defmodule Imp.GepaSuiteConditionCLI do
           judge_max_output_tokens: :integer,
           input_price_per_million: :float,
           output_price_per_million: :float,
+          task_input_price_per_million: :float,
+          task_output_price_per_million: :float,
+          reflection_input_price_per_million: :float,
+          reflection_output_price_per_million: :float,
+          judge_input_price_per_million: :float,
+          judge_output_price_per_million: :float,
           max_concurrency: :integer,
           initial_cost_usd: :float,
           max_cost_usd: :float,
@@ -333,6 +339,12 @@ defmodule Imp.GepaSuiteConditionCLI do
       judge_max_output_tokens: opts[:judge_max_output_tokens],
       input_price_per_million: opts[:input_price_per_million],
       output_price_per_million: opts[:output_price_per_million],
+      task_input_price_per_million: opts[:task_input_price_per_million],
+      task_output_price_per_million: opts[:task_output_price_per_million],
+      reflection_input_price_per_million: opts[:reflection_input_price_per_million],
+      reflection_output_price_per_million: opts[:reflection_output_price_per_million],
+      judge_input_price_per_million: opts[:judge_input_price_per_million],
+      judge_output_price_per_million: opts[:judge_output_price_per_million],
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
       initial_cost_usd: opts[:initial_cost_usd],
       max_cost_usd: opts[:max_cost_usd],
@@ -720,13 +732,10 @@ defmodule Imp.GepaSuiteConditionCLI do
           |> to_string()
         ]
       end) ++
+        price_args(config) ++
         [
           "--api-key-env",
           config.api_key_env,
-          "--input-price-per-million",
-          to_string(config.input_price_per_million),
-          "--output-price-per-million",
-          to_string(config.output_price_per_million),
           "--max-concurrency",
           to_string(config.max_concurrency),
           "--initial-cost-usd",
@@ -746,6 +755,38 @@ defmodule Imp.GepaSuiteConditionCLI do
     else
       args
     end
+  end
+
+  defp price_args(config) do
+    shared =
+      if is_number(config.input_price_per_million) and
+           is_number(config.output_price_per_million) do
+        [
+          "--input-price-per-million",
+          to_string(config.input_price_per_million),
+          "--output-price-per-million",
+          to_string(config.output_price_per_million)
+        ]
+      else
+        []
+      end
+
+    role_specific =
+      Enum.flat_map([:task, :reflection, :judge], fn role ->
+        Enum.flat_map([:input, :output], fn direction ->
+          key = String.to_existing_atom("#{role}_#{direction}_price_per_million")
+
+          case Map.get(config, key) do
+            value when is_number(value) ->
+              ["--#{role}-#{direction}-price-per-million", to_string(value)]
+
+            _ ->
+              []
+          end
+        end)
+      end)
+
+    shared ++ role_specific
   end
 
   defp retrieval_args(%{retrieval_root: nil}), do: []
@@ -788,14 +829,17 @@ defmodule Imp.GepaSuiteConditionCLI do
     output_tokens =
       required_positive!(config, String.to_existing_atom("#{role}_max_output_tokens"))
 
+    input_price = role_price!(config, role, :input)
+    output_price = role_price!(config, role, :output)
+
     api_key = System.fetch_env!(config.api_key_env)
 
     inner =
       Imp.req_llm(
         priced_model_spec(
           model,
-          config.input_price_per_million,
-          config.output_price_per_million
+          input_price,
+          output_price
         ),
         api_key: api_key,
         cache: false,
@@ -813,8 +857,8 @@ defmodule Imp.GepaSuiteConditionCLI do
             data_collection: "deny",
             zdr: true,
             max_price: %{
-              prompt: config.input_price_per_million,
-              completion: config.output_price_per_million
+              prompt: input_price,
+              completion: output_price
             }
           },
           openrouter_usage: %{include: true}
@@ -834,8 +878,8 @@ defmodule Imp.GepaSuiteConditionCLI do
       config.spend_guard,
       role,
       role_reservation(config, role),
-      config.input_price_per_million,
-      config.output_price_per_million
+      input_price,
+      output_price
     )
   end
 
@@ -972,13 +1016,23 @@ defmodule Imp.GepaSuiteConditionCLI do
              max_input_content_bytes:
                Map.get(config, String.to_existing_atom("#{role}_max_input_bytes")),
              max_output_tokens:
-               Map.get(config, String.to_existing_atom("#{role}_max_output_tokens"))
+               Map.get(config, String.to_existing_atom("#{role}_max_output_tokens")),
+             prices_per_million: %{
+               input: role_price(config, role, :input),
+               output: role_price(config, role, :output)
+             }
            }}
         end),
-      prices_per_million: %{
-        input: config.input_price_per_million,
-        output: config.output_price_per_million
-      }
+      legacy_shared_prices_per_million:
+        if(
+          is_number(config.input_price_per_million) and
+            is_number(config.output_price_per_million),
+          do: %{
+            input: config.input_price_per_million,
+            output: config.output_price_per_million
+          },
+          else: nil
+        )
     }
   end
 
@@ -1012,8 +1066,37 @@ defmodule Imp.GepaSuiteConditionCLI do
     input = Map.fetch!(config, String.to_existing_atom("#{role}_max_input_bytes"))
     output = Map.fetch!(config, String.to_existing_atom("#{role}_max_output_tokens"))
 
-    (input * config.input_price_per_million + output * config.output_price_per_million) /
+    (input * role_price!(config, role, :input) +
+       output * role_price!(config, role, :output)) /
       1_000_000
+  end
+
+  @doc false
+  def role_price!(config, role, direction) do
+    role_price(config, role, direction) ||
+      raise ArgumentError,
+            "#{role}_#{direction}_price_per_million or #{direction}_price_per_million " <>
+              "must be a nonnegative number"
+  end
+
+  defp role_price(config, role, direction) do
+    role_key = String.to_existing_atom("#{role}_#{direction}_price_per_million")
+    shared_key = String.to_existing_atom("#{direction}_price_per_million")
+
+    case Map.get(config, role_key) do
+      value when is_number(value) and value >= 0 ->
+        value
+
+      nil ->
+        case Map.get(config, shared_key) do
+          value when is_number(value) and value >= 0 -> value
+          nil -> nil
+          _ -> raise ArgumentError, "#{shared_key} must be a nonnegative number"
+        end
+
+      _ ->
+        raise ArgumentError, "#{role_key} must be a nonnegative number"
+    end
   end
 
   defp evaluation(result) do
@@ -1516,8 +1599,9 @@ defmodule Imp.GepaSuiteConditionCLI do
         required_positive!(config, String.to_existing_atom("#{role}_#{suffix}"))
       end
 
-      required_nonnegative_number!(config, :input_price_per_million)
-      required_nonnegative_number!(config, :output_price_per_million)
+      for role <- [:task, :reflection, :judge], direction <- [:input, :output] do
+        role_price!(config, role, direction)
+      end
 
       if config.run? do
         required_nonnegative_number!(config, :initial_cost_usd)

@@ -83,6 +83,35 @@ This checkpoint authorizes no provider call and earns no effectiveness result.
 It exists only to ensure that the next paid swing answers the declared question
 and leaves independently auditable evidence.
 
+### Owner-authorized pre-benchmark swing (2026-08-06)
+
+Before committing substantially larger benchmark spend, execute one complete
+matched IFBench–MIPROv2-Heavy cell under a fresh `$100` prospective cap. This
+is not a reduced canary: it uses the official `150/300/294` train/selection/test
+splits, seed `2026080101`, the substantive modeled heavy search, both ordinary
+Imp and pinned-DSPy runtimes, and Artifact/state plus fresh four-call service.
+It is the first real optimizer cell in the frozen table and directly tests the
+previously invalid IFBench direction after the scorer repair.
+
+The task treatment remains the dated DeepSeek V4 Flash model on exact
+`siliconflow/fp8`, matching the admitted IFBench baseline route. Proposal work
+uses current Gemini 3.5 Flash on exact `google-vertex/global`. Current public
+catalog and independent ZDR-list inspection show both exact endpoints active
+with the required temperature/response-format/max-token parameters; response
+cache is disabled, fallback/retry are disabled, and provider prompt caching is
+retained as an observed treatment variable rather than priced as a discount.
+The matched entrances now price task, reflection, and judge roles separately,
+so a cheap task call is not conservatively mischarged at the proposer rate.
+
+The source-derived opportunity is `15,694` nominal transports across both
+runtimes and `31,258` under the legal ordinary-fallback envelope. Report the
+held-out scores, each runtime's lift over its already-admitted matched baseline,
+the Imp-versus-DSPy lift difference, exact calls/cost/errors, and fresh-service
+outcome. No post-outcome threshold, task replacement, or favorable early stop
+is allowed. A scientific negative is retained; a reproduced product or
+treatment defect is repaired at its owner before deciding whether this cell
+can be rerun or the larger table should proceed.
+
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 
 The recognized six-task endpoint remains ratified. The one-seed matched

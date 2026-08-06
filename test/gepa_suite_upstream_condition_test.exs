@@ -265,6 +265,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
         task_model="model", task_provider="provider", task_max_input_bytes=2,
         task_max_output_tokens=16, input_price_per_million=0.14,
         output_price_per_million=0.28, api_base="https://example.invalid", api_key_env="TEST_KEY",
+        task_input_price_per_million=0.09, task_output_price_per_million=0.18,
         family="AIMEBench", arm="baseline", seed=17, max_concurrency=8,
         initial_cost_usd=0.0, max_cost_usd=1.0
     )
@@ -273,6 +274,9 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     progress = condition.init_progress(args)
     condition.SPEND_GUARD = condition.ProspectiveSpendGuard(0.0, 1.0)
     lm = condition.make_lm(dspy, "task", args)
+    assert lm.kwargs["extra_body"]["provider"]["max_price"] == {
+        "prompt": 0.09, "completion": 0.18
+    }
     baseline = object()
     selected = object()
     assert condition.arm_program("baseline", baseline, selected) is baseline

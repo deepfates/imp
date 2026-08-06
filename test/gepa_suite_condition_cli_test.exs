@@ -547,6 +547,37 @@ defmodule Imp.GepaSuiteConditionCLITest do
              )
   end
 
+  test "mixed model roles use their own price receipts and reservations" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition.exs")
+    source = File.read!(script)
+
+    body =
+      String.replace_suffix(
+        source,
+        "Imp.GepaSuiteConditionCLI.main(System.argv())\n",
+        ""
+      )
+
+    Code.compile_string(body, script)
+
+    config = %{
+      input_price_per_million: 1.5,
+      output_price_per_million: 9.0,
+      task_input_price_per_million: 0.09,
+      task_output_price_per_million: 0.18,
+      reflection_input_price_per_million: nil,
+      reflection_output_price_per_million: nil,
+      judge_input_price_per_million: nil,
+      judge_output_price_per_million: nil
+    }
+
+    assert apply(Imp.GepaSuiteConditionCLI, :role_price!, [config, :task, :input]) == 0.09
+    assert apply(Imp.GepaSuiteConditionCLI, :role_price!, [config, :task, :output]) == 0.18
+    assert apply(Imp.GepaSuiteConditionCLI, :role_price!, [config, :reflection, :input]) == 1.5
+    assert apply(Imp.GepaSuiteConditionCLI, :role_price!, [config, :reflection, :output]) == 9.0
+  end
+
   test "prospective guard admits useful work, reconciles actual cost, and stops the next request" do
     root = File.cwd!()
     script = Path.join(root, "scripts/gepa_suite_condition.exs")

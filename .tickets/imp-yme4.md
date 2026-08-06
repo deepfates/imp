@@ -101,18 +101,29 @@ is retained for audit, but it does not define priority.
   fresh-child failure usage/spend into terminal evidence, starts the configured
   ReqLLM pool in the cold entrance, and corrected source-sensitive LiveBench
   AMPS and PAPILLON scoring. Immutable live Results remain unchanged.
-- **Next sequence:** ratify optimizer scale and spend; then run the complete
-  merge-enabled GEPA/MIPROv2 table. Do not
-  replace the ratified table with AIME/IFBench verticals, task-shop after
-  results, or let the legal failure ceiling masquerade as planned opportunity.
+- **Next sequence:** use the owner-authorized pre-benchmark engineering/science
+  tranche to execute one complete matched IFBench–MIPROv2-Heavy cell, then use
+  that result to decide whether a product/treatment repair is needed before the
+  much larger table. This is the full official split and ordinary headline
+  table path—not a reduced canary, new success metric, or substitute task. It
+  directly retests the previously invalid IFBench optimizer direction with the
+  corrected scorer and matched pinned DSPy. A valid negative remains a real
+  table cell; it may not be hidden by task-shopping or threshold changes.
 - **Current operation:** no provider process is active. The completed baseline
-  tranche conservatively charged `$15.155289378` of its `$20` authority. Both
+  tranche conservatively charged `$15.155289378` of its prior `$20` authority.
+  The owner has separately authorized up to `$100` for this one pre-benchmark
+  tranche. Both
   ordinary study entrances enforce the same prospective rule: initial actual
   spend plus the greater of provider-reported or conservative full-price token
   cost for completed calls, active/unreconciled reservations, and the next
-  request's full-price envelope must remain under the cap. The remaining
-  `$4.844710622` does not authorize optimizer calls; their experimental scale
-  and a new spend boundary are an explicit owner decision.
+  request's role-specific full-price envelope must remain under the cap. The
+  exact cell is seed `2026080101`, Imp plus pinned DSPy, dated DeepSeek V4 Flash
+  task work on the same exact SiliconFlow route as the admitted baseline,
+  Gemini 3.5 Flash proposal work on Google Vertex, MIPROv2 Heavy, portable
+  Artifact/state, and fresh four-call service. It is `15,694` nominal and
+  `31,258` legal transports across both runtimes. No provider call begins until
+  exact catalog/ZDR/privacy/route checks, clean provider-free construction, and
+  the prospective guard pass.
 
 The provider-free scale audit gives that decision concrete units. One complete
 generated seed across both runtimes and both remaining optimizer arms is

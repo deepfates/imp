@@ -152,6 +152,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--judge-max-output-tokens", type=int)
     parser.add_argument("--input-price-per-million", type=float)
     parser.add_argument("--output-price-per-million", type=float)
+    for role in ("task", "reflection", "judge"):
+        parser.add_argument(f"--{role}-input-price-per-million", type=float)
+        parser.add_argument(f"--{role}-output-price-per-million", type=float)
     parser.add_argument("--max-concurrency", type=int, default=1)
     parser.add_argument("--initial-cost-usd", type=float)
     parser.add_argument("--max-cost-usd", type=float)
@@ -564,15 +567,17 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
         raise RuntimeError("live execution requires every positive input byte envelope")
     if not isinstance(max_output_tokens, int) or max_output_tokens <= 0:
         raise RuntimeError("live execution requires every positive output token envelope")
-    if not isinstance(args.input_price_per_million, (int, float)) or args.input_price_per_million < 0:
+    input_price = role_price(args, role, "input")
+    output_price = role_price(args, role, "output")
+    if not isinstance(input_price, (int, float)) or input_price < 0:
         raise RuntimeError("live execution requires a nonnegative input price")
-    if not isinstance(args.output_price_per_million, (int, float)) or args.output_price_per_million < 0:
+    if not isinstance(output_price, (int, float)) or output_price < 0:
         raise RuntimeError("live execution requires a nonnegative output price")
     import os
 
     reservation = (
-        max_input_bytes * args.input_price_per_million
-        + max_output_tokens * args.output_price_per_million
+        max_input_bytes * input_price
+        + max_output_tokens * output_price
     ) / 1_000_000
 
     class InputBoundLM(dspy.LM):
@@ -594,8 +599,8 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
                 response = super().forward(prompt=prompt, messages=messages, **kwargs)
                 usage = response_usage(response)
                 conservative = (
-                    usage["input_tokens"] * args.input_price_per_million
-                    + usage["output_tokens"] * args.output_price_per_million
+                    usage["input_tokens"] * input_price
+                    + usage["output_tokens"] * output_price
                 ) / 1_000_000
                 SPEND_GUARD.settle(reservation_id, max(usage["cost_usd"], conservative))
                 record_runtime_response(role, rendered, started, response)
@@ -614,8 +619,8 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
                 response = await super().aforward(prompt=prompt, messages=messages, **kwargs)
                 usage = response_usage(response)
                 conservative = (
-                    usage["input_tokens"] * args.input_price_per_million
-                    + usage["output_tokens"] * args.output_price_per_million
+                    usage["input_tokens"] * input_price
+                    + usage["output_tokens"] * output_price
                 ) / 1_000_000
                 SPEND_GUARD.settle(reservation_id, max(usage["cost_usd"], conservative))
                 record_runtime_response(role, rendered, started, response)
@@ -643,8 +648,8 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
                 "data_collection": "deny",
                 "zdr": True,
                 "max_price": {
-                    "prompt": args.input_price_per_million,
-                    "completion": args.output_price_per_million,
+                    "prompt": input_price,
+                    "completion": output_price,
                 },
             },
             "usage": {"include": True},
@@ -654,6 +659,13 @@ def make_lm(dspy: Any, role: str, args: argparse.Namespace):
             "X-OpenRouter-Cache": "false",
         },
     )
+
+
+def role_price(args: argparse.Namespace, role: str, direction: str) -> float | None:
+    value = getattr(args, f"{role}_{direction}_price_per_million", None)
+    if value is not None:
+        return value
+    return getattr(args, f"{direction}_price_per_million", None)
 
 
 def spend_admission(args: argparse.Namespace) -> dict[str, Any]:
@@ -837,13 +849,18 @@ def condition_receipt(args: argparse.Namespace, imp_identity: dict[str, Any]) ->
                 "provider": getattr(args, f"{role}_provider"),
                 "max_input_content_bytes": getattr(args, f"{role}_max_input_bytes"),
                 "max_output_tokens": getattr(args, f"{role}_max_output_tokens"),
+                "prices_per_million": {
+                    "input": role_price(args, role, "input"),
+                    "output": role_price(args, role, "output"),
+                },
             }
             for role in ("task", "reflection", "judge")
         },
-        "prices_per_million": {
-            "input": args.input_price_per_million,
-            "output": args.output_price_per_million,
-        },
+        "legacy_shared_prices_per_million": (
+            {"input": args.input_price_per_million, "output": args.output_price_per_million}
+            if args.input_price_per_million is not None and args.output_price_per_million is not None
+            else None
+        ),
     }
 
 
@@ -1010,12 +1027,19 @@ def main() -> None:
             "--task-max-output-tokens", str(args.task_max_output_tokens),
             "--reflection-max-output-tokens", str(args.reflection_max_output_tokens),
             "--judge-max-output-tokens", str(args.judge_max_output_tokens),
-            "--input-price-per-million", str(args.input_price_per_million),
-            "--output-price-per-million", str(args.output_price_per_million),
             "--max-concurrency", str(args.max_concurrency),
             "--api-key-env", args.api_key_env,
             "--state", str(state_path), "--output", str(fresh_path),
         ]
+        if args.input_price_per_million is not None:
+            child_args += ["--input-price-per-million", str(args.input_price_per_million)]
+        if args.output_price_per_million is not None:
+            child_args += ["--output-price-per-million", str(args.output_price_per_million)]
+        for role in ("task", "reflection", "judge"):
+            for direction in ("input", "output"):
+                value = getattr(args, f"{role}_{direction}_price_per_million", None)
+                if value is not None:
+                    child_args += [f"--{role}-{direction}-price-per-million", str(value)]
         if args.api_base:
             child_args += ["--api-base", args.api_base]
         if args.livebench_math_python:
