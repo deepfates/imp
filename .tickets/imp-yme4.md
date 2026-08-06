@@ -1135,3 +1135,16 @@ with four full request envelopes retained conservatively, total study charge is
 `$12.979243978` under the unchanged `$20` cap. HotPotQA is now an admitted
 baseline row; HoVer and PAPILLON remain missing before optimizer scale is
 ratified.
+
+**2026-08-05T17:27:00Z**
+
+The matched official HoVer baseline completed both ordinary four-stage paths.
+Imp scored `140/300` (`0.4666666667`) and pinned DSPy scored `139/300`
+(`0.4633333333`), with 24 Imp-higher rows, 23 DSPy-higher rows, and 253 ties
+across identical inputs. Imp retained 14 row errors over 1,221 transports;
+DSPy retained two over 1,269. This is a near-tied current-source baseline datum,
+not optimizer effectiveness.
+
+The pair conservatively charged `$0.912609520`, bringing the study to
+`$13.891853498` under the same `$20` cap. PAPILLON is the only remaining
+missing baseline family before the optimizer-scale decision.

@@ -3584,3 +3584,25 @@ Python as a relative path; Imp refused before transport and DSPy was stopped
 after 34 successful calls (`$0.005058956`). Conservatively retaining four
 possibly active full request envelopes, the table-study charge is now
 `$12.979243978` under the same `$20` cap.
+
+## Current-model table: admitted HoVer baseline datum
+
+The matched HoVer baseline pair from clean `5ba370a4` completed both ordinary
+four-stage current-model paths on the same official 300 held-out rows and the
+same authenticated current Wiki17/BM25s retrieval. The private root is
+`benchmarks/results/gepa-suite-hover-baseline-5ba370a4-20260805-9mNnWo`.
+Imp scored `140/300` (`0.4666666667`) and pinned DSPy scored `139/300`
+(`0.4633333333`). Paired outcomes were 24 Imp-higher rows, 23 DSPy-higher
+rows, and 253 equal rows; all 300 input hashes match. This one-point baseline
+difference is descriptive runtime/model behavior, not optimizer lift.
+
+Imp retained 14 ordinary row errors across 1,221 task transports, including 56
+declared Chat-to-JSON fallbacks. DSPy retained two row errors across 1,269 task
+transports. Both lanes bind the same corpus and current index-tree hashes as the
+admitted HotPot row. Result SHA-256 values are
+`78921ee30655f3c818503904d2a49d361cf9a3b95c68920bf4aa803801066cb9`
+for Imp and
+`49efa7655cd37487fbd68fb5178d38bae9d5203b278b793f1828f06126192989`
+for DSPy. Provider-reported pair cost was `$0.888407924`; conservative
+prospective accounting charged `$0.912609520`. The table-study charge is now
+`$13.891853498` under the unchanged `$20` cap.
