@@ -4,17 +4,23 @@ This note records the outside view used to shape Imp. It separates scientific
 authorities, implementation comparators, production complements, and recent
 work that is promising but too new to become a release claim.
 
-The review was refreshed on 2026-08-03. Moving repositories must still be
+The review was refreshed on 2026-08-06. Moving repositories must still be
 re-pinned before their behavior is used in a differential gate.
 
 ## Current GEPA And Optimize Anything Snapshot
 
-DSPy `3.2.1` remains the latest stable tag. `3.3.0b1` is the current immutable
-prerelease and adds experimental ReActV2/native tool history, a typed
-provider-neutral LM boundary, shared BaseLM save/load and normalized errors,
-and GEPA `0.1.1` integration. Imp therefore keeps stable compatibility claims
-anchored to `3.2.1` while tracking the beta surfaces separately; prerelease
-tracking is not evidence that those runtime seams are complete in Imp.
+DSPy `3.3.0` is the latest stable tag, released on 2026-08-03 at commit
+`e4e97aae29b8ad8aa2fb7e99ffae6fd52970fad8`. Imp's existing reproducible
+compatibility baseline remains DSPy `3.2.1@29448ae` until a reviewed baseline
+migration accounts for the new stable surface; that historical pin must not be
+described as the current upstream product. The earlier `3.3.0b1` tracking work
+covers ReActV2, the typed provider-neutral LM boundary, shared BaseLM
+save/load, and normalized errors. Stable `3.3.0` additionally makes `Flex` and
+its GEPA code-optimization path a public product surface and changes substantial
+adapter, interpreter, resource, and runtime behavior. Imp has no admitted Flex
+equivalent today. Frozen DSPy-3.2.1 benchmark differentials remain valid for
+their declared authority; they do not establish current DSPy-3.3.0 product
+coverage or superiority over the current library.
 
 The current released implementation authority is GEPA `v0.1.4` at
 `8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`. That tag still reports package

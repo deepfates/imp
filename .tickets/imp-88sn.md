@@ -86,12 +86,27 @@ and leaves independently auditable evidence.
 ### Owner-authorized pre-benchmark swing (2026-08-06)
 
 Before committing substantially larger benchmark spend, execute one complete
-matched IFBench–MIPROv2-Heavy cell under a fresh `$100` prospective cap. This
-is not a reduced canary: it uses the official `150/300/294` train/selection/test
-splits, seed `2026080101`, the substantive modeled heavy search, both ordinary
-Imp and pinned-DSPy runtimes, and Artifact/state plus fresh four-call service.
-It is the first real optimizer cell in the frozen table and directly tests the
-previously invalid IFBench direction after the scorer repair.
+matched IFBench baseline plus MIPROv2-Heavy cell under a fresh `$100`
+prospective cap. This is not a reduced canary: it uses the official
+`150/300/294` train/selection/test splits, seed `2026080101`, the substantive
+modeled heavy search, both ordinary Imp and pinned-DSPy runtimes, and
+Artifact/state plus fresh four-call service. It is the first real optimizer
+cell in the frozen table and directly tests the previously invalid IFBench
+direction after the scorer repair.
+
+The admitted baseline Results remain immutable and useful evidence for their
+matched `4096`-token treatment, but they are not the baseline for this cell.
+Direct source inspection shows that `gepa-artifact@cbefbc1` configures every
+task LM at `max_tokens=16384`, and its GEPA instruction proposal independently
+requests `16384`. The retained baseline progress also proves that `4096` was
+frequently binding: across both IFBench runtimes it recorded 379
+`finish_reason=length` responses, while AIME, HotPotQA, HoVer, PAPILLON, and
+LiveBench Math also recorded material length stops. Comparing a new `16384`
+optimizer arm with the old `4096` baseline would therefore confound optimizer
+lift with generation opportunity. Run a fresh matched `16384` baseline pair
+first, then evaluate MIPRO under the identical cap. Preserve the old row in the
+table as an honestly named matched-4096 treatment rather than reinterpreting
+it.
 
 The task treatment remains the dated DeepSeek V4 Flash model on exact
 `siliconflow/fp8`, matching the admitted IFBench baseline route. Proposal work
@@ -102,15 +117,35 @@ cache is disabled, fallback/retry are disabled, and provider prompt caching is
 retained as an observed treatment variable rather than priced as a discount.
 The matched entrances now price task, reflection, and judge roles separately,
 so a cheap task call is not conservatively mischarged at the proposer rate.
+Both task and proposal calls use the source-derived `16384` output cap. A
+`900000` nested-content-byte pretransport envelope leaves explicit room below
+both endpoints' current `1048576`-token context window while remaining far
+above the frozen IFBench row bytes and ordinary proposal batches. This guard is
+a fail-closed safety boundary, not a claim about full serialized-wire bytes;
+an overflow makes the condition scientifically null rather than changing its
+opportunity.
 
-The source-derived opportunity is `15,694` nominal transports across both
-runtimes and `31,258` under the legal ordinary-fallback envelope. Report the
-held-out scores, each runtime's lift over its already-admitted matched baseline,
-the Imp-versus-DSPy lift difference, exact calls/cost/errors, and fresh-service
-outcome. No post-outcome threshold, task replacement, or favorable early stop
-is allowed. A scientific negative is retained; a reproduced product or
+The MIPRO opportunity is `15,694` nominal transports across both runtimes and
+`31,258` under the legal ordinary-fallback envelope; the new matched baseline
+adds `1,176` nominal transports. Report the new baseline and held-out scores,
+each runtime's optimizer-minus-new-baseline lift, the Imp-versus-DSPy lift
+difference, exact calls/cost/errors, and fresh-service outcome. No post-outcome
+threshold, task replacement, favorable early stop, or score-conditioned GEPA
+launch is allowed. A scientific negative is retained; a reproduced product or
 treatment defect is repaired at its owner before deciding whether this cell
-can be rerun or the larger table should proceed.
+can be rerun or the larger table should proceed. A later merge-GEPA decision
+may use only operational call/cost evidence from this cell to determine whether
+it fits the remaining `$100` risk budget, never favorable MIPRO scores.
+
+The combined cap is enforced without a benchmark coordinator by a fixed
+pre-outcome allocation: at most `$5` for each matched baseline lane and `$45`
+for each MIPRO lane, totaling `$100`. Each ordinary entrance already refuses a
+transport prospectively when completed cost, retained/active reservations, and
+the next full role envelope would exceed that lane's cap. Unused allocation is
+not transferred after outcomes. Run the two baseline lanes before either
+optimizer lane; do not start MIPRO if the supposedly identical baseline
+treatment exposes a product/treatment asymmetry that invalidates the
+denominator.
 
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 

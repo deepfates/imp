@@ -7,12 +7,23 @@ names found in source code or documentation. The authoritative ledger lives in
 
 ## Baseline Policy
 
-The release baseline is DSPy `3.2.1`, pinned to commit
-`29448ae12756abdd14bd8796c819247ebb83673c` (annotated tag object
+The currently declared Imp compatibility baseline is DSPy `3.2.1`, pinned to
+commit `29448ae12756abdd14bd8796c819247ebb83673c` (annotated tag object
 `27a8e2a134b0b8dbd2d7433ea67ffe9be627d376`). Imp separately tracks DSPy
 `3.3.0b1` at `b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f` so prerelease work such as
 the normalized BaseLM runtime, ReActV2, and the GEPA 0.1.1 result contract is
 visible without silently changing the stable release target.
+
+This baseline is now historical rather than current upstream. DSPy released
+stable `3.3.0` on 2026-08-03 at
+`e4e97aae29b8ad8aa2fb7e99ffae6fd52970fad8`. Direct source comparison from
+`3.2.1` to `3.3.0` adds the public `Flex` module and GEPA Flex optimization,
+ReActV2, typed LM request/response contracts, sandbox-serializable execution,
+resource loading, and broad adapter/runtime changes. The existing beta gates
+remain evidence for their exact pinned source; they are not a completed stable
+baseline migration. Until the ledger accounts for the full `3.3.0` surface,
+Imp may claim the scoped `3.2.1` and beta differentials it actually exercises,
+but not current whole-DSPy parity or superiority over the latest library.
 
 Standalone GEPA is versioned independently. Its current implementation
 authority is release `v0.1.4` at

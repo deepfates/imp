@@ -46,7 +46,7 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 
 The product center is real but the telos is open.
 
-### Principal protocol audit (2026-08-05, after clean `99e7484b`)
+### Principal protocol audit (2026-08-06, after clean `951c0f1b`)
 
 Start here after compaction or a cold handoff. The chronological evidence below
 is retained for audit, but it does not define priority.
@@ -56,11 +56,13 @@ is retained for audit, but it does not define priority.
   operate them after a fresh restart; whose advertised optimizer families are
   honestly classified; and whose strongest comparative claims are
   independently recomputable.
-- **Implemented:** a broad stable-DSPy-compatible BEAM product center with typed
-  programs, evaluation, public optimizers, parameter/value Artifacts, and OTP
-  operation. The product-only `0.3.0` candidate is unpublished. Current DSPy
-  `3.3.0b1` tracking is explicit and partial rather than silently folded into
-  the stable `3.2.1` compatibility claim.
+- **Implemented:** a broad DSPy-`3.2.1`-compatible BEAM product center with
+  typed programs, evaluation, public optimizers, parameter/value Artifacts, and
+  OTP operation. The product-only `0.3.0` candidate is unpublished. DSPy
+  `3.3.0` became stable on 2026-08-03; the existing `3.3.0b1` tracking covers
+  important runtime and ReActV2 seams but is not a completed stable-baseline
+  migration. In particular, Imp has no admitted equivalent for the new public
+  Flex/GEPA-code-optimization surface.
 - **Actually exercised:** unpacked-package and uncoached install-to-optimize-to-
   Artifact-to-fresh-service lifecycles; scoped operational advantages for
   owner-only checksummed Artifacts and supervised hard-timeout containment;
@@ -71,8 +73,8 @@ is retained for audit, but it does not define priority.
   Math. This row measures current runtime behavior, not optimization lift.
 - **Unknown/open:** no current matched GEPA or MIPROv2 arm has completed; broad
   optimizer effectiveness and blanket Imp-over-DSPy superiority are unproved;
-  several current DSPy beta surfaces remain tracking/gaps; public release and
-  truly external adoption remain owner-held future steps.
+  the stable DSPy `3.3.0` delta has not been fully classified or implemented;
+  public release and truly external adoption remain owner-held future steps.
 - **Protocol truth:** the official artifact generated one seed, evaluated each
   held-out arm once, included both merge and no-merge GEPA, and set each GEPA
   metric budget from the observed MIPROv2-Heavy work. The current Imp plan adds
@@ -102,13 +104,18 @@ is retained for audit, but it does not define priority.
   ReqLLM pool in the cold entrance, and corrected source-sensitive LiveBench
   AMPS and PAPILLON scoring. Immutable live Results remain unchanged.
 - **Next sequence:** use the owner-authorized pre-benchmark engineering/science
-  tranche to execute one complete matched IFBench–MIPROv2-Heavy cell, then use
-  that result to decide whether a product/treatment repair is needed before the
-  much larger table. This is the full official split and ordinary headline
-  table path—not a reduced canary, new success metric, or substitute task. It
-  directly retests the previously invalid IFBench optimizer direction with the
-  corrected scorer and matched pinned DSPy. A valid negative remains a real
-  table cell; it may not be hidden by task-shopping or threshold changes.
+  tranche to execute one complete matched IFBench baseline plus
+  MIPROv2-Heavy cell at the source protocol's `16384` task/proposer output cap,
+  then use that result to decide whether a product/treatment repair is needed
+  before the much larger table. The prior matched baseline remains valid only
+  as a `4096`-token treatment: direct raw-progress review found the cap heavily
+  binding, so using it as the denominator for a `16384` optimizer would
+  confound generation opportunity with optimizer lift. This is the full
+  official split and ordinary headline table path—not a reduced canary, new
+  success metric, or substitute task. It directly retests the previously
+  invalid IFBench optimizer direction with the corrected scorer and matched
+  pinned DSPy. A valid negative remains a real table cell; it may not be hidden
+  by task-shopping or threshold changes.
 - **Current operation:** no provider process is active. The completed baseline
   tranche conservatively charged `$15.155289378` of its prior `$20` authority.
   The owner has separately authorized up to `$100` for this one pre-benchmark
@@ -120,10 +127,14 @@ is retained for audit, but it does not define priority.
   exact cell is seed `2026080101`, Imp plus pinned DSPy, dated DeepSeek V4 Flash
   task work on the same exact SiliconFlow route as the admitted baseline,
   Gemini 3.5 Flash proposal work on Google Vertex, MIPROv2 Heavy, portable
-  Artifact/state, and fresh four-call service. It is `15,694` nominal and
-  `31,258` legal transports across both runtimes. No provider call begins until
-  exact catalog/ZDR/privacy/route checks, clean provider-free construction, and
-  the prospective guard pass.
+  Artifact/state, and fresh four-call service. The new baseline adds `1,176`
+  nominal transports; MIPRO is `15,694` nominal and `31,258` legal transports
+  across both runtimes. Both roles use `16384` output tokens and a `900000`
+  nested-content-byte fail-closed input guard under the current `1048576`
+  context limit. The combined `$100` is split prospectively into four
+  non-transferable lane caps: `$5` per baseline runtime and `$45` per MIPRO
+  runtime. No provider call begins until exact catalog/ZDR/privacy/route checks,
+  clean provider-free construction, and the prospective guard pass.
 
 The provider-free scale audit gives that decision concrete units. One complete
 generated seed across both runtimes and both remaining optimizer arms is
