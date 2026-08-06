@@ -76,7 +76,10 @@ defmodule Imp.BenchmarkTruth.IFBenchFeedbackTest do
     program = IFBenchTwoStage.new(lm, adapter: Imp.Adapter.Chat)
 
     adapter =
-      ProgramAdapter.new(program, metric, component_feedback: IFBenchFeedback.callbacks(metric))
+      ProgramAdapter.new(program, metric,
+        component_feedback: IFBenchFeedback.callbacks(metric),
+        reflection_record_mode: :gepa_v0_1_4
+      )
 
     result =
       Evaluation.evaluate(adapter, [ifbench_example()], Candidate.from_program(program),
@@ -84,8 +87,22 @@ defmodule Imp.BenchmarkTruth.IFBenchFeedbackTest do
       )
 
     assert result.scores == [1.0]
-    assert result.side_information.generate_response_module == ["draft feedback"]
+    assert result.side_information.generate_response_module == ["final feedback"]
     assert result.side_information.ensure_correct_response_module == ["final feedback"]
+
+    reflective =
+      Imp.Optimizer.GEPA.Adapter.make_reflective_dataset(
+        adapter,
+        Candidate.from_program(program),
+        result,
+        [:generate_response_module, :ensure_correct_response_module]
+      )
+
+    assert get_in(reflective, [:generate_response_module, Access.at(0), "Feedback"]) ==
+             "draft feedback"
+
+    assert get_in(reflective, [:ensure_correct_response_module, Access.at(0), "Feedback"]) ==
+             "final feedback"
   end
 
   test "passes captured trace to arity-three metrics and fails closed without feedback" do

@@ -30,7 +30,52 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   end
 
   @doc false
+  def gepa_metric(%{"upstream_metric" => upstream} = spec, opts)
+      when upstream in [
+             "AIME.metric integer exact match",
+             "livebench_math.calculate_livebench_score",
+             "papillon_utils.compute_overall_score"
+           ] do
+    metric = metric(spec, opts)
+    feedback_metric = metric_with_feedback(spec, opts)
+
+    fn example, prediction, trace ->
+      result = metric.(example, prediction) |> Imp.Metrics.normalize_result()
+      feedback = feedback_metric.(example, prediction) |> Imp.Metrics.normalize_result()
+
+      result = %{result | feedback: feedback.feedback}
+
+      if upstream == "papillon_utils.compute_overall_score" and not is_nil(trace) do
+        passed? = result.score >= 1.0
+        %{result | score: if(passed?, do: 1.0, else: 0.0), passed?: passed?}
+      else
+        result
+      end
+    end
+  end
+
+  def gepa_metric(spec, opts), do: metric(spec, opts)
+
+  @doc false
   def metric_with_feedback(spec, opts \\ [])
+
+  def metric_with_feedback(%{"upstream_metric" => "AIME.metric integer exact match"}, _opts) do
+    &aime_integer_exact_with_feedback/2
+  end
+
+  def metric_with_feedback(
+        %{"upstream_metric" => "papillon_utils.compute_overall_score"},
+        opts
+      ) do
+    opts |> Keyword.get(:judge_lm) |> papillon_overall_with_feedback()
+  end
+
+  def metric_with_feedback(
+        %{"upstream_metric" => "livebench_math.calculate_livebench_score"},
+        _opts
+      ) do
+    &livebench_math_with_feedback/2
+  end
 
   def metric_with_feedback(%{"upstream_metric" => "IFBench.ifbench_metric.metric"}, opts) do
     fn example, prediction ->
@@ -43,13 +88,60 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   end
 
   defp aime_integer_exact(example, prediction) do
-    with {gold, ""} <- example |> Imp.Example.get(:answer) |> to_string() |> Integer.parse(),
-         {predicted, ""} <-
-           prediction |> Imp.Prediction.get(:answer) |> to_string() |> Integer.parse() do
+    with {:ok, gold} <- example |> Imp.Example.get(:answer) |> python_integer(),
+         {:ok, predicted} <- prediction |> Imp.Prediction.get(:answer) |> python_integer() do
       gold == predicted
     else
       _ -> false
     end
+  end
+
+  defp aime_integer_exact_with_feedback(example, prediction) do
+    correct_answer = example |> Imp.Example.get(:answer) |> to_string()
+    predicted = prediction |> Imp.Prediction.get(:answer) |> to_string()
+    written_solution = example |> Imp.Example.get(:solution, "") |> to_string()
+
+    {score, feedback} =
+      case {python_integer(correct_answer), python_integer(predicted)} do
+        {{:ok, correct}, {:ok, answer}} ->
+          score = if correct == answer, do: 1.0, else: 0.0
+
+          prefix =
+            if score == 1.0,
+              do: "Your answer is correct. The correct answer is '#{correct}'.",
+              else: "Your answer is incorrect. The correct answer is '#{correct}'."
+
+          {score, prefix <> aime_solution_feedback(written_solution, false)}
+
+        {{:ok, correct}, _invalid} ->
+          text =
+            "The final answer must be a valid integer and nothing else. You responded with " <>
+              "'#{predicted}', which couldn't be parsed as a python integer. Please ensure your " <>
+              "answer is a valid integer without any additional text or formatting. The correct " <>
+              "answer is '#{correct}'."
+
+          {0.0, text <> aime_solution_feedback(written_solution, true)}
+
+        _ ->
+          {0.0, "The frozen AIME row has an invalid integer answer."}
+      end
+
+    %Imp.Metrics.Result{score: score, passed?: score > 0, feedback: feedback}
+  end
+
+  defp aime_solution_feedback("", _parse_failure?), do: ""
+
+  defp aime_solution_feedback(solution, parse_failure?) do
+    ending =
+      if parse_failure?,
+        do:
+          "Think about what takeaways you can learn from this solution to improve your future " <>
+            "answers and approach to similar problems and ensure your final answer is a valid integer.",
+        else:
+          "Think about what takeaways you can learn from this solution to improve your future " <>
+            "answers and approach to similar problems."
+
+    " Here's the full step-by-step solution:\n#{solution}\n\n#{ending}"
   end
 
   defp hotpot_answer_exact(example, prediction) do
@@ -1991,6 +2083,49 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
     end
   end
 
+  defp livebench_math_with_feedback(example, prediction) do
+    question = Imp.Example.get(example, :question_d, %{})
+    answer = prediction |> Imp.Prediction.get(:answer) |> to_string() |> strip_thinking()
+    amps? = Map.get(question, "task", Map.get(question, :task)) == "AMPS_Hard"
+    bridge = System.get_env("IMP_LIVEBENCH_MATH_BRIDGE") || default_livebench_bridge()
+    python = System.get_env("IMP_LIVEBENCH_MATH_PYTHON") || "python3"
+
+    payload_path =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-livebench-feedback-#{System.unique_integer([:positive])}.json"
+      )
+
+    File.write!(
+      payload_path,
+      Jason.encode!(%{
+        "task" => if(amps?, do: "amps_hard_feedback", else: "livebench_math_feedback"),
+        "question_d" => if(amps?, do: nil, else: question),
+        "ground_truth" => if(amps?, do: Map.get(question, "ground_truth", ""), else: nil),
+        "answer" => answer
+      })
+    )
+
+    try do
+      case System.cmd(python, [bridge, payload_path], stderr_to_stdout: true) do
+        {output, 0} ->
+          %{"score" => score, "feedback" => feedback} = Jason.decode!(output)
+
+          %Imp.Metrics.Result{
+            score: numeric_score!(score),
+            passed?: numeric_score!(score) > 0,
+            feedback: feedback
+          }
+
+        {output, status} ->
+          raise ArgumentError,
+                "LiveBenchMath feedback bridge failed with status #{status}: #{String.trim(output)}"
+      end
+    after
+      File.rm(payload_path)
+    end
+  end
+
   defp strip_thinking(answer) do
     Regex.replace(~r/<think>.*?<\/think>/s, answer, "")
   end
@@ -2353,6 +2488,42 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   end
 
   defp papillon_overall(judge_lm) do
+    fn example, prediction ->
+      case papillon_metrics(judge_lm, example, prediction) do
+        {:ok, %{score: score}} -> papillon_result(score, prediction)
+        {:error, result} -> result
+      end
+    end
+  end
+
+  defp papillon_overall_with_feedback(nil) do
+    fn _example, _prediction ->
+      raise ArgumentError,
+            "Papillon GEPA metric requires :judge_lm because upstream scoring is an LLM judge"
+    end
+  end
+
+  defp papillon_overall_with_feedback(judge_lm) do
+    fn example, prediction ->
+      case papillon_metrics(judge_lm, example, prediction) do
+        {:ok, %{score: score, quality: quality, privacy: privacy}} ->
+          %Imp.Metrics.Result{
+            score: score,
+            passed?: score > 0,
+            feedback:
+              "The overall score is #{format_papillon_score(score)}, which is the arithmetic " <>
+                "mean of the quality score (#{format_papillon_score(quality)}) and the leakage " <>
+                "score (#{format_papillon_score(privacy)}). Try to improve the quality of your " <>
+                "response and reduce the leakage of PII information."
+          }
+
+        {:error, result} ->
+          result
+      end
+    end
+  end
+
+  defp papillon_metrics(judge_lm, example, prediction) do
     quality_judge =
       Imp.signature(
         "user_query, response_A, response_B -> judgment",
@@ -2373,34 +2544,36 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
         adapter: Imp.Adapter.Chat
       )
 
-    fn example, prediction ->
-      user_query = Imp.Example.get(example, :user_query, "")
-      target_response = Imp.Example.get(example, :target_response, "")
-      pii = example |> Imp.Example.get(:pii_str, "") |> papillon_pii_units()
-      new_response = Imp.Prediction.get(prediction, :response, "")
-      updated_query = Imp.Prediction.get(prediction, :llm_request, "")
+    user_query = Imp.Example.get(example, :user_query, "")
+    target_response = Imp.Example.get(example, :target_response, "")
+    pii = example |> Imp.Example.get(:pii_str, "") |> papillon_pii_units()
+    new_response = Imp.Prediction.get(prediction, :response, "")
+    updated_query = Imp.Prediction.get(prediction, :llm_request, "")
 
-      with {:ok, judgment_1} <-
-             papillon_quality?(quality_judge, user_query, new_response, target_response),
-           {:ok, judgment_2} <-
-             papillon_quality?(quality_judge, user_query, target_response, new_response),
-           {:ok, leaked_count} <- papillon_leakage_count(leakage_judge, pii, updated_query) do
-        quality = judgment_1 or judgment_1 == judgment_2
-        leakage = if pii == [], do: 0.0, else: leaked_count / length(pii)
-        score = (boolean_score(quality) + (1.0 - leakage)) / 2.0
-        papillon_result(score, prediction)
-      else
-        error ->
-          Imp.OperationalSafetyError.raise_if_present!(error)
+    with {:ok, judgment_1} <-
+           papillon_quality?(quality_judge, user_query, new_response, target_response),
+         {:ok, judgment_2} <-
+           papillon_quality?(quality_judge, user_query, target_response, new_response),
+         {:ok, leaked_count} <- papillon_leakage_count(leakage_judge, pii, updated_query) do
+      quality = boolean_score(judgment_1 or judgment_1 == judgment_2)
+      leakage = if pii == [], do: 0.0, else: leaked_count / length(pii)
+      privacy = 1.0 - leakage
+      {:ok, %{score: (quality + privacy) / 2.0, quality: quality, privacy: privacy}}
+    else
+      error ->
+        Imp.OperationalSafetyError.raise_if_present!(error)
 
-          %Imp.Metrics.Result{
-            score: 0.0,
-            passed?: false,
-            metadata: %{imp_metric_error: Imp.Redaction.redact(error)}
-          }
-      end
+        {:error,
+         %Imp.Metrics.Result{
+           score: 0.0,
+           passed?: false,
+           metadata: %{imp_metric_error: Imp.Redaction.redact(error)}
+         }}
     end
   end
+
+  defp format_papillon_score(value),
+    do: value |> :erlang.float_to_binary(decimals: 2) |> to_string()
 
   defp papillon_quality?(quality_judge, user_query, response_a, response_b) do
     case Imp.Predict.ChainOfThought.call(quality_judge, %{
@@ -2431,12 +2604,9 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   defp papillon_leakage_count(leakage_judge, pii, prompt) do
     case Imp.Predict.ChainOfThought.call(leakage_judge, %{pii: pii, prompt: prompt}) do
       {:ok, prediction} ->
-        prediction
-        |> Imp.Prediction.get(:num_pii_leaked, 0)
-        |> parse_number()
-        |> case do
-          nil -> {:error, :invalid_leakage_count}
-          count -> {:ok, min(max(count, 0), length(pii))}
+        case prediction |> Imp.Prediction.get(:num_pii_leaked) |> python_integer() do
+          {:ok, count} -> {:ok, count}
+          :error -> {:error, :invalid_leakage_count}
         end
 
       {:error, reason} ->
@@ -2461,17 +2631,18 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   defp boolean_score(true), do: 1.0
   defp boolean_score(false), do: 0.0
 
-  defp parse_number(value) when is_integer(value), do: value
-  defp parse_number(value) when is_float(value), do: round(value)
+  defp python_integer(value) do
+    normalized = value |> to_string() |> String.trim()
 
-  defp parse_number(value) when is_binary(value) do
-    case Integer.parse(String.trim(value)) do
-      {int, _rest} -> int
-      :error -> nil
+    if Regex.match?(~r/^[+-]?\d(?:_?\d)*$/, normalized) do
+      case normalized |> String.replace("_", "") |> Integer.parse() do
+        {integer, ""} -> {:ok, integer}
+        _ -> :error
+      end
+    else
+      :error
     end
   end
-
-  defp parse_number(_value), do: nil
 
   defp numeric_score!(value) when is_integer(value), do: value * 1.0
   defp numeric_score!(value) when is_float(value), do: value

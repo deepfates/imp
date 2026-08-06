@@ -19,14 +19,17 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     metric_opts = Keyword.get(opts, :metric_opts, []) |> Keyword.put_new(:judge_lm, judge_lm)
     program = GepaSuite.program!(loaded.spec, task_lm, execution)
     metric = GepaSuite.metric!(loaded.spec, metric_opts)
+    gepa_metric = GepaSuite.gepa_metric!(loaded.spec, metric_opts)
     feedback_metric = GepaSuite.feedback_metric!(loaded.spec, metric_opts)
 
     %{
       loaded: loaded,
       program: program,
       metric: metric,
+      gepa_metric: gepa_metric,
       feedback_metric: feedback_metric,
-      component_feedback: GepaSuite.component_feedback!(loaded.spec, program, feedback_metric),
+      component_feedback:
+        GepaSuite.component_feedback!(loaded.spec, program, feedback_metric, gepa_metric),
       lms: %{task: task_lm, reflection: fetch_lm!(lms, :reflection), judge: judge_lm},
       outer_max_concurrency: max_concurrency,
       program_grounding: program_grounding(loaded.spec, program)
@@ -60,7 +63,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     semantic_metric_calls = Map.fetch!(spec, "metric_calls")
     envelope = GEPA.v014_budget_envelope(dev_size, 3, semantic_metric_calls)
 
-    GEPA.new(prepared.metric,
+    GEPA.new(prepared.gepa_metric,
       execution_profile: :gepa_v0_1_4_merge,
       reflection_lm: prepared.lms.reflection,
       component_feedback: prepared.component_feedback,

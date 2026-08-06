@@ -1187,7 +1187,8 @@ defmodule Imp.Optimizer.TrajectoryRunner do
               captured
           end
 
-        result = safe_metric(metric, example, prediction, trace)
+        metric_trace = if Keyword.get(opts, :metric_trace, true), do: trace, else: nil
+        result = safe_metric(metric, example, prediction, metric_trace)
 
         %Trajectory{
           index: index,

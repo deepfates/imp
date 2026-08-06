@@ -61,6 +61,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         max_concurrency: adapter.max_concurrency,
         timeout: adapter.timeout,
         deadline: Keyword.get(opts, :deadline),
+        metric_trace: Keyword.get(opts, :capture_traces, false),
         runtime: :gepa,
         program_id: candidate_id(candidate)
       )
@@ -83,13 +84,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     Result.new(outputs, scores,
       objective_scores: objective_scores,
       trajectories: component_trajectories,
-      side_information:
-        side_information(
-          trajectories,
-          components,
-          adapter.component_feedback,
-          Keyword.get(opts, :capture_traces, false)
-        ),
+      side_information: side_information(trajectories, components),
       metadata: %{
         metric_calls: length(trajectories),
         failures: Enum.count(trajectories, &(not is_nil(&1.error)))
@@ -120,6 +115,8 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
               else: feedback_only_records(feedback, adapter.reflection_record_mode)
 
           {trajectory, feedback} ->
+            feedback = reflective_feedback(adapter, trajectory, component, feedback)
+
             case reflection_record(
                    trajectory,
                    feedback,
@@ -171,7 +168,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     end
   end
 
-  defp side_information(trajectories, components, callbacks, capture_traces?) do
+  defp side_information(trajectories, components) do
     single_component? = length(components) == 1
 
     Map.new(components, fn component ->
@@ -182,12 +179,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
               diagnostic_failure(trajectory)
 
             single_component? or component_visited?(trajectory, component) ->
-              component_feedback(
-                trajectory,
-                component,
-                callbacks,
-                capture_traces?
-              )
+              trajectory.feedback || metric_feedback(trajectory)
 
             true ->
               nil
@@ -207,8 +199,8 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   defp component_visited?(_trajectory, _component), do: false
 
-  defp component_feedback(trajectory, component, callbacks, true) do
-    case Map.fetch(callbacks, component) do
+  defp reflective_feedback(adapter, trajectory, component, fallback) do
+    case Map.fetch(adapter.component_feedback, component) do
       {:ok, callback} ->
         step = fetch_component_step!(trajectory.trace, component)
 
@@ -225,12 +217,9 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         })
 
       :error ->
-        trajectory.feedback || metric_feedback(trajectory)
+        fallback
     end
   end
-
-  defp component_feedback(trajectory, _component, _callbacks, _capture_traces?),
-    do: trajectory.feedback || metric_feedback(trajectory)
 
   defp fetch_component_step!(trace, component) do
     Enum.find(trace, &match?(%{predictor: ^component}, &1)) ||

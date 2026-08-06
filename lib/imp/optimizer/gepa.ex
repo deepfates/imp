@@ -202,7 +202,7 @@ defmodule Imp.Optimizer.GEPA do
                             ]
 
   def new(metric, opts \\ []) do
-    Imp.FunctionContract.validate!(metric, 2, "Imp.Optimizer.GEPA.new/2", "metric")
+    Imp.FunctionContract.validate!(metric, [2, 3], "Imp.Optimizer.GEPA.new/2", "metric")
     requested_opts = opts
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.GEPA.new/2")
     opts = resolve_execution_profile!(requested_opts, opts)

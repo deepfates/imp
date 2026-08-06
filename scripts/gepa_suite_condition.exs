@@ -221,6 +221,7 @@ defmodule Imp.GepaSuiteConditionCLI do
   @arms ~w(baseline mipro_v2_heavy gepa_v0_1_4_merge)
   @request_timeout_ms 120_000
   @study_seeds [2_026_080_101, 2_026_080_102, 2_026_080_103]
+  @gepa_artifact_commit "cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
 
   def main(argv) do
     {opts, positional, invalid} =
@@ -231,6 +232,7 @@ defmodule Imp.GepaSuiteConditionCLI do
           retrieval_receipt: :string,
           retrieval_python: :string,
           livebench_math_python: :string,
+          livebench_math_source_root: :string,
           family: :string,
           arm: :string,
           seed: :integer,
@@ -302,6 +304,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       retrieval_receipt: expand(opts[:retrieval_receipt]),
       retrieval_python: Keyword.get(opts, :retrieval_python, "python3"),
       livebench_math_python: expand(opts[:livebench_math_python]),
+      livebench_math_source_root: expand(opts[:livebench_math_source_root]),
       family: family,
       arm:
         Map.fetch!(
@@ -359,6 +362,20 @@ defmodule Imp.GepaSuiteConditionCLI do
       config.livebench_math_python ||
         raise(ArgumentError, "LiveBenchMathBench live execution requires --livebench-math-python")
 
+    source_root =
+      config.livebench_math_source_root ||
+        raise(
+          ArgumentError,
+          "LiveBenchMathBench live execution requires --livebench-math-source-root"
+        )
+
+    unless git_output(["-C", source_root, "rev-parse", "HEAD"]) == @gepa_artifact_commit and
+             git_status(["-C", source_root, "diff", "--quiet"]) == 0 and
+             git_status(["-C", source_root, "diff", "--cached", "--quiet"]) == 0 do
+      raise ArgumentError,
+            "LiveBenchMath feedback source root is not the clean pinned GEPA artifact"
+    end
+
     bridge = Path.expand("scripts/livebench_math_score.py", File.cwd!())
 
     payload =
@@ -370,16 +387,28 @@ defmodule Imp.GepaSuiteConditionCLI do
     File.write!(
       payload,
       Jason.encode!(%{
-        "task" => "amps_hard",
-        "ground_truth" => "x^2",
+        "task" => "livebench_math_feedback",
+        "question_d" => %{
+          "task" => "AMPS_Hard",
+          "subtask" => "amps_hard_algebra",
+          "turns" => ["Solve."],
+          "ground_truth" => "x^2"
+        },
         "answer" => "\\boxed{x^2}"
       })
     )
 
     try do
-      case System.cmd(python, [bridge, payload], stderr_to_stdout: true) do
+      case System.cmd(python, [bridge, payload],
+             stderr_to_stdout: true,
+             env: [{"IMP_LIVEBENCH_MATH_SOURCE_ROOT", source_root}]
+           ) do
         {output, 0} ->
-          unless match?({:ok, %{"score" => score}} when score in [1, 1.0], Jason.decode(output)) do
+          unless match?(
+                   {:ok, %{"score" => score, "feedback" => feedback}}
+                   when is_number(score) and is_binary(feedback),
+                   Jason.decode(output)
+                 ) do
             raise ArgumentError,
                   "LiveBenchMath symbolic scorer preflight returned an invalid result"
           end
@@ -395,6 +424,7 @@ defmodule Imp.GepaSuiteConditionCLI do
 
     System.put_env("IMP_LIVEBENCH_MATH_PYTHON", python)
     System.put_env("IMP_LIVEBENCH_MATH_BRIDGE", bridge)
+    System.put_env("IMP_LIVEBENCH_MATH_SOURCE_ROOT", source_root)
     %{config | livebench_math_python: python}
   end
 
@@ -445,6 +475,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       req_llm_pool: req_llm_pool(config),
       heldout_decoded: false,
       split_counts: prepared.loaded.spec["split_counts"],
+      data: data_receipt(prepared.loaded.spec),
       treatments: treatments,
       retrieval: retrieval_disclosure(config, prepared.loaded.spec),
       metric_runtime: metric_runtime(config),
@@ -480,49 +511,70 @@ defmodule Imp.GepaSuiteConditionCLI do
         progress
       )
 
-    {optimized, heldout} = unwrap_run!(outcome, config, admission, wall_time_us, usage)
+    {optimized, heldout} = unwrap_run!(outcome, config, prepared, admission, wall_time_us, usage)
 
     accounted_total =
       config.spend_guard
       |> Imp.GepaSuiteSpendGuard.snapshot()
       |> Map.fetch!(:accounted_total_usd)
 
-    {artifact_sha, fresh_sha, fresh_usage, fresh_spend} =
-      case optimized.artifact do
-        nil ->
-          {nil, nil, empty_runtime(), nil}
+    try do
+      {artifact_sha, fresh_sha, fresh_usage, fresh_spend} =
+        case optimized.artifact do
+          nil ->
+            {nil, nil, empty_runtime(), nil}
 
-        artifact ->
-          for key <- [:artifact, :fresh_output], do: required_config!(config, key)
-          Artifact.write!(artifact, config.artifact)
-          fresh_child!(config, accounted_total)
-          fresh = config.fresh_output |> File.read!() |> Jason.decode!()
+          artifact ->
+            for key <- [:artifact, :fresh_output], do: required_config!(config, key)
+            write_artifact_exclusive!(artifact, config.artifact)
+            artifact_sha = sha256(config.artifact)
+            fresh_child!(config, accounted_total)
+            fresh = config.fresh_output |> File.read!() |> Jason.decode!()
+            expected_condition = condition_receipt(config) |> json_safe()
+            expected_data = data_receipt(prepared.loaded.spec) |> json_safe()
 
-          {sha256(config.artifact), sha256(config.fresh_output), fresh["usage"],
-           fresh["spend_admission"]}
-      end
+            unless fresh["status"] == "fresh_ok" and
+                     fresh["loaded_artifact_sha256"] == artifact_sha and
+                     fresh["condition"] == expected_condition and fresh["data"] == expected_data do
+              raise "fresh GEPA suite receipt does not bind the selected Artifact and condition"
+            end
 
-    write_private!(config.output, %{
-      status: :complete,
-      family: config.family,
-      arm: config.arm,
-      seed: config.seed,
-      heldout: evaluation(heldout.result),
-      artifact_sha256: artifact_sha,
-      fresh_sha256: fresh_sha,
-      usage: merge_runtime(usage, fresh_usage),
-      usage_cost_basis: :frozen_catalog_calculated,
-      progress_sha256: sha256(progress),
-      wall_time_us: wall_time_us,
-      request_timeout_ms: @request_timeout_ms,
-      req_llm_pool: req_llm_pool(config),
-      spend_admission: Map.put(admission, "final", spend_snapshot(config)),
-      fresh_spend_admission: fresh_spend,
-      heldout_decoded: true,
-      metric_runtime: metric_runtime(config),
-      retrieval: retrieval_disclosure(config, prepared.loaded.spec),
-      condition: condition_receipt(config)
-    })
+            {artifact_sha, sha256(config.fresh_output), fresh["usage"], fresh["spend_admission"]}
+        end
+
+      write_private!(config.output, %{
+        status: :complete,
+        family: config.family,
+        arm: config.arm,
+        seed: config.seed,
+        heldout: evaluation(heldout.result),
+        artifact_sha256: artifact_sha,
+        fresh_sha256: fresh_sha,
+        usage: merge_runtime(usage, fresh_usage),
+        usage_cost_basis: :frozen_catalog_calculated,
+        progress_sha256: sha256(progress),
+        wall_time_us: wall_time_us,
+        request_timeout_ms: @request_timeout_ms,
+        req_llm_pool: req_llm_pool(config),
+        spend_admission: Map.put(admission, "final", spend_snapshot(config)),
+        fresh_spend_admission: fresh_spend,
+        heldout_decoded: true,
+        metric_runtime: metric_runtime(config),
+        retrieval: retrieval_disclosure(config, prepared.loaded.spec),
+        condition: condition_receipt(config),
+        data: data_receipt(prepared.loaded.spec)
+      })
+    rescue
+      error ->
+        write_failure_unless_exists!(config, prepared, :persist_or_fresh_service, error, %{
+          usage: usage,
+          wall_time_us: wall_time_us,
+          progress_sha256: existing_sha256(progress),
+          spend_admission: Map.put(admission, "final", spend_snapshot(config))
+        })
+
+        reraise error, __STACKTRACE__
+    end
   end
 
   defp fresh!(config, prepared) do
@@ -536,6 +588,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       )
     end
 
+    loaded_artifact_sha256 = sha256(config.artifact)
     program = config.artifact |> Artifact.read!() |> Artifact.apply(prepared.program)
     test = GepaSuite.load_test!(prepared.loaded) |> Enum.take(4)
     supervisor = Module.concat([ImpGepaSuiteFresh, TaskSupervisor])
@@ -572,9 +625,28 @@ defmodule Imp.GepaSuiteConditionCLI do
         progress
       )
 
-    outcomes = unwrap_fresh!(outcome, config, wall_time_us, usage)
+    outcomes =
+      unwrap_fresh!(outcome, config, prepared, loaded_artifact_sha256, wall_time_us, usage)
 
     unless length(outcomes) == 4 and Enum.all?(outcomes, &(&1.status == :ok)) do
+      write_private!(config.fresh_output, %{
+        status: :failed,
+        family: config.family,
+        arm: config.arm,
+        seed: config.seed,
+        stage: :fresh_service_acceptance,
+        calls: outcomes,
+        usage: usage,
+        progress_sha256: existing_sha256(progress),
+        wall_time_us: wall_time_us,
+        spend_admission:
+          spend_admission(config)
+          |> Map.put("final", spend_snapshot(config)),
+        loaded_artifact_sha256: loaded_artifact_sha256,
+        condition: condition_receipt(config),
+        data: data_receipt(prepared.loaded.spec)
+      })
+
       raise "fresh GEPA suite service did not complete all four calls: #{inspect(outcomes)}"
     end
 
@@ -591,7 +663,9 @@ defmodule Imp.GepaSuiteConditionCLI do
         |> Map.put("final", spend_snapshot(config)),
       progress_sha256: sha256(progress),
       wall_time_us: wall_time_us,
-      condition: condition_receipt(config)
+      condition: condition_receipt(config),
+      data: data_receipt(prepared.loaded.spec),
+      loaded_artifact_sha256: loaded_artifact_sha256
     })
   end
 
@@ -599,7 +673,7 @@ defmodule Imp.GepaSuiteConditionCLI do
     args =
       [
         "run",
-        "--no-compile",
+        "--no-start",
         "--no-deps-check",
         Path.expand(__ENV__.file),
         "--fresh",
@@ -627,32 +701,47 @@ defmodule Imp.GepaSuiteConditionCLI do
   end
 
   defp live_args(config, initial_cost_usd) do
-    Enum.flat_map([:task, :reflection, :judge], fn role ->
-      [
-        "--#{role}-model",
-        Map.fetch!(config, String.to_existing_atom("#{role}_model")),
-        "--#{role}-provider",
-        Map.fetch!(config, String.to_existing_atom("#{role}_provider")),
-        "--#{role}-max-input-bytes",
-        config |> Map.fetch!(String.to_existing_atom("#{role}_max_input_bytes")) |> to_string(),
-        "--#{role}-max-output-tokens",
-        config |> Map.fetch!(String.to_existing_atom("#{role}_max_output_tokens")) |> to_string()
-      ]
-    end) ++
-      [
-        "--api-key-env",
-        config.api_key_env,
-        "--input-price-per-million",
-        to_string(config.input_price_per_million),
-        "--output-price-per-million",
-        to_string(config.output_price_per_million),
-        "--max-concurrency",
-        to_string(config.max_concurrency),
-        "--initial-cost-usd",
-        to_string(initial_cost_usd),
-        "--max-cost-usd",
-        to_string(config.max_cost_usd)
-      ]
+    args =
+      Enum.flat_map([:task, :reflection, :judge], fn role ->
+        [
+          "--#{role}-model",
+          Map.fetch!(config, String.to_existing_atom("#{role}_model")),
+          "--#{role}-provider",
+          Map.fetch!(config, String.to_existing_atom("#{role}_provider")),
+          "--#{role}-max-input-bytes",
+          config |> Map.fetch!(String.to_existing_atom("#{role}_max_input_bytes")) |> to_string(),
+          "--#{role}-max-output-tokens",
+          config
+          |> Map.fetch!(String.to_existing_atom("#{role}_max_output_tokens"))
+          |> to_string()
+        ]
+      end) ++
+        [
+          "--api-key-env",
+          config.api_key_env,
+          "--input-price-per-million",
+          to_string(config.input_price_per_million),
+          "--output-price-per-million",
+          to_string(config.output_price_per_million),
+          "--max-concurrency",
+          to_string(config.max_concurrency),
+          "--initial-cost-usd",
+          to_string(initial_cost_usd),
+          "--max-cost-usd",
+          to_string(config.max_cost_usd)
+        ]
+
+    if config.family == "LiveBenchMathBench" do
+      args ++
+        [
+          "--livebench-math-python",
+          config.livebench_math_python,
+          "--livebench-math-source-root",
+          config.livebench_math_source_root
+        ]
+    else
+      args
+    end
   end
 
   defp retrieval_args(%{retrieval_root: nil}), do: []
@@ -851,7 +940,7 @@ defmodule Imp.GepaSuiteConditionCLI do
         usage_required: true
       },
       papillon_judge_treatment:
-        if(config.family == "PAPILLONBench",
+        if(config.family == "Papillon",
           do:
             :source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction,
           else: :not_applicable
@@ -872,6 +961,14 @@ defmodule Imp.GepaSuiteConditionCLI do
         input: config.input_price_per_million,
         output: config.output_price_per_million
       }
+    }
+  end
+
+  defp data_receipt(spec) do
+    %{
+      source: spec["source"] || spec["dataset_source"] || spec["source_commit"],
+      split_counts: spec["split_counts"],
+      split_checksums: spec["split_checksums"] || spec["checksums"]
     }
   end
 
@@ -968,9 +1065,17 @@ defmodule Imp.GepaSuiteConditionCLI do
     end
   end
 
-  defp unwrap_run!({:ok, result}, _config, _reservation, _wall_time_us, _usage), do: result
+  defp unwrap_run!({:ok, result}, _config, _prepared, _reservation, _wall_time_us, _usage),
+    do: result
 
-  defp unwrap_run!({:error, error, stacktrace}, config, reservation, wall_time_us, usage) do
+  defp unwrap_run!(
+         {:error, error, stacktrace},
+         config,
+         prepared,
+         reservation,
+         wall_time_us,
+         usage
+       ) do
     write_private!(config.output, %{
       status: :failed,
       family: config.family,
@@ -981,15 +1086,53 @@ defmodule Imp.GepaSuiteConditionCLI do
       usage: usage,
       progress_sha256: existing_sha256(progress_path(config)),
       wall_time_us: wall_time_us,
-      spend_admission: reservation
+      spend_admission: Map.put(reservation, "final", spend_snapshot(config)),
+      condition: condition_receipt(config),
+      data: data_receipt(prepared.loaded.spec)
     })
 
     reraise error, stacktrace
   end
 
-  defp unwrap_fresh!({:ok, result}, _config, _wall_time_us, _usage), do: result
+  defp write_failure_unless_exists!(config, prepared, stage, error, details) do
+    unless File.exists?(config.output) do
+      write_private!(
+        config.output,
+        Map.merge(
+          %{
+            status: :failed,
+            family: config.family,
+            arm: config.arm,
+            seed: config.seed,
+            stage: stage,
+            error: redacted_error(error),
+            condition: condition_receipt(config),
+            data: data_receipt(prepared.loaded.spec)
+          },
+          details
+        )
+      )
+    end
+  end
 
-  defp unwrap_fresh!({:error, error, stacktrace}, config, wall_time_us, usage) do
+  defp unwrap_fresh!(
+         {:ok, result},
+         _config,
+         _prepared,
+         _loaded_artifact_sha256,
+         _wall_time_us,
+         _usage
+       ),
+       do: result
+
+  defp unwrap_fresh!(
+         {:error, error, stacktrace},
+         config,
+         prepared,
+         loaded_artifact_sha256,
+         wall_time_us,
+         usage
+       ) do
     write_private!(config.fresh_output, %{
       status: :failed,
       family: config.family,
@@ -999,7 +1142,13 @@ defmodule Imp.GepaSuiteConditionCLI do
       error: redacted_error(error),
       usage: usage,
       progress_sha256: existing_sha256(progress_path(config)),
-      wall_time_us: wall_time_us
+      wall_time_us: wall_time_us,
+      spend_admission:
+        spend_admission(config)
+        |> Map.put("final", spend_snapshot(config)),
+      loaded_artifact_sha256: loaded_artifact_sha256,
+      condition: condition_receipt(config),
+      data: data_receipt(prepared.loaded.spec)
     })
 
     reraise error, stacktrace
@@ -1284,6 +1433,8 @@ defmodule Imp.GepaSuiteConditionCLI do
       symbolic_bridge_python_sha256: sha256(python),
       symbolic_bridge_path: bridge,
       symbolic_bridge_sha256: sha256(bridge),
+      feedback_source_root: System.fetch_env!("IMP_LIVEBENCH_MATH_SOURCE_ROOT"),
+      feedback_source_commit: @gepa_artifact_commit,
       preflight: :exact_symbolic_identity_score_passed_before_transport
     }
   end
@@ -1366,6 +1517,28 @@ defmodule Imp.GepaSuiteConditionCLI do
     end)
 
     File.chmod!(path, 0o600)
+  end
+
+  @doc false
+  def write_artifact_exclusive!(artifact, path) do
+    temporary = path <> ".tmp-#{System.pid()}-#{System.monotonic_time()}"
+
+    try do
+      Artifact.write!(artifact, temporary)
+
+      case File.ln(temporary, path) do
+        :ok ->
+          :ok
+
+        {:error, :eexist} ->
+          raise ArgumentError, "refusing to overwrite existing evidence: #{path}"
+
+        {:error, reason} ->
+          raise File.Error, reason: reason, action: "link", path: path
+      end
+    after
+      File.rm(temporary)
+    end
   end
 
   defp ensure_new_targets!(paths) do

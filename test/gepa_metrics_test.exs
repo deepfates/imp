@@ -103,6 +103,32 @@ defmodule GepaMetricsTest do
     assert [%{index: 0, stage: :metric, reason: {:error, :judge_unavailable}}] = result.errors
   end
 
+  test "AIME GEPA feedback matches Python integer parsing and source text" do
+    metric =
+      Imp.BenchmarkTruth.GepaMetrics.gepa_metric(
+        %{
+          "upstream_metric" => "AIME.metric integer exact match"
+        },
+        []
+      )
+
+    example =
+      Imp.example(question: "q", answer: "42", solution: "proof")
+      |> Imp.with_inputs(:question)
+
+    assert %{score: 1.0, feedback: correct} =
+             metric.(example, Imp.prediction(answer: " 42 "), [%{predictor: :main}])
+
+    assert correct ==
+             "Your answer is correct. The correct answer is '42'. Here's the full step-by-step solution:\nproof\n\nThink about what takeaways you can learn from this solution to improve your future answers and approach to similar problems."
+
+    assert %{score: +0.0, feedback: invalid} =
+             metric.(example, Imp.prediction(answer: "42x"), [%{predictor: :main}])
+
+    assert invalid =~ "couldn't be parsed as a python integer"
+    assert invalid =~ "ensure your final answer is a valid integer"
+  end
+
   test "Papillon task failures keep the released score and remain diagnostic-only" do
     judge =
       Imp.LM.Static.new(
@@ -764,6 +790,60 @@ defmodule GepaMetricsTest do
     end
   end
 
+  test "LiveBenchMath GEPA uses the pinned AMPS parsed-answer feedback sentence" do
+    metric =
+      Imp.BenchmarkTruth.GepaMetrics.gepa_metric(
+        %{
+          "upstream_metric" => "livebench_math.calculate_livebench_score",
+          "output_key" => "answer"
+        },
+        []
+      )
+
+    example =
+      Imp.example(
+        question: "Solve.",
+        answer: "x^2",
+        question_d: %{
+          "task" => "AMPS_Hard",
+          "subtask" => "amps_hard_algebra",
+          "turns" => ["Solve."],
+          "ground_truth" => "x^2"
+        }
+      )
+      |> Imp.with_inputs(:question)
+
+    bridge =
+      Path.join(System.tmp_dir!(), "imp-livebench-gepa-#{System.unique_integer([:positive])}.py")
+
+    File.write!(bridge, """
+    import json, sys
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload["task"] in {"amps_hard", "amps_hard_feedback"}
+    result = {"score": 1, "parsed_answer": "x^2"}
+    if payload["task"] == "amps_hard_feedback":
+        result["feedback"] = "The symbolic scorer parsed 'x^2'; the answer scored 1.0."
+    print(json.dumps(result))
+    """)
+
+    previous_bridge = System.get_env("IMP_LIVEBENCH_MATH_BRIDGE")
+    System.put_env("IMP_LIVEBENCH_MATH_BRIDGE", bridge)
+
+    on_exit(fn ->
+      if previous_bridge,
+        do: System.put_env("IMP_LIVEBENCH_MATH_BRIDGE", previous_bridge),
+        else: System.delete_env("IMP_LIVEBENCH_MATH_BRIDGE")
+
+      File.rm(bridge)
+    end)
+
+    assert %{score: 1.0, feedback: feedback} =
+             metric.(example, Imp.prediction(answer: "x^2"), [%{predictor: :main}])
+
+    assert feedback == "The symbolic scorer parsed 'x^2'; the answer scored 1.0."
+  end
+
   test "Papillon metric uses Imp judges for quality and leakage arithmetic" do
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
@@ -818,6 +898,42 @@ defmodule GepaMetricsTest do
     prompts = Agent.get(calls, &Enum.reverse/1)
     assert length(prompts) == 3
     assert Enum.any?(prompts, &(&1 =~ "Count the number information pieces"))
+  end
+
+  test "Papillon GEPA uses six judges per metric call, trace Boolean scoring, and no leakage clamp" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    judge =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          Agent.update(calls, &(&1 + 1))
+          prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
+
+          if prompt =~ "num_pii_leaked",
+            do: %{reasoning: "three", num_pii_leaked: 3},
+            else: %{reasoning: "yes", judgment: true}
+        end
+      )
+
+    metric =
+      Imp.BenchmarkTruth.GepaMetrics.gepa_metric(
+        %{"upstream_metric" => "papillon_utils.compute_overall_score"},
+        judge_lm: judge
+      )
+
+    example =
+      Imp.example(user_query: "q", target_response: "target", pii_str: "a||b")
+      |> Imp.with_inputs(:user_query)
+
+    prediction = Imp.prediction(llm_request: "request", response: "response")
+
+    assert %{score: 0.25, feedback: feedback} = metric.(example, prediction, nil)
+    assert Agent.get(calls, & &1) == 6
+    assert feedback =~ "leakage score (-0.50)"
+
+    Agent.update(calls, fn _ -> 0 end)
+    assert %{score: +0.0, passed?: false} = metric.(example, prediction, [%{predictor: :main}])
+    assert Agent.get(calls, & &1) == 6
   end
 
   test "Papillon metric requires an explicit judge LM" do

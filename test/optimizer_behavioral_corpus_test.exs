@@ -534,8 +534,8 @@ defmodule OptimizerBehavioralCorpusTest do
                  fn -> Imp.Optimizer.SIMBA.new(fn _example -> true end) end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.GEPA\.new\/2 expects a metric function with arity 2/,
-                 fn -> Imp.Optimizer.GEPA.new(fn _example, _prediction, _trace -> true end) end
+                 ~r/Imp\.Optimizer\.GEPA\.new\/2 expects a metric function with arity 2 or 3/,
+                 fn -> Imp.Optimizer.GEPA.new(fn _example -> true end) end
 
     assert_raise ArgumentError,
                  ~r/Imp\.Optimizer\.GEPA\.new\/2: invalid value for :feedback_fn option: expected nil or an arity-1 function/,

@@ -76,14 +76,19 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
 
     reflective = Evaluation.evaluate(adapter, batch, candidate, capture_traces: true)
 
+    refute_received {:component_feedback, _context}
+    assert reflective.side_information.main == ["metric feedback"]
+
+    reflective_dataset =
+      Adapter.make_reflective_dataset(adapter, candidate, reflective, [:main])
+
     assert_receive {:component_feedback, context}
     assert context.component == :main
     assert context.predictor_inputs == %{question: "Capital of France?"}
     assert context.predictor_output == %{answer: "Paris"}
     assert context.score == 0.5
 
-    assert %{main: [%{"Feedback" => feedback}]} =
-             Adapter.make_reflective_dataset(adapter, candidate, reflective, [:main])
+    assert %{main: [%{"Feedback" => feedback}]} = reflective_dataset
 
     assert feedback =~ "Inspect Paris"
   end
@@ -160,8 +165,11 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
 
     batch = [Imp.example(question: "q") |> Imp.with_inputs(:question)]
 
-    assert_raise RuntimeError, ~r/component feedback failed for :main: feedback exploded/, fn ->
+    result =
       Evaluation.evaluate(adapter, batch, Candidate.from_program(program), capture_traces: true)
+
+    assert_raise RuntimeError, ~r/component feedback failed for :main: feedback exploded/, fn ->
+      Adapter.make_reflective_dataset(adapter, Candidate.from_program(program), result, [:main])
     end
   end
 
@@ -178,8 +186,11 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
 
     batch = [Imp.example(question: "q") |> Imp.with_inputs(:question)]
 
-    assert_raise Imp.OperationalSafetyError, fn ->
+    result =
       Evaluation.evaluate(adapter, batch, Candidate.from_program(program), capture_traces: true)
+
+    assert_raise Imp.OperationalSafetyError, fn ->
+      Adapter.make_reflective_dataset(adapter, Candidate.from_program(program), result, [:main])
     end
   end
 

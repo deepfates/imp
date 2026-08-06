@@ -77,9 +77,12 @@ is retained for audit, but it does not define priority.
   held-out arm once, included both merge and no-merge GEPA, and set each GEPA
   metric budget from the observed MIPROv2-Heavy work. The current Imp plan adds
   three fixed seeds, fresh Artifact/service acceptance, and conservative legal
-  failure envelopes. Its `2,151,306` transports are therefore a legal ceiling,
+  failure envelopes. Its `2,280,420` transports are therefore a legal ceiling,
   not scheduled work; the corresponding no-failure/no-fallback nominal plan is
-  `1,104,168` transports. Neither number is an observed cost.
+  `1,231,212` transports. Neither number is an observed cost. The increase is
+  the corrected pinned PAPILLON GEPA judge schedule: six judge calls on ordinary
+  optimizer rows and twelve on reflected parent rows, rather than three on all
+  rows.
 - **Product/treatment repair:** pinned DSPy `3.2.1` enables GEPA merge by
   default, while Imp previously authenticated only a no-merge profile. The new
   `:gepa_v0_1_4_merge` profile composes pinned scheduling, CPython RNG,

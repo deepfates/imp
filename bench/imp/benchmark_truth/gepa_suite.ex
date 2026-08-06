@@ -106,12 +106,20 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
   @doc "Returns the source-faithful task metric for one family."
   def metric!(spec, opts \\ []), do: GepaMetrics.metric(spec, opts)
 
+  @doc "Returns the source-faithful GEPA metric, including trace-sensitive scoring."
+  def gepa_metric!(spec, opts \\ []), do: GepaMetrics.gepa_metric(spec, opts)
+
   @doc "Returns the source-faithful GEPA feedback metric for one family."
   def feedback_metric!(spec, opts \\ []), do: GepaMetrics.metric_with_feedback(spec, opts)
 
   @doc "Binds component-local GEPA feedback to the constructed program."
   def component_feedback!(spec, program, feedback_metric) do
     GepaComponentFeedback.callbacks!(spec, program, feedback_metric)
+  end
+
+  @doc false
+  def component_feedback!(spec, program, feedback_metric, gepa_metric) do
+    GepaComponentFeedback.callbacks!(spec, program, feedback_metric, gepa_metric)
   end
 
   def split_paths(dataset_root, family) do

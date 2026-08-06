@@ -105,7 +105,34 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         primary_table: :per_task_runtime_optimizer_seed_heldout_score,
         within_runtime_effect: :optimizer_minus_matched_baseline,
         cross_runtime_effect: :imp_lift_minus_dspy_lift,
-        uncertainty: [:raw_seed_dispersion, :paired_row_bootstrap_where_defined],
+        paired_row_bootstrap: %{
+          eligible_metrics: :all_six_frozen_row_metrics,
+          confidence_level: 0.95,
+          resamples: 10_000,
+          rng: :exsss,
+          seed_derivation: %{
+            identity: :canonical_json_list_of_task_runtime_optimizer_seed_metric_and_comparison,
+            rng_seed:
+              :first_twelve_sha256_bytes_as_three_consecutive_unsigned_big_endian_32_bit_words
+          },
+          unit: :heldout_row_index_paired_across_every_arm_in_the_estimand,
+          sampling: :sample_n_row_indexes_with_replacement_from_the_frozen_n_rows_per_resample,
+          estimator: :arithmetic_mean_of_paired_row_score_differences,
+          interval: %{
+            method: :percentile_nearest_rank,
+            sorted_zero_based_indexes: %{lower: 249, upper: 9_749}
+          }
+        },
+        seed_uncertainty: %{
+          inferential_interval: false,
+          report: [:all_three_values, :arithmetic_mean, :median, :minimum, :maximum]
+        },
+        secondary_macro: %{
+          task_weighting: :equal_across_all_six_frozen_tasks,
+          quantities: [:within_runtime_lift, :cross_runtime_difference_in_differences],
+          reduce_order: :task_mean_per_seed_then_report_three_seed_values_and_arithmetic_mean,
+          post_outcome_task_removal: false
+        },
         operational_outcomes: [:calls, :cost, :latency, :parse_and_runtime_failures],
         heterogeneous_task_macro_average_is_secondary: true,
         private_universal_victory_threshold: false,
@@ -150,13 +177,21 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
     dev = get_in(spec, ["split_counts", "dev"])
     test = get_in(spec, ["split_counts", "test"])
     mipro_metric_calls = Map.fetch!(spec, "metric_calls")
-    gepa = GEPA.v014_budget_envelope(dev, 3, mipro_metric_calls)
+
+    gepa =
+      dev
+      |> GEPA.v014_budget_envelope(3, mipro_metric_calls)
+      |> Map.put(:semantic_metric_calls, mipro_metric_calls)
 
     program_evaluations =
       test + mipro_metric_calls + test + gepa.max_metric_calls + test
 
     task_transports = legal_task_transports(program_evaluations, shape.task_stages)
-    judge_transports = program_evaluations * shape.judge_stages
+
+    judge_transports =
+      baseline_judge_transports(family, test, shape) +
+        mipro_judge_transports(family, mipro_metric_calls + test, shape) +
+        gepa_judge_transports(family, gepa, test, shape, :legal)
 
     fresh_program_evaluations = @fresh_examples_per_selected_arm * @selected_arms
 
@@ -176,7 +211,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         arm_totals(
           test,
           legal_task_transports(test, shape.task_stages),
-          test * shape.judge_stages,
+          baseline_judge_transports(family, test, shape),
           0,
           0
         ),
@@ -187,7 +222,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
             mipro_metric_calls + test + @fresh_examples_per_selected_arm,
             shape.task_stages
           ),
-          (mipro_metric_calls + test) * shape.judge_stages,
+          mipro_judge_transports(family, mipro_metric_calls + test, shape),
           mipro_proposer_transports,
           0
         ),
@@ -198,7 +233,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
             gepa.max_metric_calls + test + @fresh_examples_per_selected_arm,
             shape.task_stages
           ),
-          (gepa.max_metric_calls + test) * shape.judge_stages,
+          gepa_judge_transports(family, gepa, test, shape, :legal),
           0,
           gepa.max_reflection_calls
         )
@@ -209,7 +244,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         arm_totals(
           test,
           test * shape.task_stages,
-          test * shape.judge_stages,
+          baseline_judge_transports(family, test, shape),
           0,
           0
         ),
@@ -217,7 +252,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         arm_totals(
           mipro_metric_calls + test,
           (mipro_metric_calls + test + @fresh_examples_per_selected_arm) * shape.task_stages,
-          (mipro_metric_calls + test) * shape.judge_stages,
+          mipro_judge_transports(family, mipro_metric_calls + test, shape),
           mipro_proposer_transports,
           0
         ),
@@ -225,7 +260,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         arm_totals(
           mipro_metric_calls + test,
           (mipro_metric_calls + test + @fresh_examples_per_selected_arm) * shape.task_stages,
-          (mipro_metric_calls + test) * shape.judge_stages,
+          gepa_judge_transports(family, gepa, test, shape, :nominal),
           0,
           gepa.max_iterations
         )
@@ -272,7 +307,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         semantic_metric_calls: mipro_metric_calls,
         legal_metric_calls: gepa.max_metric_calls,
         logical_iterations: gepa.max_iterations,
-        legal_reflection_transports: gepa.max_reflection_calls
+        legal_reflection_transports: gepa.max_reflection_calls,
+        judge_schedule: gepa_judge_schedule(family, gepa, test, shape)
       },
       mipro: %{
         auto: :heavy,
@@ -288,6 +324,50 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
   defp legal_task_transports(program_evaluations, task_stages) do
     program_evaluations * task_stages * @chat_json_fallback_transport_factor
   end
+
+  defp baseline_judge_transports(_family, program_evaluations, shape),
+    do: program_evaluations * shape.judge_stages
+
+  defp mipro_judge_transports(_family, program_evaluations, shape),
+    do: program_evaluations * shape.judge_stages
+
+  # The pinned Papillon GEPA wrapper calls the three-judge overall metric and the
+  # three-judge feedback metric for every optimizer evaluation. For a captured
+  # parent minibatch, GEPA's component feedback callback invokes that wrapper a
+  # second time. Held-out evaluation uses the ordinary three-judge metric once.
+  defp gepa_judge_transports("Papillon", gepa, test, _shape, mode) do
+    optimizer_calls =
+      if mode == :legal, do: gepa.max_metric_calls, else: gepa.semantic_metric_calls
+
+    traced_calls = min(optimizer_calls, gepa.max_iterations * 3)
+    untraced_calls = optimizer_calls - traced_calls
+    traced_calls * 12 + untraced_calls * 6 + test * 3
+  end
+
+  defp gepa_judge_transports(_family, gepa, test, shape, mode) do
+    optimizer_calls =
+      if mode == :legal, do: gepa.max_metric_calls, else: gepa.semantic_metric_calls
+
+    (optimizer_calls + test) * shape.judge_stages
+  end
+
+  defp gepa_judge_schedule("Papillon", gepa, test, _shape) do
+    legal_traced = min(gepa.max_metric_calls, gepa.max_iterations * 3)
+    nominal_traced = min(gepa.semantic_metric_calls, gepa.max_iterations * 3)
+
+    %{
+      ordinary_judges_per_evaluation: 3,
+      optimizer_untraced_judges_per_evaluation: 6,
+      optimizer_traced_judges_per_evaluation: 12,
+      nominal_traced_evaluations: nominal_traced,
+      nominal_untraced_evaluations: gepa.semantic_metric_calls - nominal_traced,
+      legal_traced_evaluations: legal_traced,
+      legal_untraced_evaluations: gepa.max_metric_calls - legal_traced,
+      heldout_evaluations: test
+    }
+  end
+
+  defp gepa_judge_schedule(_family, _gepa, _test, _shape), do: :ordinary_metric_once
 
   defp arm_totals(program_evaluations, task, judge, mipro_proposer, gepa_reflection) do
     %{

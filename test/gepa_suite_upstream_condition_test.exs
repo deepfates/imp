@@ -37,6 +37,8 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       assert receipt["heldout_decoded"] == false
       assert receipt["outer_max_concurrency"] == 8
       assert receipt["condition"]["seed"] == 2_026_080_101
+      assert receipt["data"]["split_counts"] == receipt["splits"]
+      assert map_size(receipt["data"]["split_checksums"]) == 3
 
       assert receipt["condition"]["source_commit"] ==
                String.trim(git!(root, ["rev-parse", "HEAD"]))
@@ -51,7 +53,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
              }
 
       expected_judge_treatment =
-        if family == "PAPILLONBench",
+        if family == "Papillon",
           do:
             "source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction",
           else: "not_applicable"
@@ -128,6 +130,65 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert message =~ "refusing to overwrite existing evidence"
     assert File.read!(output) == "retained\n"
     refute File.exists?(output <> ".progress.jsonl")
+  end
+
+  test "pinned DSPy progress creation is an atomic non-overwrite admission lock" do
+    root = File.cwd!()
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+    script = Path.join(root, "scripts/gepa_suite_condition_upstream.py")
+
+    probe = ~S'''
+    import argparse, importlib.util, pathlib, sys, tempfile
+    path = pathlib.Path(sys.argv[1])
+    spec = importlib.util.spec_from_file_location("condition", path)
+    condition = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(condition)
+    root = pathlib.Path(tempfile.mkdtemp())
+    output = root / "result.json"
+    progress = output.with_suffix(".json.progress.jsonl")
+    progress.write_text("retained-evidence\n")
+    args = argparse.Namespace(output=output, family="AIMEBench", arm="baseline", seed=2026080101, max_concurrency=1)
+    try:
+        condition.init_progress(args)
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("existing progress evidence was overwritten")
+    assert progress.read_text() == "retained-evidence\n"
+    '''
+
+    assert {"", 0} = System.cmd(python, ["-P", "-c", probe, script], stderr_to_stdout: true)
+  end
+
+  test "pinned DSPy selected state cannot replace an existing target" do
+    root = File.cwd!()
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+    script = Path.join(root, "scripts/gepa_suite_condition_upstream.py")
+
+    probe = ~S'''
+    import importlib.util, pathlib, sys, tempfile
+    path = pathlib.Path(sys.argv[1])
+    spec = importlib.util.spec_from_file_location("condition", path)
+    condition = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(condition)
+    root = pathlib.Path(tempfile.mkdtemp())
+    target = root / "selected.json"
+    class Program:
+        def __init__(self, value): self.value = value
+        def save(self, path, save_program=False):
+            assert save_program is False
+            pathlib.Path(path).write_text(self.value)
+    condition.save_state_exclusive(Program("first"), target)
+    try:
+        condition.save_state_exclusive(Program("second"), target)
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("existing selected state was replaced")
+    assert target.read_text() == "first"
+    '''
+
+    assert {"", 0} = System.cmd(python, ["-P", "-c", probe, script], stderr_to_stdout: true)
   end
 
   test "upstream entrance enforces the same nested content-byte envelope before transport" do

@@ -7,6 +7,10 @@ instead of implementing a weak approximation.
 """
 
 import json
+import os
+import contextlib
+import io
+from pathlib import Path
 import re
 import sys
 import traceback
@@ -190,7 +194,30 @@ def main():
         payload = json.load(sys.stdin)
     task = payload.get("task")
 
-    if task != "amps_hard":
+    if task == "livebench_math_feedback":
+        source_root = os.environ.get("IMP_LIVEBENCH_MATH_SOURCE_ROOT")
+        if not source_root:
+            raise RuntimeError("livebench_math_feedback requires IMP_LIVEBENCH_MATH_SOURCE_ROOT")
+        source_root = str(Path(source_root).resolve())
+        if source_root not in sys.path:
+            sys.path.insert(0, source_root)
+        from gepa_artifact.benchmarks.livebench_math.livebenchmath_utils.metric import (
+            calculate_livebench_score,
+        )
+
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+            warnings.catch_warnings(),
+        ):
+            warnings.simplefilter("ignore")
+            score, feedback = calculate_livebench_score(
+                payload["question_d"], str(payload.get("answer", "")), debug=True
+            )
+        print(json.dumps({"score": score, "feedback": feedback}))
+        return
+
+    if task not in {"amps_hard", "amps_hard_feedback"}:
         raise RuntimeError(f"unsupported bridge task: {task}")
 
     score, parsed_answer = amps_hard_process_results(
@@ -198,7 +225,12 @@ def main():
         str(payload.get("answer", "")),
     )
 
-    json.dump({"score": score, "parsed_answer": parsed_answer}, sys.stdout)
+    result = {"score": score, "parsed_answer": parsed_answer}
+    if task == "amps_hard_feedback":
+        result["feedback"] = (
+            f"The symbolic scorer parsed {parsed_answer!r}; the answer scored {float(score)}."
+        )
+    json.dump(result, sys.stdout)
     sys.stdout.write("\n")
 
 

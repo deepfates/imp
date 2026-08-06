@@ -40,6 +40,8 @@ defmodule Imp.GepaSuiteConditionCLITest do
       assert receipt["outer_max_concurrency"] == 8
       assert receipt["request_timeout_ms"] == 120_000
       assert receipt["condition"]["seed"] == 2_026_080_101
+      assert receipt["data"]["split_counts"] == receipt["split_counts"]
+      assert map_size(receipt["data"]["split_checksums"]) == 3
 
       assert receipt["condition"]["source_commit"] ==
                String.trim(git!(root, ["rev-parse", "HEAD"]))
@@ -54,7 +56,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
              }
 
       expected_judge_treatment =
-        if family == "PAPILLONBench",
+        if family == "Papillon",
           do:
             "source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction",
           else: "not_applicable"
@@ -130,6 +132,9 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert output == ""
     receipt = fresh_path |> File.read!() |> Jason.decode!()
     assert receipt["status"] == "fresh_ok"
+    assert receipt["loaded_artifact_sha256"] == sha256(artifact_path)
+    assert receipt["condition"]["family"] == "AIMEBench"
+    assert receipt["data"]["split_counts"] == %{"dev" => 45, "test" => 150, "train" => 45}
     assert receipt["usage_cost_basis"] == "frozen_catalog_calculated"
     assert length(receipt["calls"]) == 4
     assert Enum.all?(receipt["calls"], &(&1["status"] == "ok"))
@@ -160,6 +165,46 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert Jason.decode!(header)["event"] == "start"
     assert is_integer(receipt["wall_time_us"])
     assert receipt["wall_time_us"] >= 0
+  end
+
+  test "selected Artifact cannot replace an existing target" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition.exs")
+
+    script
+    |> File.read!()
+    |> String.replace_suffix("Imp.GepaSuiteConditionCLI.main(System.argv())\n", "")
+    |> Code.compile_string(script)
+
+    output_root =
+      Path.join(System.tmp_dir!(), "imp-gepa-artifact-lock-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(output_root)
+    target = Path.join(output_root, "selected.artifact.json")
+    on_exit(fn -> File.rm_rf!(output_root) end)
+
+    first =
+      "first"
+      |> Imp.Optimizer.Artifact.value_candidate(%{"value" => 1})
+      |> Imp.Optimizer.Artifact.new()
+
+    second =
+      "second"
+      |> Imp.Optimizer.Artifact.value_candidate(%{"value" => 2})
+      |> Imp.Optimizer.Artifact.new()
+
+    apply(Imp.GepaSuiteConditionCLI, :write_artifact_exclusive!, [first, target])
+    retained_sha = sha256(target)
+
+    assert_raise ArgumentError, ~r/refusing to overwrite existing evidence/, fn ->
+      apply(Imp.GepaSuiteConditionCLI, :write_artifact_exclusive!, [second, target])
+    end
+
+    assert sha256(target) == retained_sha
+
+    assert target |> Imp.Optimizer.Artifact.read!() |> Imp.Optimizer.Artifact.value() == %{
+             "value" => 1
+           }
   end
 
   test "live entrance refuses an over-cap condition before transport" do
@@ -308,6 +353,8 @@ defmodule Imp.GepaSuiteConditionCLITest do
         output_path,
         "--livebench-math-python",
         "/usr/bin/false",
+        "--livebench-math-source-root",
+        Path.join(root, "tmp/gepa-artifact"),
         "--input-price-per-million",
         "0.14",
         "--output-price-per-million",

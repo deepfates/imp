@@ -40,37 +40,37 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
     assert plan.per_runtime_seed == %{
              program_evaluations: 52_614,
              task_transports: 326_256,
-             judge_transports: 16_890,
+             judge_transports: 38_409,
              mipro_proposer_transports: 439,
              gepa_reflection_transports: 14_966,
-             total_transports: 358_551
+             total_transports: 380_070
            }
 
     assert plan.full_study == %{
              program_evaluations: 315_684,
              task_transports: 1_957_536,
-             judge_transports: 101_340,
+             judge_transports: 230_454,
              mipro_proposer_transports: 2_634,
              gepa_reflection_transports: 89_796,
-             total_transports: 2_151_306
+             total_transports: 2_280_420
            }
 
     assert plan.nominal_per_runtime_seed == %{
              program_evaluations: 51_411,
              task_transports: 159_561,
-             judge_transports: 16_545,
+             judge_transports: 37_719,
              mipro_proposer_transports: 439,
              gepa_reflection_transports: 7_483,
-             total_transports: 184_028
+             total_transports: 205_202
            }
 
     assert plan.nominal_study == %{
              program_evaluations: 308_466,
              task_transports: 957_366,
-             judge_transports: 99_270,
+             judge_transports: 226_314,
              mipro_proposer_transports: 2_634,
              gepa_reflection_transports: 44_898,
-             total_transports: 1_104_168
+             total_transports: 1_231_212
            }
 
     assert plan.per_runtime_seed_by_arm.baseline == %{
@@ -106,7 +106,20 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
     assert Enum.map(plan.families, & &1.family) ==
              ~w(AIMEBench HotpotQABench hoverBench IFBench LiveBenchMathBench Papillon)
 
-    assert Enum.find(plan.families, &(&1.family == "Papillon")).transports.judge == 16_890
+    papillon = Enum.find(plan.families, &(&1.family == "Papillon"))
+    assert papillon.transports.judge == 38_409
+
+    assert papillon.gepa.judge_schedule == %{
+             ordinary_judges_per_evaluation: 3,
+             optimizer_untraced_judges_per_evaluation: 6,
+             optimizer_traced_judges_per_evaluation: 12,
+             nominal_traced_evaluations: 2_316,
+             nominal_untraced_evaluations: 110,
+             legal_traced_evaluations: 2_316,
+             legal_untraced_evaluations: 225,
+             heldout_evaluations: 221
+           }
+
     assert plan.boundaries.provider_calls_authorized == false
     assert plan.boundaries.preserves_full_six_family_endpoint
     assert plan.boundaries.baseline_sweep_is_not_a_success_gate
@@ -123,6 +136,13 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
 
     assert plan.analysis_contract.within_runtime_effect == :optimizer_minus_matched_baseline
     assert plan.analysis_contract.cross_runtime_effect == :imp_lift_minus_dspy_lift
+    assert plan.analysis_contract.paired_row_bootstrap.resamples == 10_000
+    assert plan.analysis_contract.paired_row_bootstrap.confidence_level == 0.95
+    refute plan.analysis_contract.seed_uncertainty.inferential_interval
+
+    assert plan.analysis_contract.secondary_macro.task_weighting ==
+             :equal_across_all_six_frozen_tasks
+
     refute plan.analysis_contract.private_universal_victory_threshold
     refute plan.analysis_contract.task_removal_after_outcomes
     refute plan.analysis_contract.continuation_based_on_interim_scores

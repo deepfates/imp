@@ -59,6 +59,7 @@ RUNTIME_LOCK = threading.Lock()
 PROGRESS_PATH: Path | None = None
 ACTIVE_ARGS: argparse.Namespace | None = None
 ACTIVE_STAGE = "preflight"
+ACTIVE_PREFLIGHT: dict[str, Any] | None = None
 RUN_STARTED_NS: int | None = None
 SPEND_GUARD = None
 
@@ -475,9 +476,22 @@ def init_progress(args: argparse.Namespace) -> Path:
         "seed": args.seed,
         "max_concurrency": args.max_concurrency,
     }
-    PROGRESS_PATH.write_text(json.dumps(header, sort_keys=True) + "\n")
+    with PROGRESS_PATH.open("x") as handle:
+        handle.write(json.dumps(header, sort_keys=True) + "\n")
     PROGRESS_PATH.chmod(0o600)
     return PROGRESS_PATH
+
+
+def save_state_exclusive(program: Any, state_path: Path) -> None:
+    temporary_state = state_path.with_name(
+        state_path.name + f".tmp-{os.getpid()}-{time.monotonic_ns()}"
+    )
+    try:
+        program.save(temporary_state, save_program=False)
+        temporary_state.chmod(0o600)
+        os.link(temporary_state, state_path)
+    finally:
+        temporary_state.unlink(missing_ok=True)
 
 
 def runtime_usage() -> dict[str, Any]:
@@ -790,7 +804,7 @@ def condition_receipt(args: argparse.Namespace, imp_identity: dict[str, Any]) ->
         "papillon_judge_treatment":
             (
                 "source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction"
-                if args.family == "PAPILLONBench"
+                if args.family == "Papillon"
                 else "not_applicable"
             ),
         "roles": {
@@ -809,8 +823,16 @@ def condition_receipt(args: argparse.Namespace, imp_identity: dict[str, Any]) ->
     }
 
 
+def data_receipt(spec: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source": spec.get("source") or spec.get("dataset_source") or spec.get("source_commit"),
+        "split_counts": spec["split_counts"],
+        "split_checksums": spec.get("split_checksums") or spec.get("checksums"),
+    }
+
+
 def main() -> None:
-    global ACTIVE_ARGS, ACTIVE_STAGE, RUN_STARTED_NS, SPEND_GUARD
+    global ACTIVE_ARGS, ACTIVE_STAGE, ACTIVE_PREFLIGHT, RUN_STARTED_NS, SPEND_GUARD
     args = parse_args()
     imp_identity = tree_identity(Path(__file__).resolve().parent.parent)
     if args.max_concurrency <= 0:
@@ -872,7 +894,9 @@ def main() -> None:
             "gepa_v0_1_4_merge": {"max_concurrency": args.max_concurrency},
         },
         "condition": condition_receipt(args, imp_identity),
+        "data": data_receipt(spec),
     }
+    ACTIVE_PREFLIGHT = preflight
     if not args.run and not args.fresh:
         print(json.dumps(preflight, sort_keys=True))
         return
@@ -892,6 +916,7 @@ def main() -> None:
         if args.state is None:
             raise RuntimeError("fresh mode requires --state")
         ACTIVE_STAGE = "fresh_load_and_service"
+        loaded_state_sha256 = sha256(args.state)
         program.load(args.state)
         test = load_rows(dspy, test_path, spec["input_keys"])
         calls = []
@@ -909,6 +934,7 @@ def main() -> None:
             "spend_admission": {**admission, "final": SPEND_GUARD.snapshot()},
             "progress_sha256": sha256(progress_path),
             "wall_time_us": (time.monotonic_ns() - started) // 1_000,
+            "loaded_state_sha256": loaded_state_sha256,
         }
         if args.output:
             write_private_json(args.output, payload)
@@ -943,8 +969,7 @@ def main() -> None:
     fresh_usage = {}
     if arm_requires_fresh_state(args.arm):
         ACTIVE_STAGE = "persist_and_fresh_service"
-        selected.save(state_path, save_program=False)
-        state_path.chmod(0o600)
+        save_state_exclusive(selected, state_path)
 
         child_args = [
             sys.executable, "-P", str(Path(__file__).resolve()), "--fresh", "--run",
@@ -982,7 +1007,15 @@ def main() -> None:
         subprocess.run(child_args, check=True)
         state_sha = sha256(state_path)
         fresh_sha = sha256(fresh_path)
-        fresh_usage = json.loads(fresh_path.read_text())["usage"]
+        fresh_receipt = json.loads(fresh_path.read_text())
+        if not (
+            fresh_receipt.get("status") == "fresh_ok"
+            and fresh_receipt.get("loaded_state_sha256") == state_sha
+            and fresh_receipt.get("condition") == preflight["condition"]
+            and fresh_receipt.get("data") == preflight["data"]
+        ):
+            raise RuntimeError("fresh DSPy receipt does not bind the selected state and condition")
+        fresh_usage = fresh_receipt["usage"]
 
     payload = {
         **preflight,
@@ -1006,6 +1039,7 @@ def retain_terminal_failure(error: BaseException) -> None:
         return
     elapsed = 0 if RUN_STARTED_NS is None else (time.monotonic_ns() - RUN_STARTED_NS) // 1_000
     payload = {
+        **(ACTIVE_PREFLIGHT or {}),
         "status": "failed",
         "family": args.family,
         "arm": args.arm,
@@ -1017,6 +1051,9 @@ def retain_terminal_failure(error: BaseException) -> None:
         "progress_sha256":
             sha256(PROGRESS_PATH) if PROGRESS_PATH is not None and PROGRESS_PATH.exists() else None,
         "wall_time_us": elapsed,
+        "spend_admission": (
+            {"final": SPEND_GUARD.snapshot()} if SPEND_GUARD is not None else None
+        ),
     }
     write_private_json(args.output, payload)
 

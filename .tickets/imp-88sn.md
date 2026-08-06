@@ -44,26 +44,40 @@ by changing tasks or thresholds after seeing outcomes.
 
 ## Current status
 
-### Pre-run integrity freeze (`95624acc`, 2026-08-05)
+### Pre-run integrity freeze (`95624acc` plus post-review repair, 2026-08-05)
 
 The next matched optimizer tranche is now mechanically bound to seeds
 `2026080101/02/03`; each ordinary Imp and pinned-DSPy result records the full
 family/arm/seed, model-role/provider, input/output envelope, price, concurrency,
 timeout, cache/retry/fallback, route/privacy, and source-identity receipt. Both
-entrances refuse existing Result/progress/Artifact/fresh-service targets before
-transport. Imp evidence now separates task, reflection, and judge attempts,
+entrances use non-overwriting Result/progress/Artifact/state/fresh-service
+targets. Fresh receipts bind the exact loaded digest, condition, and split
+receipt, and terminal failures retain those identities plus final spend state.
+Imp evidence now separates task, reflection, and judge attempts,
 tokens, latency, cost, and failures instead of leaving proposer traffic folded
 into one total.
 
 The analysis is frozen before optimizer outcomes: report every task/runtime/
 optimizer/seed held-out score; compute optimizer-minus-matched-baseline within
 each runtime and Imp-lift-minus-DSPy-lift across runtimes; show raw seed
-dispersion and paired-row bootstrap uncertainty where the metric permits it;
-and report calls, cost, latency, and failures. A heterogeneous-task macro
-average is secondary. No task may be removed, no private universal victory
+dispersion and a deterministic 10,000-resample 95% paired-row percentile
+bootstrap for every frozen row metric; and report calls, cost, latency, and
+failures. The three seed values are shown raw with mean/median/range and no
+inferential seed interval. The secondary macro is an equal-weight mean across
+all six tasks. No task may be removed, no private universal victory
 threshold may be introduced, and no continuation decision may use interim
 scores. PAPILLON is explicitly an adapted current-model use of the source
 scoring procedure, not reproduction of its historical GPT-4.1 Mini judge.
+
+The cold science review also repaired treatment mismatches before spend. AIME,
+LiveBench Math, and PAPILLON now give Imp GEPA the source feedback available to
+pinned DSPy. Trace-aware metrics receive `nil` on full evaluation and the trace
+only on reflective evaluation, preserving PAPILLON's continuous full score and
+Boolean traced score. Component callbacks run only while building the parent
+reflective dataset, not eagerly for child candidates. PAPILLON's legal judge
+ceiling is phase-specific—three calls on heldout rows, six on ordinary GEPA
+optimizer rows, and twelve on reflected parent rows—and source edge vectors
+cover AIME integer parsing, AMPS feedback, and unclamped PAPILLON leakage counts.
 
 This checkpoint authorizes no provider call and earns no effectiveness result.
 It exists only to ensure that the next paid swing answers the declared question
@@ -83,7 +97,7 @@ normalize that spelling without changing decoded inputs or immutable Results.
 
 The exact current three-seed/two-runtime plan has two deliberately different
 accounting views. Its no-failure/no-JSON-fallback nominal schedule is
-`1,104,168` transports. Its `2,151,306` legal ceiling additionally allows one
+`1,231,212` transports. Its `2,280,420` legal ceiling additionally allows one
 ordinary task-adapter fallback, GEPA budget-boundary overshoot, and the pinned
 batch-to-single reflection failure path. The latter is a safety envelope, not
 the planned experimental opportunity, an expected cost, or evidence that the
@@ -547,18 +561,24 @@ same `$0.14/M` / `$0.28/M` maxima. This proves route/parameter admission, not
 task quality or sustained capacity; the full matched pair remains the next
 meaningful measurement.
 
-The scale is material. With baseline, MIPROv2-Heavy, and no-merge GEPA; the
+The scale is material. With baseline, MIPROv2-Heavy, and merge-enabled pinned
+GEPA; the
 official metric-call opportunities; legal GEPA iteration completion; and one
 held-out evaluation per arm, one runtime/seed permits at most `52,614` program
 evaluations. The official graphs plus four fresh calls for each selected arm
-expand that into `326,256` legal task-model transports and `16,890` PAPILLON judge
+expand that into `326,256` legal task-model transports and `38,409` PAPILLON judge
 transports. Pinned Heavy MIPRO program-aware grounding permits another `439`
 proposal transports, while GEPA's boundary-checked batch-to-single failure
 policy permits `14,966` reflection transports. Three fixed seeds across Imp and
-DSPy therefore permit exactly `2,151,306` total transports: `1,957,536` task,
-`101,340` judge, `2,634` MIPRO proposal, and `89,796` GEPA reflection. The
+DSPy therefore permit exactly `2,280,420` total transports: `1,957,536` task,
+`230,454` judge, `2,634` MIPRO proposal, and `89,796` GEPA reflection. The
 provider-free `GepaStudyPlan` recomputes this from the source receipts and
-optimizer budget functions. The task maximum includes the initial Chat call
+optimizer budget functions. PAPILLON is phase-specific: its ordinary held-out
+metric uses three judge calls; each GEPA optimizer row runs both the overall and
+feedback metrics for six calls; and each parent row entering reflection runs
+that six-call wrapper once more. Its legal ceiling is therefore
+`6 * legal optimizer rows + 18 * logical iterations + 3 * held-out rows`, not
+three judges per program evaluation. The task maximum includes the initial Chat call
 plus at most one ordinary JSON-adapter fallback per task stage; fallback counts
 must be reported separately because they are treatment behavior, not retries.
 The corrected all-six matched baseline seed permits `17,034` total transports
@@ -571,6 +591,30 @@ format behavior, reflection quality, and a potentially order-of-magnitude cost
 difference at this scale. Exact dated model aliases, providers, request
 envelopes, a usage pilot if needed, and a prospective condition spend cap must
 be ratified before any table call.
+
+The post-baseline cold review found and repaired material pre-run defects rather
+than presentation issues. GEPA now accepts an arity-three metric and passes
+`nil` for ordinary/full evaluation versus the captured trace for reflective
+evaluation, reproducing PAPILLON's pinned continuous-versus-Boolean score
+boundary. AIME, LiveBench Math, and PAPILLON now supply the source feedback GEPA
+actually sees; component callbacks execute only when the parent reflective
+dataset is built, not eagerly on child candidate evaluations. AIME reproduces
+Python integer parsing for the exercised whitespace/underscore domain;
+LiveBench preserves the pinned AMPS parsed-answer feedback; PAPILLON does not
+silently clamp judge leakage counts.
+
+Run evidence is non-overwriting at the progress, Result, parameter Artifact,
+and pinned-DSPy state boundaries. Fresh receipts bind the exact loaded digest,
+condition, and split receipt; parents validate those identities before accepting
+fresh service. Failure receipts retain the same condition/data identity and the
+final spend snapshot, and the Imp fresh process compiles authenticated source
+rather than trusting an ignored stale BEAM. Analysis is fixed before outcomes:
+the primary table is every task/runtime/optimizer/seed held-out score;
+within-runtime lift and Imp-minus-DSPy difference-in-differences use matched
+baselines; all six row metrics use a deterministic 10,000-resample 95% paired-row
+percentile bootstrap; the three seed values are shown raw with mean/median/range
+and no inferential seed interval; and the secondary macro is an equal-weight
+six-task mean with no post-outcome task removal.
 
 This ticket remains open. Its non-prompt half passed: the structured retry-policy
 condition selected proposer-generated values in two of three seeds, improved the

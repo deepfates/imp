@@ -45,11 +45,24 @@ defmodule Imp.Optimizer.GEPAMetricContractTest do
     assert GEPA.Candidate.from_program(compiled) == GEPA.Candidate.from_program(program)
   end
 
-  test "constructor rejects a trace-aware metric outside the documented public contract" do
-    trace_aware = fn _example, _prediction, _trace -> 1.0 end
+  test "public arity-three metric receives nil for full evaluation" do
+    owner = self()
 
-    assert_raise ArgumentError, ~r/expects a metric function with arity 2/, fn ->
-      GEPA.new(trace_aware)
+    metric = fn _example, _prediction, trace ->
+      send(owner, {:metric_trace, trace})
+      1.0
     end
+
+    lm = Imp.LM.Static.new(answer: "42")
+    program = Imp.predict("question -> answer", lm: lm)
+
+    example =
+      Imp.Example.new(%{question: "six times seven", answer: "42"})
+      |> Imp.Example.with_inputs([:question])
+
+    GEPA.new(metric, generations: 0)
+    |> GEPA.compile_with_report(program, [example], [example])
+
+    assert_receive {:metric_trace, nil}
   end
 end
