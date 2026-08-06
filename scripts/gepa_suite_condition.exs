@@ -72,15 +72,19 @@ defmodule Imp.GepaSuiteSpendGuard do
 
   def generate(%__MODULE__{} = lm, messages, opts) do
     with {:ok, reservation_id} <- reserve(lm) do
+      started = System.monotonic_time()
+
       case generate_inner(lm.inner, messages, opts) do
         {:ok, value} = success ->
           case response_cost(value, lm) do
-            {:ok, cost} ->
-              settle(lm.guard, reservation_id, cost)
+            {:ok, usage} ->
+              settle(lm.guard, reservation_id, usage.cost_usd)
+              emit_role_event(:stop, lm.role, started, usage)
               success
 
             {:error, reason} ->
               retain(lm.guard, reservation_id)
+              emit_role_event(:exception, lm.role, started, %{error: reason})
 
               {:error,
                %Imp.OperationalSafetyError{
@@ -92,6 +96,7 @@ defmodule Imp.GepaSuiteSpendGuard do
 
         {:error, _reason} = error ->
           retain(lm.guard, reservation_id)
+          emit_role_event(:exception, lm.role, started, %{error: elem(error, 1)})
           error
       end
     end
@@ -102,6 +107,14 @@ defmodule Imp.GepaSuiteSpendGuard do
 
   defp generate_inner(%module{} = inner, messages, opts) do
     apply(module, :generate, [inner, messages, opts])
+  end
+
+  defp emit_role_event(status, role, started, metadata) do
+    :telemetry.execute(
+      [:imp, :gepa_suite, :role, status],
+      %{duration: System.monotonic_time() - started},
+      Map.put(metadata, :role, role)
+    )
   end
 
   defp reserve(lm) do
@@ -183,7 +196,13 @@ defmodule Imp.GepaSuiteSpendGuard do
 
       if is_nil(reported) or (is_number(reported) and reported >= 0) do
         calculated = (input * lm.input_price + output * lm.output_price) / 1_000_000
-        {:ok, max((reported || 0) * 1.0, calculated)}
+
+        {:ok,
+         %{
+           input_tokens: input,
+           output_tokens: output,
+           cost_usd: max((reported || 0) * 1.0, calculated)
+         }}
       else
         {:error, {:invalid_provider_cost, reported}}
       end
@@ -201,6 +220,7 @@ defmodule Imp.GepaSuiteConditionCLI do
 
   @arms ~w(baseline mipro_v2_heavy gepa_v0_1_4_merge)
   @request_timeout_ms 120_000
+  @study_seeds [2_026_080_101, 2_026_080_102, 2_026_080_103]
 
   def main(argv) do
     {opts, positional, invalid} =
@@ -428,12 +448,26 @@ defmodule Imp.GepaSuiteConditionCLI do
       treatments: treatments,
       retrieval: retrieval_disclosure(config, prepared.loaded.spec),
       metric_runtime: metric_runtime(config),
+      condition: condition_receipt(config),
       provider_calls_authorized: false
     })
   end
 
   defp run!(config, prepared) do
     for key <- [:output], do: required_config!(config, key)
+
+    if config.arm != :baseline do
+      for key <- [:artifact, :fresh_output], do: required_config!(config, key)
+    end
+
+    ensure_new_targets!(
+      [config.output, progress_path(config)] ++
+        if(config.arm == :baseline,
+          do: [],
+          else: [config.artifact, config.fresh_output, config.fresh_output <> ".progress.jsonl"]
+        )
+    )
+
     admission = spend_admission(config)
     progress = init_progress!(config)
 
@@ -486,12 +520,14 @@ defmodule Imp.GepaSuiteConditionCLI do
       fresh_spend_admission: fresh_spend,
       heldout_decoded: true,
       metric_runtime: metric_runtime(config),
-      retrieval: retrieval_disclosure(config, prepared.loaded.spec)
+      retrieval: retrieval_disclosure(config, prepared.loaded.spec),
+      condition: condition_receipt(config)
     })
   end
 
   defp fresh!(config, prepared) do
     for key <- [:artifact, :fresh_output], do: required_config!(config, key)
+    ensure_new_targets!([config.fresh_output, progress_path(config)])
     progress = init_progress!(config)
 
     for file <- ~w(support_pipeline.ex callbacks.ex workflow.ex program_server.ex) do
@@ -554,7 +590,8 @@ defmodule Imp.GepaSuiteConditionCLI do
         spend_admission(config)
         |> Map.put("final", spend_snapshot(config)),
       progress_sha256: sha256(progress),
-      wall_time_us: wall_time_us
+      wall_time_us: wall_time_us,
+      condition: condition_receipt(config)
     })
   end
 
@@ -789,6 +826,67 @@ defmodule Imp.GepaSuiteConditionCLI do
     }
   end
 
+  defp condition_receipt(config) do
+    %{
+      study: "matched-current-model-gepa-suite-v1",
+      protocol: :adapted_current_model_reference_differential,
+      source_commit: git_output(["rev-parse", "HEAD"]),
+      source_tracked_clean:
+        git_status(["diff", "--quiet"]) == 0 and git_status(["diff", "--cached", "--quiet"]) == 0,
+      family: config.family,
+      arm: config.arm,
+      seed: config.seed,
+      temperature: 1.0,
+      max_concurrency: config.max_concurrency,
+      request_timeout_ms: @request_timeout_ms,
+      cache: false,
+      retries: 0,
+      fallback: false,
+      route: %{
+        api_base: "https://openrouter.ai/api/v1",
+        require_parameters: true,
+        data_collection: :deny,
+        zdr: true,
+        response_cache: false,
+        usage_required: true
+      },
+      papillon_judge_treatment:
+        if(config.family == "PAPILLONBench",
+          do:
+            :source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction,
+          else: :not_applicable
+        ),
+      roles:
+        Map.new([:task, :reflection, :judge], fn role ->
+          {role,
+           %{
+             model: Map.get(config, String.to_existing_atom("#{role}_model")),
+             provider: Map.get(config, String.to_existing_atom("#{role}_provider")),
+             max_input_content_bytes:
+               Map.get(config, String.to_existing_atom("#{role}_max_input_bytes")),
+             max_output_tokens:
+               Map.get(config, String.to_existing_atom("#{role}_max_output_tokens"))
+           }}
+        end),
+      prices_per_million: %{
+        input: config.input_price_per_million,
+        output: config.output_price_per_million
+      }
+    }
+  end
+
+  defp git_output(args) do
+    case System.cmd("git", args, stderr_to_stdout: true) do
+      {output, 0} -> String.trim(output)
+      {_output, _status} -> nil
+    end
+  end
+
+  defp git_status(args) do
+    {_output, status} = System.cmd("git", args, stderr_to_stdout: true)
+    status
+  end
+
   defp spend_snapshot(%{spend_guard: nil}), do: nil
 
   defp spend_snapshot(config) do
@@ -844,7 +942,9 @@ defmodule Imp.GepaSuiteConditionCLI do
           [:req_llm, :request, :start],
           [:req_llm, :request, :stop],
           [:req_llm, :request, :exception],
-          [:imp, :adapter, :parse, :json_fallback]
+          [:imp, :adapter, :parse, :json_fallback],
+          [:imp, :gepa_suite, :role, :stop],
+          [:imp, :gepa_suite, :role, :exception]
         ],
         &__MODULE__.handle_runtime_event/4,
         usage
@@ -974,7 +1074,63 @@ defmodule Imp.GepaSuiteConditionCLI do
     record_runtime_event(usage, event_record, %{"json_fallbacks" => count})
   end
 
-  defp empty_runtime, do: %{"summary" => empty_usage(), "events" => []}
+  def handle_runtime_event(
+        [:imp, :gepa_suite, :role, status],
+        measurements,
+        metadata,
+        usage
+      )
+      when status in [:stop, :exception] do
+    role = Map.fetch!(metadata, :role)
+    successful? = status == :stop
+
+    delta = %{
+      "request_attempts" => 1,
+      "usage_events" => if(successful?, do: 1, else: 0),
+      "error_count" => if(successful?, do: 0, else: 1),
+      "request_duration_us" =>
+        measurements
+        |> Map.get(:duration, 0)
+        |> System.convert_time_unit(:native, :microsecond),
+      "input_tokens" => if(successful?, do: Map.get(metadata, :input_tokens, 0), else: 0),
+      "output_tokens" => if(successful?, do: Map.get(metadata, :output_tokens, 0), else: 0),
+      "cost_usd" => if(successful?, do: Map.get(metadata, :cost_usd, 0.0), else: 0.0)
+    }
+
+    event_record = %{
+      "sequence" => nil,
+      "event" => "role_transport",
+      "role" => Atom.to_string(role),
+      "status" => if(successful?, do: "ok", else: "error"),
+      "duration_us" => delta["request_duration_us"],
+      "input_tokens" => delta["input_tokens"],
+      "output_tokens" => delta["output_tokens"],
+      "cost_usd" => delta["cost_usd"],
+      "error" => if(successful?, do: nil, else: redacted_error(Map.get(metadata, :error)))
+    }
+
+    Agent.update(usage, fn state ->
+      sequence = state["next_sequence"]
+      event_record = Map.put(event_record, "sequence", sequence)
+      append_progress!(state["progress_path"], event_record)
+
+      state
+      |> put_in(
+        ["by_role", Atom.to_string(role)],
+        add_usage(get_in(state, ["by_role", Atom.to_string(role)]), delta)
+      )
+      |> Map.put("events", [event_record | state["events"]])
+      |> Map.put("next_sequence", sequence + 1)
+    end)
+  end
+
+  defp empty_runtime do
+    %{
+      "summary" => empty_usage(),
+      "by_role" => Map.new(~w(task reflection judge), &{&1, empty_role_usage()}),
+      "events" => []
+    }
+  end
 
   defp finalize_runtime(runtime) do
     events =
@@ -994,6 +1150,18 @@ defmodule Imp.GepaSuiteConditionCLI do
       "request_attempts" => 0,
       "request_starts" => 0,
       "json_fallbacks" => 0,
+      "request_duration_us" => 0,
+      "input_tokens" => 0,
+      "output_tokens" => 0,
+      "cost_usd" => 0.0
+    }
+  end
+
+  defp empty_role_usage do
+    %{
+      "usage_events" => 0,
+      "request_attempts" => 0,
+      "error_count" => 0,
       "request_duration_us" => 0,
       "input_tokens" => 0,
       "output_tokens" => 0,
@@ -1029,6 +1197,14 @@ defmodule Imp.GepaSuiteConditionCLI do
 
     %{
       "summary" => add_usage(Map.get(left, "summary", %{}), Map.get(right, "summary", %{})),
+      "by_role" =>
+        Map.new(~w(task reflection judge), fn role ->
+          {role,
+           add_usage(
+             get_in(left, ["by_role", role]) || empty_role_usage(),
+             get_in(right, ["by_role", role]) || empty_role_usage()
+           )}
+        end),
       "events" => events
     }
   end
@@ -1117,6 +1293,11 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp validate_live!(config) do
     required_positive!(config, :max_concurrency)
 
+    unless config.seed in @study_seeds do
+      raise ArgumentError,
+            "seed must be one of the frozen study seeds: #{inspect(@study_seeds)}"
+    end
+
     if config.provider_disabled_fixture? and not config.fresh? do
       raise ArgumentError, "--provider-disabled-fixture is restricted to fresh lifecycle tests"
     end
@@ -1179,8 +1360,21 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp write_private!(path, payload) do
     File.mkdir_p!(Path.dirname(path))
     File.chmod!(Path.dirname(path), 0o700)
-    File.write!(path, Jason.encode!(json_safe(payload), pretty: true) <> "\n")
+
+    File.open!(path, [:write, :exclusive], fn file ->
+      IO.binwrite(file, Jason.encode!(json_safe(payload), pretty: true) <> "\n")
+    end)
+
     File.chmod!(path, 0o600)
+  end
+
+  defp ensure_new_targets!(paths) do
+    paths
+    |> Enum.reject(&is_nil/1)
+    |> Enum.each(fn path ->
+      if File.exists?(path),
+        do: raise(ArgumentError, "refusing to overwrite existing evidence: #{path}")
+    end)
   end
 
   defp init_progress!(config) do
@@ -1196,7 +1390,10 @@ defmodule Imp.GepaSuiteConditionCLI do
       "max_concurrency" => config.max_concurrency
     }
 
-    File.write!(progress_path, Jason.encode!(json_safe(header)) <> "\n")
+    File.open!(progress_path, [:write, :exclusive], fn file ->
+      IO.binwrite(file, Jason.encode!(json_safe(header)) <> "\n")
+    end)
+
     File.chmod!(progress_path, 0o600)
     progress_path
   end

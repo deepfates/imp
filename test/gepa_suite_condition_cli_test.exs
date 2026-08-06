@@ -39,6 +39,27 @@ defmodule Imp.GepaSuiteConditionCLITest do
       assert receipt["provider_calls_authorized"] == false
       assert receipt["outer_max_concurrency"] == 8
       assert receipt["request_timeout_ms"] == 120_000
+      assert receipt["condition"]["seed"] == 2_026_080_101
+
+      assert receipt["condition"]["source_commit"] ==
+               String.trim(git!(root, ["rev-parse", "HEAD"]))
+
+      assert receipt["condition"]["route"] == %{
+               "api_base" => "https://openrouter.ai/api/v1",
+               "data_collection" => "deny",
+               "require_parameters" => true,
+               "response_cache" => false,
+               "usage_required" => true,
+               "zdr" => true
+             }
+
+      expected_judge_treatment =
+        if family == "PAPILLONBench",
+          do:
+            "source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction",
+          else: "not_applicable"
+
+      assert receipt["condition"]["papillon_judge_treatment"] == expected_judge_treatment
 
       assert receipt["req_llm_pool"] == %{
                "protocols" => ["http1"],
@@ -114,6 +135,11 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert Enum.all?(receipt["calls"], &(&1["status"] == "ok"))
 
     assert receipt["usage"] == %{
+             "by_role" => %{
+               "judge" => empty_role_usage(),
+               "reflection" => empty_role_usage(),
+               "task" => empty_role_usage()
+             },
              "events" => [],
              "summary" => %{
                "cost_usd" => 0.0,
@@ -193,6 +219,65 @@ defmodule Imp.GepaSuiteConditionCLITest do
     receipt = output_root |> Path.join("result.json") |> File.read!() |> Jason.decode!()
     assert receipt["status"] == "failed"
     assert receipt["usage"]["summary"]["request_starts"] == 0
+  end
+
+  test "ordinary live entrance refuses to overwrite retained evidence before transport" do
+    root = File.cwd!()
+
+    output_root =
+      Path.join(System.tmp_dir!(), "imp-gepa-overwrite-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(output_root)
+    output = Path.join(output_root, "result.json")
+    File.write!(output, "retained\n")
+    on_exit(fn -> File.rm_rf!(output_root) end)
+
+    args =
+      [
+        "run",
+        "--no-start",
+        Path.join(root, "scripts/gepa_suite_condition.exs"),
+        "--run",
+        "--dataset-root",
+        Path.join(root, "tmp/gepa-six-task-current-root"),
+        "--family",
+        "AIMEBench",
+        "--arm",
+        "baseline",
+        "--output",
+        output,
+        "--input-price-per-million",
+        "0.14",
+        "--output-price-per-million",
+        "0.28",
+        "--initial-cost-usd",
+        "0.0",
+        "--max-cost-usd",
+        "1.0"
+      ] ++
+        Enum.flat_map(["task", "reflection", "judge"], fn role ->
+          [
+            "--#{role}-model",
+            "provider-disabled/model",
+            "--#{role}-provider",
+            "provider/endpoint",
+            "--#{role}-max-input-bytes",
+            "65536",
+            "--#{role}-max-output-tokens",
+            "4096"
+          ]
+        end)
+
+    {message, status} =
+      System.cmd("mix", args,
+        env: [{"MIX_ENV", "test"}, {"OPENROUTER_API_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert status != 0
+    assert message =~ "refusing to overwrite existing evidence"
+    assert File.read!(output) == "retained\n"
+    refute File.exists?(output <> ".progress.jsonl")
   end
 
   test "LiveBench live entrance authenticates the symbolic scorer before transport" do
@@ -443,8 +528,29 @@ defmodule Imp.GepaSuiteConditionCLITest do
       )
 
     lm = apply(Imp.GepaSuiteSpendGuard, :wrap, [inner, guard, :task, 0.4, 1.0, 1.0])
+
+    telemetry_id = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach_many(
+        telemetry_id,
+        [[:imp, :gepa_suite, :role, :stop], [:imp, :gepa_suite, :role, :exception]],
+        fn event, measurements, metadata, parent ->
+          send(parent, {:role_event, event, measurements, metadata})
+        end,
+        self()
+      )
+
     assert {:ok, _} = Imp.LM.generate(lm, [%{role: :user, content: "one"}])
     assert {:ok, _} = Imp.LM.generate(lm, [%{role: :user, content: "two"}])
+
+    for _ <- 1..2 do
+      assert_receive {:role_event, [:imp, :gepa_suite, :role, :stop], %{duration: duration},
+                      %{role: :task, input_tokens: 1, output_tokens: 1, cost_usd: 0.1}}
+
+      assert is_integer(duration)
+      assert duration >= 0
+    end
 
     assert {:error, %Imp.OperationalSafetyError{kind: :budget}} =
              Imp.LM.generate(lm, [%{role: :user, content: "three"}])
@@ -458,6 +564,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
 
     assert_in_delta reconciled, 0.2, 1.0e-12
     assert_in_delta accounted, 0.7, 1.0e-12
+    :telemetry.detach(telemetry_id)
     Agent.stop(guard)
 
     zero_reported =
@@ -546,5 +653,22 @@ defmodule Imp.GepaSuiteConditionCLITest do
 
   defp sha256(path) do
     :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
+  end
+
+  defp empty_role_usage do
+    %{
+      "cost_usd" => 0.0,
+      "error_count" => 0,
+      "input_tokens" => 0,
+      "output_tokens" => 0,
+      "request_attempts" => 0,
+      "request_duration_us" => 0,
+      "usage_events" => 0
+    }
+  end
+
+  defp git!(root, args) do
+    {output, 0} = System.cmd("git", ["-C", root | args])
+    output
   end
 end

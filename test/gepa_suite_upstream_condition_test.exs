@@ -36,12 +36,98 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
       assert receipt["status"] == "provider_disabled_ready"
       assert receipt["heldout_decoded"] == false
       assert receipt["outer_max_concurrency"] == 8
+      assert receipt["condition"]["seed"] == 2_026_080_101
+
+      assert receipt["condition"]["source_commit"] ==
+               String.trim(git!(root, ["rev-parse", "HEAD"]))
+
+      assert receipt["condition"]["route"] == %{
+               "api_base" => "https://openrouter.ai/api/v1",
+               "data_collection" => "deny",
+               "require_parameters" => true,
+               "response_cache" => false,
+               "usage_required" => true,
+               "zdr" => true
+             }
+
+      expected_judge_treatment =
+        if family == "PAPILLONBench",
+          do:
+            "source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction",
+          else: "not_applicable"
+
+      assert receipt["condition"]["papillon_judge_treatment"] == expected_judge_treatment
 
       assert receipt["treatments"] == %{
                "mipro_v2_heavy" => %{"max_concurrency" => 8},
                "gepa_v0_1_4_merge" => %{"max_concurrency" => 8}
              }
     end
+  end
+
+  test "pinned DSPy live entrance refuses to overwrite retained evidence before transport" do
+    root = File.cwd!()
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+
+    output_root =
+      Path.join(System.tmp_dir!(), "dspy-gepa-overwrite-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(output_root)
+    output = Path.join(output_root, "result.json")
+    File.write!(output, "retained\n")
+    on_exit(fn -> File.rm_rf!(output_root) end)
+
+    args =
+      [
+        "-P",
+        Path.join(root, "scripts/gepa_suite_condition_upstream.py"),
+        "--run",
+        "--dspy-root",
+        Path.join(root, "tmp/dspy-3.2.1"),
+        "--gepa-root",
+        Path.join(root, "tmp/gepa-v0.1.4"),
+        "--artifact-root",
+        Path.join(root, "tmp/gepa-artifact"),
+        "--dataset-root",
+        Path.join(root, "tmp/gepa-six-task-current-root"),
+        "--family",
+        "AIMEBench",
+        "--arm",
+        "baseline",
+        "--output",
+        output,
+        "--input-price-per-million",
+        "0.14",
+        "--output-price-per-million",
+        "0.28",
+        "--initial-cost-usd",
+        "0.0",
+        "--max-cost-usd",
+        "1.0"
+      ] ++
+        Enum.flat_map(["task", "reflection", "judge"], fn role ->
+          [
+            "--#{role}-model",
+            "provider-disabled/model",
+            "--#{role}-provider",
+            "provider/endpoint",
+            "--#{role}-max-input-bytes",
+            "65536",
+            "--#{role}-max-output-tokens",
+            "4096"
+          ]
+        end)
+
+    {message, status} =
+      System.cmd(python, args,
+        env: [{"OPENROUTER_API_KEY", "not-a-provider-key"}],
+        stderr_to_stdout: true
+      )
+
+    assert status != 0
+    assert message =~ "refusing to overwrite existing evidence"
+    assert File.read!(output) == "retained\n"
+    refute File.exists?(output <> ".progress.jsonl")
   end
 
   test "upstream entrance enforces the same nested content-byte envelope before transport" do
@@ -513,5 +599,10 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
                String.downcase(key) == "x-openrouter-metadata" and value == "enabled"
              end)
     end
+  end
+
+  defp git!(root, args) do
+    {output, 0} = System.cmd("git", ["-C", root | args])
+    output
   end
 end

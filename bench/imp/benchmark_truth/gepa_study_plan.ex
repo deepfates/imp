@@ -11,6 +11,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
   @fresh_examples_per_selected_arm 4
   @selected_arms 2
   @chat_json_fallback_transport_factor 2
+  @fixed_seed_values [2_026_080_101, 2_026_080_102, 2_026_080_103]
 
   @family_shape %{
     "AIMEBench" => %{predictors: 1, task_stages: 1, judge_stages: 0},
@@ -23,7 +24,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
 
   @doc "Derives the complete provider-opportunity bound for the matched six-task study."
   def plan!(dataset_root, opts \\ []) when is_binary(dataset_root) and is_list(opts) do
-    seeds = Keyword.get(opts, :seeds, 3)
+    seed_values = fixed_seed_values!(opts)
+    seeds = length(seed_values)
     runtimes = Keyword.get(opts, :runtimes, 2)
 
     unless is_integer(seeds) and seeds > 0,
@@ -60,13 +62,14 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         gepa_budget_source: :observed_mipro_v2_heavy_metric_calls
       },
       current_protocol_additions: %{
-        fixed_seeds: seeds,
+        fixed_seeds: seed_values,
         selected_artifact_fresh_service_examples: @fresh_examples_per_selected_arm,
         selected_arms_with_fresh_service: @selected_arms,
         strict_no_cache_no_retry_route_evidence: true,
         task_json_fallback_is_a_legal_failure_envelope_not_scheduled_work: true
       },
       seeds: seeds,
+      seed_values: seed_values,
       runtimes: runtimes,
       lanes: lanes,
       families: families,
@@ -97,8 +100,47 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlan do
         selected_arms: @selected_arms,
         task_transport_bound: :initial_chat_call_plus_at_most_one_ordinary_json_adapter_fallback,
         provider_calls_authorized: false
+      },
+      analysis_contract: %{
+        primary_table: :per_task_runtime_optimizer_seed_heldout_score,
+        within_runtime_effect: :optimizer_minus_matched_baseline,
+        cross_runtime_effect: :imp_lift_minus_dspy_lift,
+        uncertainty: [:raw_seed_dispersion, :paired_row_bootstrap_where_defined],
+        operational_outcomes: [:calls, :cost, :latency, :parse_and_runtime_failures],
+        heterogeneous_task_macro_average_is_secondary: true,
+        private_universal_victory_threshold: false,
+        task_removal_after_outcomes: false,
+        continuation_based_on_interim_scores: false
       }
     }
+  end
+
+  defp fixed_seed_values!(opts) do
+    case Keyword.fetch(opts, :seed_values) do
+      {:ok, values} ->
+        unless is_list(values) and values != [] and Enum.all?(values, &is_integer/1) and
+                 length(Enum.uniq(values)) == length(values) do
+          raise ArgumentError, "study seed_values must be a nonempty list of unique integers"
+        end
+
+        case Keyword.fetch(opts, :seeds) do
+          {:ok, count} when count != length(values) ->
+            raise ArgumentError, "study seeds count must equal the explicit seed_values length"
+
+          _ ->
+            values
+        end
+
+      :error ->
+        count = Keyword.get(opts, :seeds, length(@fixed_seed_values))
+
+        unless is_integer(count) and count > 0 and count <= length(@fixed_seed_values) do
+          raise ArgumentError,
+                "study seeds must select between 1 and #{length(@fixed_seed_values)} frozen values"
+        end
+
+        Enum.take(@fixed_seed_values, count)
+    end
   end
 
   defp family_plan!(dataset_root, family) do

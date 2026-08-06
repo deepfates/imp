@@ -44,6 +44,7 @@ FAMILIES = {
     "Papillon": "gepa_artifact.benchmarks.papillon",
 }
 ARMS = ("baseline", "mipro_v2_heavy", "gepa_v0_1_4_merge")
+STUDY_SEEDS = (2026080101, 2026080102, 2026080103)
 LIVEBENCH_MATH_BRIDGE = Path(__file__).resolve().with_name("livebench_math_score.py")
 FAMILY_SHAPES = {
     "AIMEBench": {"task": 1, "judge": 0},
@@ -153,7 +154,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-concurrency", type=int, default=1)
     parser.add_argument("--initial-cost-usd", type=float)
     parser.add_argument("--max-cost-usd", type=float)
-    parser.add_argument("--api-base")
+    parser.add_argument("--api-base", default="https://openrouter.ai/api/v1")
     parser.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
     parser.add_argument("--livebench-math-python", type=Path)
     parser.add_argument("--output", type=Path)
@@ -174,6 +175,15 @@ def authenticate_clean_tree(root: Path, commit: str, label: str) -> None:
         raise RuntimeError(f"{label} tracked source is dirty")
     if subprocess.run(["git", "-C", str(root), "diff", "--cached", "--quiet"]).returncode != 0:
         raise RuntimeError(f"{label} staged source is dirty")
+
+
+def tree_identity(root: Path) -> dict[str, Any]:
+    return {
+        "commit": git(root, "rev-parse", "HEAD"),
+        "tracked_clean":
+            subprocess.run(["git", "-C", str(root), "diff", "--quiet"]).returncode == 0
+            and subprocess.run(["git", "-C", str(root), "diff", "--cached", "--quiet"]).returncode == 0,
+    }
 
 
 def sha256(path: Path) -> str:
@@ -737,15 +747,76 @@ def arm_requires_fresh_state(arm: str) -> bool:
 def write_private_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.parent.chmod(0o700)
-    path.write_text(json.dumps(payload, sort_keys=True, default=str) + "\n")
+    with path.open("x") as handle:
+        handle.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
     path.chmod(0o600)
+
+
+def ensure_new_targets(args: argparse.Namespace) -> None:
+    if args.output is None:
+        raise RuntimeError("live execution requires --output")
+    targets = [args.output, args.output.with_suffix(args.output.suffix + ".progress.jsonl")]
+    if not args.fresh and args.arm != "baseline":
+        targets += [args.output.with_suffix(".state.json"), args.output.with_suffix(".fresh.json")]
+        targets += [args.output.with_suffix(".fresh.json.progress.jsonl")]
+    for path in targets:
+        if path.exists():
+            raise RuntimeError(f"refusing to overwrite existing evidence: {path}")
+
+
+def condition_receipt(args: argparse.Namespace, imp_identity: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "study": "matched-current-model-gepa-suite-v1",
+        "protocol": "adapted_current_model_reference_differential",
+        "source_commit": imp_identity["commit"],
+        "source_tracked_clean": imp_identity["tracked_clean"],
+        "family": args.family,
+        "arm": args.arm,
+        "seed": args.seed,
+        "temperature": 1.0,
+        "max_concurrency": args.max_concurrency,
+        "request_timeout_ms": 120_000,
+        "cache": False,
+        "retries": 0,
+        "fallback": False,
+        "route": {
+            "api_base": args.api_base,
+            "require_parameters": True,
+            "data_collection": "deny",
+            "zdr": True,
+            "response_cache": False,
+            "usage_required": True,
+        },
+        "papillon_judge_treatment":
+            (
+                "source_scoring_procedure_with_matched_current_model_judge_not_historical_judge_reproduction"
+                if args.family == "PAPILLONBench"
+                else "not_applicable"
+            ),
+        "roles": {
+            role: {
+                "model": getattr(args, f"{role}_model"),
+                "provider": getattr(args, f"{role}_provider"),
+                "max_input_content_bytes": getattr(args, f"{role}_max_input_bytes"),
+                "max_output_tokens": getattr(args, f"{role}_max_output_tokens"),
+            }
+            for role in ("task", "reflection", "judge")
+        },
+        "prices_per_million": {
+            "input": args.input_price_per_million,
+            "output": args.output_price_per_million,
+        },
+    }
 
 
 def main() -> None:
     global ACTIVE_ARGS, ACTIVE_STAGE, RUN_STARTED_NS, SPEND_GUARD
     args = parse_args()
+    imp_identity = tree_identity(Path(__file__).resolve().parent.parent)
     if args.max_concurrency <= 0:
         raise RuntimeError("--max-concurrency must be a positive integer")
+    if args.seed not in STUDY_SEEDS:
+        raise RuntimeError(f"seed must be one of the frozen study seeds: {STUDY_SEEDS}")
     ACTIVE_ARGS = args
     RUN_STARTED_NS = time.monotonic_ns()
     for name in ("dspy_root", "gepa_root", "artifact_root", "dataset_root", "retrieval_root", "retrieval_receipt", "output", "state"):
@@ -800,11 +871,13 @@ def main() -> None:
             "mipro_v2_heavy": {"max_concurrency": args.max_concurrency},
             "gepa_v0_1_4_merge": {"max_concurrency": args.max_concurrency},
         },
+        "condition": condition_receipt(args, imp_identity),
     }
     if not args.run and not args.fresh:
         print(json.dumps(preflight, sort_keys=True))
         return
 
+    ensure_new_targets(args)
     admission = spend_admission(args)
     SPEND_GUARD = ProspectiveSpendGuard(args.initial_cost_usd, args.max_cost_usd)
     progress_path = init_progress(args)
@@ -929,7 +1002,7 @@ def main() -> None:
 
 def retain_terminal_failure(error: BaseException) -> None:
     args = ACTIVE_ARGS
-    if args is None or args.output is None:
+    if args is None or args.output is None or args.output.exists():
         return
     elapsed = 0 if RUN_STARTED_NS is None else (time.monotonic_ns() - RUN_STARTED_NS) // 1_000
     payload = {

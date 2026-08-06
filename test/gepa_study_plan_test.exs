@@ -34,6 +34,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
            }
 
     assert plan.lanes == 6
+    assert plan.seed_values == [2_026_080_101, 2_026_080_102, 2_026_080_103]
+    assert plan.current_protocol_additions.fixed_seeds == plan.seed_values
 
     assert plan.per_runtime_seed == %{
              program_evaluations: 52_614,
@@ -81,6 +83,7 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
            }
 
     first_baseline = GepaStudyPlan.plan!(@root, seeds: 1, runtimes: 2)
+    assert first_baseline.seed_values == [2_026_080_101]
 
     assert first_baseline.full_study_by_arm.baseline == %{
              program_evaluations: 2_782,
@@ -114,5 +117,25 @@ defmodule Imp.BenchmarkTruth.GepaStudyPlanTest do
 
     assert plan.boundaries.task_transport_bound ==
              :initial_chat_call_plus_at_most_one_ordinary_json_adapter_fallback
+
+    assert plan.analysis_contract.primary_table ==
+             :per_task_runtime_optimizer_seed_heldout_score
+
+    assert plan.analysis_contract.within_runtime_effect == :optimizer_minus_matched_baseline
+    assert plan.analysis_contract.cross_runtime_effect == :imp_lift_minus_dspy_lift
+    refute plan.analysis_contract.private_universal_victory_threshold
+    refute plan.analysis_contract.task_removal_after_outcomes
+    refute plan.analysis_contract.continuation_based_on_interim_scores
+  end
+
+  @tag :evidence_infrastructure
+  test "requires explicit seed identities to be unique and count-matched" do
+    assert_raise ArgumentError, ~r/unique integers/, fn ->
+      GepaStudyPlan.plan!(@root, seed_values: [7, 7])
+    end
+
+    assert_raise ArgumentError, ~r/must equal/, fn ->
+      GepaStudyPlan.plan!(@root, seeds: 3, seed_values: [7, 8])
+    end
   end
 end
