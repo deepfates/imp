@@ -1148,3 +1148,19 @@ not optimizer effectiveness.
 The pair conservatively charged `$0.912609520`, bringing the study to
 `$13.891853498` under the same `$20` cap. PAPILLON is the only remaining
 missing baseline family before the optimizer-scale decision.
+
+**2026-08-05T18:49:00Z**
+
+The matched official PAPILLON baseline completed both ordinary program and
+judge paths. Imp scored `0.9175144112`; pinned DSPy scored `0.8819864518`,
+with 34 Imp-higher rows, 18 DSPy-higher rows, and 169 ties across identical
+inputs. Imp retained four row errors; DSPy produced complete row scores while
+retaining five judge transport errors in usage telemetry. No retry or route
+substitution occurred. Conservative pair charge was `$1.263435880`.
+
+The one-seed current-model baseline table is now complete: Imp is higher on
+AIME, IFBench, HoVer, and PAPILLON; tied on HotPotQA; and lower on LiveBench
+Math. These are direct baseline/runtime data, not optimizer effectiveness or a
+general superiority claim. The study charge is `$15.155289378` under the `$20`
+cap. The next paid boundary is explicit ratification of optimizer scale and
+spend; provider-free reconciliation may continue.

@@ -3606,3 +3606,45 @@ for Imp and
 for DSPy. Provider-reported pair cost was `$0.888407924`; conservative
 prospective accounting charged `$0.912609520`. The table-study charge is now
 `$13.891853498` under the unchanged `$20` cap.
+
+## Current-model table: admitted PAPILLON baseline datum and completed baseline tranche
+
+The matched PAPILLON baseline pair from clean `7d2000e3` completed the official
+221 held-out rows through both ordinary three-stage program paths and the
+bidirectional quality plus leakage judges. The private root is
+`benchmarks/results/gepa-suite-papillon-baseline-7d2000e3-20260805-OA7Ruz`.
+Imp scored `0.9175144112`; pinned DSPy scored `0.8819864518`. Paired outcomes
+were 34 Imp-higher rows, 18 DSPy-higher rows, and 169 equal rows; all 221 input
+hashes match. The mean difference is `+0.0355279594` for this baseline/runtime
+condition, not optimizer lift or a general superiority claim.
+
+Imp retained four ordinary row errors across 1,362 attempted transports and
+1,354 priced usage events. DSPy completed all row scores while its usage
+telemetry retained five judge transport errors across 1,409 attempted
+transports and 1,404 priced events. No retry or route substitution occurred;
+two visible SiliconFlow 429s remained ordinary failures. Result SHA-256 values
+are
+`98906898b274c8d0bee5a2605859988ffcbc8989f6753d43985422246cd7df57`
+for Imp and
+`7ae45ca64b4f72276c97e586c775f40f34044c94f2d56963a96778029dba8c42`
+for DSPy. Provider-reported pair cost was `$1.073172596`; conservative
+prospective accounting, including retained full envelopes for unpriced/error
+transports, charged `$1.263435880`.
+
+The single-seed current-model baseline tranche is now complete across all six
+official families. Direct held-out scores are:
+
+| family | Imp | pinned DSPy | Imp - DSPy |
+| --- | ---: | ---: | ---: |
+| AIME | 0.500000 | 0.466667 | +0.033333 |
+| IFBench | 0.636054 | 0.600340 | +0.035714 |
+| HotPotQA | 0.553333 | 0.553333 | 0 |
+| HoVer | 0.466667 | 0.463333 | +0.003333 |
+| PAPILLON | 0.917514 | 0.881986 | +0.035528 |
+| LiveBench Math | 0.611111 | 0.642857 | -0.031746 |
+
+This is baseline product/runtime evidence only. It does not answer whether
+Imp's GEPA or MIPRO improves programs, and it does not erase the adapters'
+different strictness/error burdens. The conservative table-study charge is now
+`$15.155289378` under the `$20` cap. Do not launch optimizer arms until their
+scientific scale and remaining spend are explicitly ratified.
