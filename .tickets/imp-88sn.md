@@ -44,6 +44,31 @@ by changing tasks or thresholds after seeing outcomes.
 
 ## Current status
 
+### Pre-run integrity freeze (`95624acc`, 2026-08-05)
+
+The next matched optimizer tranche is now mechanically bound to seeds
+`2026080101/02/03`; each ordinary Imp and pinned-DSPy result records the full
+family/arm/seed, model-role/provider, input/output envelope, price, concurrency,
+timeout, cache/retry/fallback, route/privacy, and source-identity receipt. Both
+entrances refuse existing Result/progress/Artifact/fresh-service targets before
+transport. Imp evidence now separates task, reflection, and judge attempts,
+tokens, latency, cost, and failures instead of leaving proposer traffic folded
+into one total.
+
+The analysis is frozen before optimizer outcomes: report every task/runtime/
+optimizer/seed held-out score; compute optimizer-minus-matched-baseline within
+each runtime and Imp-lift-minus-DSPy-lift across runtimes; show raw seed
+dispersion and paired-row bootstrap uncertainty where the metric permits it;
+and report calls, cost, latency, and failures. A heterogeneous-task macro
+average is secondary. No task may be removed, no private universal victory
+threshold may be introduced, and no continuation decision may use interim
+scores. PAPILLON is explicitly an adapted current-model use of the source
+scoring procedure, not reproduction of its historical GPT-4.1 Mini judge.
+
+This checkpoint authorizes no provider call and earns no effectiveness result.
+It exists only to ensure that the next paid swing answers the declared question
+and leaves independently auditable evidence.
+
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 
 The recognized six-task endpoint remains ratified. The one-seed matched
