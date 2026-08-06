@@ -566,11 +566,15 @@ defmodule Imp.GepaSuiteConditionCLI do
       })
     rescue
       error ->
+        child = retained_fresh_failure(config, prepared)
+
         write_failure_unless_exists!(config, prepared, :persist_or_fresh_service, error, %{
-          usage: usage,
+          usage: merge_runtime(usage, child.usage),
           wall_time_us: wall_time_us,
           progress_sha256: existing_sha256(progress),
-          spend_admission: Map.put(admission, "final", spend_snapshot(config))
+          spend_admission: Map.put(admission, "final", spend_snapshot(config)),
+          fresh_failure_evidence: child.evidence,
+          fresh_spend_admission: child.spend
         })
 
         reraise error, __STACKTRACE__
@@ -879,6 +883,20 @@ defmodule Imp.GepaSuiteConditionCLI do
     Application.put_env(:req_llm, :stream_pool_protocols, pool.protocols)
     Application.put_env(:req_llm, :stream_pool_size, pool.size)
     Application.put_env(:req_llm, :stream_pool_count, pool.count)
+
+    case Application.ensure_all_started(:req_llm) do
+      {:ok, _started} ->
+        :ok
+
+      {:error, reason} ->
+        raise "failed to start ReqLLM after pool configuration: #{inspect(reason)}"
+    end
+
+    unless is_pid(Process.whereis(ReqLLM.Supervisor)) and
+             is_pid(Process.whereis(ReqLLM.Finch)) do
+      raise "ReqLLM did not start its configured supervisor and Finch pool"
+    end
+
     :ok
   end
 
@@ -1112,6 +1130,41 @@ defmodule Imp.GepaSuiteConditionCLI do
           details
         )
       )
+    end
+  end
+
+  defp retained_fresh_failure(config, prepared) do
+    expected_condition = condition_receipt(config) |> json_safe()
+    expected_data = data_receipt(prepared.loaded.spec) |> json_safe()
+
+    expected_artifact_sha256 =
+      if is_binary(config.artifact) and File.regular?(config.artifact),
+        do: sha256(config.artifact),
+        else: nil
+
+    with path when is_binary(path) <- config.fresh_output,
+         true <- File.regular?(path),
+         {:ok, receipt} <- path |> File.read!() |> Jason.decode(),
+         "failed" <- receipt["status"],
+         ^expected_condition <- receipt["condition"],
+         ^expected_data <- receipt["data"],
+         ^expected_artifact_sha256 <- receipt["loaded_artifact_sha256"] do
+      %{
+        usage: receipt["usage"] || empty_runtime(),
+        spend: receipt["spend_admission"],
+        evidence: %{status: :retained, sha256: sha256(path), path: path}
+      }
+    else
+      _ ->
+        %{
+          usage: empty_runtime(),
+          spend: nil,
+          evidence: %{
+            status: :unresolved,
+            reason: :no_valid_atomic_child_failure_receipt,
+            passed_initial_cost_usd: get_in(spend_snapshot(config), ["accounted_total_usd"])
+          }
+        }
     end
   end
 
@@ -1511,12 +1564,28 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp write_private!(path, payload) do
     File.mkdir_p!(Path.dirname(path))
     File.chmod!(Path.dirname(path), 0o700)
+    temporary = path <> ".tmp-#{System.pid()}-#{System.monotonic_time()}"
 
-    File.open!(path, [:write, :exclusive], fn file ->
-      IO.binwrite(file, Jason.encode!(json_safe(payload), pretty: true) <> "\n")
-    end)
+    try do
+      File.open!(temporary, [:write, :exclusive], fn file ->
+        File.chmod!(temporary, 0o600)
+        IO.binwrite(file, Jason.encode!(json_safe(payload), pretty: true) <> "\n")
+        :ok = :file.sync(file)
+      end)
 
-    File.chmod!(path, 0o600)
+      case File.ln(temporary, path) do
+        :ok ->
+          :ok
+
+        {:error, :eexist} ->
+          raise ArgumentError, "refusing to overwrite existing evidence: #{path}"
+
+        {:error, reason} ->
+          raise File.Error, reason: reason, action: "link", path: path
+      end
+    after
+      File.rm(temporary)
+    end
   end
 
   @doc false

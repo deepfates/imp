@@ -260,6 +260,20 @@ def load_rows(dspy: Any, path: Path, input_keys: list[str]) -> list[Any]:
     return rows
 
 
+def load_verified_rows(
+    dspy: Any, path: Path, spec: dict[str, Any], split: str
+) -> list[Any]:
+    content = path.read_bytes()
+    expected_sha = (spec.get("checksums") or spec["split_checksums"])[split].removeprefix("sha256:")
+    actual_sha = hashlib.sha256(content).hexdigest()
+    if actual_sha != expected_sha:
+        raise RuntimeError(f"{spec['family']} {split} digest drift at decode barrier")
+    records = [json.loads(line) for line in content.decode("utf-8").splitlines() if line.strip()]
+    if len(records) != spec["split_counts"][split]:
+        raise RuntimeError(f"{spec['family']} {split} count drift at decode barrier")
+    return [dspy.Example(**record).with_inputs(*spec["input_keys"]) for record in records]
+
+
 def install_retrieval(retrieval_root: Path | None, receipt_path: Path | None, spec: dict[str, Any]) -> dict[str, Any] | None:
     if "retrieval" not in spec:
         return None
@@ -761,9 +775,19 @@ def arm_requires_fresh_state(arm: str) -> bool:
 def write_private_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.parent.chmod(0o700)
-    with path.open("x") as handle:
-        handle.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
-    path.chmod(0o600)
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{time.monotonic_ns()}")
+    try:
+        with temporary.open("x") as handle:
+            temporary.chmod(0o600)
+            handle.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError as error:
+            raise RuntimeError(f"refusing to overwrite existing evidence: {path}") from error
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def ensure_new_targets(args: argparse.Namespace) -> None:
@@ -918,7 +942,7 @@ def main() -> None:
         ACTIVE_STAGE = "fresh_load_and_service"
         loaded_state_sha256 = sha256(args.state)
         program.load(args.state)
-        test = load_rows(dspy, test_path, spec["input_keys"])
+        test = load_verified_rows(dspy, test_path, spec, "test")
         calls = []
         started = time.monotonic_ns()
         with dspy.context(lm=task_lm):
@@ -955,7 +979,7 @@ def main() -> None:
     with dspy.context(lm=task_lm):
         selected = optimize(dspy, program, meta, train, dev, args, task_lm, reflection_lm, spec["metric_calls"])
         ACTIVE_STAGE = "heldout"
-        test = load_rows(dspy, test_path, spec["input_keys"])
+        test = load_verified_rows(dspy, test_path, spec, "test")
         heldout_result = evaluate(
             dspy,
             arm_program(args.arm, program, selected),
@@ -967,6 +991,7 @@ def main() -> None:
     state_sha = None
     fresh_sha = None
     fresh_usage = {}
+    fresh_spend = None
     if arm_requires_fresh_state(args.arm):
         ACTIVE_STAGE = "persist_and_fresh_service"
         save_state_exclusive(selected, state_path)
@@ -1016,6 +1041,7 @@ def main() -> None:
         ):
             raise RuntimeError("fresh DSPy receipt does not bind the selected state and condition")
         fresh_usage = fresh_receipt["usage"]
+        fresh_spend = fresh_receipt["spend_admission"]
 
     payload = {
         **preflight,
@@ -1026,6 +1052,7 @@ def main() -> None:
         "state_sha256": state_sha,
         "fresh_sha256": fresh_sha,
         "usage": merge_runtime_usage(runtime_usage(), fresh_usage),
+        "fresh_spend_admission": fresh_spend,
         "progress_sha256": sha256(progress_path),
         "wall_time_us": (time.monotonic_ns() - started) // 1_000,
         "spend_admission": {**admission, "final": SPEND_GUARD.snapshot()},
@@ -1038,6 +1065,7 @@ def retain_terminal_failure(error: BaseException) -> None:
     if args is None or args.output is None or args.output.exists():
         return
     elapsed = 0 if RUN_STARTED_NS is None else (time.monotonic_ns() - RUN_STARTED_NS) // 1_000
+    child = retained_fresh_failure(args)
     payload = {
         **(ACTIVE_PREFLIGHT or {}),
         "status": "failed",
@@ -1047,7 +1075,12 @@ def retain_terminal_failure(error: BaseException) -> None:
         "stage": ACTIVE_STAGE,
         "error_type": type(error).__name__,
         "error_sha256": hashlib.sha256(str(error).encode()).hexdigest(),
-        "usage": runtime_usage(),
+        "usage": merge_runtime_usage(runtime_usage(), child["usage"]),
+        "fresh_failure_evidence": child["evidence"],
+        "fresh_spend_admission": child["spend_admission"],
+        "loaded_state_sha256": (
+            sha256(args.state) if args.fresh and args.state is not None and args.state.is_file() else None
+        ),
         "progress_sha256":
             sha256(PROGRESS_PATH) if PROGRESS_PATH is not None and PROGRESS_PATH.exists() else None,
         "wall_time_us": elapsed,
@@ -1056,6 +1089,47 @@ def retain_terminal_failure(error: BaseException) -> None:
         ),
     }
     write_private_json(args.output, payload)
+
+
+def retained_fresh_failure(args: argparse.Namespace) -> dict[str, Any]:
+    unresolved = {
+        "usage": {"summary": {}, "events": []},
+        "spend_admission": None,
+        "evidence": {
+            "status": "unresolved",
+            "reason": "no_valid_atomic_child_failure_receipt",
+            "passed_initial_cost_usd": (
+                SPEND_GUARD.snapshot()["accounted_total_usd"] if SPEND_GUARD is not None else None
+            ),
+        },
+    }
+    if args.fresh or args.arm == "baseline" or args.output is None:
+        return unresolved
+    fresh_path = args.output.with_suffix(".fresh.json")
+    state_path = args.output.with_suffix(".state.json")
+    if not fresh_path.is_file() or not state_path.is_file():
+        return unresolved
+    try:
+        receipt = json.loads(fresh_path.read_text())
+        expected = ACTIVE_PREFLIGHT or {}
+        if not (
+            receipt.get("status") == "failed"
+            and receipt.get("condition") == expected.get("condition")
+            and receipt.get("data") == expected.get("data")
+            and receipt.get("loaded_state_sha256") == sha256(state_path)
+        ):
+            return unresolved
+        return {
+            "usage": receipt.get("usage") or {"summary": {}, "events": []},
+            "spend_admission": receipt.get("spend_admission"),
+            "evidence": {
+                "status": "retained",
+                "sha256": sha256(fresh_path),
+                "path": str(fresh_path),
+            },
+        }
+    except (OSError, ValueError):
+        return unresolved
 
 
 if __name__ == "__main__":

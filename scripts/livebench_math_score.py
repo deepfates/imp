@@ -217,7 +217,7 @@ def main():
         print(json.dumps({"score": score, "feedback": feedback}))
         return
 
-    if task not in {"amps_hard", "amps_hard_feedback"}:
+    if task != "amps_hard":
         raise RuntimeError(f"unsupported bridge task: {task}")
 
     score, parsed_answer = amps_hard_process_results(
@@ -226,10 +226,6 @@ def main():
     )
 
     result = {"score": score, "parsed_answer": parsed_answer}
-    if task == "amps_hard_feedback":
-        result["feedback"] = (
-            f"The symbolic scorer parsed {parsed_answer!r}; the answer scored {float(score)}."
-        )
     json.dump(result, sys.stdout)
     sys.stdout.write("\n")
 

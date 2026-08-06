@@ -2086,7 +2086,6 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
   defp livebench_math_with_feedback(example, prediction) do
     question = Imp.Example.get(example, :question_d, %{})
     answer = prediction |> Imp.Prediction.get(:answer) |> to_string() |> strip_thinking()
-    amps? = Map.get(question, "task", Map.get(question, :task)) == "AMPS_Hard"
     bridge = System.get_env("IMP_LIVEBENCH_MATH_BRIDGE") || default_livebench_bridge()
     python = System.get_env("IMP_LIVEBENCH_MATH_PYTHON") || "python3"
 
@@ -2099,9 +2098,8 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
     File.write!(
       payload_path,
       Jason.encode!(%{
-        "task" => if(amps?, do: "amps_hard_feedback", else: "livebench_math_feedback"),
-        "question_d" => if(amps?, do: nil, else: question),
-        "ground_truth" => if(amps?, do: Map.get(question, "ground_truth", ""), else: nil),
+        "task" => "livebench_math_feedback",
+        "question_d" => question,
         "answer" => answer
       })
     )
@@ -2618,8 +2616,6 @@ defmodule Imp.BenchmarkTruth.GepaMetrics do
     value
     |> to_string()
     |> String.split("||")
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
     |> Enum.uniq()
   end
 

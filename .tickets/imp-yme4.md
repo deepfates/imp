@@ -96,7 +96,11 @@ is retained for audit, but it does not define priority.
   trial's ordered row evaluation may use the same bounded concurrency as DSPy.
 - **Evidence repair:** identical compact cross-runtime JSON inputs now receive
   one canonical SHA-256 identity even when control-character escapes contain
-  hexadecimal letters. Immutable live Results remain unchanged.
+  hexadecimal letters. Pre-run cold review also made receipt publication
+  atomic, reauthenticates the exact held-out bytes at the decode barrier, binds
+  fresh-child failure usage/spend into terminal evidence, starts the configured
+  ReqLLM pool in the cold entrance, and corrected source-sensitive LiveBench
+  AMPS and PAPILLON scoring. Immutable live Results remain unchanged.
 - **Next sequence:** ratify optimizer scale and spend; then run the complete
   merge-enabled GEPA/MIPROv2 table. Do not
   replace the ratified table with AIME/IFBench verticals, task-shop after

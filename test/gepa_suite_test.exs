@@ -48,6 +48,12 @@ defmodule Imp.BenchmarkTruth.GepaSuiteTest do
     refute Map.has_key?(loaded, :test)
 
     assert Enum.map(GepaSuite.load_test!(loaded), &Imp.Example.get(&1, :problem)) == ["test"]
+
+    write_jsonl!(paths.test, [%{"problem" => "same-count replacement", "answer" => "3"}])
+
+    assert_raise ArgumentError, ~r/held-out digest drift at decode barrier/, fn ->
+      GepaSuite.load_test!(loaded)
+    end
   end
 
   test "rejects source drift before constructing a program" do

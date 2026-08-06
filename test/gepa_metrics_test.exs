@@ -790,7 +790,7 @@ defmodule GepaMetricsTest do
     end
   end
 
-  test "LiveBenchMath GEPA uses the pinned AMPS parsed-answer feedback sentence" do
+  test "LiveBenchMath GEPA routes AMPS feedback through the pinned source contract" do
     metric =
       Imp.BenchmarkTruth.GepaMetrics.gepa_metric(
         %{
@@ -820,11 +820,15 @@ defmodule GepaMetricsTest do
     import json, sys
     with open(sys.argv[1], "r", encoding="utf-8") as handle:
         payload = json.load(handle)
-    assert payload["task"] in {"amps_hard", "amps_hard_feedback"}
-    result = {"score": 1, "parsed_answer": "x^2"}
-    if payload["task"] == "amps_hard_feedback":
-        result["feedback"] = "The symbolic scorer parsed 'x^2'; the answer scored 1.0."
-    print(json.dumps(result))
+    if payload["task"] == "amps_hard":
+        print(json.dumps({"score": 1, "parsed_answer": "x^2"}))
+    else:
+        assert payload["task"] == "livebench_math_feedback"
+        assert payload["question_d"]["task"] == "AMPS_Hard"
+        print(json.dumps({
+            "score": 1,
+            "feedback": "Your answer is correct. Specifically, you wrote 'x^2' which was found to be equivalent to the correct answer 'x^2'."
+        }))
     """)
 
     previous_bridge = System.get_env("IMP_LIVEBENCH_MATH_BRIDGE")
@@ -841,7 +845,8 @@ defmodule GepaMetricsTest do
     assert %{score: 1.0, feedback: feedback} =
              metric.(example, Imp.prediction(answer: "x^2"), [%{predictor: :main}])
 
-    assert feedback == "The symbolic scorer parsed 'x^2'; the answer scored 1.0."
+    assert feedback ==
+             "Your answer is correct. Specifically, you wrote 'x^2' which was found to be equivalent to the correct answer 'x^2'."
   end
 
   test "Papillon metric uses Imp judges for quality and leakage arithmetic" do
@@ -883,7 +888,7 @@ defmodule GepaMetricsTest do
       Imp.example(
         user_query: "Use my private account details to draft a note.",
         target_response: "A careful useful answer.",
-        pii_str: "secret@example.com||555-0100"
+        pii_str: "||secret@example.com"
       )
       |> Imp.with_inputs(:user_query)
 

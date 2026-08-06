@@ -40,7 +40,25 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
 
   @doc "Opens the already-verified held-out rows after optimization has returned."
   def load_test!(%{spec: spec, paths: paths, test_count: expected}) do
-    rows = Imp.Datasets.jsonl(paths.test, spec["input_keys"])
+    bytes = File.read!(paths.test)
+
+    expected_sha =
+      get_in(spec, ["checksums", "test"]) || get_in(spec, ["split_checksums", "test"])
+
+    actual_sha = "sha256:" <> sha256_bytes(bytes)
+
+    if actual_sha != expected_sha do
+      raise ArgumentError,
+            "GEPA suite #{spec["family"]} held-out digest drift at decode barrier: " <>
+              "expected #{expected_sha}, got #{actual_sha}"
+    end
+
+    records =
+      bytes
+      |> String.split(~r/\R/, trim: true)
+      |> Enum.map(&Jason.decode!/1)
+
+    rows = Imp.Datasets.from_records(records, spec["input_keys"], source: paths.test)
 
     if length(rows) != expected do
       raise ArgumentError,
@@ -254,6 +272,11 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
   defp file_sha256(path) do
     path
     |> File.read!()
+    |> sha256_bytes()
+  end
+
+  defp sha256_bytes(bytes) do
+    bytes
     |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
   end

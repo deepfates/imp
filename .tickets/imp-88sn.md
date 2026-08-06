@@ -600,15 +600,21 @@ boundary. AIME, LiveBench Math, and PAPILLON now supply the source feedback GEPA
 actually sees; component callbacks execute only when the parent reflective
 dataset is built, not eagerly on child candidate evaluations. AIME reproduces
 Python integer parsing for the exercised whitespace/underscore domain;
-LiveBench preserves the pinned AMPS parsed-answer feedback; PAPILLON does not
-silently clamp judge leakage counts.
+LiveBench routes AMPS feedback through the authenticated pinned
+`calculate_livebench_score` implementation; PAPILLON preserves the pinned raw
+`pii_str.split("||")` set, including empty fields, and does not silently clamp
+judge leakage counts.
 
-Run evidence is non-overwriting at the progress, Result, parameter Artifact,
-and pinned-DSPy state boundaries. Fresh receipts bind the exact loaded digest,
-condition, and split receipt; parents validate those identities before accepting
-fresh service. Failure receipts retain the same condition/data identity and the
-final spend snapshot, and the Imp fresh process compiles authenticated source
-rather than trusting an ignored stale BEAM. Analysis is fixed before outcomes:
+Run evidence is atomically published and non-overwriting at the progress,
+Result, receipt, parameter Artifact, and pinned-DSPy state boundaries. Held-out
+bytes are rehashed at the post-optimization decode barrier in both runtimes.
+Fresh receipts bind the exact loaded digest, condition, and split receipt;
+parents validate those identities before accepting fresh service. A failed
+fresh child's atomic receipt, usage, and spend are folded into the parent
+failure when available and otherwise marked unresolved. The Imp cold entrance
+configures and explicitly starts ReqLLM before its first Finch transport, and
+the fresh process compiles authenticated source rather than trusting an ignored
+stale BEAM. Analysis is fixed before outcomes:
 the primary table is every task/runtime/optimizer/seed held-out score;
 within-runtime lift and Imp-minus-DSPy difference-in-differences use matched
 baselines; all six row metrics use a deterministic 10,000-resample 95% paired-row

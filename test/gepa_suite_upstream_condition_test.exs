@@ -160,6 +160,56 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert {"", 0} = System.cmd(python, ["-P", "-c", probe, script], stderr_to_stdout: true)
   end
 
+  test "pinned DSPy atomically publishes receipts and reauthenticates heldout decode bytes" do
+    root = File.cwd!()
+    python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
+    script = Path.join(root, "scripts/gepa_suite_condition_upstream.py")
+
+    probe = ~S'''
+    import hashlib, importlib.util, json, pathlib, sys, tempfile
+    path = pathlib.Path(sys.argv[1])
+    spec = importlib.util.spec_from_file_location("condition", path)
+    condition = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(condition)
+    root = pathlib.Path(tempfile.mkdtemp())
+    receipt = root / "result.json"
+    condition.write_private_json(receipt, {"status": "complete"})
+    assert json.loads(receipt.read_text()) == {"status": "complete"}
+    try:
+        condition.write_private_json(receipt, {"status": "replacement"})
+    except RuntimeError as error:
+        assert "refusing to overwrite" in str(error)
+    else:
+        raise AssertionError("receipt was replaced")
+    assert json.loads(receipt.read_text()) == {"status": "complete"}
+
+    heldout = root / "test.jsonl"
+    original = b'{"problem":"test","answer":"3"}\n'
+    heldout.write_bytes(original)
+    family = {
+        "family": "AIMEBench",
+        "input_keys": ["problem"],
+        "split_counts": {"test": 1},
+        "split_checksums": {"test": "sha256:" + hashlib.sha256(original).hexdigest()},
+    }
+    class Example:
+        def __init__(self, **values): self.values = values
+        def with_inputs(self, *keys): return self
+    class DSPy: pass
+    DSPy.Example = Example
+    assert len(condition.load_verified_rows(DSPy, heldout, family, "test")) == 1
+    heldout.write_text('{"problem":"replacement","answer":"3"}\n')
+    try:
+        condition.load_verified_rows(DSPy, heldout, family, "test")
+    except RuntimeError as error:
+        assert "digest drift at decode barrier" in str(error)
+    else:
+        raise AssertionError("same-count heldout replacement was accepted")
+    '''
+
+    assert {"", 0} = System.cmd(python, ["-P", "-c", probe, script], stderr_to_stdout: true)
+  end
+
   test "pinned DSPy selected state cannot replace an existing target" do
     root = File.cwd!()
     python = Path.join(root, "tmp/dspy-parity-venv/bin/python")
