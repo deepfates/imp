@@ -1214,13 +1214,46 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp sha256(path), do: :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
   defp existing_sha256(path), do: if(File.exists?(path), do: sha256(path), else: nil)
 
-  defp canonical_sha256(value) do
+  # Python's canonical study entrance uses json.dumps(..., ensure_ascii=False),
+  # which spells hexadecimal digits in required control-character escapes in
+  # lowercase. Jason emits the same JSON value with uppercase hex digits. Make
+  # that representational choice explicit so identical cross-runtime inputs
+  # have one evidence identity without changing the decoded value.
+  def canonical_sha256(value) do
     value
     |> json_safe()
     |> canonical_json_value()
     |> Jason.encode!()
+    |> normalize_json_unicode_escapes()
     |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
+  end
+
+  defp normalize_json_unicode_escapes(json) do
+    normalize_json_unicode_escapes(json, 0, [])
+  end
+
+  defp normalize_json_unicode_escapes(<<>>, _preceding_backslashes, acc),
+    do: acc |> Enum.reverse() |> IO.iodata_to_binary()
+
+  defp normalize_json_unicode_escapes(
+         <<?\\, ?u, a, b, c, d, rest::binary>> = json,
+         preceding_backslashes,
+         acc
+       ) do
+    digits = <<a, b, c, d>>
+
+    if rem(preceding_backslashes, 2) == 0 and digits =~ ~r/^[0-9A-Fa-f]{4}$/ do
+      normalize_json_unicode_escapes(rest, 0, ["\\u" <> String.downcase(digits) | acc])
+    else
+      <<byte, rest::binary>> = json
+      normalize_json_unicode_escapes(rest, preceding_backslashes + 1, [byte | acc])
+    end
+  end
+
+  defp normalize_json_unicode_escapes(<<byte, rest::binary>>, preceding_backslashes, acc) do
+    next = if byte == ?\\, do: preceding_backslashes + 1, else: 0
+    normalize_json_unicode_escapes(rest, next, [byte | acc])
   end
 
   defp canonical_json_value(map) when is_map(map) and not is_struct(map) do

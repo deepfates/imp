@@ -46,7 +46,7 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 
 The product center is real but the telos is open.
 
-### Principal protocol audit (2026-08-05, after clean `440d003a`)
+### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 
 Start here after compaction or a cold handoff. The chronological evidence below
 is retained for audit, but it does not define priority.
@@ -65,9 +65,10 @@ is retained for audit, but it does not define priority.
   Artifact-to-fresh-service lifecycles; scoped operational advantages for
   owner-only checksummed Artifacts and supervised hard-timeout containment;
   narrow positive TREC and structured Optimize Anything results; clean
-  Banking77, HotPotQA, and Grue negatives; and admitted current matched
-  baselines for AIME (`Imp 75/150`, DSPy `70/150`) and LiveBench Math
-  (`Imp 77/126`, DSPy `81/126`).
+  Banking77, HotPotQA, and Grue negatives; and the complete one-seed matched
+  baseline row across all six official GEPA-suite families. Imp is higher on
+  AIME, IFBench, HoVer, and PAPILLON, tied on HotPotQA, and lower on LiveBench
+  Math. This row measures current runtime behavior, not optimization lift.
 - **Unknown/open:** no current matched GEPA or MIPROv2 arm has completed; broad
   optimizer effectiveness and blanket Imp-over-DSPy superiority are unproved;
   several current DSPy beta surfaces remain tracking/gaps; public release and
@@ -86,20 +87,21 @@ is retained for audit, but it does not define priority.
   persistence, and the ordinary six-family entrances. Its first composed test
   exposed and repaired a real BEAM-RNG/Python-RNG incompatibility in merge.
   No-merge remains an ablation rather than the headline treatment.
-- **Next sequence:** complete the full six-family baseline sweep without using
-  outcomes as a success gate; ratify the scientific optimizer budget; then run
-  the complete merge-enabled GEPA/MIPROv2 table. Do not
+- **Evidence repair:** identical compact cross-runtime JSON inputs now receive
+  one canonical SHA-256 identity even when control-character escapes contain
+  hexadecimal letters. Immutable live Results remain unchanged.
+- **Next sequence:** ratify optimizer scale and spend; then run the complete
+  merge-enabled GEPA/MIPROv2 table. Do not
   replace the ratified table with AIME/IFBench verticals, task-shop after
   results, or let the legal failure ceiling masquerade as planned opportunity.
-- **Current operation:** no provider process is active. The previous `$20`
-  baseline tranche stopped before IFBench transport because its conservative
-  full-condition reservation exceeded the remaining cap. Both ordinary study
-  entrances now enforce a shared prospective rule instead: initial actual spend
-  plus the greater of provider-reported or conservative full-price token cost
-  for completed calls, active/unreconciled reservations, and the next request's
-  full-price envelope must remain under the cap. Provider-free tests
-  prove useful calls are admitted, concurrent reservations cannot oversubscribe
-  the cap, and a refusal is fatal safety rather than a benchmark score.
+- **Current operation:** no provider process is active. The completed baseline
+  tranche conservatively charged `$15.155289378` of its `$20` authority. Both
+  ordinary study entrances enforce the same prospective rule: initial actual
+  spend plus the greater of provider-reported or conservative full-price token
+  cost for completed calls, active/unreconciled reservations, and the next
+  request's full-price envelope must remain under the cap. The remaining
+  `$4.844710622` does not authorize optimizer calls; their experimental scale
+  and a new spend boundary are an explicit owner decision.
 
 Primary restart coordinates are this epic, `imp-88sn`, `README.md`,
 `docs/CONFORMANCE.md`, `benchmarks/claims.json`, and the executable

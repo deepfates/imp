@@ -44,13 +44,17 @@ by changing tasks or thresholds after seeing outcomes.
 
 ## Current status
 
-### Principal protocol audit (2026-08-05, after clean `440d003a`)
+### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 
-The recognized six-task endpoint remains ratified. The current table has two
-admitted baseline cells (AIME and LiveBench Math), zero current GEPA cells, and
-zero current MIPROv2 cells. Complete the remaining matched baselines across all
-six families; they are breadth data, not a success gate or a substitute for the
-optimizer comparison.
+The recognized six-task endpoint remains ratified. The one-seed matched
+baseline row is complete across all six families; it has zero current GEPA
+cells and zero current MIPROv2 cells. Imp is higher on AIME, IFBench, HoVer, and
+PAPILLON, tied on HotPotQA, and lower on LiveBench Math. These direct scores and
+their different adapter/error burdens are runtime breadth data, not optimizer
+effectiveness, causal superiority, or a success gate for the optimizer rows.
+The IFBench vertical-tab row exposed only hexadecimal escape-case drift in the
+cross-language evidence hash; prospective compact JSON identities now
+normalize that spelling without changing decoded inputs or immutable Results.
 
 The exact current three-seed/two-runtime plan has two deliberately different
 accounting views. Its no-failure/no-JSON-fallback nominal schedule is
@@ -78,15 +82,18 @@ fit cost. Once frozen, run every declared GEPA/MIPROv2 arm and retain schema-3
 Artifact application plus four-call fresh concurrent `ProgramServer` service
 for each selected Imp optimizer arm.
 
-No provider process is active. The ordinary Imp and pinned-DSPy entrances now
-enforce the corrected spend rule provider-free: before each transport, initial
-actual spend plus the greater of provider-reported or conservative full-price
-token cost for completed calls, active or unreconciled reservations, and that
-request's full-price envelope must remain under the owner cap. A refusal is
-fatal operational safety, never a zero-scored task failure, and is retained
-as an inconclusive stop. The next provider action remains the complete baseline
-sweep; its giant whole-condition planning maximum no longer blocks useful work
-before call one.
+No provider process is active. The baseline tranche conservatively charged
+`$15.155289378` of the owner's `$20` authority. The ordinary Imp and pinned-DSPy
+entrances now enforce the corrected spend rule provider-free: before each
+transport, initial actual spend plus the greater of provider-reported or
+conservative full-price token cost for completed calls, active or unreconciled
+reservations, and that request's full-price envelope must remain under the
+owner cap. A refusal is fatal operational safety, never a zero-scored task
+failure, and is retained
+as an inconclusive stop. The remaining `$4.844710622` does not authorize an
+optimizer arm. The next provider action requires explicit ratification of the
+optimizer study's scientific scale and spend; the legal failure ceiling must
+not be mistaken for planned opportunity or expected cost.
 
 ### Owner-ratified correction and next evidence tranche (2026-08-01)
 

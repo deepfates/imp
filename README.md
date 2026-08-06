@@ -110,13 +110,15 @@ valid, but does not rehabilitate the old result. These outcomes show that the
 product can optimize, select, persist, and serve honestly; they do not establish
 broad optimizer effectiveness. The next research milestone is a matched
 current-model Imp-versus-DSPy table across the official six-task GEPA suite.
-The two completed baseline cells are only the beginning of that table. The
-remaining baselines should be completed across all six families. Imp now has a
-source-authenticated merge-enabled GEPA profile matching current DSPy's public
-treatment shape; the exact current-study optimizer budget still requires
-ratification before the full GEPA and MIPROv2 sweep. This is an adapted
-current-model comparison using official task families and metrics, not an exact
-historical GEPA paper reproduction or a success-gated task search.
+Its one-seed matched baseline row is complete: Imp scored higher on AIME,
+IFBench, HoVer, and PAPILLON, tied on HotPotQA, and scored lower on LiveBench
+Math. This is runtime and measurement evidence, not optimizer effectiveness or
+a general superiority result. Imp now has a source-authenticated merge-enabled
+GEPA profile matching current DSPy's public treatment shape; the scientific
+scale and spend for the GEPA and MIPROv2 optimizer rows still require explicit
+ratification. This is an adapted current-model comparison using official task
+families and metrics, not an exact historical GEPA paper reproduction or a
+success-gated task search.
 The complementary Grue stateful-agent condition has now completed the real
 optimizer, Artifact, fresh-restart, and concurrent OTP lifecycle; its three
 fixed local-model seeds all retained baseline with zero causal lift, so it is a

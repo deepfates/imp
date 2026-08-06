@@ -354,6 +354,32 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert progress_path |> File.read!() |> String.split("\n", trim: true) |> length() == 3
   end
 
+  test "cross-runtime input identity normalizes JSON control escape spelling" do
+    root = File.cwd!()
+    script = Path.join(root, "scripts/gepa_suite_condition.exs")
+    source = File.read!(script)
+
+    body =
+      String.replace_suffix(
+        source,
+        "Imp.GepaSuiteConditionCLI.main(System.argv())\n",
+        ""
+      )
+
+    Code.compile_string(body, script)
+
+    value = %{
+      "joined" => "literal backslash\\\vtab",
+      "prompt" => "literal \\u000B text and vertical\vtab",
+      "row" => 82
+    }
+
+    # hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+    # ensure_ascii=False).encode()).hexdigest()
+    assert apply(Imp.GepaSuiteConditionCLI, :canonical_sha256, [value]) ==
+             "16d8efd5b0233ede64694cc890229b856c13155497ba5ce8c9f6ee173a8c8ad1"
+  end
+
   test "live model prices produce catalog-calculated request costs" do
     root = File.cwd!()
     script = Path.join(root, "scripts/gepa_suite_condition.exs")
