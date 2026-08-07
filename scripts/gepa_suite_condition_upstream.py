@@ -896,8 +896,8 @@ def matched_baseline(args: argparse.Namespace, spec: dict[str, Any], imp_identit
         and receipt.get("arm") == "baseline"
         and receipt.get("seed") == args.seed
         and receipt.get("heldout_decoded") is True
-        and isinstance(heldout.get("score"), (int, float))
-        and heldout.get("row_count") == spec["split_counts"]["test"]
+        and isinstance(heldout.get("mean"), (int, float))
+        and heldout.get("count") == spec["split_counts"]["test"]
         and actual.get("source_tracked_clean") is True
         and actual.get("source_commit") == args.baseline_source_commit
         and comparable(actual) == comparable(expected)
@@ -907,7 +907,7 @@ def matched_baseline(args: argparse.Namespace, spec: dict[str, Any], imp_identit
     return {
         "result_sha256": sha256(args.baseline_result),
         "source_commit": args.baseline_source_commit,
-        "heldout_score": heldout["score"],
+        "heldout_score": heldout["mean"],
         "heldout_error_count": heldout.get("error_count"),
         "progress_sha256": receipt.get("progress_sha256"),
     }

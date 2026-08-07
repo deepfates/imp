@@ -197,7 +197,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     payload = {
         "status": "complete", "family": "IFBench", "arm": "baseline", "seed": 2026080101,
         "heldout_decoded": True,
-        "heldout": {"score": 0.75, "row_count": 294, "error_count": 3},
+        "heldout": {"mean": 0.75, "count": 294, "error_count": 3},
         "progress_sha256": "0" * 64,
         "condition": baseline_condition,
         "data": condition.data_receipt(source),
