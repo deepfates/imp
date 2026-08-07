@@ -46,7 +46,7 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 
 The product center is real but the telos is open.
 
-### Principal protocol audit (2026-08-06, after clean `951c0f1b`)
+### Principal protocol audit (2026-08-06, after clean `88165e77`)
 
 Start here after compaction or a cold handoff. The chronological evidence below
 is retained for audit, but it does not define priority.
@@ -68,9 +68,10 @@ is retained for audit, but it does not define priority.
   owner-only checksummed Artifacts and supervised hard-timeout containment;
   narrow positive TREC and structured Optimize Anything results; clean
   Banking77, HotPotQA, and Grue negatives; and the complete one-seed matched
-  baseline row across all six official GEPA-suite families. Imp is higher on
-  AIME, IFBench, HoVer, and PAPILLON, tied on HotPotQA, and lower on LiveBench
-  Math. This row measures current runtime behavior, not optimization lift.
+  `4096`-token baseline row across all six official GEPA-suite families. The
+  separately admitted source-sized `16384`-token IFBench denominator scores
+  Imp `0.7619047619` and DSPy `0.7874149660`. These rows measure current
+  runtime behavior, not optimization lift.
 - **Unknown/open:** no current matched GEPA or MIPROv2 arm has completed; broad
   optimizer effectiveness and blanket Imp-over-DSPy superiority are unproved;
   the stable DSPy `3.3.0` delta has not been fully classified or implemented;
@@ -116,18 +117,24 @@ is retained for audit, but it does not define priority.
   invalid IFBench optimizer direction with the corrected scorer and matched
   pinned DSPy. A valid negative remains a real table cell; it may not be hidden
   by task-shopping or threshold changes.
-- **Current operation:** no provider process is active. The first matched 16k
-  IFBench baseline attempt at clean `e507f7d3` is scientifically inconclusive:
-  Imp completed at `.75` but retained seven transported failures and 21 row
-  errors; DSPy retained 27 provider rate-limit failures and stopped under its
-  prospective `$5` cap before a held-out Result. The pair exposed shared-route
-  capacity at sixteen combined in-flight calls, not framework quality. Preserve
-  both receipts, exclude `.75` from the table, and rerun both runtimes at
-  matched concurrency two; never rerun DSPy alone against the contaminated Imp
-  result. The stopped pair is conservatively debited at `$6.52465722`; the
-  successor receives `$2` per baseline lane and each Heavy lane `$44.50`, for a
-  worst-case cumulative `$99.52465722`. The owner has authorized up to `$100`
-  for this one pre-benchmark tranche. Both
+- **Current operation:** the matched source-sized baseline successor is
+  complete and valid from clean `88165e77`. Both runtimes used concurrency two,
+  the official `150/300/294` rows, seed `2026080101`, the exact dated DeepSeek
+  V4 Flash/SiliconFlow route, and the `16384` task cap. Imp scored
+  `0.7619047619` with 18 row errors; DSPy scored `0.7874149660` with 14. Imp
+  retained two isolated no-status request failures and both runtimes retained
+  ordinary length/parse failures, but neither lane had a rate-limit or cap
+  stop. The immutable Result/progress hashes are Imp
+  `0c142adcb01c8dab706b77c7b9786121f8a75b1fb942e99f1d1d6a57873453df` /
+  `87bf67c87bc2e72d0e1dc400d3ccce11d4a9929acaa36d91012543309e4d8af1`
+  and DSPy
+  `797c154a5b61c8c5ad09e0b9276d0c2516ab97f3980b0c4049113a00eb9e69ed` /
+  `bb8c51102f607ef4613a446b1f09d82cbc3100285255da8c4870c27cc1c9d44e`.
+  Conservative terminal accounting is `$0.96841498` and `$0.74249490`; with
+  the stopped pair's `$6.52465722` debit and both fixed `$44.50` Heavy caps,
+  cumulative worst exposure is now `$97.23556710`. The next provider action is
+  the preregistered matched MIPROv2-Heavy pair, bound to these exact baseline
+  Results and reviewed baseline source commit. Both
   ordinary study entrances enforce the same prospective rule: initial actual
   spend plus the greater of provider-reported or conservative full-price token
   cost for completed calls, active/unreconciled reservations, and the next
@@ -139,9 +146,9 @@ is retained for audit, but it does not define priority.
   nominal transports; MIPRO is `15,694` nominal and `31,258` legal transports
   across both runtimes. Both roles use `16384` output tokens and a `900000`
   nested-content-byte fail-closed input guard under the current `1048576`
-  context limit. The combined `$100` is split prospectively into four
-  non-transferable lane caps: `$5` per baseline runtime and `$45` per MIPRO
-  runtime. The evidence-only repair also requires the exact reviewed baseline
+  context limit. After the first capacity stop, the non-transferable successor
+  caps are `$2` per baseline runtime and `$44.50` per MIPRO runtime. The
+  evidence-only repair also requires the exact reviewed baseline
   source commit and Result SHA before any optimizer transport and carries them
   through terminal Result, Artifact/state, and fresh evidence. No provider call begins until exact catalog/ZDR/privacy/route checks,
   clean provider-free construction, and the prospective guard pass.

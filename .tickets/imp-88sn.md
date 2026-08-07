@@ -201,6 +201,44 @@ its SHA-256 through the optimizer Result, Imp Artifact or DSPy selected-state
 receipt, and fresh-process evidence. This prevents the historical 4k baseline,
 or an unreviewed code-identical-looking Result, from becoming the denominator.
 
+### Valid source-sized denominator (2026-08-06)
+
+The concurrency-two successor completed both ordinary baseline paths from exact
+clean commit `88165e772d19aa110479332a60b61cc53072381c`. It preserved the frozen
+official `150/300/294` rows, seed `2026080101`, temperature `1.0`, no
+retry/fallback/cache, `120000` ms timeout, exact
+`deepseek/deepseek-v4-flash-0731` on `siliconflow/fp8`, and the `16384` output
+cap. Neither runtime encountered a provider rate limit or prospective cap stop,
+so this pair is an admitted matched denominator rather than another capacity
+stop.
+
+Imp scored `0.7619047619047619` over 294 held-out rows with 18 row errors. It
+made 616 task attempts, retained 614 usage-bearing completions, 44 length stops,
+43 adapter JSON fallbacks, and two isolated no-status
+`ReqLLM.Error.API.Request` failures without retries. Its joined cost was
+`$0.70723994`; the conservative terminal accounting is `$0.96841498` after
+retaining two unknown-cost reservations. Result/progress SHA-256 identities are
+`0c142adcb01c8dab706b77c7b9786121f8a75b1fb942e99f1d1d6a57873453df` and
+`87bf67c87bc2e72d0e1dc400d3ccce11d4a9929acaa36d91012543309e4d8af1`.
+
+Pinned DSPy scored `0.7874149659863946` over the same 294 rows with 14 row
+errors. It made 628 usage-bearing task transports, retained 42 length stops and
+no transport errors, and ended with `$0.74249490` reconciled/accounted cost.
+Result/progress identities are
+`797c154a5b61c8c5ad09e0b9276d0c2516ab97f3980b0c4049113a00eb9e69ed` and
+`bb8c51102f607ef4613a446b1f09d82cbc3100285255da8c4870c27cc1c9d44e`.
+DSPy is higher by `0.0255102040816327` (7.5 exact-count points). This is a
+narrow valid baseline advantage, not optimizer effectiveness.
+
+The read-only OpenRouter account snapshot moved by `$1.46662378` across the
+window, compared with `$1.44973484` joined Result cost; the account delta is
+corroboration only, not exact treatment attribution. Conservatively debiting
+the two terminal Results plus the stopped pair and retaining both fixed
+`$44.50` Heavy caps yields a cumulative worst exposure of `$97.23556710` under
+the owner-authorized `$100`. Heavy is preregistered regardless of which
+baseline scored higher and must bind each runtime's exact Result SHA plus
+baseline source commit before its first optimizer transport.
+
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 
 The recognized six-task endpoint remains ratified. The one-seed matched
