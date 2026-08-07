@@ -40,7 +40,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
       assert receipt["outer_max_concurrency"] == 8
       assert receipt["request_timeout_ms"] == 120_000
 
-      assert receipt["condition"]["request_timeout_semantics"] ==
+      assert receipt["request_timeout_semantics"] ==
                "client_receive_timeout_not_hard_total_wall_clock"
 
       assert receipt["condition"]["seed"] == 2_026_080_101
@@ -203,7 +203,15 @@ defmodule Imp.GepaSuiteConditionCLITest do
     assert receipt["progress_sha256"] == sha256(progress_path)
     assert File.stat!(progress_path).mode |> Bitwise.band(0o777) == 0o600
     assert [header] = progress_path |> File.read!() |> String.split("\n", trim: true)
-    assert Jason.decode!(header)["event"] == "start"
+    header = Jason.decode!(header)
+    assert header["event"] == "start"
+    assert is_binary(header["recorded_at"])
+    assert is_binary(header["process_id"])
+    assert is_list(header["argv"])
+    assert header["restart_policy"] == "fresh_pair_only_no_partial_optimizer_resume"
+    assert header["condition"] == receipt["condition"]
+    assert header["data"] == receipt["data"]
+    assert header["matched_baseline"] == receipt["matched_baseline"]
     assert is_integer(receipt["wall_time_us"])
     assert receipt["wall_time_us"] >= 0
   end
@@ -739,7 +747,13 @@ defmodule Imp.GepaSuiteConditionCLITest do
     :ok =
       :telemetry.attach_many(
         telemetry_id,
-        [[:imp, :gepa_suite, :role, :stop], [:imp, :gepa_suite, :role, :exception]],
+        [
+          [:imp, :gepa_suite, :role, :stop],
+          [:imp, :gepa_suite, :role, :exception],
+          [:imp, :gepa_suite, :spend, :reserved],
+          [:imp, :gepa_suite, :spend, :settled],
+          [:imp, :gepa_suite, :spend, :retained]
+        ],
         fn event, measurements, metadata, parent ->
           send(parent, {:role_event, event, measurements, metadata})
         end,
@@ -755,6 +769,24 @@ defmodule Imp.GepaSuiteConditionCLITest do
 
       assert is_integer(duration)
       assert duration >= 0
+    end
+
+    for reservation_id <- 1..2 do
+      assert_receive {:role_event, [:imp, :gepa_suite, :spend, :reserved], %{},
+                      %{
+                        role: :task,
+                        reservation_id: ^reservation_id,
+                        reservation_usd: 0.4,
+                        spend: %{active_requests: 1}
+                      }}
+
+      assert_receive {:role_event, [:imp, :gepa_suite, :spend, :settled], %{},
+                      %{
+                        role: :task,
+                        reservation_id: ^reservation_id,
+                        actual_cost_usd: 0.1,
+                        spend: %{active_requests: 0}
+                      }}
     end
 
     assert {:error, %Imp.OperationalSafetyError{kind: :budget}} =
@@ -881,7 +913,6 @@ defmodule Imp.GepaSuiteConditionCLITest do
       "temperature" => 1.0,
       "max_concurrency" => max_concurrency,
       "request_timeout_ms" => 120_000,
-      "request_timeout_semantics" => "client_receive_timeout_not_hard_total_wall_clock",
       "cache" => false,
       "retries" => 0,
       "fallback" => false,

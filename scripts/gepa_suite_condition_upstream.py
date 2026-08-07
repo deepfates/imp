@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from datetime import datetime, timezone
 import hashlib
 import importlib
 import importlib.util
@@ -58,6 +59,7 @@ FAMILY_SHAPES = {
 RUNTIME_EVENTS: list[dict[str, Any]] = []
 RUNTIME_LOCK = threading.Lock()
 PROGRESS_PATH: Path | None = None
+PROGRESS_SEQUENCE = 0
 ACTIVE_ARGS: argparse.Namespace | None = None
 ACTIVE_STAGE = "preflight"
 ACTIVE_PREFLIGHT: dict[str, Any] | None = None
@@ -98,6 +100,14 @@ class ProspectiveSpendGuard:
             identity = self.next_id
             self.next_id += 1
             self.active[identity] = reservation
+            append_progress_event({
+                "event": "spend_reservation",
+                "status": "reserved",
+                "role": role,
+                "reservation_id": identity,
+                "reservation_usd": reservation,
+                "spend": self._snapshot_unlocked(),
+            })
             return identity
 
     def settle(self, identity: int, actual_cost: float) -> None:
@@ -107,25 +117,42 @@ class ProspectiveSpendGuard:
         with self.lock:
             if self.active.pop(identity, None) is not None:
                 self.accounted += float(actual_cost)
+                append_progress_event({
+                    "event": "spend_reservation",
+                    "status": "settled",
+                    "reservation_id": identity,
+                    "actual_cost_usd": float(actual_cost),
+                    "spend": self._snapshot_unlocked(),
+                })
 
     def retain(self, identity: int) -> None:
         with self.lock:
             reservation = self.active.pop(identity, None)
             if reservation is not None:
                 self.retained += reservation
+                append_progress_event({
+                    "event": "spend_reservation",
+                    "status": "retained",
+                    "reservation_id": identity,
+                    "reservation_usd": reservation,
+                    "spend": self._snapshot_unlocked(),
+                })
 
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
-            active = sum(self.active.values())
-            return {
-                "initial_actual_cost_usd": self.initial_actual,
-                "reconciled_accounted_cost_usd": self.accounted,
-                "retained_reservation_usd": self.retained,
-                "active_reservation_usd": active,
-                "active_requests": len(self.active),
-                "owner_cap_usd": self.owner_cap,
-                "accounted_total_usd": self.initial_actual + self.accounted + self.retained + active,
-            }
+            return self._snapshot_unlocked()
+
+    def _snapshot_unlocked(self) -> dict[str, Any]:
+        active = sum(self.active.values())
+        return {
+            "initial_actual_cost_usd": self.initial_actual,
+            "reconciled_accounted_cost_usd": self.accounted,
+            "retained_reservation_usd": self.retained,
+            "active_reservation_usd": active,
+            "active_requests": len(self.active),
+            "owner_cap_usd": self.owner_cap,
+            "accounted_total_usd": self.initial_actual + self.accounted + self.retained + active,
+        }
 
 
 def parse_args() -> argparse.Namespace:
@@ -475,29 +502,74 @@ def record_runtime_error(role: str, messages: Any, started_ns: int, error: BaseE
 
 def append_runtime_event(event: dict[str, Any]) -> None:
     with RUNTIME_LOCK:
-        event = {**event, "sequence": len(RUNTIME_EVENTS) + 1}
+        event = {**event, "runtime_sequence": len(RUNTIME_EVENTS) + 1}
+        event = append_progress_event(event, lock_held=True)
         RUNTIME_EVENTS.append(event)
+
+
+def append_progress_event(event: dict[str, Any], lock_held: bool = False) -> dict[str, Any]:
+    global PROGRESS_SEQUENCE
+
+    def append() -> dict[str, Any]:
+        global PROGRESS_SEQUENCE
+        PROGRESS_SEQUENCE += 1
+        recorded = {
+            **event,
+            "sequence": PROGRESS_SEQUENCE,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
         if PROGRESS_PATH is not None:
             with PROGRESS_PATH.open("a") as handle:
-                handle.write(json.dumps(event, sort_keys=True, default=str) + "\n")
+                handle.write(json.dumps(recorded, sort_keys=True, default=str) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        return recorded
+
+    if lock_held:
+        return append()
+    with RUNTIME_LOCK:
+        return append()
 
 
-def init_progress(args: argparse.Namespace) -> Path:
-    global PROGRESS_PATH
+def init_progress(
+    args: argparse.Namespace,
+    preflight: dict[str, Any] | None = None,
+    admission: dict[str, Any] | None = None,
+    matched_baseline_receipt: dict[str, Any] | None = None,
+) -> Path:
+    global PROGRESS_PATH, PROGRESS_SEQUENCE
     if args.output is None:
         raise RuntimeError("live progress requires --output")
     PROGRESS_PATH = args.output.with_suffix(args.output.suffix + ".progress.jsonl")
     PROGRESS_PATH.parent.mkdir(parents=True, exist_ok=True)
     PROGRESS_PATH.parent.chmod(0o700)
+    PROGRESS_SEQUENCE = 0
     header = {
         "event": "start",
         "family": args.family,
         "arm": args.arm,
         "seed": args.seed,
         "max_concurrency": args.max_concurrency,
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "process_id": os.getpid(),
+        "argv": sys.argv,
+        "restart_policy": "fresh_pair_only_no_partial_optimizer_resume",
+        "request_timeout_ms": 120_000,
+        "request_timeout_semantics": "client_receive_timeout_not_hard_total_wall_clock",
+        "condition": (preflight or {}).get("condition"),
+        "data": (preflight or {}).get("data"),
+        "matched_baseline": matched_baseline_receipt,
+        "spend_admission": admission,
+        "output_paths": {
+            "result": str(args.output),
+            "state": str(args.output.with_suffix(".state.json")),
+            "fresh": str(args.output.with_suffix(".fresh.json")),
+        },
     }
     with PROGRESS_PATH.open("x") as handle:
         handle.write(json.dumps(header, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
     PROGRESS_PATH.chmod(0o600)
     return PROGRESS_PATH
 
@@ -829,7 +901,6 @@ def condition_receipt(args: argparse.Namespace, imp_identity: dict[str, Any]) ->
         "temperature": 1.0,
         "max_concurrency": args.max_concurrency,
         "request_timeout_ms": 120_000,
-        "request_timeout_semantics": "client_receive_timeout_not_hard_total_wall_clock",
         "cache": False,
         "retries": 0,
         "fallback": False,
@@ -965,6 +1036,8 @@ def main() -> None:
         "arm": args.arm,
         "seed": args.seed,
         "outer_max_concurrency": args.max_concurrency,
+        "request_timeout_ms": 120_000,
+        "request_timeout_semantics": "client_receive_timeout_not_hard_total_wall_clock",
         "splits": spec["split_counts"],
         "metric_calls": spec["metric_calls"],
         "runtime": {"bridge": bridge.as_dict(), "gepa": runtime},
@@ -993,7 +1066,7 @@ def main() -> None:
     ACTIVE_PREFLIGHT = preflight
     admission = spend_admission(args)
     SPEND_GUARD = ProspectiveSpendGuard(args.initial_cost_usd, args.max_cost_usd)
-    progress_path = init_progress(args)
+    progress_path = init_progress(args, preflight, admission, baseline_receipt)
 
     task_lm = make_lm(dspy, "task", args)
     reflection_lm = make_lm(dspy, "reflection", args)

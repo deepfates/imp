@@ -363,9 +363,19 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
     assert usage["cost_usd"] == 0.0
     assert condition.SPEND_GUARD.snapshot()["reconciled_accounted_cost_usd"] > 0
     progress_lines = progress.read_text().splitlines()
-    assert len(progress_lines) == 2
+    assert len(progress_lines) == 4
     assert progress.stat().st_mode & 0o777 == 0o600
-    assert json.loads(progress_lines[1])["sequence"] == 1
+    reserve_event = json.loads(progress_lines[1])
+    settle_event = json.loads(progress_lines[2])
+    transport_event = json.loads(progress_lines[3])
+    assert reserve_event["sequence"] == 1
+    assert reserve_event["event"] == "spend_reservation"
+    assert reserve_event["status"] == "reserved"
+    assert settle_event["sequence"] == 2
+    assert settle_event["status"] == "settled"
+    assert transport_event["sequence"] == 3
+    assert transport_event["status"] == "ok"
+    assert all("recorded_at" in json.loads(line) for line in progress_lines)
     args.judge_max_input_bytes = 2
     args.judge_max_output_tokens = 16
     admission = condition.spend_admission(args)

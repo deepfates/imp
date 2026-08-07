@@ -71,7 +71,12 @@ defmodule Imp.GepaSuiteSpendGuard do
   def generate(_messages, _opts), do: {:error, :gepa_suite_spend_guard_instance_required}
 
   def generate(%__MODULE__{} = lm, messages, opts) do
-    with {:ok, reservation_id} <- reserve(lm) do
+    with {:ok, reservation_id, reservation_snapshot} <- reserve(lm) do
+      emit_spend_event(:reserved, lm.role, reservation_id, %{
+        reservation_usd: lm.reservation_usd,
+        spend: reservation_snapshot
+      })
+
       started = System.monotonic_time()
 
       case generate_inner(lm.inner, messages, opts) do
@@ -79,11 +84,23 @@ defmodule Imp.GepaSuiteSpendGuard do
           case response_cost(value, lm) do
             {:ok, usage} ->
               settle(lm.guard, reservation_id, usage.cost_usd)
+
+              emit_spend_event(:settled, lm.role, reservation_id, %{
+                actual_cost_usd: usage.cost_usd,
+                spend: snapshot(lm.guard)
+              })
+
               emit_role_event(:stop, lm.role, started, usage)
               success
 
             {:error, reason} ->
               retain(lm.guard, reservation_id)
+
+              emit_spend_event(:retained, lm.role, reservation_id, %{
+                reservation_usd: lm.reservation_usd,
+                spend: snapshot(lm.guard)
+              })
+
               emit_role_event(:exception, lm.role, started, %{error: reason})
 
               {:error,
@@ -96,6 +113,12 @@ defmodule Imp.GepaSuiteSpendGuard do
 
         {:error, _reason} = error ->
           retain(lm.guard, reservation_id)
+
+          emit_spend_event(:retained, lm.role, reservation_id, %{
+            reservation_usd: lm.reservation_usd,
+            spend: snapshot(lm.guard)
+          })
+
           emit_role_event(:exception, lm.role, started, %{error: elem(error, 1)})
           error
       end
@@ -117,6 +140,16 @@ defmodule Imp.GepaSuiteSpendGuard do
     )
   end
 
+  defp emit_spend_event(status, role, reservation_id, metadata) do
+    :telemetry.execute(
+      [:imp, :gepa_suite, :spend, status],
+      %{},
+      metadata
+      |> Map.put(:role, role)
+      |> Map.put(:reservation_id, reservation_id)
+    )
+  end
+
   defp reserve(lm) do
     Agent.get_and_update(lm.guard, fn state ->
       active = state.active |> Map.values() |> Enum.sum()
@@ -128,8 +161,21 @@ defmodule Imp.GepaSuiteSpendGuard do
       if projected <= state.owner_cap_usd + 1.0e-9 do
         id = state.next_id
 
-        {{:ok, id},
-         %{state | active: Map.put(state.active, id, lm.reservation_usd), next_id: id + 1}}
+        next = %{state | active: Map.put(state.active, id, lm.reservation_usd), next_id: id + 1}
+        active_reservation = next.active |> Map.values() |> Enum.sum()
+
+        snapshot =
+          next
+          |> Map.drop([:active, :next_id])
+          |> Map.put(:active_reservation_usd, active_reservation)
+          |> Map.put(:active_requests, map_size(next.active))
+          |> Map.put(
+            :accounted_total_usd,
+            next.initial_actual_cost_usd + next.reconciled_accounted_cost_usd +
+              next.retained_reservation_usd + active_reservation
+          )
+
+        {{:ok, id, snapshot}, next}
       else
         error =
           %Imp.OperationalSafetyError{
@@ -491,6 +537,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       seed: config.seed,
       outer_max_concurrency: config.max_concurrency,
       request_timeout_ms: @request_timeout_ms,
+      request_timeout_semantics: :client_receive_timeout_not_hard_total_wall_clock,
       req_llm_pool: req_llm_pool(config),
       heldout_decoded: false,
       split_counts: prepared.loaded.spec["split_counts"],
@@ -522,7 +569,7 @@ defmodule Imp.GepaSuiteConditionCLI do
 
     matched_baseline = matched_baseline!(config, prepared)
     admission = spend_admission(config)
-    progress = init_progress!(config)
+    progress = init_progress!(config, prepared, matched_baseline, admission)
 
     {wall_time_us, outcome, usage} =
       capture_runtime(
@@ -594,6 +641,7 @@ defmodule Imp.GepaSuiteConditionCLI do
         progress_sha256: sha256(progress),
         wall_time_us: wall_time_us,
         request_timeout_ms: @request_timeout_ms,
+        request_timeout_semantics: :client_receive_timeout_not_hard_total_wall_clock,
         req_llm_pool: req_llm_pool(config),
         spend_admission: Map.put(admission, "final", spend_snapshot(config)),
         fresh_spend_admission: fresh_spend,
@@ -625,7 +673,9 @@ defmodule Imp.GepaSuiteConditionCLI do
   defp fresh!(config, prepared) do
     for key <- [:artifact, :fresh_output], do: required_config!(config, key)
     ensure_new_targets!([config.fresh_output, progress_path(config)])
-    progress = init_progress!(config)
+    matched_baseline = matched_baseline!(config, prepared)
+    admission = spend_admission(config)
+    progress = init_progress!(config, prepared, matched_baseline, admission)
 
     for file <- ~w(support_pipeline.ex callbacks.ex workflow.ex program_server.ex) do
       Code.require_file(
@@ -633,7 +683,6 @@ defmodule Imp.GepaSuiteConditionCLI do
       )
     end
 
-    matched_baseline = matched_baseline!(config, prepared)
     loaded_artifact_sha256 = sha256(config.artifact)
     artifact = Artifact.read!(config.artifact)
 
@@ -1033,7 +1082,6 @@ defmodule Imp.GepaSuiteConditionCLI do
       temperature: 1.0,
       max_concurrency: config.max_concurrency,
       request_timeout_ms: @request_timeout_ms,
-      request_timeout_semantics: :client_receive_timeout_not_hard_total_wall_clock,
       cache: false,
       retries: 0,
       fallback: false,
@@ -1244,7 +1292,10 @@ defmodule Imp.GepaSuiteConditionCLI do
           [:req_llm, :request, :exception],
           [:imp, :adapter, :parse, :json_fallback],
           [:imp, :gepa_suite, :role, :stop],
-          [:imp, :gepa_suite, :role, :exception]
+          [:imp, :gepa_suite, :role, :exception],
+          [:imp, :gepa_suite, :spend, :reserved],
+          [:imp, :gepa_suite, :spend, :settled],
+          [:imp, :gepa_suite, :spend, :retained]
         ],
         &__MODULE__.handle_runtime_event/4,
         usage
@@ -1517,6 +1568,34 @@ defmodule Imp.GepaSuiteConditionCLI do
         add_usage(get_in(state, ["by_role", Atom.to_string(role)]), delta)
       )
       |> Map.put("events", [event_record | state["events"]])
+      |> Map.put("next_sequence", sequence + 1)
+    end)
+  end
+
+  def handle_runtime_event(
+        [:imp, :gepa_suite, :spend, status],
+        _measurements,
+        metadata,
+        usage
+      )
+      when status in [:reserved, :settled, :retained] do
+    event_record = %{
+      "sequence" => nil,
+      "event" => "spend_reservation",
+      "status" => Atom.to_string(status),
+      "role" => metadata |> Map.fetch!(:role) |> Atom.to_string(),
+      "reservation_id" => Map.fetch!(metadata, :reservation_id),
+      "reservation_usd" => Map.get(metadata, :reservation_usd),
+      "actual_cost_usd" => Map.get(metadata, :actual_cost_usd),
+      "spend" => json_safe(Map.fetch!(metadata, :spend))
+    }
+
+    Agent.update(usage, fn state ->
+      sequence = state["next_sequence"]
+      event_record = Map.put(event_record, "sequence", sequence)
+      append_progress!(state["progress_path"], event_record)
+
+      state
       |> Map.put("next_sequence", sequence + 1)
     end)
   end
@@ -1815,7 +1894,7 @@ defmodule Imp.GepaSuiteConditionCLI do
     end)
   end
 
-  defp init_progress!(config) do
+  defp init_progress!(config, prepared, matched_baseline, admission) do
     progress_path = progress_path(config)
     File.mkdir_p!(Path.dirname(progress_path))
     File.chmod!(Path.dirname(progress_path), 0o700)
@@ -1825,11 +1904,27 @@ defmodule Imp.GepaSuiteConditionCLI do
       "family" => config.family,
       "arm" => config.arm,
       "seed" => config.seed,
-      "max_concurrency" => config.max_concurrency
+      "max_concurrency" => config.max_concurrency,
+      "recorded_at" => recorded_at(),
+      "process_id" => System.pid(),
+      "argv" => System.argv(),
+      "restart_policy" => "fresh_pair_only_no_partial_optimizer_resume",
+      "request_timeout_ms" => @request_timeout_ms,
+      "request_timeout_semantics" => "client_receive_timeout_not_hard_total_wall_clock",
+      "condition" => json_safe(condition_receipt(config)),
+      "data" => json_safe(data_receipt(prepared.loaded.spec)),
+      "matched_baseline" => json_safe(matched_baseline),
+      "spend_admission" => json_safe(admission),
+      "output_paths" => %{
+        "result" => config.output,
+        "artifact" => config.artifact,
+        "fresh" => config.fresh_output
+      }
     }
 
     File.open!(progress_path, [:write, :exclusive], fn file ->
       IO.binwrite(file, Jason.encode!(json_safe(header)) <> "\n")
+      :ok = :file.sync(file)
     end)
 
     File.chmod!(progress_path, 0o600)
@@ -1842,8 +1937,15 @@ defmodule Imp.GepaSuiteConditionCLI do
   end
 
   defp append_progress!(path, event) do
-    File.write!(path, Jason.encode!(json_safe(event)) <> "\n", [:append])
+    event = Map.put_new(event, "recorded_at", recorded_at())
+
+    File.open!(path, [:append], fn file ->
+      IO.binwrite(file, Jason.encode!(json_safe(event)) <> "\n")
+      :ok = :file.sync(file)
+    end)
   end
+
+  defp recorded_at, do: DateTime.utc_now() |> DateTime.to_iso8601()
 
   defp emit(payload), do: IO.puts(Jason.encode!(json_safe(payload)))
   defp sha256(path), do: :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
