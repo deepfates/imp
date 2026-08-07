@@ -194,6 +194,56 @@ is retained for audit, but it does not define priority.
   `$0.001896916` DSPy partial cost as `initial-cost-usd` inside the existing
   non-transferable `$44.50` DSPy cap.
 
+  A second fresh pair from clean `9a8154d5` crossed setup and exposed a
+  different, source-reproduced Imp fidelity defect before any search trial.
+  Pinned DSPy ignored MIPRO's extra Predict-only `max_depth` input while Imp's
+  upstream proposer forwarded it into ReqLLM generation options. DSPy completed
+  all `65` reflection calls and entered its 300-row internal baseline; Imp
+  completed `47` reflection calls but rejected `18` program-aware
+  module-description calls before provider transport. The interrupted Imp lane
+  retained `178` task completions, two active task requests, and no terminal
+  Result. DSPy's terminal failure Result records `146` successful task calls,
+  two ordinary task errors, `65` reflection calls, two active requests, and a
+  `KeyboardInterrupt`. Neither lane produced an optimizer trial outcome,
+  selected state, held-out score, Artifact, or fresh service. This is another
+  product/treatment stop, not an IFBench or MIPRO scientific result.
+
+  The immutable second root is
+  `ifbench-sourcecap-mipro-heavy-c2-9a8154d5-Ce5EKa`. Its DSPy
+  log/Result/progress hashes are
+  `6007da5f0c36ce70848d31942ac61097717f18cbfba6032d82992aa371818aaf` /
+  `e2aead1a8c34c42a66239943089f74e512ab5806dc30427c7bf59a30e96fe312` /
+  `035aaf46cff0c714fd324e754cec508145297e63aa195364e4b4ea3534b3160a`;
+  its Imp log/progress hashes are
+  `f531d8904cc2cb3927c3a82a117f288151708030d0ebb2700d8a0d20b33ac040` /
+  `17e1722e1993fd6ecf00fa3d86c5a2464ee3f203810c22d244e6d4f2e68b84de`.
+  All are private mode `0600` under a mode-`0700` root.
+
+  Clean repair `a889590b` removes the generation-option leak and proves the
+  complete source-sized proposal sequence against pinned DSPy through the real
+  ReqLLM parser. Clean `013d54b3` separately restores exact admission of both
+  immutable `88165e77` baselines by keeping timeout interpretation outside
+  treatment identity. It also makes the existing progress JSONL crash-auditable:
+  the start record binds the full condition, data, baseline, spend admission,
+  argv/PID/output paths, UTC time, and fresh-pair-only restart policy, while
+  every reservation transition is timestamped, synchronized to disk, and
+  carries the conservative guard snapshot. This remains a restart-only matched
+  cell; Imp's public optimizer resume mechanism is not used asymmetrically.
+
+  Frozen accounting is intentionally more conservative than provider billing.
+  Imp's carry-forward is `$27.98555792`: `$0.77017488` settled work,
+  `18 * $1.497456 = $26.954208` retained reflection envelopes for the
+  pretransport failures, and `$0.26117504` for two active task envelopes.
+  DSPy's terminal accounted carry-forward is `$1.475607856`, already including
+  the first stop. A fresh pair must pass those exact values as initial cost
+  inside the unchanged `$44.50` per-lane caps; the overall `$97.23556710`
+  worst-case authorization therefore does not expand. The clean entrances now
+  accept the exact retained baseline hashes provider-free. Before dispatch,
+  repeat current catalog/route/privacy/price checks and run the pair under an
+  awake monitored process with a predeclared 20-minute no-progress pair stop.
+  A watchdog or lane failure is inconclusive and stops both; no partial resume,
+  favorable-lane retention, or treatment edit is allowed.
+
 The provider-free scale audit gives that decision concrete units. One complete
 generated seed across both runtimes and both remaining optimizer arms is
 `358,876` nominal transports (`700,068` legal with ordinary task fallback and

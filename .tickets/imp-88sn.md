@@ -275,6 +275,52 @@ is scientifically valid because neither runtime produced any candidate,
 selection, or heldout outcome; it must preserve the stopped root and carry the
 DSPy partial cost as `initial-cost-usd` within the existing `$44.50` cap.
 
+The next fresh pair at clean `9a8154d5` also stopped before an optimizer
+outcome, for a different and now reproduced reason. Pinned DSPy treats MIPRO's
+extra `max_depth` value as an ignored Predict-only input. Imp incorrectly
+forwarded it into ReqLLM generation options, so `18` program-aware
+module-description proposal slots failed before transport. DSPy completed all
+`65` reflection calls and entered its 300-row internal baseline; Imp completed
+`47` reflection calls and `178` task calls, with two task requests active at
+interruption. DSPy's terminal failure Result retains `146` successful task
+calls, two ordinary task errors, `65` reflection calls, two active requests,
+and `KeyboardInterrupt`. There was no search-trial outcome, selection, held-out
+decode, selected state, Artifact, or fresh service in either lane. This is a
+product/treatment stop, not scientific evidence about optimizer usefulness.
+
+The immutable private root is
+`ifbench-sourcecap-mipro-heavy-c2-9a8154d5-Ce5EKa`. DSPy
+log/Result/progress SHA-256 identities are
+`6007da5f0c36ce70848d31942ac61097717f18cbfba6032d82992aa371818aaf` /
+`e2aead1a8c34c42a66239943089f74e512ab5806dc30427c7bf59a30e96fe312` /
+`035aaf46cff0c714fd324e754cec508145297e63aa195364e4b4ea3534b3160a`;
+Imp log/progress identities are
+`f531d8904cc2cb3927c3a82a117f288151708030d0ebb2700d8a0d20b33ac040` /
+`17e1722e1993fd6ecf00fa3d86c5a2464ee3f203810c22d244e6d4f2e68b84de`.
+All retained files are mode `0600` under a mode-`0700` root.
+
+Clean `a889590b` removes the option leak and exercises the exact source-sized
+proposal sequence against pinned DSPy through a real local ReqLLM parser.
+Clean `013d54b3` keeps descriptive timeout semantics outside matched treatment
+identity, so both exact `88165e77` baselines again admit provider-free. It also
+makes the existing progress files sufficient after abrupt death: their start
+records bind the full condition/data/baseline/spend/argv/PID/output identity and
+fresh-pair-only policy, and every reservation transition is timestamped,
+fsynced, and includes the conservative guard snapshot. The matched cell is
+restart-only; do not use Imp-only optimizer resume.
+
+The required initial debits are `$27.98555792` for Imp and `$1.475607856` for
+DSPy inside their unchanged `$44.50` lane caps. Imp's value deliberately
+includes `$26.954208` in retained envelopes for the `18` pretransport failures,
+even though evidenced provider billing for those calls is zero; this preserves
+the frozen prospective-accounting policy. The overall `$97.23556710` worst
+case does not expand. A successor is scientifically valid only from a new
+private root with unchanged rows, seed, models/routes, opportunity, baseline
+binding, and strict held-out barrier. Immediately before it starts, repeat the
+catalog/route/privacy/price checks and use an awake paired monitor with a
+predeclared 20-minute no-progress stop. Any lane/watchdog failure stops both and
+is inconclusive; no partial resume or favorable-lane retention.
+
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 
 The recognized six-task endpoint remains ratified. The one-seed matched
