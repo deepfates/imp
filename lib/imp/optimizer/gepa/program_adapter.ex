@@ -87,7 +87,8 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
       side_information: side_information(trajectories, components),
       metadata: %{
         metric_calls: length(trajectories),
-        failures: Enum.count(trajectories, &(not is_nil(&1.error)))
+        failures: Enum.count(trajectories, &(not is_nil(&1.error))),
+        killed: Enum.count(trajectories, &Imp.Optimizer.Trajectory.killed?/1)
       }
     )
   end

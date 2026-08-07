@@ -127,6 +127,14 @@ defmodule Imp.Optimizer.Trajectory do
     redact_value(trajectory, keys)
   end
 
+  @doc """
+  True when this trajectory's failure came from a killed evaluation task
+  (timeout or deadline exhaustion), not from model or metric behavior.
+  """
+  @spec killed?(t()) :: boolean()
+  def killed?(%__MODULE__{error: {:task_exit, _reason}}), do: true
+  def killed?(%__MODULE__{}), do: false
+
   @doc "Dumps every trajectory field into a deterministic JSON-safe versioned map."
   @spec dump(t()) :: map()
   def dump(%__MODULE__{} = trajectory) do
@@ -1073,6 +1081,8 @@ defmodule Imp.Optimizer.TrajectoryRunner do
   alias Imp.Optimizer.{Trace, Trajectory}
   alias Imp.Optimizer.GEPA.Coordinator
 
+  require Logger
+
   @spec run(struct(), Enumerable.t(), function(), keyword()) :: [Trajectory.t()]
   def run(program, examples, metric, opts \\ []) do
     program = annotate_predictors(program)
@@ -1103,7 +1113,7 @@ defmodule Imp.Optimizer.TrajectoryRunner do
       on_timeout: :kill_task,
       zip_input_on_exit: true
     )
-    |> to_trajectories(opts)
+    |> to_trajectories(opts, "timeout: #{inspect(timeout)}")
   end
 
   # Task.async_stream applies its timeout per task. Split a deadline-bound
@@ -1148,27 +1158,58 @@ defmodule Imp.Optimizer.TrajectoryRunner do
       on_timeout: :kill_task,
       zip_input_on_exit: true
     )
-    |> to_trajectories(opts)
+    |> to_trajectories(opts, "deadline remaining: #{inspect(remaining)}ms")
   end
 
-  defp to_trajectories(results, opts) do
-    Enum.map(results, fn
-      {:ok, trajectory} ->
-        Imp.OperationalSafetyError.raise_if_present!(trajectory)
-        trajectory
+  defp to_trajectories(results, opts, budget) do
+    trajectories =
+      Enum.map(results, fn
+        {:ok, trajectory} ->
+          Imp.OperationalSafetyError.raise_if_present!(trajectory)
+          trajectory
 
-      {:exit, {{example, index}, reason}} ->
-        Imp.OperationalSafetyError.raise_if_present!(reason)
-        failed(index, normalize_example(example), [], {:task_exit, reason}, opts)
+        {:exit, {{example, index}, reason}} ->
+          Imp.OperationalSafetyError.raise_if_present!(reason)
+          warn_killed_row(index, reason, budget)
+          failed(index, normalize_example(example), [], {:task_exit, reason}, opts)
 
-      {:exit, reason} ->
-        Imp.OperationalSafetyError.raise_if_present!(reason)
-        failed(-1, nil, [], {:task_exit, reason}, opts)
-    end)
+        {:exit, reason} ->
+          Imp.OperationalSafetyError.raise_if_present!(reason)
+          warn_killed_row(-1, reason, budget)
+          failed(-1, nil, [], {:task_exit, reason}, opts)
+      end)
+
+    warn_killed_summary(trajectories)
+    trajectories
   end
 
-  defp timed_out_trajectory({example, index}, opts),
-    do: failed(index, normalize_example(example), [], {:task_exit, :timeout}, opts)
+  # A killed task is machinery, not model behavior; scoring it 0.0 silently
+  # would be indistinguishable from a real miss (mirrors Imp.Evaluate's
+  # warning for the identical event).
+  defp warn_killed_row(index, reason, budget) do
+    Logger.warning(
+      "Imp.Optimizer.Trajectory killed row #{index} (#{inspect(reason)}) after exceeding its " <>
+        "time budget (#{budget}); recording score 0.0. This is a killed call, not a model " <>
+        "miss - raise :timeout or use :infinity if your model calls are legitimately slow."
+    )
+  end
+
+  defp warn_killed_summary(trajectories) do
+    killed = Enum.count(trajectories, &Imp.Optimizer.Trajectory.killed?/1)
+
+    if killed > 0 do
+      Logger.warning(
+        "Imp.Optimizer.Trajectory: #{killed} of #{length(trajectories)} rows were killed on " <>
+          "time budget and scored 0.0; candidate scores from this batch are deflated by " <>
+          "machinery, not model behavior."
+      )
+    end
+  end
+
+  defp timed_out_trajectory({example, index}, opts) do
+    warn_killed_row(index, :deadline_exhausted, "deadline remaining: 0ms")
+    failed(index, normalize_example(example), [], {:task_exit, :timeout}, opts)
+  end
 
   defp evaluate(program, example, index, metric, opts) do
     example = normalize_example(example)

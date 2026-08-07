@@ -129,6 +129,47 @@ defmodule Imp.Optimizer.TrajectoryTest do
     end
   end
 
+  test "timeout-killed rows warn loudly and are marked killed, not model misses" do
+    slow_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Process.sleep(200)
+          %{answer: "Paris"}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: slow_lm)
+    example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
+    metric = fn _example, _prediction -> 1.0 end
+
+    {trajectories, log} =
+      ExUnit.CaptureLog.with_log(fn ->
+        Imp.Optimizer.TrajectoryRunner.run(program, [example], metric, timeout: 20)
+      end)
+
+    [trajectory] = trajectories
+    assert trajectory.score == 0.0
+    assert Imp.Optimizer.Trajectory.killed?(trajectory)
+    assert log =~ "killed row 0"
+    assert log =~ "not a model miss"
+    assert log =~ "1 of 1 rows were killed"
+  end
+
+  test "successful rows are not marked killed and emit no kill warning" do
+    program = program(false)
+    example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
+    metric = fn _example, _prediction -> 1.0 end
+
+    {trajectories, log} =
+      ExUnit.CaptureLog.with_log(fn ->
+        Imp.Optimizer.TrajectoryRunner.run(program, [example], metric, timeout: 5_000)
+      end)
+
+    [trajectory] = trajectories
+    refute Imp.Optimizer.Trajectory.killed?(trajectory)
+    refute log =~ "killed"
+  end
+
   defp program(fail_after_first) do
     hint_lm = %{
       module: Imp.LM.Static,
