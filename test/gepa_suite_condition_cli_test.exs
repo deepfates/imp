@@ -39,6 +39,10 @@ defmodule Imp.GepaSuiteConditionCLITest do
       assert receipt["provider_calls_authorized"] == false
       assert receipt["outer_max_concurrency"] == 8
       assert receipt["request_timeout_ms"] == 120_000
+
+      assert receipt["condition"]["request_timeout_semantics"] ==
+               "client_receive_timeout_not_hard_total_wall_clock"
+
       assert receipt["condition"]["seed"] == 2_026_080_101
       assert receipt["data"]["split_counts"] == receipt["split_counts"]
       assert map_size(receipt["data"]["split_checksums"]) == 3
@@ -877,6 +881,7 @@ defmodule Imp.GepaSuiteConditionCLITest do
       "temperature" => 1.0,
       "max_concurrency" => max_concurrency,
       "request_timeout_ms" => 120_000,
+      "request_timeout_semantics" => "client_receive_timeout_not_hard_total_wall_clock",
       "cache" => false,
       "retries" => 0,
       "fallback" => false,

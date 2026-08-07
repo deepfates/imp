@@ -829,6 +829,7 @@ def condition_receipt(args: argparse.Namespace, imp_identity: dict[str, Any]) ->
         "temperature": 1.0,
         "max_concurrency": args.max_concurrency,
         "request_timeout_ms": 120_000,
+        "request_timeout_semantics": "client_receive_timeout_not_hard_total_wall_clock",
         "cache": False,
         "retries": 0,
         "fallback": False,

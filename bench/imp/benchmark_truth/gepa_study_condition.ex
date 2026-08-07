@@ -40,6 +40,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
   def optimizer!(:baseline, _prepared, _seed), do: nil
 
   def optimizer!(:mipro_v2_heavy, prepared, seed) do
+    spec = prepared.loaded.spec
+
     MIPROv2.new(prepared.metric,
       auto: :heavy,
       prompt_lm: prepared.lms.reflection,
@@ -53,7 +55,19 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
       data_aware_proposer: true,
       tip_aware_proposer: true,
       fewshot_aware_proposer: true,
-      program_grounding: {:text, prepared.program_grounding}
+      program_grounding: {:text, prepared.program_grounding},
+      metric_identity: %{
+        "id" => "matched-current-model-gepa-suite/#{spec["family"]}/metric",
+        "version" => 1,
+        "config" =>
+          Map.take(spec, [
+            "family",
+            "upstream_metric",
+            "output_key",
+            "source",
+            "source_commit"
+          ])
+      }
     )
   end
 
@@ -96,7 +110,8 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
         optimizer,
         prepared.program,
         prepared.loaded.train,
-        prepared.loaded.dev
+        prepared.loaded.dev,
+        Keyword.take(opts, [:checkpoint_fn, :resume_state, :max_trials])
       )
 
     %{

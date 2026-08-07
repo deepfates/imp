@@ -347,6 +347,12 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     assert Enum.map(calls, fn {messages, _opts} -> stringify(messages) end) ==
              upstream["prompt_messages"]
 
+    # DSPy passes max_depth=10 to Predict as an extra input field. Predict
+    # ignores it because DescribeModule has no such signature field; it never
+    # reaches the LM generation options. Keeping that boundary matters for
+    # strict clients such as ReqLLM, which reject unknown generation options.
+    refute Enum.any?(calls, fn {_messages, opts} -> Keyword.has_key?(opts, :max_depth) end)
+
     proposal_calls = Enum.drop(calls, 2)
 
     assert Enum.map(proposal_calls, fn {_messages, opts} -> opts[:rollout_id] end) ==
@@ -354,6 +360,9 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     report = Imp.Optimizer.Report.fetch(paused)
     assert report.metadata.proposals.main.program_aware
+    assert report.metadata.proposals.main.status == :ok
+    assert report.metadata.proposals.main.errors == []
+    assert Enum.all?(report.metadata.proposals.main.slots, &(&1.program_context_calls == 2))
     assert report.metadata.proposals.main.calls == 6
     assert report.metadata.proposals.main.candidate_count == 2
     assert report.metadata.proposals.main.total_setup_calls == 8
@@ -511,6 +520,100 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         program_code: "Predict(text) -> route"
       )
     end
+  end
+
+  test "program-aware proposals reach the real ReqLLM option parser without Predict-only fields" do
+    owner = self()
+
+    base_url =
+      Imp.Test.LocalHTTP.start(fn request ->
+        body = Jason.decode!(request.body)
+        send(owner, {:program_aware_req_llm_wire, body})
+
+        prompt = body["messages"] |> Enum.map_join("\n", & &1["content"])
+
+        {field, value} =
+          cond do
+            String.contains?(prompt, "proposed_instruction") ->
+              {"proposed_instruction", "Use the grounded program and module descriptions."}
+
+            String.contains?(prompt, "module_description") ->
+              {"module_description", "Routes the first-stage draft into a final answer."}
+
+            String.contains?(prompt, "program_description") ->
+              {"program_description", "A two-stage instruction-following program."}
+
+            String.contains?(prompt, "summary") ->
+              {"summary", "Instruction-following requests with strict constraints."}
+
+            String.contains?(prompt, "observations") ->
+              {"observations", "Rows contain prompts and required route labels."}
+          end
+
+        content = "[[ ## #{field} ## ]]\n#{value}\n\n[[ ## completed ## ]]"
+
+        {200,
+         %{
+           "id" => "provider-disabled-program-aware",
+           "object" => "chat.completion",
+           "model" => "provider-disabled-program-aware",
+           "choices" => [
+             %{
+               "index" => 0,
+               "message" => %{"role" => "assistant", "content" => content},
+               "finish_reason" => "stop"
+             }
+           ],
+           "usage" => %{
+             "prompt_tokens" => 1,
+             "completion_tokens" => 1,
+             "total_tokens" => 2,
+             "cost" => 0.0
+           }
+         }}
+      end)
+
+    lm =
+      Imp.req_llm(
+        %{
+          provider: :openai,
+          id: "provider-disabled-program-aware",
+          model: "provider-disabled-program-aware",
+          base_url: base_url <> "/v1"
+        },
+        api_key: "provider-disabled",
+        cache: false,
+        temperature: 1.0,
+        max_tokens: 1024,
+        max_retries: 0
+      )
+
+    trainset = [Imp.example(text: "request", route: "K11") |> Imp.with_inputs(:text)]
+    summary = UpstreamProposer.summarize!(lm, trainset, 10)
+    predictor = Imp.predict(Imp.signature("text -> route", "Route the request."))
+
+    {instructions, report} =
+      UpstreamProposer.propose_with_report!(lm, predictor, summary,
+        count: 1,
+        seed: 9,
+        temperature: 1.0,
+        program_aware: true,
+        program_code: "draft = Predict(text) -> draft\nfinal = Predict(draft) -> route"
+      )
+
+    assert instructions == ["Use the grounded program and module descriptions."]
+    assert report.status == :ok
+    assert report.errors == []
+    assert [%{program_context_calls: 2, program_context_error: nil}] = report.slots
+
+    wires =
+      for _ <- 1..5 do
+        assert_receive {:program_aware_req_llm_wire, body}
+        body
+      end
+
+    assert Enum.map(wires, fn body -> body["model"] end) ==
+             List.duplicate("provider-disabled-program-aware", 5)
   end
 
   test "compile overwrites candidate zero with baseline and resume rejects fidelity drift" do

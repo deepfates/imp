@@ -238,8 +238,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
               module: module
             },
             rollout_id: rollout_id,
-            temperature: temperature,
-            max_depth: 10
+            temperature: temperature
           )
           |> Imp.get(:module_description)
           |> strip_prefix()

@@ -1033,6 +1033,7 @@ defmodule Imp.GepaSuiteConditionCLI do
       temperature: 1.0,
       max_concurrency: config.max_concurrency,
       request_timeout_ms: @request_timeout_ms,
+      request_timeout_semantics: :client_receive_timeout_not_hard_total_wall_clock,
       cache: false,
       retries: 0,
       fallback: false,
