@@ -111,7 +111,7 @@ product can optimize, select, persist, and serve honestly; they do not establish
 broad optimizer effectiveness. The next research milestone is a matched
 current-model Imp-versus-DSPy table across the official six-task GEPA suite.
 Its one-seed matched `4096`-token baseline row is complete. A separately
-admitted source-sized `16384`-token IFBench denominator now scores Imp
+completed source-sized `16384`-token IFBench denominator now scores Imp
 `0.7619047619` and DSPy `0.7874149660`; this is runtime and measurement
 evidence, not optimizer effectiveness or a general superiority result. Imp now
 has a source-authenticated merge-enabled GEPA profile matching current DSPy's

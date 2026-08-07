@@ -247,15 +247,33 @@ now accept their exact own-runtime baseline and reject a mismatched schema
 before any optimizer transport; the focused upstream condition suite passes
 `11/11`.
 
-The Heavy pair remains unstarted because the immediate live catalog preflight
-reports status `-2` for the exact frozen DeepSeek/SiliconFlow task endpoint,
-versus status `0` during the admitted baseline. The endpoint remains present in
-the ZDR catalog with the same model identity, prices, context, and cache
-capability; the exact Gemini/Google proposer endpoint remains status `0`, and
-account usage is unchanged at `$238.667041876`. This is an unresolved external
-route-health anomaly. Do not infer optimizer evidence from it or silently
-change the treatment: recheck the same route and launch only after the frozen
-healthy-preflight condition is restored.
+The exact route recovered to status `0` and the full live preflight passed, but
+the first matched Heavy launch from clean `6ccf37e8` stopped on an Imp dispatch
+defect before Imp made any provider call. `optimize!/4` passed the prepared
+condition as `optimizer!/3`'s arm argument, so Imp retained a terminal failed
+Result with zero attempts/spend and no candidate, selection, heldout, Artifact,
+or service outcome. The paired DSPy lane was terminated under the frozen stop
+rule after eight usage-bearing bootstrap task calls costing `$0.001896916`,
+before proposal/search/selection/heldout/state/service; those calls have no
+scientific interpretation. The shared-key account window moved
+`$249.770880876 -> $249.773126476`, which is corroboration only.
+
+Private root `ifbench-sourcecap-mipro-heavy-c2-6ccf37e8-T85xPy` preserves the
+mode-`0600` Imp Result/progress/log hashes
+`0138febb81ac86d8a8b7848f37d5a312d526f573de6fa31ec93fde83b6728361` /
+`a881911285efec73446e52022585453b35ce437789b6665475f82f96e50ec103` /
+`e964aa82b7e54c4513fa32ab6e67e0e1bb027784ffb10d66bdfd6f37585e9dc6`
+and DSPy progress/log hashes
+`331ca114f016c3e1d590f1f466f8bde08994cae3af792cf8d0d2dbb4da978ec8` /
+`ca9a254c5d04b44674c8bdcee875f86f024927b25fee1774560819095df32fcc`.
+The owning
+repair removes the erroneous pipeline for both MIPROv2-Heavy and merge-GEPA.
+A provider-free regression forces each nonbaseline arm to reach its actual
+compile boundary, and the focused suites pass `3/3` plus `24/24`. This is a
+product/integration stop, not an optimizer result. A fresh unchanged successor
+is scientifically valid because neither runtime produced any candidate,
+selection, or heldout outcome; it must preserve the stopped root and carry the
+DSPy partial cost as `initial-cost-usd` within the existing `$44.50` cap.
 
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 

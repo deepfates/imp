@@ -89,10 +89,15 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
     do: %{selected: prepared.program, artifact: nil, report: nil}
 
   def optimize!(:mipro_v2_heavy, prepared, seed, opts) do
+    optimizer = optimizer!(:mipro_v2_heavy, prepared, seed)
+
     selected =
-      prepared
-      |> optimizer!(:mipro_v2_heavy, seed)
-      |> MIPROv2.compile(prepared.program, prepared.loaded.train, prepared.loaded.dev)
+      MIPROv2.compile(
+        optimizer,
+        prepared.program,
+        prepared.loaded.train,
+        prepared.loaded.dev
+      )
 
     %{
       selected: selected,
@@ -106,10 +111,11 @@ defmodule Imp.BenchmarkTruth.GepaStudyCondition do
   end
 
   def optimize!(:gepa_v0_1_4_merge, prepared, seed, opts) do
+    optimizer = optimizer!(:gepa_v0_1_4_merge, prepared, seed)
+
     {selected, report, artifact} =
-      prepared
-      |> optimizer!(:gepa_v0_1_4_merge, seed)
-      |> GEPA.compile_with_artifact(
+      GEPA.compile_with_artifact(
+        optimizer,
         prepared.program,
         prepared.loaded.train,
         prepared.loaded.dev,

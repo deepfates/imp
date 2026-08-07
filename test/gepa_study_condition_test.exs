@@ -10,6 +10,21 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
     def generate(_lm, _messages, _opts), do: raise("provider call was not expected")
   end
 
+  defmodule SafetyLM do
+    defstruct []
+
+    def generate(_messages, _opts), do: raise(safety_error())
+    def generate(_lm, _messages, _opts), do: raise(safety_error())
+
+    defp safety_error do
+      %Imp.OperationalSafetyError{
+        kind: :budget,
+        message: "provider-disabled compile boundary",
+        reason: :provider_disabled_compile_boundary
+      }
+    end
+  end
+
   @root "tmp/gepa-six-task-current-root"
 
   @tag :evidence_infrastructure
@@ -44,6 +59,24 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
 
     assert prepared.loaded.test_count == 150
     refute Map.has_key?(prepared.loaded, :test)
+  end
+
+  @tag :evidence_infrastructure
+  test "nonbaseline optimize paths reach execution with the declared arm" do
+    lm = %SafetyLM{}
+
+    prepared =
+      GepaStudyCondition.prepare!(@root, "AIMEBench", %{
+        task: lm,
+        reflection: lm,
+        judge: lm
+      })
+
+    for arm <- [:mipro_v2_heavy, :gepa_v0_1_4_merge] do
+      assert_raise Imp.OperationalSafetyError, ~r/provider-disabled compile boundary/, fn ->
+        GepaStudyCondition.optimize!(arm, prepared, 17)
+      end
+    end
   end
 
   @tag :evidence_infrastructure

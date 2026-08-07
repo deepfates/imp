@@ -162,16 +162,37 @@ is retained for audit, but it does not define priority.
   binding into selected-state/fresh evidence. The focused upstream condition
   suite passes `11/11`.
 
-  Heavy has not started. The immediate live preflight still finds the exact
-  task endpoint `deepseek/deepseek-v4-flash-0731` on `siliconflow/fp8` in the
-  ZDR catalog with the frozen model, prices, context, and no implicit caching,
-  but its catalog status changed from the admitted baseline's `0` to `-2`.
-  The exact Gemini proposer endpoint remains status `0`, and the account usage
-  snapshot remains `$238.667041876`. Because the preregistered rule requires an
-  unchanged healthy exact route, this is an external route-health hold—not a
-  product defect, scientific result, or reason to substitute a different
-  provider. Recheck the same route; launch the already-frozen pair only when
-  the exact preflight is healthy. No provider process is active.
+  The exact task route later returned to status `0`, the full live preflight
+  passed, and the matched Heavy pair began once from clean `6ccf37e8`. Imp then
+  failed before its first transport: the ordinary nonbaseline dispatch piped
+  the prepared condition into `optimizer!/3` as the arm argument. Its terminal
+  Result records zero attempts and zero spend while retaining the exact
+  baseline binding. Per the frozen stop rule, the concurrently started DSPy
+  lane was terminated during its first bootstrap set after eight usage-bearing
+  task calls (`$0.001896916` joined cost), before proposals, search, selection,
+  heldout access, selected state, or fresh service. The account snapshot moved
+  from `$249.770880876` to `$249.773126476` across the window; that larger
+  `$0.002245600` delta is shared-key corroboration, not treatment attribution.
+
+  This is a product/integration stop and no optimizer result exists. Private
+  root `ifbench-sourcecap-mipro-heavy-c2-6ccf37e8-T85xPy` retains the Imp
+  Result/progress hashes
+  `0138febb81ac86d8a8b7848f37d5a312d526f573de6fa31ec93fde83b6728361` /
+  `a881911285efec73446e52022585453b35ce437789b6665475f82f96e50ec103`,
+  Imp log
+  `e964aa82b7e54c4513fa32ab6e67e0e1bb027784ffb10d66bdfd6f37585e9dc6`,
+  and DSPy progress/log
+  `331ca114f016c3e1d590f1f466f8bde08994cae3af792cf8d0d2dbb4da978ec8` /
+  `ca9a254c5d04b44674c8bdcee875f86f024927b25fee1774560819095df32fcc`,
+  all mode `0600`. The repair
+  calls both optimizer constructors with the declared arm before compilation;
+  a provider-free regression now makes both Heavy and merge-GEPA reach their
+  real compile boundaries, and the focused condition suites pass `3/3` and
+  `24/24`. A clean from-scratch successor is scientifically valid because no
+  candidate, selection, or heldout outcome was produced. It must preserve this
+  stop, use the unchanged treatment and fresh output root, and debit the
+  `$0.001896916` DSPy partial cost as `initial-cost-usd` inside the existing
+  non-transferable `$44.50` DSPy cap.
 
 The provider-free scale audit gives that decision concrete units. One complete
 generated seed across both runtimes and both remaining optimizer arms is
