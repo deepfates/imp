@@ -5382,6 +5382,7 @@
       "category": "experimental",
       "functions": [
         "dump/1",
+        "killed?/1",
         "load!/1",
         "load/1",
         "project/3",
@@ -5397,6 +5398,9 @@
         "functions": {
           "dump/1": [
             "dump(trajectory)"
+          ],
+          "killed?/1": [
+            "killed?(trajectory)"
           ],
           "load!/1": [
             "load!(state)"

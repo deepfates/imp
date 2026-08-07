@@ -228,6 +228,9 @@ defmodule Imp.Optimize.Anything.Adapter do
       )
       |> Enum.map(&resolve_task_result(&1, adapter.raise_on_exception))
 
+    # No completeness here (an exception can be a legitimately scored outcome
+    # under exceptions-as-scores); the killed count in metadata is what stops
+    # timeout-killed 0.0s from being cached and replayed on resume.
     result_from_evaluations(adapter, candidate, evaluations, capture_traces, false)
   end
 
@@ -567,7 +570,12 @@ defmodule Imp.Optimize.Anything.Adapter do
     trajectories = Enum.map(evaluations, & &1.trajectory)
     failures = Enum.count(evaluations, &(not is_nil(&1.trajectory.error)))
 
-    metadata = %{failures: failures, mode: adapter.mode}
+    # killed counts timeout-killed evaluator tasks. The engine refuses to
+    # cache any result carrying killed rows, so resumed runs re-evaluate
+    # them; completeness (acceptance semantics) is a separate, stricter
+    # concept recorded only on the batch-evaluator path.
+    killed = Enum.count(evaluations, &Map.get(&1, :killed, false))
+    metadata = %{failures: failures, killed: killed, mode: adapter.mode}
 
     metadata =
       if record_completeness?, do: Map.put(metadata, :complete?, failures == 0), else: metadata
@@ -932,6 +940,7 @@ defmodule Imp.Optimize.Anything.Adapter do
       output: nil,
       side_info: diagnostic,
       objective_scores: %{},
+      killed: true,
       trajectory: trajectory(index, example, nil, 0.0, diagnostic, %{}, diagnostic["error"])
     }
   end

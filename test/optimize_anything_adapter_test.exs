@@ -108,7 +108,7 @@ defmodule Imp.Optimize.Anything.AdapterTest do
       Evaluation.evaluate(partial, [:first, :failed, :third], %{prompt: "candidate"})
 
     assert result.scores == [1.0, 0.0, 3.0]
-    assert result.metadata == %{complete?: false, failures: 1, mode: :multi_task}
+    assert result.metadata == %{complete?: false, failures: 1, killed: 0, mode: :multi_task}
     assert Enum.map(result.outputs, &elem(&1, 1)) == List.duplicate(%{prompt: "candidate"}, 3)
 
     assert get_in(result.side_information, [:prompt, Access.at(1), "error"]) =~

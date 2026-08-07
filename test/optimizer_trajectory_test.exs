@@ -155,6 +155,35 @@ defmodule Imp.Optimizer.TrajectoryTest do
     assert log =~ "1 of 1 rows were killed"
   end
 
+  test "GEPA ProgramAdapter counts killed rows in result metadata" do
+    slow_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Process.sleep(200)
+          %{answer: "Paris"}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: slow_lm)
+    example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
+    metric = fn _example, _prediction -> 1.0 end
+
+    adapter = Imp.Optimizer.GEPA.ProgramAdapter.new(program, metric, timeout: 20)
+    candidate = Map.new(adapter.component_order, &{&1, "Answer the question."})
+
+    {result, _log} =
+      ExUnit.CaptureLog.with_log(fn ->
+        Imp.Optimizer.GEPA.ProgramAdapter.evaluate(adapter, [example], candidate, [])
+      end)
+
+    assert result.metadata.killed == 1
+    refute Map.has_key?(result.metadata, :complete?)
+
+    fast_adapter = Imp.Optimizer.GEPA.ProgramAdapter.new(program, metric, timeout: 5_000)
+    fast_result = Imp.Optimizer.GEPA.ProgramAdapter.evaluate(fast_adapter, [example], candidate, [])
+    assert fast_result.metadata.killed == 0
+  end
+
   test "successful rows are not marked killed and emit no kill warning" do
     program = program(false)
     example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)

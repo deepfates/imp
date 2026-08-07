@@ -49,6 +49,11 @@ defmodule Imp.Optimizer.Report do
     "all_improvements" => :all_improvements,
     "ancestors" => :ancestors,
     "avatar" => :avatar,
+    # Evaluation-completeness metadata (killed rows must not be cached or
+    # accepted) travels inside persisted results and decodes in a fresh VM
+    # before any evaluator module is loaded.
+    "complete?" => :complete?,
+    "killed" => :killed,
     # BootstrapFewShot marks generated demonstrations with this owned field.
     # Saved programs decode demos before the optimizer module is necessarily
     # loaded in a fresh OS process, so this portable marker cannot depend on

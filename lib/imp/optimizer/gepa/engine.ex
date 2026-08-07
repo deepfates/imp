@@ -1685,7 +1685,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
                 record_with_reservation(state.budget, actual, plan.reservation, :full)
 
               cache =
-                if (cache? and fresh) && complete_evaluation?(fresh) do
+                if (cache? and fresh) && complete_evaluation?(fresh) &&
+                     not killed_rows?(fresh) do
                   backend.put(state.cache, plan.proposal.candidate, plan.missing_batch, fresh)
                 else
                   state.cache
@@ -4343,7 +4344,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
             case record_with_reservation(state.budget, actual_calls, reservation, kind) do
               {:ok, budget} ->
-                cache = backend.put(state.cache, candidate, missing_batch, missing_result)
+                cache =
+                  maybe_cache_result(state.cache, candidate, missing_batch, missing_result, true)
+
                 notify_budget_updated(opts, state, budget, actual_calls, event.iteration)
                 notify_evaluation_end(opts, result, event)
                 {:ok, result, %{state | budget: budget, cache: cache}}
@@ -4445,12 +4448,21 @@ defmodule Imp.Optimizer.GEPA.Engine do
   end
 
   defp maybe_cache_result(cache, candidate, batch, result, true) do
-    if complete_evaluation?(result),
+    if complete_evaluation?(result) and not killed_rows?(result),
       do: evaluation_cache_backend(cache).put(cache, candidate, batch, result),
       else: cache
   end
 
   defp maybe_cache_result(cache, _candidate, _batch, _result, false), do: cache
+
+  # Results carrying timeout/deadline-killed rows are deflated by machinery,
+  # not model behavior. They stay usable for this run (the kills are loudly
+  # logged and counted) but must never be cached: a resumed run has to
+  # re-evaluate them rather than replay the deflation.
+  defp killed_rows?(%Result{metadata: metadata}) do
+    killed = Map.get(metadata, :killed, Map.get(metadata, "killed", 0))
+    is_integer(killed) and killed > 0
+  end
 
   defp acceptance_completeness(result) when is_struct(result, Result) do
     if incomplete_evaluation?(result),

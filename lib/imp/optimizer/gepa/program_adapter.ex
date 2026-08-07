@@ -81,6 +81,8 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         do: Result.by_component(trajectories, components),
         else: %{}
 
+    killed = Enum.count(trajectories, &Imp.Optimizer.Trajectory.killed?/1)
+
     Result.new(outputs, scores,
       objective_scores: objective_scores,
       trajectories: component_trajectories,
@@ -88,7 +90,12 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
       metadata: %{
         metric_calls: length(trajectories),
         failures: Enum.count(trajectories, &(not is_nil(&1.error))),
-        killed: Enum.count(trajectories, &Imp.Optimizer.Trajectory.killed?/1)
+        # Killed rows are machinery artifacts (timeout/deadline kills), not
+        # model behavior. The engine refuses to cache results that carry any,
+        # so a resumed run re-evaluates them instead of replaying deflated
+        # scores. The run itself proceeds (matching DSPy, which scores
+        # failures 0.0 and continues) - the kills are already loudly logged.
+        killed: killed
       }
     )
   end
