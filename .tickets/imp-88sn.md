@@ -239,6 +239,24 @@ the owner-authorized `$100`. Heavy is preregistered regardless of which
 baseline scored higher and must bind each runtime's exact Result SHA plus
 baseline source commit before its first optimizer transport.
 
+The binding path is now clean at `612ee2aa`. A provider-disabled execution
+found and repaired a real DSPy evidence-boundary bug: the optimizer entrance
+was validating the Imp `heldout.score/row_count` shape instead of the actual
+pinned-DSPy `heldout.mean/count` baseline Result. Both ordinary Heavy entrances
+now accept their exact own-runtime baseline and reject a mismatched schema
+before any optimizer transport; the focused upstream condition suite passes
+`11/11`.
+
+The Heavy pair remains unstarted because the immediate live catalog preflight
+reports status `-2` for the exact frozen DeepSeek/SiliconFlow task endpoint,
+versus status `0` during the admitted baseline. The endpoint remains present in
+the ZDR catalog with the same model identity, prices, context, and cache
+capability; the exact Gemini/Google proposer endpoint remains status `0`, and
+account usage is unchanged at `$238.667041876`. This is an unresolved external
+route-health anomaly. Do not infer optimizer evidence from it or silently
+change the treatment: recheck the same route and launch only after the frozen
+healthy-preflight condition is restored.
+
 ### Principal protocol audit (2026-08-05, after clean `99e7484b`)
 
 The recognized six-task endpoint remains ratified. The one-seed matched

@@ -46,7 +46,7 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 
 The product center is real but the telos is open.
 
-### Principal protocol audit (2026-08-06, after clean `88165e77`)
+### Principal protocol audit (2026-08-06, after clean `612ee2aa`)
 
 Start here after compaction or a cold handoff. The chronological evidence below
 is retained for audit, but it does not define priority.
@@ -152,6 +152,26 @@ is retained for audit, but it does not define priority.
   source commit and Result SHA before any optimizer transport and carries them
   through terminal Result, Artifact/state, and fresh evidence. No provider call begins until exact catalog/ZDR/privacy/route checks,
   clean provider-free construction, and the prospective guard pass.
+
+  The binding is now exercised end to end at clean `612ee2aa`.
+  Provider-disabled construction exposed one real evidence defect before spend:
+  the DSPy optimizer entrance expected Imp's `heldout.score/row_count` fields
+  even though its own completed baseline writes `heldout.mean/count`. The repair
+  validates the actual pinned-DSPy Result schema, and both ordinary Heavy
+  entrances now accept only their own exact completed baseline and carry that
+  binding into selected-state/fresh evidence. The focused upstream condition
+  suite passes `11/11`.
+
+  Heavy has not started. The immediate live preflight still finds the exact
+  task endpoint `deepseek/deepseek-v4-flash-0731` on `siliconflow/fp8` in the
+  ZDR catalog with the frozen model, prices, context, and no implicit caching,
+  but its catalog status changed from the admitted baseline's `0` to `-2`.
+  The exact Gemini proposer endpoint remains status `0`, and the account usage
+  snapshot remains `$238.667041876`. Because the preregistered rule requires an
+  unchanged healthy exact route, this is an external route-health hold—not a
+  product defect, scientific result, or reason to substitute a different
+  provider. Recheck the same route; launch the already-frozen pair only when
+  the exact preflight is healthy. No provider process is active.
 
 The provider-free scale audit gives that decision concrete units. One complete
 generated seed across both runtimes and both remaining optimizer arms is
