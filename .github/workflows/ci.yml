@@ -240,6 +240,33 @@ jobs:
       # per entry there) and on stale ignore entries (list_unused_filters).
       - run: mix dialyzer.check
 
+  differential:
+    name: differential.check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/elixir-setup
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The :dspy_parity suite validates Imp against real pinned DSPy 3.2.1:
+      # a venv with the pinned release plus the pinned source checkout under
+      # tmp/. Children also spawn via zsh (provenance-pinned command shape)
+      # and run `mix run` in the dev env.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q zsh
+      - run: scripts/setup_dspy_parity_env.sh
+      - run: scripts/setup_dspy_stable_source.sh
+      - run: MIX_ENV=dev mix deps.compile && MIX_ENV=dev mix compile
+      # Known-red residue at introduction (tracked on imp-sqkr): the sealed
+      # v1 contract detects mix.lock drift after the bandit CVE bump, and the
+      # MuSiQue receipts read a machine-local /tmp data dir. This job makes
+      # that visible on every run rather than hiding it in the fast lane.
+      - run: mix differential.check
+
   docs:
     name: docs.check
     runs-on: ubuntu-latest
