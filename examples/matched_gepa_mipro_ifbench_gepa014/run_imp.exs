@@ -144,15 +144,24 @@ defmodule MatchedIFBenchGepa014Imp.Observer do
     %{
       task:
         request["task"]["reservation_input_tokens"] *
-          String.to_float(models["task"]["catalog_prompt_per_token"]) +
+          catalog_price!(models["task"]["catalog_prompt_per_token"]) +
           request["task"]["max_tokens"] *
-            String.to_float(models["task"]["catalog_completion_per_token"]),
+            catalog_price!(models["task"]["catalog_completion_per_token"]),
       optimizer:
         request["optimizer"]["reservation_input_tokens"] *
-          String.to_float(models["optimizer"]["catalog_cache_write_per_token"]) +
+          catalog_price!(models["optimizer"]["catalog_cache_write_per_token"]) +
           request["optimizer"]["max_tokens"] *
-            String.to_float(models["optimizer"]["catalog_completion_per_token"])
+            catalog_price!(models["optimizer"]["catalog_completion_per_token"])
     }
+  end
+
+  # String.to_float/1 crashes on integer-formatted prices like "0"; catalog
+  # values must parse completely either way or preflight fails loudly.
+  defp catalog_price!(value) when is_binary(value) do
+    case Float.parse(value) do
+      {price, ""} -> price
+      _other -> raise ArgumentError, "invalid catalog price: #{inspect(value)}"
+    end
   end
 
   defp runtime_usd_limit(manifest) do
