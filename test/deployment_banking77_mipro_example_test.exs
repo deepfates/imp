@@ -1,6 +1,11 @@
 defmodule DeploymentBanking77MIPROExampleTest do
   use ExUnit.Case, async: true
 
+  # Requires the pinned DSPy parity environment (scripts/setup_dspy_parity_env.sh
+  # + setup_dspy_stable_source.sh) and/or example-project deps; runs in the CI
+  # differential lane, not fast.check.
+  @moduletag :dspy_parity
+
   @root Path.expand("../examples/deployment", __DIR__)
   @data Path.join(@root, "data/banking77-mipro-confirmatory-v1.json")
   @script Path.join(@root, "banking77_mipro.exs")

@@ -1,6 +1,11 @@
 defmodule DeploymentHotPotQAGEPAExampleTest do
   use ExUnit.Case, async: false
 
+  # Requires the pinned DSPy parity environment (scripts/setup_dspy_parity_env.sh
+  # + setup_dspy_stable_source.sh) and/or example-project deps; runs in the CI
+  # differential lane, not fast.check.
+  @moduletag :dspy_parity
+
   @example Path.expand("../examples/deployment", __DIR__)
   @data Path.join(@example, "data/hotpotqa-gepa")
 

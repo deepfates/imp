@@ -1,6 +1,11 @@
 defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
   use ExUnit.Case, async: false
 
+  # Requires the pinned DSPy parity environment (scripts/setup_dspy_parity_env.sh
+  # + setup_dspy_stable_source.sh) and/or example-project deps; runs in the CI
+  # differential lane, not fast.check.
+  @moduletag :dspy_parity
+
   alias Imp.BenchmarkTruth.MusiqueAnsMiproCurrent, as: Plan
   alias Imp.Optimizer.{MIPROv2, Report}
 

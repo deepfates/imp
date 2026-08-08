@@ -1,6 +1,11 @@
 defmodule Imp.UpstreamFidelityTest do
   use ExUnit.Case, async: true
 
+  # Requires the pinned DSPy parity environment (scripts/setup_dspy_parity_env.sh
+  # + setup_dspy_stable_source.sh) and/or example-project deps; runs in the CI
+  # differential lane, not fast.check.
+  @moduletag :dspy_parity
+
   test "ledger is pinned to an immutable stable DSPy baseline" do
     report = Imp.UpstreamFidelity.report()
 

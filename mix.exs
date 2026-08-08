@@ -67,6 +67,7 @@ defmodule Imp.MixProject do
       "protocol.retriever.check": :test,
       "protocol.mcp.check": :test,
       "live.check": :test,
+      "differential.check": :test,
       "livebook.check": :test,
       "livebook.execute.check": :test,
       "package.check": :test,
@@ -343,7 +344,16 @@ defmodule Imp.MixProject do
         "clean",
         "compile --warnings-as-errors",
         "legacy_identity.check",
-        "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package"
+        # dspy_parity additionally excluded here (not in production.check):
+        # those tests need the pinned DSPy parity env + example-project deps,
+        # which the CI differential lane provisions and fast runners lack.
+        "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package --exclude dspy_parity"
+      ],
+      # The pinned-DSPy differential suite (imp-sqkr): everything tagged
+      # :dspy_parity, run after scripts/setup_dspy_parity_env.sh and
+      # scripts/setup_dspy_stable_source.sh have provisioned the environment.
+      "differential.check": [
+        "test --raise --only dspy_parity"
       ],
       # Heavy gates without the unit suite (dee-9k5m). fast.check is the sole
       # unit-suite gate in CI; production.check keeps the suite for local

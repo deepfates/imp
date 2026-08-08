@@ -24,3 +24,7 @@ All four failure modes have fixes or documented workarounds; a smoke launch of b
 **2026-08-07T17:15:37Z**
 
 ADDITION (r2): fifth preflight failure mode in the same family — run_imp.exs:147-152 uses String.to_float/1 on catalog price fields, crashes on integer-formatted strings like "0".
+
+**2026-08-08T02:05:11Z**
+
+STATUS at HEAD: all five preflight failure modes addressed - (1) :ssl started before verify_models! (landed pre-session at run_imp.exs:299), (2) String.to_float hardened to Float.parse complete-parse (this commit), (3) gepa 0.1.4 stale pyproject marker explicitly declared in gepa014 contract.json (source_distribution_version 0.1.3 vs installed 0.0.27) with run_upstream.py handling, (4)+(5) v1 forward AttributeError and v3 acceptance_criterion TypeError superseded by the sealed gepa014 successor (predecessors permanently stopped, no-reuse). REMAINING AC: smoke launch of both arms to the first-paid-call gate - needs the bootstrap env (python venv, shadow TLS server) and is the natural next session's opening move alongside cache_identity wiring into run_imp.exs (see imp-emrr note).

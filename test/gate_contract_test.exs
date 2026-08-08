@@ -19,12 +19,20 @@ defmodule GateContractTest do
 
     # Path-filtered CI (dee-4g0z): the fast merge signal. Pinned so it can't
     # silently drift from production.check's format/compile/unit-suite prefix.
+    # fast.check additionally excludes dspy_parity: those tests need the
+    # pinned DSPy parity env, which the CI differential lane provisions.
     assert Keyword.fetch!(aliases, :"fast.check") == [
              "format --check-formatted",
              "clean",
              "compile --warnings-as-errors",
              "legacy_identity.check",
-             "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package"
+             "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package --exclude dspy_parity"
+           ]
+
+    # The pinned-DSPy differential lane (imp-sqkr): the :dspy_parity-tagged
+    # suite, run only after the parity environment is provisioned.
+    assert Keyword.fetch!(aliases, :"differential.check") == [
+             "test --raise --only dspy_parity"
            ]
 
     # Path-filtered CI (dee-4g0z): the docs-only path. Render docs + validate

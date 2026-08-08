@@ -1,6 +1,11 @@
 defmodule Imp.DspyGepaOutputAlignmentTest do
   use ExUnit.Case, async: true
 
+  # Requires the pinned DSPy parity environment (scripts/setup_dspy_parity_env.sh
+  # + setup_dspy_stable_source.sh) and/or example-project deps; runs in the CI
+  # differential lane, not fast.check.
+  @moduletag :dspy_parity
+
   @python "tmp/dspy-parity-venv/bin/python"
   @dspy "tmp/dspy-3.2.1"
   @gepa "tmp/gepa-v0.1.4"

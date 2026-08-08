@@ -1,6 +1,11 @@
 defmodule Imp.MatchedInstructionFamilyIFBenchDesignTest do
   use ExUnit.Case, async: true
 
+  # Requires the pinned DSPy parity environment (scripts/setup_dspy_parity_env.sh
+  # + setup_dspy_stable_source.sh) and/or example-project deps; runs in the CI
+  # differential lane, not fast.check.
+  @moduletag :dspy_parity
+
   @root "examples/matched_instruction_family_ifbench"
 
   test "draft binds a bounded non-launchable cross-family condition" do

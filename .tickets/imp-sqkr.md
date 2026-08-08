@@ -18,3 +18,9 @@ Parity with DSPy is the null hypothesis for a faithful port; the strongest pre-r
 
 All differential/conformance suites executed at the campaign commit with results recorded as evidence; any red differential is a filed defect blocking launch.
 
+
+## Notes
+
+**2026-08-08T02:32:55Z**
+
+SCOPE MERGE (r7): the natural implementation is a dedicated CI differential job that runs scripts/setup_dspy_parity_env.sh then the :dspy_parity-tagged suite (see imp-fkwy note for the 16 tests) — green differentials at HEAD and CI coverage of them become the same artifact.
