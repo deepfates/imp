@@ -165,7 +165,8 @@ defmodule Imp.Optimizer.GEPA.EngineCacheControlTest do
   end
 
   test "disk cache partitions by identity so config changes cannot replay stale entries" do
-    run_dir = Path.join(System.tmp_dir!(), "gepa-cache-identity-#{System.unique_integer([:positive])}")
+    run_dir =
+      Path.join(System.tmp_dir!(), "gepa-cache-identity-#{System.unique_integer([:positive])}")
 
     try do
       a = Imp.Optimizer.GEPA.EvaluationCache.Disk.new(run_dir: run_dir, identity: %{model: "a"})

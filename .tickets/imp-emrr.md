@@ -1,6 +1,6 @@
 ---
 id: imp-emrr
-status: in_progress
+status: closed
 deps: []
 links: [imp-g22q, imp-90uc, imp-pk5c]
 created: 2026-08-07T17:07:55Z
@@ -28,3 +28,7 @@ SCOPE CORRECTION (adversarial review r2): GEPA never passes :cache_evaluation_st
 **2026-08-07T17:58:48Z**
 
 ON-PATH CONFIRMED (r5): same two-cache clarification as imp-g22q — evaluation cache (memory+checkpoint) live in campaign; identity fingerprint needed on the checkpoint dump/load path before any resumed Heavy result is trusted.
+
+**2026-08-08T01:06:10Z**
+
+DONE at 03f6ab15: :cache_identity option on GEPA + Optimize Anything; digest bound into checkpoint schema 8 (4-7 still resume), fail-closed mismatch validation on resume incl. identity-vs-none both directions; disk cache root partitioned per identity so reused run_dirs cannot collide. NOTE for campaign (imp-nbyg preflight): run_imp.exs should pass cache_identity: %{model, params, metric, dataset shas} explicitly. Full suite 2806/0.

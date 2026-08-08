@@ -1,4 +1,13 @@
 defmodule Imp.Experiment.Result do
+  defmodule SortedKeys do
+    @moduledoc false
+    # Key-set equality via sorted lists instead of MapSet: OTP 28 dialyzer
+    # flags `==` between opaque MapSets and literal-typed sets
+    # (:opaque_compare), a warning kind dialyxir cannot filter by tuple.
+    def new(keys), do: keys |> Enum.map(&to_string/1) |> Enum.sort()
+    def put(keys, key), do: Enum.sort([to_string(key) | keys])
+  end
+
   @moduledoc "Durable result of a fail-closed `Imp.Experiment.check/5` lifecycle."
 
   alias Imp.Evaluate.Result, as: EvaluationResult
@@ -95,10 +104,10 @@ defmodule Imp.Experiment.Result do
   def read!(path) when is_binary(path) do
     result = path |> File.read!() |> Jason.decode!()
 
-    expected = MapSet.new(["result_type", "schema_version", "payload_sha256", "payload"])
+    expected = SortedKeys.new(["result_type", "schema_version", "payload_sha256", "payload"])
     payload = result["payload"]
 
-    unless MapSet.new(Map.keys(result)) == expected and
+    unless SortedKeys.new(Map.keys(result)) == expected and
              result["result_type"] == "imp_experiment_result" and
              result["schema_version"] in [1, 2, 3, 4] and
              is_binary(result["payload_sha256"]) and is_map(payload) and
@@ -112,21 +121,29 @@ defmodule Imp.Experiment.Result do
 
   defp validate_payload!(payload, schema_version) do
     expected =
-      MapSet.new(["status", "detail", "selected", "selection", "test", "artifact", "provenance"])
+      SortedKeys.new([
+        "status",
+        "detail",
+        "selected",
+        "selection",
+        "test",
+        "artifact",
+        "provenance"
+      ])
       |> then(fn keys ->
-        if schema_version in [2, 3, 4], do: MapSet.put(keys, "baseline_test"), else: keys
+        if schema_version in [2, 3, 4], do: SortedKeys.put(keys, "baseline_test"), else: keys
       end)
       |> then(fn keys ->
-        if schema_version in [3, 4], do: MapSet.put(keys, "repetitions"), else: keys
+        if schema_version in [3, 4], do: SortedKeys.put(keys, "repetitions"), else: keys
       end)
 
     selection = payload["selection"]
 
     valid? =
-      MapSet.new(Map.keys(payload)) == expected and payload["status"] == "completed" and
+      SortedKeys.new(Map.keys(payload)) == expected and payload["status"] == "completed" and
         payload["detail"] in ["summary", "rows"] and
         payload["selected"] in ["baseline", "optimized"] and is_map(selection) and
-        MapSet.new(Map.keys(selection)) == MapSet.new(["baseline", "optimized"]) and
+        SortedKeys.new(Map.keys(selection)) == SortedKeys.new(["baseline", "optimized"]) and
         valid_evaluation?(selection["baseline"], payload["detail"]) and
         valid_evaluation?(selection["optimized"], payload["detail"]) and
         valid_optional_evaluation?(payload["baseline_test"], payload["detail"], schema_version) and
@@ -141,14 +158,14 @@ defmodule Imp.Experiment.Result do
   end
 
   defp valid_evaluation?(evaluation, "summary") when is_map(evaluation) do
-    MapSet.new(Map.keys(evaluation)) == MapSet.new(["score", "row_count", "error_count"]) and
+    SortedKeys.new(Map.keys(evaluation)) == SortedKeys.new(["score", "row_count", "error_count"]) and
       is_number(evaluation["score"]) and is_integer(evaluation["row_count"]) and
       is_integer(evaluation["error_count"])
   end
 
   defp valid_evaluation?(evaluation, "rows") when is_map(evaluation) do
-    MapSet.new(Map.keys(evaluation)) ==
-      MapSet.new(["score", "row_count", "error_count", "rows", "errors"]) and
+    SortedKeys.new(Map.keys(evaluation)) ==
+      SortedKeys.new(["score", "row_count", "error_count", "rows", "errors"]) and
       is_number(evaluation["score"]) and is_integer(evaluation["row_count"]) and
       is_integer(evaluation["error_count"]) and is_list(evaluation["rows"]) and
       is_list(evaluation["errors"])
@@ -171,7 +188,7 @@ defmodule Imp.Experiment.Result do
 
   defp valid_repetitions?(repetitions, detail, 3) when is_map(repetitions) do
     expected =
-      MapSet.new([
+      SortedKeys.new([
         "count",
         "aggregation",
         "outer_row_evaluations",
@@ -183,24 +200,24 @@ defmodule Imp.Experiment.Result do
     deltas = repetitions["paired_deltas"]
     opportunity = repetitions["outer_row_evaluations"]
 
-    MapSet.new(Map.keys(repetitions)) == expected and
+    SortedKeys.new(Map.keys(repetitions)) == expected and
       is_integer(repetitions["count"]) and repetitions["count"] > 1 and
       repetitions["aggregation"] == "mean" and
       valid_opportunity?(opportunity) and is_map(stages) and
-      MapSet.new(Map.keys(stages)) ==
-        MapSet.new(~w(baseline_selection optimized_selection baseline_test test)) and
+      SortedKeys.new(Map.keys(stages)) ==
+        SortedKeys.new(~w(baseline_selection optimized_selection baseline_test test)) and
       valid_repetition_stage?(stages["baseline_selection"], detail, repetitions["count"]) and
       valid_repetition_stage?(stages["optimized_selection"], detail, repetitions["count"]) and
       valid_optional_repetition_stage?(stages["baseline_test"], detail, repetitions["count"]) and
       valid_repetition_stage?(stages["test"], detail, repetitions["count"]) and
-      is_map(deltas) and MapSet.new(Map.keys(deltas)) == MapSet.new(~w(selection test)) and
+      is_map(deltas) and SortedKeys.new(Map.keys(deltas)) == SortedKeys.new(~w(selection test)) and
       valid_deltas?(deltas["selection"], repetitions["count"]) and
       valid_optional_deltas?(deltas["test"], repetitions["count"])
   end
 
   defp valid_repetitions?(repetitions, detail, 4) when is_map(repetitions) do
     expected =
-      MapSet.new([
+      SortedKeys.new([
         "counts",
         "aggregation",
         "outer_row_evaluations",
@@ -213,15 +230,15 @@ defmodule Imp.Experiment.Result do
     deltas = repetitions["paired_deltas"]
     opportunity = repetitions["outer_row_evaluations"]
 
-    MapSet.new(Map.keys(repetitions)) == expected and valid_stage_counts?(counts) and
+    SortedKeys.new(Map.keys(repetitions)) == expected and valid_stage_counts?(counts) and
       repetitions["aggregation"] == "mean" and is_map(stages) and
-      MapSet.new(Map.keys(stages)) ==
-        MapSet.new(~w(baseline_selection optimized_selection baseline_test test)) and
+      SortedKeys.new(Map.keys(stages)) ==
+        SortedKeys.new(~w(baseline_selection optimized_selection baseline_test test)) and
       valid_repetition_stage?(stages["baseline_selection"], detail, counts["selection"]) and
       valid_repetition_stage?(stages["optimized_selection"], detail, counts["selection"]) and
       valid_optional_repetition_stage?(stages["baseline_test"], detail, counts["test"]) and
       valid_repetition_stage?(stages["test"], detail, counts["test"]) and is_map(deltas) and
-      MapSet.new(Map.keys(deltas)) == MapSet.new(~w(selection test)) and
+      SortedKeys.new(Map.keys(deltas)) == SortedKeys.new(~w(selection test)) and
       valid_deltas?(deltas["selection"], counts["selection"]) and
       valid_optional_deltas?(deltas["test"], counts["test"]) and
       valid_exact_opportunity?(opportunity, stages)
@@ -240,7 +257,7 @@ defmodule Imp.Experiment.Result do
   defp valid_opportunity?(_opportunity), do: false
 
   defp valid_stage_counts?(%{"selection" => selection, "test" => test} = counts) do
-    MapSet.new(Map.keys(counts)) == MapSet.new(~w(selection test)) and
+    SortedKeys.new(Map.keys(counts)) == SortedKeys.new(~w(selection test)) and
       is_integer(selection) and selection > 0 and is_integer(test) and test > 0 and
       selection != test
   end
@@ -262,7 +279,7 @@ defmodule Imp.Experiment.Result do
   defp valid_exact_opportunity?(_opportunity, _stages), do: false
 
   defp valid_repetition_stage?(stage, detail, count) when is_map(stage) do
-    MapSet.new(Map.keys(stage)) == MapSet.new(~w(aggregate_score runs)) and
+    SortedKeys.new(Map.keys(stage)) == SortedKeys.new(~w(aggregate_score runs)) and
       is_number(stage["aggregate_score"]) and is_list(stage["runs"]) and
       length(stage["runs"]) == count and
       Enum.with_index(stage["runs"], 1)
@@ -277,15 +294,15 @@ defmodule Imp.Experiment.Result do
     do: valid_repetition_stage?(stage, detail, count)
 
   defp valid_repetition_run?(run, "summary", index) when is_map(run) do
-    MapSet.new(Map.keys(run)) == MapSet.new(~w(index score row_count error_count)) and
+    SortedKeys.new(Map.keys(run)) == SortedKeys.new(~w(index score row_count error_count)) and
       run["index"] == index and is_number(run["score"]) and
       is_integer(run["row_count"]) and run["row_count"] >= 0 and
       is_integer(run["error_count"]) and run["error_count"] >= 0
   end
 
   defp valid_repetition_run?(run, "rows", index) when is_map(run) do
-    MapSet.new(Map.keys(run)) ==
-      MapSet.new(~w(index score row_count error_count rows errors)) and
+    SortedKeys.new(Map.keys(run)) ==
+      SortedKeys.new(~w(index score row_count error_count rows errors)) and
       valid_repetition_run?(Map.drop(run, ~w(rows errors)), "summary", index) and
       is_list(run["rows"]) and is_list(run["errors"])
   end

@@ -1127,7 +1127,15 @@ defmodule Imp.Optimizer.TrajectoryRunner do
   # Task.async_stream applies its timeout per task. Split a deadline-bound
   # evaluation into effective-concurrency waves so every new wave gets only
   # the time remaining from the original monotonic deadline.
-  defp run_until_deadline(program, indexed_examples, metric, opts, max_concurrency, deadline, timeout) do
+  defp run_until_deadline(
+         program,
+         indexed_examples,
+         metric,
+         opts,
+         max_concurrency,
+         deadline,
+         timeout
+       ) do
     effective_concurrency =
       min(max_concurrency, Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers))
 

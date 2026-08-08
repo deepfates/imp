@@ -728,7 +728,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
     verify_identity_disjoint!(data_root)
     verify_split_receipt!(split_receipt_path)
 
-    unless MapSet.new(Map.keys(runtime_retrievals)) == MapSet.new(@runtime_entries) do
+    unless Enum.sort(Map.keys(runtime_retrievals)) == Enum.sort(@runtime_entries) do
       raise ArgumentError, "HoVer retrieval paths must be supplied for Imp and DSPy"
     end
 

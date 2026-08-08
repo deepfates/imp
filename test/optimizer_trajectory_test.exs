@@ -180,7 +180,10 @@ defmodule Imp.Optimizer.TrajectoryTest do
     refute Map.has_key?(result.metadata, :complete?)
 
     fast_adapter = Imp.Optimizer.GEPA.ProgramAdapter.new(program, metric, timeout: 5_000)
-    fast_result = Imp.Optimizer.GEPA.ProgramAdapter.evaluate(fast_adapter, [example], candidate, [])
+
+    fast_result =
+      Imp.Optimizer.GEPA.ProgramAdapter.evaluate(fast_adapter, [example], candidate, [])
+
     assert fast_result.metadata.killed == 0
   end
 
