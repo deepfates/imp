@@ -184,6 +184,47 @@ defmodule Imp.Optimizer.TrajectoryTest do
     assert fast_result.metadata.killed == 0
   end
 
+  test "per-row timeout applies under a deadline so one hung row cannot starve the rest" do
+    # Row 0 hangs; rows 1-2 answer instantly. With a 2s deadline and a 50ms
+    # per-row timeout, the hung row must be killed at ~50ms - not allowed to
+    # consume the whole remaining deadline and starve the later wave.
+    hang_first_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+          if prompt =~ "hang-me", do: Process.sleep(60_000)
+          %{answer: "Paris"}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: hang_first_lm)
+
+    examples =
+      for q <- ["hang-me", "France?", "Capital?"] do
+        Imp.example(question: q, answer: "Paris") |> Imp.with_inputs(:question)
+      end
+
+    metric = fn _example, _prediction -> 1.0 end
+    deadline = Imp.Deadline.resolve(2_000)
+
+    {trajectories, _log} =
+      ExUnit.CaptureLog.with_log(fn ->
+        Imp.Optimizer.TrajectoryRunner.run(program, examples, metric,
+          timeout: 50,
+          deadline: deadline,
+          max_concurrency: 1
+        )
+      end)
+
+    assert length(trajectories) == 3
+    [hung, second, third] = trajectories
+    assert Imp.Optimizer.Trajectory.killed?(hung)
+    refute Imp.Optimizer.Trajectory.killed?(second)
+    refute Imp.Optimizer.Trajectory.killed?(third)
+    assert second.score == 1.0
+    assert third.score == 1.0
+  end
+
   test "successful rows are not marked killed and emit no kill warning" do
     program = program(false)
     example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)

@@ -380,11 +380,20 @@ defmodule Imp.Evaluate do
     |> Enum.chunk_every(effective_concurrency)
     |> Stream.flat_map(fn wave ->
       case Imp.Deadline.remaining(evaluator.deadline) do
-        0 -> Enum.map(wave, fn _item -> {:exit, :timeout} end)
-        remaining -> run_evaluation_wave(wave, evaluator, program, remaining)
+        0 ->
+          Enum.map(wave, fn _item -> {:exit, :timeout} end)
+
+        remaining ->
+          # The per-row timeout still applies under a deadline: one hung row
+          # may consume at most min(timeout, remaining), not the entire
+          # remaining deadline (which would starve every later wave).
+          run_evaluation_wave(wave, evaluator, program, min_budget(evaluator.timeout, remaining))
       end
     end)
   end
+
+  defp min_budget(:infinity, remaining), do: remaining
+  defp min_budget(timeout, remaining), do: min(timeout, remaining)
 
   defp run_evaluation_wave(items, evaluator, program, timeout) do
     Imp.Tasks.async_stream(

@@ -138,6 +138,38 @@ defmodule SilentFailureRegressionsTest do
     assert log =~ "time budget"
   end
 
+  test "P09: per-row :timeout still applies under a :deadline (one hung row cannot starve the rest)" do
+    # Row 0 hangs; rows 1-2 are instant. With a 2s deadline and a 50ms
+    # per-row timeout, the hung row is killed at ~50ms instead of consuming
+    # the whole remaining deadline and starving the later waves.
+    program = %Program{
+      handler: fn inputs ->
+        if inputs.question == "hang-me", do: Process.sleep(60_000)
+        {:ok, Imp.prediction(answer: "ok")}
+      end
+    }
+
+    metric = fn _example, _prediction -> true end
+
+    rows = [example("hang-me", "ok"), example("fast-1", "ok"), example("fast-2", "ok")]
+
+    evaluator =
+      Imp.Evaluate.new(rows, metric,
+        timeout: 50,
+        deadline: Imp.Deadline.resolve(2_000),
+        max_concurrency: 1
+      )
+
+    {result, log} = with_log(fn -> Imp.Evaluate.run(evaluator, program) end)
+
+    assert [hung, fast1, fast2] = result.rows
+    assert hung.score == 0.0
+    assert hung.error == {:evaluation_task_exit, :timeout}
+    assert fast1.passed?
+    assert fast2.passed?
+    assert log =~ "killed row 0"
+  end
+
   test "P09: an infinite timeout runs sequentially; an explicit max_concurrency: 1 still kills" do
     program = %Program{handler: fn _inputs -> {:ok, Imp.prediction(answer: "ok")} end}
     metric = fn _example, _prediction -> true end

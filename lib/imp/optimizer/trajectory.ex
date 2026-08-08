@@ -1099,7 +1099,15 @@ defmodule Imp.Optimizer.TrajectoryRunner do
         run_stream(program, indexed_examples, metric, opts, max_concurrency, timeout)
 
       deadline ->
-        run_until_deadline(program, indexed_examples, metric, opts, max_concurrency, deadline)
+        run_until_deadline(
+          program,
+          indexed_examples,
+          metric,
+          opts,
+          max_concurrency,
+          deadline,
+          timeout
+        )
     end
   end
 
@@ -1119,7 +1127,7 @@ defmodule Imp.Optimizer.TrajectoryRunner do
   # Task.async_stream applies its timeout per task. Split a deadline-bound
   # evaluation into effective-concurrency waves so every new wave gets only
   # the time remaining from the original monotonic deadline.
-  defp run_until_deadline(program, indexed_examples, metric, opts, max_concurrency, deadline) do
+  defp run_until_deadline(program, indexed_examples, metric, opts, max_concurrency, deadline, timeout) do
     effective_concurrency =
       min(max_concurrency, Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers))
 
@@ -1138,11 +1146,17 @@ defmodule Imp.Optimizer.TrajectoryRunner do
             opts,
             effective_concurrency,
             deadline,
-            remaining
+            # The per-row timeout still applies under a deadline: one hung
+            # row may consume at most min(timeout, remaining), not the whole
+            # remaining deadline (which would starve every later wave).
+            min_budget(timeout, remaining)
           )
       end
     end)
   end
+
+  defp min_budget(:infinity, remaining), do: remaining
+  defp min_budget(timeout, remaining), do: min(timeout, remaining)
 
   defp run_deadline_wave(program, wave, metric, opts, max_concurrency, deadline, remaining) do
     wave
