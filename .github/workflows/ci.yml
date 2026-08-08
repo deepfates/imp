@@ -90,6 +90,9 @@ jobs:
       # Fresh-OS-process tests (deployment examples, sealed campaign entries)
       # spawn `mix run` children in the dev env, so dev must be compiled too
       # or every child fails with "Unchecked dependencies for environment dev".
+      # They also shell out via zsh (the provenance-pinned command shape from
+      # the maintainer environment), which ubuntu runners lack.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q zsh
       - run: MIX_ENV=dev mix deps.compile && MIX_ENV=dev mix compile
       - run: mix fast.check
 
