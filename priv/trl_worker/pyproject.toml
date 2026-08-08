@@ -5,7 +5,7 @@ requires-python = "==3.12.*"
 dependencies = [
   "peft==0.18.1",
   "torch==2.10.0",
-  "transformers==4.57.6",
+  "transformers==5.5.0",
   "trl==1.6.0",
 ]
 
