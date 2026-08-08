@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = "==3.12.*"
 dependencies = [
   "peft==0.18.1",
-  "torch==2.10.0",
+  "torch==2.13.0",
   "transformers==4.57.6",
   "trl==1.6.0",
 ]
