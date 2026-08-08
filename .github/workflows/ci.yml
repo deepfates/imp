@@ -87,13 +87,6 @@ jobs:
       # + the deterministic unit suite (same exclusions as production.check's
       # test step, minus failure_campaign/package/livebooks/docs).
       #
-      # Fresh-OS-process tests (deployment examples, sealed campaign entries)
-      # spawn `mix run` children in the dev env, so dev must be compiled too
-      # or every child fails with "Unchecked dependencies for environment dev".
-      # They also shell out via zsh (the provenance-pinned command shape from
-      # the maintainer environment), which ubuntu runners lack.
-      - run: sudo apt-get update -q && sudo apt-get install -y -q zsh
-      - run: MIX_ENV=dev mix deps.compile && MIX_ENV=dev mix compile
       - run: mix fast.check
 
   campaign:
@@ -260,7 +253,12 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -y -q zsh
       - run: scripts/setup_dspy_parity_env.sh
       - run: scripts/setup_dspy_stable_source.sh
+      # Pinned GEPA v0.1.4 source (same shape as the maintainer checkout).
+      - run: git clone --filter=blob:none --branch v0.1.4 --depth 1 https://github.com/gepa-ai/gepa.git tmp/gepa-v0.1.4
       - run: MIX_ENV=dev mix deps.compile && MIX_ENV=dev mix compile
+      # Deployment-example tests spawn children inside examples/deployment,
+      # which is its own Mix project and needs its deps fetched and built.
+      - run: cd examples/deployment && IMP_PATH=../.. mix deps.get && IMP_PATH=../.. mix deps.compile
       # Known-red residue at introduction (tracked on imp-sqkr): the sealed
       # v1 contract detects mix.lock drift after the bandit CVE bump, and the
       # MuSiQue receipts read a machine-local /tmp data dir. This job makes

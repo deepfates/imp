@@ -1,6 +1,10 @@
 defmodule Imp.LocalOptimizeAnythingRetryPolicyThreeSeedEvidenceTest do
   use ExUnit.Case, async: false
 
+  # Spawns fresh dev-env OS processes; runs in the CI differential lane
+  # (fast.check begins with clean, which wipes any pre-built dev _build).
+  @moduletag :dspy_parity
+
   alias Imp.Optimizer.Artifact
 
   @manifest "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json"
