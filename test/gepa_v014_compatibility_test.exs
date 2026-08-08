@@ -464,7 +464,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
 
     assert first.adapter_state == %{evaluations: 1, session: "first"}
     checkpoint = Engine.dump_state(first)
-    assert checkpoint["schema_version"] == 7
+    assert checkpoint["schema_version"] == 8
 
     {:ok, resumed_store} = Agent.start_link(fn -> %{evaluations: 0} end)
 
@@ -484,6 +484,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
       |> Map.delete("adapter_state")
       |> Map.delete("batch_sampler")
       |> Map.delete("reflection_strategy_state")
+      |> Map.delete("cache_identity")
 
     migrated = run(max_iterations: 0, resume_state: schema4)
     assert migrated.adapter_state == %{}
@@ -497,7 +498,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
 
     checkpoint = partial |> Engine.dump_state() |> json_round_trip()
 
-    assert checkpoint["schema_version"] == 7
+    assert checkpoint["schema_version"] == 8
     assert checkpoint["batch_sampler"]["minibatch_size"] == 2
 
     resumed =
@@ -525,6 +526,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
     schema6 =
       checkpoint
       |> Map.put("schema_version", 6)
+      |> Map.delete("cache_identity")
       |> update_in(["batch_sampler"], &Map.delete(&1, "minibatch_size"))
 
     migrated =

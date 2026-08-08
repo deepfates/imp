@@ -4444,6 +4444,7 @@
       "struct_fields": [
         "acceptance_policy",
         "cache_evaluation",
+        "cache_identity",
         "callbacks",
         "candidate_selection_strategy",
         "combee",

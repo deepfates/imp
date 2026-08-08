@@ -46,6 +46,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
               rejected: [],
               history: [],
               cache: %{},
+              cache_identity: nil,
               budget: nil,
               rng_state: nil,
               merge_due: 0,
@@ -3116,6 +3117,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
   defp load_proposal_policy(dumped, 7, requested),
     do: load_proposal_policy(dumped, 4, requested)
 
+  defp load_proposal_policy(dumped, 8, requested),
+    do: load_proposal_policy(dumped, 4, requested)
+
   defp strategy_configuration(opts) do
     configuration = %{
       sampling_strategy:
@@ -3164,6 +3168,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
     do: load_combee_policy(dumped, 4, requested)
 
   defp load_combee_policy(dumped, 7, requested),
+    do: load_combee_policy(dumped, 4, requested)
+
+  defp load_combee_policy(dumped, 8, requested),
     do: load_combee_policy(dumped, 4, requested)
 
   defp validate_pending_ledger!(%State{pending_proposal_batch: nil, budget_ledger: ledger}) do
@@ -3239,6 +3246,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
     do: validate_checkpoint_integrity!(dumped, 4)
 
   defp validate_checkpoint_integrity!(dumped, 7),
+    do: validate_checkpoint_integrity!(dumped, 4)
+
+  defp validate_checkpoint_integrity!(dumped, 8),
     do: validate_checkpoint_integrity!(dumped, 4)
 
   defp dump_pending_validation(nil), do: nil
@@ -3389,12 +3399,13 @@ defmodule Imp.Optimizer.GEPA.Engine do
       )
 
     checkpoint = %{
-      "schema_version" => 7,
+      "schema_version" => 8,
       "iteration" => state.iteration,
       "candidates" => Enum.map(state.candidates, &dump_entry/1),
       "rejected" => Imp.Optimizer.Report.encode_term(state.rejected),
       "history" => Imp.Optimizer.Report.encode_term(state.history),
       "cache" => dump_cache(state.cache),
+      "cache_identity" => state.cache_identity,
       "budget" => Budget.dump(state.budget),
       "rng_state" => dump_rng(state.rng_state),
       "merge_due" => state.merge_due,
@@ -3430,6 +3441,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
     state = %State{
       cache: new_evaluation_cache(opts),
+      cache_identity: cache_identity_digest(opts),
       budget:
         Budget.new(
           max_metric_calls: Keyword.get(opts, :max_metric_calls, :infinity),
@@ -5092,13 +5104,14 @@ defmodule Imp.Optimizer.GEPA.Engine do
          seed_candidate,
          opts
        )
-       when schema_version in [4, 5, 6, 7] do
+       when schema_version in [4, 5, 6, 7, 8] do
     versioned_keys =
       case schema_version do
         4 -> []
         5 -> ["adapter_state"]
         6 -> ["adapter_state", "batch_sampler", "reflection_strategy_state"]
         7 -> ["adapter_state", "batch_sampler", "reflection_strategy_state"]
+        8 -> ["adapter_state", "batch_sampler", "reflection_strategy_state", "cache_identity"]
       end
 
     require_checkpoint_keys!(
@@ -5110,6 +5123,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
     )
 
     validate_resume_seed!(dumped, seed_candidate)
+    validate_cache_identity!(dumped, opts)
 
     budget = dumped |> Map.fetch!("budget") |> Budget.load!()
 
@@ -5122,7 +5136,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
     batch_sampler =
       case schema_version do
-        7 ->
+        current when current in [7, 8] ->
           dumped
           |> Map.fetch!("batch_sampler")
           |> BatchSampler.load!(requested_batch_sampler)
@@ -5147,7 +5161,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       end
 
     reflection_strategy =
-      if schema_version in [6, 7] do
+      if schema_version in [6, 7, 8] do
         ReflectionStrategy.load(
           Map.fetch!(dumped, "reflection_strategy_state"),
           configured_strategy,
@@ -5163,6 +5177,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       rejected: dumped |> Map.fetch!("rejected") |> restore(),
       history: dumped |> Map.fetch!("history") |> restore(),
       cache: dumped |> Map.fetch!("cache") |> load_evaluation_cache(opts),
+      cache_identity: Map.get(dumped, "cache_identity"),
       budget: budget,
       rng_state: dumped |> Map.fetch!("rng_state") |> load_rng!(),
       merge_due: Map.fetch!(dumped, "merge_due"),
@@ -5217,6 +5232,26 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
   defp load_state!(state, _seed_candidate, _opts),
     do: raise(ArgumentError, "invalid GEPA engine resume state: #{inspect(state)}")
+
+  # The checkpointed cache is keyed by candidate and example only, so it is
+  # replayable solely under the configuration that produced it. Fails closed
+  # on any mismatch, including a checkpoint written before an identity was
+  # configured (or vice versa) - stale scores must never survive a config
+  # change through resume.
+  defp validate_cache_identity!(dumped, opts) do
+    stored = Map.get(dumped, "cache_identity")
+    current = cache_identity_digest(opts)
+
+    unless stored == current do
+      raise ArgumentError,
+            "GEPA resume cache identity does not match: the checkpointed evaluation cache " <>
+              "was built under a different configuration (stored #{inspect(stored)}, " <>
+              "current #{inspect(current)}). Start a fresh run, or resume with the same " <>
+              ":cache_identity the checkpoint was written with."
+    end
+
+    :ok
+  end
 
   defp validate_resume_seed!(%{"candidates" => [%{"candidate" => candidate} | _]}, seed) do
     unless restore(candidate) == seed do
@@ -5367,15 +5402,37 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
   defp new_evaluation_cache(opts) do
     case Keyword.get(opts, :cache_evaluation_storage, :memory) do
-      :memory -> %{}
-      {:disk, run_dir} -> DiskEvaluationCache.new(run_dir)
+      :memory ->
+        %{}
+
+      {:disk, run_dir} ->
+        DiskEvaluationCache.new(run_dir: run_dir, identity: Keyword.get(opts, :cache_identity))
     end
   end
 
   defp load_evaluation_cache(entries, opts) do
     case Keyword.get(opts, :cache_evaluation_storage, :memory) do
-      :memory -> load_cache(entries)
-      {:disk, run_dir} -> DiskEvaluationCache.new(run_dir)
+      :memory ->
+        load_cache(entries)
+
+      {:disk, run_dir} ->
+        DiskEvaluationCache.new(run_dir: run_dir, identity: Keyword.get(opts, :cache_identity))
+    end
+  end
+
+  # A checkpointed evaluation cache is only replayable under the same
+  # configuration it was built with (its entries are keyed by candidate and
+  # example alone). The digest of the caller-supplied :cache_identity binds
+  # the checkpoint to that configuration; a mismatch on resume fails closed.
+  defp cache_identity_digest(opts) do
+    case Keyword.get(opts, :cache_identity) do
+      nil ->
+        nil
+
+      identity ->
+        :sha256
+        |> :crypto.hash(:erlang.term_to_binary(identity, [:deterministic]))
+        |> Base.encode16(case: :lower)
     end
   end
 

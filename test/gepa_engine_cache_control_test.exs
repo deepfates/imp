@@ -135,6 +135,50 @@ defmodule Imp.Optimizer.GEPA.EngineCacheControlTest do
     assert checkpoint["cache"] == []
   end
 
+  test "resume fails closed when the checkpoint cache identity does not match" do
+    initial = run_engine(max_iterations: 0, cache_identity: %{model: "gpt-5.4-mini", temp: 1.0})
+    checkpoint = initial |> Engine.dump_state() |> Jason.encode!() |> Jason.decode!()
+
+    # Same identity resumes.
+    resumed =
+      run_engine(
+        max_iterations: 1,
+        cache_identity: %{model: "gpt-5.4-mini", temp: 1.0},
+        resume_state: checkpoint
+      )
+
+    assert resumed.iteration == 1
+
+    # A different configuration must not replay the checkpointed cache.
+    assert_raise ArgumentError, ~r/cache identity does not match/, fn ->
+      run_engine(
+        max_iterations: 1,
+        cache_identity: %{model: "some-other-model", temp: 0.0},
+        resume_state: checkpoint
+      )
+    end
+
+    # Dropping the identity entirely is also a mismatch (fail closed).
+    assert_raise ArgumentError, ~r/cache identity does not match/, fn ->
+      run_engine(max_iterations: 1, resume_state: checkpoint)
+    end
+  end
+
+  test "disk cache partitions by identity so config changes cannot replay stale entries" do
+    run_dir = Path.join(System.tmp_dir!(), "gepa-cache-identity-#{System.unique_integer([:positive])}")
+
+    try do
+      a = Imp.Optimizer.GEPA.EvaluationCache.Disk.new(run_dir: run_dir, identity: %{model: "a"})
+      b = Imp.Optimizer.GEPA.EvaluationCache.Disk.new(run_dir: run_dir, identity: %{model: "b"})
+      default = Imp.Optimizer.GEPA.EvaluationCache.Disk.new(run_dir: run_dir)
+
+      roots = Enum.map([a, b, default], & &1.root)
+      assert length(Enum.uniq(roots)) == 3
+    after
+      File.rm_rf(run_dir)
+    end
+  end
+
   test "cache_evaluation must be boolean" do
     assert_raise ArgumentError, ":cache_evaluation must be a boolean", fn ->
       run_engine(cache_evaluation: :memory)

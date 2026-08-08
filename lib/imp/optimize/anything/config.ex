@@ -140,6 +140,7 @@ defmodule Imp.Optimize.Anything.Config do
       max_workers: [type: {:or, [:pos_integer, nil]}, default: @default_max_workers],
       cache_evaluation: [type: :boolean, default: false],
       cache_evaluation_storage: [type: {:in, [:memory, :disk, :auto]}, default: :auto],
+      cache_identity: [type: :any, default: nil],
       best_example_evals_k: [type: :non_neg_integer, default: 30],
       capture_stdio: [type: :boolean, default: false]
     ]
@@ -163,6 +164,7 @@ defmodule Imp.Optimize.Anything.Config do
               max_workers: @default_max_workers,
               cache_evaluation: false,
               cache_evaluation_storage: :auto,
+              cache_identity: nil,
               best_example_evals_k: 30,
               capture_stdio: false
 
@@ -550,6 +552,7 @@ defmodule Imp.Optimize.Anything.Config do
       frontier_type: engine.frontier_type,
       cache_evaluation: engine.cache_evaluation,
       cache_evaluation_storage: cache_storage(engine),
+      cache_identity: engine.cache_identity,
       candidate_selection_strategy: engine.candidate_selection_strategy,
       acceptance_policy: acceptance_policy(engine.acceptance_criterion),
       sampling_strategy: engine.sampling_strategy,

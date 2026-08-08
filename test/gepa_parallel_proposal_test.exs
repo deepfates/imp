@@ -200,9 +200,9 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     assert Task.await(task) == [{:error, {:worker_exit, :killed}}]
   end
 
-  test "schema 7 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
+  test "schema 8 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
     prepared = interrupt_checkpoint!(:prepared)
-    assert prepared["schema_version"] == 7
+    assert prepared["schema_version"] == 8
     assert prepared["pending_proposal_batch"]["status"] == "prepared"
 
     resumed = run_engine(resume_state: json_round_trip(prepared))
@@ -214,6 +214,7 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
       |> Map.delete("adapter_state")
       |> Map.delete("batch_sampler")
       |> Map.delete("reflection_strategy_state")
+      |> Map.delete("cache_identity")
 
     strategy_resumed =
       run_engine(

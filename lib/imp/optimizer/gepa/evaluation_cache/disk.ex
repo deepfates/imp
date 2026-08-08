@@ -43,7 +43,18 @@ defmodule Imp.Optimizer.GEPA.EvaluationCache.Disk do
 
   def new(opts) when is_list(opts) do
     run_dir = opts |> Keyword.fetch!(:run_dir) |> Path.expand()
-    root = Path.join([run_dir, "evaluation_cache", "v#{@schema_version}"])
+
+    # Cache entries are keyed only by candidate and example, so a reused
+    # run_dir with a different configuration (model, params, metric) would
+    # replay stale scores. An identity term partitions the cache per
+    # configuration; runs without one share the historical "default" root.
+    identity_segment =
+      case Keyword.get(opts, :identity) do
+        nil -> []
+        identity -> [Codec.digest(identity)]
+      end
+
+    root = Path.join([run_dir, "evaluation_cache", "v#{@schema_version}"] ++ identity_segment)
     File.mkdir_p!(root)
     File.chmod!(root, 0o700)
     %__MODULE__{root: root}
