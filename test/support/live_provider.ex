@@ -34,6 +34,9 @@ defmodule Imp.Test.LiveProvider do
   defp provider_environment!(provider) when provider in ["gemini", "google"],
     do: {"gemini", "GEMINI_API_KEY", "GEMINI_MODEL"}
 
+  defp provider_environment!("openrouter"),
+    do: {"openrouter", "OPENROUTER_API_KEY", "OPENROUTER_MODEL"}
+
   defp provider_environment!(provider),
     do: raise("unsupported IMP_LIVE_PROVIDER #{inspect(provider)}")
 
