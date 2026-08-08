@@ -86,6 +86,11 @@ jobs:
       # `mix fast.check` = format --check-formatted + compile --warnings-as-errors
       # + the deterministic unit suite (same exclusions as production.check's
       # test step, minus failure_campaign/package/livebooks/docs).
+      #
+      # Fresh-OS-process tests (deployment examples, sealed campaign entries)
+      # spawn `mix run` children in the dev env, so dev must be compiled too
+      # or every child fails with "Unchecked dependencies for environment dev".
+      - run: MIX_ENV=dev mix deps.compile && MIX_ENV=dev mix compile
       - run: mix fast.check
 
   campaign:
