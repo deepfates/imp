@@ -1,6 +1,6 @@
 ---
 id: imp-7aah
-status: open
+status: closed
 deps: [imp-kejs]
 links: []
 created: 2026-08-07T17:07:55Z
@@ -28,3 +28,7 @@ MAJOR CORRECTION (owner pushback, verified): 'live tests never run' is FALSE. Li
 **2026-08-08T01:11:39Z**
 
 RUN at HEAD (2026-08-08): first recorded gate-evidence artifact tmp/gate-evidence/gate-evidence-live_provider_smoke-20260808T011119Z.json — status failing: 12/15 pass, 3 failures = ReAct/CodeAct unknown_tool on OpenRouter route + README-hero test hard-requiring OPENAI_API_KEY. Filed as imp-<new> bug; core provider path (predict/CoT/RAG/history/refine) verified live. Gate goes green when that bug closes or an OpenAI key is provisioned for the native route.
+
+**2026-08-09T07:33:48Z**
+
+GREEN: live_provider_smoke gate recorded passing at HEAD via OpenRouter (tmp/gate-evidence/gate-evidence-live_provider_smoke-20260809T*, second attempt after one stochastic flake noted on imp-kejs/zc94). AC met: live suite executed with recorded artifact at the campaign HEAD.

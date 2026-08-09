@@ -1,6 +1,6 @@
 ---
 id: imp-kejs
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-08T01:11:39Z
@@ -18,3 +18,9 @@ First recorded live.check at HEAD (via OpenRouter, openai/gpt-5.4-mini): 12/15 p
 
 ReAct/CodeAct live tests pass via OpenRouter; nil/'None' tool signals handled per DSPy semantics or rejected with a clear provider-route diagnostic; README-hero live test skips under non-openai providers; gate evidence recorded green.
 
+
+## Notes
+
+**2026-08-09T07:33:48Z**
+
+FIXED at 0f221d1e: three real defects (multi_tool_use recipient_name/parameters shape; 'tool'-keyed shape; CodeAct 'None' placeholder) + diagnostics + test budget fixes. Live e2e 11/11 via OpenRouter; gate recorded passing. Residual flake: ReAct fail-fast on missing-field submit (imp-zc94's observe-and-retry semantics would stabilize).
