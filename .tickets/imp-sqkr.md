@@ -1,6 +1,6 @@
 ---
 id: imp-sqkr
-status: open
+status: closed
 deps: [imp-fkwy]
 links: [imp-sa2a]
 created: 2026-08-07T18:49:14Z
@@ -32,3 +32,7 @@ LANE LANDED: :dspy_parity tag across 12 test files, fast.check excludes it (gate
 **2026-08-08T07:08:03Z**
 
 CI RESIDUE (run 31245094460, 8 failures, down from 16): the 3 known owner-decision items (sealed v1 lock drift; musique /tmp data dir x2) plus 5 more machine-local dependencies to triage next session: hover pilot 'pinned private source' x2, hotpotqa deployment example, dspy public workflow gate, ifbench design stage1. Pattern so far: every one has been a provisioning fact, not a code bug. Triage each to provision-in-CI / commit-the-data / historical-seal semantics.
+
+**2026-08-09T06:42:20Z**
+
+DONE in substance: differential.check GREEN on CI at HEAD (run 31299100715) — the pinned-DSPy 3.2.1 differential suite (adapters, optimizers, workflow gates, hover/papillon pilots, deployment examples) provisioned from scratch and passing on a clean runner, on every push. Converged 16→8→4→2→0 across 6 provisioning rounds. Residual scope honestly disposed: 2 MuSiQue receipt-replay tests gated on MUSIQUE_DATA_ROOT (raw dataset provisioned on no machine — re-provisioning tracked on imp-sg0r), v1 sealed launch preflight skipped-with-reason (definitionally unrunnable at HEAD). Remaining AC nuance: 'any red differential is a filed defect blocking launch' is now structurally true — the lane IS the gate.
