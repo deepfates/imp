@@ -1,6 +1,6 @@
 ---
 id: imp-sa2a
-status: open
+status: closed
 deps: []
 links: [imp-sqkr]
 created: 2026-08-07T18:49:14Z
@@ -24,3 +24,7 @@ Written verdict per historical negative with evidence (DSPy literature/replicati
 **2026-08-07T18:49:30Z**
 
 Depends conceptually on nothing; can start immediately and in parallel — its verdicts inform imp-u3af's prediction band.
+
+**2026-08-09T07:20:39Z**
+
+DONE: verdicts recorded in docs/EVIDENCE.md. HotPotQA benign (32 vs 6,871 paper metric calls, sub-granularity −0.015, mutations verified, strict-parse conservative bias on seed 1), Banking77 benign (both conditions POSITIVE — +0.0417/+0.0208 means, spot-verified seed 05 test 0.8958→0.9792 — bar exceeded 48-row resolving power at 0.875+ ceiling), Grue benign (all-zero metric floor, real reflected candidates inspected), IFBench bug-fixed at 8c798d2e. FRAMING CORRECTION: HotPotQA ran GPT-5.4-mini/Sonnet-4.6 via OpenRouter, NOT local models — my earlier epic note and imp-pomi description wrongly said 'small local models' for all negatives; only Grue was local. No new blocking bugs; no 'bug' verdicts beyond the already-fixed IFBench scorer.

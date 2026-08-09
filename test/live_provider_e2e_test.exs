@@ -108,7 +108,7 @@ defmodule LiveProviderE2ETest do
 
     agent =
       Imp.react(signature, [lookup],
-        lm: live_lm(max_completion_tokens: 160),
+        lm: live_lm(max_completion_tokens: 1024),
         tool_policy: [:lookup, :submit],
         max_iters: 4
       )
@@ -195,7 +195,7 @@ defmodule LiveProviderE2ETest do
 
     agent =
       Imp.react(signature, [lookup],
-        lm: live_lm(max_completion_tokens: 400),
+        lm: live_lm(max_completion_tokens: 1024),
         tool_policy: [:lookup_capital, :submit],
         max_iters: 4
       )
@@ -295,7 +295,7 @@ defmodule LiveProviderE2ETest do
   test "live provider drives CodeAct through the BEAM-safe sandbox" do
     program =
       Imp.code_act("question -> answer: int", [],
-        lm: live_lm(max_completion_tokens: 100),
+        lm: live_lm(max_completion_tokens: 1024),
         adapter: Imp.Adapter.JSON,
         config: [json_retries: 1],
         max_iters: 2

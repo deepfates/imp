@@ -18,3 +18,9 @@ README/EVIDENCE currently present historical negatives without config context, r
 
 README evidence section and docs/EVIDENCE.md state the parity frame with per-result config context; claims registry updated consistently; claim-drift checks pass.
 
+
+## Notes
+
+**2026-08-09T07:20:39Z**
+
+CORRECTION for the reframe: earlier framing 'single-arm absolute-lift runs on small local models' is wrong for HotPotQA and Banking77 (GPT-5.4-mini/Sonnet-4.6 via OpenRouter); only Grue was local. The accurate story per docs/EVIDENCE.md verdicts: configs whose budgets/test-granularity/ceilings could not resolve paper-sized effects — Banking77 was actually POSITIVE both times, just under the preregistered bar. Use the EVIDENCE.md table as source of truth.

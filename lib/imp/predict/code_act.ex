@@ -292,7 +292,12 @@ defmodule Imp.Predict.CodeAct do
     %{prediction | metadata: Map.put(prediction.metadata, :code_act_trace, Enum.reverse(trace))}
   end
 
-  defp present?(value), do: value not in [nil, ""]
+  # "None"/"null"/"none" are placeholder spellings of "no tool this step":
+  # the tool field is optional in the pinned signature and Python-trained
+  # models emit Python's None as its string form. Treating them as present
+  # would fail the step as {:unknown_tool, "None"} instead of falling
+  # through to the program branch.
+  defp present?(value), do: value not in [nil, "", "None", "null", "none"]
 
   defp normalize_tool_name(tools, name), do: Imp.Tool.resolve_name(tools, name)
 

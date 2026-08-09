@@ -28,3 +28,7 @@ ADDITION (r2): fifth preflight failure mode in the same family — run_imp.exs:1
 **2026-08-08T02:05:11Z**
 
 STATUS at HEAD: all five preflight failure modes addressed - (1) :ssl started before verify_models! (landed pre-session at run_imp.exs:299), (2) String.to_float hardened to Float.parse complete-parse (this commit), (3) gepa 0.1.4 stale pyproject marker explicitly declared in gepa014 contract.json (source_distribution_version 0.1.3 vs installed 0.0.27) with run_upstream.py handling, (4)+(5) v1 forward AttributeError and v3 acceptance_criterion TypeError superseded by the sealed gepa014 successor (predecessors permanently stopped, no-reuse). REMAINING AC: smoke launch of both arms to the first-paid-call gate - needs the bootstrap env (python venv, shadow TLS server) and is the natural next session's opening move alongside cache_identity wiring into run_imp.exs (see imp-emrr note).
+
+**2026-08-09T07:14:34Z**
+
+PREFLIGHT BINDINGS LANDED: run_imp.exs GEPA arm now passes cache_identity (campaign/arm/seed/dataset shas) + resume_cache: :drop. OWNER STEP REQUIRED BEFORE SMOKE LAUNCH: contract.json imp_entry sha (c084ba41...) no longer matches run_imp.exs (drift began at 852c34ea price hardening, extended by the parity bindings) — the launch guard will correctly refuse; re-freeze the contract over the repaired runner (single ratification covering price hardening + parity bindings).

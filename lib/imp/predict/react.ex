@@ -63,6 +63,8 @@ defmodule Imp.Predict.ReAct do
   Tool call history is redacted before it is attached to the final prediction.
   """
 
+  require Logger
+
   @behaviour Imp.Module
 
   @trajectory_call_attempts 3
@@ -454,6 +456,12 @@ defmodule Imp.Predict.ReAct do
     requested_name = tool_call_name(call)
     name = normalize_tool_name(agent.tools, requested_name)
 
+    if is_nil(name) do
+      Logger.warning(
+        "ReAct could not resolve a tool from call: #{inspect(Imp.Redaction.redact(call), limit: 20, printable_limit: 500)}"
+      )
+    end
+
     args = call |> tool_call_arguments() |> Imp.Tool.normalize_arguments()
 
     {name, args, execute_tool_call(agent, name, requested_name, args)}
@@ -465,8 +473,18 @@ defmodule Imp.Predict.ReAct do
   defp tool_call_name(call) do
     function = Map.get(call, :function) || Map.get(call, "function") || %{}
 
-    Map.get(call, :name) || Map.get(call, "name") || Map.get(function, :name) ||
-      Map.get(function, "name")
+    name =
+      Map.get(call, :name) || Map.get(call, "name") || Map.get(function, :name) ||
+        Map.get(function, "name") || Map.get(call, :tool) || Map.get(call, "tool") ||
+        Map.get(call, :recipient_name) || Map.get(call, "recipient_name")
+
+    # OpenAI's multi_tool_use wire shape namespaces the tool as
+    # "functions.<name>" under recipient_name; LiteLLM (DSPy's client)
+    # normalizes it away, so models emit it expecting the strip.
+    case name do
+      "functions." <> bare -> bare
+      other -> other
+    end
   end
 
   defp tool_call_arguments(call) do
@@ -474,11 +492,28 @@ defmodule Imp.Predict.ReAct do
 
     Map.get(call, :arguments) || Map.get(call, :args) || Map.get(call, "arguments") ||
       Map.get(call, "args") || Map.get(function, :arguments) || Map.get(function, :args) ||
-      Map.get(function, "arguments") || Map.get(function, "args") || %{}
+      Map.get(function, "arguments") || Map.get(function, "args") ||
+      Map.get(call, :parameters) || Map.get(call, "parameters") || %{}
   end
 
-  defp execute_tool_call(_agent, nil, requested_name, _args),
-    do: {:error, {:unknown_tool, requested_name}}
+  defp execute_tool_call(_agent, nil, requested_name, _args) do
+    if requested_name in [nil, "", "None", "null"] do
+      # A missing/placeholder tool name usually means the completion was
+      # truncated before the model finished emitting a tool call (reasoning
+      # models burn completion budget on reasoning first) or the model
+      # emitted a no-tool placeholder. Say so instead of leaving the caller
+      # to debug {:unknown_tool, nil}.
+      Logger.warning(
+        "ReAct received a tool call with missing/placeholder name " <>
+          "#{inspect(requested_name)}. This usually means the completion was " <>
+          "truncated before a tool call was emitted - check finish_reason and " <>
+          "raise max_completion_tokens (reasoning models need budget for " <>
+          "reasoning before the call)."
+      )
+    end
+
+    {:error, {:unknown_tool, requested_name}}
+  end
 
   defp execute_tool_call(agent, name, _requested_name, args),
     do: execute_tool_call(agent, name, args)

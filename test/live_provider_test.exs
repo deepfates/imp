@@ -63,8 +63,16 @@ defmodule LiveProviderTest do
   # program, exact README ticket, exact README model, temp 0.
   @tag :live
   test "the README hero example produces its displayed output" do
-    api_key = System.fetch_env!("OPENAI_API_KEY")
-    lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: api_key, temperature: 0)
+    # The README pins "openai:gpt-5.4-mini" verbatim; the same model via the
+    # OpenRouter route still verifies the displayed output when no native
+    # OpenAI key is provisioned.
+    {lm_spec, api_key} =
+      case System.get_env("OPENAI_API_KEY") do
+        key when key not in [nil, ""] -> {"openai:gpt-5.4-mini", key}
+        _missing -> {"openrouter:openai/gpt-5.4-mini", System.fetch_env!("OPENROUTER_API_KEY")}
+      end
+
+    lm = Imp.req_llm(lm_spec, api_key: api_key, temperature: 0)
 
     route =
       "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"

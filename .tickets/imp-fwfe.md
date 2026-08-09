@@ -1,6 +1,6 @@
 ---
 id: imp-fwfe
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:15:37Z
@@ -24,3 +24,7 @@ Upstream resume accounting compared; Imp either charges parity or the delta is m
 **2026-08-07T17:58:48Z**
 
 ON-PATH CONFIRMED (r5): Heavy resume is real (two stops recorded); zero-charge cache hits on resume (engine.ex:4307) apply to the actual campaign, pending upstream-accounting comparison.
+
+**2026-08-09T07:00:56Z**
+
+RESOLVED at 7e52298f: upstream comparison done by reading pinned gepa v0.1.4 source. In-run accounting is PARITY (both charge cache misses only — engine.py evaluate docstring). Across resume: genuine divergence (upstream state.py does not persist evaluation_cache; imp replays checkpointed cache free). Fix: GEPA resume_cache: :drop mirrors upstream; matched campaigns that resume must pass it — added to gepa014 preflight expectations alongside cache_identity (see imp-nbyg note). Load semantics tested both modes.
