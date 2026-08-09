@@ -682,7 +682,13 @@ def compile_arm(dspy: Any, arm: str, program: Any, train: list[Any], selection: 
             max_bootstrapped_demos=0,
             max_labeled_demos=0,
             num_threads=1,
-            max_errors=0,
+            # Refusal tolerance (2026-08-09, owner-approved): at temperature
+            # 1.0 the task model occasionally refuses IFBench prompts on
+            # ethics grounds; zero tolerance made each refusal fatal to the
+            # campaign. 48 = train(16)+selection(32): a refused/unparseable
+            # row scores 0 like native dspy.Evaluate, symmetrically with the
+            # Imp arm. Operational (transport/budget/route) errors stay fatal.
+            max_errors=48,
             seed=seed,
         ).compile(
             program,

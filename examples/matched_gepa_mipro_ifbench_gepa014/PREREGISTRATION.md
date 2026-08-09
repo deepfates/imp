@@ -55,3 +55,17 @@ defect hunt: the defect is a matched-semantics asymmetry (imp 50x stricter
 timeout than the arm it matches), fixed by matching imp to 6000s. Spend to
 the stop: single-digit dollars; no scores retained. Predictions P1-P3 and the
 decision rule are unchanged for relaunch.
+
+## Addendum 2 (2026-08-09, after pilot stop 2, before relaunch)
+
+Pilot launch 2: both arms sealed baseline and GEPA for seed 2026072705; the
+run died in the upstream MIPRO arm when the task model (temperature 1.0)
+refused an IFBench prompt on ethics grounds and the contract's max_errors=0
+made the single unparseable response fatal. Owner-approved change: refusal
+tolerance max_errors=48 (train 16 + selection 32) on BOTH arms symmetrically
+- a refused/unparseable row scores 0, matching native dspy.Evaluate and the
+GEPA-paper harness semantics (and what both GEPA arms already did within
+rollouts). Operational errors (transport, budget, routing) remain fatal, and
+per-row failure counts stay in the ledgers, so an asymmetric failure RATE
+between arms remains visible and reportable. P1-P3 and the decision rule
+unchanged. Cumulative real spend across attempts: ~\$1.50 of the \$74 cap.

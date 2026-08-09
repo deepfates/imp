@@ -779,7 +779,10 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       task_lm: task_lm,
       max_concurrency: 1,
       timeout: 6_000_000,
-      max_errors: 0,
+      # Refusal tolerance (2026-08-09, owner-approved): symmetric with the
+      # upstream arm's max_errors=48 - refused/unparseable rows score 0
+      # instead of killing the campaign; operational errors stay fatal.
+      max_errors: 48,
       seed: seed
     )
     |> MIPROv2.compile(program, examples(rows.train, true), examples(rows.selection, false))
