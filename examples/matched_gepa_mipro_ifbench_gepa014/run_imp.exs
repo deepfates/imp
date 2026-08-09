@@ -730,8 +730,15 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       reflection_record_mode: :gepa_v0_1_4,
       component_feedback: Imp.BenchmarkTruth.IFBenchFeedback.callbacks(metric),
       max_concurrency: 1,
-      timeout: 120_000,
-      proposal_timeout: 120_000,
+      # Matched to upstream's effective per-call ceiling: litellm's default
+      # request timeout is 6000s and pinned DSPy sets none stricter. The
+      # prior 120s here was 50x tighter than the matched arm and killed two
+      # slow-tail calls upstream would have waited out (pilot stop,
+      # 2026-08-09) - severed dispatches then tripped the call-accounting
+      # consistency check, which treats spend without recorded outcome as a
+      # stop condition (correctly).
+      timeout: 6_000_000,
+      proposal_timeout: 6_000_000,
       raise_on_exception: true,
       # Score-integrity bindings (2026-08-09): the evaluation cache identity
       # is fingerprinted so a resumed run can never replay entries from a
@@ -771,7 +778,7 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       prompt_lm: optimizer_lm,
       task_lm: task_lm,
       max_concurrency: 1,
-      timeout: 120_000,
+      timeout: 6_000_000,
       max_errors: 0,
       seed: seed
     )
