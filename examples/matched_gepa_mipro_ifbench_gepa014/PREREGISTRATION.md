@@ -44,3 +44,14 @@ one row of granularity is not expected either for working optimizers.
 
 Whatever the numbers are, they are recorded and disclosed. This file may not
 be edited after launch; corrections belong in a dated addendum.
+
+## Addendum 1 (2026-08-09, after pilot stop 1, before relaunch)
+
+Pilot launch 1 stopped under P1: imp's 120s per-row timeout killed two
+slow-tail calls that upstream (litellm default 6000s) would have waited out;
+the severed dispatches tripped the spend-without-evidence consistency check,
+which halted both arms cleanly. Per the decision rule this was an operational
+defect hunt: the defect is a matched-semantics asymmetry (imp 50x stricter
+timeout than the arm it matches), fixed by matching imp to 6000s. Spend to
+the stop: single-digit dollars; no scores retained. Predictions P1-P3 and the
+decision rule are unchanged for relaunch.
