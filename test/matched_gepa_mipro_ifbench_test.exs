@@ -8,6 +8,16 @@ defmodule Imp.MatchedGepaMiproIFBenchTest do
 
   @root Path.expand("../examples/matched_gepa_mipro_ifbench", __DIR__)
 
+  # This is the v1 campaign's LAUNCH preflight: contract.exs pins the working
+  # tree's root mix.lock sha, so it can only pass while the tree matches the
+  # seal. v1 is permanently stopped (recorded, with this contract's own sha,
+  # in the gepa014 successor's immutable_predecessors - amending it would
+  # break that seal), and the 2026-08-08 bandit CVE bump changed mix.lock.
+  # The seal's historical validity is still checkable by running this test at
+  # the sealed commit; at HEAD it is definitionally unrunnable.
+  @tag skip:
+         "v1 launch preflight pins the sealed mix.lock; permanently stopped campaign, " <>
+           "unrunnable at HEAD after any dependency change (see imp-sqkr)"
   test "sealed design binds the source-disjoint two-family opportunity and maximum" do
     Code.require_file(Path.join(@root, "contract.exs"))
     plan = apply(MatchedGepaMiproIFBench.Contract, :plan!, [Path.join(@root, "contract.json")])

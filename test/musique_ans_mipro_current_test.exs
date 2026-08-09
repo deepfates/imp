@@ -271,6 +271,8 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
   end
 
   @tag :evidence_infrastructure
+  # Reads the raw MuSiQue dataset; gated on MUSIQUE_DATA_ROOT (test_helper).
+  @tag :musique_data
   test "receipt replays exact official rows and discloses only exact-question exclusion" do
     data = Plan.data!(data_root!())
     assert {length(data.train), length(data.selection), length(data.test)} == {700, 300, 2_417}
@@ -316,6 +318,8 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
   end
 
   @tag :evidence_infrastructure
+  # Reads the raw MuSiQue dataset; gated on MUSIQUE_DATA_ROOT (test_helper).
+  @tag :musique_data
   test "exact frozen setup censes every proposer call and actual pinned demo arms" do
     data = Plan.data!(data_root!())
 

@@ -61,6 +61,18 @@ external_excludes =
   |> Enum.reject(fn {env, _tag} -> System.get_env(env) in ["1", "true", "TRUE", "yes"] end)
   |> Enum.map(fn {_env, tag} -> {tag, true} end)
 
+# The MuSiQue receipt-replay tests read the raw MuSiQue dataset (pinned
+# checkout + data jsonl), distributed out-of-band; the old
+# /tmp/musique-current-data-dir pointer convention was ephemeral and is now
+# provisioned on no machine. This gate takes a PATH, not a "1" flag: set
+# MUSIQUE_DATA_ROOT to the checkout to include them. The committed receipts
+# stay validated by the other tests in that module.
+external_excludes =
+  case System.get_env("MUSIQUE_DATA_ROOT") do
+    root when root in [nil, ""] -> [{:musique_data, true} | external_excludes]
+    _root -> external_excludes
+  end
+
 ExUnit.configure(exclude: external_excludes)
 
 ExUnit.start()
