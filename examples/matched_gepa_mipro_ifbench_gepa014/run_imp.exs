@@ -732,7 +732,20 @@ defmodule MatchedIFBenchGepa014Imp.Runner do
       max_concurrency: 1,
       timeout: 120_000,
       proposal_timeout: 120_000,
-      raise_on_exception: true
+      raise_on_exception: true,
+      # Score-integrity bindings (2026-08-09): the evaluation cache identity
+      # is fingerprinted so a resumed run can never replay entries from a
+      # different configuration, and resume_cache: :drop mirrors pinned gepa
+      # v0.1.4 exactly (upstream does not persist its evaluation cache across
+      # runs), keeping resumed-arm budget accounting matched.
+      cache_identity: %{
+        campaign: "matched-gepa-mipro-ifbench-dspy321-gepa014-successor-v1",
+        arm: "gepa",
+        seed: seed,
+        train_sha256: manifest["dataset"]["train_sha256"],
+        selection_sha256: manifest["dataset"]["selection_sha256"]
+      },
+      resume_cache: :drop
     )
     |> GEPA.compile(program, examples(rows.train, true), examples(rows.selection, false))
   end
