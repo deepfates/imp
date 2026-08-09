@@ -28,3 +28,7 @@ SCOPE MERGE (r7): the natural implementation is a dedicated CI differential job 
 **2026-08-08T06:44:56Z**
 
 LANE LANDED: :dspy_parity tag across 12 test files, fast.check excludes it (gate contract updated), mix differential.check alias (test env), CI job 'differential.check' provisions parity venv + pinned source + zsh + dev build. Local clean-tree run: 76 tests, 3 failures, all pre-existing environmental facts needing owner decisions: (1) sealed matched_gepa_mipro_ifbench v1 contract fails 'root Mix lock drift' because the bandit CVE bump changed mix.lock — sealed contracts pin the lock hash, so ANY dep bump invalidates historical contract validation at HEAD; decide re-freeze vs historical-seal skip semantics. (2)+(3) musique_ans_mipro_current receipt tests read /tmp/musique-current-data-dir — machine-local data OUTSIDE the repo, absent even here now; needs data re-provisioning or receipt-only validation. CI verdict pending on this push.
+
+**2026-08-08T07:08:03Z**
+
+CI RESIDUE (run 31245094460, 8 failures, down from 16): the 3 known owner-decision items (sealed v1 lock drift; musique /tmp data dir x2) plus 5 more machine-local dependencies to triage next session: hover pilot 'pinned private source' x2, hotpotqa deployment example, dspy public workflow gate, ifbench design stage1. Pattern so far: every one has been a provisioning fact, not a code bug. Triage each to provision-in-CI / commit-the-data / historical-seal semantics.

@@ -1,6 +1,6 @@
 ---
 id: imp-fkwy
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:19:00Z
@@ -28,3 +28,7 @@ STATUS: 7/8 CI jobs green at HEAD (dialyzer, quality/hex-audit incl. bandit CVE 
 **2026-08-08T04:34:17Z**
 
 invalid_evidence==2 ROOT CAUSE (verified in a fresh worktree, not guessed): claim.optimizer.mmgrpo.semantic_conformance ('DSPy authority materialization differs at dspy/teleprompt/grpo.py') and claim.optimizer.ensemble.semantic_conformance ('could not read tmp/dspy-3.2.1/tests/teleprompt/test_ensemble.py') — the pinned DSPy 3.2.1 checkout lives in gitignored tmp/, provisioned only by scripts/setup_dspy_parity_env.sh. Same fix as the 16 fast.check failures: the differential CI lane (imp-sqkr) runs the setup script first; fast.check should exclude UpstreamFidelityTest's evidence assertions or the audit should classify absent-authority as 'unavailable' rather than 'invalid'. CORRECTION LOG: my interim claim that test/protocol_* suites were untracked was FALSE (directory-vs-file comparison bug in my check); they are committed and passing. Caught before any commit.
+
+**2026-08-08T07:08:03Z**
+
+DONE in substance: all nine merge-gating CI jobs GREEN at HEAD (fast, quality, dialyzer, package, campaign, protocol, integration, docs, classify) — first fully green pipeline since 2026-07-24, achieved across 6 push-diagnose-fix rounds. The tenth job (differential.check) is the new truth-surfacing lane, red by design until its 8 residual items get owner decisions — all named on imp-sqkr. Branch-protection decision remains open (repo private, CI advisory).
