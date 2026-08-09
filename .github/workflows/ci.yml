@@ -258,7 +258,9 @@ jobs:
       # tags like v0.1.1, so no --depth 1).
       - run: git clone --filter=blob:none https://github.com/gepa-ai/gepa.git tmp/gepa-v0.1.4 && git -C tmp/gepa-v0.1.4 checkout --detach v0.1.4
       # Corrected GEPA comparator artifact checkout (hover/papillon pilots).
-      - run: scripts/setup_corrected_gepa_comparator.sh tmp/gepa-artifact
+      # Its self-test imports gepa_artifact from the checkout root; the
+      # maintainer environment had that on the ambient path, runners don't.
+      - run: PYTHONPATH="$PWD/tmp/gepa-artifact" scripts/setup_corrected_gepa_comparator.sh tmp/gepa-artifact
       # Source-exact IFBench scorer venv (docs/internal/BENCHMARK_TRUTH.md).
       - run: |
           python3 -m venv tmp/ifbench-parity-venv
