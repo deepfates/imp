@@ -91,7 +91,7 @@
     "gate_path": "../../scripts/dspy_optimizer_public_workflow_gate.py",
     "gate_sha256": "80f48254aeee0bf269198e1cae1cd1fe09b4f1042a567909e00ee1d6e8517578",
     "test_path": "../../test/dspy_optimizer_public_workflow_gate_test.exs",
-    "test_sha256": "7a4b3672748ff5a16cbaf78c8230d88387081d1851ba992f069c87f77b8ddea2",
+    "test_sha256": "60f9edb2ab56706ceb87bbb5d4cfb6eed2a0dd0541661622892edee9368722e3",
     "documentation_path": "../../docs/maintainers/DSPY_GEPA_MIPRO_PUBLIC_WORKFLOW.md",
     "documentation_sha256": "e5095e75afff52a5c943376b0f45b8ec7b0c950438a77055f38a82a3af1f1ab3",
     "required_result": {
@@ -246,7 +246,7 @@
       "elixir": "1.19.5",
       "otp": "28",
       "mix_lock_path": "../../mix.lock",
-      "mix_lock_sha256": "42df3c3a67ef79116c4fbc6f6f8a0dc64c7b28b3226487447e197a016a0fd247",
+      "mix_lock_sha256": "15c1d00ca1a8ab71686fc115b1e2814b0bcebaedad90f1372daa99e07b3fa8f0",
       "consumer_mix_lock_path": "mix.lock",
       "consumer_mix_lock_sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd",
       "packages": {"req_llm": "1.17.1", "llm_db": "2026.7.3", "req": "0.6.3", "jason": "1.4.5"}
