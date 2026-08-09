@@ -270,7 +270,8 @@ jobs:
       # Deployment-example tests spawn children inside examples/deployment,
       # which is its own Mix project; build it fully so child runs don't
       # spend their test timeout compiling.
-      - run: cd examples/deployment && IMP_PATH=../.. mix deps.get && IMP_PATH=../.. mix deps.compile && IMP_PATH=../.. mix compile
+      # Children run in both dev (banking77) and test (hotpotqa) envs.
+      - run: cd examples/deployment && IMP_PATH=../.. mix deps.get && IMP_PATH=../.. mix deps.compile && IMP_PATH=../.. mix compile && IMP_PATH=../.. MIX_ENV=test mix deps.compile && IMP_PATH=../.. MIX_ENV=test mix compile
       # Known-red residue at introduction (tracked on imp-sqkr): the sealed
       # v1 contract detects mix.lock drift after the bandit CVE bump, and the
       # MuSiQue receipts read a machine-local /tmp data dir. This job makes
