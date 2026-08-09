@@ -5411,11 +5411,20 @@ defmodule Imp.Optimizer.GEPA.Engine do
   end
 
   defp load_evaluation_cache(entries, opts) do
-    case Keyword.get(opts, :cache_evaluation_storage, :memory) do
-      :memory ->
+    case {Keyword.get(opts, :resume_cache, :replay),
+          Keyword.get(opts, :cache_evaluation_storage, :memory)} do
+      # Matched-parity mode: upstream gepa v0.1.4 does not persist its
+      # evaluation cache across runs (state.py "evaluation_cache is not
+      # persisted across runs by default"), so a resumed upstream arm
+      # re-evaluates and re-pays where a replayed imp cache would be free.
+      # :drop mirrors upstream exactly for matched campaigns.
+      {:drop, :memory} ->
+        %{}
+
+      {:replay, :memory} ->
         load_cache(entries)
 
-      {:disk, run_dir} ->
+      {_mode, {:disk, run_dir}} ->
         DiskEvaluationCache.new(run_dir: run_dir, identity: Keyword.get(opts, :cache_identity))
     end
   end

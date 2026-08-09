@@ -180,6 +180,22 @@ defmodule Imp.Optimizer.GEPA.EngineCacheControlTest do
     end
   end
 
+  test "resume_cache :drop mirrors upstream by re-evaluating instead of replaying" do
+    initial = run_engine(max_iterations: 0)
+    checkpoint = initial |> Engine.dump_state() |> Jason.encode!() |> Jason.decode!()
+    assert checkpoint["cache"] != []
+
+    # Default :replay keeps the checkpointed cache (free hits on resume);
+    # :drop starts empty like upstream gepa v0.1.4 (its evaluation cache is
+    # not persisted across runs), so a resumed matched arm re-pays for
+    # evaluations exactly as the upstream arm does.
+    replayed = run_engine(max_iterations: 0, resume_state: checkpoint)
+    assert map_size(replayed.cache) == 1
+
+    dropped = run_engine(max_iterations: 0, resume_state: checkpoint, resume_cache: :drop)
+    assert map_size(dropped.cache) == 0
+  end
+
   test "cache_evaluation must be boolean" do
     assert_raise ArgumentError, ":cache_evaluation must be a boolean", fn ->
       run_engine(cache_evaluation: :memory)

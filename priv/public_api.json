@@ -4473,6 +4473,7 @@
         "reflection_lm",
         "reflection_record_mode",
         "reflection_strategy",
+        "resume_cache",
         "rng_algorithm",
         "sampling_strategy",
         "seed",

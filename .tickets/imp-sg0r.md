@@ -28,3 +28,7 @@ CI PROOF (2026-08-08): UpstreamFidelityTest fails on CI with invalid_evidence==2
 **2026-08-08T04:31:03Z**
 
 PARTIAL FIX pushed: the 'machine-local evidence' was three entire untracked protocol test suites (test/protocol_mcp, protocol_retriever, protocol_training) referenced by the claims registry — committed at fc918518, 6/6 passing locally. CI protocol.check had been green against directories it didn't have (skipped-success semantics); it now has real content. Verify invalid_evidence drops to 0 on next CI run; sealed tmp/ artifacts remain this ticket's open scope.
+
+**2026-08-09T06:54:51Z**
+
+Evidence lane GREEN (run 31299539655) after archiving 12 superseded orphaned artifacts per the provenance test's own remedy. Remaining scope: sealed tmp/ raw artifacts durability + MuSiQue dataset re-provisioning (MUSIQUE_DATA_ROOT gate documents the absence).
