@@ -229,7 +229,7 @@
     "upstream": {
       "python": "3.13.2",
       "lock_path": "../../benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock",
-      "lock_sha256": "c7e29a1f246afd36adcca2306ad3a11e3d3288a99e43fb54618c9a1b48581bb7",
+      "lock_sha256": "363ae084040d5044ba02b05b701324032e00d886264dbea63a8982bd33f9f799",
       "packages": {"dspy": "3.2.1", "gepa": "0.0.27", "optuna": "4.9.0", "numpy": "2.5.1", "litellm": "1.93.0", "openai": "2.48.0", "pydantic": "2.13.4"},
       "source_roots": {"dspy": "tmp/dspy-3.2.1", "gepa": "tmp/gepa-v0.1.4"},
       "effective_gepa": "authenticated source checkout 0.1.4@8b0ce6c overlays the locked 0.0.27 distribution before imports"
