@@ -339,5 +339,5 @@
     "launch_commit_binding": "paired coordinator captures clean HEAD, passes it to both peers, and both peers refuse any exact commit mismatch"
   },
   "provider_authority": "none_terminal_zero_call_stop; shadow-only coordinator path is credential-free",
-  "launch_status": "terminal_zero_call_stopped"
+  "launch_status": "sealed"
 }
