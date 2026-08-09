@@ -545,8 +545,18 @@ def treatment_preservation_gate(contract: dict[str, Any]) -> dict[str, Any]:
     successor_upstream = dict(contract["runtime_dependencies"]["upstream"])
     successor_upstream.pop("source_roots")
     successor_upstream.pop("effective_gepa")
+    # lock_sha256 is compared with a disclosed-delta allowance: v3 sealed a
+    # lock that omitted the IFBench artifact scoring imports (immutabledict,
+    # nltk, langdetect...) and therefore could not execute the run it seals -
+    # v3 stopped before ever reaching that code. The successor's lock adds
+    # exactly those scoring deps; package versions in "packages" remain
+    # hard-checked here, and run_upstream.py independently enforces both the
+    # exact versions and freeze==lock byte equality at launch.
+    v3_upstream = dict(v3["runtime_dependencies"]["upstream"])
+    successor_upstream.pop("lock_sha256", None)
+    v3_upstream.pop("lock_sha256", None)
     require(
-        successor_upstream == v3["runtime_dependencies"]["upstream"],
+        successor_upstream == v3_upstream,
         "successor changed the locked upstream environment",
     )
     require(
