@@ -72,3 +72,21 @@ scope and point to observable evidence. The generated dashboard may group that
 information into surfaces, claims, requirements, and profiles for maintainers;
 users should not need those counts to decide whether the documented workflow
 works for them.
+
+## Historical negatives: bug-or-benign verdicts (2026-08-09)
+
+Under the parity frame — pinned DSPy/GEPA/MIPRO are replicated results, so a
+faithful port should match them — each historical negative was diagnosed from
+its retained artifacts as either a config that could not show lift even
+upstream (benign) or an Imp fidelity defect (bug).
+
+| Negative | Verdict | Why |
+|---|---|---|
+| HotPotQA JSON-GEPA, mean lift −0.015 (3 seeds, GPT-5.4-mini task / Sonnet 4.6 reflection) | **Benign** | 32 semantic metric calls vs the GEPA artifact's 6,871 for HotpotQA (`tmp/gepa-artifact/scripts/experiment_configs.py`); −0.015 is below the 24-row test's 0.042 per-row granularity; instructions verifiably mutated and selection improved before failing to transfer from an 8-row selection set. The strict one-attempt JSON policy also scored 6 parse failures as zeros on one seed — a declared conservative deviation from DSPy's retrying adapters. |
+| Banking77 modeled-MIPRO, two conditions missed the ≥0.05 bar | **Benign** | Both conditions were *positive* (means +0.0417 and +0.0208, 2/3 seeds each; verified against `benchmarks/results/banking77-mipro-*`); the preregistered bar exceeded what a 48-row test at a 0.875–0.93 baseline ceiling can resolve (one row = 0.0208). The postmortem verified real proposals, attached demos, and legal Optuna acquisitions. |
+| Grue stateful-agent GEPA, 0/3 seeds lift (local llama3.2:3b) | **Benign — metric floor** | Every candidate scored 0.0 on every selection row: GEPA received zero signal to optimize against, and strict admission correctly retained baseline. Reflected candidates were real and varied (inspected in the retained raw results). Upstream GEPA given an all-zero frontier returns the seed program identically. |
+| IFBench optimization interpretation | **Bug — fixed and disclosed** | Scorer represented nested rule arguments incorrectly and used a non-pinned language fallback; fixed source-exact at `8c798d2e` with the superseded interpretation explicitly withdrawn. |
+
+None of the benign verdicts double as effectiveness evidence: they say the
+configs could not have resolved a lift, not that lift exists. The matched
+campaign remains the instrument that can.
