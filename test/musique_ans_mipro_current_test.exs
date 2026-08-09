@@ -4,11 +4,15 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
   # Requires the pinned DSPy parity environment (scripts/setup_dspy_parity_env.sh
   # + setup_dspy_stable_source.sh) and/or example-project deps; runs in the CI
   # differential lane, not fast.check.
-  @moduletag :dspy_parity
+  # :dspy_parity is applied per-test (not as a moduletag): the differential
+  # lane selects with --only dspy_parity, and ExUnit includes override tag
+  # excludes - a moduletag would drag the :musique_data receipt-replay tests
+  # (raw dataset provisioned on no machine) into the lane unconditionally.
 
   alias Imp.BenchmarkTruth.MusiqueAnsMiproCurrent, as: Plan
   alias Imp.Optimizer.{MIPROv2, Report}
 
+  @tag :dspy_parity
   test "frozen receipt and exact opportunity planner remain internally coherent" do
     receipt = Plan.receipt!()
     assert length(receipt["splits"]["train"]) == 700
@@ -97,6 +101,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
            }
   end
 
+  @tag :dspy_parity
   test "real ReqLLM JSON and pinned DSPy JSONAdapter preserve actual two-stage wires" do
     owner = self()
 
@@ -180,6 +185,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
            )
   end
 
+  @tag :dspy_parity
   test "frozen task and proposer routes reach the real ReqLLM serializer" do
     owner = self()
 
@@ -305,6 +311,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
   end
 
   @tag :evidence_infrastructure
+  @tag :dspy_parity
   test "exact accepted pinned Optuna minibatch configuration is admitted without work" do
     upstream = File.read!("tmp/dspy-3.2.1/dspy/teleprompt/mipro_optimizer_v2.py")
     assert upstream =~ "minibatch: bool = True"
@@ -411,6 +418,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
   end
 
   @tag :evidence_infrastructure
+  @tag :dspy_parity
   test "reduced modeled MIPRO selects, persists, and serves four calls in a fresh OS" do
     task_lm = reduced_task_lm()
 
@@ -551,6 +559,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
   end
 
   @tag :evidence_infrastructure
+  @tag :dspy_parity
   test "pinned DSPy reduced MIPRO selects optimized state and serves four calls fresh" do
     {output, 0} =
       System.cmd(
