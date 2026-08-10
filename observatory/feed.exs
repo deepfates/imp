@@ -92,6 +92,7 @@ defmodule Observatory.Feed do
       cells: [],
       spend_usd: nil,
       arm_summaries: [],
+      optimizer_points: [],
       updated_at: System.os_time(:second)
     }
   end
@@ -105,7 +106,7 @@ defmodule Observatory.Feed do
 
     {cells, trials, seal_events, known_cells} = scan_sealed(state)
     results = read_results(state.run_root)
-    {log_events, log_peers, log_pos, log_partial} = tail_log(state)
+    {log_events, log_peers, log_points, log_pos, log_partial} = tail_log(state)
 
     prev = state.public
 
@@ -127,6 +128,8 @@ defmodule Observatory.Feed do
         results
         |> Map.values()
         |> Enum.flat_map(fn r -> (r && Map.get(r, :arm_summaries)) || [] end),
+      optimizer_points:
+        (Map.get(prev, :optimizer_points, []) ++ log_points) |> Enum.take(-800),
       updated_at: now
     }
 
@@ -375,7 +378,7 @@ defmodule Observatory.Feed do
   # -- log tailing -------------------------------------------------------------
   # Remember byte position; on truncation/rotation (size < pos) reset to 0.
 
-  defp tail_log(%{log_path: nil} = state), do: {[], %{}, state.log_pos, state.log_partial}
+  defp tail_log(%{log_path: nil} = state), do: {[], %{}, [], state.log_pos, state.log_partial}
 
   defp tail_log(%{log_path: path, log_pos: pos, log_partial: partial}) do
     case File.stat(path) do
@@ -385,15 +388,15 @@ defmodule Observatory.Feed do
         case read_from(path, pos, size) do
           {:ok, chunk, new_pos} ->
             {lines, new_partial} = split_lines(partial <> chunk)
-            {events, peers} = parse_log_lines(lines)
-            {events, peers, new_pos, new_partial}
+            {events, peers, points} = parse_log_lines(lines)
+            {events, peers, points, new_pos, new_partial}
 
           _ ->
-            {[], %{}, pos, partial}
+            {[], %{}, [], pos, partial}
         end
 
       _ ->
-        {[], %{}, 0, ""}
+        {[], %{}, [], 0, ""}
     end
   end
 
@@ -438,11 +441,16 @@ defmodule Observatory.Feed do
   @tqdm_re ~r/^(?<label>.+?):\s+(?<pct>\d+)%\|.*\|\s*(?<done>\d+)\/(?<total>\d+)/
   @logger_re ~r/\[(?<level>debug|info|warning|error)\]\s*(?<text>.*)$/
   @refusal_re ~r/can[’']t help|cannot help|refus/iu
+  # dspy full-eval lines, e.g. "Average Metric: 26.83 / 32 (83.9%)" — every
+  # optimizer candidate evaluation emits one; the percentage is the 0..1 score.
+  @eval_re ~r/Average Metric: [\d.]+ \/ \d+ \((?<pct>[\d.]+)%\)/
+  # GEPA's running champion, already 0..1: "Best score on valset: 0.8385"
+  @best_re ~r/Best score on valset: (?<score>[\d.]+)/
 
   defp parse_log_lines(lines) do
     now = System.os_time(:second)
 
-    Enum.reduce(lines, {[], %{}}, fn line, {events, peers} ->
+    Enum.reduce(lines, {[], %{}, []}, fn line, {events, peers, points} ->
       cond do
         captures = Regex.named_captures(@tqdm_re, line) ->
           # tqdm progress lines come from the upstream (python) worker
@@ -458,7 +466,7 @@ defmodule Observatory.Feed do
               &Map.merge(&1, %{alive: true, phase: phase, progress: {done, total}, last_line_at: now})
             )
 
-          {events, peers}
+          {events, peers, points}
 
         captures = Regex.named_captures(@logger_re, line) ->
           # Elixir Logger lines come from the imp worker
@@ -489,16 +497,17 @@ defmodule Observatory.Feed do
             end
 
           events = maybe_phase(events, peers, text)
-          {events, peers}
+          {events, peers, points}
 
-        # Live optimizer scores: during the multi-hour GEPA/MIPRO grind the
-        # score charts only fill at seal time, so surface dspy's per-iteration
-        # score lines in the event stream — the one live signal of whether
-        # optimization is moving.
-        Regex.match?(~r/gepa: Iteration \d+|Average Metric:|New best|Best score/, line) ->
-          {[%{at: now, runtime: "upstream", kind: :info,
-              text: String.slice(String.trim(line), 0, 160)} | events],
-           peers}
+        captures = Regex.named_captures(@best_re, line) ->
+          point = %{at: now, runtime: "upstream", kind: :best,
+                    score: String.to_float(captures["score"])}
+          {events, peers, points ++ [point]}
+
+        captures = Regex.named_captures(@eval_re, line) ->
+          {pct, _} = Float.parse(captures["pct"])
+          point = %{at: now, runtime: "upstream", kind: :eval, score: pct / 100.0}
+          {events, peers, points ++ [point]}
 
         # Absorbed row-level failures: upstream's failure-preserving adapter
         # scores refusal/unparseable rows 0 and CONTINUES (max_errors
@@ -510,21 +519,21 @@ defmodule Observatory.Feed do
             String.contains?(line, "dspy.utils.parallelizer: Error for Example") ->
           {[%{at: now, runtime: "upstream", kind: :truncation,
               text: "tolerated row failure (scored 0): " <> String.slice(line, 0, 140)} | events],
-           peers}
+           peers, points}
 
         String.starts_with?(line, "Traceback (most recent call last):") ->
-          {events, peers}
+          {events, peers, points}
 
         Regex.match?(~r/^\w[\w.]*(Error|Exception|Stop)\b.*:/, line) ->
           {[%{at: now, runtime: "upstream", kind: :error, text: String.slice(line, 0, 200)} | events],
-           peers}
+           peers, points}
 
         phase_line?(line) ->
           {[%{at: now, runtime: nil, kind: :phase, text: String.slice(String.trim(line), 0, 200)} | events],
-           peers}
+           peers, points}
 
         true ->
-          {events, peers}
+          {events, peers, points}
       end
     end)
   end
@@ -538,7 +547,8 @@ defmodule Observatory.Feed do
   end
 
   defp phase_line?(text) do
-    Regex.match?(~r/\b(seed \d+|compile|preflight|bootstrap|sealing|selection)\b/i, text)
+    Regex.match?(~r/\b(seed \d+|compile|preflight|bootstrap|sealing|selection)\b/i, text) and
+      not String.contains?(text, "\"")
   end
 
   # -- __imp_type__ decoding ---------------------------------------------------

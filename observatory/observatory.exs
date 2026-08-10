@@ -134,6 +134,34 @@ defmodule Observatory.Live do
 
   defp sx(score), do: 120 + score * 560
 
+  # ---- live optimization section -------------------------------------------
+
+  defp live_points(state), do: Map.get(state, :optimizer_points, [])
+
+  # dashed reference: the sealed upstream baseline selection mean, if present
+  defp live_base(state) do
+    state.cells
+    |> Enum.find(&(&1.runtime == "upstream" and &1.arm == "baseline"))
+    |> case do
+      %{selection_mean: m} when is_number(m) -> m
+      _ -> nil
+    end
+  end
+
+  defp lx(_i, n) when n <= 1, do: 40
+  defp lx(i, n), do: 40 + i / (n - 1) * 710
+
+  defp ly(score), do: 130 - score * 110
+
+  defp best_path(points) do
+    n = length(points)
+
+    points
+    |> Enum.with_index()
+    |> Enum.filter(fn {pt, _i} -> pt.kind == :best end)
+    |> Enum.map_join(" ", fn {pt, i} -> "#{lx(i, n)},#{ly(pt.score)}" end)
+  end
+
   defp summ(state, rt, seed, arm) do
     Enum.find(state.arm_summaries || [], &(&1.runtime == rt and &1.seed == seed and &1.arm == arm))
   end
@@ -227,6 +255,8 @@ defmodule Observatory.Live do
       assign(assigns,
         verdict: verdict(st), slopes: slopes(st), trial_rows: trial_rows(st),
         health: health(st), seeds: seeds(st), running: running?(st),
+        live_points: live_points(st), live_base: live_base(st),
+        best_path: best_path(live_points(st)),
         now: st.updated_at || System.system_time(:second))
 
     ~H"""
@@ -245,6 +275,46 @@ defmodule Observatory.Live do
           <% end %>
         </p>
       </header>
+
+      <section :if={@running}>
+        <h2>live optimization <span class="q">is the search moving right now?</span></h2>
+        <%= for rt <- ["imp", "upstream"], p = @state.peers[rt] do %>
+          <div class="peerline">
+            <span class={"peername " <> rt}><%= rt %></span>
+            <span class="peerphase"><%= (p && p.phase) || "idle" %></span>
+            <%= case p && p.progress do %>
+              <% {d, t} -> %>
+                <span class="pbar"><span class="pfill" style={"width:#{round(d / max(t, 1) * 100)}%"}></span></span>
+                <span class="pnum"><%= d %>/<%= t %> · <%= round(d / max(t, 1) * 100) %>%</span>
+              <% _ -> %>
+                <span class="pnote"><%= if rt == "imp",
+                  do: "no live telemetry — ledger discloses at seal",
+                  else: "no progress line yet" %></span>
+            <% end %>
+          </div>
+        <% end %>
+        <%= if @live_points != [] do %>
+          <svg viewBox="0 0 760 150" class="chart">
+            <%= for tick <- [0.0, 0.5, 1.0] do %>
+              <line x1="40" y1={ly(tick)} x2="750" y2={ly(tick)} class="grid" />
+              <text x="8" y={ly(tick) + 4} class="tick"><%= tick %></text>
+            <% end %>
+            <%= if is_number(@live_base) do %>
+              <line x1="40" y1={ly(@live_base)} x2="750" y2={ly(@live_base)} class="baseref" />
+              <text x="748" y={ly(@live_base) - 4} class="tick" text-anchor="end">baseline <%= fmt(@live_base) %></text>
+            <% end %>
+            <%= for {pt, i} <- Enum.with_index(@live_points), pt.kind == :eval do %>
+              <circle cx={lx(i, length(@live_points))} cy={ly(pt.score)} r="3" class="seed upstream">
+                <title>candidate eval <%= fmt(pt.score) %> at <%= hhmmss(pt.at) %></title>
+              </circle>
+            <% end %>
+            <%= if @best_path != "" do %>
+              <polyline points={@best_path} class="bestline" />
+            <% end %>
+          </svg>
+          <p class="note">orange dots = every upstream candidate evaluation (parsed live) · line = best-on-valset so far · dashed = that runtime's sealed baseline · imp's optimizer runs silent by design; its trials land when the arm seals</p>
+        <% end %>
+      </section>
 
       <section>
         <h2>held-out verdict <span class="q">is imp matching upstream?</span></h2>
@@ -390,6 +460,16 @@ defmodule Observatory.Live do
       .slope.imp { stroke:#3987e5; } .slope.upstream { stroke:#d95926; }
       .slope.base { stroke:#575650; stroke-width:1; opacity:.7; }
       .baseref { stroke:#c3c2b7; stroke-width:1.5; stroke-dasharray:3 2; }
+      .peerline { display:flex; align-items:center; gap:10px; margin:6px 0; }
+      .peername { width:76px; font-weight:bold; }
+      .peername.imp { color:#3987e5; } .peername.upstream { color:#d95926; }
+      .peerphase { color:#c3c2b7; min-width:170px; }
+      .pbar { flex:1; height:8px; background:#2e2e2c; border-radius:4px; overflow:hidden; }
+      .pfill { display:block; height:100%; background:#c98500; border-radius:4px; transition:width 1s linear; }
+      .pnum { color:#a5a49b; min-width:130px; text-align:right; }
+      .pnote { color:#8a897f; font-style:italic; flex:1; }
+      .bestline { stroke:#199e70; stroke-width:2; fill:none; }
+      .note { color:#8a897f; margin:4px 0 0; }
       .healthgrid { display:flex; flex-direction:column; gap:5px; margin-top:6px; }
       .hrow { display:flex; align-items:center; gap:10px; }
       .hrow .lbl { width:150px; color:#c3c2b7; font-size:11px; }
