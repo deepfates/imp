@@ -366,11 +366,11 @@
     },
     "coordinator": {
       "path": "run_paired.py",
-      "sha256": "0cdd659cd88fc03c8e10174a268dbe76a215cfd80ad7b5b787c3923394c7f6d7"
+      "sha256": "fb333162b47c43bbbdd82c0dcec4baf534e24a8b1b0311ae19bce7e01f99b697"
     },
     "imp_entry": {
       "path": "run_imp.exs",
-      "sha256": "7814a4f07ba12d29d6614330124f0a27bfc16542fa4a7cab85396902743ce88e"
+      "sha256": "337402672fc0762dcff5b46fa843e27534b3254a07608d140a1b2fd4b171ac6c"
     },
     "shadow_tls_server": {
       "path": "shadow_tls_server.py",
@@ -398,7 +398,7 @@
     },
     "upstream_entry": {
       "path": "run_upstream.py",
-      "sha256": "ec5a6d077ebaf67b66aae12e8357ca78d0fa159495e13fc3e3693670e7e40379"
+      "sha256": "793e89c2fd6e25c9e4c0b9fde7cc363d4a8b4f628b4d818d45c9f7996bafc2d7"
     }
   },
   "provider_authority": "none until live launch; shadow-only coordinator path is credential-free"

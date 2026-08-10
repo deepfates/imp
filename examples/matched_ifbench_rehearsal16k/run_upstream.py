@@ -1217,7 +1217,7 @@ def run(args: argparse.Namespace) -> None:
                 api_base="https://openrouter.ai/api/v1",
                 api_key=os.environ["OPENROUTER_API_KEY"],
                 cache=False,
-                num_retries=0,
+                num_retries=3,  # dspy 3.2.1 default: transient transport retries (lm.py:41)
                 capture=capture,
                 role="task",
                 seed=seed,
@@ -1230,7 +1230,7 @@ def run(args: argparse.Namespace) -> None:
                 api_base="https://openrouter.ai/api/v1",
                 api_key=os.environ["OPENROUTER_API_KEY"],
                 cache=False,
-                num_retries=0,
+                num_retries=3,  # dspy 3.2.1 default: transient transport retries (lm.py:41)
                 capture=capture,
                 role="optimizer",
                 temperature=request["optimizer"]["temperature"],
@@ -1438,7 +1438,7 @@ def shadow_preflight(args: argparse.Namespace) -> None:
         api_base=api_base_url,
         api_key="local-shadow-only",
         cache=False,
-        num_retries=0,
+        num_retries=3,  # dspy 3.2.1 default: transient transport retries (lm.py:41)
         capture=capture,
         role="task",
         seed=17,
@@ -1452,7 +1452,7 @@ def shadow_preflight(args: argparse.Namespace) -> None:
         api_base=api_base_url,
         api_key="local-shadow-only",
         cache=False,
-        num_retries=0,
+        num_retries=3,  # dspy 3.2.1 default: transient transport retries (lm.py:41)
         capture=capture,
         role="optimizer",
         temperature=request["optimizer"]["temperature"],

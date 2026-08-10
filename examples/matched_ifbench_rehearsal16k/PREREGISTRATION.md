@@ -56,3 +56,17 @@ recorded for powering the Heavy design, whatever it is.
 
 Whatever the numbers are, they are recorded and disclosed. This file may not
 be edited after launch; corrections belong in a dated addendum.
+
+## Addendum 1 (2026-08-09, after stop 1, before relaunch)
+
+Launch 1: both baselines sealed (upstream 0.7917 — reproducing the published
+source-sized denominator 0.7874 at the corrected config; imp 0.7031, an
+edge-of-noise single-pass watch item), then upstream's GEPA arm died on a
+provider-side 503 (litellm ServiceUnavailableError) ~1h in. Root cause: the
+contract's zero-retry rule is stricter than pinned DSPy's own default of 3
+transient-transport retries (dspy/clients/lm.py:41) — the same
+stricter-than-source deviation family as the pilot's 120s timeout. Fixed
+symmetrically: num_retries=3 upstream, max_retries: 3 / retry: :transient on
+the imp arm. Also fixed a coordinator stop-path bug where the source-binding
+check misfires on any stopped record and masks the real stop cause. Spend to
+stop: ~$1.50. Predictions unchanged.

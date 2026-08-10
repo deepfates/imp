@@ -785,10 +785,14 @@ def require_rescued_stop_artifacts(
             == require_bootstrap_contract(manifest, launch_commit),
             f"{runtime} stopped bootstrap binding drift",
         )
-        require(
-            result.get("source_commits") == expected_sources,
-            f"{runtime} source commit binding drift",
-        )
+        if result.get("status") != "stopped":
+            # A stopped record writes source bookkeeping as "unavailable";
+            # the stop error is the finding - do not mask it with a
+            # binding-drift misfire (2026-08-09 rehearsal stop 1 lesson).
+            require(
+                result.get("source_commits") == expected_sources,
+                f"{runtime} source commit binding drift",
+            )
         actual = require_number(result.get("actual_cost"), f"{runtime} actual cost")
         reserved = require_number(
             result.get("usd_reserved"), f"{runtime} reserved cost"

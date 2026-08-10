@@ -488,7 +488,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
     %{status: 200, body: %{"status" => "ready"}} =
       Req.get!(health_url,
         retry: false,
-        max_retries: 0,
+        max_retries: 3,
         connect_options: connect_options
       )
 
@@ -1031,7 +1031,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
     api_key =
       if shadow?, do: "local-shadow-only", else: System.fetch_env!("OPENROUTER_API_KEY")
 
-    req_http_options = [retry: false, max_retries: 0]
+    req_http_options = [retry: :transient, max_retries: 3]
 
     req_http_options =
       if shadow?,
@@ -1047,7 +1047,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
       api_key: api_key,
       cache: false,
       max_tokens: request["max_tokens"],
-      max_retries: 0,
+      max_retries: 3,
       timeout: 6_000_000,
       provider_options: [openrouter_provider: guard, openrouter_usage: %{include: true}],
       req_http_options: req_http_options
@@ -1102,7 +1102,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
       Map.new(~w(task optimizer), fn role ->
         expected = manifest["models"][role]
         endpoint_url = "#{catalog_base_url}/models/#{expected["logical"]}/endpoints"
-        request_options = [retry: false, max_retries: 0]
+        request_options = [retry: :transient, max_retries: 3]
 
         request_options =
           if connect_options,
