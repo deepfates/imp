@@ -366,7 +366,7 @@
     },
     "coordinator": {
       "path": "run_paired.py",
-      "sha256": "3314d7dbcde066123ff18ebb20a78ac9f0e64fe853350295d4d16572857e7b7d"
+      "sha256": "6f56b71f4b92ea102b9d9681d34284678ce87f0bb444b1c5c4ff6be3740ca5ff"
     },
     "imp_entry": {
       "path": "run_imp.exs",

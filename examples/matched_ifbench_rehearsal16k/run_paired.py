@@ -763,7 +763,7 @@ def require_rescued_stop_artifacts(
     }
     rates = reservation_rates(manifest)
     runtime_maximum = worst_case_usd(manifest) / Decimal(2)
-    require(runtime_maximum == Decimal("107.25504000"), "runtime reservation cap drift")
+    require(runtime_maximum == Decimal("115.03104000"), "runtime reservation cap drift")
     tolerance = Decimal("0.000000001")
     for runtime in ("imp", "upstream"):
         path = TMP / f"{runtime}-result.json"

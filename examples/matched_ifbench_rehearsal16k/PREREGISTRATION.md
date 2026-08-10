@@ -160,3 +160,19 @@ cannot alter optimization. Baselines re-run at the same seed (temperature-1
 sampling means per-take selection means vary within the measured ±0.08 s.e.;
 0.67-0.84 observed across takes is consistent with that noise, and no
 single-cell number is interpreted alone). Predictions unchanged.
+
+## Addendum 6 (2026-08-10, after stop 7, before relaunch)
+
+Take 7 (healthy: both baselines sealed at imp 0.750 / upstream 0.745; both
+GEPA arms ~10% through budget with live candidates above baseline; $12.17
+spent) was killed by the upstream arm's launch-commit re-admission guard —
+correctly. The operator committed observatory (dashboard-only) changes to
+the repository during the live run; HEAD moved five commits off the pinned
+launch commit and the guard refused to continue. The guard, both rescue
+paths, and the coordinated stop all worked as designed. Rule adopted and
+recorded: the repository is FROZEN (no commits) between launch and terminal
+for every live run; observability work batches before launch or after
+terminal. Also fixed: the rescue validator's per-runtime reservation-cap
+literal still encoded the pre-Addendum-4 ceiling (107.25504 -> 115.03104);
+a full sweep of every Decimal literal in the paired surfaces verified the
+remainder against current arithmetic. Predictions unchanged.
