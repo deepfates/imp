@@ -25,9 +25,11 @@ defmodule MatchedIFBenchR16k.Contract do
     },
     "gepa" => %{
       "task_logical" => 2992,
-      "optimizer_logical" => 24,
-      "transports" => 3016,
-      "total_logical" => 3016
+      # source caps only metric calls; 96 ~= 2.4x the reflection rate
+      # measured at stop 3 (25 calls by rollout 752/1200)
+      "optimizer_logical" => 96,
+      "transports" => 3088,
+      "total_logical" => 3088
     },
     "mipro_v2" => %{
       "task_logical" => 1504,
@@ -42,7 +44,7 @@ defmodule MatchedIFBenchR16k.Contract do
 
   def plan!(path) do
     manifest = load!(path)
-    # 1 seed x 2 runtimes x (192 + 2992 + 1504) task; 2 runtimes x (24 + 15) optimizer.
+    # 1 seed x 2 runtimes x (192 + 2992 + 1504) task; 2 runtimes x (96 + 15) optimizer.
     task_calls = 9_376
     optimizer_calls = 78
     request = manifest["execution"]["request"]

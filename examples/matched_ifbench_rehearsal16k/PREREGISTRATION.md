@@ -97,3 +97,26 @@ stops. Ledger arithmetic (logical == transports) and all ceilings are
 unchanged. Shadow preflight (provider-free) passes end to end, including the
 one-transport-per-role assertion. Spend to stop 2: ~$0. Predictions
 unchanged.
+
+## Addendum 3 (2026-08-09, after stop 3, before relaunch)
+
+Launch 3 ran clean through both baselines and 752/1200 GEPA rollouts
+(upstream actual spend $3.68), then stopped on two defects at once:
+
+1. **Optimizer-call ceiling stricter than source (again).** Upstream GEPA
+   requested reflection call 25 against our ceiling of 24. The source caps
+   nothing but metric calls; our 24 assumed ~1 reflection per iteration, but
+   the measured rate is ~2.5 (25 calls by rollout 752), extrapolating to ~40
+   at budget exhaustion. Ceiling raised to 96 (~2.4x measured need) in
+   contract + upstream expected-ceiling check; transports/total raised
+   accordingly (3088). Documented reservation ceiling rises 214.51 -> 228.33
+   USD; the actual-spend cap (new_spend_max $60, $30/runtime) is unchanged.
+2. **Rescue-path crash planted by the stop-2 fix.** Imp's SIGTERM stopped-
+   artifact writer crashed: Jason cannot encode the raw BEAM Reference used
+   as the retry dispatch_tag, which rides transport metadata into the
+   serialized ledger. The tag is now a unique positive integer. This is why
+   no imp-result.json exists for stop 3 (imp spend unrecorded; upstream's
+   $3.68 is the observed side).
+
+Predictions unchanged. Cumulative observed rehearsal spend to date: ~$1.50
+(stop 1) + ~$0 (stop 2) + $3.68+imp-side (stop 3).

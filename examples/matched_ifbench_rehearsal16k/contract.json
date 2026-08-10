@@ -256,9 +256,9 @@
       },
       "gepa": {
         "task_logical": 2992,
-        "optimizer_logical": 24,
-        "transports": 3016,
-        "total_logical": 3016
+        "optimizer_logical": 96,
+        "transports": 3088,
+        "total_logical": 3088
       },
       "mipro_v2": {
         "task_logical": 1504,
@@ -335,7 +335,7 @@
   "budget": {
     "new_spend_max": 60.0,
     "hard_cap_semantics": "actual gateway-reported spend across both runtimes; enforced per runtime as new_spend_max/2 in each reconcile path",
-    "reservation_ceiling_usd": 214.51008,
+    "reservation_ceiling_usd": 228.33408,
     "reservation_ceiling_derivation": "9376 task calls x $0.02208 (4864 in x $0.75/M + p99 4096 out x $4.5/M) + 78 optimizer calls x $0.096 (17408 in x $3.75/M cache-write + 2048 out x $15/M)",
     "realistic_estimate_usd": "20-50 (pilot per-call actuals x 2-3x token growth at the lifted cap)"
   },
@@ -358,7 +358,7 @@
     },
     "contract_runtime": {
       "path": "contract.exs",
-      "sha256": "97564f4e4e57f8ac6e7ad22c8c15b6093111dd4aec192b9f20c439f0904ae786"
+      "sha256": "97da7c02ecbab24a46361646705e4ca0be2605baccf15d000867058e88a05f87"
     },
     "bootstrap_environment": {
       "path": "peer_bootstrap.py",
@@ -370,7 +370,7 @@
     },
     "imp_entry": {
       "path": "run_imp.exs",
-      "sha256": "38f8dc737148955f6ee3fb19445944aeab8468ce070d56bdba0e70de717754fb"
+      "sha256": "6d26bbffdbfa1077ccd624f5aa5da6331ed76a292ef66ff00a8e040e0aa6d799"
     },
     "shadow_tls_server": {
       "path": "shadow_tls_server.py",
@@ -398,7 +398,7 @@
     },
     "upstream_entry": {
       "path": "run_upstream.py",
-      "sha256": "0bf2271573f232dccafbc755c4ed227e7c797b0b870b22afb7f4e1fbca838a10"
+      "sha256": "af54932abcedf7ed3cdee717819836c514ee5ab518e390c046ff90e9a41a382f"
     }
   },
   "provider_authority": "none until live launch; shadow-only coordinator path is credential-free"

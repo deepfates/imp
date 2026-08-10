@@ -314,7 +314,10 @@ defmodule MatchedIFBenchR16kImp.ObservedLM do
   @transient_retry_limit 3
 
   defp dispatch_with_retries(lm, messages, opts) do
-    Process.put(:r16k_dispatch_tag, make_ref())
+    # unique integer, not make_ref(): the tag rides transport metadata into
+    # the serialized ledger, and Jason cannot encode a Reference (stop 3's
+    # rescue-path crash)
+    Process.put(:r16k_dispatch_tag, :erlang.unique_integer([:positive]))
     attempt_dispatch(lm, messages, opts, 0)
   end
 

@@ -351,7 +351,11 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
     # makes one metric/eval program call = 2 task transports):
     #   baseline: selection 32x2 = 64 + held_out 64x2 = 128              -> 192
     #   gepa:     legal metric-call cap 1400 x2 = 2800 + 64 + 128        -> 2992
-    #             optimizer = legal reflection cap                        -> 24
+    #             optimizer: the source caps nothing (its only budget is
+    #             metric calls); stop 3 measured 25 reflection calls by
+    #             rollout 752/1200 (~2.5/iteration), extrapolating to ~40
+    #             at budget exhaustion. 96 = ~2.4x that need, a
+    #             reservation bound rather than an expectation           -> 96
     #   mipro_v2: compile = 2x((trials 18 + 2 full valset evals) x 32
     #             + train 16) = 1312 (trials 8 -> 672 matched the sealed
     #             gepa014 compile slice exactly); + 64 + 128             -> 1504
@@ -365,9 +369,9 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
         },
         "gepa": {
             "task_logical": 2992,
-            "optimizer_logical": 24,
-            "transports": 3016,
-            "total_logical": 3016,
+            "optimizer_logical": 96,
+            "transports": 3088,
+            "total_logical": 3088,
         },
         "mipro_v2": {
             "task_logical": 1504,
