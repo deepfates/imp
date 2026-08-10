@@ -515,11 +515,17 @@ defmodule Observatory.Feed do
         # raw tracebacks would paint a healthy run red. Classify the known
         # tolerated shapes amber (:truncation renders warn); reserve :error
         # for lines outside that family (potentially fatal).
-        String.contains?(line, "AdapterParseError") or
+        # One absorbed row produces several matching traceback lines; emit only
+        # the exception-message line ("...AdapterParseError: Adapter ...") so a
+        # single tolerated failure reads as a single event.
+        String.contains?(line, "AdapterParseError: ") or
             String.contains?(line, "dspy.utils.parallelizer: Error for Example") ->
           {[%{at: now, runtime: "upstream", kind: :truncation,
               text: "tolerated row failure (scored 0): " <> String.slice(line, 0, 140)} | events],
            peers, points}
+
+        String.contains?(line, "AdapterParseError") ->
+          {events, peers, points}
 
         String.starts_with?(line, "Traceback (most recent call last):") ->
           {events, peers, points}
