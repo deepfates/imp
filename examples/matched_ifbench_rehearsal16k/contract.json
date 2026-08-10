@@ -370,7 +370,7 @@
     },
     "imp_entry": {
       "path": "run_imp.exs",
-      "sha256": "337402672fc0762dcff5b46fa843e27534b3254a07608d140a1b2fd4b171ac6c"
+      "sha256": "38f8dc737148955f6ee3fb19445944aeab8468ce070d56bdba0e70de717754fb"
     },
     "shadow_tls_server": {
       "path": "shadow_tls_server.py",
@@ -398,7 +398,7 @@
     },
     "upstream_entry": {
       "path": "run_upstream.py",
-      "sha256": "793e89c2fd6e25c9e4c0b9fde7cc363d4a8b4f628b4d818d45c9f7996bafc2d7"
+      "sha256": "0bf2271573f232dccafbc755c4ed227e7c797b0b870b22afb7f4e1fbca838a10"
     }
   },
   "provider_authority": "none until live launch; shadow-only coordinator path is credential-free"

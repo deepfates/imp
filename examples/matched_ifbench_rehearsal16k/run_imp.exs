@@ -131,15 +131,56 @@ defmodule MatchedIFBenchR16kImp.Observer do
     end
   end
 
+  # One transport entry per LOGICAL dispatch, mirroring upstream's ledger
+  # (run_upstream.py records adapter_transport_dispatch per forward; its
+  # litellm-internal num_retries=3 attempts are invisible to that ledger).
+  # Imp's transient retry attempts (ObservedLM.dispatch_with_retries/3) share
+  # a dispatch_tag; they merge into the logical call's entry with the attempt
+  # total disclosed in measurements.count. Ledger arithmetic (logical ==
+  # transports) is therefore preserved, with strictly more disclosure.
   def transport(pid, measurements, metadata) do
     Agent.update(pid, fn state ->
-      entry = %{
-        phase: state.phase,
-        measurements: measurements,
-        metadata: metadata
-      }
+      tag = Map.get(metadata, :dispatch_tag)
 
-      %{state | transports: state.transports ++ [entry]}
+      merge_index =
+        if is_nil(tag) do
+          nil
+        else
+          state.transports
+          |> Enum.with_index()
+          |> Enum.reverse()
+          |> Enum.find_value(fn {entry, index} ->
+            if Map.get(entry.metadata, :dispatch_tag) == tag, do: index
+          end)
+        end
+
+      case merge_index do
+        nil ->
+          entry = %{
+            phase: state.phase,
+            measurements: measurements,
+            metadata: metadata
+          }
+
+          %{state | transports: state.transports ++ [entry]}
+
+        index ->
+          merged =
+            List.update_at(state.transports, index, fn entry ->
+              %{
+                entry
+                | measurements:
+                    Map.update(
+                      entry.measurements,
+                      :count,
+                      1,
+                      &(&1 + Map.get(measurements, :count, 1))
+                    )
+              }
+            end)
+
+          %{state | transports: merged}
+      end
     end)
   end
 
@@ -233,7 +274,7 @@ defmodule MatchedIFBenchR16kImp.ObservedLM do
          :ok <-
            MatchedIFBenchR16kImp.Observer.reserve_call!(lm.observer, lm.seed, lm.arm, lm.role) do
       MatchedIFBenchR16kImp.Observer.message(lm.observer, lm.role, messages)
-      result = dispatch(lm, messages, opts)
+      result = dispatch_with_retries(lm, messages, opts)
       MatchedIFBenchR16kImp.Observer.response(lm.observer, lm.role, result)
 
       case result do
@@ -262,6 +303,39 @@ defmodule MatchedIFBenchR16kImp.ObservedLM do
 
   def response_format_capability(%__MODULE__{inner: inner}),
     do: Imp.LM.response_format_capability(inner)
+
+  # dspy 3.2.1 parity: LM(num_retries=3) retries transient transport failures
+  # beneath its call ledger (litellm-internal; lm.py:41). Imp mirrors the same
+  # 3-retry budget HERE, where the accounting can see it: each attempt is an
+  # explicit no-retry dispatch (so the client's transport telemetry fires per
+  # attempt), all attempts share a dispatch_tag and merge into one ledger
+  # entry (Observer.transport/3). Retries apply only to transport-class
+  # failures — never to cost/route/contract safety stops.
+  @transient_retry_limit 3
+
+  defp dispatch_with_retries(lm, messages, opts) do
+    Process.put(:r16k_dispatch_tag, make_ref())
+    attempt_dispatch(lm, messages, opts, 0)
+  end
+
+  defp attempt_dispatch(lm, messages, opts, tried) do
+    result = dispatch(lm, messages, opts)
+
+    retriable? =
+      case result do
+        {:error, %Imp.OperationalSafetyError{kind: :transport}} -> true
+        {:error, %Imp.OperationalSafetyError{}} -> false
+        {:error, _transient_transport} -> true
+        _success -> false
+      end
+
+    if retriable? and tried < @transient_retry_limit do
+      Process.sleep(1000 * Integer.pow(2, tried))
+      attempt_dispatch(lm, messages, opts, tried + 1)
+    else
+      result
+    end
+  end
 
   defp dispatch(lm, messages, opts) do
     Imp.LM.generate(lm.inner, messages, opts)
@@ -373,7 +447,13 @@ defmodule MatchedIFBenchR16kImp.Runner do
         telemetry_id,
         [:imp, :lm, :transport, :attempt],
         fn _event, measurements, metadata, target ->
-          Observer.transport(target, measurements, metadata)
+          # :telemetry.execute is synchronous in the emitting process, so the
+          # dispatching call's tag is readable here and travels with the entry.
+          Observer.transport(
+            target,
+            measurements,
+            Map.put(metadata, :dispatch_tag, Process.get(:r16k_dispatch_tag))
+          )
         end,
         observer
       )
@@ -487,7 +567,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
 
     %{status: 200, body: %{"status" => "ready"}} =
       Req.get!(health_url,
-        retry: false,
+        retry: :transient,
         max_retries: 3,
         connect_options: connect_options
       )
@@ -1031,7 +1111,11 @@ defmodule MatchedIFBenchR16kImp.Runner do
     api_key =
       if shadow?, do: "local-shadow-only", else: System.fetch_env!("OPENROUTER_API_KEY")
 
-    req_http_options = [retry: :transient, max_retries: 3]
+    # Explicit no-retry at the Req layer is what installs the client's
+    # transport-attempt telemetry guard (req_llm.ex enforce_explicit_no_retry):
+    # observability and no-hidden-retries are one mechanism. Transient retries
+    # live in ObservedLM.dispatch_with_retries/3 where the ledger can see them.
+    req_http_options = [retry: false, max_retries: 0]
 
     req_http_options =
       if shadow?,
@@ -1047,7 +1131,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
       api_key: api_key,
       cache: false,
       max_tokens: request["max_tokens"],
-      max_retries: 3,
+      max_retries: 0,
       timeout: 6_000_000,
       provider_options: [openrouter_provider: guard, openrouter_usage: %{include: true}],
       req_http_options: req_http_options
@@ -1298,7 +1382,8 @@ defmodule MatchedIFBenchR16kImp.Runner do
 
     unless evidence.model in [configured, expected["imp"]] and
              String.downcase(to_string(evidence.route)) == expected_provider and
-             evidence.attempts == 1 and evidence.retry == false and
+             is_integer(evidence.attempts) and evidence.attempts in 1..4 and
+             evidence.retry == false and
              is_number(evidence.input_tokens) and
              evidence.input_tokens <= expected["max_input_tokens"] and
              is_number(evidence.output_tokens) and

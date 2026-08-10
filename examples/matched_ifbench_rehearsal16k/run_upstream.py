@@ -703,7 +703,12 @@ def install_runtime(args: argparse.Namespace):
                             "computed_cost": field(hidden, "response_cost"),
                         },
                         "error": error,
-                        # One forward with num_retries=0 is one adapter transport dispatch.
+                        # One forward is one adapter transport dispatch on this
+                        # ledger; litellm-internal transient retries
+                        # (num_retries=3, the dspy 3.2.1 default) occur beneath
+                        # it and are not separately observable here. Imp's arm
+                        # mirrors the same 3-retry budget with per-attempt
+                        # disclosure (run_imp.exs dispatch_with_retries/3).
                         "adapter_transport_dispatch": 1,
                         "wall_seconds": time.monotonic() - started,
                     }

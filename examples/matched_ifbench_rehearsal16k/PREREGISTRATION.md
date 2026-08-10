@@ -70,3 +70,30 @@ symmetrically: num_retries=3 upstream, max_retries: 3 / retry: :transient on
 the imp arm. Also fixed a coordinator stop-path bug where the source-binding
 check misfires on any stopped record and masks the real stop cause. Spend to
 stop: ~$1.50. Predictions unchanged.
+
+## Addendum 2 (2026-08-09, after stop 2, before relaunch)
+
+Launch 2 died deterministically on imp's first baseline row: "invalid
+two-stage call envelope". Addendum 1's retry fix was itself defective: in
+imp's client the transport-attempt telemetry is emitted only by the explicit
+no-retry guard plugin (req_llm.ex enforce_explicit_no_retry — observability
+and no-hidden-retries are one mechanism). Setting `retry: :transient` at the
+Req layer uninstalled that guard, so NO transport events fired and the
+envelope check (messages == responses == transports) refused every row. Note
+the initial diagnosis ("retries created extra transport events") was wrong
+and is corrected here: transports were missing, not surplus, which is why
+the failure was deterministic on row 1 with no provider error present.
+
+Fix, mirroring upstream's ledger semantics exactly (run_upstream.py counts
+one adapter_transport_dispatch per logical forward; litellm's num_retries=3
+attempts are invisible beneath it): the imp arm reverts to explicit no-retry
+at the Req layer (restoring per-attempt telemetry) and performs its 3-retry
+transient budget in ObservedLM.dispatch_with_retries/3, where the ledger can
+see it. Attempts share a dispatch_tag and merge into ONE transport entry per
+logical call with the attempt total disclosed in measurements.count; the
+attempts evidence bound widens from ==1 to 1..4 on the imp side only.
+Retries apply solely to transport-class failures, never cost/route/contract
+stops. Ledger arithmetic (logical == transports) and all ceilings are
+unchanged. Shadow preflight (provider-free) passes end to end, including the
+one-transport-per-role assertion. Spend to stop 2: ~$0. Predictions
+unchanged.
