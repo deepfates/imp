@@ -229,6 +229,20 @@ defmodule Observatory.Live do
     end
   end
 
+  # Sealed cells whose held-out leg doesn't exist yet: show their selection
+  # means on the left axis DURING the run (otherwise the only numbers the
+  # campaign has produced so far are invisible in every chart), skipping any
+  # already covered by a full slope.
+  defp pending_selections(state, slopes) do
+    covered = MapSet.new(slopes, &{&1.rt, &1.seed, &1.arm})
+
+    for c <- state.cells,
+        is_number(c.selection_mean),
+        not MapSet.member?(covered, {c.runtime, c.seed, c.arm}) do
+      %{rt: c.runtime, seed: c.seed, arm: c.arm, sel: c.selection_mean}
+    end
+  end
+
   # imp trials per {arm, seed} with the imp baseline selection mean as reference
   defp trial_rows(state) do
     for arm <- ~w(gepa mipro_v2), seed <- seeds(state) do
@@ -285,7 +299,8 @@ defmodule Observatory.Live do
     st = assigns.state
     assigns =
       assign(assigns,
-        verdict: verdict(st), slopes: slopes(st), trial_rows: trial_rows(st),
+        verdict: verdict(st), slopes: slopes(st), pending: pending_selections(st, slopes(st)),
+        trial_rows: trial_rows(st),
         health: health(st), seeds: seeds(st), running: running?(st),
         live_points: live_points(st), live_base: live_base(st),
         best_path: best_path(live_points(st)),
@@ -402,6 +417,12 @@ defmodule Observatory.Live do
               <title><%= s.rt %> <%= s.seed %> <%= s.arm %>: <%= fmt(s.sel) %> → <%= fmt(s.held) %></title>
             </line>
             <circle :if={s.arm != "baseline"} cx="560" cy={y2} r="3" class={"seed " <> s.rt} />
+          <% end %>
+          <%= for pnd <- @pending do %>
+            <circle cx="200" cy={220 - pnd.sel * 190} r="4" class={"seed " <> pnd.rt}>
+              <title><%= pnd.rt %> <%= pnd.seed %> <%= pnd.arm %> selection: <%= fmt(pnd.sel) %> (held-out pending)</title>
+            </circle>
+            <text x="192" y={220 - pnd.sel * 190 + 4} class="tick" text-anchor="end"><%= pnd.arm %></text>
           <% end %>
         </svg>
         <p class="cap">gray = baselines (the transfer cost of the split itself) · colored = optimizer champions; a colored line falling steeper than gray = selection win that evaporated</p>
