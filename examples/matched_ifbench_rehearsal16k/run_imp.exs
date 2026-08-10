@@ -443,6 +443,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
     rows = optimization_rows!(manifest)
     {:ok, observer} = Observer.start_link(manifest)
     Process.put(:matched_ifbench_observer, observer)
+    start_live_snapshots(observer)
     telemetry_id = {__MODULE__, self()}
 
     :ok =
@@ -1621,6 +1622,51 @@ defmodule MatchedIFBenchR16kImp.Runner do
   end
 
   defp map_get(_value, _key), do: nil
+
+  # Read-only live telemetry: every 10s, atomic-write a SMALL plain-JSON
+  # snapshot (phase, per-arm call counts, spend) to run_root/live/imp.json for
+  # the observatory. Write-only side channel — it feeds nothing back into the
+  # run, and the payload is scalars and string-keyed maps only (no refs, no
+  # tuples: the stop-3 rescue crash is why that constraint is spelled out).
+  # The peers-speak-only-via-disk isolation principle is preserved.
+  defp start_live_snapshots(observer) do
+    live_path = Path.join([Path.dirname(@output), "live", "imp.json"])
+
+    spawn(fn -> live_snapshot_loop(observer, live_path) end)
+  end
+
+  defp live_snapshot_loop(observer, live_path) do
+    snapshot = Observer.snapshot(observer)
+
+    budgets =
+      Map.new(snapshot.call_budgets, fn {{seed, arm}, budget} ->
+        {"#{seed}/#{arm}",
+         %{
+           counts: budget.counts,
+           ceiling: budget.ceiling,
+           refusals: length(budget.refusals)
+         }}
+      end)
+
+    payload = %{
+      runtime: "imp",
+      phase: snapshot.phase,
+      call_budgets: budgets,
+      usd_reserved: snapshot.usd_reserved,
+      actual_cost: snapshot.actual_cost,
+      responses: length(snapshot.responses),
+      updated_at: System.os_time(:second)
+    }
+
+    atomic_write!(live_path, payload)
+    Process.sleep(10_000)
+    live_snapshot_loop(observer, live_path)
+  rescue
+    # telemetry must never take down the run; skip the beat and continue
+    _error ->
+      Process.sleep(10_000)
+      live_snapshot_loop(observer, live_path)
+  end
 
   defp atomic_write!(path, value) do
     File.mkdir_p!(Path.dirname(path))

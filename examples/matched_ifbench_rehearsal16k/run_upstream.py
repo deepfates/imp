@@ -582,7 +582,40 @@ class Capture:
             "refusals": [],
         }
 
+    # Read-only live telemetry, mirroring the imp arm: a throttled small
+    # plain-JSON snapshot to run_root/live/upstream.json for the observatory.
+    # Write-only side channel; failures are swallowed (telemetry must never
+    # take down the run).
+    def write_live_snapshot(self) -> None:
+        now = time.monotonic()
+        if now - getattr(self, "_live_written_at", 0.0) < 10.0:
+            return
+        self._live_written_at = now
+        try:
+            atomic_write(
+                OUTPUT.parent / "live" / "upstream.json",
+                {
+                    "runtime": "upstream",
+                    "phase": self.phase,
+                    "call_budgets": {
+                        key: {
+                            "counts": budget.get("counts"),
+                            "ceiling": budget.get("ceiling"),
+                            "refusals": len(budget.get("refusals", [])),
+                        }
+                        for key, budget in self.call_budgets.items()
+                    },
+                    "usd_reserved": self.usd_reserved,
+                    "actual_cost": self.actual_cost,
+                    "responses": len(self.calls),
+                    "updated_at": int(time.time()),
+                },
+            )
+        except Exception:
+            pass
+
     def reserve(self, role: str) -> None:
+        self.write_live_snapshot()
         if self.phase is None:
             raise RuntimeError("LM dispatch lacks an active phase")
         key = f"{self.phase['seed']}:{self.phase['arm']}"

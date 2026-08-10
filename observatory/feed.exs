@@ -112,6 +112,7 @@ defmodule Observatory.Feed do
     results = read_results(state.run_root)
     {log_events, log_peers, log_points, log_pos, log_partial} = tail_log(state)
     log_events = if state.primed, do: log_events, else: []
+    live = read_live(state.run_root)
 
     prev = state.public
 
@@ -119,7 +120,10 @@ defmodule Observatory.Feed do
       (Enum.reverse(seal_events) ++ Enum.reverse(log_events) ++ prev.events)
       |> Enum.take(@event_cap)
 
-    peers = merge_peers(prev.peers, log_peers, results, now)
+    peers =
+      prev.peers
+      |> merge_peers(log_peers, results, now)
+      |> merge_live_peers(live, now)
 
     public = %{
       status: overall_status(results, cells, peers),
@@ -128,7 +132,15 @@ defmodule Observatory.Feed do
       events: events,
       cells: cells,
       spend_usd:
-        results |> Map.values() |> Enum.map(fn r -> r && r.spend end) |> sum_or_nil(),
+        results
+        |> Map.values()
+        |> Enum.map(fn r -> r && r.spend end)
+        |> sum_or_nil()
+        |> case do
+          # no terminal results yet: sum the runners' live snapshots
+          nil -> live |> Map.values() |> Enum.map(& &1["actual_cost"]) |> sum_or_nil()
+          terminal -> terminal
+        end,
       arm_summaries:
         results
         |> Map.values()
@@ -146,6 +158,64 @@ defmodule Observatory.Feed do
         log_pos: log_pos,
         log_partial: log_partial
     }
+  end
+
+  # -- live runner snapshots (run_root/live/*.json, written by the runners) ----
+
+  defp read_live(run_root) do
+    for runtime <- ["imp", "upstream"],
+        path = Path.join([run_root, "live", "#{runtime}.json"]),
+        {:ok, body} <- [File.read(path)],
+        {:ok, decoded} <- [Jason.decode(body)],
+        into: %{} do
+      {runtime, decoded}
+    end
+  end
+
+  # A fresh live snapshot is authoritative for a runner's phase and progress
+  # (the imp runner logs nothing, so this is its ONLY live signal). Progress =
+  # the current arm's used vs ceiling logical calls.
+  defp merge_live_peers(peers, live, now) do
+    Enum.reduce(live, peers, fn {runtime, snap}, acc ->
+      age = now - (snap["updated_at"] || 0)
+      phase = snap["phase"]
+
+      existing = Map.get(acc, runtime)
+
+      # upstream's tqdm-derived progress (rollouts) is finer than call counts;
+      # only let the snapshot take over when the log signal is stale
+      log_signal_fresh? =
+        runtime == "upstream" and is_map(existing) and existing.progress != nil and
+          is_integer(existing.last_line_at) and now - existing.last_line_at < 60
+
+      if age > 45 or not is_map(phase) or log_signal_fresh? do
+        acc
+      else
+        arm = phase["arm"]
+        budget = snap["call_budgets"]["#{phase["seed"]}/#{arm}"]
+
+        progress =
+          with %{"counts" => counts, "ceiling" => ceiling} <- budget,
+               used when is_integer(used) <- counts["total_logical"],
+               total when is_integer(total) and total > 0 <- ceiling["total_logical"] do
+            {used, total}
+          else
+            _ -> nil
+          end
+
+        label =
+          [arm, phase["phase"]]
+          |> Enum.reject(&is_nil/1)
+          |> Enum.join(" / ")
+
+        Map.update(
+          acc,
+          runtime,
+          %{alive: true, phase: label, progress: progress, last_line_at: now},
+          &%{&1 | alive: true, phase: label, progress: progress, last_line_at: now}
+        )
+      end
+    end)
   end
 
   defp sum_or_nil(vals) do
