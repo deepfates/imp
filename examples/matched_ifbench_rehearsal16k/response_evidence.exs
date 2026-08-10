@@ -36,12 +36,21 @@ defmodule MatchedIFBenchR16k.ResponseEvidence do
   def from_result!(other), do: raise("invalid observed LM result: #{inspect(other)}")
 
   @doc false
+  # Relative tolerance: the guard exists to catch misrouting/overbilling, and
+  # an absolute 1e-6 proved tighter than the providers' own rounding agreement —
+  # OpenAI's implicit prompt cache (auto-activates on long repeated prefixes,
+  # exactly what evolved GEPA prompts become) prices cache-read line items with
+  # ~1e-6-scale rounding differences between req_llm's computation and
+  # OpenRouter billing, which killed take 9 at 93% of GEPA over 0.4 millionths
+  # of a dollar. 0.5% of the call cost still catches any real routing or
+  # billing anomaly by orders of magnitude.
   def costs_reconcile?(gateway, computed) when is_number(gateway) and is_number(computed) do
+    tolerance = max(@cost_tolerance, 0.005 * max(abs(gateway), abs(computed)))
+
     gateway
     |> Kernel.-(computed)
     |> abs()
-    |> Float.round(12)
-    |> Kernel.<=(@cost_tolerance)
+    |> Kernel.<=(tolerance)
   end
 
   def costs_reconcile?(_gateway, _computed), do: false

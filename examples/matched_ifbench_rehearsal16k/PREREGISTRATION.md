@@ -199,3 +199,21 @@ campaign reservation 204.62592). The modeled-TPE gap is ticketed as a
 prerequisite for paper-scale MIPRO in the Heavy campaign. Take-8 spend:
 $13.06. Predictions unchanged; P2's GEPA leg is already satisfied at
 selection pending held-out.
+
+## Addendum 8 (2026-08-10, after stop 9, before any relaunch)
+
+Take 9 died at GEPA rollout 1120/1200 (93%, 3h17m, $11.97) on cost-evidence
+drift of 1.4e-6 USD against an absolute tolerance of 1.0e-6: OpenAI's
+implicit prompt caching activates on the long repeated prefixes that evolved
+GEPA prompts become, and its cache-read line items round differently
+(~1e-6 scale) between req_llm's computed cost and OpenRouter's billed cost.
+The reconciliation guard is now relative (0.5% of call cost, still orders
+of magnitude tighter than any real misroute/overbilling) instead of an
+absolute millionth tighter than the providers agree with themselves.
+Deterministic-in-late-GEPA once caching engages; take 8's differing evolved
+prompts are why it sealed. Also disclosed: extraction testing found
+run_imp.exs:407 discards reconcile_cost!'s return, so imp's LAST-RESort
+actual-spend cap was unenforced this whole campaign (upstream's mirror
+raises); the enforced pre-dispatch reservation guard bounded spend
+throughout. Fixed in the same patch: the reconcile error now propagates as
+the operational stop it was designed to be. Predictions unchanged.

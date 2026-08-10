@@ -404,14 +404,23 @@ defmodule MatchedIFBenchR16kImp.ObservedLM do
         is_number(evidence.output_tokens) and
         evidence.output_tokens > lm.hard_stop_completion_tokens
 
-    if is_number(evidence.gateway_reported_cost) and evidence.gateway_reported_cost >= 0 do
-      MatchedIFBenchR16kImp.Observer.reconcile_cost!(
-        lm.observer,
-        evidence.gateway_reported_cost
-      )
-    end
+    # The return was previously discarded, leaving the hard actual-spend cap
+    # unenforced (found by the extracted lifecycle test suite; upstream's
+    # mirror raises on the same condition). A cost-cap breach is now the
+    # operational stop it was designed to be.
+    reconciliation =
+      if is_number(evidence.gateway_reported_cost) and evidence.gateway_reported_cost >= 0 do
+        MatchedIFBenchR16kImp.Observer.reconcile_cost!(
+          lm.observer,
+          evidence.gateway_reported_cost
+        )
+      else
+        :ok
+      end
 
     cond do
+      match?({:error, _}, reconciliation) ->
+        reconciliation
       anomaly? ->
         operational_error(
           :cost,
