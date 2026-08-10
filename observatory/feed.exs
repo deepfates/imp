@@ -491,6 +491,15 @@ defmodule Observatory.Feed do
           events = maybe_phase(events, peers, text)
           {events, peers}
 
+        # Live optimizer scores: during the multi-hour GEPA/MIPRO grind the
+        # score charts only fill at seal time, so surface dspy's per-iteration
+        # score lines in the event stream — the one live signal of whether
+        # optimization is moving.
+        Regex.match?(~r/gepa: Iteration \d+|Average Metric:|New best|Best score/, line) ->
+          {[%{at: now, runtime: "upstream", kind: :info,
+              text: String.slice(String.trim(line), 0, 160)} | events],
+           peers}
+
         # Absorbed row-level failures: upstream's failure-preserving adapter
         # scores refusal/unparseable rows 0 and CONTINUES (max_errors
         # tolerance, by design). dspy logs a traceback per absorbed row, so
