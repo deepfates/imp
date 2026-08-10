@@ -217,3 +217,25 @@ actual-spend cap was unenforced this whole campaign (upstream's mirror
 raises); the enforced pre-dispatch reservation guard bounded spend
 throughout. Fixed in the same patch: the reconcile error now propagates as
 the operational stop it was designed to be. Predictions unchanged.
+
+## Addendum 9 (2026-08-10, after stop 10, before relaunch)
+
+Take 10 died at GEPA rollout 800/1200 (67%, $7.63) from an OPERATOR-SIDE
+cause with no bearing on the science: the supervising Claude Code session
+crashed, and its process-group teardown SIGTERMed the coordinator, which
+gracefully stopped both peers. The stop machinery worked exactly as
+drilled — both rescue artifacts written, ledgers coherent, no orphans.
+
+Nothing was recoverable, by design: both arms run cache: false with no
+GEPA checkpoint path, because pinned gepa v0.1.4 does not persist its
+evaluation cache across runs and matched design requires imp to match
+that. The lost work is therefore a fidelity cost, not a defect — and a
+live demonstration of the resume-economics claim already preregistered
+as a separate question (imp-94ax): imp HAS durable checkpointing; the
+matched harness deliberately declines to use it.
+
+Operational fix adopted (no contract change): the coordinator now
+launches in its own session (os.setsid) so no supervising-tool crash can
+kill a multi-hour paid run again. Cumulative campaign spend $51.50;
+take 11 lands ~$65, inside the owner-approved envelope for the completed
+rehearsal. Predictions unchanged.

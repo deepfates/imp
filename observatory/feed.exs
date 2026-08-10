@@ -111,7 +111,7 @@ defmodule Observatory.Feed do
 
     {cells, trials, seal_events, known_cells} = scan_sealed(state)
     results = read_results(state.run_root)
-    {log_events, log_peers, log_points, log_pos, log_partial} = tail_log(state)
+    {log_events, log_peers, log_points, log_pos, log_partial, log_truncated?} = tail_log(state)
     log_events = if state.primed, do: log_events, else: []
     live = read_live(state.run_root)
 
@@ -146,8 +146,11 @@ defmodule Observatory.Feed do
         results
         |> Map.values()
         |> Enum.flat_map(fn r -> (r && Map.get(r, :arm_summaries)) || [] end),
+      # a truncated log = a new take: the score chart shows THIS run only,
+      # never two runs stitched onto one time axis
       optimizer_points:
-        (Map.get(prev, :optimizer_points, []) ++ log_points) |> Enum.take(-800),
+        (if(log_truncated?, do: [], else: Map.get(prev, :optimizer_points, [])) ++ log_points)
+        |> Enum.take(-800),
       # imp's live valset scores come whole from its snapshot (engine callback
       # -> live/imp.json); replace rather than append — the file is cumulative
       imp_trials: get_in(live, ["imp", "live_trials"]) || [],
@@ -468,25 +471,27 @@ defmodule Observatory.Feed do
   # -- log tailing -------------------------------------------------------------
   # Remember byte position; on truncation/rotation (size < pos) reset to 0.
 
-  defp tail_log(%{log_path: nil} = state), do: {[], %{}, [], state.log_pos, state.log_partial}
+  defp tail_log(%{log_path: nil} = state),
+    do: {[], %{}, [], state.log_pos, state.log_partial, false}
 
   defp tail_log(%{log_path: path, log_pos: pos, log_partial: partial}) do
     case File.stat(path) do
       {:ok, %{size: size}} ->
-        pos = if size < pos, do: 0, else: pos
+        truncated? = size < pos
+        pos = if truncated?, do: 0, else: pos
 
         case read_from(path, pos, size) do
           {:ok, chunk, new_pos} ->
             {lines, new_partial} = split_lines(partial <> chunk)
             {events, peers, points} = parse_log_lines(lines)
-            {events, peers, points, new_pos, new_partial}
+            {events, peers, points, new_pos, new_partial, truncated?}
 
           _ ->
-            {[], %{}, [], pos, partial}
+            {[], %{}, [], pos, partial, truncated?}
         end
 
       _ ->
-        {[], %{}, [], 0, ""}
+        {[], %{}, [], 0, "", false}
     end
   end
 
@@ -651,8 +656,10 @@ defmodule Observatory.Feed do
   end
 
   defp phase_line?(text) do
-    Regex.match?(~r/\b(seed \d+|compile|preflight|bootstrap|sealing|selection)\b/i, text) and
-      not String.contains?(text, "\"")
+    # anchored: evolved-prompt text (which freely contains words like
+    # "selection") must never classify as a phase marker
+    Regex.match?(~r/^\s*(seed \d+|compile|preflight|bootstrap|sealing|selection)\b/i, text) and
+      not String.contains?(text, "\"") and not String.starts_with?(String.trim(text), "**")
   end
 
   # -- __imp_type__ decoding ---------------------------------------------------
