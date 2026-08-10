@@ -1,6 +1,6 @@
 ---
 id: imp-sg0r
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:08:17Z
@@ -32,3 +32,7 @@ PARTIAL FIX pushed: the 'machine-local evidence' was three entire untracked prot
 **2026-08-09T06:54:51Z**
 
 Evidence lane GREEN (run 31299539655) after archiving 12 superseded orphaned artifacts per the provenance test's own remedy. Remaining scope: sealed tmp/ raw artifacts durability + MuSiQue dataset re-provisioning (MUSIQUE_DATA_ROOT gate documents the absence).
+
+**2026-08-10T04:49:45Z**
+
+Archived gepa014 pilot + rehearsal stop1/stop2 roots to evidence/matched/*.tar.zst with SHA256SUMS and README (extraction instructions + what each archive is). No docs/EVIDENCE.md exists at HEAD; the PREREGISTRATION.md files are the interpreting docs and the README links the pilot's. Routine going forward (recorded in README): archive each run root at terminal — the live rehearsal root joins on completion.
