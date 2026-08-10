@@ -69,3 +69,48 @@ rollouts). Operational errors (transport, budget, routing) remain fatal, and
 per-row failure counts stay in the ledgers, so an asymmetric failure RATE
 between arms remains visible and reportable. P1-P3 and the decision rule
 unchanged. Cumulative real spend across attempts: ~\$1.50 of the \$74 cap.
+
+## Final verdict (2026-08-09, after completion and adversarial analysis)
+
+The pilot completed: 18/18 cells, both runtimes, three seeds, zero
+operational stops, ledgers exact. Scored against the bands:
+
+- **P1 (machinery): PASS.**
+- **P2/P3: NOT EVALUABLE AS DESIGNED.** The bands were set tighter than the
+  instrument's measured noise floor (same-program 64-row re-evaluations at
+  temperature 1.0 vary by ±0.07–0.11; a paired sign test on *identical
+  programs* reached p=0.066). This was a preregistration design error.
+
+What the pilot actually established, each point adversarially verified
+against raw ledgers by an independent cold-read analysis:
+
+1. **Chain integrity (imp): clean.** Real searches (11 proposal calls and 18
+   evolved instructions per MIPRO run), champions byte-match trial winners,
+   held-out evaluated exactly the sealed champions.
+2. **Runtime fidelity: PASS at row level.** 192 paired held-out rows of the
+   identical stock program across runtimes: imp 26↑ / 16↓ / 150 tied,
+   p=0.164 — no significant difference.
+3. **Neither optimizer demonstrably moved.** Upstream returned stock 9/9
+   cells (its apparent lifts are one program sampled twice); imp's two
+   evolved champions are noise-equivalent to baseline (paired p=0.076
+   excluding the legitimately-stock seed).
+4. **Root cause is two sealed config numbers deviating from the bench's own
+   intent** (gepa-artifact source): output cap 1024 vs the authors' explicit
+   16384 ("overriding the dspy defaults") — 20% of held-out generations hit
+   the cap on both runtimes, zeroing ~11% of rows on the novel-constraint
+   split the bench exists to measure; and optimizer budget 80 metric calls
+   vs the paper's 3,593 — searches cannot resolve candidates through
+   temperature-1 noise at 2% of source budget.
+5. Analyst-error log, for the record: three interpretive stories (selection
+   overfitting; all-noise; champion-parameter drop) were successively
+   falsified by deeper reads; a fourth claim (upstream empty-instruction
+   seals) rested on a misread. The data never lied; the summaries did.
+
+Decision-rule outcome: P1's pass funds nothing by itself; the Heavy campaign
+requires a redesigned contract (source-intent token budget, paper-regime or
+explicitly-powered optimizer budget, refusal-tolerant bootstrap, upstream
+trial-score sealing) before any further spend. Measured pilot economics for
+that design: ~$6 of recorded eval spend for 1,728 scored rows; held-out
+output tokens median 505 / mean 648 with 20% capped at 1024, so a 16384 cap
+raises realistic cost by roughly 2–3x, not 16x (reservation policy, which
+prices worst-case, is the binding constraint to redesign).
