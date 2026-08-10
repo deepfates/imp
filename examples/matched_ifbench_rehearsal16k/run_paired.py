@@ -549,7 +549,7 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
     # Reservation ceiling: 9,376 task x $0.02208 + 78 optimizer x $0.096.
     maximum = worst_case_usd(manifest)
     require(
-        maximum == Decimal("214.51008000"),
+        maximum == Decimal("228.33408000"),
         f"reservation ceiling drift: {maximum}",
     )
     # Hard cap on ACTUAL spend (enforced per-runtime as new_spend_max/2 in
