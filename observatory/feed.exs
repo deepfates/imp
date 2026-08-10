@@ -491,8 +491,20 @@ defmodule Observatory.Feed do
           events = maybe_phase(events, peers, text)
           {events, peers}
 
+        # Absorbed row-level failures: upstream's failure-preserving adapter
+        # scores refusal/unparseable rows 0 and CONTINUES (max_errors
+        # tolerance, by design). dspy logs a traceback per absorbed row, so
+        # raw tracebacks would paint a healthy run red. Classify the known
+        # tolerated shapes amber (:truncation renders warn); reserve :error
+        # for lines outside that family (potentially fatal).
+        String.contains?(line, "AdapterParseError") or
+            String.contains?(line, "dspy.utils.parallelizer: Error for Example") ->
+          {[%{at: now, runtime: "upstream", kind: :truncation,
+              text: "tolerated row failure (scored 0): " <> String.slice(line, 0, 140)} | events],
+           peers}
+
         String.starts_with?(line, "Traceback (most recent call last):") ->
-          {[%{at: now, runtime: "upstream", kind: :error, text: "python traceback"} | events], peers}
+          {events, peers}
 
         Regex.match?(~r/^\w[\w.]*(Error|Exception|Stop)\b.*:/, line) ->
           {[%{at: now, runtime: "upstream", kind: :error, text: String.slice(line, 0, 200)} | events],
