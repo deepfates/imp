@@ -437,7 +437,7 @@ defmodule Observatory.Live do
               </circle>
             <% end %>
           </svg>
-          <p class="note">shared time axis · orange = upstream evals (small/faint = 8-row minibatch, full = 32-row valset) · blue = imp valset evals, ringed = new best · green line = upstream best-so-far · dashed = sealed upstream baseline · y zoomed to the scoring band</p>
+          <p class="note">small dots = 8-row minibatches · line = best-so-far · hover any mark</p>
         <% end %>
       </section>
 
@@ -476,7 +476,7 @@ defmodule Observatory.Live do
       </section>
 
       <p :if={@state.arm_summaries == [] and @running} class="note">
-        held-out verdict &amp; instrument health fill at end of run (held-out rows stay sealed until every arm is)
+        held-out unlocks when every arm seals
       </p>
 
       <section>
@@ -507,7 +507,7 @@ defmodule Observatory.Live do
             <text :if={pnd.rt == "upstream"} x="214" y={220 - pnd.sel * 190 + 12} class="tick" text-anchor="start"><%= pnd.arm %> <%= fmt(pnd.sel) %></text>
           <% end %>
         </svg>
-        <p class="cap">gray = baselines (the transfer cost of the split itself) · colored = optimizer champions; a colored line falling steeper than gray = selection win that evaporated</p>
+        <p class="cap">a colored line falling steeper than the gray baseline = selection win that evaporated</p>
       </section>
 
       <section :if={@state.trials != []}>
