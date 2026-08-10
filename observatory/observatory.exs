@@ -203,18 +203,50 @@ defmodule Observatory.Live do
     end
   end
 
-  defp lx(_i, n) when n <= 1, do: 40
-  defp lx(i, n), do: 40 + i / (n - 1) * 710
+  # Shared TIME x-axis across both series (each point carries its wall-clock
+  # `at`), and a y-domain zoomed to where scores actually live — the action is
+  # in the top quarter of 0..1 and deserves the vertical resolution.
+  defp live_geometry(upstream_points, imp_points, base) do
+    ats =
+      Enum.map(upstream_points, & &1.at) ++ Enum.map(imp_points, &(&1["at"] || 0))
 
-  defp ly(score), do: 130 - score * 110
+    scores =
+      Enum.map(upstream_points, & &1.score) ++
+        Enum.map(imp_points, & &1["score"]) ++ if(is_number(base), do: [base], else: [])
 
-  defp best_path(points) do
-    n = length(points)
+    {t0, t1} =
+      case Enum.filter(ats, &(is_integer(&1) and &1 > 0)) do
+        [] -> {0, 1}
+        ts -> {Enum.min(ts), max(Enum.max(ts), Enum.min(ts) + 60)}
+      end
 
+    floor =
+      case Enum.filter(scores, &is_number/1) do
+        [] -> 0.0
+        ss -> min(0.5, Float.floor(Enum.min(ss) * 10) / 10 - 0.1) |> max(0.0)
+      end
+
+    %{t0: t0, t1: t1, y_min: floor}
+  end
+
+  defp lt(at, %{t0: t0, t1: t1}) when is_integer(at),
+    do: 40 + (at - t0) / max(t1 - t0, 1) * 700
+
+  defp lt(_at, _geo), do: 40
+
+  defp ly(score, %{y_min: y_min}), do: 130 - (score - y_min) / max(1.0 - y_min, 0.1) * 110
+
+  # sample size carries visual weight: a 8-row minibatch eval is weaker
+  # evidence than a 32-row valset eval and should look it
+  defp eval_r(n) when is_integer(n) and n < 16, do: 2
+  defp eval_r(_n), do: 3.5
+  defp eval_opacity(n) when is_integer(n) and n < 16, do: "0.45"
+  defp eval_opacity(_n), do: "0.9"
+
+  defp best_path(points, geo) do
     points
-    |> Enum.with_index()
-    |> Enum.filter(fn {pt, _i} -> pt.kind == :best end)
-    |> Enum.map_join(" ", fn {pt, i} -> "#{lx(i, n)},#{ly(pt.score)}" end)
+    |> Enum.filter(&(&1.kind == :best))
+    |> Enum.map_join(" ", fn pt -> "#{lt(pt.at, geo)},#{ly(pt.score, geo)}" end)
   end
 
   defp summ(state, rt, seed, arm) do
@@ -337,7 +369,7 @@ defmodule Observatory.Live do
         trial_rows: trial_rows(st),
         health: health(st), seeds: seeds(st), running: running?(st),
         live_points: live_points(st), live_base: live_base(st),
-        best_path: best_path(live_points(st)),
+        live_geo: live_geometry(live_points(st), Map.get(st, :imp_trials, []), live_base(st)),
         imp_live: Map.get(st, :imp_trials, []),
         now: st.updated_at || System.system_time(:second))
 
@@ -379,34 +411,37 @@ defmodule Observatory.Live do
         <% end %>
         <%= if @live_points != [] or @imp_live != [] do %>
           <svg viewBox="0 0 760 150" class="chart">
-            <%= for tick <- [0.0, 0.5, 1.0] do %>
-              <line x1="40" y1={ly(tick)} x2="750" y2={ly(tick)} class="grid" />
-              <text x="8" y={ly(tick) + 4} class="tick"><%= tick %></text>
+            <%= for tick <- [@live_geo.y_min, (@live_geo.y_min + 1.0) / 2, 1.0] do %>
+              <line x1="40" y1={ly(tick, @live_geo)} x2="750" y2={ly(tick, @live_geo)} class="grid" />
+              <text x="8" y={ly(tick, @live_geo) + 4} class="tick"><%= fmt2(tick) %></text>
             <% end %>
+            <text x="40" y="148" class="tick" text-anchor="start"><%= hhmmss(@live_geo.t0) %></text>
+            <text x="740" y="148" class="tick" text-anchor="end"><%= hhmmss(@live_geo.t1) %></text>
             <%= if is_number(@live_base) do %>
-              <line x1="40" y1={ly(@live_base)} x2="750" y2={ly(@live_base)} class="baseref" />
-              <text x="748" y={ly(@live_base) - 4} class="tick" text-anchor="end">baseline <%= fmt(@live_base) %></text>
+              <line x1="40" y1={ly(@live_base, @live_geo)} x2="750" y2={ly(@live_base, @live_geo)} class="baseref" />
+              <text x="748" y={ly(@live_base, @live_geo) - 4} class="tick" text-anchor="end">baseline <%= fmt(@live_base) %></text>
             <% end %>
-            <%= for {pt, i} <- Enum.with_index(@live_points), pt.kind == :eval do %>
-              <circle cx={lx(i, length(@live_points))} cy={ly(pt.score)} r="3" class="seed upstream">
-                <title>candidate eval <%= fmt(pt.score) %> at <%= hhmmss(pt.at) %></title>
+            <%= for pt <- @live_points, pt.kind == :eval do %>
+              <circle cx={lt(pt.at, @live_geo)} cy={ly(pt.score, @live_geo)}
+                r={eval_r(Map.get(pt, :n))} opacity={eval_opacity(Map.get(pt, :n))} class="seed upstream">
+                <title>upstream eval <%= fmt(pt.score) %> over <%= Map.get(pt, :n) || "?" %> rows at <%= hhmmss(pt.at) %></title>
               </circle>
             <% end %>
-            <%= if @best_path != "" do %>
-              <polyline points={@best_path} class="bestline" />
+            <%= if best_path(@live_points, @live_geo) != "" do %>
+              <polyline points={best_path(@live_points, @live_geo)} class="bestline" />
             <% end %>
-            <%= for {pt, i} <- Enum.with_index(@imp_live) do %>
-              <circle cx={lx(i, length(@imp_live))} cy={ly(pt["score"])} r="3"
+            <%= for pt <- @imp_live do %>
+              <circle cx={lt(pt["at"], @live_geo)} cy={ly(pt["score"], @live_geo)} r="3.5"
                 class={"seed imp" <> if(pt["kind"] == "best", do: " champ", else: "")}>
-                <title>imp valset eval <%= fmt(pt["score"] * 1.0) %> (iteration <%= pt["iteration"] %>)</title>
+                <title>imp valset eval <%= fmt(pt["score"] * 1.0) %> (iteration <%= pt["iteration"] %>) at <%= hhmmss(pt["at"]) %></title>
               </circle>
             <% end %>
           </svg>
-          <p class="note">orange dots = upstream candidate evals (parsed live) · blue dots = imp valset evals (engine callback), ringed = new best · green line = upstream best-so-far · dashed = sealed upstream baseline · each series indexes its own x; compare shapes, not columns</p>
+          <p class="note">shared time axis · orange = upstream evals (small/faint = 8-row minibatch, full = 32-row valset) · blue = imp valset evals, ringed = new best · green line = upstream best-so-far · dashed = sealed upstream baseline · y zoomed to the scoring band</p>
         <% end %>
       </section>
 
-      <section>
+      <section :if={@state.arm_summaries != [] or not @running}>
         <h2>held-out verdict <span class="q">is imp matching upstream?</span></h2>
         <svg viewBox="0 0 760 190" class="chart">
           <%= for tick <- [0.0, 0.25, 0.5, 0.75, 1.0] do %>
@@ -440,6 +475,10 @@ defmodule Observatory.Live do
         <p class="cap"><i class="sw swimp"></i>imp&nbsp;&nbsp;<i class="sw swup"></i>upstream (pinned DSPy) · thick tick = 3-seed mean · small dots = seeds · gray band = ±0.09 same-program noise around upstream · Δ beyond band would matter</p>
       </section>
 
+      <p :if={@state.arm_summaries == [] and @running} class="note">
+        held-out verdict &amp; instrument health fill at end of run (held-out rows stay sealed until every arm is)
+      </p>
+
       <section>
         <h2>selection → held-out <span class="q">did optimization transfer?</span></h2>
         <svg viewBox="0 0 760 240" class="chart">
@@ -460,16 +499,18 @@ defmodule Observatory.Live do
             <circle :if={s.arm != "baseline"} cx="560" cy={y2} r="3" class={"seed " <> s.rt} />
           <% end %>
           <%= for pnd <- @pending do %>
-            <circle cx="200" cy={220 - pnd.sel * 190} r="4" class={"seed " <> pnd.rt}>
+            <% px = if pnd.rt == "imp", do: 196, else: 204 %>
+            <circle cx={px} cy={220 - pnd.sel * 190} r="4" class={"seed " <> pnd.rt}>
               <title><%= pnd.rt %> <%= pnd.seed %> <%= pnd.arm %> selection: <%= fmt(pnd.sel) %> (held-out pending)</title>
             </circle>
-            <text x="192" y={220 - pnd.sel * 190 + 4} class="tick" text-anchor="end"><%= pnd.arm %></text>
+            <text :if={pnd.rt == "imp"} x="186" y={220 - pnd.sel * 190 - 6} class="tick" text-anchor="end"><%= pnd.arm %> <%= fmt(pnd.sel) %></text>
+            <text :if={pnd.rt == "upstream"} x="214" y={220 - pnd.sel * 190 + 12} class="tick" text-anchor="start"><%= pnd.arm %> <%= fmt(pnd.sel) %></text>
           <% end %>
         </svg>
         <p class="cap">gray = baselines (the transfer cost of the split itself) · colored = optimizer champions; a colored line falling steeper than gray = selection win that evaporated</p>
       </section>
 
-      <section>
+      <section :if={@state.trials != []}>
         <h2>trials vs baseline <span class="q">did the search beat baseline on its own terms? (imp ledger; upstream seals no trial scores)</span></h2>
         <svg viewBox="0 0 760 250" class="chart">
           <%= for {{arm, seed, ts, base}, i} <- Enum.with_index(@trial_rows) do %>
@@ -493,7 +534,7 @@ defmodule Observatory.Live do
         <p class="cap">vertical dash = that seed's baseline score on the same objective · ringed dot = champion · dots left of the dash never justified selection</p>
       </section>
 
-      <section>
+      <section :if={@state.arm_summaries != []}>
         <h2>instrument health <span class="q">can the means be trusted?</span></h2>
         <div class="healthgrid">
           <%= for {rt, arm, h} <- @health, h.n > 0 do %>

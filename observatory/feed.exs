@@ -533,7 +533,7 @@ defmodule Observatory.Feed do
   @refusal_re ~r/can[’']t help|cannot help|refus/iu
   # dspy full-eval lines, e.g. "Average Metric: 26.83 / 32 (83.9%)" — every
   # optimizer candidate evaluation emits one; the percentage is the 0..1 score.
-  @eval_re ~r/Average Metric: [\d.]+ \/ \d+ \((?<pct>[\d.]+)%\)/
+  @eval_re ~r/Average Metric: [\d.]+ \/ (?<n>\d+) \((?<pct>[\d.]+)%\)/
   # GEPA's running champion, already 0..1: "Best score on valset: 0.8385"
   @best_re ~r/Best score on valset: (?<score>[\d.]+)/
 
@@ -596,7 +596,15 @@ defmodule Observatory.Feed do
 
         captures = Regex.named_captures(@eval_re, line) ->
           {pct, _} = Float.parse(captures["pct"])
-          point = %{at: now, runtime: "upstream", kind: :eval, score: pct / 100.0}
+
+          point = %{
+            at: now,
+            runtime: "upstream",
+            kind: :eval,
+            score: pct / 100.0,
+            n: String.to_integer(captures["n"])
+          }
+
           {events, peers, points ++ [point]}
 
         # Absorbed row-level failures: upstream's failure-preserving adapter
