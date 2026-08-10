@@ -8,7 +8,7 @@ defmodule MatchedIFBenchR16k.Contract do
   #   baseline: selection 32x2 = 64  + held_out 64x2 = 128            -> 192
   #   gepa:     legal metric-call cap 1400 x2 = 2800 + 64 + 128       -> 2992
   #             optimizer = legal reflection cap                       -> 24
-  #   mipro_v2: compile = 2 x ((trials 18 + 2 full valset evals
+  #   mipro_v2: compile = 2 x ((trials 9 + 2 full valset evals
   #             [initial default program + final champion]) x 32
   #             + train 16 [proposer/bootstrap probe]) = 2x656 = 1312
   #             (pilot ground truth: trials 8 -> 2x((8+2)x32+16) = 672,
@@ -286,7 +286,9 @@ defmodule MatchedIFBenchR16k.Contract do
     require!(
       optimizer["mipro_v2"] == %{
         "num_candidates" => 6,
-        "trials" => 18,
+        # capped at imp's declared Optuna-startup fidelity boundary (<= 9
+        # post-baseline objective trials; modeled TPE unimplemented)
+        "trials" => 9,
         "minibatch" => false,
         "max_bootstrapped_demos" => 0,
         "max_labeled_demos" => 0,

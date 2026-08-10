@@ -358,7 +358,7 @@
     },
     "contract_runtime": {
       "path": "contract.exs",
-      "sha256": "aef9ae76ea87eb6eef45e2ffe342536cd88088a088a297fd3f1346b146510cd6"
+      "sha256": "7937bbc833e1fdc7eca051d27bbec40766dac3a226703e4f5b08447f4eca0365"
     },
     "bootstrap_environment": {
       "path": "peer_bootstrap.py",
