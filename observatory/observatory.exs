@@ -304,6 +304,7 @@ defmodule Observatory.Live do
         health: health(st), seeds: seeds(st), running: running?(st),
         live_points: live_points(st), live_base: live_base(st),
         best_path: best_path(live_points(st)),
+        imp_live: Map.get(st, :imp_trials, []),
         now: st.updated_at || System.system_time(:second))
 
     ~H"""
@@ -342,7 +343,7 @@ defmodule Observatory.Live do
             <% end %>
           </div>
         <% end %>
-        <%= if @live_points != [] do %>
+        <%= if @live_points != [] or @imp_live != [] do %>
           <svg viewBox="0 0 760 150" class="chart">
             <%= for tick <- [0.0, 0.5, 1.0] do %>
               <line x1="40" y1={ly(tick)} x2="750" y2={ly(tick)} class="grid" />
@@ -360,8 +361,14 @@ defmodule Observatory.Live do
             <%= if @best_path != "" do %>
               <polyline points={@best_path} class="bestline" />
             <% end %>
+            <%= for {pt, i} <- Enum.with_index(@imp_live) do %>
+              <circle cx={lx(i, length(@imp_live))} cy={ly(pt["score"])} r="3"
+                class={"seed imp" <> if(pt["kind"] == "best", do: " champ", else: "")}>
+                <title>imp valset eval <%= fmt(pt["score"] * 1.0) %> (iteration <%= pt["iteration"] %>)</title>
+              </circle>
+            <% end %>
           </svg>
-          <p class="note">orange dots = every upstream candidate evaluation (parsed live) · line = best-on-valset so far · dashed = that runtime's sealed baseline · imp's optimizer runs silent by design; its trials land when the arm seals</p>
+          <p class="note">orange dots = upstream candidate evals (parsed live) · blue dots = imp valset evals (engine callback), ringed = new best · green line = upstream best-so-far · dashed = sealed upstream baseline · each series indexes its own x; compare shapes, not columns</p>
         <% end %>
       </section>
 

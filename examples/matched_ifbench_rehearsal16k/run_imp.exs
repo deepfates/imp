@@ -184,6 +184,16 @@ defmodule MatchedIFBenchR16kImp.Observer do
     end)
   end
 
+  # Live optimizer scores from the engine's observational callbacks
+  # (Imp.Optimizer.GEPA.Callback) — read-only telemetry for the dashboard,
+  # capped, plain scalars only.
+  def live_trial(pid, entry) do
+    Agent.update(pid, fn state ->
+      trials = Map.get(state, :live_trials, []) ++ [entry]
+      Map.put(state, :live_trials, Enum.take(trials, -600))
+    end)
+  end
+
   def snapshot(pid), do: Agent.get(pid, & &1)
 
   defp operational_error(kind, reason, message) do
@@ -240,6 +250,30 @@ defmodule MatchedIFBenchR16kImp.Observer do
       end)
 
     per_seed * length(manifest["seeds"])
+  end
+end
+
+defmodule MatchedIFBenchR16kImp.LiveGepaCallback do
+  @moduledoc """
+  Observational-only GEPA hook: mirrors upstream's live log scores for the
+  imp arm. Feeds valset evaluations into the Observer's live_trials, which
+  the 10s snapshot writer publishes to run_root/live/imp.json. Return values
+  are ignored by the engine; this cannot alter the optimization.
+  """
+  @behaviour Imp.Optimizer.GEPA.Callback
+
+  @impl true
+  def on_valset_evaluated(event, observer) do
+    if is_number(event.average_score) do
+      MatchedIFBenchR16kImp.Observer.live_trial(observer, %{
+        kind: if(event.is_best_program, do: "best", else: "eval"),
+        score: event.average_score * 1.0,
+        iteration: event.iteration,
+        at: System.os_time(:second)
+      })
+    end
+
+    :ok
   end
 end
 
@@ -839,9 +873,13 @@ defmodule MatchedIFBenchR16kImp.Runner do
     GEPA.new(metric,
       execution_profile: :gepa_v0_1_4,
       reflection_lm: optimizer_lm,
+      callbacks: [
+        {MatchedIFBenchR16kImp.LiveGepaCallback, Process.get(:matched_ifbench_observer)}
+      ],
       # Semantic budget is the pinned profile's authority and supersedes the
       # BEAM-native generations knob: 1200 metric calls (~1/3 of the paper's
-      # 3,593 IFBench budget), legal iteration cap 1400, reflection cap 24.
+      # 3,593 IFBench budget), legal iteration cap 1400, reflection ceiling 96
+      # (contract call_ceilings; a reservation bound, not a source knob).
       max_metric_calls: config["semantic_max_metric_calls"],
       minibatch_size: config["minibatch_size"],
       seed: seed,
@@ -1655,6 +1693,7 @@ defmodule MatchedIFBenchR16kImp.Runner do
       usd_reserved: snapshot.usd_reserved,
       actual_cost: snapshot.actual_cost,
       responses: length(snapshot.responses),
+      live_trials: Map.get(snapshot, :live_trials, []),
       updated_at: System.os_time(:second)
     }
 

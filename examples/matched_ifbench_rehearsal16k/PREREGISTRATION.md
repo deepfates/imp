@@ -145,3 +145,18 @@ alone, and the same audit found no further zero-margin bounds. Lifecycle
 behavior (signals, rescue, ceilings) has no fast test today; that suite is
 now the acceptance spine of the harness-extraction ticket (imp-6mls).
 Predictions unchanged.
+
+## Addendum 5 (2026-08-10, telemetry-only restart, before relaunch)
+
+Take 6 (healthy, ~$1 spent, both baselines sealed at imp 0.8125 / upstream
+0.8385 selection) was stopped via the drill-verified signal path solely to
+complete live observability, owner-directed: (1) both runners publish 10s
+read-only snapshots to run_root/live/*.json (phase, call counts vs ceiling,
+spend); (2) the imp GEPA arm registers the engine's OBSERVATIONAL callback
+(Imp.Optimizer.GEPA.Callback, return values ignored by design) to publish
+live valset scores, mirroring the upstream arm's log-derived live scores.
+No budget, model, dataset, or decision-path parameter changes; the callback
+cannot alter optimization. Baselines re-run at the same seed (temperature-1
+sampling means per-take selection means vary within the measured ±0.08 s.e.;
+0.67-0.84 observed across takes is consistent with that noise, and no
+single-cell number is interpreted alone). Predictions unchanged.

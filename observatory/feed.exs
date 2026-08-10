@@ -97,6 +97,7 @@ defmodule Observatory.Feed do
       spend_usd: nil,
       arm_summaries: [],
       optimizer_points: [],
+      imp_trials: [],
       updated_at: System.os_time(:second)
     }
   end
@@ -147,6 +148,9 @@ defmodule Observatory.Feed do
         |> Enum.flat_map(fn r -> (r && Map.get(r, :arm_summaries)) || [] end),
       optimizer_points:
         (Map.get(prev, :optimizer_points, []) ++ log_points) |> Enum.take(-800),
+      # imp's live valset scores come whole from its snapshot (engine callback
+      # -> live/imp.json); replace rather than append — the file is cumulative
+      imp_trials: get_in(live, ["imp", "live_trials"]) || [],
       updated_at: now
     }
 
