@@ -272,12 +272,12 @@ defmodule Observatory.Live do
                 </rect>
               <% end %>
             <% end %>
-            <text x="740" y={y + 4} class={"delta " <> if(is_number(delta) and abs(delta) > 0.05, do: "hot", else: "")}>
+            <text x="740" y={y + 4} class={"delta " <> if(is_number(delta) and abs(delta) > 0.09, do: "hot", else: "")}>
               Δ<%= if is_number(delta), do: (if delta >= 0, do: "+", else: "") <> fmt2(delta), else: "–" %>
             </text>
           <% end %>
         </svg>
-        <p class="cap">thick tick = 3-seed mean · small dots = seeds · gray band = ±0.09 same-program noise around upstream · Δ beyond band would matter</p>
+        <p class="cap"><i class="sw swimp"></i>imp&nbsp;&nbsp;<i class="sw swup"></i>upstream (pinned DSPy) · thick tick = 3-seed mean · small dots = seeds · gray band = ±0.09 same-program noise around upstream · Δ beyond band would matter</p>
       </section>
 
       <section>
@@ -379,7 +379,7 @@ defmodule Observatory.Live do
       .grid { stroke:#2e2e2c; stroke-width:1; }
       .tick { fill:#8a897f; font-size:10px; text-anchor:middle; }
       .lbl { fill:#c3c2b7; font-size:11px; }
-      .noise { fill:#d95926; opacity:.13; }
+      .noise { fill:#8a897f; opacity:.16; }
       .seed.imp { fill:#3987e5; } .seed.upstream { fill:#d95926; }
       .seed { opacity:.75; }
       .seed.champ { stroke:#fff; stroke-width:1.5; opacity:1; }
@@ -400,7 +400,7 @@ defmodule Observatory.Live do
       .hnum { width:110px; text-align:right; color:#8a897f; font-size:11px; }
       .legend { display:flex; gap:14px; margin-top:6px; color:#a5a49b; font-size:11px; flex-wrap:wrap;}
       .sw { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; }
-      .sw.ones{background:#199e70}.sw.mid{background:#2e6b52}.sw.fail{background:#575650}.sw.trunc{background:#c98500}.sw.parse{background:#e66767}
+      .sw.swimp{background:#3987e5}.sw.swup{background:#d95926}.sw.ones{background:#199e70}.sw.mid{background:#2e6b52}.sw.fail{background:#575650}.sw.trunc{background:#c98500}.sw.parse{background:#e66767}
       .feed { display:flex; flex-direction:column; gap:2px; margin-top:4px; }
       .ev { display:flex; gap:10px; font-size:11px; color:#a5a49b; }
       .ev .t { color:#8a897f; } .ev .k { width:70px; }
