@@ -549,7 +549,7 @@ def preflight(preflight_only: bool) -> dict[str, Any]:
     # Reservation ceiling: 9,376 task x $0.02208 + 78 optimizer x $0.096.
     maximum = worst_case_usd(manifest)
     require(
-        maximum == Decimal("228.33408000"),
+        maximum == Decimal("230.06208000"),
         f"reservation ceiling drift: {maximum}",
     )
     # Hard cap on ACTUAL spend (enforced per-runtime as new_spend_max/2 in
@@ -827,7 +827,19 @@ def require_rescued_stop_artifacts(
         )
 
 
+class CoordinatorSignal(BaseException):
+    """External SIGTERM/SIGINT: route through the BaseException cleanup so
+    peers are stopped (killpg SIGTERM -> their rescue paths) instead of being
+    orphaned mid-spend by the default instant-death signal action."""
+
+
+def _coordinator_signal(signum: int, _frame: Any) -> None:
+    raise CoordinatorSignal(f"coordinator received signal {signum}")
+
+
 def run_peers(launch_commit: str) -> int:
+    signal.signal(signal.SIGTERM, _coordinator_signal)
+    signal.signal(signal.SIGINT, _coordinator_signal)
     manifest = json.loads(MANIFEST.read_text())
     expected_bootstrap_digest = require_bootstrap_contract(manifest, launch_commit)
     env = peer_environment(live_mode(os.environ, system_ca_file()), launch_commit)

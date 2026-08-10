@@ -120,3 +120,28 @@ Launch 3 ran clean through both baselines and 752/1200 GEPA rollouts
 
 Predictions unchanged. Cumulative observed rehearsal spend to date: ~$1.50
 (stop 1) + ~$0 (stop 2) + $3.68+imp-side (stop 3).
+
+## Addendum 4 (2026-08-09, preemptive stop of launch 4, before relaunch)
+
+Launch 4 was stopped minutes in (both baselines re-sealed; ~cents of spend)
+after a ledger audit of the completed pilot found the next stop before paying
+for it: the MIPRO optimizer ceiling of 15 is formula-exact with ZERO margin
+(3 data-summary + 2 proposals x 6 candidates; the pilot measured 11 = 3 +
+2x4, identically in both runtimes across all three seeds — the formula is
+right, but "exactly right" is what the GEPA ceiling was believed to be).
+Raised to 24. Documented reservation ceiling 228.33 -> 230.06 USD; actual
+spend caps unchanged.
+
+The stop also exposed and fixed a coordinator defect: run_paired.py
+installed no signal handler, so an external SIGTERM killed it instantly and
+orphaned both peers mid-spend (observed live; the orphans were then
+SIGTERMed directly and — verifying the Addendum 3 fix — both wrote clean
+rescue artifacts). SIGTERM/SIGINT now route through the existing
+BaseException cleanup that stops peers via killpg.
+
+Method note, recorded as a standing lesson: every ceiling in the contract is
+now audited against MEASURED ledgers (pilot + stop 3) rather than derivation
+alone, and the same audit found no further zero-margin bounds. Lifecycle
+behavior (signals, rescue, ceilings) has no fast test today; that suite is
+now the acceptance spine of the harness-extraction ticket (imp-6mls).
+Predictions unchanged.

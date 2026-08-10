@@ -359,7 +359,8 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
     #   mipro_v2: compile = 2x((trials 18 + 2 full valset evals) x 32
     #             + train 16) = 1312 (trials 8 -> 672 matched the sealed
     #             gepa014 compile slice exactly); + 64 + 128             -> 1504
-    #             optimizer = data summary ceil(16/10)+1 = 3 + 2x6 = 15
+    #             optimizer: formula-exact 3 + 2x6 = 15 (pilot measured
+    #             11 = 3 + 2x4 in both runtimes); 24 adds margin
     expected_ceilings = {
         "baseline": {
             "task_logical": 192,
@@ -375,9 +376,9 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
         },
         "mipro_v2": {
             "task_logical": 1504,
-            "optimizer_logical": 15,
-            "transports": 1519,
-            "total_logical": 1519,
+            "optimizer_logical": 24,
+            "transports": 1528,
+            "total_logical": 1528,
         },
     }
     if manifest.get("execution", {}).get("call_ceilings") != expected_ceilings:

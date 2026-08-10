@@ -262,9 +262,9 @@
       },
       "mipro_v2": {
         "task_logical": 1504,
-        "optimizer_logical": 15,
-        "transports": 1519,
-        "total_logical": 1519
+        "optimizer_logical": 24,
+        "transports": 1528,
+        "total_logical": 1528
       }
     },
     "call_ceiling_derivation": "one seed, per runtime, two-stage program (1 metric/eval call = 2 task transports): baseline = selection 32x2 + held_out 64x2 = 192; gepa = legal metric-call cap 1400 x2 + 64 + 128 = 2992 task, optimizer = reflection cap 24; mipro_v2 = compile 2x((trials 18 + 2 full valset evals)x32 + train 16) = 1312 + 64 + 128 = 1504 task (trials 8 gave 672, matching the sealed gepa014 compile slice exactly), optimizer = data summary ceil(16/10)+1 = 3 plus 2 predictors x 6 candidates = 15"
@@ -335,7 +335,7 @@
   "budget": {
     "new_spend_max": 60.0,
     "hard_cap_semantics": "actual gateway-reported spend across both runtimes; enforced per runtime as new_spend_max/2 in each reconcile path",
-    "reservation_ceiling_usd": 228.33408,
+    "reservation_ceiling_usd": 230.06208,
     "reservation_ceiling_derivation": "9376 task calls x $0.02208 (4864 in x $0.75/M + p99 4096 out x $4.5/M) + 78 optimizer calls x $0.096 (17408 in x $3.75/M cache-write + 2048 out x $15/M)",
     "realistic_estimate_usd": "20-50 (pilot per-call actuals x 2-3x token growth at the lifted cap)"
   },
@@ -358,7 +358,7 @@
     },
     "contract_runtime": {
       "path": "contract.exs",
-      "sha256": "97da7c02ecbab24a46361646705e4ca0be2605baccf15d000867058e88a05f87"
+      "sha256": "50f599d40f0151c9e15ffea389eb2c2496ff120cec4b5691437cddc5be9ae833"
     },
     "bootstrap_environment": {
       "path": "peer_bootstrap.py",
@@ -366,7 +366,7 @@
     },
     "coordinator": {
       "path": "run_paired.py",
-      "sha256": "77b2e00523c7521e85202825bee5d7743c5122c316e752dcc35a60349beb5ca6"
+      "sha256": "3314d7dbcde066123ff18ebb20a78ac9f0e64fe853350295d4d16572857e7b7d"
     },
     "imp_entry": {
       "path": "run_imp.exs",
@@ -398,7 +398,7 @@
     },
     "upstream_entry": {
       "path": "run_upstream.py",
-      "sha256": "af54932abcedf7ed3cdee717819836c514ee5ab518e390c046ff90e9a41a382f"
+      "sha256": "ecc4e393d046c0fbf83f5ba6a72f00cce20e9b2fa94f83221ee027d24f999706"
     }
   },
   "provider_authority": "none until live launch; shadow-only coordinator path is credential-free"
