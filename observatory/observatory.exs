@@ -31,11 +31,25 @@ defmodule Observatory.Source do
           {:fixture, @fixture}
 
         File.exists?(feed_file) ->
-          Code.require_file(feed_file)
+          # The Playground app restarts on crash storms and re-runs this init.
+          # Re-requiring the file would recompile the module, PURGING old code
+          # and killing the running Feed — which then crashes every mounted
+          # LiveView's next tick and sustains the storm forever. Load once,
+          # reuse the named process if it survived.
+          unless Code.ensure_loaded?(Observatory.Feed), do: Code.require_file(feed_file)
 
-          {:ok, pid} =
-            apply(Observatory.Feed, :start_link,
-              [[run_root: opts[:root], log_path: opts[:log]]])
+          pid =
+            case Process.whereis(Observatory.Feed) do
+              nil ->
+                {:ok, new_pid} =
+                  apply(Observatory.Feed, :start_link,
+                    [[run_root: opts[:root], log_path: opts[:log]]])
+
+                new_pid
+
+              live_pid ->
+                live_pid
+            end
 
           {:feed, pid}
 
@@ -70,9 +84,29 @@ defmodule Observatory.Source do
 
   def get do
     case :persistent_term.get(:observatory_source) do
-      {:feed, pid} -> apply(Observatory.Feed, :state, [pid])
-      {:fixture, path} -> load_fixture(path)
+      {:feed, _pid} ->
+        # resolve by name each call and degrade gracefully — a briefly-dead
+        # feed must not crash every mounted page (crash containment)
+        case Process.whereis(Observatory.Feed) do
+          nil -> placeholder_state("feed restarting")
+          pid -> apply(Observatory.Feed, :state, [pid])
+        end
+
+      {:fixture, path} ->
+        load_fixture(path)
     end
+  rescue
+    _ -> placeholder_state("feed unavailable")
+  catch
+    :exit, _ -> placeholder_state("feed unavailable")
+  end
+
+  defp placeholder_state(note) do
+    %{status: :idle,
+      peers: %{"imp" => %{alive: false, phase: note, progress: nil, last_line_at: nil},
+               "upstream" => %{alive: false, phase: note, progress: nil, last_line_at: nil}},
+      trials: [], events: [], cells: [], arm_summaries: [], optimizer_points: [],
+      imp_trials: [], spend_usd: nil, updated_at: System.system_time(:second)}
   end
 
   defp load_fixture(path) do

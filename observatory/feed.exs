@@ -18,7 +18,7 @@ defmodule Observatory.Feed do
   # -- public API --------------------------------------------------------------
 
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts)
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   @doc "Cheap read of the merged state map (see CONTRACT.md for shape)."
