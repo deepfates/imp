@@ -413,7 +413,7 @@ defmodule Observatory.Live do
           <svg viewBox="0 0 760 150" class="chart">
             <%= for tick <- [@live_geo.y_min, (@live_geo.y_min + 1.0) / 2, 1.0] do %>
               <line x1="40" y1={ly(tick, @live_geo)} x2="750" y2={ly(tick, @live_geo)} class="grid" />
-              <text x="8" y={ly(tick, @live_geo) + 4} class="tick"><%= fmt2(tick) %></text>
+              <text x="2" y={ly(tick, @live_geo) + 4} class="tick" style="text-anchor:start"><%= fmt2(tick) %></text>
             <% end %>
             <text x="40" y="148" class="tick" text-anchor="start"><%= hhmmss(@live_geo.t0) %></text>
             <text x="740" y="148" class="tick" text-anchor="end"><%= hhmmss(@live_geo.t1) %></text>
@@ -487,7 +487,7 @@ defmodule Observatory.Live do
           <%= for tick <- [0.25, 0.5, 0.75, 1.0] do %>
             <% ty = 220 - tick * 190 %>
             <line x1="200" y1={ty} x2="560" y2={ty} class="grid" />
-            <text x="180" y={ty + 3} class="tick"><%= tick %></text>
+            <text :if={not Enum.any?(@pending, &(abs(&1.sel - tick) < 0.03))} x="180" y={ty + 3} class="tick"><%= tick %></text>
           <% end %>
           <%= for s <- @slopes do %>
             <% y1 = 220 - s.sel * 190 %>

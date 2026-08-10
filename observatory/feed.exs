@@ -535,7 +535,7 @@ defmodule Observatory.Feed do
   # optimizer candidate evaluation emits one; the percentage is the 0..1 score.
   @eval_re ~r/Average Metric: [\d.]+ \/ (?<n>\d+) \((?<pct>[\d.]+)%\)/
   # GEPA's running champion, already 0..1: "Best score on valset: 0.8385"
-  @best_re ~r/Best score on valset: (?<score>[\d.]+)/
+  @best_re ~r/(?:Best score on valset|Base program full valset score|Full valset score for new program): (?<score>[\d.]+)/
 
   defp parse_log_lines(lines) do
     now = System.os_time(:second)
