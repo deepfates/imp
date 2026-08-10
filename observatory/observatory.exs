@@ -44,7 +44,28 @@ defmodule Observatory.Source do
       end
 
     :persistent_term.put(:observatory_source, mode)
+    :persistent_term.put(:observatory_expected_cells, expected_cells(opts[:root]))
     mode
+  end
+
+  # Denominator for the header cell counter, derived from THIS run's contract
+  # (seeds x ceiling arms x 2 runtimes) by the examples/<run-basename>/ naming
+  # convention; nil (no denominator shown) when no contract is found.
+  def expected_cells(nil), do: nil
+
+  def expected_cells(root) do
+    path = Path.join(["examples", Path.basename(root), "contract.json"])
+
+    with true <- File.exists?(path),
+         {:ok, body} <- File.read(path),
+         {:ok, contract} <- Jason.decode(body),
+         seeds when is_list(seeds) and seeds != [] <- contract["seeds"],
+         arms when is_map(arms) and map_size(arms) > 0 <-
+           get_in(contract, ["execution", "call_ceilings"]) do
+      length(seeds) * map_size(arms) * 2
+    else
+      _ -> nil
+    end
   end
 
   def get do
@@ -243,7 +264,18 @@ defmodule Observatory.Live do
   defp event_class(_), do: "info"
 
   defp hhmmss(nil), do: "--:--:--"
-  defp hhmmss(unix), do: unix |> DateTime.from_unix!() |> Calendar.strftime("%H:%M:%S")
+
+  # local wall-clock, not UTC — this is a local dashboard
+  defp hhmmss(unix) do
+    {{_y, _mo, _d}, {h, m, sec}} =
+      unix
+      |> DateTime.from_unix!()
+      |> DateTime.to_naive()
+      |> NaiveDateTime.to_erl()
+      |> :calendar.universal_time_to_local_time()
+
+    :io_lib.format("~2..0B:~2..0B:~2..0B", [h, m, sec]) |> IO.iodata_to_binary()
+  end
 
   defp running?(state), do: state.status == :running
 
@@ -265,7 +297,9 @@ defmodule Observatory.Live do
         <h1>matched-campaign observatory</h1>
         <p class="sub">
           <span class={"st " <> to_string(@state.status)}><%= @state.status %></span>
-          · <%= Enum.count(@state.cells) %>/18 cells
+          · <%= Enum.count(@state.cells) %><%= case :persistent_term.get(:observatory_expected_cells, nil) do
+              nil -> ""
+              n -> "/#{n}" end %> cells
           · $<%= fmt(@state.spend_usd) %> recorded
           · <%= hhmmss(@state.updated_at) %>
           <%= for rt <- ["imp", "upstream"], p = @state.peers[rt] do %>
