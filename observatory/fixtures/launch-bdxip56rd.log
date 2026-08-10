@@ -1,0 +1,32 @@
+ 1 file changed, 11 insertions(+)
+   6fcb151d..b865b316  main -> main
+    raise e
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-3.2.1/dspy/adapters/chat_adapter.py", line 72, in __call__
+    return super().__call__(lm, lm_kwargs, signature, demos, inputs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-3.2.1/dspy/adapters/base.py", line 206, in __call__
+    return self._call_postprocess(processed_signature, signature, outputs, lm, lm_kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-3.2.1/dspy/adapters/base.py", line 133, in _call_postprocess
+    value = self.parse(processed_signature, text)
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-3.2.1/dspy/utils/callback.py", line 326, in sync_wrapper
+    return fn(instance, *args, **kwargs)
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-3.2.1/dspy/adapters/chat_adapter.py", line 239, in parse
+    raise AdapterParseError(
+    ...<4 lines>...
+    )
+dspy.utils.exceptions.AdapterParseError: Adapter ChatAdapter failed to parse the LM response. 
+
+LM Response: [[ ## reasoning ## ]]
+I can’t help with manipulating or skewing data to mislead readers or exaggerate results. I can, however, help you present findings clearly and ethically by using appropriate summaries, charts, subgroup analyses, and transparency about limitations. 
+
+Expected to find output fields in the LM response: [reasoning, response] 
+
+Actual output fields parsed from the LM response: [reasoning] 
+
+
+
+10:13:23.973 [notice] SIGTERM received - shutting down
+
+** (EXIT from #PID<0.94.0>) shutdown
+

@@ -1,0 +1,158 @@
+{
+ "status": "running",
+ "peers": {
+  "imp": {
+   "alive": true,
+   "phase": "seed 06 / mipro_v2 / compile",
+   "progress": [
+    5,
+    8
+   ],
+   "last_line_at": 1786329204
+  },
+  "upstream": {
+   "alive": true,
+   "phase": "seed 06 / gepa / compile",
+   "progress": [
+    52,
+    80
+   ],
+   "last_line_at": 1786329206
+  }
+ },
+ "trials": [
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 1,
+   "score": 0.6979
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 2,
+   "score": 0.6302
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 3,
+   "score": 0.7448
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 4,
+   "score": 0.724
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 5,
+   "score": 0.8542
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 6,
+   "score": 0.7865
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 7,
+   "score": 0.6354
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "mipro_v2",
+   "trial": 8,
+   "score": 0.6979
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072706",
+   "arm": "mipro_v2",
+   "trial": 1,
+   "score": 0.8854
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072706",
+   "arm": "mipro_v2",
+   "trial": 2,
+   "score": 0.6562
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072706",
+   "arm": "mipro_v2",
+   "trial": 3,
+   "score": 0.7604
+  }
+ ],
+ "events": [
+  {
+   "at": 1786329202,
+   "runtime": "upstream",
+   "kind": "warning",
+   "text": "AdapterParseError: response missing [[ ## response ## ]] (scored 0)"
+  },
+  {
+   "at": 1786329167,
+   "runtime": "imp",
+   "kind": "refusal",
+   "text": "task model refused: 'I can't help with manipulating\u2026' (scored 0)"
+  },
+  {
+   "at": 1786329117,
+   "runtime": "imp",
+   "kind": "seal",
+   "text": "sealed imp-2026072705-mipro_v2"
+  }
+ ],
+ "cells": [
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "baseline",
+   "mtime": 1786328607,
+   "selection_mean": 0.786,
+   "trial_scores": null
+  },
+  {
+   "runtime": "upstream",
+   "seed": "2026072705",
+   "arm": "baseline",
+   "mtime": 1786328607,
+   "selection_mean": 0.745,
+   "trial_scores": null
+  },
+  {
+   "runtime": "imp",
+   "seed": "2026072705",
+   "arm": "gepa",
+   "mtime": 1786328607,
+   "selection_mean": 0.786,
+   "trial_scores": null
+  },
+  {
+   "runtime": "upstream",
+   "seed": "2026072705",
+   "arm": "gepa",
+   "mtime": 1786328607,
+   "selection_mean": 0.682,
+   "trial_scores": null
+  }
+ ],
+ "spend_usd": 2.41,
+ "updated_at": 1786329207
+}

@@ -1,0 +1,34 @@
+imp_entry: 407c7a6b -> 6e75abc5
+runner: 5ab88e54 -> e619f79a
+ 4 files changed, 27 insertions(+), 4 deletions(-)
+   b865b316..47a9ef69  main -> main
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "measurements"
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "count"
+                },
+                1
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "system_time"
+                },
+                1786310080729465830
+              ]
+            ]
+          }
+        ]
+      ]
+    }
+  ],
+  "claim_boundary": "stock-DSPy-adapted IFBench task graph comparison; not the unmodified artifact or paper reproduction"
+}

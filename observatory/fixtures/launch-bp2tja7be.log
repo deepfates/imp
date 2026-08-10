@@ -1,0 +1,33 @@
+status: terminal_zero_call_stopped -> sealed
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+   51fc21ad..d77c69db  main -> main
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-parity-venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 407, in __iter__
+    raise exc from None
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-parity-venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 403, in __iter__
+    for part in self._stream:
+                ^^^^^^^^^^^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-parity-venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 342, in __iter__
+    raise exc
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-parity-venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 334, in __iter__
+    for chunk in self._connection._receive_response_body(**kwargs):
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-parity-venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 203, in _receive_response_body
+    event = self._receive_event(timeout=timeout)
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-parity-venv/lib/python3.13/site-packages/httpcore/_sync/http11.py", line 217, in _receive_event
+    data = self._network_stream.read(
+        self.READ_NUM_BYTES, timeout=timeout
+    )
+  File "/Users/deepfates/Hacking/github/deepfates/imp/tmp/dspy-parity-venv/lib/python3.13/site-packages/httpcore/_backends/sync.py", line 128, in read
+    return self._sock.recv(max_bytes)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.2/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 1285, in recv
+    return self.read(buflen)
+           ~~~~~~~~~^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.2/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 1140, in read
+    return self._sslobj.read(len)
+           ~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/examples/matched_gepa_mipro_ifbench/run_upstream.py", line 918, in coordinated_stop
+    raise CoordinatedStop(f"coordinator signal {signum}")
+matched_ifbench_v1_upstream.CoordinatedStop: coordinator signal 15
+GEPA Optimization:  80%|████████  | 64/80 [09:29<02:22,  8.90s/rollouts]

@@ -1,0 +1,21 @@
+Traceback (most recent call last):
+  File "/Users/deepfates/Hacking/github/deepfates/imp/examples/matched_gepa_mipro_ifbench_gepa014/run_paired.py", line 1135, in <module>
+    main()
+    ~~~~^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/examples/matched_gepa_mipro_ifbench_gepa014/run_paired.py", line 1130, in main
+    coordinate(args.preflight_only, args.compatibility_only, args.shadow_only)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/examples/matched_gepa_mipro_ifbench_gepa014/run_paired.py", line 1118, in coordinate
+    report = preflight(preflight_only)
+  File "/Users/deepfates/Hacking/github/deepfates/imp/examples/matched_gepa_mipro_ifbench_gepa014/run_paired.py", line 653, in preflight
+    require(
+    ~~~~~~~^
+        manifest["launch_status"] in ("blocked_live_preflight", "sealed"),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "manifest launch state drift",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/deepfates/Hacking/github/deepfates/imp/examples/matched_gepa_mipro_ifbench_gepa014/run_paired.py", line 93, in require
+    raise RuntimeError(message)
+RuntimeError: manifest launch state drift
