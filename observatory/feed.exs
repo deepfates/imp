@@ -192,7 +192,11 @@ defmodule Observatory.Feed do
         acc
       else
         arm = phase["arm"]
-        budget = snap["call_budgets"]["#{phase["seed"]}/#{arm}"]
+
+        # imp keys budgets "seed/arm", upstream "seed:arm" — accept both
+        budget =
+          snap["call_budgets"]["#{phase["seed"]}/#{arm}"] ||
+            snap["call_budgets"]["#{phase["seed"]}:#{arm}"]
 
         progress =
           with %{"counts" => counts, "ceiling" => ceiling} <- budget,
