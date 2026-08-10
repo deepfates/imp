@@ -32,13 +32,13 @@ defmodule MatchedIFBenchR16k.Contract do
       "total_logical" => 3088
     },
     "mipro_v2" => %{
-      "task_logical" => 1504,
+      "task_logical" => 928,
       # formula-exact need is 15 (3 summary + 2 proposals x 6 candidates;
       # pilot measured 11 = 3 + 2x4 in BOTH runtimes) — 24 adds the margin
       # whose absence killed the gepa arm at stop 3
       "optimizer_logical" => 24,
-      "transports" => 1528,
-      "total_logical" => 1528
+      "transports" => 952,
+      "total_logical" => 952
     }
   }
 
@@ -47,7 +47,7 @@ defmodule MatchedIFBenchR16k.Contract do
 
   def plan!(path) do
     manifest = load!(path)
-    # 1 seed x 2 runtimes x (192 + 2992 + 1504) task; 2 runtimes x (96 + 24) optimizer.
+    # 1 seed x 2 runtimes x (192 + 2992 + 928) task; 2 runtimes x (96 + 24) optimizer.
     task_calls = 9_376
     optimizer_calls = 78
     request = manifest["execution"]["request"]

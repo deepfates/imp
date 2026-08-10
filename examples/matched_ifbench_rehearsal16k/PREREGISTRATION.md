@@ -176,3 +176,26 @@ terminal. Also fixed: the rescue validator's per-runtime reservation-cap
 literal still encoded the pre-Addendum-4 ceiling (107.25504 -> 115.03104);
 a full sweep of every Decimal literal in the paired surfaces verified the
 remainder against current arithmetic. Predictions unchanged.
+
+## Addendum 7 (2026-08-10, after stop 8, before relaunch)
+
+Take 8 delivered the campaign's first substantive result before stopping:
+BOTH GEPA arms sealed at the source-faithful budget. Selection champions:
+imp 0.8542 vs upstream 0.8698 (delta -0.016, well inside the ±0.09 band) —
+matched GEPA optimization parity on selection, from baselines of 0.8229 /
+0.7083 (both within the established per-take sampling noise). Upstream's
+17-candidate trial ledger and imp's 39-trial ledger sealed intact.
+
+The stop: imp's MIPROv2 REFUSED trials=18 by declared fidelity boundary
+("pinned DSPy 3.2.1/Optuna 4.9.0 startup fidelity supports at most 9
+objective trials after the baseline; modeled TPE is not implemented",
+mipro_v2.ex:1097). This is a genuine, honestly-declared parity gap in the
+port — the benchmark surfacing exactly what it exists to surface — not a
+harness defect. The pilot's trials=8 sat under the boundary, which is why
+it never fired. Design amendment: MIPRO trials 18 -> 9 for BOTH arms (the
+largest budget both runtimes can run faithfully; matched design over
+budget ambition), ceilings/reservations recomputed (mipro task 928,
+campaign reservation 204.62592). The modeled-TPE gap is ticketed as a
+prerequisite for paper-scale MIPRO in the Heavy campaign. Take-8 spend:
+$13.06. Predictions unchanged; P2's GEPA leg is already satisfied at
+selection pending held-out.

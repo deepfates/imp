@@ -356,9 +356,13 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
     #             rollout 752/1200 (~2.5/iteration), extrapolating to ~40
     #             at budget exhaustion. 96 = ~2.4x that need, a
     #             reservation bound rather than an expectation           -> 96
-    #   mipro_v2: compile = 2x((trials 18 + 2 full valset evals) x 32
-    #             + train 16) = 1312 (trials 8 -> 672 matched the sealed
-    #             gepa014 compile slice exactly); + 64 + 128             -> 1504
+    #   mipro_v2: compile = 2x((trials 9 + 2 full valset evals) x 32
+    #             + train 16) = 736 (trials 8 -> 672 matched the sealed
+    #             gepa014 compile slice exactly); + 64 + 128              -> 928
+    #             trials capped at 9 by imp's DECLARED MIPROv2 fidelity
+    #             boundary (Optuna TPE startup phase only; modeled TPE
+    #             unimplemented, mipro_v2.ex:1097) — matched design means
+    #             BOTH arms run the budget both can run faithfully
     #             optimizer: formula-exact 3 + 2x6 = 15 (pilot measured
     #             11 = 3 + 2x4 in both runtimes); 24 adds margin
     expected_ceilings = {
@@ -375,10 +379,10 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
             "total_logical": 3088,
         },
         "mipro_v2": {
-            "task_logical": 1504,
+            "task_logical": 928,
             "optimizer_logical": 24,
-            "transports": 1528,
-            "total_logical": 1528,
+            "transports": 952,
+            "total_logical": 952,
         },
     }
     if manifest.get("execution", {}).get("call_ceilings") != expected_ceilings:
@@ -393,7 +397,7 @@ def load_manifest(args: argparse.Namespace) -> dict[str, Any]:
             f"legal metric-call cap does not cover the pinned envelope: {envelope!r}"
         )
     mipro = manifest["optimizer"]["mipro_v2"]
-    if mipro["num_candidates"] != 6 or mipro["trials"] != 18:
+    if mipro["num_candidates"] != 6 or mipro["trials"] != 9:
         raise RuntimeError("rehearsal MIPRO budget contract drift")
     request = manifest["execution"]["request"]
     if (
@@ -1092,7 +1096,8 @@ def compile_arm(
             prompt_model=optimizer_lm,
             task_model=task_lm,
             auto=None,
-            # 6 candidates / 18 trials: ~1/3 of the paper's MIPROv2-Heavy shape.
+            # 6 candidates / 9 trials: the largest MIPROv2 budget imp's pinned
+            # Optuna-startup fidelity supports (see call-ceiling note).
             num_candidates=mipro["num_candidates"],
             max_bootstrapped_demos=0,
             max_labeled_demos=0,
