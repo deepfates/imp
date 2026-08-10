@@ -436,8 +436,18 @@ defmodule Observatory.Live do
                 <title>imp valset eval <%= fmt(pt["score"] * 1.0) %> (iteration <%= pt["iteration"] %>) at <%= hhmmss(pt["at"]) %></title>
               </circle>
             <% end %>
+            <%= for {pt, lbl_class, dy} <- [
+                  {List.last(Enum.filter(@live_points, &(&1.kind == :eval))), "lbl-upstream", -6},
+                  {List.last(@imp_live), "lbl-imp", 12}
+                ],
+                pt != nil do %>
+              <% score = pt[:score] || pt["score"] %>
+              <% at = pt[:at] || pt["at"] %>
+              <text x={min(lt(at, @live_geo) + 8, 700)} y={ly(score, @live_geo) + dy}
+                class={"vlabel " <> lbl_class}><%= fmt(score * 1.0) %></text>
+            <% end %>
           </svg>
-          <p class="note">small dots = 8-row minibatches · line = best-so-far · hover any mark</p>
+          <p class="note">small dots = 8-row minibatches · line = best-so-far</p>
         <% end %>
       </section>
 
@@ -606,6 +616,8 @@ defmodule Observatory.Live do
       .pnum { color:#a5a49b; min-width:130px; text-align:right; }
       .pnote { color:#8a897f; font-style:italic; flex:1; }
       .bestline { stroke:#199e70; stroke-width:2; fill:none; }
+      .vlabel { font-size:10px; }
+      .lbl-imp { fill:#3987e5; } .lbl-upstream { fill:#d95926; }
       .note { color:#8a897f; margin:4px 0 0; }
       .healthgrid { display:flex; flex-direction:column; gap:5px; margin-top:6px; }
       .hrow { display:flex; align-items:center; gap:10px; }
