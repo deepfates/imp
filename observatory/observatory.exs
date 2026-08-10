@@ -90,12 +90,13 @@ defmodule Observatory.Source do
               mtime: c["mtime"], selection_mean: c["selection_mean"],
               trial_scores: c["trial_scores"]}
           end,
+        arm_summaries: [],
         spend_usd: raw["spend_usd"],
         updated_at: raw["updated_at"] || System.system_time(:second)
       }
     else
       _ ->
-        %{status: :idle, peers: %{}, trials: [], events: [], cells: [],
+        %{status: :idle, peers: %{}, trials: [], events: [], cells: [], arm_summaries: [],
           spend_usd: nil, updated_at: System.system_time(:second)}
     end
   end
@@ -110,10 +111,8 @@ end
 defmodule Observatory.Live do
   use Phoenix.LiveView
 
-  @arms ~w(baseline gepa mipro_v2)
-  @opt_arms ~w(gepa mipro_v2)
-  @runtimes ~w(imp upstream)
-  @spend_budget 40.0
+  # Insight-first redesign: every panel answers a question on a shared 0..1
+  # score axis with explicit references. Ink goes to data; boxes are gone.
 
   def mount(_params, _session, socket) do
     if connected?(socket), do: :timer.send_interval(1000, self(), :tick)
@@ -124,40 +123,88 @@ defmodule Observatory.Live do
     {:noreply, assign(socket, state: Observatory.Source.get())}
   end
 
-  # ---- helpers ------------------------------------------------------------
+  # ---- data shaping --------------------------------------------------------
 
   defp fmt(nil), do: "–"
   defp fmt(x) when is_float(x), do: :erlang.float_to_binary(x, decimals: 3)
   defp fmt(x), do: to_string(x)
 
+  defp fmt2(nil), do: "–"
+  defp fmt2(x) when is_number(x), do: :erlang.float_to_binary(x * 1.0, decimals: 2)
+
+  defp sx(score), do: 120 + score * 560
+
+  defp summ(state, rt, seed, arm) do
+    Enum.find(state.arm_summaries || [], &(&1.runtime == rt and &1.seed == seed and &1.arm == arm))
+  end
+
   defp seeds(state) do
-    (Enum.map(state.cells, & &1.seed) ++ Enum.map(state.trials, & &1.seed))
+    ((state.arm_summaries || []) |> Enum.map(& &1.seed)) ++ Enum.map(state.cells, & &1.seed)
     |> Enum.uniq()
     |> Enum.sort()
   end
 
-  defp cell(state, rt, seed, arm),
-    do: Enum.find(state.cells, &(&1.runtime == rt and &1.seed == seed and &1.arm == arm))
+  defp mean(xs) do
+    case Enum.filter(xs, &is_number/1) do
+      [] -> nil
+      ys -> Enum.sum(ys) / length(ys)
+    end
+  end
 
-  defp peer_class(nil), do: "idle"
-  defp peer_class(%{phase: "complete"}), do: "ok"
-  defp peer_class(%{alive: true}), do: "run"
-  defp peer_class(%{alive: false}), do: "bad"
+  # verdict rows: {arm, %{rt => {mean, [seed_means]}}, delta}
+  defp verdict(state) do
+    for arm <- ~w(baseline gepa mipro_v2) do
+      per_rt =
+        for rt <- ~w(imp upstream), into: %{} do
+          pts = for seed <- seeds(state), s = summ(state, rt, seed, arm), s.held_out, do: s.held_out.mean
+          {rt, {mean(pts), pts}}
+        end
 
-  defp ago(nil, _now), do: "never"
-  defp ago(t, now), do: "#{max(now - t, 0)}s ago"
+      delta =
+        case {per_rt["imp"], per_rt["upstream"]} do
+          {{i, _}, {u, _}} when is_number(i) and is_number(u) -> i - u
+          _ -> nil
+        end
 
-  defp status_word(%{phase: "complete"}), do: "complete"
-  defp status_word(%{alive: true}), do: "alive"
-  defp status_word(%{alive: false}), do: "down"
-  defp status_word(nil), do: "no signal"
+      {arm, per_rt, delta}
+    end
+  end
 
-  # trials for one arm, grouped by seed (sorted), each trial keeps order
-  defp arm_trials(state, arm) do
-    state.trials
-    |> Enum.filter(&(&1.arm == arm))
-    |> Enum.group_by(& &1.seed)
-    |> Enum.sort_by(&elem(&1, 0))
+  # slopes: [{rt, seed, arm, sel, held}]
+  defp slopes(state) do
+    for rt <- ~w(imp upstream), seed <- seeds(state), arm <- ~w(baseline gepa mipro_v2),
+        s = summ(state, rt, seed, arm),
+        s.selection && s.held_out,
+        is_number(s.selection.mean) and is_number(s.held_out.mean) do
+      %{rt: rt, seed: seed, arm: arm, sel: s.selection.mean, held: s.held_out.mean}
+    end
+  end
+
+  # imp trials per {arm, seed} with the imp baseline selection mean as reference
+  defp trial_rows(state) do
+    for arm <- ~w(gepa mipro_v2), seed <- seeds(state) do
+      ts = for t <- state.trials, t.arm == arm, t.seed == seed, is_number(t.score), do: t.score
+      base = case summ(state, "imp", seed, "baseline") do
+        %{selection: %{mean: m}} -> m
+        _ -> nil
+      end
+      {arm, seed, ts, base}
+    end
+  end
+
+  # health: pooled held-out outcome composition per {rt, arm}
+  defp health(state) do
+    for rt <- ~w(imp upstream), arm <- ~w(baseline gepa mipro_v2) do
+      sums =
+        for seed <- seeds(state), s = summ(state, rt, seed, arm), s.held_out, reduce: %{n: 0, ones: 0, parse: 0, trunc: 0, fail: 0} do
+          acc ->
+            z = s.held_out.zeros || %{}
+            %{acc | n: acc.n + s.held_out.n, ones: acc.ones + s.held_out.ones,
+              parse: acc.parse + Map.get(z, :parse, 0), trunc: acc.trunc + Map.get(z, :trunc, 0),
+              fail: acc.fail + Map.get(z, :fail, 0)}
+        end
+      {rt, arm, sums}
+    end
   end
 
   defp event_class(:warning), do: "warn"
@@ -168,244 +215,197 @@ defmodule Observatory.Live do
   defp event_class(_), do: "info"
 
   defp hhmmss(nil), do: "--:--:--"
+  defp hhmmss(unix), do: unix |> DateTime.from_unix!() |> Calendar.strftime("%H:%M:%S")
 
-  defp hhmmss(unix) do
-    unix |> DateTime.from_unix!() |> Calendar.strftime("%H:%M:%S")
-  end
+  defp running?(state), do: state.status == :running
 
-  # per-arm selection means from sealed cells: {arm, [{rt, mean}]}
-  defp dotstrip(state) do
-    for arm <- @arms do
-      pts =
-        for c <- state.cells, c.arm == arm, is_number(c.selection_mean),
-            do: {c.runtime, c.seed, c.selection_mean}
-
-      {arm, pts}
-    end
-  end
-
-  # ---- render -------------------------------------------------------------
+  # ---- render --------------------------------------------------------------
 
   def render(assigns) do
+    st = assigns.state
     assigns =
       assign(assigns,
-        now: assigns.state.updated_at || System.system_time(:second),
-        runtimes: @runtimes,
-        arms: @arms,
-        opt_arms: @opt_arms
-      )
+        verdict: verdict(st), slopes: slopes(st), trial_rows: trial_rows(st),
+        health: health(st), seeds: seeds(st), running: running?(st),
+        now: st.updated_at || System.system_time(:second))
 
     ~H"""
     <div class="wrap">
-      <h1>⚡ matched-campaign observatory</h1>
-      <p class="sub">
-        run <%= @state.status %> ·
-        <%= Enum.count(@state.cells) %>/18 cells sealed ·
-        updated <%= hhmmss(@state.updated_at) %>
-      </p>
-
-      <div class="statusrow">
-        <div :for={rt <- @runtimes} class={"status " <> peer_class(@state.peers[rt])}>
-          <b><%= rt %></b>
-          <span title={"phase: " <> (get_in(@state.peers, [rt, Access.key(:phase)]) || "?")}>
-            <%= status_word(@state.peers[rt]) %> ·
-            last line <%= ago(get_in(@state.peers, [rt, Access.key(:last_line_at)]), @now) %>
-          </span>
-        </div>
-        <div class="status spend" title={"recorded eval spend $" <> fmt(@state.spend_usd) <> " of ~$40 budget"}>
-          <b>spend</b>
-          <span>$<%= fmt(@state.spend_usd) %></span>
-          <div class="meter">
-            <div class="fill spendfill" style={"width:" <> fmt(Float.round(min((@state.spend_usd || 0.0) / 40.0, 1.0) * 100, 1)) <> "%"}></div>
-          </div>
-        </div>
-      </div>
-
-      <h2 id="phase-ticker">phase ticker</h2>
-      <div class="phases">
-        <div :for={rt <- @runtimes} class="phase">
-          <span class={"rtlabel " <> rt}><%= rt %></span>
-          <% p = @state.peers[rt] %>
-          <span class="phasetext"><%= (p && p.phase) || "—" %></span>
-          <%= case p && p.progress do %>
-            <% {done, total} when total > 0 -> %>
-              <div class="meter wide" title={"#{done}/#{total}"}>
-                <div class={"fill " <> rt} style={"width:" <> fmt(Float.round(done / total * 100, 1)) <> "%"}></div>
-              </div>
-              <span class="prognum"><%= done %>/<%= total %></span>
-            <% _ -> %>
-              <span class="prognum dim">no progress signal</span>
+      <header>
+        <h1>matched-campaign observatory</h1>
+        <p class="sub">
+          <span class={"st " <> to_string(@state.status)}><%= @state.status %></span>
+          · <%= Enum.count(@state.cells) %>/18 cells
+          · $<%= fmt(@state.spend_usd) %> recorded
+          · <%= hhmmss(@state.updated_at) %>
+          <%= for rt <- ["imp", "upstream"], p = @state.peers[rt] do %>
+            · <b><%= rt %></b> <%= (p && p.phase) || "—" %><%= case p && p.progress do
+                {d, t} -> " #{d}/#{t}"
+                _ -> "" end %>
           <% end %>
-        </div>
-      </div>
+        </p>
+      </header>
 
-      <h2>trial strips <span class="note">(dot = one optimizer trial score, grouped by seed)</span></h2>
-      <div :for={arm <- @opt_arms} class="trialarm">
-        <div class="armhead"><%= arm %>
-          <span class="note"><%= @state.trials |> Enum.count(& &1.arm == arm) %> trials</span>
-        </div>
-        <%= if arm_trials(@state, arm) == [] do %>
-          <p class="empty">no trials yet</p>
-        <% else %>
-          <svg viewBox={"0 0 720 " <> to_string(30 + length(arm_trials(@state, arm)) * 34)} class="chart">
-            <%= for {{seed, trials}, gi} <- Enum.with_index(arm_trials(@state, arm)) do %>
-              <% y = 24 + gi * 34 %>
-              <text x="8" y={y + 4} class="lbl">s<%= String.slice(seed, -2, 2) %></text>
-              <line x1="60" y1={y} x2="700" y2={y} class="axis" />
-              <%= for tick <- [0.0, 0.5, 1.0] do %>
-                <line x1={60 + tick * 630} y1={y - 3} x2={60 + tick * 630} y2={y + 3} class="axis" />
+      <section>
+        <h2>held-out verdict <span class="q">is imp matching upstream?</span></h2>
+        <svg viewBox="0 0 760 190" class="chart">
+          <%= for tick <- [0.0, 0.25, 0.5, 0.75, 1.0] do %>
+            <line x1={sx(tick)} y1="18" x2={sx(tick)} y2="158" class="grid" />
+            <text x={sx(tick)} y="172" class="tick"><%= tick %></text>
+          <% end %>
+          <%= for {{arm, per_rt, delta}, i} <- Enum.with_index(@verdict) do %>
+            <% y = 40 + i * 46 %>
+            <text x="8" y={y + 4} class="lbl"><%= arm %></text>
+            <% {umean, _} = per_rt["upstream"] %>
+            <%= if is_number(umean) do %>
+              <rect x={sx(max(umean - 0.09, 0.0))} y={y - 9} width={(min(umean + 0.09, 1.0) - max(umean - 0.09, 0.0)) * 560} height="18" class="noise">
+                <title>upstream mean ±0.09 measured noise</title>
+              </rect>
+            <% end %>
+            <%= for rt <- ["imp", "upstream"], {m, pts} = per_rt[rt] do %>
+              <%= for p <- pts do %>
+                <circle cx={sx(p)} cy={y} r="3.5" class={"seed " <> rt}><title><%= rt %> seed: <%= fmt(p) %></title></circle>
               <% end %>
-              <%= for t <- trials, is_number(t.score) do %>
-                <circle cx={60 + t.score * 630} cy={y} r="5" class={"dot trialdot " <> t.runtime}>
-                  <title><%= t.runtime %> <%= arm %> seed <%= seed %> trial <%= t.trial %>: <%= fmt(t.score) %></title>
-                </circle>
+              <%= if is_number(m) do %>
+                <rect x={sx(m) - 2} y={y - 12} width="4" height="24" class={"mn " <> rt}>
+                  <title><%= rt %> <%= arm %> mean <%= fmt(m) %></title>
+                </rect>
               <% end %>
             <% end %>
-          </svg>
-        <% end %>
-      </div>
-
-      <h2 id="event-feed">event feed</h2>
-      <ul class="events">
-        <li :for={e <- Enum.take(@state.events, 15)} class={"event " <> event_class(e.kind)}>
-          <span class="etime"><%= hhmmss(e.at) %></span>
-          <span class="ekind"><%= e.kind %></span>
-          <span class="ert"><%= e.runtime || "—" %></span>
-          <span class="etext"><%= e.text %></span>
-        </li>
-        <li :if={@state.events == []} class="event info"><span class="etext">no events yet</span></li>
-      </ul>
-
-      <h2>cell grid</h2>
-      <table class="grid">
-        <tr><th></th><th :for={arm <- @arms} colspan="2"><%= arm %></th></tr>
-        <tr><th>seed</th><%= for _ <- @arms do %><th>imp</th><th>up</th><% end %></tr>
-        <tr :for={seed <- seeds(@state)}>
-          <td class="seed"><%= String.slice(seed, -2, 2) %></td>
-          <%= for arm <- @arms, rt <- @runtimes do %>
-            <td class={if cell(@state, rt, seed, arm), do: "sealed", else: "pending"}
-                title={"#{rt} #{seed} #{arm}"}>
-              <%= case cell(@state, rt, seed, arm) do
-                %{selection_mean: m} when is_number(m) -> fmt(m)
-                %{} -> "✓"
-                nil -> "·"
-              end %>
-            </td>
+            <text x="740" y={y + 4} class={"delta " <> if(is_number(delta) and abs(delta) > 0.05, do: "hot", else: "")}>
+              Δ<%= if is_number(delta), do: (if delta >= 0, do: "+", else: "") <> fmt2(delta), else: "–" %>
+            </text>
           <% end %>
-        </tr>
-        <tr :if={seeds(@state) == []}><td class="seed" colspan="7">no cells yet</td></tr>
-      </table>
+        </svg>
+        <p class="cap">thick tick = 3-seed mean · small dots = seeds · gray band = ±0.09 same-program noise around upstream · Δ beyond band would matter</p>
+      </section>
 
-      <h2>selection means <span class="note">(dots = sealed cells; ±0.09 noise band around each runtime mean)</span></h2>
-      <svg viewBox="0 0 720 190" class="chart">
-        <%= for {{arm, pts}, i} <- Enum.with_index(dotstrip(@state)) do %>
-          <% y = 40 + i * 50 %>
-          <text x="8" y={y + 4} class="lbl"><%= arm %></text>
-          <line x1="110" y1={y} x2="700" y2={y} class="axis" />
-          <%= for tick <- [0.0, 0.25, 0.5, 0.75, 1.0] do %>
-            <line x1={110 + tick * 590} y1={y - 4} x2={110 + tick * 590} y2={y + 4} class="axis" />
-            <text :if={i == 2} x={110 + tick * 590} y={y + 22} class="tick"><%= tick %></text>
+      <section>
+        <h2>selection → held-out <span class="q">did optimization transfer?</span></h2>
+        <svg viewBox="0 0 760 240" class="chart">
+          <text x="200" y="16" class="tick">selection</text>
+          <text x="560" y="16" class="tick">held-out</text>
+          <%= for tick <- [0.25, 0.5, 0.75, 1.0] do %>
+            <% ty = 220 - tick * 190 %>
+            <line x1="200" y1={ty} x2="560" y2={ty} class="grid" />
+            <text x="180" y={ty + 3} class="tick"><%= tick %></text>
           <% end %>
-          <%= for {rt, seed, mean} <- pts do %>
-            <circle cx={110 + mean * 590} cy={y} r="7" class={"dot " <> rt}>
-              <title><%= rt %> <%= arm %> seed <%= seed %>: <%= fmt(mean) %></title>
-            </circle>
+          <%= for s <- @slopes do %>
+            <% y1 = 220 - s.sel * 190 %>
+            <% y2 = 220 - s.held * 190 %>
+            <line x1="200" y1={y1} x2="560" y2={y2}
+              class={if s.arm == "baseline", do: "slope base", else: "slope " <> s.rt}>
+              <title><%= s.rt %> <%= s.seed %> <%= s.arm %>: <%= fmt(s.sel) %> → <%= fmt(s.held) %></title>
+            </line>
+            <circle :if={s.arm != "baseline"} cx="560" cy={y2} r="3" class={"seed " <> s.rt} />
           <% end %>
-          <% means = for rt <- Enum.uniq(for {rt, _, _} <- pts, do: rt) do
-               vals = for {r, _, m} <- pts, r == rt, do: m
-               {rt, Enum.sum(vals) / max(length(vals), 1)}
-             end %>
-          <%= for {rt, mu} <- means do %>
-            <rect x={110 + mu * 590 - 1.5} y={y - 12} width="3" height="24" class={"mean " <> rt}>
-              <title><%= rt %> mean: <%= fmt(mu) %></title>
-            </rect>
-            <rect x={110 + max(mu - 0.09, 0.0) * 590} y={y - 2}
-                  width={min(0.18, 1.0 - max(mu - 0.09, 0.0)) * 590} height="4" class={"band " <> rt}>
-              <title><%= rt %> ±0.09 noise band</title>
-            </rect>
-          <% end %>
-        <% end %>
-      </svg>
-      <div class="legend">
-        <span><i class="dot imp swatch"></i> imp</span>
-        <span><i class="dot upstream swatch"></i> upstream (pinned DSPy)</span>
-      </div>
+        </svg>
+        <p class="cap">gray = baselines (the transfer cost of the split itself) · colored = optimizer champions; a colored line falling steeper than gray = selection win that evaporated</p>
+      </section>
 
-      <h2>seal timeline</h2>
-      <svg viewBox="0 0 720 120" class="chart">
-        <% sorted = Enum.sort_by(@state.cells, & &1.mtime) %>
-        <% t0 = case sorted do [] -> @now; [c | _] -> c.mtime end %>
-        <% span = max(@now - t0, 60) %>
-        <line x1="20" y1="100" x2="700" y2="100" class="axis" />
-        <%= for {c, i} <- Enum.with_index(sorted) do %>
-          <% x = 20 + (c.mtime - t0) / span * 660 %>
-          <% y = 100 - (i + 1) * (80 / 18) %>
-          <circle cx={x} cy={y} r="5" class={"dot " <> c.runtime}>
-            <title><%= c.runtime %> <%= c.seed %> <%= c.arm %> sealed <%= hhmmss(c.mtime) %></title>
-          </circle>
-        <% end %>
-        <text x="20" y="116" class="tick">start</text>
-        <text x="660" y="116" class="tick">now</text>
-      </svg>
+      <section>
+        <h2>trials vs baseline <span class="q">did the search beat baseline on its own terms? (imp ledger; upstream seals no trial scores)</span></h2>
+        <svg viewBox="0 0 760 250" class="chart">
+          <%= for {{arm, seed, ts, base}, i} <- Enum.with_index(@trial_rows) do %>
+            <% y = 32 + i * 36 %>
+            <text x="8" y={y + 4} class="lbl"><%= arm %> s<%= String.slice(seed, -2, 2) %></text>
+            <line x1="120" y1={y} x2="680" y2={y} class="grid" />
+            <%= if is_number(base) do %>
+              <line x1={sx(base)} y1={y - 10} x2={sx(base)} y2={y + 10} class="baseref">
+                <title>imp baseline selection mean <%= fmt(base) %></title>
+              </line>
+            <% end %>
+            <%= for {t, j} <- Enum.with_index(ts) do %>
+              <circle cx={sx(t)} cy={y} r={if t == Enum.max(ts, fn -> nil end), do: 5, else: 3.5}
+                class={"seed imp" <> if(t == Enum.max(ts, fn -> nil end), do: " champ", else: "")}>
+                <title>trial <%= j + 1 %>: <%= fmt(t) %></title>
+              </circle>
+            <% end %>
+            <text :if={ts == []} x="400" y={y + 4} class="tick">no trials yet</text>
+          <% end %>
+        </svg>
+        <p class="cap">vertical dash = that seed's baseline score on the same objective · ringed dot = champion · dots left of the dash never justified selection</p>
+      </section>
+
+      <section>
+        <h2>instrument health <span class="q">can the means be trusted?</span></h2>
+        <div class="healthgrid">
+          <%= for {rt, arm, h} <- @health, h.n > 0 do %>
+            <div class="hrow">
+              <span class="lbl"><span class={"rttag " <> rt}><%= rt %></span> <%= arm %></span>
+              <div class="hbar" title={"#{h.n} rows: #{h.ones} perfect · #{h.fail} constraint-fail zeros · #{h.trunc} truncated zeros · #{h.parse} parse-error zeros"}>
+                <div class="seg ones" style={"width:#{h.ones / h.n * 100}%"}></div>
+                <div class="seg mid" style={"width:#{max(h.n - h.ones - h.parse - h.trunc - h.fail, 0) / h.n * 100}%"}></div>
+                <div class="seg fail" style={"width:#{h.fail / h.n * 100}%"}></div>
+                <div class="seg trunc" style={"width:#{h.trunc / h.n * 100}%"}></div>
+                <div class="seg parse" style={"width:#{h.parse / h.n * 100}%"}></div>
+              </div>
+              <span class="hnum"><%= h.parse + h.trunc %> artifact zeros</span>
+            </div>
+          <% end %>
+        </div>
+        <div class="legend">
+          <span><i class="sw ones"></i>perfect</span><span><i class="sw mid"></i>partial</span>
+          <span><i class="sw fail"></i>constraint fail</span><span><i class="sw trunc"></i>truncated (cap)</span>
+          <span><i class="sw parse"></i>parse error</span>
+        </div>
+        <p class="cap">truncated + parse zeros are instrument artifacts, not model skill — they moved cell means by ±0.05–0.10 in the pilot</p>
+      </section>
+
+      <section :if={@running or @state.events != []}>
+        <h2>event feed</h2>
+        <div class="feed">
+          <div :for={e <- Enum.take(@state.events, 10)} class={"ev " <> event_class(e.kind)}>
+            <span class="t"><%= hhmmss(e.at) %></span>
+            <span class="k"><%= e.kind %></span>
+            <span class="rt"><%= e.runtime %></span>
+            <span class="tx"><%= e.text %></span>
+          </div>
+        </div>
+      </section>
     </div>
     <style>
       :root { color-scheme: dark; }
-      body { background:#1a1a19; color:#fff; font: 14px/1.5 ui-monospace, monospace; margin:0; }
-      .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px; overflow-x: hidden; }
-      h1 { font-size: 18px; margin: 0 0 2px; }
-      h2 { font-size: 14px; margin: 28px 0 8px; color:#c3c2b7; }
-      .sub { color:#c3c2b7; margin: 0 0 16px; }
-      .note { color:#8a897f; font-weight: normal; font-size: 12px; }
-      .empty { color:#54534e; font-size:12px; margin:4px 0; }
-      .statusrow { display:flex; gap:12px; flex-wrap:wrap; }
-      .status { padding:8px 14px; border-radius:8px; background:#262625; display:flex; gap:10px; align-items:center;}
-      .status.ok { outline:2px solid #199e70; }
-      .status.bad { outline:2px solid #e66767; }
-      .status.run { outline:2px solid #c98500; }
-      .status.idle { outline:2px solid #3a3a38; }
-      .status span { color:#c3c2b7; font-size:12px; }
-      .meter { width:90px; height:8px; border-radius:4px; background:#3a3a38; overflow:hidden; }
-      .meter.wide { width:180px; }
-      .meter .fill { height:100%; border-radius:4px; }
-      .fill.spendfill { background:#199e70; }
-      .fill.imp { background:#3987e5; } .fill.upstream { background:#d95926; }
-      .phases { display:flex; flex-direction:column; gap:8px; }
-      .phase { display:flex; gap:12px; align-items:center; background:#212120; border-radius:8px; padding:8px 12px; flex-wrap:wrap; }
-      .rtlabel { font-weight:bold; color:#c3c2b7; width:70px; }
-      .phasetext { color:#c3c2b7; font-size:12px; min-width:200px; }
-      .prognum { color:#8a897f; font-size:12px; }
-      .prognum.dim { color:#54534e; }
-      .trialarm { margin-bottom:10px; }
-      .armhead { color:#c3c2b7; font-size:13px; margin:6px 0 2px; }
-      ul.events { list-style:none; margin:0; padding:0; background:#212120; border-radius:10px; }
-      .event { display:flex; gap:10px; padding:5px 12px; font-size:12px; border-bottom:1px solid #2b2b2a; }
-      .event:last-child { border-bottom:none; }
-      .etime { color:#8a897f; flex:none; }
-      .ekind { flex:none; width:72px; }
-      .ert { color:#8a897f; flex:none; width:64px; }
-      .etext { color:#c3c2b7; overflow-wrap:anywhere; }
-      .event.warn .ekind { color:#c98500; }
-      .event.bad .ekind { color:#e66767; }
-      .event.ok .ekind { color:#199e70; }
-      .event.info .ekind { color:#8a897f; }
-      table.grid { border-collapse: collapse; width:100%; }
-      .grid th { color:#8a897f; font-weight:normal; font-size:12px; padding:4px; }
-      .grid td { text-align:center; padding:6px 4px; border-radius:6px; font-size:12px; }
-      .grid td.sealed { background:#24313f; color:#9fc7f2; }
-      .grid td.pending { color:#54534e; }
-      .grid td.seed { color:#8a897f; }
-      svg.chart { width:100%; height:auto; background:#212120; border-radius:10px; margin-top:4px; }
-      .axis { stroke:#3a3a38; stroke-width:1; }
-      .lbl { fill:#c3c2b7; font-size:12px; }
+      body { background:#161615; color:#eee; font: 13px/1.45 ui-monospace, monospace; margin:0; }
+      .wrap { max-width: 800px; margin: 0 auto; padding: 20px 16px 60px; overflow-x:hidden; }
+      header h1 { font-size: 16px; margin: 0; letter-spacing:.5px;}
+      .sub { color:#a5a49b; margin: 4px 0 8px; }
+      .sub b { color:#eee; }
+      .st.complete { color:#199e70; } .st.running { color:#c98500; } .st.stopped { color:#e66767; }
+      h2 { font-size: 13px; margin: 26px 0 4px; color:#eee; }
+      .q { color:#8a897f; font-weight: normal; font-style: italic; }
+      .cap { color:#8a897f; font-size: 11px; margin: 2px 0 0; }
+      svg.chart { width:100%; height:auto; display:block; }
+      .grid { stroke:#2e2e2c; stroke-width:1; }
       .tick { fill:#8a897f; font-size:10px; text-anchor:middle; }
-      .dot.imp { fill:#3987e5; stroke:#1a1a19; stroke-width:2; }
-      .dot.upstream { fill:#d95926; stroke:#1a1a19; stroke-width:2; }
-      .trialdot { opacity:.85; }
-      .mean.imp { fill:#3987e5; } .mean.upstream { fill:#d95926; }
-      .band.imp { fill:#3987e5; opacity:.18; } .band.upstream { fill:#d95926; opacity:.18; }
-      .legend { display:flex; gap:18px; margin-top:6px; color:#c3c2b7; font-size:12px; align-items:center;}
-      .legend .swatch { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; }
-      i.dot.imp.swatch { background:#3987e5;} i.dot.upstream.swatch { background:#d95926;}
+      .lbl { fill:#c3c2b7; font-size:11px; }
+      .noise { fill:#d95926; opacity:.13; }
+      .seed.imp { fill:#3987e5; } .seed.upstream { fill:#d95926; }
+      .seed { opacity:.75; }
+      .seed.champ { stroke:#fff; stroke-width:1.5; opacity:1; }
+      .mn.imp { fill:#3987e5; } .mn.upstream { fill:#d95926; }
+      .delta { fill:#c3c2b7; font-size:12px; text-anchor:end; }
+      .delta.hot { fill:#e66767; }
+      .slope { stroke-width:1.5; opacity:.8; fill:none; }
+      .slope.imp { stroke:#3987e5; } .slope.upstream { stroke:#d95926; }
+      .slope.base { stroke:#575650; stroke-width:1; opacity:.7; }
+      .baseref { stroke:#c3c2b7; stroke-width:1.5; stroke-dasharray:3 2; }
+      .healthgrid { display:flex; flex-direction:column; gap:5px; margin-top:6px; }
+      .hrow { display:flex; align-items:center; gap:10px; }
+      .hrow .lbl { width:150px; color:#c3c2b7; font-size:11px; }
+      .rttag.imp { color:#3987e5; } .rttag.upstream { color:#d95926; }
+      .hbar { flex:1; display:flex; height:12px; border-radius:3px; overflow:hidden; background:#222; }
+      .seg.ones { background:#199e70; } .seg.mid { background:#2e6b52; }
+      .seg.fail { background:#575650; } .seg.trunc { background:#c98500; } .seg.parse { background:#e66767; }
+      .hnum { width:110px; text-align:right; color:#8a897f; font-size:11px; }
+      .legend { display:flex; gap:14px; margin-top:6px; color:#a5a49b; font-size:11px; flex-wrap:wrap;}
+      .sw { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; }
+      .sw.ones{background:#199e70}.sw.mid{background:#2e6b52}.sw.fail{background:#575650}.sw.trunc{background:#c98500}.sw.parse{background:#e66767}
+      .feed { display:flex; flex-direction:column; gap:2px; margin-top:4px; }
+      .ev { display:flex; gap:10px; font-size:11px; color:#a5a49b; }
+      .ev .t { color:#8a897f; } .ev .k { width:70px; }
+      .ev.ok .k { color:#199e70; } .ev.warn .k { color:#c98500; } .ev.bad .k { color:#e66767; }
+      .ev .tx { color:#c3c2b7; }
     </style>
     """
   end

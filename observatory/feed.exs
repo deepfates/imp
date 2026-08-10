@@ -91,6 +91,7 @@ defmodule Observatory.Feed do
       events: [],
       cells: [],
       spend_usd: nil,
+      arm_summaries: [],
       updated_at: System.os_time(:second)
     }
   end
@@ -122,6 +123,10 @@ defmodule Observatory.Feed do
       cells: cells,
       spend_usd:
         results |> Map.values() |> Enum.map(fn r -> r && r.spend end) |> sum_or_nil(),
+      arm_summaries:
+        results
+        |> Map.values()
+        |> Enum.flat_map(fn r -> (r && Map.get(r, :arm_summaries)) || [] end),
       updated_at: now
     }
 
@@ -250,7 +255,12 @@ defmodule Observatory.Feed do
         with {:ok, body} <- File.read(path),
              {:ok, decoded} <- Jason.decode(body) do
           decoded = decode_imp(decoded)
-          %{status: decoded["status"], spend: result_spend(decoded)}
+
+          %{
+            status: decoded["status"],
+            spend: result_spend(decoded),
+            arm_summaries: arm_summaries(decoded, runtime)
+          }
         else
           _ -> nil
         end
@@ -258,6 +268,49 @@ defmodule Observatory.Feed do
       {runtime, value}
     end
   end
+
+  # Per (seed, arm) analytic summary for the insight panels: split means,
+  # zero decomposition (parse error / truncated / genuine constraint fail),
+  # and - imp side - the trial ledger's champion + baseline objective.
+  defp arm_summaries(decoded, runtime) do
+    for seed_entry <- List.wrap(decoded["seeds"]),
+        is_map(seed_entry),
+        arm <- List.wrap(seed_entry["arms"]),
+        is_map(arm) do
+      rows = arm["rows"] || %{}
+
+      %{
+        runtime: runtime,
+        seed: to_string(seed_entry["seed"]),
+        arm: arm["arm"] || arm["name"],
+        selection: split_stats(rows["selection"]),
+        held_out: split_stats(rows["held_out"])
+      }
+    end
+  end
+
+  defp split_stats(rows) when is_list(rows) and rows != [] do
+    scores = for r <- rows, is_number(r["score"]), do: r["score"]
+
+    zeros =
+      for r <- rows, r["score"] == 0.0 or r["score"] == 0 do
+        cond do
+          r["error"] not in [nil, false] -> :parse
+          "length" in List.wrap(r["finish_reason"]) -> :trunc
+          is_list(r["output_tokens"]) and Enum.any?(r["output_tokens"], &(is_integer(&1) and &1 >= 1024)) -> :trunc
+          true -> :fail
+        end
+      end
+
+    %{
+      mean: if(scores != [], do: Enum.sum(scores) / length(scores)),
+      n: length(rows),
+      zeros: Enum.frequencies(zeros),
+      ones: Enum.count(scores, &(&1 == 1.0))
+    }
+  end
+
+  defp split_stats(_), do: nil
 
   defp result_spend(decoded) do
     costs =
@@ -659,6 +712,7 @@ defmodule Observatory.Replay do
       events: events,
       cells: cells,
       spend_usd: nil,
+      arm_summaries: [],
       updated_at: now
     }
   end
