@@ -437,7 +437,9 @@ defmodule Observatory.Live do
               </circle>
             <% end %>
             <%= for {pt, lbl_class, dy} <- [
-                  {List.last(Enum.filter(@live_points, &(&1.kind == :eval))), "lbl-upstream", -6},
+                  {List.last(
+                     Enum.filter(@live_points, &(&1.kind == :eval and (Map.get(&1, :n) || 32) >= 16))
+                   ), "lbl-upstream", -6},
                   {List.last(@imp_live), "lbl-imp", 12}
                 ],
                 pt != nil do %>
