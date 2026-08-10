@@ -3986,3 +3986,7 @@ Imp's GEPA or MIPRO improves programs, and it does not erase the adapters'
 different strictness/error burdens. The conservative table-study charge is now
 `$15.155289378` under the `$20` cap. Do not launch optimizer arms until their
 scientific scale and remaining spend are explicitly ratified.
+
+**2026-08-10T02:21:57Z**
+
+Pilot done (see imp-u3af): machinery+fidelity validated at row level; optimization unmeasurable at pilot scale by construction. Next: land upstream trial-score sealing + bootstrap refusal handling, then the owner ratifies a Heavy successor from HEAVY_DESIGN_DRAFT.md (dress rehearsal ~$25-50, full pair ~$150-300 realistic).
