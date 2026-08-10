@@ -45,6 +45,10 @@ defmodule Observatory.Feed do
       log_pos: 0,
       log_partial: "",
       replay: nil,
+      # first poll swallows the whole existing log: chart points are kept, but
+      # historical lines must NOT become events stamped with the current clock
+      # (a restart would re-announce old failures as if they just happened)
+      primed: false,
       known_cells: MapSet.new(),
       public: empty_public()
     }
@@ -107,6 +111,7 @@ defmodule Observatory.Feed do
     {cells, trials, seal_events, known_cells} = scan_sealed(state)
     results = read_results(state.run_root)
     {log_events, log_peers, log_points, log_pos, log_partial} = tail_log(state)
+    log_events = if state.primed, do: log_events, else: []
 
     prev = state.public
 
@@ -133,7 +138,14 @@ defmodule Observatory.Feed do
       updated_at: now
     }
 
-    %{state | public: public, known_cells: known_cells, log_pos: log_pos, log_partial: log_partial}
+    %{
+      state
+      | public: public,
+        primed: true,
+        known_cells: known_cells,
+        log_pos: log_pos,
+        log_partial: log_partial
+    }
   end
 
   defp sum_or_nil(vals) do
