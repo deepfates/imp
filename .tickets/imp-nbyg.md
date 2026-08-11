@@ -1,6 +1,6 @@
 ---
 id: imp-nbyg
-status: in_progress
+status: closed
 deps: [imp-90uc, imp-7aah]
 links: []
 created: 2026-08-07T17:07:55Z
@@ -36,3 +36,7 @@ PREFLIGHT BINDINGS LANDED: run_imp.exs GEPA arm now passes cache_identity (campa
 **2026-08-10T04:48:16Z**
 
 Rehearsal (matched_ifbench_rehearsal16k) extends this family with three more stricter-than-source stops, all fixed and preregistered as addenda: stop 1 = zero transport retries vs dspy default num_retries=3 (provider 503 fatal ~1h into GEPA); stop 2 = the retry fix itself (Req-level retry: :transient uninstalled the client's no-retry guard plugin — the sole emitter of transport telemetry — so the envelope check refused row 1 with transports MISSING, not surplus; the first 'extra transports' diagnosis was wrong and is corrected in PREREGISTRATION Addendum 2). Final design: 3-retry transient budget in ObservedLM.dispatch_with_retries/3, attempts merged into one ledger entry per logical call via dispatch_tag with the attempt count disclosed, ledger arithmetic unchanged — mirroring upstream, where litellm retries run beneath the per-forward ledger. Take 3 launched 2026-08-09 21:25: both baselines sealed (imp 0.7135 / upstream 0.6719 selection means), GEPA past 128/1200 rollouts. AC exceeded (paid run well past first-call gate). Close when the rehearsal reaches a terminal verdict.
+
+**2026-08-10T18:24:10Z**
+
+CLOSED 2026-08-10: acceptance criteria ('all four/five failure modes fixed; smoke launch of both arms passes preflight and reaches first paid call gate') were met and vastly exceeded — the matched harness has since executed ten launches including complete GEPA arms on both runtimes at source-faithful budget. The launch-stop saga that continued past this ticket's scope is documented as dated addenda in examples/matched_ifbench_rehearsal16k/PREREGISTRATION.md (stops 1-10: retry semantics, transport telemetry, GEPA reflection ceiling, reservation literals, MIPROv2 fidelity boundary, cost-tolerance vs provider prompt-cache rounding, operator commit drift, supervising-process crash). Ongoing campaign work moves to the successor ticket; harness consolidation is imp-6mls.

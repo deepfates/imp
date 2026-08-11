@@ -90,3 +90,54 @@ upstream (benign) or an Imp fidelity defect (bug).
 None of the benign verdicts double as effectiveness evidence: they say the
 configs could not have resolved a lift, not that lift exists. The matched
 campaign remains the instrument that can.
+
+## The matched campaign: state as of 2026-08-10
+
+**Nothing in this section is effectiveness or fidelity evidence.** It records
+what an *engineering rehearsal* established, and — as importantly — what an
+earlier draft of this section wrongly claimed.
+
+The 16k rehearsal (`examples/matched_ifbench_rehearsal16k`) is scoped by its
+own contract as `one_seed_engineering_rehearsal_source_faithful_config`:
+it exercises machinery and cost at the benchmark authors' settings before any
+larger spend, and by preregistration claims nothing about optimizer
+effectiveness. Read at that scope, it succeeded: on its eleventh launch both
+runtimes completed baseline, GEPA, and MIPROv2 and sealed all six arm cells at
+16384-token settings for $16.42, before stopping in the held-out phase on an
+input-token bound of our own (4096, exceeded by a 4243-token prompt). Ten prior
+launches stopped on harness defects, each dated in `PREREGISTRATION.md` and
+archived under `evidence/matched/`.
+
+**Withdrawn.** An earlier version of this section reported "GEPA optimization
+moves at source-faithful budget, and imp's magnitude matches upstream's,"
+citing imp 0.8542 vs upstream 0.8698. That comparison was invalid: imp's figure
+was its optimizer's *internal* champion score (a maximum over noisy trials,
+biased upward by selection), while upstream's was an *independent re-scoring*
+of the champion program. They are different quantities. The claim is withdrawn
+in full, and no lift or parity conclusion replaces it — the rehearsal is not
+powered to support one. A single paired cell in this design carries roughly
+±0.09; the effects at issue are 0.05–0.10.
+
+**A measurement worth keeping.** Across takes, per-cell score variation is
+dominated not by task performance but by **ChatAdapter parse failures scored
+zero** — upstream logged 0–5 such rows per 32-row evaluation (mean 8.3%), and
+the count correlates with the take's mean at r = -0.84. Any future outcome
+must be reported as two numbers, parse rate and score-given-parse; a single
+mean silently absorbs a format-robustness effect and cannot answer a question
+about optimizers.
+
+**A declared parity boundary.** imp's MIPROv2 implements only the startup phase
+of the pinned Optuna 4.9.0 TPE sampler and refuses more than 9 post-baseline
+objective trials rather than silently substituting a different search. Both
+arms therefore run 9 trials; paper-scale MIPROv2 is blocked on modeled TPE.
+This is the intended failure mode — a fidelity gap that announces itself.
+
+**Where fidelity evidence actually comes from.** The C1 rung, not this campaign.
+Deterministic differential tests against pinned DSPy 3.2.1 and gepa 0.1.4 —
+including a recorded-tape GEPA component comparison of reflective datasets,
+reflection prompts, module rotation, and stopping decisions — run in CI at no
+cost and with no sampling noise. That instrument is strictly better suited to
+the question, and it earns its keep: it exposed a real divergence in GEPA's
+Pareto pruning (ties broken by an Elixir term-printing artifact rather than
+upstream's stable discovery order), a trajectory-level defect that an
+end-to-end score comparison at this power could never have detected.

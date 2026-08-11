@@ -115,9 +115,13 @@ completed source-sized `16384`-token IFBench denominator now scores Imp
 `0.7619047619` and DSPy `0.7874149660`; this is runtime and measurement
 evidence, not optimizer effectiveness or a general superiority result. Imp now
 has a source-authenticated merge-enabled GEPA profile matching current DSPy's
-public treatment shape. The owner has ratified exactly one bounded matched
-IFBench MIPROv2-Heavy cell against that denominator; the scale and spend for
-the broader GEPA/MIPROv2 table remain a later decision. This is an adapted
+public treatment shape. A one-seed engineering rehearsal has since
+completed both optimizers end to end at the benchmark authors' own settings
+(16384 output tokens, ~1/3-paper optimizer budget), establishing that the
+machinery and its cost hold at that scale; by its own preregistration it
+establishes nothing about optimizer effectiveness, and no parity or lift
+conclusion is drawn from it. See [docs/EVIDENCE.md](docs/EVIDENCE.md). The scale and spend for the broader GEPA/MIPROv2 table
+remain a later decision. This is an adapted
 current-model comparison using official task families and metrics, not an exact
 historical GEPA paper reproduction or a success-gated task search.
 The complementary Grue stateful-agent condition has now completed the real
