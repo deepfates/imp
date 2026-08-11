@@ -21,3 +21,25 @@ FIX: give imp's MIPROv2 the same provider-free proposal source the DSPy side has
 
 DO NOT close this by asserting the row passes without re-running the lane.
 
+
+## Notes
+
+**2026-08-11T14:17:20Z**
+
+HYPOTHESIS FALSIFIED, DIAGNOSIS SHARPENED (2026-08-11).
+
+My 'unfair setup' hypothesis was WRONG. The lane's own task LM already returns the planted winner when asked to propose (imp.benchmark.optimizer_lift.ex:703, 'Propose Imp instruction candidates' -> instructions: ['Always answer Paris when asked about France.']), and MIPROv2 falls back to the program's LM as :prompt_lm. I added an explicit prompt_lm anyway; result was identical (9/10 both before and after), so the change was neutral and I reverted it. imp was NOT short a proposal source.
+
+WHAT IS ACTUALLY ESTABLISHED (provider-free, deterministic, repeatable):
+- dspy MIPROv2: baseline 0.0 -> optimized 1.0 (lift 1.0)
+- imp  MIPROv2: baseline 0.0 -> optimized 0.0 (lift 0.0), candidate_count 2
+- imp's trial trace shows it DID select a non-default instruction: params {'atom:main:demos': 0, 'atom:main:instruction': 1}, yet the trial scored 0.0 and the compiled program scores 0.0 on the devset.
+- The fixture LM answers 'Paris' iff the rendered prompt contains 'Always answer Paris' (should_answer_paris?/1, line 721). So a correctly APPLIED winning instruction is sufficient to score 1.0.
+- This lane's stated purpose (moduledoc) is exactly 'given an injected winning instruction/demo, Imp optimizers select and apply it identically to DSPy 3.2.1 (lift_gap <= 0.001)'. So this row failing is the lane detecting its own target condition.
+
+REMAINING FORK — one of:
+ (a) the instruction at index 1 is not the planted winner (proposal path returns something else), or
+ (b) index 1 IS the winner but the selected instruction is not applied to the compiled program / not rendered into the prompt.
+(b) would be a genuine MIPROv2 defect and the more serious outcome.
+
+NEXT DIAGNOSTIC (cheap, no provider): after MIPROv2.compile in this lane, dump (1) the compiled program's effective instruction, (2) the instruction candidate pool by index, (3) the rendered prompt for one devset call. That distinguishes (a) from (b) immediately. Do not close this ticket on reasoning; close it on that dump plus a re-run.
