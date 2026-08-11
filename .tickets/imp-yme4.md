@@ -1327,3 +1327,30 @@ Gap map (2026-08-07 trust audit, verified first-hand): Telos = a cold user (DSPy
 **2026-08-07T18:49:47Z**
 
 WORLDVIEW UPDATE (2026-08-07, with owner): DSPy/GEPA/MIPRO are published, replicated results; Imp is a port of known-working software. Therefore PARITY IS THE NULL HYPOTHESIS for matched runs — favorable-or-parity is the expected outcome of a faithful implementation, and a deficit is an implementation defect to find, not evidence about optimization. Historical negatives were single-arm, small-local-model, absolute-lift runs (no DSPy arm) and do not contradict this; the one true matched head-to-head (TREC) was favorable. The benchmark campaign is CONFIRMATION, and the pre-run job is driving the probability of parity-or-better up: score-integrity fixes (90uc/g22q/emrr/pk5c/fwfe), launch repairs (nbyg), live smoke at HEAD (7aah), CI provenance (fkwy), green differentials at HEAD (sqkr), bug-or-benign verdicts on past misses (sa2a), and an in-band preregistered pilot (u3af) before Heavy spend. BEAM additions should show up as equal-or-better results per dollar. Narrative reframe of docs: imp-pomi.
+
+**2026-08-11T06:01:28Z**
+
+EVIDENCE BURN-DOWN LOG (2026-08-11, principal working session)
+
+Operating method adopted: benchmarks/claims.json + 'mix imp.benchmark.dashboard' is the repo's own coherence machine — it computes, per asserted claim, whether its declared evidence lane exists, is fresh (<24h), and is bound to the current commit. Work = burn that list down cheapest-first; never assert in docs what the dashboard does not compute.
+
+IMPORTANT CAVEAT ON THAT MACHINE (falsified it before trusting it): the dashboard verifies PROVENANCE AND FRESHNESS, not soundness. Nothing re-executes a lane's assertions; artifacts self-report. 'validator_revalidated' is a mislabeled policy flag (it is just policy == :immutable_admission). Several checks assert only is_binary(...) on a digest field — presence, not correctness. So it catches stale/drifted evidence (it caught a real one) but cannot catch a weak or lying lane. Treat 'profile ready' as a necessary, not sufficient, gate.
+
+STARTING STATE: profile_ready false; 48 asserted claims -> 13 proven, 25 blocked; 27 lanes -> 12 full, 2 passing, 5 stale, 7 missing, 3 failing.
+
+PROGRESS THIS SESSION:
+- instruction_optimizer_contract: was FAILING for a real reason — evidence recorded at 01d8a15 while implementation is ba3311d (revision mismatch). Re-ran: 33/33 required cases pass, structural_contract_complete true, now 'full'/fresh at HEAD. Diagnosis: implementation did not regress, the evidence had gone stale. (exact_sampler_sequence_parity / full_optimizer_parity / paper_protocol_complete remain false — higher-tier claims, not regressions.)
+- provider_free_overhead: re-ran, 11/11 cases pass threshold.
+- Dashboard after: full_evidence_lanes 12 -> 13, passing_lanes 17 -> 18.
+
+REMAINING FAILING: gepa_replication (needs fresh rows for 6 families — paid), optimize_anything (needs 3 live artifact classes x 3 seeds — paid).
+REMAINING MISSING/STALE, free: golden_trace, protocol_gates, product_package (mix imp.package.clean_room), livebook_execute, failure_recovery, optimizer_lift.
+REMAINING MISSING, paid/hardware: live_provider_smoke, live_matched_model, local_mlx_weight_training.
+
+**2026-08-11T06:06:03Z**
+
+LOOP ITERATION 1 (2026-08-11): two lanes recovered, one real lane bug filed as imp-vfqw.
+- provider_free_overhead: re-ran clean, 11/11 cases pass threshold.
+- product_package (mix imp.package.clean_room): PASSES — clean-room proof incl. OTP fresh-process service, linked result/artifact, 4 concurrent calls.
+- optimizer_lift: was CRASHING, not merely stale. Root cause is a coherent pattern worth naming: the library added explicit refusals ('COPRO requires :proposer_lm... it does not synthesize proposal suffixes'; 'GEPA optimization requires :reflection_lm or :reflection_strategy; Imp does not synthesize reflection proposals') — good design, fail loudly rather than fake a proposal — but the benchmark lanes were never updated, so they have been dead since that tightening and their evidence stale ever since. Fixed both call sites with deterministic provider-free static LMs. Lane now RUNS: 9/10 rows pass; the MIPROv2 row fails for the unfair-setup reason in imp-vfqw.
+LESSON FOR THE LEDGER: a lane that crashes looks identical to a lane that is merely stale in the dashboard's 'failing' state. Crashing lanes should be distinguishable from failing-assertion lanes.

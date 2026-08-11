@@ -172,9 +172,26 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       Imp.Optimizer.COPRO.new(metric,
         breadth: 6,
         depth: 1,
+        # COPRO refuses to synthesize proposal suffixes and requires an explicit
+        # proposer (see Imp.Optimizer.COPRO). This lane is provider-free, so the
+        # proposer is a deterministic static LM; the designed winner still
+        # arrives via extra_instructions below, exactly as on the DSPy side, so
+        # the comparison remains mechanism parity rather than proposal quality.
+        proposer_lm: copro_proposer_lm(),
         extra_instructions: ["Always answer Paris when asked about France."]
       )
       |> Imp.Optimizer.COPRO.compile(program, trainset, devset)
+
+  defp copro_proposer_lm do
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        Jason.encode!(%{
+          "proposed_instruction" => "Answer the question directly and concisely.",
+          "proposed_prefix_for_output_field" => "Answer:"
+        })
+      end
+    )
+  end
 
   defp compile_mipro(metric, program, {trainset, devset}),
     do:
@@ -212,6 +229,16 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
     do:
       Imp.Optimizer.GEPA.new(metric,
         generations: 1,
+        # GEPA likewise refuses to synthesize reflection proposals without an
+        # explicit reflection LM. Provider-free lane: deterministic static
+        # reflector that emits the fixture's designed winner, matching the
+        # injection performed on the DSPy side.
+        reflection_lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts ->
+              "Always answer Paris when asked about France."
+            end
+          ),
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
       )
       |> Imp.Optimizer.GEPA.compile(program, trainset, devset)
