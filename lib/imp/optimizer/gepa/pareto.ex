@@ -34,11 +34,30 @@ defmodule Imp.Optimizer.GEPA.Pareto do
   @doc "Removes candidates whose instance-front coverage is redundant."
   @spec remove_dominated(mapping(), %{optional(candidate_id()) => number()}) :: mapping()
   def remove_dominated(mapping, aggregate_scores \\ %{}) when is_map(mapping) do
-    programs =
+    # Upstream (gepa v0.1.4 gepa_utils.py:37-49) builds `freq` by walking the
+    # front mapping in key order, then `sorted(programs, key=scores[x])`. Python's
+    # sort is STABLE, so candidates tied on aggregate score keep their DISCOVERY
+    # order — first appearance while scanning fronts. Because the removal walk
+    # below is greedy and order-sensitive, that tiebreak decides which of two
+    # equally-covering candidates survives.
+    #
+    # This previously tied-break on `inspect/1`, i.e. the PRINTED id, which sorts
+    # lexicographically ("10" before "2") and has no upstream counterpart. On a
+    # tie-heavy score matrix that silently kept a different candidate than DSPy
+    # and diverged the whole search trajectory (imp-wkpf).
+    discovery_order =
       mapping
-      |> Map.values()
-      |> Enum.reduce(MapSet.new(), &MapSet.union/2)
-      |> Enum.sort_by(&{Map.get(aggregate_scores, &1, 1), inspect(&1)})
+      |> Enum.sort_by(fn {key, _front} -> key end)
+      |> Enum.flat_map(fn {_key, front} -> Enum.sort(front) end)
+      |> Enum.with_index()
+      |> Enum.reduce(%{}, fn {program, index}, acc ->
+        Map.put_new(acc, program, index)
+      end)
+
+    programs =
+      discovery_order
+      |> Map.keys()
+      |> Enum.sort_by(&{Map.get(aggregate_scores, &1, 1), Map.fetch!(discovery_order, &1)})
 
     dominated = remove_until_stable(programs, mapping, %{})
     dominators = MapSet.difference(MapSet.new(programs), MapSet.new(Map.keys(dominated)))
