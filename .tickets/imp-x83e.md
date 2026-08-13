@@ -1,6 +1,6 @@
 ---
 id: imp-x83e
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-11T17:03:33Z
@@ -26,3 +26,22 @@ FIX OPTIONS:
 
 ACCEPTANCE: the exact command published in docs/CASE_STUDY_TREC.md runs clean from a fresh checkout and reproduces the documented aggregate; add it to CI so it cannot silently rot again.
 
+
+## Notes
+
+**2026-08-13T01:49:49Z**
+
+FIXED AND VERIFIED 2026-08-11.
+
+Root cause confirmed: commit 027ff2a1 (2026-08-09) edited the SHARED benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock in place to add IFBench scoring packages (defusedxml, nltk, langdetect, emoji, regex...) and repinned only the IFBench contract, invalidating TREC's seal. Broken for 2 days; nobody noticed because no test ran the published command.
+
+FIX (structural, option b): sealed contracts no longer share a mutable lock.
+- benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock RESTORED to the exact content TREC's evidence was produced under (sha c7e29a1f...), recovered from 027ff2a1^. TREC's contract.json/contract.exs are UNTOUCHED, so its manifest_sha256 and archived result bindings stay intact.
+- The IFBench variant is preserved immutably at benchmarks/locks/dspy-3.2.1-optuna-4.9-ifbench-363ae084.lock; both IFBench contracts (gepa014, rehearsal16k) repointed there. Their campaigns are complete/stopped and not lane-recomputed, so moving them is the cheap side of the trade.
+- benchmarks/locks/README.md records the immutability rule and why repinning TREC to the new lock would have been a lie (that lock did not produce the TREC result).
+
+VERIFIED BY EXECUTION, not reasoning:
+- The exact command published in docs/CASE_STUDY_TREC.md now prints the exact documented line: 'matched TREC compact recomputation passed: GEPA +0.4000, MIPROv2 +0.1458, GEPA Imp-minus-DSPy -0.0083'.
+- IFBench rehearsal shadow preflight still passes end to end (status: pass) on the snapshot path.
+
+REGRESSION GUARD (the acceptance criterion): test/case_study_trec_recomputation_test.exs, provider-free, 0.8s, 2 tests — one runs the published command and asserts the documented line, one asserts docs/CASE_STUDY_TREC.md still documents that same line and still references every input path. Docs and evidence can no longer drift apart silently.
