@@ -1354,3 +1354,15 @@ LOOP ITERATION 1 (2026-08-11): two lanes recovered, one real lane bug filed as i
 - product_package (mix imp.package.clean_room): PASSES — clean-room proof incl. OTP fresh-process service, linked result/artifact, 4 concurrent calls.
 - optimizer_lift: was CRASHING, not merely stale. Root cause is a coherent pattern worth naming: the library added explicit refusals ('COPRO requires :proposer_lm... it does not synthesize proposal suffixes'; 'GEPA optimization requires :reflection_lm or :reflection_strategy; Imp does not synthesize reflection proposals') — good design, fail loudly rather than fake a proposal — but the benchmark lanes were never updated, so they have been dead since that tightening and their evidence stale ever since. Fixed both call sites with deterministic provider-free static LMs. Lane now RUNS: 9/10 rows pass; the MIPROv2 row fails for the unfair-setup reason in imp-vfqw.
 LESSON FOR THE LEDGER: a lane that crashes looks identical to a lane that is merely stale in the dashboard's 'failing' state. Crashing lanes should be distinguishable from failing-assertion lanes.
+
+**2026-08-11T14:32:47Z**
+
+MACHINERY MECHANICS LEARNED (2026-08-11) — this is how the evidence system actually works, recorded because I got it wrong twice:
+
+1. Running a lane is NOT sufficient. Pipeline is: run lane -> writes artifact under tmp/ or benchmarks/runs/ -> 'mix imp.evidence.admit' validates and admits ONE immutable artifact into benchmarks/evidence/admitted/<lane>/ -> only then does the dashboard count it. I ran provider_free_overhead (11/11 pass) and product_package/clean_room (pass) yesterday and both still report 'artifact_missing' precisely because I never admitted them. My earlier burn-down note overstated progress.
+
+2. Evidence is bound to a commit. Lanes carry a freshness policy (:age with max_age_hours 24, :source_revision, :source_and_age, :immutable_admission). instruction_optimizer_contract went 'full' immediately after I re-ran it, then reverted once I committed again — source_compatible false. So under source-bound policies, ANY further commit invalidates previously admitted evidence.
+
+CONSEQUENCE, and it is structural, not a bug to fix casually: 'profile ready: true' requires every release-blocking claim to hold admitted, in-policy evidence SIMULTANEOUSLY. With 24h ages and commit binding, that state is only reachable by running and admitting the full lane set at one commit and then not committing. This is achievable as a release ritual (a release branch, freeze, full lane sweep, admit, tag) but is NOT a state that ordinary development can hold. Treat 'profile ready' as a release gate, not a daily health metric; the daily metric should be 'no lane is FAILING for a content reason'.
+
+3. Current true state (dashboard at 26485a5b): claims 13 proven / 25 blocked / 23 informational of 48; lanes 10 full, 2 passing, 5 stale, 7 missing, 3 failing. Claim coverage is very uneven by category: optimizer 12/22 proven, tools_agents_rag 0/11, runtime 0/6, evaluation 1/3, operations 0/2, package/docs/persistence/dspy_parity 0/1 each.

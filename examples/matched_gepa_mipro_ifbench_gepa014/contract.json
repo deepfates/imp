@@ -103,7 +103,11 @@
       "mipro_prompt_calls": 11,
       "mipro_task_calls": 590,
       "ordinary_evaluator_failure": "contained_as_zero_score_by_mipro_eval_candidate_program",
-      "operational_failure": {"type": "OperationalSafetyAbort", "contained": false, "calls": 1}
+      "operational_failure": {
+        "type": "OperationalSafetyAbort",
+        "contained": false,
+        "calls": 1
+      }
     }
   },
   "compatibility_translation": {
@@ -161,7 +165,11 @@
     "selection_sha256": "f0c2d8e808e4783e496ecf189ead61fde4a1e80373ff85f3ea801883f68c7468",
     "held_out_path": "../matched_instruction_family_ifbench/data/held_out.jsonl",
     "held_out_sha256": "49779533faa842decda93a1221ce7bae615af82403e33e380ab69d2abc84610d",
-    "counts": {"train": 16, "selection": 32, "held_out": 64},
+    "counts": {
+      "train": 16,
+      "selection": 32,
+      "held_out": 64
+    },
     "program": "IFBenchCoT2StageModule",
     "task_graph": "pinned IFBenchCoT2StageProgram two-stage predictor graph",
     "runtime_classes": {
@@ -194,8 +202,16 @@
       "catalog_cache_write_per_token": "0.00000375"
     }
   },
-  "seeds": [2026072705, 2026072706, 2026072707],
-  "arms": ["baseline", "gepa", "mipro_v2"],
+  "seeds": [
+    2026072705,
+    2026072706,
+    2026072707
+  ],
+  "arms": [
+    "baseline",
+    "gepa",
+    "mipro_v2"
+  ],
   "optimizer": {
     "gepa": {
       "iterations": 1,
@@ -228,10 +244,21 @@
   "runtime_dependencies": {
     "upstream": {
       "python": "3.13.2",
-      "lock_path": "../../benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock",
+      "lock_path": "../../benchmarks/locks/dspy-3.2.1-optuna-4.9-ifbench-363ae084.lock",
       "lock_sha256": "363ae084040d5044ba02b05b701324032e00d886264dbea63a8982bd33f9f799",
-      "packages": {"dspy": "3.2.1", "gepa": "0.0.27", "optuna": "4.9.0", "numpy": "2.5.1", "litellm": "1.93.0", "openai": "2.48.0", "pydantic": "2.13.4"},
-      "source_roots": {"dspy": "tmp/dspy-3.2.1", "gepa": "tmp/gepa-v0.1.4"},
+      "packages": {
+        "dspy": "3.2.1",
+        "gepa": "0.0.27",
+        "optuna": "4.9.0",
+        "numpy": "2.5.1",
+        "litellm": "1.93.0",
+        "openai": "2.48.0",
+        "pydantic": "2.13.4"
+      },
+      "source_roots": {
+        "dspy": "tmp/dspy-3.2.1",
+        "gepa": "tmp/gepa-v0.1.4"
+      },
       "effective_gepa": "authenticated source checkout 0.1.4@8b0ce6c overlays the locked 0.0.27 distribution before imports"
     },
     "ifbench": {
@@ -240,7 +267,15 @@
       "site_packages_path": "../../tmp/ifbench-parity-venv/lib/python3.13/site-packages",
       "nltk_data_path": "../../tmp/ifbench-parity-venv/nltk_data",
       "nltk_data_sha256": "da6e65071925e64f597ba1bfcb5f9f66e1dbcc7b2b3f90c40fb336cf6031016a",
-      "packages": {"emoji": "2.15.0", "immutabledict": "4.3.1", "langdetect": "1.0.9", "nltk": "3.10.0", "packaging": "26.2", "setuptools": "80.10.2", "syllapy": "0.7.2"}
+      "packages": {
+        "emoji": "2.15.0",
+        "immutabledict": "4.3.1",
+        "langdetect": "1.0.9",
+        "nltk": "3.10.0",
+        "packaging": "26.2",
+        "setuptools": "80.10.2",
+        "syllapy": "0.7.2"
+      }
     },
     "imp": {
       "elixir": "1.19.5",
@@ -249,7 +284,12 @@
       "mix_lock_sha256": "15c1d00ca1a8ab71686fc115b1e2814b0bcebaedad90f1372daa99e07b3fa8f0",
       "consumer_mix_lock_path": "mix.lock",
       "consumer_mix_lock_sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd",
-      "packages": {"req_llm": "1.17.1", "llm_db": "2026.7.3", "req": "0.6.3", "jason": "1.4.5"}
+      "packages": {
+        "req_llm": "1.17.1",
+        "llm_db": "2026.7.3",
+        "req": "0.6.3",
+        "jason": "1.4.5"
+      }
     }
   },
   "execution": {
@@ -266,40 +306,121 @@
       "allow_fallbacks": false,
       "require_parameters": true,
       "usage_include": true,
-      "task_only": ["openai"],
-      "task_order": ["openai"],
-      "optimizer_only": ["anthropic"],
-      "optimizer_order": ["anthropic"],
-      "task_max_price_per_million": {"prompt": 0.75, "completion": 4.5, "request": 0},
-      "optimizer_max_price_per_million": {"prompt": 3, "completion": 15, "request": 0}
+      "task_only": [
+        "openai"
+      ],
+      "task_order": [
+        "openai"
+      ],
+      "optimizer_only": [
+        "anthropic"
+      ],
+      "optimizer_order": [
+        "anthropic"
+      ],
+      "task_max_price_per_million": {
+        "prompt": 0.75,
+        "completion": 4.5,
+        "request": 0
+      },
+      "optimizer_max_price_per_million": {
+        "prompt": 3,
+        "completion": 15,
+        "request": 0
+      }
     },
     "request": {
-      "task": {"temperature": null, "seed": "experiment_seed", "max_tokens": 768, "max_input_tokens": 4096, "reservation_input_tokens": 4864},
-      "optimizer": {"temperature": 1, "max_tokens": 1024, "max_input_tokens": 16384, "reservation_input_tokens": 17408}
+      "task": {
+        "temperature": null,
+        "seed": "experiment_seed",
+        "max_tokens": 768,
+        "max_input_tokens": 4096,
+        "reservation_input_tokens": 4864
+      },
+      "optimizer": {
+        "temperature": 1,
+        "max_tokens": 1024,
+        "max_input_tokens": 16384,
+        "reservation_input_tokens": 17408
+      }
     },
     "call_ceilings": {
-      "baseline": {"task_logical": 192, "optimizer_logical": 0, "transports": 192, "total_logical": 192},
-      "gepa": {"task_logical": 432, "optimizer_logical": 12, "transports": 444, "total_logical": 444},
-      "mipro_v2": {"task_logical": 864, "optimizer_logical": 11, "transports": 875, "total_logical": 875}
+      "baseline": {
+        "task_logical": 192,
+        "optimizer_logical": 0,
+        "transports": 192,
+        "total_logical": 192
+      },
+      "gepa": {
+        "task_logical": 432,
+        "optimizer_logical": 12,
+        "transports": 444,
+        "total_logical": 444
+      },
+      "mipro_v2": {
+        "task_logical": 864,
+        "optimizer_logical": 11,
+        "transports": 875,
+        "total_logical": 875
+      }
     }
   },
   "output_contract": {
     "program": "two sequential ChainOfThought predictors",
-    "fields": ["response", "final_response"],
+    "fields": [
+      "response",
+      "final_response"
+    ],
     "adapter": "DSPy ChatAdapter marker envelope",
     "normalization": "none"
   },
   "metrics": {
     "primary": "mean_fraction_executable_constraints_satisfied",
-    "paired_hypotheses": ["optimizer_vs_own_baseline", "Imp_vs_DSPy_same_family"],
+    "paired_hypotheses": [
+      "optimizer_vs_own_baseline",
+      "Imp_vs_DSPy_same_family"
+    ],
     "noninferiority_margin": -0.05,
     "uncertainty": "source-id clustered bootstrap with Holm correction"
   },
   "accounting": {
-    "per_row": ["source_id", "instruction_id_list", "raw_response", "parsed_response", "score", "input_tokens", "output_tokens", "wall_seconds", "error", "actual_model", "actual_route", "gateway", "service_tier", "request_seed", "transport_attempts", "gateway_reported_cost", "adapter_computed_cost"],
-    "fail_closed": ["model", "route", "cost", "transport_attempt", "optimizer_parser", "budget", "held_out_barrier", "artifact"]
+    "per_row": [
+      "source_id",
+      "instruction_id_list",
+      "raw_response",
+      "parsed_response",
+      "score",
+      "input_tokens",
+      "output_tokens",
+      "wall_seconds",
+      "error",
+      "actual_model",
+      "actual_route",
+      "gateway",
+      "service_tier",
+      "request_seed",
+      "transport_attempts",
+      "gateway_reported_cost",
+      "adapter_computed_cost"
+    ],
+    "fail_closed": [
+      "model",
+      "route",
+      "cost",
+      "transport_attempt",
+      "optimizer_parser",
+      "budget",
+      "held_out_barrier",
+      "artifact"
+    ]
   },
-  "capture": {"messages": true, "responses": true, "transports": true, "costs": true, "selected_parameters": true},
+  "capture": {
+    "messages": true,
+    "responses": true,
+    "transports": true,
+    "costs": true,
+    "selected_parameters": true
+  },
   "source_commits": {
     "imp": "resolved exactly from the clean paired coordinator launch; required compatibility ancestor 10328114f96975ebccf71f57a052bfe045b99a88",
     "dspy": "https://github.com/stanfordnlp/dspy@29448ae12756abdd14bd8796c819247ebb83673c",
@@ -314,21 +435,66 @@
     "authorized_workshop_ceiling": 100.0
   },
   "paired_surface": {
-    "call_budget": {"path": "call_budget.exs", "sha256": "1ea18c97c713a6c16411ef0e00b1bb1dc3cabfe3553fa707d457de82556b01fd"},
-    "consumer_gitignore": {"path": ".gitignore", "sha256": "8304b37aa09dbb085a768a8b036b7dace48049b0865148f257d55e35bf4fc41f"},
-    "consumer_lock": {"path": "mix.lock", "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"},
-    "consumer_project": {"path": "mix.exs", "sha256": "0fbcd8d51feac25aba18c9e4c0d8aca88b64eab80d123c3ca8d880f82df5ab40"},
-    "contract_runtime": {"path": "contract.exs", "sha256": "daf2f127b2a9fddf581f17ad7a2a2b36335e3d3dd94de32e1eaa0d4a5c3ab28b"},
-    "bootstrap_environment": {"path": "peer_bootstrap.py", "sha256": "6e6628bc4e1a08516319959a6f2e2272aceac5133a34af7dd157cc50890783a3"},
-    "coordinator": {"path": "run_paired.py", "sha256": "562408684c860e56817b6d01d6906f85b7552d7322f535ae8ff9de7380aa95a9"},
-    "guard_equivalence": {"path": "guard_equivalence.py", "sha256": "1b0dfd6397fcf6e6118d71dff572ece462aa518dd6d52e4c149e49a166ad6630"},
-    "imp_entry": {"path": "run_imp.exs", "sha256": "6e75abc5f154b48e000ccc4850fe1b795a77b41fcb59c3def351ffcf61f7faba"},
-    "shadow_tls_server": {"path": "shadow_tls_server.py", "sha256": "1503dc503fa9cb1b030954f732d3d2759621a46eb68b612e3cc91f3c650a3ced"},
-    "response_evidence": {"path": "response_evidence.exs", "sha256": "a2e627ba31b19511aa8243a45e37074bd108d4bf2b9134b1bc1237814cd1d27a"},
-    "source_identity": {"path": "source_identity.exs", "sha256": "ed5c419009aa9a204e12b406c485efd75c119100aa3c7b822221201325193726"},
-    "stop_accounting": {"path": "stop_accounting.exs", "sha256": "c2acb84373382c2436b602c112c36e93a7ab6797146032a4cfbb6d2b496cdcda"},
-    "two_phase": {"path": "two_phase.exs", "sha256": "d7a92778338cca5e72a51aa8a46d54cce2a371525d22326465fcf30ed92e7e9e"},
-    "upstream_entry": {"path": "run_upstream.py", "sha256": "a5821f02ebf5f10d7ed73fbf268f9e925fbee811694717f63b1178cd7f0f14a9"}
+    "call_budget": {
+      "path": "call_budget.exs",
+      "sha256": "1ea18c97c713a6c16411ef0e00b1bb1dc3cabfe3553fa707d457de82556b01fd"
+    },
+    "consumer_gitignore": {
+      "path": ".gitignore",
+      "sha256": "8304b37aa09dbb085a768a8b036b7dace48049b0865148f257d55e35bf4fc41f"
+    },
+    "consumer_lock": {
+      "path": "mix.lock",
+      "sha256": "04cb8a9ab2e6c4b16481f062843dcf1f81a792f7c5816a190ec707720b595dfd"
+    },
+    "consumer_project": {
+      "path": "mix.exs",
+      "sha256": "0fbcd8d51feac25aba18c9e4c0d8aca88b64eab80d123c3ca8d880f82df5ab40"
+    },
+    "contract_runtime": {
+      "path": "contract.exs",
+      "sha256": "daf2f127b2a9fddf581f17ad7a2a2b36335e3d3dd94de32e1eaa0d4a5c3ab28b"
+    },
+    "bootstrap_environment": {
+      "path": "peer_bootstrap.py",
+      "sha256": "6e6628bc4e1a08516319959a6f2e2272aceac5133a34af7dd157cc50890783a3"
+    },
+    "coordinator": {
+      "path": "run_paired.py",
+      "sha256": "562408684c860e56817b6d01d6906f85b7552d7322f535ae8ff9de7380aa95a9"
+    },
+    "guard_equivalence": {
+      "path": "guard_equivalence.py",
+      "sha256": "1b0dfd6397fcf6e6118d71dff572ece462aa518dd6d52e4c149e49a166ad6630"
+    },
+    "imp_entry": {
+      "path": "run_imp.exs",
+      "sha256": "6e75abc5f154b48e000ccc4850fe1b795a77b41fcb59c3def351ffcf61f7faba"
+    },
+    "shadow_tls_server": {
+      "path": "shadow_tls_server.py",
+      "sha256": "1503dc503fa9cb1b030954f732d3d2759621a46eb68b612e3cc91f3c650a3ced"
+    },
+    "response_evidence": {
+      "path": "response_evidence.exs",
+      "sha256": "a2e627ba31b19511aa8243a45e37074bd108d4bf2b9134b1bc1237814cd1d27a"
+    },
+    "source_identity": {
+      "path": "source_identity.exs",
+      "sha256": "ed5c419009aa9a204e12b406c485efd75c119100aa3c7b822221201325193726"
+    },
+    "stop_accounting": {
+      "path": "stop_accounting.exs",
+      "sha256": "c2acb84373382c2436b602c112c36e93a7ab6797146032a4cfbb6d2b496cdcda"
+    },
+    "two_phase": {
+      "path": "two_phase.exs",
+      "sha256": "d7a92778338cca5e72a51aa8a46d54cce2a371525d22326465fcf30ed92e7e9e"
+    },
+    "upstream_entry": {
+      "path": "run_upstream.py",
+      "sha256": "a5821f02ebf5f10d7ed73fbf268f9e925fbee811694717f63b1178cd7f0f14a9"
+    }
   },
   "provider_free_gate": {
     "source_path": "equivalence_gate.py",

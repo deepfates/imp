@@ -144,7 +144,7 @@
   "runtime_dependencies": {
     "upstream": {
       "python": "3.13.2",
-      "lock_path": "../../benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock",
+      "lock_path": "../../benchmarks/locks/dspy-3.2.1-optuna-4.9-ifbench-363ae084.lock",
       "lock_sha256": "363ae084040d5044ba02b05b701324032e00d886264dbea63a8982bd33f9f799",
       "packages": {
         "dspy": "3.2.1",
