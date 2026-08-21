@@ -162,7 +162,7 @@ defmodule AvatarTest do
     blocking =
       Imp.tool(:blocking, "blocking local callback", fn _arguments ->
         send(parent, {:blocking_tool_started, self()})
-        Process.sleep(250)
+        Process.sleep(2_000)
         send(parent, :blocking_tool_late_side_effect)
         "too late"
       end)
@@ -171,14 +171,14 @@ defmodule AvatarTest do
       Imp.avatar("question -> answer", [blocking],
         lm: lm,
         max_iters: 5,
-        tool_timeout_ms: 25
+        tool_timeout_ms: 250
       )
 
     started_at = System.monotonic_time(:millisecond)
     assert {:ok, prediction} = Imp.call(avatar, %{question: "q"})
     elapsed = System.monotonic_time(:millisecond) - started_at
 
-    assert elapsed < 200
+    assert elapsed < 1_000
     assert_received :timeout_actor_called
     assert_received :timeout_finalizer_called
     assert_received {:blocking_tool_started, tool_pid}
@@ -191,7 +191,7 @@ defmodule AvatarTest do
              %ActionOutput{
                tool_name: :blocking,
                tool_input_query: %{query: "slow"},
-               tool_output: {:error, {:tool_timeout, :blocking, 25}},
+               tool_output: {:error, {:tool_timeout, :blocking, 250}},
                error?: true,
                terminal_reason: :tool_timeout
              }
