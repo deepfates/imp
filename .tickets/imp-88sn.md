@@ -1,7 +1,7 @@
 ---
 id: imp-88sn
 status: open
-deps: [imp-argb, imp-tg2z, imp-90uc, imp-g22q, imp-pk5c, imp-emrr, imp-7aah, imp-fwfe, imp-fkwy, imp-sqkr, imp-u3af, imp-2kyx, imp-x83e, imp-k1od]
+deps: [imp-v03h]
 links: []
 created: 2026-07-30T22:14:26Z
 type: feature
@@ -12,35 +12,42 @@ tags: [experiments, effectiveness, multi-stage, optimize-anything]
 ---
 # Demonstrate current-source usefulness across different problems
 
-Obstacle: Imp has one narrow historical positive matched result, several honest
-negative results, and strong lifecycle evidence, but not enough current-source
-evidence that its ordinary optimizer product is useful across materially
-different problem types or competitive with DSPy. Answer that question with a
-recognizable standard benchmark table plus a distinctive stateful-agent proof,
-not another private campaign framework or success definition.
+This is the release-facing usefulness milestone, not the paper-scale benchmark
+program. Prove that an ordinary user can improve materially different programs
+through Imp's public API under realistic provider behavior and then operate the
+selected result. Large matched tables remain valuable downstream research, but
+they do not substitute for this capability and are not prerequisites for it.
+
+Current evidence is stronger than the old obstacle statement: the current-source
+Optimize Anything campaign improved retry-controller code, agent configuration,
+and scheduling on untouched held-out cases (all three families positive in the
+mean; improving seeds 3/3, 3/3, and 2/3), and matched TREC retained positive
+GEPA and MIPROv2 held-out lift. Those results are scoped. The remaining question
+is whether the normal packaged prompt-program loop works and helps on a small
+set of representative user stories without benchmark-only entrances.
 
 ## Acceptance Criteria
 
-Before provider calls, freeze the official six-task GEPA suite with current
-models and matched Imp/pinned-DSPy baseline, GEPA, and MIPROv2 arms. Use official
-data and task metrics, the same information and optimizer opportunity in both
-runtimes, preregistered repeated runs sufficient to expose instability, and
-selection that never reads held-out outcomes. Complete every declared arm and
-report the direct per-task and aggregate table, uncertainty, calls, cost,
-latency, parse failures, and clean negatives without a private universal lift
-or positive-seed victory rule. Every selected Imp program must produce a
-portable parameter Artifact that applies to fresh trusted code and serves
-through the ordinary OTP path.
+Exercise at least three materially different ordinary user stories through the
+packaged public API: typed structured generation, a composed/named-predictor or
+tool-using program, and one non-prompt artifact class. For each applicable
+prompt program, establish a real baseline on disjoint data, run an appropriate
+public optimizer with a bounded live provider budget, select without reading
+test outcomes, and report scores, failures, calls, tokens, and cost. The set
+must include at least one few-shot optimizer and one instruction/search
+optimizer; planted proposal fixtures prove mechanics but do not satisfy live
+usefulness.
 
-Separately, exercise a Grue/Zork agent through a real optimizer and the same
-Artifact/fresh-operation boundary, using deterministic forkable episodes and a
-task-native progress measure. Retain the already-earned proposer-generated
-Optimize Anything mutation on untouched executable behavior as the non-prompt
-problem class. The standard table establishes recognizable comparative quality;
-Grue and OA establish stateful-agent and non-prompt breadth. Unit fixtures,
-historical-source results, controller completion, and lifecycle-only execution
-cannot satisfy this ticket, and a failed table may not be converted into success
-by changing tasks or thresholds after seeing outcomes.
+Every selected program must round-trip through a credential-free parameter
+Artifact, apply to freshly constructed trusted code in a new OS process, and
+serve concurrent calls through the ordinary OTP path. Preserve genuine
+scientific negatives and diagnose them as product defect, treatment defect,
+scientific negative, or unresolved uncertainty; do not change thresholds after
+seeing outcomes. The admitted Optimize Anything and TREC results may satisfy
+their exact non-prompt and search evidence limbs after independent integrity
+checks. Heavy, HoVer, the six-family matched table, resume economics, and MLX
+are downstream research or specialized optimizer work and cannot close this
+ticket by proxy.
 
 ## Current status
 

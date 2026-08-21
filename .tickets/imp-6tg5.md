@@ -1,7 +1,7 @@
 ---
 id: imp-6tg5
 status: open
-deps: []
+deps: [imp-6mls]
 links: [imp-6mls]
 created: 2026-08-10T02:56:49Z
 type: feature

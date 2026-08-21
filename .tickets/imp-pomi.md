@@ -1,7 +1,7 @@
 ---
 id: imp-pomi
 status: open
-deps: []
+deps: [imp-88sn]
 links: []
 created: 2026-08-07T18:49:30Z
 type: task
@@ -10,13 +10,25 @@ assignee: deepfates
 parent: imp-yme4
 tags: [docs, evidence, narrative]
 ---
-# Reframe evidence narrative around the parity worldview
+# Canonize the release evidence and its limits
 
-README/EVIDENCE currently present historical negatives without config context, reading as 'optimizer effectiveness is an open question.' Corrected worldview: DSPy/GEPA/MIPRO are published, replicated results — parity is the null hypothesis for a faithful port; the negatives were single-arm absolute-lift runs on small local models with no DSPy arm (the one true matched head-to-head, TREC, was favorable). Reword the evidence narrative to state expectations honestly: parity expected, deficit = implementation defect, benchmark = confirmation. Must go through the claims-registry/claim-drift machinery, not drive-by prose edits.
+Make the public story match what a user can actually do at the release commit.
+The null expectation for a faithful DSPy port is that central prompt optimizers
+work under comparable treatment, so unexpected deficits trigger diagnosis; it
+is not legitimate to declare every negative an implementation defect without
+classification. Canonize the core packaged lifecycle, current positive TREC and
+Optimize Anything evidence, valid Banking77/HotPot negatives, and open matched
+breadth. Remove stale chronology and invalid parity language through the claims
+registry rather than drive-by prose.
 
 ## Acceptance Criteria
 
-README evidence section and docs/EVIDENCE.md state the parity frame with per-result config context; claims registry updated consistently; claim-drift checks pass.
+README, docs/EVIDENCE.md, case studies, archive READMEs, claims registry, and
+generated conformance surfaces agree on the exact current results and scopes;
+every public claim identifies whether it is implementation, exercised behavior,
+scientific evidence, or open uncertainty; stale take-8/take-11 and pre-OA status
+is removed or explicitly superseded; claim-drift checks pass at the release
+commit.
 
 
 ## Notes

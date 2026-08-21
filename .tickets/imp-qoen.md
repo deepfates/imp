@@ -1,22 +1,33 @@
 ---
 id: imp-qoen
 status: open
-deps: [imp-86as, imp-4er4]
+deps: [imp-pomi]
 links: []
 created: 2026-08-07T17:08:17Z
 type: feature
-priority: 2
+priority: 0
 assignee: deepfates
 parent: imp-yme4
 tags: [release, package]
 ---
-# Hex publication readiness for 0.3.0
+# Freeze a releasable 0.3.0 product candidate
 
-Not on Hex; livebook standalone fallback (Mix.install {:imp, "~> 0.3.0"}) cannot resolve by its own admission; adopters cannot install without cloning and pinning a commit. Publication is an explicit owner action — this ticket tracks readiness, not the act.
+Produce one immutable, installable 0.3.0 candidate whose public program,
+evaluation, bounded optimization, Artifact, and fresh OTP operation story has
+been exercised from the package. Publication channel remains an explicit owner
+decision: tomorrow's release may be a private/source candidate, Git tag, public
+repository, or Hex package, but the candidate itself must not depend on
+maintainer checkout state or research-only inputs.
 
 ## Acceptance Criteria
 
-Tag/changelog/docs coherent for 0.3.0; hex.publish dry-run clean; livebook fallback resolves post-publication.
+The exact clean commit and package checksum are recorded; consumer install,
+representative live usefulness, Artifact restart/concurrent service, docs,
+Livebooks, protocols, quality, Dialyzer, package audit, and publication dry-run
+pass at that commit; no Git blob prevents promotion; changelog/version/docs are
+coherent; unresolved research surfaces are labeled without weakening product
+gates. Tagging, repository visibility, and Hex publication occur only in the
+owner-selected release form.
 
 
 ## Notes

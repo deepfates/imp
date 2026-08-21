@@ -1,7 +1,7 @@
 ---
 id: imp-6mls
 status: open
-deps: []
+deps: [imp-v03h]
 links: [imp-6tg5]
 created: 2026-08-10T04:48:01Z
 type: benchmarks
@@ -9,9 +9,31 @@ priority: 2
 assignee: deepfates
 parent: imp-yme4
 ---
-# Extract the matched-benchmark harness into one shared instrument
+# Build one thin shared instrument for matched benchmark campaigns
 
-The sealed-contract methodology is right, but the instrument is being re-copied per experiment: run_imp.exs (~1.6k lines: Observer, ObservedLM, envelope/ledger validation, seal writing) and its Python mirror run_upstream.py were copied pilot→rehearsal and will be copied again for Heavy, kept in sync only by comments (a stale num_retries comment already bit us). Extract: (1) the imp-side instrument (Observer, ObservedLM incl. dispatch_with_retries, envelope+ledger validation, seal/stop payloads) into one tested shared module contracts pin by sha; (2) same for the upstream Capture/RecordingLM mirror; (3) contracts become thin frozen data (pins, budgets, models, seeds) + a sha-pinned instrument version; (4) live ledger snapshots as an instrument feature: Observer/Capture atomic-write run_root/live/{imp,upstream}.json every ~10s (trial scores, phase, spend) — keeps the peers-speak-only-via-disk principle (rejected: distributed-node RPC, which would punch an unaudited live channel into a sealed runner), gives the observatory live imp trials + a live spend meter, and crash forensics for free. Acceptance: the Heavy contract is THIN — parameters only, zero copied instrument code — and the observatory reads live+sealed data from the stable format with no per-run parsing.
+The sealed-contract methodology is right, but its implementation has been
+copied between campaigns and repeatedly produced coordination, accounting, and
+envelope defects. This ticket owns only the research instrument. First consume
+the public spend/usage capability from imp-v03h; do not hide a second product
+runtime inside benchmark code.
+
+Extract the Imp observer/recording boundary and pinned-DSPy mirror into one
+tested internal instrument. Contracts become thin immutable data with derived
+arithmetic and a pinned instrument identity. Stable atomic live snapshots and
+sealed terminal artifacts support crash forensics and downstream observatory
+views without experiment-specific parsing. This precedes further HoVer, Heavy,
+IFBench-continuation, observatory, and resume-economics campaigns, but does not
+block the ordinary release product loop.
+
+## Acceptance Criteria
+
+The Imp side uses the public budget/usage ledger; provider-free perturbation
+tests cover retries, timeout, signal interruption, cap exhaustion, parse
+failure, and actual-cost reconciliation; the Python mirror has the same
+observable rules; envelope and call-count arithmetic is derived from thin
+contracts; a campaign completes or stops with synchronized, checksummed rescue
+artifacts and no orphan processes; Heavy and the IFBench continuation contain
+parameters only and no copied instrument implementation.
 
 
 ## Notes

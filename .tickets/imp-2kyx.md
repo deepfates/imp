@@ -1,21 +1,38 @@
 ---
 id: imp-2kyx
 status: in_progress
-deps: []
+deps: [imp-6mls]
 links: []
 created: 2026-08-10T18:24:10Z
 type: ifbench
-priority: 0
+priority: 2
 assignee: deepfates
 parent: imp-yme4
 ---
-# Run the source-faithful matched rehearsal to terminal and publish the verdict
+# Complete a clean held-out continuation from the frozen IFBench champions
 
-The 16k rehearsal (examples/matched_ifbench_rehearsal16k) is the campaign that answers whether imp's optimizers match pinned DSPy at the benchmark authors' own settings (16384 output tokens, ~1/3-paper budgets, 1 seed, $60-65 envelope). State 2026-08-10: ten launches, all ten stops harness defects (documented as PREREGISTRATION addenda 1-9, roots archived to evidence/matched/); take 11 running detached. ESTABLISHED so far: GEPA selection-set parity (take 8, imp 0.8542 vs upstream 0.8698 champions) + full trial ledgers; imp MIPROv2 fidelity boundary found (<=9 Optuna-startup trials, ticket imp-gbvu) and both arms matched at 9. REMAINING: a terminal run producing all 6 sealed cells including the held-out barrier (64 novel-constraint rows/arm), then the verdict written against PREREGISTRATION P1/P2/P3 with paired analysis, an evidence archive, and docs/EVIDENCE.md updated from target to measured.
+Take 11 is terminal and durably archived: all six baseline/GEPA/MIPRO selection
+cells were frozen, then held-out evaluation stopped because the harness rejected
+a successful 4,243-input-token response against a 4,096 evidence bound even
+though the same contract reserved 4,864 input tokens. This is a benchmark
+integration defect, not a product failure or scientific optimizer result.
+
+Do not rerun optimization or reinterpret partial held-out work. After the
+shared instrument owns coherent derived envelopes and fresh Artifact application
+is proven locally, create a parent-bound held-out-only continuation. Reapply the
+six frozen champions to fresh Imp and pinned-DSPy programs and reevaluate all
+64 held-out rows for all three arms in both runtimes under the unchanged model
+treatment. Keep this downstream of ordinary product-path work.
 
 ## Acceptance Criteria
 
-One take reaches terminal with 6 sealed cells and both complete result artifacts; verdict addendum written against P1/P2/P3 including held-out paired analysis; run root archived to evidence/matched/ with checksums; docs/EVIDENCE.md + README reconciled to the measured outcome.
+A continuation binds the take-11 archive, original manifest/source commit,
+selection receipts, and all six artifact hashes; shadow validation proves fresh
+application and parameter-name compatibility; all held-out rows are evaluated
+fresh for every runtime/arm with zero optimizer calls; row ledgers, parse rate,
+score-given-parse, cost, and Artifact application evidence are retained; the
+verdict and canonical evidence docs distinguish the terminal take-11 stop from
+the continuation result.
 
 
 ## Notes

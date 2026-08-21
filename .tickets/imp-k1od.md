@@ -1,17 +1,22 @@
 ---
 id: imp-k1od
 status: open
-deps: []
+deps: [imp-6mls]
 links: []
 created: 2026-08-13T07:18:07Z
 type: gepa
-priority: 0
+priority: 2
 assignee: deepfates
 parent: imp-yme4
 ---
-# HoVer full-scale GEPA replication: provision, preregister, run
+# Run the staged HoVer GEPA replication on the shared instrument
 
-Owner-directed 2026-08-11: prove imp works on a STANDARD benchmark people actually use with DSPy, not a bespoke task. HoVer chosen as the nearest-credible GEPA-paper family (source-exact BM25 retrieval matching upstream; design already source-faithful).
+Owner-directed 2026-08-11: prove Imp works on a standard benchmark people use
+with DSPy, not a bespoke task. Provisioning, source corpus/index verification,
+splits, and preregistration are complete. The next step is not an uncapped
+optimizer run: migrate the campaign to the shared instrument, then execute the
+preregistered baseline-only cost/parse stage. Use that measurement to write the
+separate power/cost authorization for the 7,051-metric-call optimizer stage.
 
 DESIGN ALREADY CORRECT IN benchmarks/data/gepa-campaign-full/families.json: hoverBench split_counts train 150 / dev 300 / test 300 (exactly the gepa-artifact authors' sizes, benchmark.py:30-32 — NOT the starved 16/32/64 that made IFBench unreadable), metric_calls 7051, program HoverMultiHop, metric hover_utils.discrete_retrieval_eval, signature 'claim -> retrieved_docs'. Full campaign manifest exists at benchmarks/config/gepa-paper-campaign-v2.json (seeds [0,1]).
 

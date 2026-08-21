@@ -1,7 +1,7 @@
 ---
 id: imp-yme4
 status: in_progress
-deps: [imp-argb, imp-tg2z, imp-88sn]
+deps: [imp-88sn, imp-0du1]
 links: []
 created: 2026-07-25T16:21:13Z
 type: epic
@@ -45,6 +45,31 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 ## Current frontier
 
 The product center is real but the telos is open.
+
+### Capability dependency graph (2026-08-20 owner correction)
+
+The active order is architectural, not dashboard- or benchmark-driven:
+
+1. provider configuration plus typed signatures and adapters;
+2. one executable-program boundary for Predict, composition, and tools;
+3. examples, metrics, disjoint evaluation, traces, and failure accounting;
+4. stable parameter identity plus public, spend-bounded optimization;
+5. selection, credential-free Artifact persistence, fresh trusted application,
+   and supervised concurrent operation;
+6. representative live usefulness through the packaged public API;
+7. current-stable DSPy semantic completion and broader optimizer fidelity;
+8. matched paper-scale research, resume economics, observatory work, and
+   provider/local weight training including MLX.
+
+The 0.3.0 candidate depends on the bounded real-user loop and truthful evidence,
+not completion of the paper-scale research program. The epic still depends on
+broader usefulness and the stable DSPy delta; a scoped release cannot close it.
+TREC and current-source Optimize Anything are positive scoped evidence.
+Banking77 and HotPot are retained treatment-specific negatives. IFBench take 11
+is a terminal benchmark-instrument stop after selection, not optimizer
+effectiveness evidence. MLX is downstream and stays honestly gated, but it does
+not jump ahead of the shared prompt-program loop merely because its evidence is
+stale.
 
 ### Principal protocol audit (2026-08-06, after clean `612ee2aa`)
 
