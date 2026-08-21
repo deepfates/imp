@@ -1,21 +1,18 @@
-defmodule OptimizerEffectivenessTest do
+defmodule OptimizerSelectionWiringTest do
   use ExUnit.Case
 
   defp demo_sensitive_lm do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = Enum.map_join(messages, "\n", & &1.content)
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", & &1.content)
 
-          cond do
-            prompt =~ "[[ ## answer ## ]]\nParis" -> %{answer: "Paris"}
-            prompt =~ "Always answer Paris" -> %{answer: "Paris"}
-            true -> %{answer: "unknown"}
-          end
+        cond do
+          prompt =~ "[[ ## answer ## ]]\nParis" -> %{answer: "Paris"}
+          prompt =~ "Always answer Paris" -> %{answer: "Paris"}
+          true -> %{answer: "unknown"}
         end
-      ]
-    }
+      end
+    )
   end
 
   defp trainset do
@@ -32,7 +29,7 @@ defmodule OptimizerEffectivenessTest do
     ]
   end
 
-  test "labeled few-shot compilation improves evaluated score" do
+  test "labeled few-shot compilation injects the selected demo" do
     metric = Imp.Metrics.exact_match(:answer)
     program = Imp.predict("question -> answer", lm: demo_sensitive_lm())
     evaluator = Imp.Evaluate.new(devset(), metric)
@@ -46,7 +43,7 @@ defmodule OptimizerEffectivenessTest do
     assert Imp.Evaluate.run(evaluator, compiled).score == 1.0
   end
 
-  test "instruction optimizer can improve score using candidate instructions" do
+  test "instruction optimizer applies the selected candidate instruction" do
     metric = Imp.Metrics.exact_match(:answer)
     program = Imp.predict("question -> answer", lm: demo_sensitive_lm())
     evaluator = Imp.Evaluate.new(devset(), metric)
@@ -66,7 +63,7 @@ defmodule OptimizerEffectivenessTest do
     assert Imp.Evaluate.run(evaluator, compiled).score == 1.0
   end
 
-  test "random search keeps a candidate that improves dev score" do
+  test "random search keeps the best scripted dev-set candidate" do
     metric = Imp.Metrics.exact_match(:answer)
     program = Imp.predict("question -> answer", lm: demo_sensitive_lm())
     evaluator = Imp.Evaluate.new(devset(), metric)

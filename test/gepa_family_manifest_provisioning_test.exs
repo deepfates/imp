@@ -14,6 +14,7 @@ defmodule ImpTest.GEPAFamilyManifestProvisioningTest do
   @manifest "benchmarks/data/gepa-campaign-full/families.json"
   @artifact_root "tmp/gepa-artifact"
 
+  @tag :local_provisioning
   test "any family declaring retrieval status 'present' actually has its corpus and index on disk" do
     manifest = @manifest |> File.read!() |> Jason.decode!()
 

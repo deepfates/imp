@@ -17,3 +17,9 @@ The 16k rehearsal (examples/matched_ifbench_rehearsal16k) is the campaign that a
 
 One take reaches terminal with 6 sealed cells and both complete result artifacts; verdict addendum written against P1/P2/P3 including held-out paired analysis; run root archived to evidence/matched/ with checksums; docs/EVIDENCE.md + README reconciled to the measured outcome.
 
+
+## Notes
+
+**2026-08-21T03:23:01Z**
+
+Ledger correction: take 11 completed and sealed all six optimizer arm cells at the source-faithful 16k settings, then stopped during held-out evaluation on Imp's repo-owned 4096 input-token bound. The engineering rehearsal succeeded at its narrow scope, but this ticket's held-out paired analysis and archival acceptance criteria remain unmet, so it stays open.

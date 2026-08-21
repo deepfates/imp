@@ -1,6 +1,6 @@
 ---
 id: imp-k5wi
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:12:13Z
@@ -18,3 +18,9 @@ Cold-reader findings: GLOSSARY says dev/train/test, API_GUIDE says training/sele
 
 One vocabulary used everywhere or explicit bridges; both artifact kinds in GLOSSARY; arities corrected; schema-N bookkeeping moved to internal docs; metric return-shape guidance written.
 
+
+## Notes
+
+**2026-08-21T03:27:59Z**
+
+Reconciled the remaining user vocabulary: dev is explicitly bridged to Experiment selection; train/selection/test roles are distinct; full-program and parameter Artifacts are separately defined; metric return shapes now say when feedback is consumed; signature fields use Imp.get while struct metadata may use dot access; internal result schema numbers were removed from API_GUIDE. Current save and load arities were verified against the facade and were already correct. Focused docs contracts pass.

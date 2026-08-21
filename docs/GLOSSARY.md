@@ -20,10 +20,12 @@ or bracketed prose into an answer.
 
 ## Artifact
 
-An artifact is a saved program: a checksummed JSON file produced by
-`Imp.save!/2` and loaded with `Imp.load!/1`. It carries the program shape,
-instructions, and demos — never provider credentials. Review and version it
-like the deployable state it is.
+Imp has two explicit artifact forms. `Imp.save!/2` and `Imp.load!/1` persist a
+portable built-in program, including its shape, instructions, and demos.
+`Imp.Optimizer.Artifact` persists selected parameters for application-owned
+program code; reconstruct the trusted module and apply those parameters after
+restart. Neither form stores provider credentials. Review and version either
+one like the deployable state it is.
 
 ## Demo
 
@@ -33,7 +35,9 @@ input/output pattern. Demos are data, not hidden prompt strings.
 ## Dev Set
 
 A dev set is the set of examples used to choose between candidate programs.
-Optimizers score candidates on the dev set.
+Imp's Experiment API calls this the **selection set** to make that role
+explicit. Optimizers may score candidates on dev data during search; final
+admission and untouched testing remain separate stages.
 
 ## Example
 
@@ -47,8 +51,9 @@ An LM is the runtime model dependency. In tests this is often
 
 ## Metric
 
-A metric scores a prediction against an example. Metrics can return booleans,
-numbers, maps with feedback, or `Imp.Metrics.Result`.
+A metric scores a prediction against an example. Return a boolean for a strict
+pass/fail check, a number for graded credit, or `Imp.Metrics.Result` (or its map
+shape) when an optimizer or report also needs feedback and metadata.
 
 ## Optimizer
 
@@ -58,8 +63,9 @@ variants, or optimize text artifacts.
 
 ## Prediction
 
-A prediction is the structured output of a program. It contains fields,
-optional completions, score metadata, and traces.
+A prediction is the structured output of a program. Read signature-declared
+dynamic fields with `Imp.get/2`; ordinary struct fields such as `metadata` and
+`completions` can use dot access. Predictions can also carry scores and traces.
 
 ## Program
 
@@ -78,6 +84,9 @@ Example:
 Imp.signature("question -> answer: short_span")
 ```
 
+See the [signature type DSL](API_GUIDE.md#signature-type-dsl) for every scalar,
+array, enum, and answer-shape spelling and its validation behavior.
+
 ## Test Set
 
 A test set (held-out set) is data that nothing selected against: not the
@@ -93,4 +102,5 @@ evaluation, and Imp redacts common secret-shaped values.
 ## Train Set
 
 A train set is the set of examples an optimizer can use to build candidates,
-for example by selecting demos.
+for example by selecting demos. It is distinct from the dev/selection set that
+chooses a candidate and the test set that estimates the selected result.

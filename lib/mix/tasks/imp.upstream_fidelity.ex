@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Imp.UpstreamFidelity do
   @moduledoc """
-  Emit and optionally gate the Imp executable upstream-conformance ledger.
+  Emit and optionally gate the Imp audited upstream-conformance ledger.
 
       mix imp.upstream_fidelity
       mix imp.upstream_fidelity --out tmp/upstream-fidelity.json --require-conformant
@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
 
   use Mix.Task
 
-  @shortdoc "Audit executable Imp conformance against pinned upstream surfaces"
+  @shortdoc "Audit Imp conformance dispositions against pinned upstream surfaces"
 
   @impl true
   def run(args) do
@@ -64,12 +64,17 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
       |> Enum.join("\n\n")
 
     """
-    # Imp Executable Upstream Conformance
+    # Imp Audited Upstream Conformance Ledger
 
     This generated report answers whether the selected upstream-conformance
     profile has unresolved blocking rows. It is not the product release verdict
     or work queue; the source repository's maintainer release procedure owns
     the ordinary consumer finish line and `tk` owns unfinished work.
+
+    Each status below is a maintainer-authored disposition. The generator checks
+    that named evidence exists, that claim and reproduction registries are
+    internally valid, and that gaps obey the selected profile; it does not infer
+    semantic conformance merely because the named test files pass.
 
     Baseline: DSPy #{report.baseline.version} (`#{report.baseline.git_sha}`)
     Release profile: #{report.release_profile["id"]}
@@ -86,11 +91,11 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     Selected-profile blockers: #{report.summary.release_blockers}
     Conformance profile passing: #{report.summary.passing}
 
-    | ID | Category | Status | Product gate | Upstream surfaces |
+    | ID | Category | Maintainer disposition | Product gate | Upstream surfaces |
     | --- | --- | --- | --- | --- |
     #{rows}
 
-    ## Executable Contracts
+    ## Audited Contracts
 
     #{details}
     """
@@ -189,7 +194,7 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     """
     ### `#{surface.id}`
 
-    Status: `#{surface.status}`
+    Maintainer disposition: `#{surface.status}`
 
     Upstream source: `#{surface.source}`
 

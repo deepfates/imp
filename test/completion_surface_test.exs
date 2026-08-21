@@ -528,6 +528,14 @@ defmodule CompletionSurfaceTest do
     assert Enum.take(Imp.Streaming.stream(program, %{question: "order?"}), 6) == ~w(o n e t w o)
   end
 
+  test "provider streaming fails loudly for composed programs without a streamable predictor" do
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "n * 2"} end)
+    program = Imp.program_of_thought("n: integer -> doubled: integer", lm: lm)
+
+    assert Imp.Streaming.collect(program, %{n: 2}, provider_stream: true) ==
+             {:error, {:provider_stream_unsupported, Imp.Predict.ProgramOfThought}}
+  end
+
   test "streaming fallback collects wrapper outputs through their task contracts" do
     pot_lm = %{
       module: Imp.LM.Static,

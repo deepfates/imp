@@ -1,6 +1,6 @@
 ---
 id: imp-vfqw
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-11T06:06:03Z
@@ -43,3 +43,7 @@ REMAINING FORK — one of:
 (b) would be a genuine MIPROv2 defect and the more serious outcome.
 
 NEXT DIAGNOSTIC (cheap, no provider): after MIPROv2.compile in this lane, dump (1) the compiled program's effective instruction, (2) the instruction candidate pool by index, (3) the rendered prompt for one devset call. That distinguishes (a) from (b) immediately. Do not close this ticket on reasoning; close it on that dump plus a re-run.
+
+**2026-08-21T03:22:22Z**
+
+Falsified the suspected core MIPRO application defect. The provider-free fixture matched an obsolete proposer prompt, so both Imp proposal calls returned `invalid_proposal` and never offered the planted winner. Updated the fixture to the current proposer contract; `mix imp.benchmark.optimizer_lift` now passes 10/10 rows, including MIPROv2 0.0 -> 1.0. This is a benchmark integration defect, not held-out effectiveness evidence.

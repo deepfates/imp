@@ -1,6 +1,6 @@
 ---
 id: imp-st1u
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:12:13Z
@@ -18,3 +18,9 @@ The signature string mini-language ('ticket -> team: enum[...]', short_span, lis
 
 One canonical table of every signature type with example + validation behavior; linked from README, API_GUIDE, GLOSSARY.
 
+
+## Notes
+
+**2026-08-21T03:22:15Z**
+
+Added the canonical signature type DSL table to API_GUIDE, including aliases, recursive arrays, enums, answer shapes, validation, map-only code, and unsupported boundaries. README and GLOSSARY link it; documentation contract enforces coverage.

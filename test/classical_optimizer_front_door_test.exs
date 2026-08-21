@@ -138,7 +138,7 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
     assert applied.lm == fresh.lm
     applied_report = Report.fetch(applied)
     optimized_report = Report.fetch(optimized)
-    assert to_string(applied_report.optimizer) == to_string(optimized_report.optimizer)
+    assert applied_report.optimizer == optimized_report.optimizer
     assert applied_report.best_score == optimized_report.best_score
     assert applied_report.candidate_count == optimized_report.candidate_count
     assert_fresh_os_artifact(path, Report.fetch(optimized))

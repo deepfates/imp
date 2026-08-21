@@ -1,6 +1,6 @@
 ---
 id: imp-4er4
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:08:17Z
@@ -18,3 +18,9 @@ HTTP retriever response_mapper example is arity-2 where schema requires {:fun, 1
 
 Both snippets construct successfully when pasted; error-message references reconciled.
 
+
+## Notes
+
+**2026-08-21T03:22:15Z**
+
+Corrected ADVANCED.md to the actual arity-1 HTTP response_mapper contract and Databricks new/2 endpoint contract. External retriever and documentation contracts pass.

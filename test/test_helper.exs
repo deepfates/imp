@@ -54,6 +54,9 @@ external_excludes =
     # here (removing the tag from the default exclude list) is what makes the
     # per-PR / capture split actually take effect.
     {"DSPY_CAPTURE", :requires_dspy_capture},
+    # Machine-local corpus/index provisioning is not a clean-checkout product
+    # invariant. Opt in only on a host that is preparing the HoVer campaign.
+    {"GEPA_LOCAL_PROVISIONING", :local_provisioning},
     {"PROTOCOL_TRAINING", :protocol_training},
     {"PROTOCOL_RETRIEVER", :protocol_retriever},
     {"PROTOCOL_MCP", :protocol_mcp}

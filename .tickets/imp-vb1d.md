@@ -1,6 +1,6 @@
 ---
 id: imp-vb1d
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:14:57Z
@@ -18,3 +18,9 @@ CONFORMANCE.md claims to be an 'Executable Upstream Conformance' report, but sta
 
 Each row's invariants map to named tests whose passing is required for the status (or report renamed to 'audited ledger' and each hand-judgment labeled as such); a deliberately broken invariant flips its row in the generated report.
 
+
+## Notes
+
+**2026-08-21T03:26:22Z**
+
+Took the allowed audited-ledger disposition. The generated report is renamed Imp Audited Upstream Conformance Ledger; its introduction, table, and every row label statuses as maintainer-authored dispositions and state exactly what the generator validates and that passing named test files does not itself infer semantic conformance. Generator projection tests enforce those labels.

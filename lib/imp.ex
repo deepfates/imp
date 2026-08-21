@@ -260,9 +260,11 @@ defmodule Imp do
   @doc """
   Streams one program call as an Enumerable of chunks.
 
-  Pass `provider_stream: true` to stream chunks from the provider as it
-  generates; otherwise the program runs once and the result is chunked
-  locally, so stream consumers keep working with any program or LM.
+  Pass `provider_stream: true` to require chunks from the provider as it
+  generates. If the program does not expose a streamable predictor, the stream
+  returns a terminal `{:provider_stream_unsupported, module}` error. Without
+  that option, the program runs once and the result is chunked locally, so
+  stream consumers keep working with any program or LM.
   """
   defdelegate stream(program, inputs, opts \\ []), to: Imp.Streaming
 

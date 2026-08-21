@@ -20,11 +20,13 @@ on exactly one family (TREC); this is the breadth gap.
 | BM25 index `bm25s_retriever` | 1.0 GB, built by upstream's own `initialize_bm25s_retriever_and_corpus` (k1=0.9, b=0.4) |
 | splits train/dev/test | 150 / 300 / 300, sha256 **byte-identical** to manifest `split_checksums` |
 | retrieval smoke | real dev claim returns the correct multi-hop chain |
-| provisioning guard | `test/gepa_family_manifest_provisioning_test.exs` green |
+| provisioning guard | `GEPA_LOCAL_PROVISIONING=1 mix test test/gepa_family_manifest_provisioning_test.exs` green on the provisioned campaign host |
 
 `families.json` had declared retrieval `status: "present"` while corpus and
 index were both absent; earlier "live present, capped" HoVer rows ran off a
-1,485-entry retrieval cache. That field is now computed from the filesystem.
+1,485-entry retrieval cache. The opt-in local-provisioning guard computes the
+claim from the filesystem; the default clean-checkout product suite does not
+pretend ignored multi-gigabyte research data ships with the repository.
 
 ## Fixed design (from the manifest; not chosen by me)
 

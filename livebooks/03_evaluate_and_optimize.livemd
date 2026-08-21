@@ -72,17 +72,15 @@ Start with a baseline before optimizing. A baseline tells you whether the
 metric, dev set, adapter, and LM are wired together before search adds motion.
 
 ```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [
+lm =
+  Imp.LM.Static.new(
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
       if prompt =~ "answer: 4" or prompt =~ "Always answer 4",
         do: %{answer: "4"},
         else: %{answer: "unknown"}
     end
-  ]
-}
+  )
 
 program = Imp.predict("question -> answer", lm: lm)
 Imp.evaluate(program, devset, metric)

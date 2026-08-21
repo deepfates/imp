@@ -226,7 +226,7 @@ behaviour:
 retriever =
   Imp.Retrievers.HTTP.new("https://retriever.example/search",
     body_builder: fn query, opts -> %{query: query, k: Keyword.get(opts, :k, 3)} end,
-    response_mapper: fn _retriever, decoded -> decoded["documents"] end
+    response_mapper: fn decoded -> decoded["documents"] end
   )
 ```
 
@@ -238,10 +238,9 @@ weaviate = Imp.Retrievers.Weaviate.new("https://weaviate.example", "Passage")
 
 databricks =
   Imp.Retrievers.Databricks.new(
-    "https://workspace.example",
-    "catalog.schema.index",
+    "https://workspace.example/api/2.0/vector-search/indexes/catalog.schema.index/query",
     token: System.fetch_env!("DATABRICKS_TOKEN")
-)
+  )
 ```
 
 Network-facing protocol clients share the same transport boundary: `transport:`

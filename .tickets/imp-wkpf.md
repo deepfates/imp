@@ -1,6 +1,6 @@
 ---
 id: imp-wkpf
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-11T04:53:24Z
@@ -45,3 +45,7 @@ SCOPE RESOLVED FROM SOURCE (2026-08-11), not from inference. gepa_utils.py selec
 DECISION: match the SEMANTICS (dominance rule + score-ordered removal + coverage-weighted sampling); do NOT emulate CPython hash-container iteration. Consequence, stated plainly so it is never over-claimed: bit-exact GEPA TRAJECTORY parity with gepa v0.1.4 is unattainable in imp without emulating CPython set/dict iteration order throughout — rng.choice indexes into a list whose order comes from that iteration, so even the bit-exact MT19937 (rng_algorithm: :python_v3) cannot deliver identical draws by itself. imp should therefore claim behavioural/semantic fidelity, never trajectory reproduction.
 
 Fix stands (inspect/1 printed-id ordering was indefensible regardless). Tie exemption is encoded as a test that FAILS if it ever starts agreeing, so it cannot go stale.
+
+**2026-08-21T03:22:16Z**
+
+Verified the recorded semantic disposition against pinned gepa v0.1.4: `mix test test/gepa_pareto_tie_order_differential_test.exs --include dspy_parity` passes 2/2. Imp matches dominance and stable discovery semantics for defined cases; CPython hash-container collision order remains an explicit, tested non-semantic divergence, so no bit-exact trajectory claim is made.

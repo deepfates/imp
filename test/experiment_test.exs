@@ -299,7 +299,7 @@ defmodule Imp.ExperimentTest do
     assert result.test.score == 1.0
     assert result.repetition_summary.counts == %{selection: 2, test: 1}
     assert Result.to_map(result)["schema_version"] == 4
-    assert %Report{optimizer: "labeled_few_shot"} = Report.fetch(result.program)
+    assert %Report{optimizer: :labeled_few_shot} = Report.fetch(result.program)
     assert Artifact.inspect(result.artifact).champion_id == "optimized"
 
     fresh =

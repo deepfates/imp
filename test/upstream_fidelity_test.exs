@@ -195,6 +195,9 @@ defmodule Imp.UpstreamFidelityTest do
     body = File.read!("docs/CONFORMANCE.md")
 
     assert body =~ report.baseline.git_sha
+    assert body =~ "# Imp Audited Upstream Conformance Ledger"
+    assert body =~ "Each status below is a maintainer-authored disposition."
+    assert body =~ "| ID | Category | Maintainer disposition |"
 
     for row <- report.surfaces do
       assert body =~ "| #{row.id} | #{row.category} | #{row.status} |"

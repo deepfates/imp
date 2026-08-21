@@ -83,7 +83,7 @@ the publication version, and publication remain separate owner actions.
 Run from a clean candidate commit:
 
 ```sh
-scripts/setup_reference_test_env.sh
+PYTHON=python3.12 scripts/setup_reference_test_env.sh
 mix production.check
 mix integration.check
 mix protocol.check

@@ -144,7 +144,7 @@ matters more than prose flexibility.
 `Imp.LM` is a small behaviour. Tests usually use:
 
 ```elixir
-%{module: Imp.LM.Static, opts: [handler: fn messages, opts -> %{answer: "ok"} end]}
+Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
 ```
 
 The preferred production client is:

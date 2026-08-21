@@ -803,13 +803,13 @@ defmodule PackageContractTest do
       |> Imp.Optimizer.Artifact.apply(program)
 
     unless match?(
-             %Imp.Optimizer.Report{optimizer: "random_search"},
+             %Imp.Optimizer.Report{optimizer: :random_search},
              Imp.Optimizer.Report.fetch(random_deployed)
            ) do
       raise "RandomSearch package artifact lost its optimizer report on application"
     end
 
-    verify_program_optimizer.(:random_search_artifact, "random_search", random_deployed)
+    verify_program_optimizer.(:random_search_artifact, :random_search, random_deployed)
 
     knn_few_shot =
       Imp.Optimizer.KNNFewShot.new(1, fixture_trainset,

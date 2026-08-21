@@ -123,7 +123,7 @@ jobs:
         run: |
           PYTHON=python3.12 scripts/setup_dspy_parity_env.sh
           PYTHON=python3.12 scripts/setup_dspy_current_target.sh
-          scripts/setup_reference_test_env.sh
+          PYTHON=python3.12 scripts/setup_reference_test_env.sh
       - name: Run the full evidence-infrastructure suite
         env:
           EVIDENCE_INFRASTRUCTURE: "1"

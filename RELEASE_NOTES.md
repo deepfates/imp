@@ -132,7 +132,13 @@ the packaged example.
   [evidence reconciliation](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
   for what a clean clone can verify from committed evidence alone.
 - Streaming promoted to the facade (`Imp.stream/3`, `Imp.collect/3`) with
-  provider token streaming and an honest local fallback.
+  provider token streaming and an explicit local fallback. Setting
+  `provider_stream: true` is strict: composed programs without a streamable
+  predictor return a terminal unsupported-program error instead of replaying a
+  completed response as if it were provider output.
+- Known optimizer identities in `Imp.Optimizer.Report` retain their atom type
+  after a checksummed Artifact write/read/apply cycle; unknown extension
+  identifiers remain portable strings.
 - Two silent-failure bugs found and fixed the same day they were exposed by
   the claims census (batch message mangling; swallowed telemetry), plus
   loud-by-default evaluation timeouts and a threadable teacher timeout for

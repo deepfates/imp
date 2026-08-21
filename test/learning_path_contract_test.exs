@@ -32,7 +32,7 @@ defmodule LearningPathContractTest do
       {3, {"security", "high"}},
       {4, 0.5},
       {7, "security"},
-      {8, {"security", "labeled_few_shot"}},
+      {8, {"security", :labeled_few_shot}},
       {9, {"Ines", [[:imp, :tool, :start], [:imp, :tool, :stop]]}}
     ]
 

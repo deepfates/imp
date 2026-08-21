@@ -1,6 +1,6 @@
 ---
 id: imp-mnec
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:08:17Z
@@ -18,3 +18,9 @@ Rendered prompts tell the model outputs 'must be formatted as a valid Python Lit
 
 Adapter docs explain the DSPy-parity wire format and why; front-door doc links to it.
 
+
+## Notes
+
+**2026-08-21T03:28:53Z**
+
+API_GUIDE now explains that Python Literal, list, and dict wording in Chat and JSON prompts deliberately matches pinned DSPy 3.2.1 wire guidance; Imp parses it into Elixir types and never evaluates Python. README links directly to that adapter-wire-format section. Documentation contracts pass.

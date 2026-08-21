@@ -103,9 +103,8 @@ ReAct is the provider-tool-call path: the LM proposes tool calls and then
 submits a final signature-shaped answer through the reserved `submit` tool.
 
 ```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [
+lm =
+  Imp.LM.Static.new(
     handler: fn _messages, _opts ->
       %{
         tool_calls: [
@@ -114,8 +113,7 @@ lm = %{
         ]
       }
     end
-  ]
-}
+  )
 
 react = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
 {:ok, pred} = Imp.call(react, %{question: "Capital of France?"})
@@ -202,16 +200,14 @@ actions = [
   %{reasoning: "Submit the persisted value.", code: ~S|submit(%{answer: scratch})|}
 ]
 
-controller_lm = %{
-  module: Imp.LM.Static,
-  opts: [
+controller_lm =
+  Imp.LM.Static.new(
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_actions)
       Process.put(:rlm_actions, rest)
       action
     end
-  ]
-}
+  )
 
 Process.put(:rlm_actions, actions)
 
@@ -254,16 +250,14 @@ Process.put(:rlm_lazy_actions, [
   %{reasoning: "Submit.", code: ~S|submit(%{answer: "loaded"})|}
 ])
 
-lazy_controller = %{
-  module: Imp.LM.Static,
-  opts: [
+lazy_controller =
+  Imp.LM.Static.new(
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_lazy_actions)
       Process.put(:rlm_lazy_actions, rest)
       action
     end
-  ]
-}
+  )
 
 lazy_rlm = Imp.rlm("context, question -> answer", lm: lazy_controller)
 {:ok, lazy_pred} = Imp.call(lazy_rlm, %{context: lazy_context, question: "q"})
@@ -280,27 +274,23 @@ ordinary environment values. Each batch item counts against `max_llm_calls`.
 ```elixir
 parent = self()
 
-batch_controller = %{
-  module: Imp.LM.Static,
-  opts: [
+batch_controller =
+  Imp.LM.Static.new(
     handler: fn _messages, _opts ->
       [action | rest] = Process.get(:rlm_batch_actions)
       Process.put(:rlm_batch_actions, rest)
       action
     end
-  ]
-}
+  )
 
-batch_sub_lm = %{
-  module: Imp.LM.Static,
-  opts: [
+batch_sub_lm =
+  Imp.LM.Static.new(
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
       send(parent, {:rlm_batch_prompt, prompt})
       %{answer: if(prompt =~ "first", do: "one", else: "two")}
     end
-  ]
-}
+  )
 
 Process.put(:rlm_batch_actions, [
   %{
@@ -327,9 +317,8 @@ Process.delete(:rlm_batch_actions)
 ## RLM Budget Failure
 
 ```elixir
-loop_lm = %{
-  module: Imp.LM.Static,
-  opts: [
+loop_lm =
+  Imp.LM.Static.new(
     handler: fn messages, _opts ->
       if Enum.map_join(messages, "\n", & &1.content) =~ "RLM extract pass" do
         %{answer: "recovered by extract"}
@@ -337,8 +326,7 @@ loop_lm = %{
         %{reasoning: "Inspect without submitting.", code: "1 + 1"}
       end
     end
-  ]
-}
+  )
 
 rlm = Imp.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
 Imp.call(rlm, %{question: "loop?"})

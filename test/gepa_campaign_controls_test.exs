@@ -319,6 +319,29 @@ defmodule GepaCampaignControlsTest do
     assert plan["semantic_progress"] == %{"max_consecutive_proposal_errors" => 5}
   end
 
+  test "direct CLI plan parses a comma-separated family selector", context do
+    Mix.Task.reenable("imp.benchmark.gepa_campaign")
+    manifest = GepaCampaignManifest.load!(context.manifest_path)
+    manifest_opts = GepaCampaignManifest.task_options!(manifest, manifest: context.manifest_path)
+
+    output =
+      ExUnit.CaptureIO.capture_io(fn ->
+        assert :ok =
+                 GepaTask.run([
+                   "--dataset-root",
+                   manifest_opts[:dataset_root],
+                   "--campaign-id",
+                   "family-selector-contract",
+                   "--families",
+                   "AIMEBench,LiveBenchMathBench",
+                   "--plan"
+                 ])
+      end)
+
+    plan = Jason.decode!(output)
+    assert plan["families"] == ["AIMEBench", "LiveBenchMathBench"]
+  end
+
   defp start_budget(path, overrides) do
     link? = Keyword.get(overrides, :link, true)
 

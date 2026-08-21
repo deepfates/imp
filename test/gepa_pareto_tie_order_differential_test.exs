@@ -26,7 +26,11 @@ defmodule ImpTest.GEPAParetoTieOrderDifferentialTest do
   end
 
   defp upstream_survivors(mapping, scores) do
-    front = mapping |> Enum.map(fn {k, v} -> "#{k}: {#{Enum.join(Enum.sort(v), ",")}}" end) |> Enum.join(", ")
+    front =
+      mapping
+      |> Enum.map(fn {k, v} -> "#{k}: {#{Enum.join(Enum.sort(v), ",")}}" end)
+      |> Enum.join(", ")
+
     score = scores |> Enum.map(fn {k, v} -> "#{k}: #{v}" end) |> Enum.join(", ")
 
     script = """
@@ -71,11 +75,14 @@ defmodule ImpTest.GEPAParetoTieOrderDifferentialTest do
   @tag :dspy_parity
   test "dominance pruning matches pinned gepa v0.1.4 under tied aggregate scores" do
     unless File.dir?(@gepa_source) do
-      flunk("pinned gepa source missing at #{@gepa_source}; run scripts/setup_corrected_gepa_comparator.sh")
+      flunk(
+        "pinned gepa source missing at #{@gepa_source}; run scripts/setup_corrected_gepa_comparator.sh"
+      )
     end
 
     for {mapping, scores} <- @cases do
       mapping = Map.new(mapping, fn {k, v} -> {k, MapSet.new(v)} end)
+
       assert survivors(mapping, scores) == upstream_survivors(mapping, scores),
              "Pareto survivors diverged from upstream for mapping=#{inspect(mapping)}"
     end

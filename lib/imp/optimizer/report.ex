@@ -162,6 +162,9 @@ defmodule Imp.Optimizer.Report do
     signature_optimizer: Imp.Optimizer.SignatureOptimizer,
     simba: Imp.Optimizer.SIMBA
   }
+  @portable_optimizer_identities Map.new(@optimizer_modules, fn {name, _module} ->
+                                   {Atom.to_string(name), name}
+                                 end)
 
   defstruct optimizer: nil,
             best_score: nil,
@@ -245,7 +248,12 @@ defmodule Imp.Optimizer.Report do
       raise ArgumentError, "malformed optimizer report state"
     end
 
-    optimizer = state |> fetch_required!(:optimizer) |> load_value(atom_mode)
+    optimizer =
+      state
+      |> fetch_required!(:optimizer)
+      |> load_value(atom_mode)
+      |> normalize_optimizer_identity()
+
     ensure_optimizer_runtime_loaded!(optimizer)
     best_score = state |> fetch_required!(:best_score) |> load_value(atom_mode)
     candidate_count = state |> fetch_required!(:candidate_count) |> load_value(atom_mode)
@@ -685,6 +693,11 @@ defmodule Imp.Optimizer.Report do
       :erlang.binary_to_existing_atom(value, :utf8)
     end)
   end
+
+  defp normalize_optimizer_identity(value) when is_binary(value),
+    do: Map.get(@portable_optimizer_identities, value, value)
+
+  defp normalize_optimizer_identity(value), do: value
 
   defp maybe_with_inputs(example, nil), do: example
   defp maybe_with_inputs(example, input_keys), do: Imp.Example.with_inputs(example, input_keys)

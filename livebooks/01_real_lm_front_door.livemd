@@ -224,10 +224,7 @@ free — this is also how your test suite exercises Imp programs. Livebook 03
 expands it into the full evaluation and optimization workflow:
 
 ```elixir
-static_lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-}
+static_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
 program = Imp.predict("question -> answer", lm: static_lm)
 

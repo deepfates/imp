@@ -1,9 +1,14 @@
-# Imp Executable Upstream Conformance
+# Imp Audited Upstream Conformance Ledger
 
 This generated report answers whether the selected upstream-conformance
 profile has unresolved blocking rows. It is not the product release verdict
 or work queue; the source repository's maintainer release procedure owns
 the ordinary consumer finish line and `tk` owns unfinished work.
+
+Each status below is a maintainer-authored disposition. The generator checks
+that named evidence exists, that claim and reproduction registries are
+internally valid, and that gaps obey the selected profile; it does not infer
+semantic conformance merely because the named test files pass.
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
 Release profile: v0.1
@@ -20,7 +25,7 @@ Duplicate manifest owners: 0
 Selected-profile blockers: 0
 Conformance profile passing: true
 
-| ID | Category | Status | Product gate | Upstream surfaces |
+| ID | Category | Maintainer disposition | Product gate | Upstream surfaces |
 | --- | --- | --- | --- | --- |
 | programming.contracts | programming_model | conformant | satisfied | Signature, InputField, OutputField, Example, Prediction, History |
 | programming.modules | programming_model | conformant | satisfied | Module, Predict, ChainOfThought, MultiChainComparison, Parallel |
@@ -49,11 +54,11 @@ Conformance profile passing: true
 | product.learning_path | product | conformant | satisfied | getting started, tutorials, real-world examples, API reference, production guide |
 | product.release | product | tracking | tracked | installable package, versioned release, security policy, CI, clean-room consumer |
 
-## Executable Contracts
+## Audited Contracts
 
 ### `programming.contracts`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/signatures; dspy/primitives`
 
@@ -86,7 +91,7 @@ Missing evidence or behavior:
 
 ### `programming.modules`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/primitives/module.py; dspy/predict`
 
@@ -119,7 +124,7 @@ Missing evidence or behavior:
 
 ### `models.runtime`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/clients; dspy/dsp/utils/settings.py; dspy/utils/exceptions.py`
 
@@ -149,7 +154,7 @@ Missing evidence or behavior:
 
 ### `models.normalized_runtime_prerelease`
 
-Status: `tracking`
+Maintainer disposition: `tracking`
 
 Upstream source: `dspy/core/types.py; dspy/clients/base_lm.py @ 3.3.0b1`
 
@@ -173,7 +178,7 @@ Missing evidence or behavior:
 
 ### `adapters.structured_io`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/adapters`
 
@@ -199,7 +204,7 @@ Missing evidence or behavior:
 
 ### `adapters.xml`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/adapters/xml_adapter.py`
 
@@ -225,7 +230,7 @@ Missing evidence or behavior:
 
 ### `adapters.two_step`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/adapters/two_step_adapter.py`
 
@@ -252,7 +257,7 @@ Missing evidence or behavior:
 
 ### `primitives.multimodal`
 
-Status: `gap`
+Maintainer disposition: `gap`
 
 Upstream source: `dspy/adapters/types; dspy/experimental`
 
@@ -281,7 +286,7 @@ Missing evidence or behavior:
 
 ### `tools.typed_calls`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/adapters/types/tool.py; dspy/utils/mcp.py`
 
@@ -316,7 +321,7 @@ Missing evidence or behavior:
 
 ### `agents.react_family`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/react.py; react_v2.py; code_act.py; program_of_thought.py`
 
@@ -354,7 +359,7 @@ Missing evidence or behavior:
 
 ### `agents.rlm`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/rlm.py; arXiv:2512.24601`
 
@@ -391,7 +396,7 @@ Missing evidence or behavior:
 
 ### `composition.refinement`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/predict/best_of_n.py; dspy/predict/refine.py; tests/predict/test_refine.py @ 3.3.0b1 b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`
 
@@ -427,7 +432,7 @@ Missing evidence or behavior:
 
 ### `evaluation.metrics`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/evaluate`
 
@@ -463,7 +468,7 @@ Missing evidence or behavior:
 
 ### `optimization.few_shot`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/teleprompt/vanilla.py; bootstrap.py; random_search.py`
 
@@ -501,7 +506,7 @@ Missing evidence or behavior:
 
 ### `optimization.knn`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/predict/knn.py; dspy/teleprompt/knn_fewshot.py`
 
@@ -533,7 +538,7 @@ Missing evidence or behavior:
 
 ### `optimization.instructions`
 
-Status: `gap`
+Maintainer disposition: `gap`
 
 Upstream source: `dspy/teleprompt/copro_optimizer.py; mipro_optimizer_v2.py; simba.py; infer_rules.py`
 
@@ -576,7 +581,7 @@ Missing evidence or behavior:
 
 ### `optimization.gepa`
 
-Status: `gap`
+Maintainer disposition: `gap`
 
 Upstream source: `gepa-ai/gepa@8b0ce6cd99a234f6b74daf37558a2ac0ce18f975 (standalone v0.1.4 structural authority)`
 
@@ -620,7 +625,7 @@ Missing evidence or behavior:
 
 ### `optimization.weights`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/predict/avatar; dspy/teleprompt/avatar_optimizer.py; bootstrap_finetune.py; grpo.py; bettertogether.py; ensemble.py`
 
@@ -675,7 +680,7 @@ Missing evidence or behavior:
 
 ### `optimization.fast_slow`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `arXiv:2605.12484v2; official GEPA Fast-Slow project article`
 
@@ -709,7 +714,7 @@ Missing evidence or behavior:
 
 ### `optimization.anything`
 
-Status: `gap`
+Maintainer disposition: `gap`
 
 Upstream source: `arXiv:2605.19633; gepa-ai optimize-anything`
 
@@ -754,18 +759,19 @@ Missing evidence or behavior:
 
 ### `retrieval.data`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/retrievers; dspy/datasets`
 
 Imp modules: `Imp.Retrieve`, `Imp.Embeddings`, `Imp.Retrievers.HTTP`, `Imp.Datasets`
-Elixir-native rationale: Imp owns retrieval protocols and composition while production indexes remain replaceable services; embedded ColBERT is intentionally omitted.
+Elixir-native rationale: Imp owns retrieval protocols and composition while production indexes remain replaceable services. Unlike DSPy's convenience dataset helpers, named Imp loaders require explicit local files and never auto-download; embedded ColBERT is intentionally omitted.
 
 Semantic invariants:
 
 - retrievers return ranked normalized documents
 - external protocols are contract tested
 - dataset splits and provenance are explicit
+- named dataset loaders require explicit local files and never auto-download
 
 Executable evidence:
 
@@ -787,7 +793,7 @@ Missing evidence or behavior:
 
 ### `runtime.async_stream_cache`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/utils; dspy/streaming; dspy/clients/cache.py`
 
@@ -796,12 +802,14 @@ Semantic invariants:
 
 - work is supervised and cancellable
 - stream events preserve final results and errors
+- provider streaming either reaches a streamable predictor or returns a terminal unsupported-program error
 - cache policy and usage accounting are configurable
 - provider-free overhead is measured against upstream
 
 Executable evidence:
 
 - test: `test/runtime_async_stream_cache_test.exs`
+- test: `test/completion_surface_test.exs`
 - test: `test/task_supervision_test.exs`
 - test: `test/production_hardening_test.exs`
 - docs: `docs/ARCHITECTURE.md`
@@ -815,7 +823,7 @@ Missing evidence or behavior:
 
 ### `runtime.observability`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/utils/inspect_history.py; dspy/utils/callback.py; observability docs`
 
@@ -841,7 +849,7 @@ Missing evidence or behavior:
 
 ### `state.persistence_deployment`
 
-Status: `elixir_native_equivalent`
+Maintainer disposition: `elixir_native_equivalent`
 
 Upstream source: `dspy/primitives/base_module.py; dspy/utils/saving.py; deployment docs`
 
@@ -873,7 +881,7 @@ Missing evidence or behavior:
 
 ### `product.learning_path`
 
-Status: `conformant`
+Maintainer disposition: `conformant`
 
 Upstream source: `dspy/docs/docs`
 
@@ -903,7 +911,7 @@ Missing evidence or behavior:
 
 ### `product.release`
 
-Status: `tracking`
+Maintainer disposition: `tracking`
 
 Upstream source: `Hex package and canonical GitHub repository`
 

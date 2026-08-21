@@ -23,6 +23,14 @@ Chat, JSON, and XML adapters emit language-aware guidance, render source inputs,
 and return fenced or plain outputs as validated typed code values;
 the type transports source but does not execute it.
 
+Release hardening also keeps a report's known optimizer identity stable across
+an Artifact round-trip, while leaving unknown extension identifiers as strings.
+Strict provider streaming now fails with
+`{:provider_stream_unsupported, module}` when a composed program exposes no
+streamable predictor; local post-call chunking remains available when
+`provider_stream: true` is omitted. The packaged guides use the current
+`Imp.LM.Static.new/1` API and now include a complete signature type reference.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is

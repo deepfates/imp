@@ -1,6 +1,6 @@
 ---
 id: imp-ze7u
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:08:17Z
@@ -18,3 +18,9 @@ test/optimizer_effectiveness_test.exs pattern-matches the winning prompt string 
 
 File and test names describe wiring/selection; no offline test carries 'effectiveness' in its name.
 
+
+## Notes
+
+**2026-08-21T03:28:53Z**
+
+Renamed the provider-free scripted test to optimizer_selection_wiring_test and its module/tests to describe demo injection, selected instructions, and scripted dev-set selection. Migrated its Static LM to the current struct API. No offline test filename contains effectiveness; focused tests pass.

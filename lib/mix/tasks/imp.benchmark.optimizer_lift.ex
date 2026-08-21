@@ -673,7 +673,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
         prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
 
         cond do
-          String.contains?(prompt, "Propose Imp instruction candidates") ->
+          String.contains?(prompt, "Propose one complete Imp task instruction") ->
             {:ok, %{instructions: ["Always answer Paris when asked about France."]}}
 
           String.contains?(prompt, "better_program_trajectory") ->

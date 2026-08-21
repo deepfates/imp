@@ -11,9 +11,11 @@ defmodule Imp.Streaming do
   @doc """
   Streams one program call as an Enumerable of chunks.
 
-  With `provider_stream: true` and a provider-streaming-capable program,
-  chunks arrive from the provider as it generates. Otherwise the program runs
-  once and the result is chunked locally (grapheme by grapheme, or through
+  With `provider_stream: true`, the program must expose a streamable predictor;
+  unsupported composed programs return a terminal
+  `{:provider_stream_unsupported, module}` error instead of silently replaying
+  a completed response as chunks. Without `provider_stream: true`, the program
+  runs once and the result is chunked locally (grapheme by grapheme, or through
   the `:chunker` function when given).
   """
   def stream(program, inputs, opts \\ []) do
@@ -23,12 +25,21 @@ defmodule Imp.Streaming do
       owned_opts[:provider_stream] ->
         case Imp.ProgramAccess.provider_stream_predict(program) do
           %Imp.Predict.Predict{} = predict -> provider_stream(predict, inputs, opts)
-          nil -> fallback_stream(program, inputs, opts)
+          nil -> provider_stream_unsupported(program)
         end
 
       true ->
         fallback_stream(program, inputs, opts)
     end
+  end
+
+  defp provider_stream_unsupported(program) do
+    module =
+      if is_map(program),
+        do: Map.get(program, :__struct__, :unknown_program),
+        else: :unknown_program
+
+    error_response({:provider_stream_unsupported, module})
   end
 
   defp fallback_stream(program, inputs, opts) do

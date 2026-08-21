@@ -58,7 +58,7 @@ defmodule Imp.Optimizer.ArtifactTest do
     assert predictor.predictor.adapter == live.predict.adapter
 
     assert %Report{
-             optimizer: "gepa",
+             optimizer: :gepa,
              best_score: 0.9,
              candidate_count: 2,
              candidates: [],

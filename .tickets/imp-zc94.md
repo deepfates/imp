@@ -1,6 +1,6 @@
 ---
 id: imp-zc94
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:13:23Z
@@ -18,3 +18,9 @@ Imp ReAct fails fast on tool errors; DSPy feeds the error back as an observation
 
 Either an opt-in observe-and-continue mode with tests, or a loud migration-table warning; benchmark configs state which semantics ran.
 
+
+## Notes
+
+**2026-08-21T03:22:15Z**
+
+Took the documented acceptance path: the DSPy migration table now warns that Imp ReAct tool execution errors fail the call rather than becoming observations for a recovery turn. Existing conformance remains the detailed boundary.

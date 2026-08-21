@@ -88,10 +88,10 @@ returning the fields you script, while everything else — signature
 validation, adapters, metrics — runs for real.
 
 ```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{team: "security", urgency: "high"} end]
-}
+lm =
+  Imp.LM.Static.new(
+    handler: fn _messages, _opts -> %{team: "security", urgency: "high"} end
+  )
 
 router =
   "ticket -> team: enum[billing,infrastructure,security,product], urgency: enum[low,normal,high]"
@@ -110,10 +110,8 @@ big evaluation — a scripted model that always answers `security` should score
 exactly the fraction of examples labeled `security`:
 
 ```elixir
-always_security = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{team: "security"} end]
-}
+always_security =
+  Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "security"} end)
 
 program = Imp.predict("ticket -> team", lm: always_security)
 
@@ -243,10 +241,7 @@ program pinned to a non-portable runtime LM fails loudly instead of silently
 dropping the pin.
 
 ```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{team: "security"} end]
-}
+lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "security"} end)
 
 path = Path.join(System.tmp_dir!(), "ticket-router-#{System.unique_integer([:positive])}.json")
 

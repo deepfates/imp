@@ -1,6 +1,6 @@
 ---
 id: imp-86as
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:08:17Z
@@ -18,3 +18,9 @@ README, LEARNING_PATH §4, livebook 01, IMP_FOR_DSPY_USERS table all teach %{mod
 
 All teaching surfaces use Imp.LM.Static.new/1; a note where Static meets persistence pointing at rebind/context; grep for the deprecated shape in docs/livebooks returns nothing.
 
+
+## Notes
+
+**2026-08-21T03:22:15Z**
+
+Migrated shipped docs and Livebooks to `Imp.LM.Static.new/1`; the Learning Path already demonstrates portable save/load plus runtime LM rebinding/context. Deprecated-shape grep is empty across README/docs/livebooks/examples; docs and all five executable Livebooks pass.

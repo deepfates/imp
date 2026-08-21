@@ -22,7 +22,7 @@ Imp-only behaviors normally carry Imp-only names
 | `dspy.Signature` / `"q -> a"` | `Imp.signature("q -> a")` — same string DSL, types included (`enum[...]`, lists, numbers) |
 | `dspy.Predict(sig)` | `Imp.predict(sig, lm: lm)` |
 | `dspy.ChainOfThought` | `Imp.chain_of_thought/2` |
-| `dspy.ReAct(sig, tools=[...])` | `Imp.react(sig, tools, tool_policy: [...])` — tool policy is explicit |
+| `dspy.ReAct(sig, tools=[...])` | `Imp.react(sig, tools, tool_policy: [...])` — tool policy is explicit; tool execution errors fail the call instead of becoming observations for another model turn |
 | `dspy.Example` / `.with_inputs` | `Imp.example/1` / `Imp.with_inputs/2` |
 | `dspy.Prediction` | `%Imp.Prediction{}` — read fields with `Imp.get/2` |
 | `dspy.Evaluate` | `Imp.evaluate/4` — returns score plus per-example rows |
@@ -35,7 +35,7 @@ Imp-only behaviors normally carry Imp-only names
 | `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
 | `dspy.configure(lm=...)` | `Imp.configure(lm: ...)` sets a supervised node-local default; explicit `lm:` per program is the recommended style |
 | `dspy.context(lm=...)` | `Imp.context([lm: ...], fn -> ... end)` — process-scoped |
-| `dspy.inspect_history()` | `Imp.trace/2` and `Imp.Observability.status/1` — redacted by default |
+| `dspy.inspect_history()` | Plan ahead with `Imp.trace/2`, then render retained history with `Imp.inspect_history/2` or inspect `Imp.Observability.status/1`; Imp has no retroactive global last-call buffer |
 | `dspy.LM("openai/gpt-...")` (LiteLLM) | `Imp.req_llm("openai:gpt-...")` ([ReqLLM](https://hex.pm/packages/req_llm) providers) |
 | `DummyLM` in tests | `Imp.LM.Static` — scripted fields, everything else runs for real |
 

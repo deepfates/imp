@@ -25,3 +25,13 @@ FALSE STATUS FOUND AND GUARDED: families.json declared retrieval status 'present
 
 BEFORE ANY PAID CALL (lessons from the $68 IFBench rehearsal, non-negotiable): preregister splits/budget/seed-count with a power estimate computed FIRST; report outcomes as two numbers (parse rate, score-given-parse) so an adapter effect cannot masquerade as an optimizer effect; set rng_algorithm :python_v3 so both arms draw identical minibatches (common random numbers, free variance reduction); cost-estimate from measured per-call spend before launching.
 
+
+## Notes
+
+**2026-08-21T03:23:01Z**
+
+Provisioning is no longer the frontier: commits 75944af0 and c51404d2 verify the source corpus, isolated Python environment, BM25 index/splits, and preregistration. The next scientific step is a bounded baseline-only cost and parse-rate measurement before any uncapped optimizer campaign.
+
+**2026-08-21T03:36:50Z**
+
+Release-gate correction: the corpus and BM25 index are ignored multi-gigabyte machine-local research inputs, so their filesystem assertion is now tagged local_provisioning and enabled only with GEPA_LOCAL_PROVISIONING=1. The preregistration records the exact opt-in command. A clean product checkout no longer claims those external bytes must ship; the campaign host must still pass the guard before any HoVer spend.

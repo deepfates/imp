@@ -1,6 +1,6 @@
 ---
 id: imp-nnur
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-08-07T17:13:23Z
@@ -18,3 +18,9 @@ Imp.Streaming.stream/3 defaults to running the program to completion then re-chu
 
 Provider streaming reaches composed programs (or fallback is loud+documented); conformance row downgraded/justified; streaming docs state exactly what streams when.
 
+
+## Notes
+
+**2026-08-21T03:22:15Z**
+
+Chose the allowed loud-fallback disposition. `provider_stream: true` now returns terminal `{:provider_stream_unsupported, module}` for composed programs without a streamable predictor instead of post-call rechunking. Facade/API/conformance docs and a regression test state the boundary; 106 focused streaming tests pass.

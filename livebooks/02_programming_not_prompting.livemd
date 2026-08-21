@@ -62,15 +62,13 @@ is deliberately boring; the point is to see the Imp program shape without
 network calls or provider variance.
 
 ```elixir
-lm = %{
-  module: Imp.LM.Static,
-  opts: [
+lm =
+  Imp.LM.Static.new(
     handler: fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
       if prompt =~ "France", do: %{answer: "Paris"}, else: %{answer: "unknown"}
     end
-  ]
-}
+  )
 
 Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
 
@@ -100,10 +98,10 @@ Some tasks benefit from a separate reasoning field. In Imp that is still a
 structured output, not an informal convention hidden in a prompt.
 
 ```elixir
-cot_lm = %{
-  module: Imp.LM.Static,
-  opts: [handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end]
-}
+cot_lm =
+  Imp.LM.Static.new(
+    handler: fn _messages, _opts -> %{reasoning: "2 + 2 is 4.", answer: "4"} end
+  )
 
 cot_program = Imp.chain_of_thought("question -> answer", lm: cot_lm)
 {:ok, pred} = Imp.call(cot_program, %{question: "What is 2+2?"})

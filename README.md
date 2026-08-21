@@ -1,8 +1,9 @@
 # Imp
 
-Imp is [DSPy](https://dspy.ai) for the BEAM. You describe a language-model
-task as a typed Elixir program, measure how it behaves, improve it from data,
-and run the selected program inside an ordinary OTP application.
+Imp is an Elixir framework that turns language-model behavior into a typed Elixir program
+you can measure and run inside an ordinary OTP application. It brings the central idea of
+[DSPy](https://dspy.ai)—improving programs from examples rather than hand-editing
+prompts—to the BEAM.
 
 <!-- "Imp with cards", Le Grand Etteilla (public domain, via Wikimedia Commons) -->
 <p align="center">
@@ -10,8 +11,24 @@ and run the selected program inside an ordinary OTP application.
        alt="An imp studies a hand of cards through a lens while a smaller imp springs from its tail.">
 </p>
 
-Here is a support-ticket router. The signature names the input, the two
-outputs, and the values the model is allowed to return.
+A hand-built ticket router usually mixes the task, output format, parser, and
+validation in one call:
+
+```elixir no_run
+text =
+  ReqLLM.Generation.generate_text!("openai:gpt-5.4-mini", """
+  Route this ticket. Return only JSON with team and urgency.
+  team must be billing, infrastructure, security, or product.
+  urgency must be low, normal, or high.
+
+  Ticket: A customer can open another user's invoice by changing the URL.
+  """)
+
+%{"team" => team, "urgency" => urgency} = Jason.decode!(text)
+```
+
+That works, but every caller must keep the prompt, parser, accepted values, and
+error policy in sync. In Imp the same contract is one typed program:
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -93,49 +110,24 @@ an API key.
 
 ## What the current evidence says
 
-The core program, evaluation, experiment, artifact, and OTP deployment path is
-exercised from an unpacked package, real providers, and fresh OS processes. All
-optimizer modules remain experimental while their mechanisms and usefulness are
-reviewed family by family before 1.0.
-
-Existing results are deliberately narrow and mixed. A frozen TREC comparison
-found positive held-out gains for GEPA and MIPROv2 on one task. A structured
-Optimize Anything retry-policy condition improved new executable cases in two
-of three seeds. Two modeled-MIPRO Banking77 conditions and one JSON-GEPA
-HotPotQA condition completed their real multi-stage Artifact and fresh-service
-lifecycles but missed their preregistered mean-lift bars. The earlier Imp
-IFBench effectiveness interpretation is invalid because its optimization-time
-scorer was wrong; the repaired source-exact scorer makes a new comparison
-valid, but does not rehabilitate the old result. These outcomes show that the
-product can optimize, select, persist, and serve honestly; they do not establish
-broad optimizer effectiveness. The next research milestone is a matched
-current-model Imp-versus-DSPy table across the official six-task GEPA suite.
-Its one-seed matched `4096`-token baseline row is complete. A separately
-completed source-sized `16384`-token IFBench denominator now scores Imp
-`0.7619047619` and DSPy `0.7874149660`; this is runtime and measurement
-evidence, not optimizer effectiveness or a general superiority result. Imp now
-has a source-authenticated merge-enabled GEPA profile matching current DSPy's
-public treatment shape. A one-seed engineering rehearsal has since
-completed both optimizers end to end at the benchmark authors' own settings
-(16384 output tokens, ~1/3-paper optimizer budget), establishing that the
-machinery and its cost hold at that scale; by its own preregistration it
-establishes nothing about optimizer effectiveness, and no parity or lift
-conclusion is drawn from it. See [docs/EVIDENCE.md](docs/EVIDENCE.md). The scale and spend for the broader GEPA/MIPROv2 table
-remain a later decision. This is an adapted
-current-model comparison using official task families and metrics, not an exact
-historical GEPA paper reproduction or a success-gated task search.
-The complementary Grue stateful-agent condition has now completed the real
-optimizer, Artifact, fresh-restart, and concurrent OTP lifecycle; its three
-fixed local-model seeds all retained baseline with zero causal lift, so it is a
-product-path proof and an honest narrow scientific negative rather than a
-usefulness result.
+The core program, evaluation, selection, Artifact, restart, and concurrent OTP
+serving path is exercised from an unpacked package, with failures retained as
+data instead of hidden. Task-scoped studies include positive held-out TREC
+results and honest negative or underpowered outcomes elsewhere; they do not
+establish broad optimizer effectiveness, and optimizer modules remain
+experimental before 1.0. The source repository's
+[evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
+contains the contracts, exact results, withdrawn interpretation, and remaining
+research gaps.
 
 ## Read next
 
 - [Learning Path](docs/LEARNING_PATH.md) — build one program from first call
   through evaluation, optimization, tools, persistence, and deployment.
 - [API Guide](docs/API_GUIDE.md) — understand signatures, programs, metrics,
-  optimizers, experiments, and artifacts.
+  optimizers, experiments, artifacts, and the
+  [signature type DSL](docs/API_GUIDE.md#signature-type-dsl), including why
+  adapter prompts use [DSPy-compatible wire-format wording](docs/API_GUIDE.md#adapter-wire-format-wording).
 - [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md) — a complete
   measured optimization example with real outputs and costs.
 - [TREC optimizer case study](docs/CASE_STUDY_TREC.md) — the strongest matched

@@ -1,6 +1,6 @@
 #!/usr/bin/env elixir
 
-# Computed migration guard for the five matched execution directories. This is
+# Computed migration guard for the six matched execution directories. This is
 # deliberately not a status ledger: claims remain in benchmarks/claims.json and
 # scientific records remain byte-owned by their result files.
 defmodule ImpExperimentReferenceGraph do
@@ -10,7 +10,8 @@ defmodule ImpExperimentReferenceGraph do
     "examples/matched_gepa_mipro_ifbench",
     "examples/matched_gepa_mipro_ifbench_v2",
     "examples/matched_gepa_mipro_ifbench_v3",
-    "examples/matched_gepa_mipro_ifbench_gepa014"
+    "examples/matched_gepa_mipro_ifbench_gepa014",
+    "examples/matched_ifbench_rehearsal16k"
   ]
   @design_owner "examples/matched_instruction_family_ifbench"
   @script "scripts/experiment_reference_graph.exs"

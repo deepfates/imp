@@ -98,6 +98,19 @@ defmodule DocumentationContractTest do
     assert missing == []
   end
 
+  test "API guide is the canonical signature type DSL reference" do
+    body = File.read!("docs/API_GUIDE.md")
+
+    for spelling <-
+          ~w(string str integer int float number boolean bool datetime object map dict array enum class yes_no short_span numeric_span) do
+      assert body =~ "`#{spelling}", "missing signature type spelling #{spelling}"
+    end
+
+    assert body =~ "custom Pydantic-style model and tuple types are not part"
+    assert File.read!("README.md") =~ "docs/API_GUIDE.md#signature-type-dsl"
+    assert File.read!("docs/GLOSSARY.md") =~ "API_GUIDE.md#signature-type-dsl"
+  end
+
   test "user-facing docs keep the default HTTP transport out of the public vocabulary" do
     docs =
       ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
@@ -648,10 +661,7 @@ defmodule DocumentationContractTest do
   end
 
   test "API guide streaming example collects predictions and parses incremental fields" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 

@@ -764,12 +764,13 @@ defmodule Imp.UpstreamFidelity do
       source: "dspy/retrievers; dspy/datasets",
       disposition: :elixir_native_equivalent,
       rationale:
-        "Imp owns retrieval protocols and composition while production indexes remain replaceable services; embedded ColBERT is intentionally omitted.",
+        "Imp owns retrieval protocols and composition while production indexes remain replaceable services. Unlike DSPy's convenience dataset helpers, named Imp loaders require explicit local files and never auto-download; embedded ColBERT is intentionally omitted.",
       imp: [Imp.Retrieve, Imp.Embeddings, Imp.Retrievers.HTTP, Imp.Datasets],
       invariants: [
         "retrievers return ranked normalized documents",
         "external protocols are contract tested",
-        "dataset splits and provenance are explicit"
+        "dataset splits and provenance are explicit",
+        "named dataset loaders require explicit local files and never auto-download"
       ],
       evidence: %{
         tests: [
@@ -799,12 +800,14 @@ defmodule Imp.UpstreamFidelity do
       invariants: [
         "work is supervised and cancellable",
         "stream events preserve final results and errors",
+        "provider streaming either reaches a streamable predictor or returns a terminal unsupported-program error",
         "cache policy and usage accounting are configurable",
         "provider-free overhead is measured against upstream"
       ],
       evidence: %{
         tests: [
           "test/runtime_async_stream_cache_test.exs",
+          "test/completion_surface_test.exs",
           "test/task_supervision_test.exs",
           "test/production_hardening_test.exs"
         ],

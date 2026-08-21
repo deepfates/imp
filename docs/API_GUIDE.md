@@ -46,6 +46,43 @@ The signature is more than prompt text. The adapter uses it to render the
 request and validate the response. An output outside the declared enum is an
 error, not a string your application discovers later.
 
+### Signature type DSL
+
+Each field is `name`, `name: type`, or `name: type "description"`. An untyped
+field is a string. The string DSL accepts these types:
+
+| Type | Aliases | Validation |
+| --- | --- | --- |
+| `string` | `str` | Elixir binary |
+| `integer` | `int` | integer only |
+| `float` | — | integer or float |
+| `number` | — | any number |
+| `boolean` | `bool` | `true` or `false` |
+| `datetime` | — | ISO 8601 on the wire; parsed to `DateTime` or `NaiveDateTime` |
+| `object` | `map`, `dict` | map |
+| `array` | — | list with unconstrained items |
+| `array[type]` | — | list whose items recursively satisfy `type`, including nested arrays |
+| `enum[a,b]` | `class[a,b]`; `|` may replace `,` | one of the listed strings |
+| `yes_no` | — | string normalized to exactly `yes` or `no` |
+| `short_span` | — | non-empty string of at most 12 normalized tokens, with no newline or semicolon |
+| `numeric_span` | — | numeric answer string, optionally signed, comma-grouped, decimal, currency-prefixed, or percent-suffixed |
+
+Imp spells DSPy's Python `list[type]` form as `array[type]`; the parser points
+mistyped `list[...]` signatures at that spelling. Unknown types and duplicate
+names across the input/output arrow fail when the signature is built. The map
+form below additionally supports `type: :code` with an optional `language:`;
+custom Pydantic-style model and tuple types are not part of Imp's string DSL.
+
+### Adapter wire-format wording
+
+When `Imp.Adapter.Chat` or `Imp.Adapter.JSON` renders a non-string output, the
+model may see wording such as “formatted as a valid Python `Literal`,” `list`,
+or `dict`. That wording deliberately matches the pinned DSPy 3.2.1 adapter
+contract so the same provider sees equivalent format guidance on both
+runtimes. Imp parses the returned wire value into the declared Elixir field
+type; it neither evaluates Python nor exposes a Python value to application
+code.
+
 Use the map form for a language-aware code field. Code inputs are rendered as
 plain source text; fenced or plain outputs are returned as a validated typed
 code value:
@@ -180,6 +217,11 @@ Built-in metrics include `Imp.exact_match/1`, `Imp.extractive_qa/3`, and
 `Imp.classification/3`. A useful metric should distinguish behavior you would
 actually deploy, not merely reward a convenient output shape.
 
+Return `true`/`false` for exact acceptance and a number for graded credit. Use
+`%Imp.Metrics.Result{score: ..., feedback: ..., metadata: ...}` (or the
+equivalent map) when reflective optimizers or row diagnostics need actionable
+feedback; Imp normalizes every accepted shape before aggregation.
+
 ## Keep training, selection, and test data separate
 
 Optimization needs at least two roles for data:
@@ -249,8 +291,8 @@ Imp runs every outer selection and test stage three times over the same ordered
 row identities, selects by the arithmetic mean, and records each run plus the
 paired candidate-minus-baseline deltas. Calls and row-evaluation opportunity
 multiply by the repeat count. The default remains one pass and keeps the
-ordinary schema-2 result shape; repeated checks write one additional redacted
-summary in schema 3, with detailed rows still opt-in.
+ordinary compact result shape; repeated checks add a redacted repetition
+summary, with detailed rows still opt-in.
 
 When the admission decision needs more replication than the final test
 estimate, declare both counts explicitly:
@@ -264,10 +306,9 @@ evaluation_options = [
 
 Both baseline and optimized selection evaluations use the selection count. The
 selected-program test evaluation—and the baseline test evaluation when
-requested—use the test count. Unequal counts are written in result schema 4
-with per-stage counts, runs, paired deltas, and exact row-evaluation
-opportunity. The integer form remains the uniform shorthand and retains its
-existing result schema.
+requested—use the test count. Unequal counts persist their per-stage counts,
+runs, paired deltas, and exact row-evaluation opportunity. The integer form
+remains the uniform shorthand.
 
 This policy does not repeat or otherwise change an optimizer's internal search
 objective. It improves the final Experiment admission decision; it does not
@@ -502,18 +543,23 @@ retrieved context enters the task.
 
 `Imp.knn/3` and `Imp.nearest/2` provide local example retrieval. Dataset
 loaders and embedding providers live under `Imp.Datasets` and
-`Imp.Embeddings`; nothing is downloaded unless the application asks for it.
+`Imp.Embeddings`. Loaders such as `Imp.Datasets.gsm8k(path)` read an existing
+local JSONL file; unlike DSPy's convenience helpers, they never download a
+dataset. A source checkout can fetch canonical benchmark data explicitly
+through the repository-only workflow in the
+[evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md);
+fetching is deliberately not an implicit side effect of a runtime loader.
 `Imp.Embeddings.BagOfWords` is the deterministic local baseline. A production
 semantic embedding provider must return one numeric vector for each input
 text.
 
 ## Streaming sends partial output without changing the program
 
-`Imp.stream/3` asks a capable provider for chunks. `Imp.collect/3` consumes the
-same path and joins the final text:
+`Imp.stream/3` can ask a capable provider for chunks. `Imp.collect/3` consumes
+the same path and joins the final text:
 
 ```elixir
-stream = Imp.stream(program, %{question: "Why is the sky blue?"})
+stream = Imp.stream(program, %{question: "Why is the sky blue?"}, provider_stream: true)
 
 Enum.each(stream, fn chunk ->
   send(self(), {:model_chunk, chunk})
@@ -521,8 +567,11 @@ end)
 ```
 
 Provider-native thinking and tool-call chunks retain their type in metadata.
-When the configured client cannot stream, Imp's fallback is explicit rather
+`provider_stream: true` is strict for program shape: a composed program that
+does not expose a streamable predictor returns
+`{:error, {:provider_stream_unsupported, module}}` from `Imp.collect/3` rather
 than pretending a locally split final response arrived from the provider.
+Omit the option when post-call local chunking is the behavior you want.
 
 ## Conversation history is task-shaped data
 
@@ -584,9 +633,11 @@ timeouts, overload behavior, and the process that serves the current program.
 The [deployment example](../examples/deployment/README.md) shows one complete
 GenServer boundary.
 
-Use `Imp.trace/2`, `Imp.inspect_history/2`, optimizer progress subscriptions,
-and telemetry to understand failures. Inspection is redacted by default; turn
-on more detail deliberately where the data policy permits it.
+Wrap calls with `Imp.trace/2` when you need a retained trace, then use
+`Imp.inspect_history/2`, optimizer progress subscriptions, and telemetry to
+understand failures. Imp does not keep a retroactive global last-call buffer.
+Inspection is redacted by default; turn on more detail deliberately where the
+data policy permits it.
 
 Continue with:
 

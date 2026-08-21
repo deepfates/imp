@@ -107,7 +107,11 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaCampaign do
           campaign_id: fetch!(opts, :campaign_id),
           model: Keyword.get(opts, :model),
           reflection_model: Keyword.get(opts, :reflection_model),
-          families: Keyword.get(opts, :families),
+          # --families arrives as a comma-separated STRING; the run path parses
+          # it and the plan path did not, so `--plan --families X` crashed in
+          # validate_requested_families! doing `"X" -- [list]`. The documented
+          # usage in this module's own @moduledoc could never work.
+          families: parse_families(Keyword.get(opts, :families)),
           budgets: Keyword.get(opts, :budgets),
           sharding: Keyword.get(opts, :sharding),
           shard: Keyword.get(opts, :shard),

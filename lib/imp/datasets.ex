@@ -1,5 +1,12 @@
 defmodule Imp.Datasets do
-  @moduledoc "Small dataset loaders for examples, JSONL, CSV, GSM8K, HotPotQA, MATH, and Colors records."
+  @moduledoc """
+  Local dataset loaders for examples, JSONL, CSV, GSM8K, HotPotQA, MATH, and
+  Colors records.
+
+  Named loaders accept an existing local path; they do not download datasets.
+  Source-checkout benchmark fixtures are fetched explicitly with
+  `mix imp.benchmark.fetch`.
+  """
 
   defmodule Error do
     defexception [:message, :path, :line, :record]

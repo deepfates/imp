@@ -114,7 +114,7 @@
   # defensive clause for non-covered stage results
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {896, 8}},
   # MapSet opacity: MapSet.equal? against a literal-typed tag key set
-  {"lib/imp/optimizer/report.ex", :call_without_opaque, {723, 55}},
+  {"lib/imp/optimizer/report.ex", :call_without_opaque, {736, 55}},
   # :rand seed format ([first | second]) at the seed_s call
   {"lib/imp/optimizer/sampling.ex", :improper_list_constr, {24, 11}},
   # defensive clause for non-covered bucket shapes
@@ -165,7 +165,7 @@
   # MapSet opacity on the hop-id set from analysis JSON
   {"lib/mix/tasks/imp.benchmark.hotpotqa_analysis.ex", :call_without_opaque, {159, 24}},
   # defensive nil-result clause on an evaluate call that always scores
-  {"lib/mix/tasks/imp.benchmark.optimizer_lift.ex", :pattern_match, {608, 8}},
+  {"lib/mix/tasks/imp.benchmark.optimizer_lift.ex", :pattern_match, {635, 8}},
   # MapSet opacity on the run-index set from parity JSON
   {"lib/mix/tasks/imp.benchmark.parity.aggregate.ex", :call_without_opaque, {328, 24}},
   # raise-only helper: invalid_python!/1 exists to Mix.raise
