@@ -330,7 +330,7 @@ mix imp.benchmark.optimize_anything \
   --seeds 17,23,31 \
   --max-proposals 5 \
   --max-cost-usd 0.50 \
-  --max-requests 20 \
+  --max-requests 45 \
   --max-input-tokens 100000 \
   --max-output-tokens 20000 \
   --max-output-tokens-per-request 1000 \
@@ -377,6 +377,17 @@ terminated run must be reviewed before starting a new run id with a newly
 declared ceiling. The telemetry handlers accept only events emitted by the
 campaign owner process, preventing unrelated concurrent ReqLLM calls from
 contaminating cost evidence.
+
+An OpenRouter engineering run on 2026-08-20 exposed that the formerly
+documented 20-request ceiling could not cover the declared opportunity: three
+artifact classes times three seeds times five proposals requires up to 45
+provider calls. The run stopped at its request ceiling after 20 calls, 34,706
+input tokens, 3,698 output tokens, and $0.042672, before it could emit a full
+artifact; it is a treatment failure, not an effectiveness result. Its complete
+checkpoint tree is retained as
+`benchmarks/evidence/archive/optimize_anything/c08da2848e912487484e13cb83c09219134e15d595b3c9d050da69f611d46591.tar.zst`,
+whose filename is its SHA-256. Campaign admission now rejects an insufficient
+request ceiling before the first provider call.
 
 The pinned standard profile uses the official OpenAI API prices of $2.50 per
 million input tokens and $15.00 per million output tokens from

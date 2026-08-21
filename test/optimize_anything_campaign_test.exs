@@ -253,6 +253,7 @@ defmodule OptimizeAnythingCampaignTest do
         provider: "openai",
         model: "gpt-5.4-mini-2026-03-17",
         seeds: [17, 23, 31],
+        max_proposals: 1,
         run_id: "oa-campaign-contract-test",
         out_dir: out_dir,
         checkpoint_dir: checkpoint_dir,
@@ -278,6 +279,38 @@ defmodule OptimizeAnythingCampaignTest do
         max_output_tokens_per_request: 1_000
       )
     end
+  end
+
+  test "campaign refuses a request ceiling that cannot cover declared proposal opportunity" do
+    root = tmp_dir("optimize-anything-request-opportunity")
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    lm = fn _, _ ->
+      Agent.update(calls, &(&1 + 1))
+      {:ok, "must not execute"}
+    end
+
+    assert_raise ArgumentError, ~r/requires at least 45 requests/, fn ->
+      Campaign.run(
+        lm: lm,
+        provider: "test",
+        model: "test",
+        seeds: [17, 23, 31],
+        max_proposals: 5,
+        run_id: "oa-insufficient-request-opportunity",
+        checkpoint_dir: Path.join(root, "checkpoints"),
+        out_dir: Path.join(root, "runs"),
+        limits: budget_limits(),
+        pricing: pricing(),
+        pricing_profile: "custom",
+        pricing_source_url: "https://example.test/pricing",
+        max_output_tokens_per_request: 1_000
+      )
+    end
+
+    assert Agent.get(calls, & &1) == 0
+    refute File.exists?(Path.join(root, "checkpoints"))
+    refute File.exists?(Path.join(root, "runs"))
   end
 
   test "representative selection never consults held-out test score" do

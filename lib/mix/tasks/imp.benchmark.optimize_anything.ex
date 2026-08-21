@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizeAnything do
         --model gpt-5.4-2026-03-05 --seeds 17,23,31 \
         --env-file .env \
         --pricing-profile openai-gpt-5.4-standard-2026-03-05 \
-        --max-cost-usd 0.50 --max-requests 20 \
+        --max-cost-usd 0.50 --max-requests 45 \
         --max-input-tokens 100000 --max-output-tokens 20000 \
         --max-output-tokens-per-request 1000 \
         --out benchmarks/runs/optimize-anything

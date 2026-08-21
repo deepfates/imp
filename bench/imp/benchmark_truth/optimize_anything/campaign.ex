@@ -43,6 +43,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
       raise ArgumentError, ":max_proposals must be a positive integer"
     end
 
+    validate_request_opportunity!(budget_config.limits, seeds, max_proposals)
+
     source = %{
       "mode" => "live_campaign",
       "run_id" => run_id,
@@ -513,6 +515,18 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
         "request_policy" => %{"cache" => false, "max_retries" => 0}
       }
     }
+  end
+
+  defp validate_request_opportunity!(limits, seeds, max_proposals) do
+    required = length(@evaluators) * length(seeds) * max_proposals
+    configured = Map.get(limits, :requests, Map.get(limits, "requests"))
+
+    unless configured >= required do
+      raise ArgumentError,
+            ":limits request ceiling #{configured} cannot execute the declared campaign opportunity; " <>
+              "#{length(@evaluators)} artifact classes * #{length(seeds)} seeds * " <>
+              "#{max_proposals} proposals requires at least #{required} requests"
+    end
   end
 
   defp persist_budget_checkpoint(path, snapshot) do
