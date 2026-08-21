@@ -419,9 +419,21 @@ schema-v2 condition used distinct train, selection, and untouched test rows:
 two of three seeds selected proposer-generated values and improved exact
 executable behavior from `3/6` to `5/6`, one retained baseline, and all three
 loaded fresh. That is scoped evidence for one non-prompt task, not admission of
-the declared three-class portfolio. Broad Imp-native non-prompt effectiveness
-therefore remains an open target. Neither schema establishes paper reproduction
-or equality with an upstream implementation under matched internals.
+the declared three-class portfolio.
+
+The 2026-08-20 OpenRouter successor at Imp commit `7d8c5e23` completed the
+schema-v2 three-class portfolio with `openai/gpt-5.4-mini`. Mean untouched-test
+lift was `+0.254759` for the retry controller, `+0.518609` for the agent
+configuration, and `+0.059774` for the scheduling heuristic. Improving-seed
+counts were respectively `3/3`, `3/3`, and `2/3`; the remaining scheduling seed
+tied baseline. The full artifact reports 44 single-attempt provider calls,
+83,219 input tokens, 6,059 output tokens, and $0.082421 under the declared
+$0.50 ceiling. The artifact and complete checkpoint tree are retained in
+`benchmarks/evidence/archive/optimize_anything/a4181fed7bfffd3be7299f75923ec96e8aafa843f7f121804718c857fe44fc40.tar.zst`,
+whose filename is its SHA-256. This satisfies the declared Imp-native
+three-class effectiveness policy under that model and treatment; it does not
+establish paper reproduction, equality with an upstream implementation, or
+effectiveness outside those executable artifact families.
 
 ## Run GEPA Paper Replication
 
