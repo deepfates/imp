@@ -239,3 +239,34 @@ launches in its own session (os.setsid) so no supervising-tool crash can
 kill a multi-hour paid run again. Cumulative campaign spend $51.50;
 take 11 lands ~$65, inside the owner-approved envelope for the completed
 rehearsal. Predictions unchanged.
+
+## Addendum 10 (2026-08-20, terminal disposition of take 11)
+
+Take 11 sealed all six optimization-and-selection cells: baseline, GEPA, and
+MIPROv2 for both Imp and pinned DSPy. The two result ledgers record a combined
+actual cost of `$16.416918`. This establishes the bounded engineering path
+through optimizer execution and selection; it does not establish held-out
+optimizer effectiveness.
+
+The campaign stopped on the first Imp held-out response whose provider usage
+reported 4,243 input tokens. The contract's task evidence check allowed at
+most 4,096 input tokens even though the same contract reserved 4,864 input
+tokens for task-call cost. The request and response completed successfully,
+but the post-response evidence guard raised an operational-safety error;
+upstream then stopped coordinately. Consequently P1 failed, P2 was not
+evaluated on held-out data, and no held-out paired analysis exists.
+
+This addendum also withdraws Addendum 7's phrase "matched GEPA optimization
+parity." The Imp value there was the optimizer's internal maximum over noisy
+trials, while the upstream value was an independently rescored selected
+champion. Those values are not commensurate and establish neither parity nor
+non-parity. The sealed trial ledgers and selection identities remain valid
+engineering evidence.
+
+The complete take-11 root is archived as
+`evidence/matched/matched_ifbench_rehearsal16k-stop11-heldout-input-envelope.tar.zst`
+with SHA-256
+`993d086c5c05a406ff7f1f19cae229e6d6d1d6cb2323fd7dd09766f32a02ba6e`.
+Any successor must be separately named and must reconcile the contradictory
+4,096 evidence bound and 4,864 reservation before provider work. It may not
+reinterpret take 11 as a completed held-out result.
