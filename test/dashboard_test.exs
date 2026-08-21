@@ -527,8 +527,7 @@ defmodule DashboardTest do
     assert blockers["claim.live_matched_model.full_parity"] == ["live_matched_model.full"]
     assert blockers["claim.gepa_replication.full"] == ["gepa_replication.full"]
 
-    assert blockers["claim.optimize_anything.non_prompt_effectiveness"] ==
-             ["optimize_anything.non_prompt.full"]
+    refute Map.has_key?(blockers, "claim.optimize_anything.non_prompt_effectiveness")
 
     assert blockers["claim.rag.hotpot_retrieval.effectiveness"] ==
              ["rag.hotpot_retrieval.effectiveness"]

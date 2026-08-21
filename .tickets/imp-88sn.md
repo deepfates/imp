@@ -1,6 +1,6 @@
 ---
 id: imp-88sn
-status: open
+status: closed
 deps: [imp-v03h]
 links: []
 created: 2026-07-30T22:14:26Z
@@ -3997,3 +3997,7 @@ scientific scale and remaining spend are explicitly ratified.
 **2026-08-10T02:21:57Z**
 
 Pilot done (see imp-u3af): machinery+fidelity validated at row level; optimization unmeasurable at pilot scale by construction. Next: land upstream trial-score sealing + bootstrap refusal handling, then the owner ratifies a Heavy successor from HEAVY_DESIGN_DRAFT.md (dress rehearsal ~$25-50, full pair ~$150-300 realistic).
+
+**2026-08-21T05:23:27Z**
+
+2026-08-20 release-facing usefulness verdict: acceptance is satisfied at current main df399c35. The ordinary live gate now auto-discovers the configured provider and passed 15/15 through OpenRouter in 28.1s, exercising typed text/JSON/native-schema generation, CoT, streaming, ReAct and ReActV2, an imported HTTP MCP tool, Parallel/BestOfN/Refine, ProgramOfThought, CodeAct, and RLM including a real sub-LM. The current three-repeat LabeledFewShot tutorial artifact 6b1b6c9f... binds clean source ab00471e and measured baseline 0.35/0.30/0.35 -> optimized 0.95/1.00/0.95, 120/120 usage-bearing single-attempt transports, zero row errors, 42,888 input + 1,493 output tokens, and $0.038887. Its parameter Artifact was loaded in a fresh OS process and served four concurrent OTP tasks 4/4 correctly under a separate four-request/$0.10 cap ($0.001701 actual). The retained TREC instruction-search evidence remains independently recomputable and its best retained Imp GEPA parameter Artifact sha256 569836fb... was additionally read and applied to current trusted code at df399c35, then served four concurrent live GPT-5.4-mini classifications 4/4 correctly with four transports, 2,555 input + 68 output tokens, $0.002224, and zero unresolved reservations. The admitted Optimize Anything schema-v2 portfolio remains green across retry-controller code, agent configuration, and scheduling, with positive mean untouched-test lift in all three classes, improving seeds 3/3, 3/3, 2/3, 44 calls/$0.082421, and fresh loads recorded; its targeted integrity tests pass. Focused TREC/OA/tutorial integrity was 41 tests/0 failures; benchmark.truth.check was 86/0; the full provider-free suite before the evidence-only delta was 2,755 tests plus doctests/properties, 0 failures. Red classifications preserved: the initial 14/15 live-gate failure was an integration defect (hard-coded OpenAI authority despite available OpenRouter); the initial cache-miss evidence assertion was a stale instrument defect after prospective budget enforcement correctly disabled cache. Neither was hidden or reclassified as model behavior. Scope remains bounded: this closes current-source product usefulness, not the six-family matched table, Heavy/HoVer, MLX freshness, or general optimizer superiority.

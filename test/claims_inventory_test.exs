@@ -277,17 +277,17 @@ defmodule ClaimsInventoryTest do
     end
   end
 
-  test "OA bounded effectiveness and evaluation quality gaps remain explicit" do
+  test "OA scoped effectiveness and evaluation quality gaps remain explicit" do
     claims = Map.new(read_claims!(), &{&1["id"], &1})
     oa = claims["claim.optimize_anything.non_prompt_effectiveness"]
 
-    assert oa["claim_state"] == "target"
-    assert oa["release"] == "telos"
+    assert oa["claim_state"] == "asserted"
+    assert oa["release"] == "v0.1"
     assert Enum.any?(oa["limitations"], &String.contains?(&1, "pre-v2"))
     assert Enum.any?(oa["limitations"], &String.contains?(&1, "development set"))
-    assert oa["statement"] =~ "open C3 target"
-    assert oa["statement"] =~ "untouched test set"
-    assert Enum.any?(oa["sources"], &String.contains?(&1, "58ff84ac"))
+    assert oa["statement"] =~ "+0.254759"
+    assert oa["statement"] =~ "$0.082421"
+    assert Enum.any?(oa["sources"], &String.contains?(&1, "0aa498b5"))
 
     assert claims["claim.optimize_anything.upstream_comparative_effectiveness"]["claim_state"] ==
              "target"

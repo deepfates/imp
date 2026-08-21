@@ -179,6 +179,10 @@ remainder against current arithmetic. Predictions unchanged.
 
 ## Addendum 7 (2026-08-10, after stop 8, before relaunch)
 
+**Historical record, superseded by Addendum 10.** The selection-parity
+interpretation below was withdrawn after the quantities were shown to be
+non-commensurate. It is retained only to preserve the decision chronology.
+
 Take 8 delivered the campaign's first substantive result before stopping:
 BOTH GEPA arms sealed at the source-faithful budget. Selection champions:
 imp 0.8542 vs upstream 0.8698 (delta -0.016, well inside the ±0.09 band) —

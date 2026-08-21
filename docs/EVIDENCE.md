@@ -73,7 +73,7 @@ information into surfaces, claims, requirements, and profiles for maintainers;
 users should not need those counts to decide whether the documented workflow
 works for them.
 
-## Historical negatives: bug-or-benign verdicts (2026-08-09)
+## Historical red results and their classifications
 
 Under the parity frame — pinned DSPy/GEPA/MIPRO are replicated results, so a
 faithful port should match them — each historical negative was diagnosed from
@@ -82,16 +82,17 @@ upstream (benign) or an Imp fidelity defect (bug).
 
 | Negative | Verdict | Why |
 |---|---|---|
-| HotPotQA JSON-GEPA, mean lift −0.015 (3 seeds, GPT-5.4-mini task / Sonnet 4.6 reflection) | **Benign** | 32 semantic metric calls vs the GEPA artifact's 6,871 for HotpotQA (`tmp/gepa-artifact/scripts/experiment_configs.py`); −0.015 is below the 24-row test's 0.042 per-row granularity; instructions verifiably mutated and selection improved before failing to transfer from an 8-row selection set. The strict one-attempt JSON policy also scored 6 parse failures as zeros on one seed — a declared conservative deviation from DSPy's retrying adapters. |
-| Banking77 modeled-MIPRO, two conditions missed the ≥0.05 bar | **Benign** | Both conditions were *positive* (means +0.0417 and +0.0208, 2/3 seeds each; verified against `benchmarks/results/banking77-mipro-*`); the preregistered bar exceeded what a 48-row test at a 0.875–0.93 baseline ceiling can resolve (one row = 0.0208). The postmortem verified real proposals, attached demos, and legal Optuna acquisitions. |
-| Grue stateful-agent GEPA, 0/3 seeds lift (local llama3.2:3b) | **Benign — metric floor** | Every candidate scored 0.0 on every selection row: GEPA received zero signal to optimize against, and strict admission correctly retained baseline. Reflected candidates were real and varied (inspected in the retained raw results). Upstream GEPA given an all-zero frontier returns the seed program identically. |
-| IFBench optimization interpretation | **Bug — fixed and disclosed** | Scorer represented nested rule arguments incorrectly and used a non-pinned language fallback; fixed source-exact at `8c798d2e` with the superseded interpretation explicitly withdrawn. |
+| HotPotQA JSON-GEPA, mean lift −0.015 (3 seeds, GPT-5.4-mini task / Sonnet 4.6 reflection) | **Scientific negative for this treatment** | The declared treatment completed and did not improve held-out performance. Its 32 semantic metric calls were tiny beside the GEPA artifact's 6,871 for HotpotQA, the 24-row test moves in 0.042 steps, and six strict-adapter parse failures scored zero on one seed. Those facts motivate a different future treatment; they do not turn this completed negative into a positive or a product defect. |
+| Banking77 modeled-MIPRO, two conditions missed the ≥0.05 bar | **Scientific negative against the preregistered bar** | Both conditions had small positive means (+0.0417 and +0.0208; 2/3 improving seeds each), but neither met the declared ≥0.05 criterion. Real proposals, attached demos, and legal acquisitions make this a clean result. The 48-row test and high baseline explain its resolution limit; they do not retroactively change the threshold. |
+| Grue stateful-agent GEPA, 0/3 seeds lift (local llama3.2:3b) | **Unresolved no-signal treatment** | Every candidate scored 0.0 on every selection row, so the optimizer had no ranking signal and correctly retained baseline. Reflected candidates were real and varied. This establishes that the treatment could not answer the usefulness question, not that GEPA is ineffective or that the product is broken. |
+| IFBench optimization interpretation | **Product/integration defect — fixed and disclosed** | The scorer represented nested rule arguments incorrectly and used a non-pinned language fallback; fixed source-exact at `8c798d2e` with the superseded interpretation explicitly withdrawn. |
 
-None of the benign verdicts double as effectiveness evidence: they say the
-configs could not have resolved a lift, not that lift exists. The matched
-campaign remains the instrument that can.
+None of these red results is erased. Completed valid treatments keep their
+negative verdicts; a no-signal treatment remains unresolved; a diagnosed defect
+is repaired at the layer that owned it. A successor experiment must be named
+and selected for a reason established before its outcomes are read.
 
-## The matched campaign: state as of 2026-08-10
+## The matched campaign: state as of 2026-08-20
 
 **Nothing in this section is effectiveness or fidelity evidence.** It records
 what an *engineering rehearsal* established, and — as importantly — what an
@@ -101,10 +102,11 @@ The 16k rehearsal (`examples/matched_ifbench_rehearsal16k`) is scoped by its
 own contract as `one_seed_engineering_rehearsal_source_faithful_config`:
 it exercises machinery and cost at the benchmark authors' settings before any
 larger spend, and by preregistration claims nothing about optimizer
-effectiveness. Read at that scope, it succeeded: on its eleventh launch both
-runtimes completed baseline, GEPA, and MIPROv2 and sealed all six arm cells at
-16384-token settings for $16.42, before stopping in the held-out phase on an
-input-token bound of our own (4096, exceeded by a 4243-token prompt). Ten prior
+effectiveness. On its eleventh launch both runtimes completed baseline, GEPA,
+and MIPROv2 and sealed all six optimization-and-selection cells at 16384-token
+settings for $16.42. The campaign itself did not complete: it stopped in the
+held-out phase on an input-token bound of our own (4096, exceeded by a
+4243-token prompt), so it produced no held-out optimizer verdict. Ten prior
 launches stopped on harness defects, each dated in `PREREGISTRATION.md` and
 archived under `evidence/matched/`.
 

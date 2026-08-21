@@ -214,7 +214,10 @@ defmodule Imp.UpstreamFidelityTest do
     assert body =~ "| optimization.anything | optimization | gap | claim-specific gap |"
 
     assert body =~
-             "schema-v2 multi-seed effectiveness across all three declared non-prompt artifact classes; one retry-policy class has passed its scoped criterion"
+             "the live schema-v2 three-class portfolio keeps train, selection, and untouched test cases distinct"
+
+    refute body =~
+             "schema-v2 multi-seed effectiveness across all three declared non-prompt artifact classes"
 
     assert body =~ "two later modeled-MIPRO Banking77 conditions"
     assert body =~ "three-seed JSON-GEPA HotPotQA treatment"

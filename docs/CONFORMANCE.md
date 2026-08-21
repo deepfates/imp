@@ -726,7 +726,7 @@ Semantic invariants:
 - feedback is per-task and per-metric
 - search retains lineage and Pareto trade-offs
 - the public lifecycle optimizes, selects, persists, and fresh-loads task-owned text and JSON-safe structured artifacts without implying paper-task reproduction
-- a later three-seed retry-policy condition used disjoint train, selection, and untouched executable test rows: two proposer-generated values improved exact behavior from 3/6 to 5/6, one seed retained baseline, and all three loaded fresh; the retained Artifacts do not independently bind provider/model identity, and this is one scoped task result rather than a three-class portfolio
+- the live schema-v2 three-class portfolio keeps train, selection, and untouched test cases distinct and satisfies its declared positive-mean and majority-improving policy for executable retry code, agent configuration, and scheduling artifacts
 
 Executable evidence:
 
@@ -746,15 +746,15 @@ Executable evidence:
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 - docs: [.tickets/imp-88sn.md](https://github.com/deepfates/imp/blob/main/.tickets/imp-88sn.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json`
+- artifact: `benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json`
 
 Current-profile capability evidence:
 
-- `optimize_anything`: valid; claims: claim.optimize_anything.operational_lifecycle (informational), claim.optimize_anything.retry_policy_task_effectiveness (informational); receipts: optimize_anything=valid
+- `optimize_anything`: valid; claims: claim.optimize_anything.operational_lifecycle (informational), claim.optimize_anything.retry_policy_task_effectiveness (informational), claim.optimize_anything.non_prompt_effectiveness (informational); receipts: optimize_anything=valid
 
 
 Missing evidence or behavior:
 
-- schema-v2 multi-seed effectiveness across all three declared non-prompt artifact classes; one retry-policy class has passed its scoped criterion
 - paper-scale upstream comparison
 
 ### `retrieval.data`
