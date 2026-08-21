@@ -379,7 +379,7 @@ defmodule DashboardTest do
     # Informational claims include narrow conformance rows plus committed,
     # task-specific GEPA, MIPROv2, and Optimize Anything outcomes. They remain
     # outside the profile-ready blocker count.
-    assert dashboard["claims"]["summary"]["informational"] == 23
+    assert dashboard["claims"]["summary"]["informational"] == 24
 
     proven_claim_ids =
       dashboard["claims"]["claims"]
@@ -1435,7 +1435,6 @@ defmodule DashboardTest do
              "golden_trace",
              "live_provider_smoke",
              "livebook_execute",
-             "local_mlx_weight_training",
              "product_package",
              "protocol_gates",
              "rag_tool_agent"
