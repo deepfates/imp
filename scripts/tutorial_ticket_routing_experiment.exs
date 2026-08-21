@@ -3,6 +3,8 @@
 # benchmarks/evidence/admitted/tutorial_ticket_routing/<sha256>.json.
 #
 #     OPENAI_API_KEY=... mix run scripts/tutorial_ticket_routing_experiment.exs
+#     OPENROUTER_API_KEY=... OPENROUTER_MODEL=openai/gpt-5.4-mini \
+#       mix run scripts/tutorial_ticket_routing_experiment.exs
 #
 # The experiment is exactly the tutorial's: a zero-shot enum router evaluated
 # on the twenty held-out test tickets, then the same router compiled with
@@ -18,14 +20,32 @@
 # and is checked by test/tutorial_ticket_routing_artifact_test.exs.
 
 defmodule TutorialTicketRoutingExperiment do
-  @model "openai:gpt-5.4-mini"
   @dataset_relative "priv/tutorial/support_tickets.json"
   @out_dir "benchmarks/evidence/admitted/tutorial_ticket_routing"
   @schema_version 1
+  @input_per_million 0.75
+  @output_per_million 4.50
+  @max_output_tokens 256
 
   def main do
-    api_key = System.fetch_env!("OPENAI_API_KEY")
     repeats = "TUTORIAL_REPEATS" |> System.get_env("3") |> String.to_integer()
+    {model, api_key} = live_provider!()
+
+    {:ok, budget} =
+      Imp.start_optimizer_budget(
+        limits: %{
+          requests: repeats * 80,
+          input_tokens: repeats * 500_000,
+          output_tokens: repeats * 20_480,
+          usd: repeats * 1.00
+        },
+        pricing: %{
+          "input_per_million" => @input_per_million,
+          "output_per_million" => @output_per_million,
+          "source_url" => "https://openai.com/api/pricing/"
+        },
+        default_max_output_tokens: @max_output_tokens
+      )
 
     dataset_path = Application.app_dir(:imp, @dataset_relative)
     dataset_bytes = File.read!(dataset_path)
@@ -34,7 +54,10 @@ defmodule TutorialTicketRoutingExperiment do
     trainset = to_examples(data["train"])
     testset = to_examples(data["test"])
 
-    lm = Imp.req_llm(@model, api_key: api_key)
+    lm =
+      model
+      |> Imp.req_llm(api_key: api_key)
+      |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
 
     router =
       "ticket -> team: enum[atlas,harbor,beacon,quill]"
@@ -104,7 +127,8 @@ defmodule TutorialTicketRoutingExperiment do
       "git_sha" => git_sha(),
       "script" => "scripts/tutorial_ticket_routing_experiment.exs",
       "tutorial" => "docs/TUTORIAL_TICKET_ROUTING.md",
-      "model" => @model,
+      "model" => "openai:gpt-5.4-mini",
+      "provider_route" => model,
       "dataset" => %{
         "path" => @dataset_relative,
         "sha256" => sha256(dataset_bytes),
@@ -136,7 +160,8 @@ defmodule TutorialTicketRoutingExperiment do
         "all_runs_improved" => Enum.all?(runs, &(&1["optimized_score"] > &1["baseline_score"])),
         "duration_ms_min" => runs |> Enum.map(& &1["duration_ms"]) |> Enum.min(),
         "duration_ms_max" => runs |> Enum.map(& &1["duration_ms"]) |> Enum.max(),
-        "total_usage" => total_usage
+        "total_usage" => total_usage,
+        "optimizer_budget" => Imp.Optimizer.Budget.snapshot(budget)
       },
       "doc_claims_under_test" => %{
         "source" => "docs/TUTORIAL_TICKET_ROUTING.md",
@@ -149,7 +174,7 @@ defmodule TutorialTicketRoutingExperiment do
       },
       "scope" => %{
         "claimed" =>
-          "LabeledFewShot(k: 8) held-out lift on the shipped sixty-ticket routing task with #{@model} across #{repeats} live repeats",
+          "LabeledFewShot(k: 8) held-out lift on the shipped sixty-ticket routing task with #{model} across #{repeats} live repeats",
         "not_claimed" => [
           "generalization beyond the shipped support-ticket dataset",
           "search-optimizer (RandomSearch/MIPROv2) effectiveness",
@@ -158,12 +183,28 @@ defmodule TutorialTicketRoutingExperiment do
       }
     }
 
-    File.mkdir_p!(@out_dir)
+    out_dir = System.get_env("TUTORIAL_OUTPUT_DIR", @out_dir)
+    File.mkdir_p!(out_dir)
     bytes = Jason.encode!(artifact, pretty: true) <> "\n"
-    path = Path.join(@out_dir, sha256(bytes) <> ".json")
+    path = Path.join(out_dir, sha256(bytes) <> ".json")
     File.write!(path, bytes)
     IO.puts("artifact: #{path}")
   end
+
+  defp live_provider! do
+    cond do
+      present?(System.get_env("OPENAI_API_KEY")) ->
+        {"openai:gpt-5.4-mini", System.fetch_env!("OPENAI_API_KEY")}
+
+      present?(System.get_env("OPENROUTER_API_KEY")) ->
+        {"openrouter:openai/gpt-5.4-mini", System.fetch_env!("OPENROUTER_API_KEY")}
+
+      true ->
+        raise "OPENAI_API_KEY or OPENROUTER_API_KEY is required"
+    end
+  end
+
+  defp present?(value), do: is_binary(value) and String.trim(value) != ""
 
   defp to_examples(rows) do
     for %{"ticket" => ticket, "team" => team} <- rows do

@@ -12,7 +12,7 @@ defmodule Imp.Test.LiveProvider do
   end
 
   def config! do
-    provider = System.get_env("IMP_LIVE_PROVIDER", "openai") |> String.downcase()
+    provider = configured_provider()
     {provider, key_env, model_env} = provider_environment!(provider)
     api_key = System.get_env(key_env)
     model = System.get_env("IMP_LIVE_MODEL") || System.get_env(model_env)
@@ -24,6 +24,38 @@ defmodule Imp.Test.LiveProvider do
       do: raise("IMP_LIVE_MODEL or #{model_env} must be configured for the live provider gate")
 
     %{provider: provider, model: model, api_key: api_key}
+  end
+
+  defp configured_provider do
+    case System.get_env("IMP_LIVE_PROVIDER") do
+      provider when is_binary(provider) and provider != "" -> String.downcase(provider)
+      _missing -> first_configured_provider()
+    end
+  end
+
+  defp first_configured_provider do
+    [
+      {"openai", "OPENAI_API_KEY"},
+      {"anthropic", "ANTHROPIC_API_KEY"},
+      {"gemini", "GEMINI_API_KEY"},
+      {"openrouter", "OPENROUTER_API_KEY"}
+    ]
+    |> Enum.find_value(fn {provider, key_env} ->
+      case System.get_env(key_env) do
+        key when is_binary(key) and key != "" -> provider
+        _missing -> nil
+      end
+    end)
+    |> case do
+      nil ->
+        raise(
+          "configure IMP_LIVE_PROVIDER and its API key, or set one of " <>
+            "OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY"
+        )
+
+      provider ->
+        provider
+    end
   end
 
   defp provider_environment!("openai"), do: {"openai", "OPENAI_API_KEY", "OPENAI_MODEL"}
