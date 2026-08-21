@@ -162,7 +162,7 @@ defmodule Imp.Optimizer.Budget do
     limits = Keyword.fetch!(opts, :limits)
     pricing = Keyword.fetch!(opts, :pricing)
     default_max_output_tokens = Keyword.fetch!(opts, :default_max_output_tokens)
-    initial = Keyword.get(opts, :initial, %{})
+    initial = opts |> Keyword.get(:initial, %{}) |> validate_initial!()
     on_change = Keyword.get(opts, :on_change)
 
     unless is_nil(on_change) or is_function(on_change, 1) do
@@ -449,9 +449,6 @@ defmodule Imp.Optimizer.Budget do
       else: raise(ArgumentError, "initial campaign requests must be a non-negative integer")
   end
 
-  defp initial_requests!(other),
-    do: raise(ArgumentError, "initial campaign budget must be a map, got: #{inspect(other)}")
-
   defp initial_transport_attempts!(initial) when is_map(initial) do
     attempts =
       Map.get(
@@ -465,9 +462,6 @@ defmodule Imp.Optimizer.Budget do
       else: raise(ArgumentError, "initial transport attempts must be a non-negative integer")
   end
 
-  defp initial_transport_attempts!(other),
-    do: raise(ArgumentError, "initial campaign budget must be a map, got: #{inspect(other)}")
-
   defp initial_transport_guard!(initial) when is_map(initial) do
     Map.get(
       initial,
@@ -476,7 +470,9 @@ defmodule Imp.Optimizer.Budget do
     ) == true
   end
 
-  defp initial_transport_guard!(other),
+  defp validate_initial!(initial) when is_map(initial), do: initial
+
+  defp validate_initial!(other),
     do: raise(ArgumentError, "initial campaign budget must be a map, got: #{inspect(other)}")
 
   defp initial_usage!(initial) do

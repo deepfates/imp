@@ -16,8 +16,6 @@
 [
   # defensive clause for non-covered content shapes
   {"lib/imp/adapter/chat.ex", :pattern_match_cov, {681, 8}},
-  # defensive clause for non-covered budget shapes
-  {"bench/imp/benchmark_truth/campaign_budget.ex", :pattern_match_cov, {382, 8}},
   # defensive guard success typing proves redundant
   {"bench/imp/benchmark_truth/failure_campaign.ex", :guard_fail, {756, 38}},
   # defensive clause for non-covered result shapes
@@ -185,8 +183,6 @@
   # Each needs individual triage (ticket imp-dialyzer-triage); most are
   # bench-side no_return/unused_fun cascades and MapSet opaque checks from
   # the current dialyzer version.
-  {"bench/imp/benchmark_truth/campaign_budget.ex", :pattern_match_cov, {398, 8}},
-  {"bench/imp/benchmark_truth/campaign_budget.ex", :pattern_match_cov, {409, 8}},
   {"bench/imp/benchmark_truth/gepa_campaign.ex", :call, {1883, 13}},
   {"bench/imp/benchmark_truth/gepa_campaign.ex", :no_return, {1881, 8}},
   {"bench/imp/benchmark_truth/gepa_campaign.ex", :no_return, {220, 28}},
@@ -272,7 +268,12 @@
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {29, 42}},
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {72, 30}},
   {"lib/imp/clients/trl_trainer.ex", :pattern_match_cov, {339, 20}},
-  {"lib/imp/experiment.ex", :pattern_match, 207},
+  # Defensive validation at the experiment boundary; Imp.evaluate/4's current
+  # success typing is narrower than the public Result score type.
+  {"lib/imp/experiment.ex", :pattern_match, 209},
+  # URI.parse/1's success type makes the ordinary-port rejection branch look
+  # unreachable; keep the public URL validator defensive at this trust boundary.
+  {"lib/imp/optimizer/budget.ex", :pattern_match, 1},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {790, 53}},
   {"lib/imp/optimizer/gepa/random.ex", :improper_list_constr, {91, 17}},
   {"lib/imp/optimizer/mipro_v2.ex", :no_return, {150, 7}},
