@@ -4,8 +4,8 @@ defmodule Imp.Datasets do
   Colors records.
 
   Named loaders accept an existing local path; they do not download datasets.
-  Source-checkout benchmark fixtures are fetched explicitly with
-  `mix imp.benchmark.fetch`.
+  Source-checkout benchmark fixtures are fetched explicitly with the
+  `imp.benchmark.fetch` Mix task.
   """
 
   defmodule Error do
