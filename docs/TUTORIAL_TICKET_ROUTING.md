@@ -4,11 +4,11 @@ Let's take the support-ticket router from the [README](../README.md) and do
 what you cannot do with a prompt string: score it on held-out data, improve it
 with an optimizer, and prove the improvement on tickets it has never seen.
 
-In the committed benchmark runs the zero-shot router scored **25–30%** on
-twenty held-out tickets. The optimized router scored **85%** on the same
-twenty — in all three repeats. Each full experiment — baseline, optimization,
-and held-out evaluation — cost about **$0.01** and ran in about **ten
-seconds** with `gpt-5.4-mini`.
+In the current committed benchmark runs the zero-shot router scored **30–35%**
+on twenty held-out tickets. The optimized router scored **95–100%** on the
+same twenty in all three repeats. Each full experiment — baseline,
+optimization, and held-out evaluation — cost about **$0.013** and ran in
+**7–9 seconds** with `gpt-5.4-mini`.
 
 Those numbers come from a committed, content-addressed run artifact in the
 source repository. The repository-only
@@ -103,8 +103,8 @@ the misses are not random — they are the model guessing what squad names mean:
 ```
 
 It reads the tickets fine. It cannot know that atlas is the money squad. On a
-task this small the exact score moves a little between runs — our repeats
-landed between 0.25 and 0.30 — but every run tells the same story.
+task this small the exact score moves a little between runs — our current
+repeats landed between 0.30 and 0.35 — but every run tells the same story.
 
 ## Improve With Measured Lift
 
@@ -135,14 +135,13 @@ The only score that counts comes from tickets the optimizer never saw:
 optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout: 60_000)
 
 {baseline.score, optimized.score}
-#=> {0.3, 0.85}
+#=> {0.3, 0.95}
 ```
 
-30% → 85% on held-out tickets: 55 points, or eleven more tickets out of
-twenty reaching the right squad. Across the three committed repeats the
-optimized router scored 0.85 every time while the baseline stayed at
-0.25–0.30. Each full run cost about $0.01 (~12,300 tokens) and finished in
-8–10 seconds.
+The current three-repeat artifact measured 35% → 95%, 30% → 100%, and
+35% → 95%: gains of 60–70 points on held-out tickets. Each full run used
+about 14,800 tokens, cost about $0.013, and finished in 7–9 seconds. All 120
+evaluation calls completed without a row error.
 
 It is not a magic button. The remaining misses are genuinely marginal tickets
 ("Scheduled reports did not run last night" — a platform failure that reads
@@ -204,6 +203,12 @@ router = Imp.load!("ticket_router.json")
 
 Credentials never enter the artifact; bind the live model at runtime with
 `Imp.with_lm/2` or a scoped `Imp.context/2`.
+
+The committed evidence runner also writes the optimized parameters as an
+`Imp.Optimizer.Artifact`, starts a fresh OS process, reconstructs the trusted
+router, applies only those parameters, and serves four concurrent OTP tasks.
+All four fresh-process probes routed correctly; the artifact never contained
+the provider credential or executable application code.
 
 ## Where To Go Next
 

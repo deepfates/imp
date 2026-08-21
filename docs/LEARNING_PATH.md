@@ -63,7 +63,7 @@ that returns a boolean, number, or structured score.
 An optimizer compiles your program into a better one, using training data and
 your metric. The [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md) runs
 this workflow end to end on sixty labeled tickets, with a baseline, a
-held-out score (30% to 85% in the committed runs, for about a cent), and a readable
+held-out score (30–35% to 95–100% in the current committed runs, for about 1.3 cents), and a readable
 diff of what changed. The shape is:
 
 ```elixir

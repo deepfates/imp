@@ -1351,12 +1351,12 @@
       "claim_state": "asserted",
       "target_rung": "C3",
       "release": "v0.1",
-      "scope": "The exact experiment shipped in docs/TUTORIAL_TICKET_ROUTING.md: ordered LabeledFewShot(k: 8, sample: false) lift over the zero-shot enum router on the twenty held-out tickets of the shipped sixty-ticket support dataset with openai:gpt-5.4-mini, across three cache-cleared live repeats.",
+      "scope": "The exact experiment shipped in docs/TUTORIAL_TICKET_ROUTING.md: ordered LabeledFewShot(k: 8, sample: false) lift over the zero-shot enum router on the twenty held-out tickets of the shipped sixty-ticket support dataset with openai:gpt-5.4-mini, across three cache-disabled, transport-accounted live repeats, followed by parameter-Artifact application and concurrent service in a fresh OS process.",
       "limitations": [
         "One task, one dataset, one model; no generalization beyond the shipped support-ticket dataset, no search-optimizer effectiveness, and no DSPy-matched comparison is claimed.",
-        "The tutorial's headline single draw (0.35 -> 0.90) was not reproduced exactly; the committed repeats measured 0.25-0.30 -> 0.85, inside the doc's published repeat ranges (baseline 0.20-0.40, optimized 0.85-0.90)."
+        "The result establishes one small few-shot classification workflow. It does not establish instruction-search effectiveness or general usefulness across tasks and models."
       ],
-      "statement": "The tutorial's optimizer lift reproduces live: in the committed three-repeat artifact every cache-cleared repeat improves held-out routing accuracy, measuring baseline 0.25-0.30 against optimized 0.85 on the twenty held-out tickets with a minimum absolute lift of 0.55.",
+      "statement": "The tutorial's optimizer lift reproduces live: the current three-repeat artifact measures baseline 0.30-0.35 against optimized 0.95-1.00 on twenty held-out tickets, with 120 usage-bearing single-attempt transports, zero row errors, $0.038887 total evaluation cost, and successful 4/4 concurrent service after parameter-Artifact application in a fresh OS process.",
       "category": "optimizer",
       "surface": [
         "docs",
@@ -1370,7 +1370,7 @@
       "sources": [
         "docs/TUTORIAL_TICKET_ROUTING.md",
         "scripts/tutorial_ticket_routing_experiment.exs",
-        "benchmarks/evidence/admitted/tutorial_ticket_routing/55af30010802d1625a1b800bc3ae905b80b383f7613673c5d11f69b10daff031.json",
+        "benchmarks/evidence/admitted/tutorial_ticket_routing/6b1b6c9fdeb279265bfa67a3afe5f4f5c0c72a0abd0dc2d6c49f3529c8403bc9.json",
         "test/tutorial_ticket_routing_artifact_test.exs"
       ],
       "requirements": [
@@ -1379,7 +1379,7 @@
           "kind": "optimizer_effectiveness",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "the committed content-addressed tutorial artifact verifies dataset provenance and positive held-out lift with zero cache hits in every recorded repeat, enforced by test/tutorial_ticket_routing_artifact_test.exs in the suite gated by mix production.check"
+          "threshold": "the committed content-addressed tutorial artifact verifies dataset provenance, positive held-out lift, exact single-attempt transport accounting, and fresh-process concurrent Artifact service, enforced by test/tutorial_ticket_routing_artifact_test.exs in the suite gated by mix production.check"
         }
       ]
     }
