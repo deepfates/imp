@@ -40,7 +40,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | BetterTogether | adaptation | provider_training<br>better_together_differential | T1 | benchmarks/evidence/admitted/better_together_differential/36898d226771e4bf121df661bac365e0a8a9c2fc98270c6e4126073ccdc015c8.json |
 | Ensemble | adaptation | optimizer_lift<br>ensemble_differential | T1 | benchmarks/evidence/admitted/ensemble_differential/df73a1f72a241214570e76b7a824ce5472c0dcff4dcc9bcc62c0d984df3866c8.json |
 | Fast-Slow orchestration and CISPO handoff | adaptation | fast_slow | NONE | none |
-| Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json |
+| Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json |
 | Retrieval, RAG, embeddings, and datasets | adaptation | rag_agent | NONE | none |
 | Async, streaming, cache, telemetry, and overhead | native_extension | operations | NONE | none |
 | Persistence and protocol boundaries | native_extension | operations | NONE | none |
