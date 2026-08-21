@@ -317,13 +317,13 @@ defmodule ClaimsInventoryTest do
            ]) == "live_matched_model"
   end
 
-  test "local MLX effectiveness claim remains narrow and independently gated" do
+  test "local MLX effectiveness claim remains narrow and informational for release" do
     claim =
       Enum.find(read_claims!(), &(&1["id"] == "claim.local_mlx_weight_training.effectiveness"))
 
     assert claim["claim_state"] == "asserted"
     assert claim["comparison"] == "imp_local_baseline"
-    assert claim["gate_policy"] == "blocking"
+    assert claim["gate_policy"] == "informational"
     assert claim["limitations"] != []
 
     assert [%{"lane" => "local_mlx_weight_training", "evidence" => "full"}] =

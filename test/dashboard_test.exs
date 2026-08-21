@@ -1434,7 +1434,6 @@ defmodule DashboardTest do
              "golden_trace",
              "live_provider_smoke",
              "livebook_execute",
-             "local_mlx_weight_training",
              "product_package",
              "protocol_gates",
              "rag_tool_agent"

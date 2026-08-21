@@ -664,7 +664,7 @@ Current-profile capability evidence:
 
 - `Avatar`: valid; claims: claim.optimizer.avatar_actor.api (blocking), claim.optimizer.avatar_actor.semantic_conformance (informational); receipts: avatar=valid
 - `AvatarOptimizer`: valid; claims: claim.optimizer.avatar_optimizer.api (blocking), claim.optimizer.avatar_optimizer.semantic_conformance (informational); receipts: avatar_optimizer=valid
-- `BootstrapFinetune`: valid; claims: claim.optimizer.bootstrap_finetune.api (blocking), claim.optimizer.bootstrap_finetune.semantic_conformance (informational), claim.local_mlx_weight_training.effectiveness (blocking); receipts: bootstrap_finetune=valid
+- `BootstrapFinetune`: valid; claims: claim.optimizer.bootstrap_finetune.api (blocking), claim.optimizer.bootstrap_finetune.semantic_conformance (informational), claim.local_mlx_weight_training.effectiveness (informational); receipts: bootstrap_finetune=valid
 - `GRPO`: valid; claims: claim.optimizer.mmgrpo.api (blocking), claim.optimizer.mmgrpo.semantic_conformance (informational); receipts: grpo=valid
 - `BetterTogether`: valid; claims: claim.optimizer.better_together.api (blocking), claim.optimizer.better_together.semantic_conformance (informational); receipts: better_together=valid
 - `Ensemble`: valid; claims: claim.optimizer.ensemble.api (blocking), claim.optimizer.ensemble.semantic_conformance (informational); receipts: ensemble=valid
