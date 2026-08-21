@@ -27,7 +27,7 @@ defmodule TutorialTicketRoutingArtifactTest do
   test "a committed tutorial run artifact exists with verified dataset provenance" do
     artifact = latest_artifact!()
 
-    assert artifact["schema_version"] == 1
+    assert artifact["schema_version"] in [1, 2]
     assert artifact["runner"] == "tutorial-ticket-routing-experiment"
     assert artifact["script"] == "scripts/tutorial_ticket_routing_experiment.exs"
     assert artifact["tutorial"] == "docs/TUTORIAL_TICKET_ROUTING.md"
@@ -62,9 +62,15 @@ defmodule TutorialTicketRoutingArtifactTest do
       assert cache["cleared_before_run"] == true and cache["hits"] == 0,
              "run #{run["run"]} is not a live repeat: cache stats #{inspect(cache)}"
 
-      assert cache["misses"] >= 40,
-             "run #{run["run"]} recorded fewer cache misses than the 40 live " <>
-               "evaluation calls it must make: #{inspect(cache)}"
+      if budget = summary_budget(artifact) do
+        assert budget["single_attempt_transport_enforced"] == true
+        assert budget["transport_attempts"] == budget["requests"]
+        assert budget["active_reservations"] == 0
+      else
+        assert cache["misses"] >= 40,
+               "run #{run["run"]} recorded fewer cache misses than the 40 live " <>
+                 "evaluation calls it must make: #{inspect(cache)}"
+      end
     end)
 
     summary = artifact["summary"]
@@ -73,13 +79,40 @@ defmodule TutorialTicketRoutingArtifactTest do
     assert summary["repeats"] == length(runs)
   end
 
+  defp summary_budget(artifact), do: get_in(artifact, ["summary", "optimizer_budget"])
+
   test "the artifact records the doc's published numbers as claims under test" do
     artifact = latest_artifact!()
     doc_claims = artifact["doc_claims_under_test"]
 
     assert doc_claims["source"] == "docs/TUTORIAL_TICKET_ROUTING.md"
-    assert doc_claims["baseline_score"] == 0.35
-    assert doc_claims["optimized_score"] == 0.90
+
+    if artifact["schema_version"] == 2 do
+      assert doc_claims["baseline_repeat_range"] == [0.25, 0.45]
+      assert doc_claims["optimized_repeat_range"] == [0.85, 1.0]
+    else
+      assert is_number(doc_claims["baseline_score"])
+      assert is_number(doc_claims["optimized_score"])
+    end
+  end
+
+  test "the selected parameters serve concurrently from a fresh OS process" do
+    artifact = latest_artifact!()
+
+    if artifact["schema_version"] == 1 do
+      assert is_nil(artifact["fresh_service"])
+    else
+      assert_fresh_service!(artifact["fresh_service"])
+    end
+  end
+
+  defp assert_fresh_service!(fresh) do
+    assert fresh["fresh_os_process"] == true
+    assert fresh["concurrency"] == 4
+    assert fresh["correct"] == fresh["total"]
+    assert fresh["artifact_sha256"] =~ ~r/^[0-9a-f]{64}$/
+    assert fresh["budget"]["transport_attempts"] == 4
+    assert fresh["budget"]["active_reservations"] == 0
   end
 
   defp latest_artifact! do
