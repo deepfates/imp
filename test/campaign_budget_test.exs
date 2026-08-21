@@ -16,6 +16,93 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
     end
   end
 
+  defmodule TelemetryLM do
+    @behaviour Imp.LM
+    defstruct []
+
+    @impl true
+    def generate(_messages, _opts), do: {:error, :telemetry_lm_instance_required}
+
+    def generate(%__MODULE__{}, _messages, _opts) do
+      :telemetry.execute(
+        [:req_llm, :token_usage],
+        %{tokens: %{input_tokens: 7, output_tokens: 3}, total_cost: 0.02},
+        %{}
+      )
+
+      {:ok, %{answer: "ok"}}
+    end
+  end
+
+  defmodule TimeoutLM do
+    @behaviour Imp.LM
+    defstruct []
+
+    @impl true
+    def generate(_messages, _opts), do: {:error, :timeout}
+  end
+
+  test "public facade constructs the packaged budget and LM decorator" do
+    assert {:ok, budget} =
+             Imp.start_optimizer_budget(
+               limits: %{requests: 1, input_tokens: 10_000, output_tokens: 20, usd: 1.0},
+               pricing: %{"input_per_million" => 1.0, "output_per_million" => 2.0},
+               default_max_output_tokens: 20
+             )
+
+    lm = Imp.budgeted_lm(%CountingLM{owner: self()}, budget, max_output_tokens: 20)
+    assert %Imp.LM.Budgeted{} = lm
+    assert {:ok, %{answer: "ok"}} = Imp.LM.generate(lm, [%{content: "first"}], [])
+    assert_received :provider_called
+
+    assert {:error, {:campaign_budget_exhausted, :requests}} =
+             Imp.LM.generate(lm, [%{content: "second"}], [])
+
+    refute_received :provider_called
+    assert Imp.Optimizer.Budget.snapshot(budget)["requests"] == 1
+  end
+
+  test "concurrent public wrappers record only their own provider telemetry" do
+    assert {:ok, budget} =
+             Imp.start_optimizer_budget(
+               limits: %{requests: 2, input_tokens: 10_000, output_tokens: 40, usd: 1.0},
+               pricing: %{"input_per_million" => 1.0, "output_per_million" => 2.0},
+               default_max_output_tokens: 20
+             )
+
+    lm = Imp.budgeted_lm(%TelemetryLM{}, budget, max_output_tokens: 20)
+
+    results =
+      ["one", "two"]
+      |> Enum.map(fn content ->
+        Task.async(fn -> Imp.LM.generate(lm, [%{content: content}], []) end)
+      end)
+      |> Enum.map(&Task.await/1)
+
+    assert results == [{:ok, %{answer: "ok"}}, {:ok, %{answer: "ok"}}]
+
+    snapshot = Imp.Optimizer.Budget.snapshot(budget)
+    assert snapshot["requests"] == 2
+    assert snapshot["usage"] == %{"input_tokens" => 14, "output_tokens" => 6, "usd" => 0.04}
+    assert snapshot["active_reservations"] == 0
+  end
+
+  test "a timeout is returned and its completed call reservation is released" do
+    assert {:ok, budget} =
+             Imp.start_optimizer_budget(
+               limits: %{requests: 1, input_tokens: 10_000, output_tokens: 20, usd: 1.0},
+               pricing: %{"input_per_million" => 1.0, "output_per_million" => 2.0},
+               default_max_output_tokens: 20
+             )
+
+    lm = Imp.budgeted_lm(%TimeoutLM{}, budget, max_output_tokens: 20)
+    assert {:error, :timeout} = Imp.LM.generate(lm, [%{content: "first"}], [])
+
+    snapshot = Imp.Optimizer.Budget.snapshot(budget)
+    assert snapshot["requests"] == 1
+    assert snapshot["active_reservations"] == 0
+  end
+
   test "reserves strict request and conservative token and USD ceilings before calls" do
     {:ok, budget} =
       CampaignBudget.start_link(

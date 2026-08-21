@@ -319,6 +319,54 @@ This is the best default for an application or a bounded experiment. Use
 `Imp.optimize/3..5` directly when you deliberately need an optimizer's native
 return value or lifecycle.
 
+### Bound live optimizer spend before the first request
+
+A live optimizer can call task and proposal models many times. Put every LM in
+the workflow behind one shared `Imp.Optimizer.Budget` so request, input-token,
+output-token, and dollar limits are prospective rather than post-hoc warnings:
+
+```elixir
+{:ok, budget} =
+  Imp.start_optimizer_budget(
+    limits: %{
+      requests: 100,
+      input_tokens: 500_000,
+      output_tokens: 50_000,
+      usd: 5.00
+    },
+    pricing: %{
+      "input_per_million" => 0.75,
+      "output_per_million" => 4.50,
+      "source_url" => "https://developers.openai.com/api/docs/pricing"
+    },
+    default_max_output_tokens: 1_000
+  )
+
+task_lm =
+  "openai:" <> System.fetch_env!("OPENAI_MODEL")
+  |> Imp.req_llm(api_key: System.fetch_env!("OPENAI_API_KEY"))
+  |> Imp.budgeted_lm(budget, max_output_tokens: 1_000)
+
+program = Imp.predict(signature, lm: task_lm)
+
+{:ok, result} =
+  Imp.Experiment.check(program, optimizer, data, metric,
+    budget: budget,
+    evaluation_options: [max_concurrency: 4]
+  )
+
+result.provenance.optimizer_budget.snapshot
+```
+
+The wrapper reserves the worst-case envelope before each call, disables cache
+and hidden transport retries, counts actual Req transport attempts, records
+provider-reported usage in the calling process, and releases completed
+reservations. The selected parameter Artifact retains the ledger through
+selection; the Result retains the final ledger after held-out evaluation.
+Resume with `initial: Imp.Optimizer.Budget.snapshot(budget)`. Any unresolved
+reservation is conservatively charged once, so a crash cannot restore capacity.
+Stop the budget process when the owning workflow ends.
+
 ## An optimizer changes a program; it does not replace measurement
 
 Public optimizers whose declared kind is `:program` can be called through

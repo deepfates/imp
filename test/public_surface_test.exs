@@ -1022,6 +1022,9 @@ defmodule PublicSurfaceTest do
       rlm_serializable: 2,
       rlm_serializable: 3,
       call: 2,
+      start_optimizer_budget: 1,
+      budgeted_lm: 2,
+      budgeted_lm: 3,
       req_llm: 1,
       req_llm: 2
     ]

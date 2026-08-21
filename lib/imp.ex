@@ -500,4 +500,71 @@ defmodule Imp do
 
   @doc "Creates a ReqLLM-backed multi-provider LM client."
   def req_llm(model_spec, opts \\ []), do: Imp.Clients.ReqLLM.new(model_spec, opts)
+
+  @doc """
+  Starts a prospective request, token, and USD ledger for live optimization.
+
+  Supply `:limits`, `:pricing`, and `:default_max_output_tokens`. A prior
+  `Imp.Optimizer.Budget.snapshot/1` may be passed as `:initial`; unresolved
+  reservations are then conservatively charged once instead of restoring spend
+  capacity after a crash.
+
+  Wrap every task and proposal LM with `budgeted_lm/3`; the wrapper records
+  ReqLLM provider usage for each call and releases its reservation afterward.
+  """
+  def start_optimizer_budget(opts) when is_list(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "Imp.start_optimizer_budget/1 expects a keyword list"
+    end
+
+    Imp.Optimizer.Budget.start_link(opts)
+  end
+
+  def start_optimizer_budget(_opts),
+    do: raise(ArgumentError, "Imp.start_optimizer_budget/1 expects a keyword list")
+
+  @doc """
+  Wraps an LM with prospective request/token/USD admission.
+
+  The wrapper caps output, disables cache and hidden retries, and rejects calls
+  before transport when their worst-case reservation would exceed the ledger.
+  """
+  def budgeted_lm(lm, budget, opts \\ [])
+
+  def budgeted_lm(lm, budget, opts) when is_pid(budget) and is_list(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "Imp.budgeted_lm/3 expects keyword options"
+    end
+
+    unknown = Keyword.keys(opts) -- [:max_output_tokens]
+
+    if unknown != [] do
+      raise ArgumentError, "Imp.budgeted_lm/3 received unknown options: #{inspect(unknown)}"
+    end
+
+    max_output_tokens =
+      case Keyword.fetch(opts, :max_output_tokens) do
+        {:ok, value} -> value
+        :error -> raise ArgumentError, "Imp.budgeted_lm/3 requires :max_output_tokens"
+      end
+
+    unless is_integer(max_output_tokens) and max_output_tokens > 0 do
+      raise ArgumentError, ":max_output_tokens must be a positive integer"
+    end
+
+    case Imp.LM.validate_lm(lm) do
+      {:ok, lm} ->
+        %Imp.LM.Budgeted{
+          inner: lm,
+          budget: budget,
+          max_output_tokens: max_output_tokens
+        }
+
+      {:error, reason} ->
+        raise ArgumentError, "invalid LM for Imp.budgeted_lm/3: #{reason}"
+    end
+  end
+
+  def budgeted_lm(_lm, _budget, _opts),
+    do: raise(ArgumentError, "Imp.budgeted_lm/3 expects an LM, budget pid, and keyword options")
 end

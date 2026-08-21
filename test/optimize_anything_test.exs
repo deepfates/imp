@@ -1,5 +1,8 @@
 defmodule OptimizeAnythingTest do
-  use ExUnit.Case, async: true
+  # The fresh-process assertion starts `mix run` against this checkout's build
+  # path. Keep the module out of the async pool so another compiling test cannot
+  # inject Mix's build-lock notice into the deliberately empty child stdout.
+  use ExUnit.Case, async: false
 
   alias Imp.Optimize.Anything
   alias Imp.Optimize.Anything.{Config, Result}

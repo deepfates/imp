@@ -20,6 +20,7 @@ defmodule PackageContractTest do
                    "lib/imp.ex",
                    "lib/imp/clients/req_llm.ex",
                    "lib/imp/lm/static.ex",
+                   "lib/imp/optimizer/budget.ex",
                    "priv/public_api.json",
                    "CHANGELOG.md",
                    "LICENSE",

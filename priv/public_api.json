@@ -374,6 +374,7 @@
         "assertion/3",
         "avatar/3",
         "best_of_n/3",
+        "budgeted_lm/3",
         "call/2",
         "chain_of_thought/2",
         "classification/3",
@@ -427,6 +428,7 @@
         "save!/3",
         "settings/0",
         "signature/2",
+        "start_optimizer_budget/1",
         "stream/3",
         "subscribe_optimizer_progress/1",
         "to_map/1",
@@ -458,6 +460,9 @@
           ],
           "best_of_n/3": [
             "best_of_n(program, metric, opts \\\\ [])"
+          ],
+          "budgeted_lm/3": [
+            "budgeted_lm(lm, budget, opts \\\\ [])"
           ],
           "call/2": [
             "call(program, inputs)"
@@ -617,6 +622,9 @@
           ],
           "signature/2": [
             "signature(spec, instructions \\\\ nil)"
+          ],
+          "start_optimizer_budget/1": [
+            "start_optimizer_budget(opts)"
           ],
           "stream/3": [
             "stream(program, inputs, opts \\\\ [])"
@@ -3268,6 +3276,35 @@
     },
     {
       "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "generate/3",
+        "response_format_capability/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.LM.Budgeted",
+      "signatures": {
+        "functions": {
+          "generate/3": [
+            "generate(lm, messages, opts)"
+          ],
+          "response_format_capability/1": [
+            "response_format_capability(budgeted)"
+          ]
+        }
+      },
+      "source": "lib/imp/optimizer/budget.ex",
+      "struct_fields": [
+        "budget",
+        "inner",
+        "max_output_tokens",
+        "record_usage"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
       "category": "stable",
       "functions": [
         "metadata/1",
@@ -4324,6 +4361,61 @@
       "source": "lib/imp/optimizer/bootstrap_rs.ex",
       "struct_fields": [],
       "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "attach_req_llm/2",
+        "authorize_transport_attempt/1",
+        "record_usage/2",
+        "release/2",
+        "reserve/3",
+        "snapshot/1",
+        "start_link/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Optimizer.Budget",
+      "signatures": {
+        "functions": {
+          "attach_req_llm/2": [
+            "attach_req_llm(server, opts \\\\ [])"
+          ],
+          "authorize_transport_attempt/1": [
+            "authorize_transport_attempt(server)"
+          ],
+          "child_spec/1": [
+            "child_spec(init_arg)"
+          ],
+          "record_usage/2": [
+            "record_usage(server, usage)"
+          ],
+          "release/2": [
+            "release(server, reservation)"
+          ],
+          "reserve/3": [
+            "reserve(server, messages, opts)"
+          ],
+          "snapshot/1": [
+            "snapshot(server)"
+          ],
+          "start_link/1": [
+            "start_link(opts)"
+          ]
+        },
+        "types": {
+          "limit/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/budget.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "limit/0"
+        }
+      ]
     },
     {
       "callbacks": [],

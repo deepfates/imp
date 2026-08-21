@@ -137,12 +137,27 @@ defmodule Imp.ExperimentTest do
 
     metric = Imp.exact_match(:answer)
 
+    {:ok, budget} =
+      Imp.start_optimizer_budget(
+        limits: %{requests: 8, input_tokens: 10_000, output_tokens: 100, usd: 1.0},
+        pricing: %{"input_per_million" => 1.0, "output_per_million" => 1.0},
+        default_max_output_tokens: 10
+      )
+
+    :ok =
+      Imp.Optimizer.Budget.record_usage(budget, %{
+        input_tokens: 7,
+        output_tokens: 3,
+        usd: 0.01
+      })
+
     assert {:ok, result} =
              Imp.Experiment.check(program, %SelectableOptimizer{owner: owner}, data, metric,
                artifact_id: "selected-v1",
                optimizer_options: [custom_optimizer_control: :owned],
                evaluation_options: [max_concurrency: 1, repetitions: 1, aggregation: :mean],
-               compare_baseline_on_test: true
+               compare_baseline_on_test: true,
+               budget: budget
              )
 
     assert result.selected == :optimized
@@ -151,6 +166,12 @@ defmodule Imp.ExperimentTest do
     assert result.baseline_test.score == 0.0
     assert result.test.score == 1.0
     assert Artifact.inspect(result.artifact).champion_id == "selected-v1"
+    assert result.provenance.optimizer_budget.stage == "final"
+    assert result.provenance.optimizer_budget.snapshot["usage"]["usd"] == 0.01
+
+    assert get_in(Artifact.inspect(result.artifact), [:provenance, "optimizer_budget", "stage"]) ==
+             "through_selection"
+
     assert_received {:optimizer_opts, optimizer_opts}
     assert optimizer_opts[:custom_optimizer_control] == :owned
     refute Keyword.has_key?(optimizer_opts, :max_concurrency)

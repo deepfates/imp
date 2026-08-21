@@ -42,7 +42,7 @@ defmodule Imp.Experiment do
     unless Keyword.keyword?(opts), do: invalid_options!(opts)
 
     {optimizer_opts, evaluation_opts, bootstrap_opts, artifact_id, declared_config,
-     metric_identity, compare_baseline_on_test?} =
+     metric_identity, compare_baseline_on_test?, budget} =
       split_options!(opts)
 
     config = %{
@@ -90,6 +90,8 @@ defmodule Imp.Experiment do
 
         selected = select(baseline, optimized_result)
 
+        artifact_provenance = put_budget_snapshot(provenance, budget, "through_selection")
+
         artifact =
           stage!(:artifact, fn ->
             build_artifact(
@@ -99,7 +101,7 @@ defmodule Imp.Experiment do
               optimized_result,
               selected,
               artifact_id,
-              provenance
+              artifact_provenance
             )
           end)
 
@@ -140,7 +142,7 @@ defmodule Imp.Experiment do
            optimized_selection: optimized_result,
            baseline_test: baseline_test,
            test: test,
-           provenance: provenance,
+           provenance: put_budget_snapshot(provenance, budget, "final"),
            repetition_summary:
              repetition_summary(
                evaluation_opts,
@@ -412,7 +414,8 @@ defmodule Imp.Experiment do
       :evaluation_options,
       :config,
       :metric_identity,
-      :compare_baseline_on_test
+      :compare_baseline_on_test,
+      :budget
     ]
 
     unknown = Keyword.keys(opts) -- public
@@ -432,6 +435,7 @@ defmodule Imp.Experiment do
     declared_config = Keyword.get(opts, :config, %{})
     metric_identity = Keyword.get(opts, :metric_identity)
     compare_baseline_on_test? = Keyword.get(opts, :compare_baseline_on_test, false)
+    budget = Keyword.get(opts, :budget)
 
     unless Keyword.keyword?(optimizer_opts),
       do: raise(ArgumentError, ":optimizer_options must be a keyword list")
@@ -468,8 +472,20 @@ defmodule Imp.Experiment do
     unless is_boolean(compare_baseline_on_test?),
       do: raise(ArgumentError, ":compare_baseline_on_test must be boolean")
 
+    unless is_nil(budget) or is_pid(budget),
+      do: raise(ArgumentError, ":budget must be an Imp.Optimizer.Budget pid or nil")
+
     {optimizer_opts, evaluation_opts, bootstrap_opts, artifact_id, declared_config,
-     metric_identity, compare_baseline_on_test?}
+     metric_identity, compare_baseline_on_test?, budget}
+  end
+
+  defp put_budget_snapshot(provenance, nil, _stage), do: provenance
+
+  defp put_budget_snapshot(provenance, budget, stage) do
+    Map.put(provenance, :optimizer_budget, %{
+      stage: stage,
+      snapshot: Imp.Optimizer.Budget.snapshot(budget)
+    })
   end
 
   defp evaluation_keys,
