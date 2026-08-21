@@ -323,7 +323,7 @@ defmodule ClaimsInventoryTest do
 
     assert claim["claim_state"] == "asserted"
     assert claim["comparison"] == "imp_local_baseline"
-    assert claim["gate_policy"] == "informational"
+    assert claim["gate_policy"] == "blocking"
     assert claim["limitations"] != []
 
     assert [%{"lane" => "local_mlx_weight_training", "evidence" => "full"}] =

@@ -999,7 +999,7 @@
       "surface": ["BootstrapFinetune", "training_protocol", "local_weight_training", "save_load"],
       "claim_type": "functional_effectiveness",
       "comparison": "imp_local_baseline",
-      "gate_policy": "informational",
+      "gate_policy": "blocking",
       "sources": ["benchmarks/results/local-mlx-public-consumer-banking77-dd6f6ad.json", "docs/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
         {
