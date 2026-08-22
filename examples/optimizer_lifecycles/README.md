@@ -35,3 +35,20 @@ mix run examples/optimizer_lifecycles/classical.exs
 The output is a task-scoped product receipt, not a general effectiveness or
 upstream-parity claim. Keep honest neutral or negative runs; diagnose them
 before choosing a different treatment.
+
+## Retained clean run
+
+The `exercised-classical/` directory retains the complete clean-commit run from
+`f21a456f9f2be7066251640dbeeab02a3d0f7ff4`. On untouched test rows, the live
+baseline scored `0.40`; BootstrapFewShot scored `0.90`, RandomSearch `0.95`, and
+KNNFewShot `0.60`, all with zero row errors. Fresh OS processes loaded the exact
+retained states and scored `1.00`, `1.00`, and `0.75` on four representative
+probes. The main run made 423 single-attempt transports, used 159,669 input and
+5,734 output tokens, and recorded `$0.145534`; the three fresh processes have
+their own bounded usage ledgers in `result.json`.
+
+The first clean attempt usefully failed because a process-owned budget wrapper
+is not portable. The second exposed the required executable-metric registry.
+The lifecycle now persists a credential-free model descriptor and a stable
+metric key, then reconstructs both trusted runtime capabilities after restart.
+That is the intended persistence contract, not a workaround.

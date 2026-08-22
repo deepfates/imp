@@ -1,0 +1,1136 @@
+{
+  "artifact_type": "imp_optimizer_artifact",
+  "payload": {
+    "candidates": {
+      "support-bootstrap-few-shot": {
+        "id": "support-bootstrap-few-shot",
+        "kind": "program",
+        "metadata": {
+          "optimizer": "bootstrap_few_shot"
+        },
+        "program": {
+          "predictors": [
+            {
+              "name": "main",
+              "predictor": {
+                "adapter": "Elixir.Imp.Adapter.Chat",
+                "config": [
+                  [
+                    "json_retries",
+                    1
+                  ]
+                ],
+                "demos": [
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "atlas"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "We were charged twice for the March invoice."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "harbor"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "Card payments have been timing out at checkout since 9am."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "beacon"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "I can't log in after resetting my password."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "quill"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "Can you add a dark mode to the dashboard?"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "atlas"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "Please send a copy of last month's receipt for our records."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "beacon"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "A former employee still has access to our workspace."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "quill"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "How do I export my data to CSV?"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "harbor"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "Dashboard pages take 30+ seconds to load today."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  }
+                ],
+                "dynamic_adapter": true,
+                "dynamic_lm": true,
+                "lm": null,
+                "metadata": {},
+                "signature": {
+                  "inputs": [
+                    {
+                      "desc": null,
+                      "kind": "input",
+                      "metadata": {},
+                      "name": "ticket",
+                      "prefix": "Ticket:",
+                      "type": "string"
+                    }
+                  ],
+                  "instructions": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.",
+                  "metadata": {},
+                  "outputs": [
+                    {
+                      "desc": null,
+                      "kind": "output",
+                      "metadata": {
+                        "constraints": {
+                          "enum": [
+                            "atlas",
+                            "harbor",
+                            "beacon",
+                            "quill"
+                          ]
+                        }
+                      },
+                      "name": "team",
+                      "prefix": "Team:",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "type": "predict"
+              }
+            }
+          ],
+          "type": "optimizer_parameter_snapshot"
+        },
+        "program_sha256": "sha256:0f9cf329007bf1b8269b1c9475c82498ea3a6e104a7a061d665c069370c8c3f3",
+        "report": {
+          "best_score": 0.8,
+          "candidate_count": 10,
+          "candidates": [
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  1
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  2
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  3
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  4
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  5
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  6
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  7
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  9
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "round"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "passed?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "feedback"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "nil"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "selected?"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            }
+          ],
+          "errors": [],
+          "metadata": {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "ok"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "max_errors"
+                },
+                10
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "max_rounds"
+                },
+                1
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "sampling_rng"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "beam_native"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "trainset_size"
+                },
+                20
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "selected_count"
+                },
+                8
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "validation_size"
+                },
+                12
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "max_errors_source"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "settings"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "max_labeled_demos"
+                },
+                8
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "sampling_schedule"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "dspy_3_2_1_seed_lifecycle"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "bootstrap_attempts"
+                },
+                10
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "student_preparation"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "reset_demos_and_optimizer_report"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "teacher_preparation"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "reset_and_labeled"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "trace_selection_rng"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "beam_sha256"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "predictor_demo_counts"
+                },
+                {
+                  "__imp_type__": "map",
+                  "entries": [
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "main"
+                      },
+                      8
+                    ]
+                  ]
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "max_bootstrapped_demos"
+                },
+                8
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "repeated_call_selections"
+                },
+                []
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "teacher_compilation_marker"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "optimizer_report"
+                }
+              ]
+            ]
+          },
+          "optimizer": {
+            "__imp_type__": "atom",
+            "value": "bootstrap_few_shot"
+          }
+        },
+        "score": 0.8
+      }
+    },
+    "champion_id": "support-bootstrap-few-shot",
+    "history": [],
+    "provenance": {
+      "optimizer": "bootstrap_few_shot"
+    },
+    "revision": 1,
+    "security": {
+      "credentials_absent": true,
+      "functions_absent": true,
+      "json_safe": true,
+      "redaction_policy": "imp_default_v1"
+    }
+  },
+  "payload_sha256": "sha256:8e50e5b35a4fba5c7b37ba403051b41e653dcd4bb020c376594802469580bf89",
+  "schema_version": 3
+}

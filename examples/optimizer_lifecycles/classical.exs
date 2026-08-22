@@ -18,7 +18,7 @@ defmodule ImpOptimizerLifecycles.Classical do
 
   defp run do
     require_clean!()
-    output = System.get_env("IMP_CLASSICAL_OUTPUT", "/tmp/imp-classical-live")
+    output = System.get_env("IMP_CLASSICAL_OUTPUT", "/tmp/imp-classical-live") |> Path.expand()
     File.mkdir_p!(output)
 
     {dataset_bytes, train, selection, test} = dataset!()
