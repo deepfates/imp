@@ -53,9 +53,9 @@ durability matters.
 
 ## Provider Training
 
-Training optimizers are intentionally separate from program optimizers. Execute
-`BootstrapFinetune` and `GRPO` with `Imp.train/3` or `Imp.train/4`, not
-`Imp.optimize`:
+Training integrations are intentionally separate from program optimizers.
+Execute `BootstrapFinetune` and experimental `GRPO` with `Imp.train/3` or
+`Imp.train/4`, not `Imp.optimize`:
 
 ```elixir
 trainer = MyApp.training_backend()
@@ -70,7 +70,8 @@ optimizer = Imp.Optimizer.BootstrapFinetune.new(metric, trainer: trainer)
 asynchronous provider job and `status: :completed` with a rebound program when
 the trainer returns a successful terminal job. Terminal failures remain errors.
 GRPO reports `status: :completed` after its synchronous trainer workflow returns
-the rebound program. Both require an explicitly configured
+the rebound program; that status proves workflow completion, not useful learned
+behavior. Both require an explicitly configured
 trainer. Imp does not silently fall back to local training when no trainer is
 configured. `Imp.Clients.MLXLMTrainer` is an optional, explicit local SFT
 backend, not a fallback or a GRPO engine. Its successful outcome is an official

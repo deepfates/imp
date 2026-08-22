@@ -493,7 +493,7 @@ need.
 | `MIPROv2`, `SIMBA` | You want a broader search over instructions and demonstrations. |
 | `GEPA` | Your metric can provide useful textual feedback for reflective instruction evolution. |
 | `Ensemble`, `BetterTogether` | You want to combine programs or compose named prompt and weight steps. |
-| `BootstrapFinetune`, `GRPO` | You intend to change model weights through an explicit trainer. |
+| `BootstrapFinetune` | You intend to change model weights through an explicit supervised trainer. |
 | `Imp.Optimize.Anything` | The thing being improved is a text or JSON-safe artifact rather than an Imp program. |
 
 All optimizer modules currently remain experimental in Imp's canonical public
@@ -517,6 +517,16 @@ lifecycles show useful selected programs for COPRO, InferRules,
 SignatureOptimizer, and SIMBA, including held-out evaluation and fresh Artifact
 application. Treat all of these effectiveness observations as experimental on
 your task rather than a general guarantee.
+
+`Imp.Optimizer.GRPO` remains available as an explicitly experimental training
+integration, not as a completed optimizer in this chooser. Its public
+orchestration can drive real grouped rewards, durable TRL/MPS LoRA updates,
+validation checkpoint selection, verified deployment, and fresh-process
+rebind. Retained natural treatments have not produced positive held-out
+learning: they were neutral or regressed after selection. Use it to investigate
+a bounded reinforcement treatment when you own the trainer and acceptance
+criteria; do not assume useful learning merely because weights changed. See
+the experimental backend contract in `ADVANCED.md`.
 
 MIPROv2 has two intentional proposal modes. Its default BEAM-native mode uses
 explicit program structure and predictor signatures. Pinned DSPy 3.2.1

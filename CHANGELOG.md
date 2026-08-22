@@ -79,6 +79,13 @@ SIMBA now has a bounded natural reflective-mutation lifecycle with semantic
 metric feedback, separate selection and untouched test splits, a useful
 selected rule, explicit task/reflection budgets, and fresh Artifact application.
 
+GRPO is now described consistently as an explicit experimental training
+integration rather than a completed optimizer in the `0.3` chooser. Its real
+grouped-reward, durable LoRA update, checkpoint selection, verified deployment,
+and fresh-rebind APIs remain available; multiple retained natural treatments
+did not produce positive held-out learning, so weight movement is not promoted
+as product usefulness.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is

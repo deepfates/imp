@@ -5449,9 +5449,13 @@
       "functions": [
         "compile/6",
         "new/1",
+        "observed_weaknesses/2",
+        "read_checkpoint!/1",
         "restore/3",
         "retained_bytes/1",
-        "rollback/1"
+        "review/1",
+        "rollback/1",
+        "write_checkpoint!/2"
       ],
       "kind": "struct",
       "macros": [],
@@ -5464,14 +5468,26 @@
           "new/1": [
             "new(opts)"
           ],
+          "observed_weaknesses/2": [
+            "observed_weaknesses(request, opts \\\\ [])"
+          ],
+          "read_checkpoint!/1": [
+            "read_checkpoint!(path)"
+          ],
           "restore/3": [
             "restore(checkpoint, program, parameter \\\\ :playbook)"
           ],
           "retained_bytes/1": [
             "retained_bytes(playbook)"
           ],
+          "review/1": [
+            "review(result)"
+          ],
           "rollback/1": [
             "rollback(result)"
+          ],
+          "write_checkpoint!/2": [
+            "write_checkpoint!(checkpoint, path)"
           ]
         },
         "types": {

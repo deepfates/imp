@@ -273,7 +273,14 @@ trainer = Imp.Clients.OpenAITrainer.new(training_file: "file-provider-id")
 OpenAI trainer submits a fine-tuning job for an already uploaded provider file;
 it does not upload examples itself.
 
-### Optional local TRL GRPO
+### Experimental local TRL GRPO
+
+GRPO is a real but research-only training integration in the `0.3` product
+cut. It is not included in the API Guide's completed optimizer chooser because
+the retained natural local treatments changed weights and survived deployment
+without producing positive held-out learning. The API remains available for
+bounded experiments; tensor movement, protocol completion, or validation-only
+lift must not be presented as useful learned behavior.
 
 `Imp.Clients.TRLTrainer` is a local Apple-Silicon backend for real LoRA GRPO
 updates. Its default one-step contract pins Qwen2.5-0.5B-Instruct at revision

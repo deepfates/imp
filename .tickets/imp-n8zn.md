@@ -1,6 +1,6 @@
 ---
 id: imp-n8zn
-status: in_progress
+status: closed
 deps: [imp-0du1, imp-nenu, imp-9r8k, imp-d6s2, imp-yotq, imp-iuev]
 links: []
 created: 2026-08-22T13:38:01Z
@@ -35,3 +35,7 @@ Ensemble child imp-yotq closed on first natural retained composition. Remaining 
 **2026-08-22T21:15:40Z**
 
 SIMBA child imp-d6s2 closed on its first bounded natural useful lifecycle. GRPO useful learning is the only remaining optimizer-family blocker.
+
+**2026-08-22T21:20:14Z**
+
+All product-advertised optimizer families now have retained natural useful lifecycles. GRPO is intentionally excluded from that completed chooser for 0.3 and documented as an experimental training integration because several real local treatments changed weights and deployed artifacts without positive held-out learning. This is a product-scope decision grounded in negative evidence, not a green reinterpretation.
