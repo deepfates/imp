@@ -81,6 +81,8 @@ defmodule Imp.SavingSecretSafetyTest do
 
     assert :ok = Imp.save!(program, path, registry: registry)
     artifact = File.read!(path)
+    assert {:ok, %File.Stat{mode: mode}} = File.stat(path)
+    assert Bitwise.band(mode, 0o777) == 0o600
 
     refute artifact =~ secret
     refute artifact =~ "Bearer abcdefghijklmnop"
@@ -98,6 +100,13 @@ defmodule Imp.SavingSecretSafetyTest do
            }
 
     assert Imp.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "beam"
+
+    # Atomic replacement preserves the private mode rather than inheriting an
+    # existing destination's broader permissions.
+    File.chmod!(path, 0o644)
+    assert :ok = Imp.save!(program, path, registry: registry)
+    assert {:ok, %File.Stat{mode: replaced_mode}} = File.stat(path)
+    assert Bitwise.band(replaced_mode, 0o777) == 0o600
   end
 
   test "tool closures fail with an actionable registry requirement" do

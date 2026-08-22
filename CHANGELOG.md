@@ -25,6 +25,10 @@ the type transports source but does not execute it.
 
 Release hardening also keeps a report's known optimizer identity stable across
 an Artifact round-trip, while leaving unknown extension identifiers as strings.
+Whole-program `Imp.save!/2,3` now matches parameter and Experiment persistence
+by writing through an exclusive, synced, mode-`0600` temporary file before
+atomic replacement; demonstrations and other saved program state are no longer
+created world-readable under a permissive process umask.
 Strict provider streaming now fails with
 `{:provider_stream_unsupported, module}` when a composed program exposes no
 streamable predictor; local post-call chunking remains available when

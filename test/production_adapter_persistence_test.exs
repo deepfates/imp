@@ -808,7 +808,7 @@ defmodule ProductionAdapterPersistenceTest do
     assert %Imp.Optimizer.Report{optimizer: :labeled_few_shot} =
              report = Imp.Optimizer.Report.fetch(loaded)
 
-    assert report.metadata.selected_count == 1
+    assert report.metadata.selected_assignment_count == 1
     assert [%{example: %Imp.Example{} = example, selected?: true}] = report.candidates
     assert Imp.Example.get(example, :answer) == "Paris"
     assert length(loaded.demos) == 1

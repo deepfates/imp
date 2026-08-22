@@ -39,9 +39,17 @@ defmodule Imp.Saving do
     }
 
     temporary = path <> ".tmp-#{System.unique_integer([:positive])}"
+    io = File.open!(temporary, [:write, :binary, :exclusive])
 
     try do
-      File.write!(temporary, Jason.encode!(artifact, pretty: true) <> "\n", [:sync])
+      File.chmod!(temporary, 0o600)
+      :ok = IO.binwrite(io, Jason.encode!(artifact, pretty: true) <> "\n")
+      :ok = :file.sync(io)
+    after
+      File.close(io)
+    end
+
+    try do
       File.rename!(temporary, path)
       :ok
     after

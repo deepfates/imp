@@ -242,7 +242,7 @@ defmodule ImpOptimizerLifecycles.Classical do
         Map.new(result.fresh_process, fn {name, receipt} ->
           {name, get_in(receipt, ["score", "score"])}
         end),
-      usage: result.budget.usage
+      usage: result.budget["usage"]
     }
   end
 
