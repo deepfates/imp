@@ -15,15 +15,19 @@ the normalized BaseLM runtime, ReActV2, and the GEPA 0.1.1 result contract is
 visible without silently changing the stable release target.
 
 This baseline is now historical rather than current upstream. DSPy released
-stable `3.3.0` on 2026-08-03 at
-`e4e97aae29b8ad8aa2fb7e99ffae6fd52970fad8`. Direct source comparison from
-`3.2.1` to `3.3.0` adds the public `Flex` module and GEPA Flex optimization,
-ReActV2, typed LM request/response contracts, sandbox-serializable execution,
-resource loading, and broad adapter/runtime changes. The existing beta gates
-remain evidence for their exact pinned source; they are not a completed stable
-baseline migration. Until the ledger accounts for the full `3.3.0` surface,
-Imp may claim the scoped `3.2.1` and beta differentials it actually exercises,
-but not current whole-DSPy parity or superiority over the latest library.
+`3.3.0` on 2026-08-03 at
+`e4e97aae29b8ad8aa2fb7e99ffae6fd52970fad8`, then released `3.3.1` at
+`638e155cf725236fe5d01b5332394a7bc128881d`. The current stable audit targets
+`3.3.1`. The delta from `3.2.1` includes the public `Flex` module and GEPA Flex
+optimization, ReActV2, typed LM request/response contracts,
+sandbox-serializable execution, resource loading, optimizer/interpreter
+callbacks, MCP and structured-result changes, GEPA `0.1.4`, and broad
+adapter/runtime corrections. The existing beta and `3.3.0` gates remain
+evidence for their exact pinned sources; they are not a completed current-stable
+baseline migration. Until the ledger accounts for the full `3.3.1` surface,
+Imp may claim the scoped `3.2.1`, beta, and individual stable differentials it
+actually exercises, but not current whole-DSPy parity or superiority over the
+latest library.
 
 Standalone GEPA is versioned independently. Its current implementation
 authority is release `v0.1.4` at
