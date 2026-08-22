@@ -246,7 +246,7 @@ renders as a text block.
 | test_reasoning_basic_operations | n/a | Python str dunder protocol on the Reasoning type; Elixir has no operator overloading — Imp reasoning values are plain strings/structs. |
 | test_reasoning_concatenation | n/a | Same. |
 | test_reasoning_string_methods | n/a | Same. |
-| test_reasoning_with_chain_of_thought | pass | `result.reasoning` is an ordinary string usable with String functions. |
+| test_reasoning_with_chain_of_thought | pass | Default `ChainOfThought` rationale remains an ordinary string, matching DSPy 3.3.1. The typed/native path is separately exercised with `rationale_field_type: :reasoning`. |
 | test_reasoning_error_message | n/a | Python AttributeError message shape. |
 
 ## tests/adapters/test_tool.py (28)
@@ -614,8 +614,8 @@ substitution; all ports assert the winning value).
 |---|---|---|
 | test_initialization_with_string_signature | pass | Output fields exactly `[:reasoning, :answer]`; call answers "2". |
 | test_async_chain_of_thought | n/a | asyncio twin. |
-| test_chain_of_thought_with_native_reasoning | pass | Ported with the mocked marker completion verbatim (including upstream's stray `[[ ## completion ## ]]` tail, which parses as an unknown section exactly as in DSPy); answer "Paris", reasoning the exact string. |
-| test_chain_of_thought_with_manual_reasoning | n/a | The distinguishing surface is litellm's `Choices.reasoning` attribute; the content-side assertions are identical to the previous row's port. |
+| test_chain_of_thought_with_native_reasoning | pass | Provider-free capability fixture proves the reasoning field is omitted from the rendered contract, low effort is requested, and returned native thinking is restored as typed Reasoning. The marker-completion port also remains covered. |
+| test_chain_of_thought_with_manual_reasoning | pass | An incapable fixture and an explicit `reasoning_effort: nil` case prove the ordinary rendered-field fallback and loud missing-field behavior. |
 
 ## tests/predict/test_knn.py (3)
 

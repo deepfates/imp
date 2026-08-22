@@ -127,26 +127,117 @@ defmodule Imp.Predict.Predict do
          {:ok, inputs} <- normalize_inputs(inputs),
          inputs = apply_input_defaults(predict.signature, inputs),
          :ok <- validate_inputs(predict.signature, inputs),
+         {:ok, request_signature, request_config, reasoning_fields} <-
+           prepare_native_reasoning(predict.signature, lm, predict.config),
          {:ok, messages} <-
-           format_with_adapter(adapter, predict.signature, inputs, demos: predict.demos),
-         {:ok, lm_opts} <- adapter_lm_opts(adapter, predict.signature, predict.config, lm),
+           format_with_adapter(adapter, request_signature, inputs, demos: predict.demos),
+         {:ok, lm_opts} <- adapter_lm_opts(adapter, request_signature, request_config, lm),
          {:ok, lm_opts} <- multi_completion_opts(lm_opts),
          {:ok, raw} <- Imp.LM.generate(lm, messages, provider_lm_opts(lm_opts)),
          :ok <- validate_completion_shape(lm_opts, raw),
          {:ok, prediction, trace_messages, trace_raw, trace_lm_metadata} <-
            parse_with_retry(
              adapter,
-             predict.signature,
+             request_signature,
              raw,
              messages,
              lm,
              lm_opts,
              inputs,
              predict.demos
-           ) do
+           ),
+         {:ok, prediction} <-
+           restore_native_reasoning(prediction, reasoning_fields, trace_lm_metadata) do
       prediction = add_trace(prediction, trace_messages, trace_raw, trace_lm_metadata)
       Imp.Optimizer.Trace.capture(predict, inputs, prediction)
       {:ok, prediction}
+    end
+  end
+
+  defp prepare_native_reasoning(signature, lm, config) do
+    fields = Enum.filter(signature.outputs, &(&1.type in [:reasoning, "reasoning"]))
+
+    if fields == [] do
+      {:ok, signature, config, []}
+    else
+      configured_effort = Imp.LM.configured_option(lm, :reasoning_effort)
+
+      effort =
+        cond do
+          Keyword.has_key?(config, :reasoning_effort) ->
+            Keyword.fetch!(config, :reasoning_effort)
+
+          match?({:ok, _}, configured_effort) ->
+            elem(configured_effort, 1)
+
+          true ->
+            "low"
+        end
+
+      if Imp.LM.reasoning_capability(lm) and not is_nil(effort) do
+        names = MapSet.new(Enum.map(fields, & &1.name))
+
+        request_signature = %{
+          signature
+          | outputs: Enum.reject(signature.outputs, &MapSet.member?(names, &1.name))
+        }
+
+        {:ok, request_signature, Keyword.put(config, :reasoning_effort, effort), fields}
+      else
+        {:ok, signature, config, []}
+      end
+    end
+  end
+
+  defp restore_native_reasoning(prediction, [], _metadata), do: {:ok, prediction}
+
+  defp restore_native_reasoning(%Imp.Prediction{} = prediction, fields, metadata) do
+    case Map.get(metadata, :completion_metadata, Map.get(metadata, "completion_metadata")) do
+      completion_metadata when is_list(completion_metadata) ->
+        if length(completion_metadata) == length(prediction.completions) do
+          with {:ok, completions} <-
+                 restore_reasoning_completions(
+                   prediction.completions,
+                   completion_metadata,
+                   fields
+                 ) do
+            [first | _rest] = completions
+            {:ok, %{first | completions: completions}}
+          end
+        else
+          {:error,
+           {:native_reasoning_completion_count_mismatch, length(prediction.completions),
+            length(completion_metadata)}}
+        end
+
+      _single ->
+        restore_reasoning_value(prediction, fields, metadata)
+    end
+  end
+
+  defp restore_reasoning_completions(predictions, metadata, fields) do
+    predictions
+    |> Enum.zip(metadata)
+    |> Enum.reduce_while({:ok, []}, fn {prediction, item_metadata}, {:ok, acc} ->
+      case restore_reasoning_value(prediction, fields, item_metadata) do
+        {:ok, restored} -> {:cont, {:ok, [restored | acc]}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, reversed} -> {:ok, Enum.reverse(reversed)}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp restore_reasoning_value(prediction, fields, metadata) do
+    case Map.get(metadata, :native_reasoning, Map.get(metadata, "native_reasoning")) do
+      text when is_binary(text) and text != "" ->
+        reasoning = Imp.Adapter.Types.Reasoning.new(text)
+        {:ok, Enum.reduce(fields, prediction, &Imp.Prediction.put(&2, &1.name, reasoning))}
+
+      _missing ->
+        {:error, {:native_reasoning_missing, Enum.map(fields, & &1.name)}}
     end
   end
 
@@ -597,8 +688,8 @@ defmodule Imp.Predict.Predict do
   defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos)
        when is_list(raw) do
     case parse_completions(adapter, signature, raw) do
-      {:ok, prediction} ->
-        {:ok, prediction, messages, raw, %{}}
+      {:ok, prediction, completion_metadata} ->
+        {:ok, prediction, messages, raw, %{completion_metadata: completion_metadata}}
 
       {:error, _reason} = error ->
         if chat_json_fallback?(adapter, opts) do
@@ -672,17 +763,20 @@ defmodule Imp.Predict.Predict do
     raw_completions
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, []}, fn {raw, index}, {:ok, acc} ->
-      with {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
+      with {:ok, output, lm_metadata} <- Imp.LM.Result.split(raw),
            {:ok, prediction} <- adapter.parse(signature, output, []) do
-        {:cont, {:ok, [prediction | acc]}}
+        {:cont, {:ok, [{prediction, lm_metadata} | acc]}}
       else
         {:error, reason} -> {:halt, {:error, {:completion_parse_failed, index, reason}}}
       end
     end)
     |> case do
       {:ok, reversed} ->
-        [first | _rest] = predictions = Enum.reverse(reversed)
-        {:ok, %{first | completions: predictions}}
+        pairs = Enum.reverse(reversed)
+        [{first, _first_metadata} | _rest] = pairs
+        predictions = Enum.map(pairs, &elem(&1, 0))
+        metadata = Enum.map(pairs, &elem(&1, 1))
+        {:ok, %{first | completions: predictions}, metadata}
 
       {:error, _reason} = error ->
         error
@@ -720,8 +814,9 @@ defmodule Imp.Predict.Predict do
 
     with {:ok, retry_raw} when is_list(retry_raw) <-
            Imp.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
-         {:ok, prediction} <- parse_completions(Imp.Adapter.JSON, signature, retry_raw) do
-      {:ok, prediction, retry_messages, retry_raw, %{}}
+         {:ok, prediction, completion_metadata} <-
+           parse_completions(Imp.Adapter.JSON, signature, retry_raw) do
+      {:ok, prediction, retry_messages, retry_raw, %{completion_metadata: completion_metadata}}
     else
       _retry_failure -> parse_error(error, original_messages, original_raw, signature)
     end

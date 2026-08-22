@@ -140,6 +140,9 @@ defmodule Imp.Adapter.Chat do
       code_field?(field) ->
         coerce_code(value, code_language(field))
 
+      field.type in [:reasoning, "reasoning"] ->
+        coerce_reasoning(value)
+
       true ->
         case enum_constraint(field) do
           values when is_list(values) -> coerce_literal(value, values)
@@ -176,6 +179,12 @@ defmodule Imp.Adapter.Chat do
 
   defp coerce_code(value, language) do
     Imp.Adapter.Types.Code.new(value, language: language)
+  rescue
+    ArgumentError -> value
+  end
+
+  defp coerce_reasoning(value) do
+    Imp.Adapter.Types.Reasoning.new(value)
   rescue
     ArgumentError -> value
   end
@@ -690,6 +699,8 @@ defmodule Imp.Adapter.Chat do
     do: String.duplicate(" ", 8) <> "# note: the value you produce " <> desc
 
   defp field_type(:string), do: "str"
+  defp field_type(:reasoning), do: "str"
+  defp field_type("reasoning"), do: "str"
   defp field_type(:integer), do: "int"
   defp field_type(:float), do: "float"
   defp field_type(:number), do: "number"

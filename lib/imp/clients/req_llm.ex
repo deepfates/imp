@@ -167,6 +167,22 @@ defmodule Imp.Clients.ReqLLM do
   defp truthy?(true), do: true
   defp truthy?(_), do: false
 
+  @doc false
+  def reasoning_capability(%__MODULE__{model: model_spec}) do
+    case resolve_model(model_spec) do
+      {:ok, model} ->
+        capabilities = Map.get(model, :capabilities) || %{}
+        reasoning = Map.get(capabilities, :reasoning) || %{}
+        truthy?(Map.get(reasoning, :enabled, false))
+
+      {:error, _reason} ->
+        false
+    end
+  end
+
+  @doc false
+  def configured_option(%__MODULE__{opts: opts}, key), do: Keyword.fetch(opts, key)
+
   @impl true
   def generate(messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/2")

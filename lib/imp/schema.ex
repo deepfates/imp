@@ -71,21 +71,56 @@ defmodule Imp.Schema do
   defp validate_type(errors, field, value) do
     valid? =
       case field.type do
-        :string -> is_binary(value)
-        :integer -> is_integer(value)
-        :float -> is_float(value) or is_integer(value)
-        :number -> is_number(value)
-        :boolean -> is_boolean(value)
-        :array -> is_list(value)
-        :object -> is_map(value)
-        :datetime -> match?(%DateTime{}, value) or match?(%NaiveDateTime{}, value)
-        :code -> match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
-        :union -> true
-        "union" -> true
-        :null -> is_nil(value)
-        "null" -> is_nil(value)
-        "code" -> match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
-        _ -> true
+        :string ->
+          is_binary(value)
+
+        :integer ->
+          is_integer(value)
+
+        :float ->
+          is_float(value) or is_integer(value)
+
+        :number ->
+          is_number(value)
+
+        :boolean ->
+          is_boolean(value)
+
+        :array ->
+          is_list(value)
+
+        :object ->
+          is_map(value)
+
+        :datetime ->
+          match?(%DateTime{}, value) or match?(%NaiveDateTime{}, value)
+
+        :code ->
+          match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
+
+        :reasoning ->
+          match?(%Imp.Adapter.Types.Reasoning{text: text} when is_binary(text), value)
+
+        "reasoning" ->
+          match?(%Imp.Adapter.Types.Reasoning{text: text} when is_binary(text), value)
+
+        :union ->
+          true
+
+        "union" ->
+          true
+
+        :null ->
+          is_nil(value)
+
+        "null" ->
+          is_nil(value)
+
+        "code" ->
+          match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
+
+        _ ->
+          true
       end
 
     if valid?, do: errors, else: errors ++ [error(field, :type, "expected #{field.type}")]

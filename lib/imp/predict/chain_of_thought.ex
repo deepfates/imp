@@ -6,16 +6,37 @@ defmodule Imp.Predict.ChainOfThought do
   defstruct [:predict]
 
   def new(signature, opts \\ []) do
+    {rationale_field, opts} = Keyword.pop(opts, :rationale_field)
+    {rationale_field_type, opts} = Keyword.pop(opts, :rationale_field_type, :string)
+
+    rationale_field =
+      case rationale_field do
+        nil ->
+          %{
+            name: :reasoning,
+            desc: "${reasoning}",
+            type: rationale_field_type
+          }
+
+        %Imp.Signature.Field{} = field ->
+          %{field | name: :reasoning, kind: :output}
+
+        field when is_map(field) or is_list(field) ->
+          field
+          |> Map.new()
+          |> Map.put(:name, :reasoning)
+
+        other ->
+          raise ArgumentError,
+                "Imp.chain_of_thought/2 :rationale_field must be a field map, keyword list, or Signature.Field; got: #{inspect(other)}"
+      end
+
     signature =
       signature
       |> Imp.Signature.ensure()
-      |> Imp.Signature.prepend_output(%{
-        name: :reasoning,
-        # DSPy 3.2.1 ChainOfThought sets the reasoning field description to the
-        # "${reasoning}" placeholder, which its ChatAdapter renders as an empty
-        # description. Match it exactly for prompt parity (epic dee-8zev).
-        desc: "${reasoning}"
-      })
+      # DSPy 3.3.1 keeps the legacy default as `str`; callers opt into its
+      # native-capable Reasoning type through `rationale_field_type`.
+      |> Imp.Signature.prepend_output(rationale_field)
 
     %__MODULE__{predict: Imp.Predict.Predict.new(signature, opts)}
   end

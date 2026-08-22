@@ -38,6 +38,28 @@ defmodule Imp.LM do
 
   def response_format_capability(_lm), do: Imp.LM.Capability.none()
 
+  @doc false
+  # Native-reasoning support is deliberately a separate capability from JSON
+  # response formatting. Registry-backed clients can declare it, and custom
+  # clients/fixtures can do the same without teaching Predict model names.
+  def reasoning_capability(%module{} = lm) do
+    Code.ensure_loaded?(module) and function_exported?(module, :reasoning_capability, 1) and
+      module.reasoning_capability(lm) == true
+  end
+
+  def reasoning_capability(_lm), do: false
+
+  @doc false
+  # A configured client option participates below a per-call/program override,
+  # matching DSPy's `lm_kwargs` > `lm.kwargs` precedence.
+  def configured_option(%module{} = lm, key) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :configured_option, 2),
+      do: module.configured_option(lm, key),
+      else: :error
+  end
+
+  def configured_option(_lm, _key), do: :error
+
   def generate(lm, messages, opts \\ [])
 
   def generate(lm, messages, opts) do

@@ -988,6 +988,29 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
+        "new/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.Reasoning",
+      "signatures": {
+        "functions": {
+          "new/1": [
+            "new(reasoning)"
+          ]
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "metadata",
+        "text"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
         "format/1",
         "from_map/1",
         "new/3"

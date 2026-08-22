@@ -1151,6 +1151,25 @@ defmodule ReqLLMClientTest do
     assert prediction.metadata.trace.lm_metadata.native_reasoning == "native plan"
   end
 
+  test "ReqLLM registry capability drives the explicit typed reasoning contract" do
+    lm = Imp.req_llm("anthropic:claude-sonnet-4-6", test_pid: self(), req_module: ThinkingStub)
+
+    program =
+      Imp.chain_of_thought("question -> answer",
+        lm: lm,
+        adapter: Imp.Adapter.JSON,
+        rationale_field_type: :reasoning
+      )
+
+    assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
+    assert %Imp.Adapter.Types.Reasoning{text: "native plan"} = Imp.get(prediction, :reasoning)
+    assert Imp.get(prediction, :answer) == "Paris"
+
+    assert_received {:req_llm_generate, "anthropic:claude-sonnet-4-6", messages, opts}
+    refute inspect(messages) =~ "reasoning"
+    assert Keyword.fetch!(opts, :reasoning_effort) == "low"
+  end
+
   test "manual reasoning fields still work without provider-native thinking" do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ManualReasoningStub)
 
@@ -1159,7 +1178,9 @@ defmodule ReqLLMClientTest do
 
     assert {:ok, prediction} = Imp.call(program, %{question: "pong?"})
     refute Map.has_key?(prediction.metadata, :native_reasoning)
+
     assert Imp.get(prediction, :reasoning) == "manual field"
+
     assert Imp.get(prediction, :answer) == "pong"
   end
 

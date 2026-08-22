@@ -70,7 +70,8 @@ field is a string. The string DSL accepts these types:
 Imp spells DSPy's Python `list[type]` form as `array[type]`; the parser points
 mistyped `list[...]` signatures at that spelling. Unknown types and duplicate
 names across the input/output arrow fail when the signature is built. The map
-form below additionally supports `type: :code` with an optional `language:`;
+form below additionally supports `type: :code` with an optional `language:`
+and `type: :reasoning` for the native-capable reasoning value;
 custom Pydantic-style model and tuple types are not part of Imp's string DSL.
 
 ### Required, nullable, and default fields
@@ -202,10 +203,28 @@ program = Imp.chain_of_thought("question -> answer: short_span", lm: lm)
 
 Imp.get(prediction, :answer)
 #=> "Paris"
+
+Imp.get(prediction, :reasoning)
+#=> "..."
 ```
 
-Provider-native reasoning remains prediction metadata. It is separate from a
-reasoning field you deliberately put in a signature.
+Like DSPy 3.3.1, `ChainOfThought` keeps a plain string rationale by default. To
+use one typed contract across native-reasoning and ordinary models, opt in:
+
+```elixir
+program =
+  Imp.chain_of_thought("question -> answer: short_span",
+    lm: lm,
+    rationale_field_type: :reasoning
+  )
+```
+
+When the LM advertises native reasoning, Imp requests it (defaulting to low
+effort), omits the synthetic field from the provider-facing schema, and restores
+the returned thinking as `%Imp.Adapter.Types.Reasoning{}`. Otherwise—or when
+`reasoning_effort: nil` explicitly disables native mode—the adapter asks for
+reasoning as ordinary text and coerces it to that same type. Provider metadata
+remains available on the prediction for transport-level inspection.
 
 ## Settings let the application choose when dependencies are fixed
 

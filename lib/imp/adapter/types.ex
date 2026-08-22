@@ -323,7 +323,31 @@ defmodule Imp.Adapter.Types do
     end
   end
 
-  defmodule Reasoning, do: defstruct([:text, metadata: %{}])
+  defmodule Reasoning do
+    @moduledoc "Provider-native or prompt-generated reasoning with one stable value shape."
+    defstruct [:text, metadata: %{}]
+
+    def new(%__MODULE__{} = reasoning), do: reasoning
+    def new(text) when is_binary(text), do: %__MODULE__{text: text}
+
+    def new(%{} = value) do
+      case Map.fetch(value, :content) do
+        {:ok, text} when is_binary(text) ->
+          %__MODULE__{text: text}
+
+        _ ->
+          case Map.fetch(value, "content") do
+            {:ok, text} when is_binary(text) -> %__MODULE__{text: text}
+            _ -> raise ArgumentError, "Reasoning requires a binary content field"
+          end
+      end
+    end
+
+    def new(value),
+      do:
+        raise(ArgumentError, "Reasoning requires a string or content map, got: #{inspect(value)}")
+  end
+
   defmodule History, do: defstruct(messages: [])
   defmodule Citation, do: defstruct([:text, :source, metadata: %{}])
 
@@ -809,5 +833,26 @@ defmodule Imp.Adapter.Types do
       ".m4a" -> "audio/mp4"
       _ -> "application/octet-stream"
     end
+  end
+end
+
+defimpl String.Chars, for: Imp.Adapter.Types.Reasoning do
+  def to_string(%{text: text}) when is_binary(text), do: text
+
+  def to_string(reasoning) do
+    raise ArgumentError,
+          "cannot convert Reasoning without binary :text to string: #{inspect(reasoning)}"
+  end
+end
+
+# DSPy's Reasoning pydantic serializer emits its formatted string, not the
+# wrapper object. Keep reports/artifacts equally compact and avoid accidentally
+# turning internal metadata into a new wire contract.
+defimpl Jason.Encoder, for: Imp.Adapter.Types.Reasoning do
+  def encode(%{text: text}, opts) when is_binary(text), do: Jason.Encode.string(text, opts)
+
+  def encode(reasoning, _opts) do
+    raise ArgumentError,
+          "cannot JSON-encode Reasoning without binary :text: #{inspect(reasoning)}"
   end
 end
