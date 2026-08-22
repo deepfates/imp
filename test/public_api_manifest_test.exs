@@ -51,6 +51,8 @@ defmodule PublicAPIManifestTest do
 
     assert modules["Imp"]["category"] == "facade"
     assert "predict/2" in modules["Imp"]["functions"]
+    assert "start_run/3" in modules["Imp"]["functions"]
+    assert "cancel_run/3" in modules["Imp"]["functions"]
     assert "optimize/4" in modules["Imp"]["functions"]
     assert "fields" in modules["Imp.Example"]["struct_fields"]
     assert %{"kind" => "type", "name" => "t/0"} in modules["Imp.Example"]["types"]

@@ -116,6 +116,7 @@ defmodule Imp.Predict.ReActV2 do
     case predict(react.react, react, history, pending) do
       {:ok, prediction} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
+        emit_reasoning(prediction, turn)
 
         if calls.tool_calls == [] do
           forced_submit(react, history, pending, :empty_tool_calls, turn, nil)
@@ -149,6 +150,7 @@ defmodule Imp.Predict.ReActV2 do
 
     with {:ok, prediction} <- predict(forced, react, history, pending) do
       calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
+      emit_reasoning(prediction, turn, forced?: true)
       submit_calls = %ToolCalls{tool_calls: Enum.filter(calls.tool_calls, &submit?/1)}
 
       if submit_calls.tool_calls == [] do
@@ -201,7 +203,25 @@ defmodule Imp.Predict.ReActV2 do
 
   defp execute_calls(react, %ToolCalls{tool_calls: calls}) do
     Enum.reduce(calls, {[], nil}, fn call, {results, final} ->
+      :ok =
+        Imp.Run.emit(:tool_call,
+          component: __MODULE__,
+          tool_call_id: call.id,
+          tool_name: call.name,
+          input: Imp.Tool.normalize_arguments(call.arguments)
+        )
+
       {result, error?} = execute_call(react, call)
+
+      :ok =
+        Imp.Run.emit(:tool_result,
+          component: __MODULE__,
+          tool_call_id: call.id,
+          tool_name: call.name,
+          output: if(error?, do: nil, else: result),
+          error: if(error?, do: result, else: nil)
+        )
+
       result = %ToolResult{name: call.name, result: result, id: call.id}
 
       final =
@@ -276,11 +296,14 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp final_prediction(final, history, reason) do
-    {:ok,
-     final
-     |> Map.put(:history, history)
-     |> Map.put(:termination_reason, reason)
-     |> Imp.Prediction.new()}
+    prediction =
+      final
+      |> Map.put(:history, history)
+      |> Map.put(:termination_reason, reason)
+      |> Imp.Prediction.new()
+
+    :ok = Imp.Run.emit(:final, component: __MODULE__, output: prediction)
+    {:ok, prediction}
   end
 
   defp incomplete_prediction(history, reason, error) do
@@ -291,7 +314,26 @@ defmodule Imp.Predict.ReActV2 do
         do: Map.put(fields, :termination_error, Imp.Redaction.redact(error)),
         else: fields
 
-    {:ok, Imp.Prediction.new(fields)}
+    prediction = Imp.Prediction.new(fields)
+    :ok = Imp.Run.emit(:final, component: __MODULE__, output: prediction)
+    {:ok, prediction}
+  end
+
+  defp emit_reasoning(prediction, turn, metadata \\ []) do
+    case Imp.get(prediction, :next_thought) do
+      nil ->
+        :ok
+
+      "" ->
+        :ok
+
+      reasoning ->
+        Imp.Run.emit(:reasoning,
+          component: __MODULE__,
+          reasoning: reasoning,
+          metadata: Map.merge(%{turn: turn}, Map.new(metadata))
+        )
+    end
   end
 
   defp submit?(%ToolCall{name: name}), do: to_string(name) == "submit"

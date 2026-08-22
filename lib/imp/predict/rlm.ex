@@ -305,9 +305,15 @@ defmodule Imp.Predict.RLM do
            max_recursion_depth: rlm.max_recursion_depth
          ) do
       {:ok, budget} ->
+        cancel_ref =
+          Imp.Run.register_cancellable(fn reason ->
+            if Process.alive?(budget), do: Budget.cancel(budget, reason)
+          end)
+
         try do
           call_with_budget_state(rlm, vars, budget, 0, opts)
         after
+          Imp.Run.unregister_cancellable(cancel_ref)
           if Process.alive?(budget), do: GenServer.stop(budget, :normal)
         end
 
@@ -420,6 +426,7 @@ defmodule Imp.Predict.RLM do
 
       if Enum.sort(keys) == Enum.sort(required) or
            Enum.sort(keys) == Enum.sort(["reasoning" | required]) do
+        emit_reasoning(Map.get(output, "reasoning", ""), iteration, :direct_submit)
         fields = Map.take(output, required)
 
         case resolve_adapter(rlm).parse(rlm.signature, fields, []) do
@@ -661,6 +668,17 @@ defmodule Imp.Predict.RLM do
 
   defp safe_error_detail(value), do: value |> Imp.Redaction.redact() |> Trace.compact(512)
 
+  defp emit_reasoning("", _iteration, _phase), do: :ok
+  defp emit_reasoning(nil, _iteration, _phase), do: :ok
+
+  defp emit_reasoning(reasoning, iteration, phase) do
+    Imp.Run.emit(:reasoning,
+      component: __MODULE__,
+      reasoning: reasoning,
+      metadata: %{iteration: iteration, phase: phase}
+    )
+  end
+
   defp stringify_action_keys(action) do
     Map.new(action, fn
       {key, value} when is_atom(key) -> {Atom.to_string(key), value}
@@ -671,6 +689,7 @@ defmodule Imp.Predict.RLM do
   defp step(%__MODULE__{} = rlm, %{"action" => "run", "code" => code} = action, state, iteration)
        when is_binary(code) do
     reasoning = Map.get(action, "reasoning", "")
+    emit_reasoning(reasoning, iteration, :controller)
 
     {execution, state} =
       drive_interpreter(rlm, state, Interpreter.execute(state.interpreter, code))
@@ -1126,9 +1145,40 @@ defmodule Imp.Predict.RLM do
   defp interpreter_load(args, runtime), do: {:error, {:invalid_load_arguments, args}, runtime}
 
   defp interpreter_tool(name, [args], %{rlm: rlm} = runtime) when is_map(args) do
+    tool_call_id = Imp.Run.new_event_id("rlm_tool")
+
+    :ok =
+      Imp.Run.emit(:tool_call,
+        component: __MODULE__,
+        tool_call_id: tool_call_id,
+        tool_name: name,
+        input: args
+      )
+
     case run_budgeted(runtime.budget, fn -> execute_tool_call(rlm, name, name, args) end) do
-      {:error, reason} -> {:error, {:rlm_tool_error, reason}, runtime}
-      value -> {:ok, value, runtime}
+      {:error, reason} ->
+        error = {:rlm_tool_error, reason}
+
+        :ok =
+          Imp.Run.emit(:tool_result,
+            component: __MODULE__,
+            tool_call_id: tool_call_id,
+            tool_name: name,
+            error: error
+          )
+
+        {:error, error, runtime}
+
+      value ->
+        :ok =
+          Imp.Run.emit(:tool_result,
+            component: __MODULE__,
+            tool_call_id: tool_call_id,
+            tool_name: name,
+            output: value
+          )
+
+        {:ok, value, runtime}
     end
   end
 

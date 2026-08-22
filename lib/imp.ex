@@ -265,6 +265,14 @@ defmodule Imp do
   @doc "Calls any Imp program struct."
   defdelegate call(program, inputs), to: Imp.Module
 
+  @doc "Starts an addressable program run with optional ordered semantic events."
+  defdelegate start_run(program, inputs, opts \\ []), to: Imp.Run, as: :start
+
+  @doc "Cooperatively cancels an addressable program run and its supervised task."
+  defdelegate cancel_run(run, reason \\ :cancelled, timeout \\ 5_000),
+    to: Imp.Run,
+    as: :cancel
+
   @doc """
   Streams one program call as an Enumerable of chunks.
 

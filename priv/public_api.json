@@ -371,6 +371,7 @@
         "best_of_n/3",
         "budgeted_lm/3",
         "call/2",
+        "cancel_run/3",
         "chain_of_thought/2",
         "classification/3",
         "classification_report/2",
@@ -426,6 +427,7 @@
         "settings/0",
         "signature/2",
         "start_optimizer_budget/1",
+        "start_run/3",
         "stream/3",
         "subscribe_optimizer_progress/1",
         "to_map/1",
@@ -463,6 +465,9 @@
           ],
           "call/2": [
             "call(program, inputs)"
+          ],
+          "cancel_run/3": [
+            "cancel_run(run, reason \\\\ :cancelled, timeout \\\\ 5000)"
           ],
           "chain_of_thought/2": [
             "chain_of_thought(signature, opts \\\\ [])"
@@ -628,6 +633,9 @@
           ],
           "start_optimizer_budget/1": [
             "start_optimizer_budget(opts)"
+          ],
+          "start_run/3": [
+            "start_run(program, inputs, opts \\\\ [])"
           ],
           "stream/3": [
             "stream(program, inputs, opts \\\\ [])"
@@ -7307,6 +7315,83 @@
       "source": "lib/imp/retrievers/http.ex",
       "struct_fields": [],
       "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "cancel/3",
+        "emit/2",
+        "start/3",
+        "stop/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Run",
+      "signatures": {
+        "functions": {
+          "cancel/3": [
+            "cancel(run, reason \\\\ :cancelled, timeout \\\\ 5000)"
+          ],
+          "emit/2": [
+            "emit(kind, attrs \\\\ [])"
+          ],
+          "start/3": [
+            "start(program, inputs, opts \\\\ [])"
+          ],
+          "stop/1": [
+            "stop(run)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/run.ex",
+      "struct_fields": [
+        "control",
+        "id",
+        "task"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Run.Event",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/run.ex",
+      "struct_fields": [
+        "component",
+        "error",
+        "input",
+        "kind",
+        "metadata",
+        "output",
+        "reasoning",
+        "run_id",
+        "sequence",
+        "tool_call_id",
+        "tool_name"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],

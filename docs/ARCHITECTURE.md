@@ -24,7 +24,7 @@ Example / inputs
 - sandbox and recursive programs: `Imp.program_of_thought/2`, `Imp.code_act/3`, `Imp.rlm/2`, `Imp.rlm_serializable/3`
 - tools and agents: `Imp.tool/4`, `Imp.react/3`, `Imp.react_v2/3`, `Imp.avatar/3`
 - retrieval: `Imp.memory/2`, `Imp.retrieve/3`, `Imp.rag/3`
-- execution: `Imp.call/2`, `Imp.stream/3`, `Imp.collect/3`, `Imp.with_demos/2`, `Imp.with_playbook/2`, `Imp.with_lm/2`
+- execution: `Imp.call/2`, `Imp.start_run/3`, `Imp.cancel_run/3`, `Imp.stream/3`, `Imp.collect/3`, `Imp.with_demos/2`, `Imp.with_playbook/2`, `Imp.with_lm/2`
 - evaluation and metrics: `Imp.evaluate/4`, `Imp.exact_match/1`, `Imp.extractive_qa/3`, `Imp.classification/3`, `Imp.classification_report/2`
 - optimization: `Imp.optimize!/3`, `Imp.optimize!/4`, `Imp.optimize!/5`, `Imp.train/4`, `Imp.optimizer_capabilities/1`
 - persistence: `Imp.dump/1`, `Imp.dump/2`, `Imp.load/1`, `Imp.load/2`, `Imp.save!/2`, `Imp.save!/3`, `Imp.load!/1`, `Imp.load!/2`
@@ -244,6 +244,15 @@ production and in script-style use.
 
 The built-in cancellation helper terminates a supervised task with a bounded
 wait.
+`Imp.Run` is the optional addressable execution boundary for hosts that need
+more than `Imp.call/2`. It owns an unlinked supervised task, ordered redacted
+`Imp.Run.Event` delivery, a barrier for terminal ordering, and cooperative
+cancellation hooks. ReActV2 and RLM emit reasoning and source-timed tool
+call/result events through this boundary; the same programs remain ordinary
+`Imp.Module` values when called without it. RLM registers its per-call budget
+owner so cancelling a run terminates active effect tasks before the outer task
+is stopped. Protocol adapters translate these Imp-native events outside the
+core package.
 `Imp.Streaming.Messages.StreamListener.attach/2` observes normalized stream
 events while yielding the original chunks, including terminal and error events,
 unchanged. `Imp.Cache.configure/1` controls enablement, TTL, and maximum entry

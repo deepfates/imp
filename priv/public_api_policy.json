@@ -178,6 +178,8 @@
         "Imp.Optimizer.Playbook",
         "Imp.Optimizer.RandomSearch",
         "Imp.Optimizer.Report",
+        "Imp.Run",
+        "Imp.Run.Event",
         "Imp.Optimizer.SIMBA",
         "Imp.Optimizer.Sampling",
         "Imp.Optimizer.SignatureOptimizer",

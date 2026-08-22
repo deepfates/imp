@@ -245,6 +245,7 @@ defmodule Imp.Tasks do
     opts = Imp.Options.validate!(opts, @async_stream_option_schema, "Imp.Tasks.async_stream/3")
     snapshot = Imp.Settings.snapshot()
     telemetry_context = Imp.Telemetry.context()
+    run_context = Imp.Run.context()
     max_workers = Map.fetch!(snapshot, :async_max_workers)
     borrowed = current_admission()
     enumerator = self()
@@ -258,13 +259,17 @@ defmodule Imp.Tasks do
         {token, lease_owner} ->
           if direct_task_caller?(@supervisor, enumerator) and
                @admission.owned_by?(token, lease_owner) do
-            run_borrowed(snapshot, telemetry_context, token, lease_owner, fn -> fun.(item) end)
+            run_borrowed(snapshot, telemetry_context, run_context, token, lease_owner, fn ->
+              fun.(item)
+            end)
           else
-            run_admitted(snapshot, telemetry_context, max_workers, fn -> fun.(item) end)
+            run_admitted(snapshot, telemetry_context, run_context, max_workers, fn ->
+              fun.(item)
+            end)
           end
 
         nil ->
-          run_admitted(snapshot, telemetry_context, max_workers, fn -> fun.(item) end)
+          run_admitted(snapshot, telemetry_context, run_context, max_workers, fn -> fun.(item) end)
       end
     end
 
@@ -280,6 +285,7 @@ defmodule Imp.Tasks do
   defp start_task(supervisor, link, fun) do
     snapshot = Imp.Settings.snapshot()
     telemetry_context = Imp.Telemetry.context()
+    run_context = Imp.Run.context()
     max_workers = Map.fetch!(snapshot, :async_max_workers)
     ensure_runtime!()
     token = @admission.reserve!(max_workers)
@@ -294,9 +300,7 @@ defmodule Imp.Tasks do
 
           try do
             with_admission(token, self(), fn ->
-              Imp.Telemetry.with_context(telemetry_context, fn ->
-                Imp.Settings.with_snapshot(snapshot, fun)
-              end)
+              with_runtime_context(snapshot, telemetry_context, run_context, fun)
             end)
           after
             @admission.release(token)
@@ -334,25 +338,29 @@ defmodule Imp.Tasks do
     end
   end
 
-  defp run_admitted(snapshot, telemetry_context, max_workers, fun) do
+  defp run_admitted(snapshot, telemetry_context, run_context, max_workers, fun) do
     token = @admission.reserve!(max_workers)
     :ok = @admission.transfer(token, self())
 
     try do
       with_admission(token, self(), fn ->
-        Imp.Telemetry.with_context(telemetry_context, fn ->
-          Imp.Settings.with_snapshot(snapshot, fun)
-        end)
+        with_runtime_context(snapshot, telemetry_context, run_context, fun)
       end)
     after
       @admission.release(token)
     end
   end
 
-  defp run_borrowed(snapshot, telemetry_context, token, owner, fun) do
+  defp run_borrowed(snapshot, telemetry_context, run_context, token, owner, fun) do
     with_admission(token, owner, fn ->
-      Imp.Telemetry.with_context(telemetry_context, fn ->
-        Imp.Settings.with_snapshot(snapshot, fun)
+      with_runtime_context(snapshot, telemetry_context, run_context, fun)
+    end)
+  end
+
+  defp with_runtime_context(snapshot, telemetry_context, run_context, fun) do
+    Imp.Telemetry.with_context(telemetry_context, fn ->
+      Imp.Settings.with_snapshot(snapshot, fn ->
+        if is_pid(run_context), do: Imp.Run.with_context(run_context, fun), else: fun.()
       end)
     end)
   end
