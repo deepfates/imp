@@ -52,3 +52,18 @@ is not portable. The second exposed the required executable-metric registry.
 The lifecycle now persists a credential-free model descriptor and a stable
 metric key, then reconstructs both trusted runtime capabilities after restart.
 That is the intended persistence contract, not a workaround.
+
+## Instruction and rule optimizer lifecycle
+
+`instruction.exs` applies the same acceptance shape to `SignatureOptimizer`
+and `InferRules`. It uses a separate live proposal model, makes selection on
+the development split, opens the test split only after compilation, writes
+parameter Artifacts, and applies them to fresh trusted program code in new OS
+processes. Task and optimizer budgets are separate so their different prices
+and failure envelopes remain visible.
+
+```sh
+OPENROUTER_API_KEY=... \
+IMP_INSTRUCTION_OUTPUT=/secure/imp-instruction-live \
+mix run examples/optimizer_lifecycles/instruction.exs
+```
