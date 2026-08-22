@@ -9,18 +9,14 @@ re-pinned before their behavior is used in a differential gate.
 
 ## Current GEPA And Optimize Anything Snapshot
 
-DSPy `3.3.0` is the latest stable tag, released on 2026-08-03 at commit
-`e4e97aae29b8ad8aa2fb7e99ffae6fd52970fad8`. Imp's existing reproducible
-compatibility baseline remains DSPy `3.2.1@29448ae` until a reviewed baseline
-migration accounts for the new stable surface; that historical pin must not be
-described as the current upstream product. The earlier `3.3.0b1` tracking work
-covers ReActV2, the typed provider-neutral LM boundary, shared BaseLM
-save/load, and normalized errors. Stable `3.3.0` additionally makes `Flex` and
-its GEPA code-optimization path a public product surface and changes substantial
-adapter, interpreter, resource, and runtime behavior. Imp has no admitted Flex
-equivalent today. Frozen DSPy-3.2.1 benchmark differentials remain valid for
-their declared authority; they do not establish current DSPy-3.3.0 product
-coverage or superiority over the current library.
+DSPy `3.3.1` is the current stable authority at commit `638e155c`. Imp's
+reviewed baseline now binds that exact source tree and public API inventory.
+Earlier 3.2.1, 3.3.0b1, and 3.3.0 differentials remain valid only for their
+declared treatments. Stable 3.3.1 includes ReActV2, normalized LM envelopes,
+resource and adapter changes, and the explicitly experimental `Flex` code
+optimization module. Imp has no admitted Flex equivalent today; its existing
+Optimize Anything code-artifact machinery is relevant prior art, not a parity
+claim or proof of current-DSPy superiority.
 
 The current released implementation authority is GEPA `v0.1.4` at
 `8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`. That tag still reports package

@@ -10,10 +10,10 @@ that named evidence exists and that claim and reproduction registries are
 internally valid; it does not infer
 semantic conformance merely because the named test files pass.
 
-Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
-Total: 26
+Baseline: DSPy 3.3.1 (`638e155cf725236fe5d01b5332394a7bc128881d`)
+Total: 27
 Conformant: 11
-Elixir-native equivalents: 9
+Elixir-native equivalents: 10
 Tracking: 2
 Gaps: 4
 Claim-specific non-blocking gaps: 4
@@ -29,7 +29,8 @@ Asserted conformance passing: true
 | programming.contracts | programming_model | conformant | satisfied | Signature, InputField, OutputField, Example, Prediction, History |
 | programming.modules | programming_model | conformant | satisfied | Module, Predict, ChainOfThought, MultiChainComparison, Parallel |
 | models.runtime | model_runtime | elixir_native_equivalent | satisfied | BaseLM, LM, Embedder, configure, context, Errors |
-| models.normalized_runtime_prerelease | model_runtime | tracking | tracked | 3.3 BaseLM normalized requests/responses, LMRequest, LMResponse, LMStream |
+| models.normalized_runtime | model_runtime | elixir_native_equivalent | satisfied | normalized requests/responses, LMRequest, LMResponse, LMStream |
+| modules.flex | experimental | tracking | tracked | Flex |
 | adapters.structured_io | adapters | conformant | satisfied | Adapter, ChatAdapter, JSONAdapter |
 | adapters.xml | adapters | conformant | satisfied | XMLAdapter |
 | adapters.two_step | adapters | conformant | satisfied | TwoStepAdapter |
@@ -152,29 +153,61 @@ Missing evidence or behavior:
 
 - none
 
-### `models.normalized_runtime_prerelease`
+### `models.normalized_runtime`
 
-Maintainer disposition: `tracking`
+Maintainer disposition: `elixir_native_equivalent`
 
-Upstream source: `dspy/core/types.py; dspy/clients/base_lm.py @ 3.3.0b1`
+Upstream source: `dspy/core/types.py; dspy/clients/base_lm.py @ 3.3.1`
 
-Imp modules: `Imp.Core.LMRequest`, `Imp.Core.LMResponse`
+Imp modules: `Imp.Core.LMRequest`, `Imp.Core.LMResponse`, `Imp.Adapter.Types`, `Imp.Streaming.Messages.StreamResponse`, `Imp.Streaming.Messages.StreamListener`
+Elixir-native rationale: Imp normalizes every ordinary LM call through typed request/response envelopes while retaining existing typed adapter values as multipart content. Lazy StreamResponse enumerables, incremental listeners, and collect/3 provide the BEAM-native stream consumer contract without a mutable LMStream.result object.
+
 Semantic invariants:
 
-- stable DSPy remains the release baseline until 3.3 is final
-- declared normalized request and response structs are not an exercised runtime until an ordinary provider path consumes and returns them
+- ordinary Imp.LM and ReqLLM calls cross the normalized request/response boundary without changing the legacy raw return contract
+- typed multimodal, reasoning, and tool values survive the normalized request boundary and are converted only at the provider edge
+- provider streams expose text, reasoning, tool-call, terminal, and error events lazily with early-halt cancellation
+- stream listeners and collection preserve final values and failures without requiring a mutable post-enumeration result object
 
 Executable evidence:
 
-- test: `test/public_surface_test.exs`
-- docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
+- test: `test/normalized_lm_runtime_test.exs`
+- test: `test/req_llm_client_test.exs`
+- test: `test/runtime_async_stream_cache_test.exs`
+- test: `test/stream_listener_incremental_test.exs`
+- docs: `docs/ARCHITECTURE.md`
+- docs: `docs/API_GUIDE.md`
 
 
 
 Missing evidence or behavior:
 
-- ordinary Imp.LM/ReqLLM request-to-provider-to-response execution through LMRequest and LMResponse
-- LMStream normalized runtime type and ordinary streaming execution
+- none
+
+### `modules.flex`
+
+Maintainer disposition: `tracking`
+
+Upstream source: `dspy/predict/flex @ 3.3.1`
+
+Imp modules: `Imp.Optimize.Anything.Runner`
+Semantic invariants:
+
+- Flex is explicitly experimental in DSPy 3.3.1 and cannot substitute for prompt-program parity
+- optimizer-authored executable code must run behind a sandbox and explicit tool/predictor bridge
+- Imp evaluates reusable code-artifact semantics through Optimize Anything before earning a Flex-shaped public module
+
+Executable evidence:
+
+- test: `test/optimize_anything_code_artifact_test.exs`
+- test: `test/optimize_anything_structured_artifact_test.exs`
+- docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
+
+
+
+Missing evidence or behavior:
+
+- an ordinary sandboxed code-optimized module user story with held-out evaluation, durable reload, and fresh service
 
 ### `adapters.structured_io`
 
@@ -828,10 +861,13 @@ Maintainer disposition: `conformant`
 Upstream source: `dspy/utils/inspect_history.py; dspy/utils/callback.py; observability docs`
 
 Imp modules: `Imp.Observability`, `Imp.Telemetry`, `Imp.Streaming.Messages`
+Elixir-native rationale: Imp emits lifecycle status through StreamListener and module/LM/tool progress through causally linked telemetry. The former passive StatusMessageProvider accumulator was removed because it did not implement DSPy's callback provider and added no capability.
+
 Semantic invariants:
 
 - developers can inspect model, tool, optimizer, and RLM traces
 - progress is observable without parsing internal structs
+- custom status consumers attach to StreamListener or :telemetry instead of subclassing a callback provider
 - all emitted data is redacted
 
 Executable evidence:

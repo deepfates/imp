@@ -7,27 +7,22 @@ names found in source code or documentation. The authoritative ledger lives in
 
 ## Baseline Policy
 
-The currently declared Imp compatibility baseline is DSPy `3.2.1`, pinned to
-commit `29448ae12756abdd14bd8796c819247ebb83673c` (annotated tag object
-`27a8e2a134b0b8dbd2d7433ea67ffe9be627d376`). Imp separately tracks DSPy
-`3.3.0b1` at `b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f` so prerelease work such as
-the normalized BaseLM runtime, ReActV2, and the GEPA 0.1.1 result contract is
-visible without silently changing the stable release target.
+The declared compatibility baseline is DSPy `3.3.1`, pinned to commit
+`638e155cf725236fe5d01b5332394a7bc128881d` (annotated tag object
+`753ab03d9ee2919159e7d9e0c9f47f753845a8ff`). The published wheel's 157-file
+source tree hashes to
+`b9364d08e549a01fb87b37aa41ebca24c4dda58160dda13523fbc83323862c4b`.
+The executable ledger also content-binds the 73-page public API inventory.
 
-This baseline is now historical rather than current upstream. DSPy released
-`3.3.0` on 2026-08-03 at
-`e4e97aae29b8ad8aa2fb7e99ffae6fd52970fad8`, then released `3.3.1` at
-`638e155cf725236fe5d01b5332394a7bc128881d`. The current stable audit targets
-`3.3.1`. The delta from `3.2.1` includes the public `Flex` module and GEPA Flex
-optimization, ReActV2, typed LM request/response contracts,
-sandbox-serializable execution, resource loading, optimizer/interpreter
-callbacks, MCP and structured-result changes, GEPA `0.1.4`, and broad
-adapter/runtime corrections. The existing beta and `3.3.0` gates remain
-evidence for their exact pinned sources; they are not a completed current-stable
-baseline migration. Until the ledger accounts for the full `3.3.1` surface,
-Imp may claim the scoped `3.2.1`, beta, and individual stable differentials it
-actually exercises, but not current whole-DSPy parity or superiority over the
-latest library.
+Historical DSPy `3.2.1`, `3.3.0b1`, and `3.3.0` differentials retain their
+original authority; they are evidence about those exact treatments, not the
+current baseline. The stable delta includes ReActV2, normalized LM envelopes,
+resource loading, MCP and adapter corrections, and experimental Flex code
+optimization. Imp implements or gives an explicit BEAM-native disposition for
+the stable programming/runtime surface. Flex remains a named experimental
+downstream gap: existing Optimize Anything code artifacts do not earn a
+Flex-shaped public module without an ordinary sandboxed optimize/reload/serve
+user story.
 
 Standalone GEPA is versioned independently. Its current implementation
 authority is release `v0.1.4` at
@@ -79,9 +74,8 @@ row records:
 - a rationale for every Elixir-native equivalent;
 - an open owner ticket for every gap.
 
-`tracking` is reserved for prerelease or research-horizon behavior and is not
-release blocking until that behavior becomes stable or Imp publicly adopts a
-corresponding product claim.
+`tracking` is reserved for experimental or research-horizon behavior and is not
+release blocking until Imp publicly adopts the corresponding product claim.
 
 A missing evidence file, missing Imp module, unowned gap, or unexplained native
 equivalent becomes `invalid_evidence`. Every gap remains visible and owned, but
@@ -128,9 +122,10 @@ function calls, a reserved `submit` tool, and fail-fast tool errors rather than
 claiming DSPy's action-field, finish-tool, observation-and-continue semantics.
 
 Multimodal image and native-PDF quality, the BEAM-native RLM controller,
-source-faithful GEPA engine, Fast-Slow orchestration boundary, and the learning path have
-executable product evidence. Their broader paper-scale, audio, external CISPO execution,
-and dominance claims remain explicitly unmade where evidence is incomplete.
+source-faithful GEPA engine, Fast-Slow orchestration boundary, normalized LM
+runtime, and learning path have executable product evidence. Their broader
+paper-scale, audio, experimental Flex, external CISPO execution, and dominance
+claims remain explicitly unmade where evidence is incomplete.
 Instruction-optimizer matched campaigns are claim-specific gaps rather than
 universal release blockers.
 

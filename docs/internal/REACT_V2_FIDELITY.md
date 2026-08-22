@@ -1,8 +1,8 @@
 # ReAct Family And Code Execution Fidelity Audit
 
-Upstream reference: DSPy `3.3.0b1`, commit `b2829b7`,
-with stable ReAct, CodeAct, and ProgramOfThought behavior unchanged from DSPy
-`3.2.1` at commit `29448ae`.
+Current upstream reference: DSPy `3.3.1`, commit `638e155c`. The hash table
+below records the earlier `3.3.0b1` differential authority; current-stable
+behavior is additionally exercised by the repository's pinned 3.3.1 probes.
 
 | Pinned authority | SHA-256 |
 | --- | --- |
@@ -94,7 +94,6 @@ behavioral parity. A matched-model campaign is still required for ReAct action
 selection and extraction quality, CodeAct task quality under the restricted
 runtime, and ProgramOfThought regeneration/extraction quality.
 
-The stable fidelity baseline remains DSPy 3.2.1. ReActV2 is prerelease tracking
-implemented from the pinned 3.3.0b1 source because the release goal explicitly
-requires this surface; it does not silently move unrelated Imp contracts to the
-prerelease baseline.
+The stable fidelity baseline is DSPy 3.3.1. ReActV2 is an exercised
+Elixir-native equivalent in that baseline; the older 3.3.0b1 hashes remain a
+historical differential rather than the current product authority.

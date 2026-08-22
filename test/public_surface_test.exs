@@ -220,7 +220,6 @@ defmodule PublicSurfaceTest do
     Imp.Streaming.Messages.StreamListener,
     Imp.Streaming.Messages.StreamResponse,
     Imp.Streaming.Messages.StatusMessage,
-    Imp.Streaming.Messages.StatusMessageProvider,
     Imp.Tasks,
     Imp.Telemetry,
     Imp.Tracking.Backend,
@@ -923,13 +922,8 @@ defmodule PublicSurfaceTest do
 
     assert Imp.Prediction.get(sem, :f1) == 1
 
-    provider =
-      %Imp.Streaming.Messages.StatusMessageProvider{}
-      |> Imp.Streaming.Messages.StatusMessageProvider.push(%Imp.Streaming.Messages.StatusMessage{
-        message: "ok"
-      })
-
-    assert length(provider.messages) == 1
+    assert %Imp.Streaming.Messages.StatusMessage{message: "ok"} =
+             %Imp.Streaming.Messages.StatusMessage{message: "ok"}
 
     listener =
       %Imp.Streaming.Messages.StreamListener{}

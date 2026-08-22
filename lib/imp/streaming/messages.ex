@@ -32,16 +32,6 @@ defmodule Imp.Streaming.Messages do
     defstruct [:message, :status, level: :info, metadata: %{}]
   end
 
-  defmodule StatusMessageProvider do
-    @moduledoc "In-memory status message accumulator for tests and local tools."
-
-    defstruct messages: []
-
-    def push(%__MODULE__{messages: messages} = provider, message) do
-      %{provider | messages: messages ++ [message]}
-    end
-  end
-
   defmodule StreamListener do
     @moduledoc """
     Incremental, transparent stream observer.

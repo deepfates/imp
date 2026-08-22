@@ -2,11 +2,14 @@
 
 You know DSPy. This page maps what you know onto Imp, names what is
 deliberately different on the BEAM, and marks what is tracked rather than
-done. Imp's completed executable baseline is DSPy 3.2.1; the latest stable
-DSPy 3.3.1 migration is active work, so Imp does not currently claim
-whole-current-DSPy parity. The few-shot and weight optimizer families and the
-adapters carry executable differential tests that run their exact pinned DSPy
-sources in a sidecar and compare arm to arm; other surfaces are held by
+done. Imp's executable product baseline is pinned to DSPy 3.3.1. Historical
+family-specific differentials retain their exact earlier DSPy source pins;
+they are not silently relabeled as current evidence. The explicitly
+experimental Flex code-optimization module remains a tracked downstream gap,
+and broad effectiveness or superiority is not implied by product conformance.
+The few-shot and weight optimizer families and the adapters carry executable
+differential tests that run their exact pinned DSPy sources in a sidecar and
+compare arm to arm; other surfaces are held by
 behavioral conformance tests or are deliberate Elixir-native equivalents, and
 some surface groups are marked as honest gaps (missing exact-reproduction
 evidence or declared algorithmic deviations). A shared DSPy

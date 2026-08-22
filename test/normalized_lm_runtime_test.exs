@@ -105,4 +105,28 @@ defmodule Imp.NormalizedLMRuntimeTest do
 
     assert Imp.Core.legacy_response(response) == [first, second]
   end
+
+  test "typed multipart values remain inert until the provider conversion edge" do
+    image = %Imp.Adapter.Types.Image{data: Base.encode64("PNG"), mime_type: "image/png"}
+    call = Imp.Adapter.Types.ToolCall.new("lookup", %{query: "beam"}, id: "call_1")
+
+    request =
+      Imp.Core.request(
+        [%{role: :user, content: ["inspect ", image, call]}],
+        [tools: [%{name: "lookup"}]],
+        %RequestAwareLM{test_pid: self()}
+      )
+
+    assert %Imp.Core.LMRequest{
+             messages: [%Imp.Core.User{content: ["inspect ", ^image, ^call]}],
+             config: %Imp.Core.LMConfig{tools: [%{name: "lookup"}]}
+           } = request
+
+    assert {[%{role: :user, content: ["inspect ", ^image, ^call]}], options} =
+             Imp.Core.request_parts(request)
+
+    assert options[:tools] == [%{name: "lookup"}]
+    assert Imp.Adapter.Types.to_openai(image).type == "image_url"
+    assert Imp.Adapter.Types.to_openai(call).type == "function"
+  end
 end

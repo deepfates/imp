@@ -7591,28 +7591,6 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
-        "push/2"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Streaming.Messages.StatusMessageProvider",
-      "signatures": {
-        "functions": {
-          "push/2": [
-            "push(provider, message)"
-          ]
-        }
-      },
-      "source": "lib/imp/streaming/messages.ex",
-      "struct_fields": [
-        "messages"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
         "attach/2",
         "new/1",
         "record/2",

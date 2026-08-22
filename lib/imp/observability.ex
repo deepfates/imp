@@ -286,11 +286,6 @@ defmodule Imp.Observability do
     {:trace, result_status(trace.result), %{event_count: length(entries)}, entries}
   end
 
-  defp normalize_inspection(%Imp.Streaming.Messages.StatusMessageProvider{messages: messages}) do
-    entries = list_entries(messages, :status)
-    {:status_stream, :ok, %{message_count: length(entries)}, entries}
-  end
-
   defp normalize_inspection(%Imp.Streaming.Messages.StatusMessage{} = message) do
     {:status, :ok, %{level: message.level}, [{:status, message}]}
   end

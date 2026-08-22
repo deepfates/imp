@@ -19,8 +19,8 @@ defmodule Imp.UpstreamAuthorityRegistryTest do
     assert report.baseline.version == stable["version"]
     assert report.baseline.git_sha == stable["commit"]
     assert report.baseline.api_manifest_sha256 == stable["source_hashes"]["api_manifest"]
-    assert report.prerelease_tracking.version == tracking["version"]
-    assert report.prerelease_tracking.git_sha == tracking["commit"]
+    assert report.historical_optimizer_contract.version == tracking["version"]
+    assert report.historical_optimizer_contract.git_sha == tracking["commit"]
     assert optimize_anything["commit"] == "58cdf89d856f2fbc174991b89076eccdcf68e4ca"
     assert map_size(optimize_anything["source_hashes"]) == 10
     assert swe_bench["commit"] == "91aa3ed51b709be6457e12d00300a6a596d4c6a3"

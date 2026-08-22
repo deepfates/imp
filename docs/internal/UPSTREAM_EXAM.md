@@ -932,10 +932,12 @@ content chunk, matching DSPy. A false marker prefix is still flushed unchanged.
    "Simulated error"; Imp raises "bootstrap error budget exhausted: 1 errors
    (maximum 1)". Loud either way; the original error is in the message chain
    but not re-raised.
-6. **No per-tool/module status-message provider** (5 streaming status tests):
-   DSPy's `StatusMessageProvider` hooks lm/tool/module start+end and streams
-   "Calling tool ..." messages; Imp's StatusMessage vocabulary covers
-   listener lifecycle only (:started/:completed/:error/:cancelled).
+6. **Per-tool/module status-message provider uses a BEAM-native boundary**:
+   DSPy's `StatusMessageProvider` subclasses hooks for LM/tool/module start and
+   end. Imp exposes listener lifecycle through `StreamListener.on_status` and
+   causally linked LM/tool/module events through `:telemetry`. The former Imp
+   type with that name was only a passive list accumulator and has been removed
+   rather than retained as a false facade.
 7. **No GEPA component_selector / instruction_proposer surfaces** — LANDED
    (dee-r67q): `Imp.Optimizer.GEPA.new/2` now takes `:module_selector`
    (upstream `component_selector`: `:round_robin` default, `:all`, an
@@ -1136,9 +1138,9 @@ trace)` shape as a `%{example:, pred:, trace:}` map.
 |---|---|---|
 | test_streamify_yields_expected_response_chunks | pass (adapted) | litellm test-server deltas → `Imp.Streaming.stream/3` local chunking; chunks assemble the full answer. |
 | test_streaming_response_yields_expected_response_chunks | n/a | `dspy.streaming.streaming_response` OpenAI-SSE re-encoding helper; no Imp counterpart by design (callers own their transport). |
-| test_default_status_streaming | blocked | Tool/module status-message provider absent (gap #6); Imp statuses cover listener lifecycle only. |
-| test_custom_status_streaming | blocked | Same (StatusMessageProvider subclass hooks). |
-| test_concurrent_status_message_providers | blocked | Same. |
+| test_default_status_streaming | native | Listener lifecycle plus causal `:telemetry`; no callback subclass. |
+| test_custom_status_streaming | native | Consumers attach ordinary telemetry handlers or `on_status`. |
+| test_concurrent_status_message_providers | native | Telemetry handlers and BEAM process lineage are concurrency-safe. |
 | test_stream_listener_chat_adapter | n/a | `@pytest.mark.llm_call` — requires a real LM. |
 | test_default_status_streaming_in_async_program | n/a | asyncio twin. |
 | test_stream_listener_json_adapter | n/a | llm_call. |

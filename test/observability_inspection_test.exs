@@ -72,18 +72,14 @@ defmodule Imp.ObservabilityInspectionTest do
     refute rendered =~ @secret
   end
 
-  test "streaming status accumulators are inspectable immutable artifacts" do
-    provider = %Imp.Streaming.Messages.StatusMessageProvider{
-      messages: [
-        %Imp.Streaming.Messages.StatusMessage{
-          message: "calling provider",
-          metadata: %{authorization: @secret}
-        }
-      ]
+  test "streaming status messages are inspectable immutable artifacts" do
+    message = %Imp.Streaming.Messages.StatusMessage{
+      message: "calling provider",
+      metadata: %{authorization: @secret}
     }
 
-    assert %Inspection{kind: :status_stream, summary: %{message_count: 1}} =
-             inspection = Imp.Observability.inspect_artifact(provider)
+    assert %Inspection{kind: :status, summary: %{level: :info}} =
+             inspection = Imp.Observability.inspect_artifact(message)
 
     assert [%{source: :status, payload: payload}] = inspection.entries
     assert payload.message == "calling provider"

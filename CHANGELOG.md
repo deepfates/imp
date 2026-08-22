@@ -242,6 +242,11 @@ installs from a source checkout, not from Hex.
   spectrum (`react`, `react_v2`, `avatar`, `code_act`, `rlm`) plus ordinary
   supervised Elixir around `Imp.call/2` and `Imp.Tool.call/2`. No replacement
   event/runtime abstraction was introduced without a real consumer.
+- Breaking in 0.3: removed the misleading
+  `Imp.Streaming.Messages.StatusMessageProvider` list accumulator. It never
+  implemented DSPy's execution-stage provider contract. Use
+  `StreamListener.on_status` for stream lifecycle and `:telemetry` handlers for
+  causally linked module, LM, and tool progress.
 - Five internal modules that carried `@moduledoc false` now have short,
   accurate moduledocs marked `Internal.`
 - CI runs four parallel gates over a deterministic dependency cache warmed

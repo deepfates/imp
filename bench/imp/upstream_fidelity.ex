@@ -18,8 +18,7 @@ defmodule Imp.UpstreamFidelity do
   @stable_api_manifest """
                        Adapter
                        Audio
-                       Avatar
-                       AvatarOptimizer
+                       BaseLM
                        BestOfN
                        BetterTogether
                        BootstrapFewShot
@@ -40,7 +39,9 @@ defmodule Imp.UpstreamFidelity do
                        Ensemble
                        Evaluate
                        EvaluationResult
+                       Errors
                        Example
+                       Flex
                        GEPA
                        GEPA advanced
                        History
@@ -63,6 +64,7 @@ defmodule Imp.UpstreamFidelity do
                        PythonInterpreter
                        RLM
                        ReAct
+                       ReActV2
                        Refine
                        SIMBA
                        SemanticF1
@@ -89,6 +91,12 @@ defmodule Imp.UpstreamFidelity do
                        streamify
                        """
                        |> String.split("\n", trim: true)
+
+  @stable_api_manifest_sha256 :crypto.hash(
+                                :sha256,
+                                Enum.join(@stable_api_manifest, "\n") <> "\n"
+                              )
+                              |> Base.encode16(case: :lower)
 
   @ledger [
     %{
@@ -163,29 +171,64 @@ defmodule Imp.UpstreamFidelity do
       }
     },
     %{
-      id: "models.normalized_runtime_prerelease",
+      id: "models.normalized_runtime",
       category: :model_runtime,
       upstream: [
-        "3.3 BaseLM normalized requests/responses",
+        "normalized requests/responses",
         "LMRequest",
         "LMResponse",
         "LMStream"
       ],
-      source: "dspy/core/types.py; dspy/clients/base_lm.py @ 3.3.0b1",
-      disposition: :tracking,
-      release_blocking: false,
+      source: "dspy/core/types.py; dspy/clients/base_lm.py @ 3.3.1",
+      disposition: :elixir_native_equivalent,
+      rationale:
+        "Imp normalizes every ordinary LM call through typed request/response envelopes while retaining existing typed adapter values as multipart content. Lazy StreamResponse enumerables, incremental listeners, and collect/3 provide the BEAM-native stream consumer contract without a mutable LMStream.result object.",
       ticket: "de-tt5j",
-      imp: [Imp.Core.LMRequest, Imp.Core.LMResponse],
+      imp: [
+        Imp.Core.LMRequest,
+        Imp.Core.LMResponse,
+        Imp.Adapter.Types,
+        Imp.Streaming.Messages.StreamResponse,
+        Imp.Streaming.Messages.StreamListener
+      ],
       invariants: [
         "ordinary Imp.LM and ReqLLM calls cross the normalized request/response boundary without changing the legacy raw return contract",
-        "the richer stable 3.3 multipart and stream-event model remains explicitly tracked rather than inferred from request envelopes"
+        "typed multimodal, reasoning, and tool values survive the normalized request boundary and are converted only at the provider edge",
+        "provider streams expose text, reasoning, tool-call, terminal, and error events lazily with early-halt cancellation",
+        "stream listeners and collection preserve final values and failures without requiring a mutable post-enumeration result object"
       ],
       evidence: %{
-        tests: ["test/public_surface_test.exs", "test/normalized_lm_runtime_test.exs"],
-        docs: ["docs/internal/UPSTREAM_FIDELITY_AUDIT.md"],
+        tests: [
+          "test/normalized_lm_runtime_test.exs",
+          "test/req_llm_client_test.exs",
+          "test/runtime_async_stream_cache_test.exs",
+          "test/stream_listener_incremental_test.exs"
+        ],
+        docs: ["docs/ARCHITECTURE.md", "docs/API_GUIDE.md"]
+      }
+    },
+    %{
+      id: "modules.flex",
+      category: :experimental,
+      upstream: ["Flex"],
+      source: "dspy/predict/flex @ 3.3.1",
+      disposition: :tracking,
+      release_blocking: false,
+      ticket: "imp-0du1",
+      imp: [Imp.Optimize.Anything.Runner],
+      invariants: [
+        "Flex is explicitly experimental in DSPy 3.3.1 and cannot substitute for prompt-program parity",
+        "optimizer-authored executable code must run behind a sandbox and explicit tool/predictor bridge",
+        "Imp evaluates reusable code-artifact semantics through Optimize Anything before earning a Flex-shaped public module"
+      ],
+      evidence: %{
+        tests: [
+          "test/optimize_anything_code_artifact_test.exs",
+          "test/optimize_anything_structured_artifact_test.exs"
+        ],
+        docs: ["docs/internal/RESEARCH_LANDSCAPE.md"],
         missing: [
-          "stable 3.3 typed multipart request and response values",
-          "LMStream event model and ordinary streaming execution through that model"
+          "an ordinary sandboxed code-optimized module user story with held-out evaluation, durable reload, and fresh service"
         ]
       }
     },
@@ -830,10 +873,13 @@ defmodule Imp.UpstreamFidelity do
       ],
       source: "dspy/utils/inspect_history.py; dspy/utils/callback.py; observability docs",
       disposition: :conformant,
+      rationale:
+        "Imp emits lifecycle status through StreamListener and module/LM/tool progress through causally linked telemetry. The former passive StatusMessageProvider accumulator was removed because it did not implement DSPy's callback provider and added no capability.",
       imp: [Imp.Observability, Imp.Telemetry, Imp.Streaming.Messages],
       invariants: [
         "developers can inspect model, tool, optimizer, and RLM traces",
         "progress is observable without parsing internal structs",
+        "custom status consumers attach to StreamListener or :telemetry instead of subclassing a callback provider",
         "all emitted data is redacted"
       ],
       evidence: %{
@@ -952,10 +998,14 @@ defmodule Imp.UpstreamFidelity do
   def baseline, do: baseline(Imp.UpstreamAuthorityRegistry.load!())
 
   @doc false
-  def prerelease_tracking, do: prerelease_tracking(Imp.UpstreamAuthorityRegistry.load!())
+  def historical_optimizer_contract,
+    do: historical_optimizer_contract(Imp.UpstreamAuthorityRegistry.load!())
 
   @doc false
   def stable_api_manifest, do: @stable_api_manifest
+
+  @doc false
+  def stable_api_manifest_sha256, do: @stable_api_manifest_sha256
 
   @doc false
   def surfaces, do: @ledger
@@ -985,7 +1035,7 @@ defmodule Imp.UpstreamFidelity do
       )
 
     stable_baseline = baseline(registry)
-    prerelease_tracking = prerelease_tracking(registry)
+    historical_optimizer_contract = historical_optimizer_contract(registry)
     rows = Enum.map(@ledger, &evaluate_row(&1, root, claims, reproduction_audit))
     blocking = Enum.filter(rows, &release_blocking_gap?/1)
     {manifest_missing, manifest_duplicates} = manifest_errors(rows)
@@ -998,7 +1048,7 @@ defmodule Imp.UpstreamFidelity do
       schema_version: 3,
       generated_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       baseline: stable_baseline,
-      prerelease_tracking: prerelease_tracking,
+      historical_optimizer_contract: historical_optimizer_contract,
       reproduction_evidence: %{
         valid: reproduction_audit["valid"],
         invalid_features:
@@ -1046,6 +1096,12 @@ defmodule Imp.UpstreamFidelity do
 
     metadata = Map.fetch!(authority, "metadata")
     source_hashes = Map.fetch!(authority, "source_hashes")
+    expected_manifest_hash = Map.fetch!(source_hashes, "api_manifest")
+
+    if expected_manifest_hash != @stable_api_manifest_sha256 do
+      raise ArgumentError,
+            "stable DSPy API manifest hash drifted: expected #{expected_manifest_hash}, got #{@stable_api_manifest_sha256}"
+    end
 
     %{
       project: Map.fetch!(authority, "project"),
@@ -1055,11 +1111,12 @@ defmodule Imp.UpstreamFidelity do
       git_sha: Map.fetch!(authority, "commit"),
       released_on: Map.fetch!(metadata, "released_on"),
       api_index: Map.fetch!(metadata, "api_index"),
-      api_manifest_sha256: Map.fetch!(source_hashes, "api_manifest")
+      api_manifest_sha256: expected_manifest_hash,
+      source_tree_sha256: Map.fetch!(source_hashes, "source_tree")
     }
   end
 
-  defp prerelease_tracking(registry) do
+  defp historical_optimizer_contract(registry) do
     authority =
       Imp.UpstreamAuthorityRegistry.authority!(
         registry,
@@ -1082,7 +1139,6 @@ defmodule Imp.UpstreamFidelity do
   defp manifest_errors(rows) do
     ownership_counts =
       rows
-      |> Enum.reject(&(&1.disposition == :tracking))
       |> Enum.flat_map(& &1.upstream)
       |> Enum.frequencies()
 

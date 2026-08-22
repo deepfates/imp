@@ -19,15 +19,16 @@
   "pinned_sources": {
     "dspy_stable": {
       "repository": "https://github.com/stanfordnlp/dspy",
-      "version": "3.2.1",
-      "git_ref": "refs/tags/3.2.1",
-      "commit": "29448ae12756abdd14bd8796c819247ebb83673c",
-      "tag_object_sha": "27a8e2a134b0b8dbd2d7433ea67ffe9be627d376",
+      "version": "3.3.1",
+      "git_ref": "refs/tags/3.3.1",
+      "commit": "638e155cf725236fe5d01b5332394a7bc128881d",
+      "tag_object_sha": "753ab03d9ee2919159e7d9e0c9f47f753845a8ff",
       "source_hashes": {
-        "api_manifest": "3e6243532fba8a8412850cb6b3f5c277c044c3f021c5626869db74665b1e933d"
+        "api_manifest": "25c0cb1fadaa2ad6394dbd3428930799ad22bbe19beb9a1ff476173dceed07bf",
+        "source_tree": "b9364d08e549a01fb87b37aa41ebca24c4dda58160dda13523fbc83323862c4b"
       },
       "metadata": {
-        "released_on": "2026-05-05",
+        "released_on": "2026-08-21",
         "api_index": "https://dspy.ai/api/"
       }
     },

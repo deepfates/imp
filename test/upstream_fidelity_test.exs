@@ -10,17 +10,23 @@ defmodule Imp.UpstreamFidelityTest do
     report = Imp.UpstreamFidelity.report()
 
     assert report.schema_version == 3
-    assert report.baseline.version == "3.2.1"
-    assert report.baseline.git_ref == "refs/tags/3.2.1"
-    assert report.baseline.tag_object_sha == "27a8e2a134b0b8dbd2d7433ea67ffe9be627d376"
-    assert report.baseline.git_sha == "29448ae12756abdd14bd8796c819247ebb83673c"
+    assert report.baseline.version == "3.3.1"
+    assert report.baseline.git_ref == "refs/tags/3.3.1"
+    assert report.baseline.tag_object_sha == "753ab03d9ee2919159e7d9e0c9f47f753845a8ff"
+    assert report.baseline.git_sha == "638e155cf725236fe5d01b5332394a7bc128881d"
 
     assert report.baseline.api_manifest_sha256 ==
-             "3e6243532fba8a8412850cb6b3f5c277c044c3f021c5626869db74665b1e933d"
+             "25c0cb1fadaa2ad6394dbd3428930799ad22bbe19beb9a1ff476173dceed07bf"
 
-    assert report.prerelease_tracking.version == "3.3.0b1"
-    assert report.prerelease_tracking.git_sha == "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
-    refute report.prerelease_tracking.release_blocking
+    assert report.baseline.source_tree_sha256 ==
+             "b9364d08e549a01fb87b37aa41ebca24c4dda58160dda13523fbc83323862c4b"
+
+    assert report.historical_optimizer_contract.version == "3.3.0b1"
+
+    assert report.historical_optimizer_contract.git_sha ==
+             "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
+
+    refute report.historical_optimizer_contract.release_blocking
   end
 
   test "status is derived from explicit contracts and executable evidence" do
@@ -29,12 +35,11 @@ defmodule Imp.UpstreamFidelityTest do
 
     assert by_id["programming.contracts"].status == :conformant
     assert by_id["models.runtime"].status == :elixir_native_equivalent
-    assert by_id["models.normalized_runtime_prerelease"].status == :tracking
+    assert by_id["models.normalized_runtime"].status == :elixir_native_equivalent
 
-    assert by_id["models.normalized_runtime_prerelease"].evidence.tests == [
-             "test/public_surface_test.exs",
-             "test/normalized_lm_runtime_test.exs"
-           ]
+    assert "test/normalized_lm_runtime_test.exs" in by_id["models.normalized_runtime"].evidence.tests
+
+    assert by_id["modules.flex"].status == :tracking
 
     assert by_id["tools.typed_calls"].status == :elixir_native_equivalent
     assert by_id["state.persistence_deployment"].status == :elixir_native_equivalent
@@ -131,7 +136,7 @@ defmodule Imp.UpstreamFidelityTest do
   end
 
   test "every stable surface has exactly one owning ledger row" do
-    stable_rows = Enum.reject(Imp.UpstreamFidelity.surfaces(), &(&1.disposition == :tracking))
+    stable_rows = Imp.UpstreamFidelity.surfaces()
     manifest = Imp.UpstreamFidelity.stable_api_manifest()
 
     surfaces = Enum.flat_map(stable_rows, & &1.upstream)
@@ -139,9 +144,12 @@ defmodule Imp.UpstreamFidelityTest do
 
     assert duplicates == []
     assert length(surfaces) >= 75
-    assert length(manifest) == 71
-    assert "Avatar" in manifest
-    assert "AvatarOptimizer" in manifest
+    assert length(manifest) == 73
+    assert "BaseLM" in manifest
+    assert "Flex" in manifest
+    assert "ReActV2" in manifest
+    refute "Avatar" in manifest
+    refute "AvatarOptimizer" in manifest
   end
 
   test "gap and native-equivalent rows carry accountable decisions" do
