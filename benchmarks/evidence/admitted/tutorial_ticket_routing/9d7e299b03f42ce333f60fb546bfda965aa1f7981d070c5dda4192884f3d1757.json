@@ -1,0 +1,209 @@
+{
+  "configuration": {
+    "adapter": "Imp.Adapter.JSON",
+    "cache_cleared_per_repeat": true,
+    "json_retries": 1,
+    "k": 8,
+    "max_concurrency": 8,
+    "metric": "Imp.exact_match(:team)",
+    "optimizer": "Imp.Optimizer.LabeledFewShot",
+    "repeats": 3,
+    "signature": "ticket -> team: enum[atlas,harbor,beacon,quill]",
+    "timeout_ms": 60000,
+    "trainset": "train split only; dev split unused; test split held out"
+  },
+  "dataset": {
+    "dev": 20,
+    "path": "priv/tutorial/support_tickets.json",
+    "sha256": "7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87",
+    "test": 20,
+    "train": 20
+  },
+  "doc_claims_under_test": {
+    "baseline_repeat_range": [
+      0.25,
+      0.45
+    ],
+    "cost_usd_per_repeat_approx": 0.015,
+    "duration_seconds_range": [
+      8,
+      22
+    ],
+    "optimized_repeat_range": [
+      0.85,
+      1.0
+    ],
+    "source": "docs/TUTORIAL_TICKET_ROUTING.md"
+  },
+  "fresh_service": {
+    "artifact_sha256": "cacd6fb5f6538da5fb7a3e7569e052e4735cafb8b404ab4e6aea3dda92537434",
+    "budget": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 50000,
+        "output_tokens": 1024,
+        "requests": 4,
+        "usd": 0.1
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "output_per_million": 4.5,
+        "source_url": "https://openai.com/api/pricing/"
+      },
+      "requests": 4,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 4,
+      "usage": {
+        "input_tokens": 1987,
+        "output_tokens": 43,
+        "usd": 0.001683
+      }
+    },
+    "concurrency": 4,
+    "correct": 4,
+    "fresh_os_process": true,
+    "total": 4
+  },
+  "generated_at": "2026-08-22T21:31:46Z",
+  "git_sha": "88d61a9c8ee1e70af929de9d5445fb317ce74040",
+  "model": "openai:gpt-5.4-mini",
+  "provider_route": "openrouter:openai/gpt-5.4-mini",
+  "runner": "tutorial-ticket-routing-experiment",
+  "runs": [
+    {
+      "absolute_lift": 0.45,
+      "baseline_errors": 0,
+      "baseline_score": 0.5,
+      "cache": {
+        "bypasses": 0,
+        "cleared_before_run": true,
+        "hits": 0,
+        "misses": 0
+      },
+      "duration_ms": 8904,
+      "heldout_examples": 20,
+      "optimized_errors": 0,
+      "optimized_score": 0.95,
+      "run": 1,
+      "started_at": "2026-08-22T21:31:17Z",
+      "usage": {
+        "input_tokens": 14296,
+        "output_tokens": 495,
+        "requests_with_usage": 40,
+        "total_tokens": 14791
+      }
+    },
+    {
+      "absolute_lift": 0.65,
+      "baseline_errors": 0,
+      "baseline_score": 0.35,
+      "cache": {
+        "bypasses": 0,
+        "cleared_before_run": true,
+        "hits": 0,
+        "misses": 0
+      },
+      "duration_ms": 8882,
+      "heldout_examples": 20,
+      "optimized_errors": 0,
+      "optimized_score": 1.0,
+      "run": 2,
+      "started_at": "2026-08-22T21:31:26Z",
+      "usage": {
+        "input_tokens": 14296,
+        "output_tokens": 481,
+        "requests_with_usage": 40,
+        "total_tokens": 14777
+      }
+    },
+    {
+      "absolute_lift": 0.65,
+      "baseline_errors": 0,
+      "baseline_score": 0.3,
+      "cache": {
+        "bypasses": 0,
+        "cleared_before_run": true,
+        "hits": 0,
+        "misses": 0
+      },
+      "duration_ms": 8325,
+      "heldout_examples": 20,
+      "optimized_errors": 0,
+      "optimized_score": 0.95,
+      "run": 3,
+      "started_at": "2026-08-22T21:31:35Z",
+      "usage": {
+        "input_tokens": 14296,
+        "output_tokens": 501,
+        "requests_with_usage": 40,
+        "total_tokens": 14797
+      }
+    }
+  ],
+  "schema_version": 2,
+  "scope": {
+    "claimed": "LabeledFewShot(k: 8) held-out lift on the shipped sixty-ticket routing task with openrouter:openai/gpt-5.4-mini across 3 live repeats",
+    "not_claimed": [
+      "generalization beyond the shipped support-ticket dataset",
+      "search-optimizer (RandomSearch/MIPROv2) effectiveness",
+      "DSPy-matched comparison"
+    ]
+  },
+  "script": "scripts/tutorial_ticket_routing_experiment.exs",
+  "summary": {
+    "all_runs_improved": true,
+    "baseline_score_max": 0.5,
+    "baseline_score_min": 0.3,
+    "duration_ms_max": 8904,
+    "duration_ms_min": 8325,
+    "min_absolute_lift": 0.45,
+    "optimized_score_max": 1.0,
+    "optimized_score_min": 0.95,
+    "optimizer_budget": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 1500000,
+        "output_tokens": 61440,
+        "requests": 240,
+        "usd": 3.0
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "output_per_million": 4.5,
+        "source_url": "https://openai.com/api/pricing/"
+      },
+      "requests": 120,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 120,
+      "usage": {
+        "input_tokens": 42888,
+        "output_tokens": 1477,
+        "usd": 0.03881899999999999
+      }
+    },
+    "repeats": 3,
+    "total_usage": {
+      "input_tokens": 42888,
+      "output_tokens": 1477,
+      "requests_with_usage": 120,
+      "total_tokens": 44365
+    }
+  },
+  "tutorial": "docs/TUTORIAL_TICKET_ROUTING.md"
+}

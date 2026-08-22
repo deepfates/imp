@@ -162,10 +162,10 @@ defmodule TutorialTicketRoutingExperiment do
       "fresh_service" => fresh_service,
       "doc_claims_under_test" => %{
         "source" => "docs/TUTORIAL_TICKET_ROUTING.md",
-        "baseline_repeat_range" => [0.25, 0.45],
-        "optimized_repeat_range" => [0.85, 1.0],
-        "cost_usd_per_repeat_approx" => 0.015,
-        "duration_seconds_range" => [8, 22]
+        "baseline_repeat_range" => [0.30, 0.50],
+        "optimized_repeat_range" => [0.95, 1.0],
+        "cost_usd_per_repeat_approx" => 0.013,
+        "duration_seconds_range" => [8, 9]
       },
       "scope" => %{
         "claimed" =>

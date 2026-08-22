@@ -4,7 +4,7 @@ Let's take the support-ticket router from the [README](../README.md) and do
 what you cannot do with a prompt string: score it on held-out data, improve it
 with an optimizer, and prove the improvement on tickets it has never seen.
 
-In the current committed benchmark runs the zero-shot router scored **30–35%**
+In the current committed benchmark runs the zero-shot router scored **30–50%**
 on twenty held-out tickets. The optimized router scored **95–100%** on the
 same twenty in all three repeats. Each full experiment — baseline,
 optimization, and held-out evaluation — cost about **$0.013** and ran in
@@ -104,7 +104,7 @@ the misses are not random — they are the model guessing what squad names mean:
 
 It reads the tickets fine. It cannot know that atlas is the money squad. On a
 task this small the exact score moves a little between runs — our current
-repeats landed between 0.30 and 0.35 — but every run tells the same story.
+repeats landed between 0.30 and 0.50 — but every run tells the same story.
 
 ## Improve With Measured Lift
 
@@ -138,8 +138,8 @@ optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout:
 #=> {0.3, 0.95}
 ```
 
-The current three-repeat artifact measured 35% → 95%, 30% → 100%, and
-35% → 95%: gains of 60–70 points on held-out tickets. Each full run used
+The current three-repeat artifact measured 50% → 95%, 35% → 100%, and
+30% → 95%: gains of 45–65 points on held-out tickets. Each full run used
 about 14,800 tokens, cost about $0.013, and finished in 7–9 seconds. All 120
 evaluation calls completed without a row error.
 

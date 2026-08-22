@@ -1196,7 +1196,7 @@
         "One task, one dataset, one model; no generalization beyond the shipped support-ticket dataset, no search-optimizer effectiveness, and no DSPy-matched comparison is claimed.",
         "The result establishes one small few-shot classification workflow. It does not establish instruction-search effectiveness or general usefulness across tasks and models."
       ],
-      "statement": "The tutorial's optimizer lift reproduces live: the current three-repeat artifact measures baseline 0.30-0.35 against optimized 0.95-1.00 on twenty held-out tickets, with 120 usage-bearing single-attempt transports, zero row errors, $0.038887 total evaluation cost, and successful 4/4 concurrent service after parameter-Artifact application in a fresh OS process.",
+      "statement": "The tutorial's optimizer lift reproduces live: the current three-repeat artifact measures baseline 0.30-0.50 against optimized 0.95-1.00 on twenty held-out tickets, with 120 usage-bearing single-attempt transports, zero row errors, $0.038819 total evaluation cost, and successful 4/4 concurrent service after parameter-Artifact application in a fresh OS process.",
       "category": "optimizer",
       "surface": [
         "docs",
@@ -1210,7 +1210,7 @@
       "sources": [
         "docs/TUTORIAL_TICKET_ROUTING.md",
         "scripts/tutorial_ticket_routing_experiment.exs",
-        "benchmarks/evidence/admitted/tutorial_ticket_routing/6b1b6c9fdeb279265bfa67a3afe5f4f5c0c72a0abd0dc2d6c49f3529c8403bc9.json",
+        "benchmarks/evidence/admitted/tutorial_ticket_routing/9d7e299b03f42ce333f60fb546bfda965aa1f7981d070c5dda4192884f3d1757.json",
         "test/tutorial_ticket_routing_artifact_test.exs"
       ],
       "requirements": [
