@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
-DSPY_CURRENT_VERSION="3.3.0b1"
-GEPA_COMMIT="cbefbc1aa0f43dd39874ec4bf42211365dbda42e"
+DSPY_CURRENT_VERSION="3.3.1"
+GEPA_COMMIT="8b0ce6cd99a234f6b74daf37558a2ac0ce18f975"
 DENO_VERSION="2.8.3"
 DSPY_PYTHON="${IMP_DSPY_PYTHON:-${PYTHON:-python3.12}}"
 DSPY_VENV="${IMP_DSPY_CURRENT_VENV:-tmp/dspy-current-venv}"
@@ -20,6 +20,7 @@ if [ "$installed_deno_version" != "$DENO_VERSION" ]; then
 fi
 
 scripts/setup_dspy_stable_source.sh
+scripts/setup_dspy_current_target.sh
 
 if command -v uv >/dev/null 2>&1; then
   uv venv --clear --python "$DSPY_PYTHON" "$DSPY_VENV"

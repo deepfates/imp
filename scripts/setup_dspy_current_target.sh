@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-DSPY_VERSION="3.3.0b1"
+DSPY_VERSION="3.3.1"
 TARGET="${IMP_DSPY_TARGET:-tmp/dspy-current-target}"
 PYTHON="${PYTHON:-python3}"
 
