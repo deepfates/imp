@@ -381,23 +381,25 @@ pytest itself only runs 6 of the 7.
 
 ## tests/signatures/test_adapter_file.py (28)
 
-Imp files (`Imp.Adapter.Types.File`) carry `path`/`url`/`data`/`mime_type`
-and encode at the provider boundary (`Types.to_openai/1`). Not modeled:
-`filename`, `file_id`, string-sniffing constructors, Python repr/str.
+Imp files (`Imp.Adapter.Types.File`) are inert `url`/`data`/`file_id`/`filename`
+values and encode at the provider boundary (`Types.to_openai/1`). Explicit
+`File.from_path/2` reads trusted local bytes eagerly; a directly constructed
+deferred `path` is rejected. String-sniffing constructors and Python repr/str
+remain language-specific and are not modeled.
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_file_from_local_path | pass (partial) | Path → `data:text/plain;base64,` file block. `filename` not modeled (blocked half). |
-| test_file_from_path_method | pass (partial) | Upstream body identical to the previous test. |
-| test_file_from_path_with_custom_filename | blocked | No filename field. |
+| test_file_from_local_path | pass | Explicit eager factory → `data:text/plain;base64,` block with basename. |
+| test_file_from_path_method | pass | `File.from_path/2`; upstream body is identical to the previous test. |
+| test_file_from_path_with_custom_filename | pass | `filename:` overrides the basename. |
 | test_file_from_bytes | pass | Default mime `application/octet-stream`. |
-| test_file_from_bytes_with_filename | blocked | No filename field. |
-| test_file_from_file_id | blocked | No file_id field (provider file registry not modeled). |
-| test_file_from_file_id_with_filename | blocked | Same. |
-| test_file_from_dict_with_file_data | pass (partial) | Data-URI accepted and passed through; filename half blocked. |
-| test_file_from_dict_with_file_id | blocked | No file_id. |
-| test_file_format_with_file_data | pass (partial) | `{type: "file", file: %{file_data: ...}}`; the `filename` key assertion blocked. |
-| test_file_format_with_file_id | blocked | No file_id. |
+| test_file_from_bytes_with_filename | pass | `File.from_bytes/2`. |
+| test_file_from_file_id | pass | `File.from_file_id/2`; ReqLLM preserves provider identity. |
+| test_file_from_file_id_with_filename | pass | Same, with filename retained. |
+| test_file_from_dict_with_file_data | pass | Data URI and filename decode into an inert value. |
+| test_file_from_dict_with_file_id | pass | OpenAI-shaped file IDs decode into an inert value. |
+| test_file_format_with_file_data | pass | `file_data` and filename are both retained. |
+| test_file_format_with_file_id | pass | `file_id` and filename are both retained. |
 | test_file_repr_with_file_data | n/a | Python repr format. |
 | test_file_repr_with_file_id | n/a | Same. |
 | test_file_str | n/a | `<<CUSTOM-TYPE-...-IDENTIFIER>>` split markers are DSPy's serialization mechanism; Imp keeps structs in content lists instead. |
@@ -406,12 +408,12 @@ and encode at the provider boundary (`Types.to_openai/1`). Not modeled:
 | test_invalid_file_string | n/a | String-sniffing constructor (URL vs path) not an Imp surface — fields are explicit. |
 | test_invalid_dict | pass | Payload-less file rejected loudly — at the provider boundary rather than construction (seam noted). |
 | test_file_in_signature | pass | One file part reaches the adapter messages; summary flows back. |
-| test_file_list_in_signature | pass (adapted) | One part per list element (2). Upstream's second file is from_file_id — substituted with a data-backed file since file_id is blocked. |
+| test_file_list_in_signature | pass | One data-backed file and one uploaded file ID both remain typed parts. |
 | test_optional_file_field | pass | Explicit nil input is skipped; zero file parts. |
 | test_save_load_file_signature | blocked | Depends on teleprompt.LabeledFewShot + predictor save/load — deferred to the teleprompt tranche. |
 | test_file_frozen | n/a | Pydantic frozen-model mutation guard; Elixir structs are immutable by construction. |
-| test_file_with_all_fields | blocked | file_id + filename not modeled. |
-| test_file_path_not_found | pass | Loud ArgumentError ("could not read Imp file attachment ..."); upstream message is "File not found" (wording differs). |
+| test_file_with_all_fields | pass | Data, file ID, and filename all survive conversion. |
+| test_file_path_not_found | pass | `File.from_path/2` rejects missing/non-regular paths before constructing a value. |
 | test_file_custom_mime_type | pass | |
 | test_file_from_bytes_custom_mime | pass | |
 | test_file_data_uri_in_format | pass | |

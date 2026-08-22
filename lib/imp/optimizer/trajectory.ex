@@ -993,6 +993,13 @@ defmodule Imp.Optimizer.Trajectory do
 
   defp validate_decoded_struct!(value), do: value
 
+  defp require_struct_keys!(value, Imp.Adapter.Types.File = module) do
+    expected = module.__struct__() |> Map.from_struct() |> Map.keys() |> Enum.map(&to_string/1)
+
+    unless MapSet.subset?(MapSet.new(Map.keys(value)), MapSet.new(expected)),
+      do: decode_error!("#{inspect(module)} wire keys do not match its schema")
+  end
+
   defp require_struct_keys!(value, module) do
     expected = module.__struct__() |> Map.from_struct() |> Map.keys() |> Enum.map(&to_string/1)
 

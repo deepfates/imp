@@ -131,6 +131,33 @@ objects, arrays, mappings, and unions, while still accepting legacy JSON inside
 an outer XML output tag. XML declarations, doctypes, and custom entities are
 rejected; model output cannot use XML parsing to load a local or remote resource.
 
+### Images, audio, and files are inert values
+
+Multimodal values never read the filesystem or fetch the network merely because
+an adapter formats them. Use an explicit factory when your application intends
+that effect; the returned value contains the bytes and can then cross retries,
+artifact persistence, or a process restart without retaining hidden access to
+the original path.
+
+```elixir
+alias Imp.Adapter.Types.{Audio, File, Image}
+
+image = Image.from_path("priv/chart.png")
+audio = Audio.from_path("priv/question.wav")
+report = File.from_path("priv/report.pdf", filename: "quarterly-report.pdf")
+uploaded = File.from_file_id("file_abc123", filename: "reference.pdf")
+```
+
+`Image.from_url/2` and `Audio.from_url/2` are explicit eager downloads. They
+require HTTP(S) and a finite timeout (30 seconds by default), but deliberately
+do not guess an application-specific SSRF policy: validate an untrusted host
+against your allowlist before calling them. Constructing `%File{path: path}`
+directly is rejected at formatting time; use
+`Imp.Adapter.Types.File.from_path/2` so the read is visible at the caller-owned
+boundary. `Imp.Adapter.Types.File.from_bytes/2` accepts raw bytes, while
+`Imp.Adapter.Types.File.from_file_id/2` carries an already uploaded provider
+reference.
+
 ### Adapter wire-format wording
 
 When `Imp.Adapter.Chat` or `Imp.Adapter.JSON` renders a non-string output, the

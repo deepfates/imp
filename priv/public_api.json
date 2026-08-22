@@ -816,7 +816,7 @@
             "content_to_openai(values)"
           ],
           "from_openai/1": [
-            "from_openai(value)"
+            "from_openai(block)"
           ],
           "to_openai/1": [
             "to_openai(image)"
@@ -826,6 +826,43 @@
       "source": "lib/imp/adapter/types.ex",
       "struct_fields": [],
       "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "from_path/1",
+        "from_url/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.Audio",
+      "signatures": {
+        "functions": {
+          "from_path/1": [
+            "from_path(path)"
+          ],
+          "from_url/2": [
+            "from_url(url, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "data",
+        "metadata",
+        "mime_type",
+        "url"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -858,6 +895,87 @@
       "struct_fields": [
         "code",
         "language"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "from_bytes/2",
+        "from_file_id/2",
+        "from_path/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.File",
+      "signatures": {
+        "functions": {
+          "from_bytes/2": [
+            "from_bytes(bytes, opts \\\\ [])"
+          ],
+          "from_file_id/2": [
+            "from_file_id(file_id, opts \\\\ [])"
+          ],
+          "from_path/2": [
+            "from_path(path, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "data",
+        "file_id",
+        "filename",
+        "metadata",
+        "mime_type",
+        "path",
+        "url"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "from_path/1",
+        "from_url/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.Image",
+      "signatures": {
+        "functions": {
+          "from_path/1": [
+            "from_path(path)"
+          ],
+          "from_url/2": [
+            "from_url(url, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "data",
+        "metadata",
+        "mime_type",
+        "url"
       ],
       "types": [
         {

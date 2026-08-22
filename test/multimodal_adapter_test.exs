@@ -127,7 +127,119 @@ defmodule MultimodalAdapterTest do
     assert %{
              type: "file",
              file: %{file_data: "data:text/plain;base64,aGVsbG8gZmlsZQ=="}
-           } = Types.to_openai(%Types.File{path: path})
+           } = path |> Types.File.from_path() |> Types.to_openai()
+  end
+
+  test "typed resources are inert and local factories perform eager reads" do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-resource-factories-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf(root) end)
+
+    image_path = Path.join(root, "pixel.png")
+    audio_path = Path.join(root, "sample.wav")
+    file_path = Path.join(root, "notes.txt")
+    File.write!(image_path, "PNG_BYTES")
+    File.write!(audio_path, "WAV_BYTES")
+    File.write!(file_path, "FILE_BYTES")
+
+    assert_raise ArgumentError, ~r/does not read deferred paths/, fn ->
+      Types.to_openai(%Types.File{path: file_path})
+    end
+
+    image = Types.Image.from_path(image_path)
+    audio = Types.Audio.from_path(audio_path)
+    file = Types.File.from_path(file_path)
+    File.rm_rf!(root)
+
+    assert image == %Types.Image{data: Base.encode64("PNG_BYTES"), mime_type: "image/png"}
+    assert audio == %Types.Audio{data: Base.encode64("WAV_BYTES"), mime_type: "audio/wav"}
+
+    assert file == %Types.File{
+             data: Base.encode64("FILE_BYTES"),
+             filename: "notes.txt",
+             mime_type: "text/plain"
+           }
+
+    assert get_in(Types.to_openai(image), [:image_url, :url]) =~ Base.encode64("PNG_BYTES")
+    assert get_in(Types.to_openai(audio), [:input_audio, :data]) == Base.encode64("WAV_BYTES")
+    assert get_in(Types.to_openai(file), [:file, :filename]) == "notes.txt"
+  end
+
+  test "explicit remote factories require HTTP(S), finite timeouts, and matching media" do
+    parent = self()
+
+    request = fn url, opts ->
+      send(parent, {:resource_request, url, opts})
+      {:ok, %{status: 200, body: "REMOTE_IMAGE", headers: %{"content-type" => ["image/png"]}}}
+    end
+
+    image =
+      Types.Image.from_url("https://assets.example/pixel.png", request: request, timeout: 25)
+
+    assert image.data == Base.encode64("REMOTE_IMAGE")
+    assert image.mime_type == "image/png"
+
+    assert_received {:resource_request, "https://assets.example/pixel.png", opts}
+    assert opts[:receive_timeout] == 25
+    assert opts[:connect_options] == [timeout: 25]
+    assert opts[:max_redirects] == 5
+
+    assert_raise ArgumentError, ~r/must use HTTP\(S\)/, fn ->
+      Types.Image.from_url("file:///etc/passwd", request: request)
+    end
+
+    assert_raise ArgumentError, ~r/positive integer/, fn ->
+      Types.Image.from_url("https://assets.example/pixel.png", request: request, timeout: nil)
+    end
+
+    wrong_media = fn _url, _opts ->
+      {:ok, %{status: 200, body: "NOT_AUDIO", headers: %{"content-type" => "text/plain"}}}
+    end
+
+    assert_raise ArgumentError, ~r/unsupported audio MIME type/, fn ->
+      Types.Audio.from_url("https://assets.example/sample.wav", request: wrong_media)
+    end
+  end
+
+  test "pre-uploaded file identity and filename survive OpenAI conversion" do
+    file = Types.File.from_file_id("file_123", filename: "research.pdf")
+
+    assert Types.to_openai(file) == %{
+             type: "file",
+             file: %{file_id: "file_123", filename: "research.pdf"}
+           }
+
+    assert Types.from_openai(%{
+             type: "file",
+             file: %{file_id: "file_123", filename: "research.pdf"}
+           }) == file
+  end
+
+  test "file conversion preserves every current DSPy file field" do
+    block = %{
+      type: "file",
+      file: %{
+        file_data: "data:text/plain;base64,Zm9v",
+        file_id: "file_123",
+        filename: "notes.txt"
+      }
+    }
+
+    value = Types.from_openai(block)
+
+    assert value == %Types.File{
+             data: "Zm9v",
+             file_id: "file_123",
+             filename: "notes.txt",
+             mime_type: "text/plain"
+           }
+
+    assert Types.to_openai(value) == block
   end
 
   test "decodes OpenAI-compatible multimodal content blocks back to adapter structs" do
@@ -151,7 +263,7 @@ defmodule MultimodalAdapterTest do
 
   test "reports malformed typed content at the adapter boundary" do
     assert_raise ArgumentError,
-                 ~r/Imp\.Adapter\.Types\.File expects binary :url, binary :path, or binary :data/,
+                 ~r/Imp\.Adapter\.Types\.File expects binary :url, :data, :file_id, or :filename/,
                  fn -> Types.to_openai(%Types.File{}) end
 
     assert_raise ArgumentError,

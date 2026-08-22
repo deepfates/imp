@@ -941,18 +941,20 @@ defmodule ReqLLMClientTest do
     assert redacted_model.id == "gpt-inline"
   end
 
-  test "ReqLLM client translates local file path attachments into file content parts" do
+  test "ReqLLM client translates eagerly loaded files without re-reading the path" do
     path = Path.join(System.tmp_dir!(), "imp-req-llm-#{System.unique_integer([:positive])}.md")
     File.write!(path, "# Attachment\n")
 
     on_exit(fn -> File.rm(path) end)
 
+    attachment = Imp.Adapter.Types.File.from_path(path)
+    File.rm!(path)
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 
     assert {:ok, _prediction} =
              Imp.Clients.ReqLLM.generate(
                lm,
-               [%{role: :user, content: [%Imp.Adapter.Types.File{path: path}]}],
+               [%{role: :user, content: [attachment]}],
                []
              )
 
@@ -968,6 +970,47 @@ defmodule ReqLLMClientTest do
            ] = message.content
 
     assert filename == Path.basename(path)
+  end
+
+  test "ReqLLM receives original multimodal bytes and pre-uploaded file identity" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+
+    content = [
+      %Imp.Adapter.Types.Image{data: Base.encode64("IMAGE"), mime_type: "image/png"},
+      %Imp.Adapter.Types.Audio{data: Base.encode64("AUDIO"), mime_type: "audio/wav"},
+      Imp.Adapter.Types.File.from_bytes("FILE", filename: "notes.txt", mime_type: "text/plain"),
+      Imp.Adapter.Types.File.from_file_id("file_123", filename: "uploaded.pdf")
+    ]
+
+    assert {:ok, _prediction} =
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: content}], [])
+
+    assert_received {:req_llm_generate, "openai:gpt-test", [%ReqLLM.Message{} = message], _opts}
+
+    assert [image, audio, file, uploaded] = message.content
+    assert image.type == :image
+    assert image.data == "IMAGE"
+    assert audio.type == :file
+    assert audio.data == "AUDIO"
+    assert audio.filename == "audio.wav"
+    assert file.data == "FILE"
+    assert file.filename == "notes.txt"
+    assert uploaded.file_id == "file_123"
+    assert uploaded.filename == "uploaded.pdf"
+  end
+
+  test "ReqLLM rejects deferred file paths before provider invocation" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+
+    assert_raise ArgumentError, ~r/does not read deferred paths/, fn ->
+      Imp.Clients.ReqLLM.generate(
+        lm,
+        [%{role: :user, content: [%Imp.Adapter.Types.File{path: "/tmp/deferred"}]}],
+        []
+      )
+    end
+
+    refute_received {:req_llm_generate, _, _, _}
   end
 
   test "ReqLLM client pre-normalizes OpenAI reasoning model options" do

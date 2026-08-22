@@ -806,28 +806,59 @@ defmodule Imp.Clients.ReqLLM do
          metadata: metadata
        })
        when is_binary(data),
-       do: [ReqLLM.Message.ContentPart.image(data, mime_type || "image/png", metadata)]
-
-  defp content_part(%Imp.Adapter.Types.File{data: data, mime_type: mime_type})
-       when is_binary(data),
        do: [
-         ReqLLM.Message.ContentPart.file(
-           data,
-           "attachment",
-           mime_type || "application/octet-stream"
+         ReqLLM.Message.ContentPart.image(
+           Imp.Adapter.Types.decode_data!(data, "image"),
+           mime_type || "image/png",
+           metadata
          )
        ]
 
-  defp content_part(%Imp.Adapter.Types.File{path: path, mime_type: mime_type})
-       when is_binary(path) do
+  defp content_part(%Imp.Adapter.Types.File{
+         data: data,
+         filename: filename,
+         mime_type: mime_type,
+         metadata: metadata
+       })
+       when is_binary(data),
+       do: [
+         data
+         |> Imp.Adapter.Types.decode_data!("file")
+         |> ReqLLM.Message.ContentPart.file(
+           filename || "attachment",
+           mime_type || "application/octet-stream"
+         )
+         |> Map.put(:metadata, metadata)
+       ]
+
+  defp content_part(%Imp.Adapter.Types.File{file_id: file_id} = file)
+       when is_binary(file_id) do
     [
-      ReqLLM.Message.ContentPart.file(
-        read_file_attachment!(path),
-        Path.basename(path),
-        mime_type || mime_type_from_path(path)
-      )
+      file_id
+      |> ReqLLM.Message.ContentPart.file_id(file.mime_type || "application/pdf", file.metadata)
+      |> Map.put(:filename, file.filename)
     ]
   end
+
+  defp content_part(%Imp.Adapter.Types.File{path: path}) when is_binary(path) do
+    raise ArgumentError,
+          "Imp.Adapter.Types.File does not read deferred paths; use Imp.Adapter.Types.File.from_path/2"
+  end
+
+  defp content_part(%Imp.Adapter.Types.File{url: url}) when is_binary(url) do
+    raise ArgumentError,
+          "ReqLLM file URL attachments are not portable; load trusted bytes explicitly or use File.from_file_id/2: #{inspect(url)}"
+  end
+
+  defp content_part(%Imp.Adapter.Types.Audio{data: data, mime_type: mime_type})
+       when is_binary(data),
+       do: [
+         ReqLLM.Message.ContentPart.file(
+           Imp.Adapter.Types.decode_data!(data, "audio"),
+           audio_filename(mime_type || "audio/wav"),
+           mime_type || "audio/wav"
+         )
+       ]
 
   defp content_part(%Imp.Adapter.Types.Document{text: text}),
     do: [ReqLLM.Message.ContentPart.text(to_string(text))]
@@ -856,34 +887,16 @@ defmodule Imp.Clients.ReqLLM do
 
   defp content_to_text(content), do: inspect(content)
 
-  defp read_file_attachment!(path) do
-    case File.read(path) do
-      {:ok, data} ->
-        data
+  defp audio_filename(mime_type) do
+    format =
+      mime_type
+      |> String.split("/", parts: 2)
+      |> List.last()
+      |> String.split(";", parts: 2)
+      |> hd()
+      |> String.replace_prefix("x-", "")
 
-      {:error, reason} ->
-        raise ArgumentError,
-              "could not read Imp file attachment #{inspect(path)}: #{:file.format_error(reason)}"
-    end
-  end
-
-  defp mime_type_from_path(path) do
-    case path |> Path.extname() |> String.downcase() do
-      ".txt" -> "text/plain"
-      ".md" -> "text/markdown"
-      ".json" -> "application/json"
-      ".csv" -> "text/csv"
-      ".pdf" -> "application/pdf"
-      ".png" -> "image/png"
-      ".jpg" -> "image/jpeg"
-      ".jpeg" -> "image/jpeg"
-      ".webp" -> "image/webp"
-      ".gif" -> "image/gif"
-      ".wav" -> "audio/wav"
-      ".mp3" -> "audio/mpeg"
-      ".m4a" -> "audio/mp4"
-      _ -> "application/octet-stream"
-    end
+    "audio.#{format}"
   end
 
   defp normalize_tool_calls(nil), do: nil

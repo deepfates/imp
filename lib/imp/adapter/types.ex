@@ -4,17 +4,242 @@ defmodule Imp.Adapter.Types do
 
   The conversion helpers are deliberately permissive for plain text values and
   deliberately strict for Imp's typed structs. A free-form value can be rendered
-  as text, but a `%File{}` without `:path`, `:url`, or `:data` is a malformed
+  as text, but a `%File{}` without file data, identity, or filename is a malformed
   attachment and should fail at this boundary instead of becoming provider text.
+
+  Typed values are inert: constructing or formatting them never reads the host
+  filesystem or fetches the network. Use the explicit `from_path/1` and
+  `from_url/2` factories when the caller intends those effects.
   """
 
   defmodule Image do
+    @moduledoc """
+    An inert image value backed by a remote reference or in-memory data.
+
+    `from_path/1` and `from_url/2` perform explicit eager I/O and return a
+    data-backed value. `from_url/2` accepts only HTTP(S); callers must validate
+    untrusted hosts against their own allowlist because redirects and private
+    network destinations are otherwise reachable.
+    """
+
     defstruct [:url, :data, :mime_type, metadata: %{}]
     @type t :: %__MODULE__{}
+
+    @doc "Reads a trusted local image immediately into an inert value."
+    def from_path(path) when is_binary(path) do
+      {bytes, mime_type} = Imp.Adapter.Types.ResourceLoader.read_path!(path, :image)
+      %__MODULE__{data: Base.encode64(bytes), mime_type: mime_type}
+    end
+
+    @doc """
+    Downloads an HTTP(S) image immediately into an inert value.
+
+    Options include `:timeout` in milliseconds (default `30_000`). `:request`
+    may inject an arity-2 transport for deterministic tests.
+    """
+    def from_url(url, opts \\ []) when is_binary(url) and is_list(opts) do
+      {bytes, mime_type} = Imp.Adapter.Types.ResourceLoader.fetch_url!(url, :image, opts)
+      %__MODULE__{data: Base.encode64(bytes), mime_type: mime_type}
+    end
   end
 
-  defmodule Audio, do: defstruct([:url, :data, :mime_type, metadata: %{}])
-  defmodule File, do: defstruct([:path, :url, :data, :mime_type, metadata: %{}])
+  defmodule Audio do
+    @moduledoc """
+    An inert audio value backed by in-memory base64 data.
+
+    Use `from_path/1` or `from_url/2` for explicit eager I/O. Remote loading has
+    the same SSRF responsibility described by `Imp.Adapter.Types.Image.from_url/2`.
+    """
+
+    defstruct [:url, :data, :mime_type, metadata: %{}]
+    @type t :: %__MODULE__{}
+
+    @doc "Reads a trusted local audio file immediately into an inert value."
+    def from_path(path) when is_binary(path) do
+      {bytes, mime_type} = Imp.Adapter.Types.ResourceLoader.read_path!(path, :audio)
+      %__MODULE__{data: Base.encode64(bytes), mime_type: mime_type}
+    end
+
+    @doc """
+    Downloads an HTTP(S) audio resource immediately into an inert value.
+
+    Options include `:timeout` in milliseconds (default `30_000`). `:request`
+    may inject an arity-2 transport for deterministic tests.
+    """
+    def from_url(url, opts \\ []) when is_binary(url) and is_list(opts) do
+      {bytes, mime_type} = Imp.Adapter.Types.ResourceLoader.fetch_url!(url, :audio, opts)
+      %__MODULE__{data: Base.encode64(bytes), mime_type: mime_type}
+    end
+  end
+
+  defmodule File do
+    @moduledoc """
+    An inert file attachment or pre-uploaded provider file reference.
+
+    `from_path/2` is the only local-path entry point and reads immediately.
+    Keeping the bytes in the value makes later adapter formatting, persistence,
+    retries, and service restarts independent of the original filesystem path.
+    """
+
+    defstruct [:path, :url, :data, :file_id, :filename, :mime_type, metadata: %{}]
+    @type t :: %__MODULE__{}
+
+    @doc "Reads a trusted local file immediately into a data-backed attachment."
+    def from_path(path, opts \\ []) when is_binary(path) and is_list(opts) do
+      {bytes, detected_mime_type} = Imp.Adapter.Types.ResourceLoader.read_path!(path, :file)
+
+      from_bytes(bytes,
+        filename: Keyword.get(opts, :filename, Path.basename(path)),
+        mime_type: Keyword.get(opts, :mime_type, detected_mime_type)
+      )
+    end
+
+    @doc "Creates an attachment from raw bytes without performing I/O."
+    def from_bytes(bytes, opts \\ []) when is_binary(bytes) and is_list(opts) do
+      %__MODULE__{
+        data: Base.encode64(bytes),
+        filename: Keyword.get(opts, :filename),
+        mime_type: Keyword.get(opts, :mime_type, "application/octet-stream")
+      }
+    end
+
+    @doc "Creates an inert reference to a file already uploaded to a provider."
+    def from_file_id(file_id, opts \\ []) when is_binary(file_id) and is_list(opts) do
+      if String.trim(file_id) == "" do
+        raise ArgumentError, "file_id must be a non-empty string"
+      end
+
+      %__MODULE__{
+        file_id: file_id,
+        filename: Keyword.get(opts, :filename),
+        mime_type: Keyword.get(opts, :mime_type)
+      }
+    end
+  end
+
+  defmodule ResourceLoader do
+    @moduledoc false
+
+    @default_timeout 30_000
+
+    def read_path!(path, kind) do
+      unless Elixir.File.regular?(path) do
+        raise ArgumentError, "file not found or not a regular file: #{inspect(path)}"
+      end
+
+      bytes =
+        case Elixir.File.read(path) do
+          {:ok, bytes} -> bytes
+          {:error, reason} -> raise_read_error!(path, reason)
+        end
+
+      mime_type = Imp.Adapter.Types.mime_type_from_path(path)
+      validate_mime_type!(mime_type, kind, path)
+      {bytes, mime_type}
+    end
+
+    def fetch_url!(url, kind, opts) do
+      validate_http_url!(url)
+      timeout = Keyword.get(opts, :timeout, @default_timeout)
+
+      unless is_integer(timeout) and timeout > 0 do
+        raise ArgumentError, "resource timeout must be a positive integer in milliseconds"
+      end
+
+      request = Keyword.get(opts, :request, &default_request/2)
+
+      response =
+        request.(url,
+          receive_timeout: timeout,
+          connect_options: [timeout: timeout],
+          redirect: true,
+          max_redirects: 5
+        )
+
+      {status, body, headers} = normalize_response!(response, url)
+
+      unless status in 200..299 do
+        raise ArgumentError, "resource request failed with HTTP #{status} for #{inspect(url)}"
+      end
+
+      unless is_binary(body) do
+        raise ArgumentError, "resource response body must be binary for #{inspect(url)}"
+      end
+
+      mime_type = response_content_type(headers) || Imp.Adapter.Types.mime_type_from_path(url)
+      validate_mime_type!(mime_type, kind, url)
+      {body, mime_type}
+    end
+
+    defp default_request(url, opts), do: Req.get(url, opts)
+
+    defp normalize_response!({:ok, %{status: status, body: body} = response}, _url)
+         when is_integer(status),
+         do: {status, body, Map.get(response, :headers, %{})}
+
+    defp normalize_response!({:error, reason}, url) do
+      raise ArgumentError, "resource request failed for #{inspect(url)}: #{inspect(reason)}"
+    end
+
+    defp normalize_response!(other, url) do
+      raise ArgumentError,
+            "resource request returned an invalid response for #{inspect(url)}: #{inspect(other)}"
+    end
+
+    defp response_content_type(headers) when is_map(headers) do
+      headers
+      |> Map.get("content-type", Map.get(headers, "Content-Type"))
+      |> normalize_header_value()
+    end
+
+    defp response_content_type(headers) when is_list(headers) do
+      headers
+      |> Enum.find_value(fn {key, value} ->
+        if String.downcase(to_string(key)) == "content-type", do: value
+      end)
+      |> normalize_header_value()
+    end
+
+    defp response_content_type(_headers), do: nil
+    defp normalize_header_value([value | _]), do: normalize_header_value(value)
+
+    defp normalize_header_value(value) when is_binary(value),
+      do: value |> String.split(";", parts: 2) |> hd() |> String.trim() |> String.downcase()
+
+    defp normalize_header_value(_value), do: nil
+
+    defp validate_http_url!(url) do
+      case URI.parse(url) do
+        %URI{scheme: scheme, host: host} when scheme in ["http", "https"] and is_binary(host) ->
+          :ok
+
+        _ ->
+          raise ArgumentError, "resource URL must use HTTP(S) and include a host: #{inspect(url)}"
+      end
+    end
+
+    defp validate_mime_type!(mime_type, :image, source) do
+      unless String.starts_with?(mime_type, "image/") do
+        raise ArgumentError,
+              "unsupported image MIME type #{inspect(mime_type)} for #{inspect(source)}"
+      end
+    end
+
+    defp validate_mime_type!(mime_type, :audio, source) do
+      unless String.starts_with?(mime_type, "audio/") do
+        raise ArgumentError,
+              "unsupported audio MIME type #{inspect(mime_type)} for #{inspect(source)}"
+      end
+    end
+
+    defp validate_mime_type!(_mime_type, :file, _source), do: :ok
+
+    defp raise_read_error!(path, reason) do
+      raise ArgumentError,
+            "could not read resource #{inspect(path)}: #{:file.format_error(reason)}"
+    end
+  end
+
   defmodule Document, do: defstruct([:text, metadata: %{}])
 
   defmodule Code do
@@ -284,7 +509,7 @@ defmodule Imp.Adapter.Types do
       %{type: "text", text: "hello"}
 
       iex> Imp.Adapter.Types.to_openai(%Imp.Adapter.Types.File{})
-      ** (ArgumentError) Imp.Adapter.Types.File expects binary :url, binary :path, or binary :data; got: %Imp.Adapter.Types.File{path: nil, url: nil, data: nil, mime_type: nil, metadata: %{}}
+      ** (ArgumentError) Imp.Adapter.Types.File expects binary :url, :data, :file_id, or :filename; got: %Imp.Adapter.Types.File{path: nil, url: nil, data: nil, file_id: nil, filename: nil, mime_type: nil, metadata: %{}}
 
   """
   def to_openai(%Image{url: url}) when is_binary(url) do
@@ -306,21 +531,30 @@ defmodule Imp.Adapter.Types do
 
   def to_openai(%Audio{} = audio), do: invalid_type!(Audio, "binary :data", audio)
 
-  def to_openai(%File{url: url}) when is_binary(url) do
-    %{type: "file", file: %{file_url: url}}
+  def to_openai(%File{path: path}) when is_binary(path) do
+    raise ArgumentError,
+          "Imp.Adapter.Types.File does not read deferred paths; use Imp.Adapter.Types.File.from_path/2"
   end
 
-  def to_openai(%File{path: path, mime_type: mime_type}) when is_binary(path) do
-    data = path |> read_file_attachment!() |> Base.encode64()
-    %{type: "file", file: %{file_data: data_uri(mime_type || mime_type_from_path(path), data)}}
-  end
+  def to_openai(%File{} = value) do
+    file =
+      %{}
+      |> maybe_put(:file_url, value.url)
+      |> maybe_put(
+        :file_data,
+        if(is_binary(value.data),
+          do: data_uri(value.mime_type || "application/octet-stream", value.data)
+        )
+      )
+      |> maybe_put(:file_id, value.file_id)
+      |> maybe_put(:filename, value.filename)
 
-  def to_openai(%File{data: data, mime_type: mime_type}) when is_binary(data) do
-    %{type: "file", file: %{file_data: data_uri(mime_type || "application/octet-stream", data)}}
+    if map_size(file) == 0 do
+      invalid_type!(File, "binary :url, :data, :file_id, or :filename", value)
+    else
+      %{type: "file", file: file}
+    end
   end
-
-  def to_openai(%File{} = file),
-    do: invalid_type!(File, "binary :url, binary :path, or binary :data", file)
 
   def to_openai(%Document{text: text, metadata: metadata})
       when is_binary(text) and is_map(metadata) do
@@ -415,17 +649,11 @@ defmodule Imp.Adapter.Types do
       when is_binary(data),
       do: %Audio{data: audio[:data], mime_type: mime_type("audio", audio[:format])}
 
-  def from_openai(%{"type" => "file", "file" => %{"file_url" => url}}) when is_binary(url),
-    do: %File{url: url}
+  def from_openai(%{"type" => "file", "file" => file} = block) when is_map(file),
+    do: file_from_openai(file, block)
 
-  def from_openai(%{type: "file", file: %{file_url: url}}) when is_binary(url),
-    do: %File{url: url}
-
-  def from_openai(%{"type" => "file", "file" => %{"file_data" => data}}) when is_binary(data),
-    do: file_from_data(data)
-
-  def from_openai(%{type: "file", file: %{file_data: data}}) when is_binary(data),
-    do: file_from_data(data)
+  def from_openai(%{type: "file", file: file} = block) when is_map(file),
+    do: file_from_openai(file, block)
 
   def from_openai(%{"type" => "text", "text" => text}) when is_binary(text),
     do: %Document{text: text}
@@ -452,6 +680,20 @@ defmodule Imp.Adapter.Types do
   """
   def content_from_openai(values) when is_list(values), do: Enum.map(values, &from_openai/1)
   def content_from_openai(value), do: from_openai(value)
+
+  @doc false
+  def decode_data!(data, label) when is_binary(data) do
+    encoded = strip_data_uri(data)
+
+    case Base.decode64(encoded) do
+      {:ok, bytes} ->
+        bytes
+
+      :error ->
+        raise ArgumentError,
+              "#{label} data must be base64 or a base64 data URI; got invalid encoded data"
+    end
+  end
 
   defp message_to_openai(%{role: role, content: content}) do
     %{role: to_string(role), content: content_to_openai(content)}
@@ -485,11 +727,34 @@ defmodule Imp.Adapter.Types do
 
   defp image_from_url(url), do: %Image{url: url}
 
-  defp file_from_data("data:" <> _rest = uri) do
-    %File{data: strip_data_uri(uri), mime_type: data_uri_mime_type(uri)}
+  defp file_from_openai(file, block) do
+    data = Map.get(file, "file_data", Map.get(file, :file_data))
+    url = Map.get(file, "file_url", Map.get(file, :file_url))
+    file_id = Map.get(file, "file_id", Map.get(file, :file_id))
+    filename = Map.get(file, "filename", Map.get(file, :filename))
+
+    if Enum.any?([data, url, file_id, filename], &is_binary/1) do
+      {data, mime_type} =
+        if is_binary(data) and String.starts_with?(data, "data:"),
+          do: {strip_data_uri(data), data_uri_mime_type(data)},
+          else: {if(is_binary(data), do: data), nil}
+
+      %File{
+        data: data,
+        url: if(is_binary(url), do: url),
+        file_id: if(is_binary(file_id), do: file_id),
+        filename: if(is_binary(filename), do: filename),
+        mime_type: mime_type
+      }
+    else
+      invalid_openai_block!("file", block)
+    end
   end
 
-  defp file_from_data(data), do: %File{data: data}
+  defp maybe_put(map, key, value) when is_binary(value) and value != "",
+    do: Map.put(map, key, value)
+
+  defp maybe_put(map, _key, _value), do: map
 
   defp data_uri_mime_type("data:" <> rest) do
     rest
@@ -524,18 +789,10 @@ defmodule Imp.Adapter.Types do
   defp mime_type(_kind, nil), do: nil
   defp mime_type(kind, format), do: "#{kind}/#{format}"
 
-  defp read_file_attachment!(path) do
-    case Elixir.File.read(path) do
-      {:ok, data} ->
-        data
+  @doc false
+  def mime_type_from_path(path) do
+    path = if String.contains?(path, "://"), do: URI.parse(path).path || "", else: path
 
-      {:error, reason} ->
-        raise ArgumentError,
-              "could not read Imp file attachment #{inspect(path)}: #{:file.format_error(reason)}"
-    end
-  end
-
-  defp mime_type_from_path(path) do
     case path |> Path.extname() |> String.downcase() do
       ".txt" -> "text/plain"
       ".md" -> "text/markdown"

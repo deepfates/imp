@@ -247,11 +247,9 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
   defp attachment(%{"delivery" => "typed_native_file", "asset_ids" => [asset_id]}, assets) do
     asset = Map.fetch!(assets, asset_id)
 
-    value = %Types.File{
-      path: asset["absolute_path"],
-      mime_type: asset["mime_type"],
-      metadata: %{asset_id: asset_id}
-    }
+    value =
+      Types.File.from_path(asset["absolute_path"], mime_type: asset["mime_type"])
+      |> Map.put(:metadata, %{asset_id: asset_id})
 
     {value, intent_shape(asset_id, asset, "Imp.Adapter.Types.File", "file")}
   end

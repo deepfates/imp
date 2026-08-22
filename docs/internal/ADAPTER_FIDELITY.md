@@ -43,8 +43,11 @@ trying to byte-match Python prompt templates.
 
 ## Declared Divergences (registered as gaps, not conformance)
 
-No known material adapter-semantic divergence remains in the supported Imp type
-system. Python class identity, aliases, and mutable `default_factory` objects are
+The current-stable audit has repaired output defaults, recursive XML, MCP result
+normalization, and explicit inert multimodal resource loading. Native typed
+reasoning remains a material open adapter semantic; do not infer complete 3.3.1
+adapter parity from the historical scalar corpus. Python class identity,
+aliases, and mutable `default_factory` objects are
 represented as portable map schemas and immutable literal defaults rather than
 Python runtime objects. The current-stable audit remains open until the exact
 3.3.1 differential inventory is rerun; historical scalar prompt byte parity is

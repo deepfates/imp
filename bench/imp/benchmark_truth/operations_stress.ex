@@ -216,7 +216,10 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
     Agent.stop(counter)
 
     pass? =
-      Imp.LM.Result.unwrap(first) == {:ok, "cached answer"} and second == first and calls == 1 and
+      Imp.LM.Result.unwrap(first) == {:ok, "cached answer"} and
+        Imp.LM.Result.unwrap(second) == {:ok, "cached answer"} and
+        match?({:ok, %{req_llm: %{cache_hit: true, usage: %{}}}}, result_metadata(second)) and
+        calls == 1 and
         Enum.any?(events, &(&1["event"] == ["imp", "cache", "miss"])) and
         Enum.any?(events, &(&1["event"] == ["imp", "cache", "hit"])) and
         not (inspect(events) =~ "sk-test-cache-secret")
@@ -226,6 +229,9 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
       "events" => events
     })
   end
+
+  defp result_metadata({:ok, result}), do: Imp.LM.Result.metadata(result)
+  defp result_metadata(_result), do: :error
 
   defp redacted_telemetry_check do
     ref = attach_events([[:imp, :ops, :stress]])

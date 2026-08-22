@@ -306,20 +306,22 @@ defmodule UpstreamExam.SignaturesTest do
     end
 
     # Upstream: tests/signatures/test_adapter_file.py::test_file_from_local_path
-    # (partial: Imp files carry no filename; the data-URI encoding half is the
-    # ported behavior. Encoding happens at the provider boundary.)
     test "file from local path", %{sample_text_file: path} do
+      file = Types.File.from_path(path)
+
       %{type: "file", file: %{file_data: file_data}} =
-        Types.to_openai(%Types.File{path: path})
+        Types.to_openai(file)
 
       assert String.starts_with?(file_data, "data:text/plain;base64,")
+      assert file.filename == Path.basename(path)
+      assert file.path == nil
     end
 
     # Upstream: tests/signatures/test_adapter_file.py::test_file_from_path_method
     # (upstream body is identical to test_file_from_local_path)
     test "file from path method", %{sample_text_file: path} do
       %{type: "file", file: %{file_data: file_data}} =
-        Types.to_openai(%Types.File{path: path})
+        path |> Types.File.from_path() |> Types.to_openai()
 
       assert String.starts_with?(file_data, "data:text/plain;base64,")
     end
@@ -342,19 +344,19 @@ defmodule UpstreamExam.SignaturesTest do
     end
 
     # Upstream: tests/signatures/test_adapter_file.py::test_file_format_with_file_data
-    # (partial: filename is not modeled on Imp files — blocked in the table)
     test "file format with file data" do
-      file = %Types.File{data: Base.encode64("test"), mime_type: "text/plain"}
+      file = Types.File.from_bytes("test", filename: "test.txt", mime_type: "text/plain")
       formatted = Types.to_openai(file)
 
       assert formatted.type == "file"
       assert Map.has_key?(formatted, :file)
       assert Map.has_key?(formatted.file, :file_data)
+      assert formatted.file.filename == "test.txt"
     end
 
     # Upstream: tests/signatures/test_adapter_file.py::test_encode_file_to_dict_from_path
     test "encode file from path", %{sample_text_file: path} do
-      %{file: %{file_data: file_data}} = Types.to_openai(%Types.File{path: path})
+      %{file: %{file_data: file_data}} = path |> Types.File.from_path() |> Types.to_openai()
       assert String.starts_with?(file_data, "data:text/plain;base64,")
     end
 
@@ -378,7 +380,7 @@ defmodule UpstreamExam.SignaturesTest do
       lm = capture_lm(fn _messages -> {:ok, %{summary: "This is a summary"}} end)
       program = Imp.predict("document -> summary", lm: lm)
 
-      assert {:ok, prediction} = Imp.call(program, %{document: %Types.File{path: path}})
+      assert {:ok, prediction} = Imp.call(program, %{document: Types.File.from_path(path)})
       assert Imp.get(prediction, :summary) == "This is a summary"
 
       assert_received {:lm_call, messages, _opts}
@@ -386,14 +388,11 @@ defmodule UpstreamExam.SignaturesTest do
     end
 
     # Upstream: tests/signatures/test_adapter_file.py::test_file_list_in_signature
-    # (adapted: the second upstream file is from_file_id, which Imp cannot
-    # express — substituted with a data-backed file; the counted behavior is
-    # one provider file part per list element)
     test "file list in signature", %{sample_text_file: path} do
       lm = capture_lm(fn _messages -> {:ok, %{summary: "Multiple files"}} end)
       program = Imp.predict("documents -> summary", lm: lm)
 
-      files = [%Types.File{path: path}, %Types.File{data: Base.encode64("second")}]
+      files = [Types.File.from_path(path), Types.File.from_file_id("file_uploaded")]
 
       assert {:ok, prediction} = Imp.call(program, %{documents: files})
       assert Imp.get(prediction, :summary) == "Multiple files"
@@ -415,17 +414,16 @@ defmodule UpstreamExam.SignaturesTest do
     end
 
     # Upstream: tests/signatures/test_adapter_file.py::test_file_path_not_found
-    # (message wording differs: Imp says "could not read Imp file attachment")
     test "file path not found" do
-      assert_raise ArgumentError, ~r/could not read/, fn ->
-        Types.to_openai(%Types.File{path: "/nonexistent/path/file.txt"})
+      assert_raise ArgumentError, ~r/file not found or not a regular file/, fn ->
+        Types.File.from_path("/nonexistent/path/file.txt")
       end
     end
 
     # Upstream: tests/signatures/test_adapter_file.py::test_file_custom_mime_type
     test "file custom mime type", %{sample_text_file: path} do
       %{file: %{file_data: file_data}} =
-        Types.to_openai(%Types.File{path: path, mime_type: "text/custom"})
+        path |> Types.File.from_path(mime_type: "text/custom") |> Types.to_openai()
 
       assert String.starts_with?(file_data, "data:text/custom;base64,")
     end
