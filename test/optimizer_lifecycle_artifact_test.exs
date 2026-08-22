@@ -65,6 +65,26 @@ defmodule Imp.OptimizerLifecycleArtifactTest do
     end)
   end
 
+  test "retained SIMBA lifecycle binds a useful reflective mutation" do
+    result = read!("exercised-simba/result.json")
+
+    assert result["git_sha"] == "fd641406583df4072c4e415f71dfa4b1cc126eab"
+    assert result["dataset"]["sha256"] == sha256(File.read!(@dataset))
+    assert result["baseline"]["test"] == %{"score" => 0.35, "errors" => 0, "rows" => 20}
+    assert result["selected"]["selection"] == %{"score" => 0.8, "errors" => 0, "rows" => 20}
+    assert result["selected"]["test"] == %{"score" => 0.8, "errors" => 0, "rows" => 20}
+    refute result["selected"]["instruction"] == source_instruction()
+    assert result["report"]["candidate_count"] == 3
+    assert result["report"]["errors"] == []
+    assert result["fresh_process"]["score"] == %{"score" => 0.75, "errors" => 0, "rows" => 4}
+    assert get_in(result, ["budgets", "task", "transport_attempts"]) == 195
+    assert get_in(result, ["budgets", "reflection", "transport_attempts"]) == 3
+
+    artifact_path = Path.join(@root, "exercised-simba/#{result["artifact"]["path"]}")
+    assert result["artifact"]["sha256"] == sha256(File.read!(artifact_path))
+    assert artifact_path |> Artifact.read!() |> Artifact.inspect() |> Map.fetch!(:champion_id)
+  end
+
   defp assert_all_fresh!(result, minimum_score) do
     assert Enum.all?(result["fresh_process"], fn {_family, receipt} ->
              receipt["fresh_os_process"] and receipt["score"]["errors"] == 0 and

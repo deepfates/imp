@@ -31,3 +31,7 @@ Instruction/rule child imp-9r8k closed: COPRO, SignatureOptimizer, and InferRule
 **2026-08-22T21:10:50Z**
 
 Ensemble child imp-yotq closed on first natural retained composition. Remaining usefulness children: SIMBA and GRPO.
+
+**2026-08-22T21:15:40Z**
+
+SIMBA child imp-d6s2 closed on its first bounded natural useful lifecycle. GRPO useful learning is the only remaining optimizer-family blocker.

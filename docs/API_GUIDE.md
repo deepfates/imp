@@ -513,11 +513,10 @@ split; that outer comparison does not change COPRO's internal search semantic.
 
 These names describe mechanisms, not guaranteed improvement. GEPA and MIPROv2
 have positive matched evidence on one frozen TREC task. Separate one-task live
-lifecycles show useful selected programs for COPRO, InferRules, and
-SignatureOptimizer, including held-out evaluation and fresh Artifact
-application. SIMBA has executed natural reflection but has not yet selected a
-useful mutation. Treat all of these effectiveness observations as experimental
-on your task rather than a general guarantee.
+lifecycles show useful selected programs for COPRO, InferRules,
+SignatureOptimizer, and SIMBA, including held-out evaluation and fresh Artifact
+application. Treat all of these effectiveness observations as experimental on
+your task rather than a general guarantee.
 
 MIPROv2 has two intentional proposal modes. Its default BEAM-native mode uses
 explicit program structure and predictor signatures. Pinned DSPy 3.2.1

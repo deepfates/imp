@@ -119,3 +119,11 @@ OPENROUTER_API_KEY=... \
 IMP_SIMBA_OUTPUT=/secure/imp-simba-live \
 mix run examples/optimizer_lifecycles/simba.exs
 ```
+
+The first clean treatment is retained in `exercised-simba/` at source commit
+`fd641406583df4072c4e415f71dfa4b1cc126eab`. SIMBA admitted three candidates,
+selected a concrete two-part routing rule, improved selection `0.40 -> 0.80`
+and untouched test `0.35 -> 0.80`, and produced zero row errors. A fresh OS
+process applied the exact private Artifact and scored `0.75` on four probes.
+The main task and reflection ledgers record 198 single-attempt transports and
+`$0.086517`; the fresh task budget is retained separately.

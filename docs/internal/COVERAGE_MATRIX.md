@@ -87,6 +87,15 @@ that exact task/model treatment, not general usefulness or parity. The
 immutable summary is
 `examples/local_grpo_opaque_banking77/exercised-trec-source-guided-v1-result.json`.
 
+Current product-lifecycle update (2026-08-22): the clean retained runners under
+`examples/optimizer_lifecycles/` now add natural useful held-out and fresh-OS
+stories for BootstrapFewShot, RandomSearch, KNNFewShot, SignatureOptimizer,
+InferRules, SIMBA, and Ensemble. In particular, SIMBA selected a real reflected
+rule and improved the shipped support-routing task's untouched test score from
+`0.35` to `0.80`; this supersedes older row text that says SIMBA has no useful
+selected mutation. These remain one-task product acceptance results, not new
+matched C3, parity, or general-effectiveness claims.
+
 | Concept | Imp status | Imp surface | Deterministic tests | Integration/live proof | Docs | Release decision |
 | --- | --- | --- | --- | --- | --- | --- |
 | Evaluation loop | Implemented | `Imp.Evaluate` with sequential and bounded concurrent row execution | `test/imp_test.exs`, `test/public_surface_test.exs`, `test/metric_contract_test.exs` cover normalized score/feedback rows, trace-aware arity-3 metrics, program/metric errors, `max_errors`, row order, and process-local settings across concurrent tasks | Local integration file-backed dataset proof exercises RAG evaluation and optimization; no paid live proof required for evaluator mechanics | `docs/API_GUIDE.md`, `livebooks/03_evaluate_and_optimize.livemd` | Keep normalized score/feedback rows and explicit concurrency via `max_concurrency:` |

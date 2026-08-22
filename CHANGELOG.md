@@ -75,6 +75,10 @@ composition: three independently optimized routers are combined by a stable
 majority reducer, evaluated on held-out rows, and reconstructed from exact
 child Artifacts in a fresh OS process.
 
+SIMBA now has a bounded natural reflective-mutation lifecycle with semantic
+metric feedback, separate selection and untouched test splits, a useful
+selected rule, explicit task/reflection budgets, and fresh Artifact application.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is

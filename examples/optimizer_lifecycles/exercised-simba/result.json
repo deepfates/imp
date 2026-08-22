@@ -1,0 +1,1905 @@
+{
+  "scope": {
+    "claimed": "one natural live SIMBA reflective-mutation lifecycle on the shipped support-routing task",
+    "not_claimed": [
+      "general SIMBA effectiveness",
+      "DSPy parity",
+      "multi-seed evidence"
+    ]
+  },
+  "report": {
+    "metadata": {
+      "__imp_type__": "map",
+      "entries": [
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "seed"
+          },
+          23
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "status"
+          },
+          {
+            "__imp_type__": "atom",
+            "value": "ok"
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "budgets"
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "max_steps"
+                },
+                4
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "completed_steps"
+                },
+                4
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "remaining_steps"
+                },
+                0
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "trajectory_calls"
+                },
+                40
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "final_evaluation_calls"
+                },
+                60
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "candidate_evaluation_calls"
+                },
+                15
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "durable"
+          },
+          {
+            "__imp_type__": "atom",
+            "value": "true"
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "resumed"
+          },
+          {
+            "__imp_type__": "atom",
+            "value": "false"
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "algorithm"
+          },
+          {
+            "__imp_type__": "atom",
+            "value": "stochastic_introspective_minibatch_ascent"
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "run_status"
+          },
+          {
+            "__imp_type__": "atom",
+            "value": "complete"
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "trial_logs"
+          },
+          [
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "step"
+                  },
+                  1
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "train_score"
+                  },
+                  0.8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "bucket_ranks"
+                  },
+                  [
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        1.0,
+                        1.0,
+                        0.5
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        0.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        0.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        0.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        0.0,
+                        0.0
+                      ]
+                    }
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "batch_indices"
+                  },
+                  [
+                    9,
+                    15,
+                    7,
+                    0,
+                    11
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_ids"
+                  },
+                  [
+                    1
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline_score"
+                  },
+                  0.1
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_scores"
+                  },
+                  [
+                    0.6
+                  ]
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "step"
+                  },
+                  2
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "train_score"
+                  },
+                  0.85
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "bucket_ranks"
+                  },
+                  [
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        1.0,
+                        1.0,
+                        0.5
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        1.0,
+                        1.0,
+                        0.5
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    }
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "batch_indices"
+                  },
+                  [
+                    3,
+                    12,
+                    4,
+                    13,
+                    10
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_ids"
+                  },
+                  [
+                    2,
+                    3
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline_score"
+                  },
+                  0.8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_scores"
+                  },
+                  [
+                    1.0,
+                    0.8
+                  ]
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "step"
+                  },
+                  3
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "bucket_ranks"
+                  },
+                  [
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        0.0,
+                        0.0
+                      ]
+                    }
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "batch_indices"
+                  },
+                  [
+                    1,
+                    19,
+                    16,
+                    17,
+                    8
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_ids"
+                  },
+                  []
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline_score"
+                  },
+                  0.8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_scores"
+                  },
+                  []
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "step"
+                  },
+                  4
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "bucket_ranks"
+                  },
+                  [
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "__imp_type__": "tuple",
+                      "items": [
+                        0.0,
+                        0.0,
+                        0.0
+                      ]
+                    }
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "batch_indices"
+                  },
+                  [
+                    6,
+                    5,
+                    2,
+                    14,
+                    18
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_ids"
+                  },
+                  []
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline_score"
+                  },
+                  0.8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "candidate_scores"
+                  },
+                  []
+                ]
+              ]
+            }
+          ]
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "resume_state"
+          },
+          {
+            "payload": {
+              "compatibility": {
+                "sha256": "34640f8af907a6cbc99f75de6726f8910e30325ad1289008ae29ccd7a8afd09a"
+              },
+              "state": {
+                "candidate_evaluation_calls": 15,
+                "completed_steps": 4,
+                "cursor": 20,
+                "errors": [],
+                "final_evaluation_calls": 60,
+                "final_evaluations": [
+                  {
+                    "errors": [],
+                    "finalist_index": 0,
+                    "program": {
+                      "predictors": [
+                        {
+                          "demos": [],
+                          "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.",
+                          "name": {
+                            "__imp_type__": "atom",
+                            "value": "main"
+                          }
+                        }
+                      ]
+                    },
+                    "score": 0.5,
+                    "scores": [
+                      0.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  {
+                    "errors": [],
+                    "finalist_index": 1,
+                    "program": {
+                      "predictors": [
+                        {
+                          "demos": [],
+                          "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.",
+                          "name": {
+                            "__imp_type__": "atom",
+                            "value": "main"
+                          }
+                        }
+                      ]
+                    },
+                    "score": 0.8,
+                    "scores": [
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      0.0,
+                      1.0
+                    ]
+                  },
+                  {
+                    "errors": [],
+                    "finalist_index": 2,
+                    "program": {
+                      "predictors": [
+                        {
+                          "demos": [],
+                          "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.\n\nFeature requests, UI/UX enhancements (like dark mode), how-to questions, and usability tickets belong to **quill** — not atlas or harbor. Atlas is strictly for financial/billing topics (invoices, charges, refunds, subscriptions). Harbor is for system health/performance/availability issues. Quill covers everything product-feature and usability oriented. When a ticket asks to 'add', 'improve', or 'change' a UI element or requests a new capability, assign it to quill. Do not assign feature or UX tickets to atlas just because they mention a product surface like 'dashboard' — check whether the content is financial (atlas), performance/reliability (harbor), or a feature/usability/documentation request (quill).",
+                          "name": {
+                            "__imp_type__": "atom",
+                            "value": "main"
+                          }
+                        }
+                      ]
+                    },
+                    "score": 0.85,
+                    "scores": [
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      0.0,
+                      1.0,
+                      1.0,
+                      0.0,
+                      0.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0,
+                      1.0
+                    ]
+                  }
+                ],
+                "order": [
+                  9,
+                  15,
+                  7,
+                  0,
+                  11,
+                  3,
+                  12,
+                  4,
+                  13,
+                  10,
+                  1,
+                  19,
+                  16,
+                  17,
+                  8,
+                  6,
+                  5,
+                  2,
+                  14,
+                  18
+                ],
+                "poisson_rng": {
+                  "algorithm": "exsss",
+                  "words": [
+                    257845178597672625,
+                    256430470225540416
+                  ]
+                },
+                "population": {
+                  "next_id": 4,
+                  "policy": {
+                    "policy": "sampling",
+                    "schema_version": 1,
+                    "state": {
+                      "rng": {
+                        "algorithm": "exsss",
+                        "words": [
+                          19792850782284374,
+                          235148938737196169
+                        ]
+                      }
+                    }
+                  },
+                  "program_ids": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  "programs": [
+                    {
+                      "id": 0,
+                      "program": {
+                        "predictors": [
+                          {
+                            "demos": [],
+                            "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.",
+                            "name": {
+                              "__imp_type__": "atom",
+                              "value": "main"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": 1,
+                      "program": {
+                        "predictors": [
+                          {
+                            "demos": [],
+                            "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.",
+                            "name": {
+                              "__imp_type__": "atom",
+                              "value": "main"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": 2,
+                      "program": {
+                        "predictors": [
+                          {
+                            "demos": [],
+                            "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.\n\nFeature requests, UI/UX enhancements (like dark mode), how-to questions, and usability tickets belong to **quill** — not atlas or harbor. Atlas is strictly for financial/billing topics (invoices, charges, refunds, subscriptions). Harbor is for system health/performance/availability issues. Quill covers everything product-feature and usability oriented. When a ticket asks to 'add', 'improve', or 'change' a UI element or requests a new capability, assign it to quill. Do not assign feature or UX tickets to atlas just because they mention a product surface like 'dashboard' — check whether the content is financial (atlas), performance/reliability (harbor), or a feature/usability/documentation request (quill).",
+                            "name": {
+                              "__imp_type__": "atom",
+                              "value": "main"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": 3,
+                      "program": {
+                        "predictors": [
+                          {
+                            "demos": [],
+                            "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.\n\nWhen you see keywords like 'invoice', 'VAT', 'billing', 'charge', 'refund', or 'subscription', always assign to atlas — these are financial/document topics. Harbor is strictly for system health: slow load times, timeouts, outages, API errors, and delivery failures. Do NOT let the word 'wrong' or any sense of a 'problem' mislead you into picking harbor; the domain of the problem (financial document vs. system reliability) is what matters. For this ticket — 'Our VAT number is wrong on the latest invoice' — the topic is a billing document error, squarely in atlas territory.",
+                            "name": {
+                              "__imp_type__": "atom",
+                              "value": "main"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "score_histories": [
+                    {
+                      "id": 0,
+                      "scores": []
+                    },
+                    {
+                      "id": 1,
+                      "scores": [
+                        1.0,
+                        0.0,
+                        1.0,
+                        1.0,
+                        0.0
+                      ]
+                    },
+                    {
+                      "id": 2,
+                      "scores": [
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    },
+                    {
+                      "id": 3,
+                      "scores": [
+                        0.0,
+                        1.0,
+                        1.0,
+                        1.0,
+                        1.0
+                      ]
+                    }
+                  ]
+                },
+                "trajectory_calls": 40,
+                "trial_logs": [
+                  {
+                    "__imp_type__": "map",
+                    "entries": [
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "step"
+                        },
+                        1
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "train_score"
+                        },
+                        0.8
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "bucket_ranks"
+                        },
+                        [
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              1.0,
+                              1.0,
+                              0.5
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              0.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              0.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              0.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              0.0,
+                              0.0
+                            ]
+                          }
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "batch_indices"
+                        },
+                        [
+                          9,
+                          15,
+                          7,
+                          0,
+                          11
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_ids"
+                        },
+                        [
+                          1
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "baseline_score"
+                        },
+                        0.1
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_scores"
+                        },
+                        [
+                          0.6
+                        ]
+                      ]
+                    ]
+                  },
+                  {
+                    "__imp_type__": "map",
+                    "entries": [
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "step"
+                        },
+                        2
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "train_score"
+                        },
+                        0.85
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "bucket_ranks"
+                        },
+                        [
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              1.0,
+                              1.0,
+                              0.5
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              1.0,
+                              1.0,
+                              0.5
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          }
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "batch_indices"
+                        },
+                        [
+                          3,
+                          12,
+                          4,
+                          13,
+                          10
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_ids"
+                        },
+                        [
+                          2,
+                          3
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "baseline_score"
+                        },
+                        0.8
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_scores"
+                        },
+                        [
+                          1.0,
+                          0.8
+                        ]
+                      ]
+                    ]
+                  },
+                  {
+                    "__imp_type__": "map",
+                    "entries": [
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "step"
+                        },
+                        3
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "bucket_ranks"
+                        },
+                        [
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              0.0,
+                              0.0
+                            ]
+                          }
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "batch_indices"
+                        },
+                        [
+                          1,
+                          19,
+                          16,
+                          17,
+                          8
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_ids"
+                        },
+                        []
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "baseline_score"
+                        },
+                        0.8
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_scores"
+                        },
+                        []
+                      ]
+                    ]
+                  },
+                  {
+                    "__imp_type__": "map",
+                    "entries": [
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "step"
+                        },
+                        4
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "bucket_ranks"
+                        },
+                        [
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              1.0,
+                              0.0
+                            ]
+                          },
+                          {
+                            "__imp_type__": "tuple",
+                            "items": [
+                              0.0,
+                              0.0,
+                              0.0
+                            ]
+                          }
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "batch_indices"
+                        },
+                        [
+                          6,
+                          5,
+                          2,
+                          14,
+                          18
+                        ]
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_ids"
+                        },
+                        []
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "baseline_score"
+                        },
+                        0.8
+                      ],
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "candidate_scores"
+                        },
+                        []
+                      ]
+                    ]
+                  }
+                ],
+                "winning_programs": [
+                  {
+                    "predictors": [
+                      {
+                        "demos": [],
+                        "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.",
+                        "name": {
+                          "__imp_type__": "atom",
+                          "value": "main"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "predictors": [
+                      {
+                        "demos": [],
+                        "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.",
+                        "name": {
+                          "__imp_type__": "atom",
+                          "value": "main"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "predictors": [
+                      {
+                        "demos": [],
+                        "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.\n\nFeature requests, UI/UX enhancements (like dark mode), how-to questions, and usability tickets belong to **quill** — not atlas or harbor. Atlas is strictly for financial/billing topics (invoices, charges, refunds, subscriptions). Harbor is for system health/performance/availability issues. Quill covers everything product-feature and usability oriented. When a ticket asks to 'add', 'improve', or 'change' a UI element or requests a new capability, assign it to quill. Do not assign feature or UX tickets to atlas just because they mention a product surface like 'dashboard' — check whether the content is financial (atlas), performance/reliability (harbor), or a feature/usability/documentation request (quill).",
+                        "name": {
+                          "__imp_type__": "atom",
+                          "value": "main"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "payload_sha256": "786ac3b27dcab57368463132517e3e676881ca700d237fed3d5758c5410a1866",
+            "schema_version": 1,
+            "type": "imp_simba_run"
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "search_policy"
+          },
+          {
+            "policy": "sampling",
+            "schema_version": 1,
+            "state": {
+              "rng": {
+                "algorithm": "exsss",
+                "words": [
+                  19792850782284374,
+                  235148938737196169
+                ]
+              }
+            }
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "baseline_score"
+          },
+          0.5
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "completed_steps"
+          },
+          4
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "metric_identity"
+          },
+          {
+            "arity": 2,
+            "kind": "external_function",
+            "module": "Elixir.ImpOptimizerLifecycles.SIMBA",
+            "name": "metric"
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "population_size"
+          },
+          4
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "upstream_commit"
+          },
+          "b2829b7"
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "final_candidates"
+          },
+          [
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.85
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "errors"
+                  },
+                  []
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "scores"
+                  },
+                  [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "parameters"
+                  },
+                  [
+                    {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "name"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "main"
+                          }
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "demos"
+                          },
+                          []
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "instruction"
+                          },
+                          "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.\n\nFeature requests, UI/UX enhancements (like dark mode), how-to questions, and usability tickets belong to **quill** — not atlas or harbor. Atlas is strictly for financial/billing topics (invoices, charges, refunds, subscriptions). Harbor is for system health/performance/availability issues. Quill covers everything product-feature and usability oriented. When a ticket asks to 'add', 'improve', or 'change' a UI element or requests a new capability, assign it to quill. Do not assign feature or UX tickets to atlas just because they mention a product surface like 'dashboard' — check whether the content is financial (atlas), performance/reliability (harbor), or a feature/usability/documentation request (quill)."
+                        ]
+                      ]
+                    }
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "finalist_index"
+                  },
+                  2
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "errors"
+                  },
+                  []
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "scores"
+                  },
+                  [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    1.0
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "parameters"
+                  },
+                  [
+                    {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "name"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "main"
+                          }
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "demos"
+                          },
+                          []
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "instruction"
+                          },
+                          "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning."
+                        ]
+                      ]
+                    }
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "finalist_index"
+                  },
+                  1
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.5
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "errors"
+                  },
+                  []
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "scores"
+                  },
+                  [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    1.0
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "parameters"
+                  },
+                  [
+                    {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "name"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "main"
+                          }
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "demos"
+                          },
+                          []
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "instruction"
+                          },
+                          "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill."
+                        ]
+                      ]
+                    }
+                  ]
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "finalist_index"
+                  },
+                  0
+                ]
+              ]
+            }
+          ]
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "trajectory_calls"
+          },
+          40
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "upstream_release"
+          },
+          "DSPy 3.3.0b1"
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "reflection_grounding"
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "mode"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "structure"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "final_evaluation_calls"
+          },
+          60
+        ],
+        [
+          {
+            "__imp_type__": "atom",
+            "value": "candidate_evaluation_calls"
+          },
+          15
+        ]
+      ]
+    },
+    "errors": [],
+    "candidates": [
+      {
+        "__imp_type__": "map",
+        "entries": [
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "id"
+            },
+            1
+          ],
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "scores"
+            },
+            [
+              1.0,
+              0.0,
+              1.0,
+              1.0,
+              0.0
+            ]
+          ],
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "average_score"
+            },
+            0.6
+          ]
+        ]
+      },
+      {
+        "__imp_type__": "map",
+        "entries": [
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "id"
+            },
+            2
+          ],
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "scores"
+            },
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ]
+          ],
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "average_score"
+            },
+            1.0
+          ]
+        ]
+      },
+      {
+        "__imp_type__": "map",
+        "entries": [
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "id"
+            },
+            3
+          ],
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "scores"
+            },
+            [
+              0.0,
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ]
+          ],
+          [
+            {
+              "__imp_type__": "atom",
+              "value": "average_score"
+            },
+            0.8
+          ]
+        ]
+      }
+    ],
+    "optimizer": "simba",
+    "best_score": 0.85,
+    "candidate_count": 3
+  },
+  "selected": {
+    "test": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.8
+    },
+    "selection": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.8
+    },
+    "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.\n\nFeature requests, UI/UX enhancements (like dark mode), how-to questions, and usability tickets belong to **quill** — not atlas or harbor. Atlas is strictly for financial/billing topics (invoices, charges, refunds, subscriptions). Harbor is for system health/performance/availability issues. Quill covers everything product-feature and usability oriented. When a ticket asks to 'add', 'improve', or 'change' a UI element or requests a new capability, assign it to quill. Do not assign feature or UX tickets to atlas just because they mention a product surface like 'dashboard' — check whether the content is financial (atlas), performance/reliability (harbor), or a feature/usability/documentation request (quill)."
+  },
+  "models": {
+    "task": "openrouter:openai/gpt-5.4-mini",
+    "reflection": "openrouter:anthropic/claude-sonnet-4.6"
+  },
+  "schema_version": 1,
+  "dataset": {
+    "path": "priv/tutorial/support_tickets.json",
+    "sha256": "7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87",
+    "counts": {
+      "test": 20,
+      "train": 20,
+      "selection": 20
+    }
+  },
+  "artifact": {
+    "path": "simba.parameters.json",
+    "bytes": 72687,
+    "sha256": "5c5b1452b5cd32ca7c9a99d476c549d434904b5c754e7d3e7f620e5d943fcf0a"
+  },
+  "baseline": {
+    "test": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.35
+    },
+    "selection": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.4
+    }
+  },
+  "git_sha": "fd641406583df4072c4e415f71dfa4b1cc126eab",
+  "fresh_process": {
+    "artifact_sha256": "5c5b1452b5cd32ca7c9a99d476c549d434904b5c754e7d3e7f620e5d943fcf0a",
+    "budget": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 100000,
+        "output_tokens": 10000,
+        "requests": 24,
+        "usd": 0.25
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "output_per_million": 4.5,
+        "source_url": "https://openrouter.ai/models/openai/gpt-5.4-mini"
+      },
+      "requests": 4,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 4,
+      "usage": {
+        "input_tokens": 1912,
+        "output_tokens": 39,
+        "usd": 0.001609
+      }
+    },
+    "fresh_os_process": true,
+    "instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nWhen classifying tickets, remember the team ownership boundaries carefully: **harbor** handles performance issues (slow load times, timeouts), outages, API errors, and delivery failures. **atlas** handles billing, invoices, charges, refunds, and subscriptions. Do not assign performance or reliability tickets like 'pages take 30+ seconds to load' to atlas — that is a harbor concern. Always check whether the ticket describes a financial/billing topic (atlas) versus a system health/performance/availability topic (harbor) before assigning.\n\nFeature requests, UI/UX enhancements (like dark mode), how-to questions, and usability tickets belong to **quill** — not atlas or harbor. Atlas is strictly for financial/billing topics (invoices, charges, refunds, subscriptions). Harbor is for system health/performance/availability issues. Quill covers everything product-feature and usability oriented. When a ticket asks to 'add', 'improve', or 'change' a UI element or requests a new capability, assign it to quill. Do not assign feature or UX tickets to atlas just because they mention a product surface like 'dashboard' — check whether the content is financial (atlas), performance/reliability (harbor), or a feature/usability/documentation request (quill).",
+    "score": {
+      "errors": 0,
+      "rows": 4,
+      "score": 0.75
+    }
+  },
+  "budgets": {
+    "task": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 1000000,
+        "output_tokens": 100000,
+        "requests": 500,
+        "usd": 1.0
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "output_per_million": 4.5,
+        "source_url": "https://openrouter.ai/models/openai/gpt-5.4-mini"
+      },
+      "requests": 195,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 195,
+      "usage": {
+        "input_tokens": 68304,
+        "output_tokens": 2054,
+        "usd": 0.06050699999999995
+      }
+    },
+    "reflection": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 300000,
+        "output_tokens": 24576,
+        "requests": 24,
+        "usd": 2.0
+      },
+      "pricing": {
+        "input_per_million": 3.0,
+        "output_per_million": 15.0,
+        "source_url": "https://openrouter.ai/models/anthropic/claude-sonnet-4.6"
+      },
+      "requests": 3,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 3,
+      "usage": {
+        "input_tokens": 4570,
+        "output_tokens": 820,
+        "usd": 0.02601
+      }
+    }
+  }
+}
