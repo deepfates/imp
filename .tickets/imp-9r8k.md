@@ -24,3 +24,7 @@ Natural live proposals or rules improve a separately selected task without hidde
 **2026-08-22T20:55:25Z**
 
 Primary-evidence disposition at start: retained COPRO V2 naturally mutated the instruction and improved held-out accuracy 0.475 -> 0.55 with zero parse errors. Its fresh process loaded and served the exact selected Artifact, but one of forty stochastic MLX predictions differed; byte-identical provider output is not a valid persistence requirement. Credit COPRO after verifying artifact identity and useful/error-free replay. Remaining capability work is SignatureOptimizer (only retained run stopped at a malformed proposer boundary) and InferRules (source-protected run selected a 0.625 tie, no useful rule).
+
+**2026-08-22T21:02:58Z**
+
+First clean live acceptance at 422b70ca ran both optimizers with real OpenRouter task/proposer models. SignatureOptimizer selected at 0.95 on the separate selection split. InferRules completed two real proposal calls, four candidates, zero bootstrap errors, and selected at 1.0, but failed the required untouched-test improvement over the 0.40 baseline. This is a treatment-level red, not a mechanism failure. The runner then exposed its own diagnostic defect: it asserted before writing result.json, losing final scores/budgets although both private parameter Artifacts survived. Move receipt persistence before the acceptance assertion; rerun only as an instrumentation repair or use a newly justified treatment, never silently call the first run green.

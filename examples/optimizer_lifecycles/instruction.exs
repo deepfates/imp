@@ -113,11 +113,11 @@ defmodule ImpOptimizerLifecycles.Instruction do
       }
     }
 
-    require_success!(result)
     path = Path.join(output, "result.json")
     File.write!(path, Jason.encode!(result, pretty: true) <> "\n")
     IO.puts(Jason.encode!(summary(result), pretty: true))
     IO.puts("result: #{path}")
+    require_success!(result)
   end
 
   defp fresh(family, artifact) do
