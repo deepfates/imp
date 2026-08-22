@@ -96,3 +96,12 @@ OPENROUTER_API_KEY=... \
 IMP_ENSEMBLE_OUTPUT=/secure/imp-ensemble-live \
 mix run examples/optimizer_lifecycles/ensemble.exs
 ```
+
+The first clean run is retained in `exercised-ensemble/result.json` at source
+commit `e3e368f80178604d22ee3c2031f1dd295b2c7324`. The three child programs
+scored `0.90`, `1.00`, and `0.90` on all twenty held-out rows; their majority
+composition scored `1.00` against the live zero-shot baseline's `0.30`, with
+zero errors. A fresh OS process reloaded the exact three child Artifacts,
+reconstructed the ensemble, and scored `1.00` on four probes. The main run made
+140 single-attempt task calls and cost `$0.059145`; the fresh budget is retained
+separately.

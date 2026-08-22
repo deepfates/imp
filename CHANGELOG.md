@@ -70,6 +70,11 @@ states are retained with disjoint evaluation, explicit provider budgets, and
 fresh-process application. These are task-scoped product lifecycles, not broad
 effectiveness or parity claims.
 
+The same retained programs now exercise `Imp.Optimizer.Ensemble` as a natural
+composition: three independently optimized routers are combined by a stable
+majority reducer, evaluated on held-out rows, and reconstructed from exact
+child Artifacts in a fresh OS process.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is

@@ -47,6 +47,24 @@ defmodule Imp.OptimizerLifecycleArtifactTest do
     assert_artifacts!("exercised-instruction", result)
   end
 
+  test "retained ensemble lifecycle binds its children and fresh composition" do
+    result = read!("exercised-ensemble/result.json")
+
+    assert result["git_sha"] == "e3e368f80178604d22ee3c2031f1dd295b2c7324"
+    assert result["dataset"]["sha256"] == sha256(File.read!(@dataset))
+    assert result["baseline"] == %{"score" => 0.3, "errors" => 0, "rows" => 20}
+    assert result["ensemble"] == %{"score" => 1.0, "errors" => 0, "rows" => 20}
+    assert result["fresh_process"]["score"] == %{"score" => 1.0, "errors" => 0, "rows" => 4}
+    assert result["budget"]["active_reservations"] == 0
+    assert result["budget"]["transport_attempts"] == 140
+
+    Enum.each(result["artifacts"], fn {_family, artifact} ->
+      path = Path.expand("../#{artifact["path"]}", __DIR__)
+      assert artifact["sha256"] == sha256(File.read!(path))
+      assert path |> Artifact.read!() |> Artifact.inspect() |> Map.fetch!(:champion_id)
+    end)
+  end
+
   defp assert_all_fresh!(result, minimum_score) do
     assert Enum.all?(result["fresh_process"], fn {_family, receipt} ->
              receipt["fresh_os_process"] and receipt["score"]["errors"] == 0 and

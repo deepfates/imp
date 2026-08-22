@@ -27,3 +27,7 @@ Classical demonstration tranche completed on clean commit f21a456f9f2be706625164
 **2026-08-22T21:07:08Z**
 
 Instruction/rule child imp-9r8k closed: COPRO, SignatureOptimizer, and InferRules now each have credible natural useful lifecycles. Remaining children are SIMBA usefulness, Ensemble composition, and GRPO useful learning.
+
+**2026-08-22T21:10:50Z**
+
+Ensemble child imp-yotq closed on first natural retained composition. Remaining usefulness children: SIMBA and GRPO.

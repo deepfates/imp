@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "claimed": "one natural live Ensemble composition of three independently optimized support routers with fresh reconstruction",
+    "not_claimed": [
+      "general ensemble effectiveness",
+      "learned ensemble selection",
+      "DSPy parity"
+    ]
+  },
+  "children": {
+    "bootstrap_few_shot": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.9
+    },
+    "signature_optimizer": {
+      "rows": 20,
+      "errors": 0,
+      "score": 1.0
+    },
+    "infer_rules": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.9
+    }
+  },
+  "model": "openrouter:openai/gpt-5.4-mini",
+  "schema_version": 1,
+  "dataset": {
+    "split": "test",
+    "path": "priv/tutorial/support_tickets.json",
+    "rows": 20,
+    "sha256": "7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87"
+  },
+  "artifacts": {
+    "bootstrap_few_shot": {
+      "path": "examples/optimizer_lifecycles/exercised-classical/bootstrap-few-shot.parameters.json",
+      "sha256": "237a73fc16e5f7bfd2f24804e734421a999cdb6e2ce096cb0f4d980b26444483"
+    },
+    "signature_optimizer": {
+      "path": "examples/optimizer_lifecycles/exercised-instruction/signature_optimizer.parameters.json",
+      "sha256": "fab23951b15367b6b2eec2676e1977dfe080f77736d4aa749d119e26646e0adc"
+    },
+    "infer_rules": {
+      "path": "examples/optimizer_lifecycles/exercised-instruction/infer_rules.parameters.json",
+      "sha256": "cb596a511a0498aa28b86acfbe2133c3120dbc0c2d761ccef6368c4008843eee"
+    }
+  },
+  "budget": {
+    "active_reservations": 0,
+    "exhausted": null,
+    "limits": {
+      "input_tokens": 500000,
+      "output_tokens": 40000,
+      "requests": 160,
+      "usd": 0.5
+    },
+    "pricing": {
+      "input_per_million": 0.75,
+      "output_per_million": 4.5,
+      "source_url": "https://openrouter.ai/models/openai/gpt-5.4-mini"
+    },
+    "requests": 140,
+    "reservation_ledger_version": 2,
+    "reservations": [],
+    "reserved": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "usd": 0.0
+    },
+    "single_attempt_transport_enforced": true,
+    "transport_attempts": 140,
+    "usage": {
+      "input_tokens": 68556,
+      "output_tokens": 1718,
+      "usd": 0.059145000000000024
+    }
+  },
+  "ensemble": {
+    "rows": 20,
+    "errors": 0,
+    "score": 1.0
+  },
+  "git_sha": "e3e368f80178604d22ee3c2031f1dd295b2c7324",
+  "baseline": {
+    "rows": 20,
+    "errors": 0,
+    "score": 0.3
+  },
+  "fresh_process": {
+    "artifact_sha256s": {
+      "bootstrap_few_shot": "237a73fc16e5f7bfd2f24804e734421a999cdb6e2ce096cb0f4d980b26444483",
+      "infer_rules": "cb596a511a0498aa28b86acfbe2133c3120dbc0c2d761ccef6368c4008843eee",
+      "signature_optimizer": "fab23951b15367b6b2eec2676e1977dfe080f77736d4aa749d119e26646e0adc"
+    },
+    "budget": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 100000,
+        "output_tokens": 10000,
+        "requests": 24,
+        "usd": 0.25
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "output_per_million": 4.5,
+        "source_url": "https://openrouter.ai/models/openai/gpt-5.4-mini"
+      },
+      "requests": 12,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 12,
+      "usage": {
+        "input_tokens": 6392,
+        "output_tokens": 141,
+        "usd": 0.005429
+      }
+    },
+    "fresh_os_process": true,
+    "score": {
+      "errors": 0,
+      "rows": 4,
+      "score": 1.0
+    }
+  },
+  "configuration": {
+    "deterministic": true,
+    "size": 3,
+    "reducer": "majority vote with stable child order"
+  }
+}
