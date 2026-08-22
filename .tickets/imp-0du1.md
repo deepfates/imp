@@ -1,6 +1,6 @@
 ---
 id: imp-0du1
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-21T04:50:53Z
@@ -106,3 +106,14 @@ Completed the reviewed stable-authority cutover to exact DSPy 3.3.1 commit `638e
 The normalized runtime is classified as a tested BEAM-native equivalent, not by symbol presence: every ordinary LM call crosses `LMRequest`/`LMResponse`; typed multimodal, reasoning, and tool values survive that boundary until provider conversion; ReqLLM streams lazily expose text/reasoning/tool/terminal/error events; early halt cancels; listeners and collection preserve results and failures. A new multipart probe and the existing stream/adversarial suites own those invariants. DSPy's explicitly experimental Flex remains a separate tracked downstream gap requiring a real sandboxed optimize/reload/serve story; Optimize Anything code artifacts are not relabeled as Flex parity.
 
 Exact source also falsified the old `Imp.Streaming.Messages.StatusMessageProvider`: it was a passive list accumulator, not DSPy's customizable execution-stage provider. Removed the false facade and its observability special case. The native replacement is `StreamListener.on_status` for lifecycle plus causally linked `:telemetry` for module/LM/tool progress; the removal is recorded as an intentional 0.3 breaking change. The combined authority, conformance, provider, stream, telemetry, public-surface, evidence-infrastructure, and documentation slice passed 186 tests except one wording-policy failure, then passed the repaired 94-test docs/public/status slice.
+
+**2026-08-22T19:55:15Z**
+
+The completion audit confirmed exact DSPy 3.3.1 authority, a content-bound
+73-page inventory, and owned dispositions for every stable public surface.
+Adapter/default/XML/MCP/resource/cache/usage/ReAct/native-reasoning/telemetry,
+Parallel, normalized-LM, and streaming deltas are implemented or explicitly
+dispositioned. Clean broad proofs passed 2,833 tests at `dd961cdf` and 2,725
+tests after the Agent cutover; `mix upstream_fidelity.check` also exits zero.
+The remaining multimodal, optimizer, and Optimize Anything research claims are
+owned by downstream lifecycle tickets rather than unowned stable-surface gaps.

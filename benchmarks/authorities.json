@@ -221,7 +221,7 @@
       "name": "Model, provider, settings, and normalized runtime",
       "kind": "runtime",
       "surface_tokens": ["ReqLLM", "ReqLLMBatch", "logprobs"],
-      "upstream_surface_ids": ["models.runtime", "models.normalized_runtime_prerelease"],
+      "upstream_surface_ids": ["models.runtime", "models.normalized_runtime", "models.normalized_runtime_prerelease"],
       "coverage_matrix_concepts": ["Process-local and global settings", "LM behaviour and injectable clients", "ReqLLM ecosystem-backed providers", "Provider-native reasoning", "Option validation and runtime dependencies", "Live matched-model matrix lane", "Provider-specific magic as default behaviour"],
       "parity_lanes": ["Lane 2: Live Matched-Model Parity"],
       "upstream_repository": {"status": "commit_pinned", "repository": "https://github.com/stanfordnlp/dspy", "version": "3.3.0b1", "git_ref": "refs/tags/3.3.0b1", "commit": "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f", "source_paths": ["dspy/clients", "dspy/core/types.py", "dspy/clients/base_lm.py"], "source_manifest": {"path": "benchmarks/authority_sources/dspy-3.3.0b1-b2829b7.json", "sha256": "2ed4fc1ddd75663349aa32d06f9000be6b8211de02ec88908ae8d7cb0c6820af", "file_count": 27}},
@@ -229,7 +229,7 @@
       "upstream_tests": {"status": "present", "references": ["tests/clients/test_lm.py#sha256=f0d72801f06a62dcd1e5d41ba7fc3811875739f45819d0e6e046cd49049716b5", "tests/clients/test_cache.py#sha256=4eb029925ae27ce523b5f5f4cdc9a9c13be11dcc856698e1481b211a272cf3b3", "tests/utils/test_usage_tracker.py#sha256=ec6a52eb03b3898e0f863aa04bcee2f99a9c945b54d018e510c6380e7cb50fd3"]},
       "dataset_protocol": {"status": "not_applicable", "references": [], "immutable_digests": []},
       "local_differential": {"status": "partial", "artifacts": ["benchmarks/results/dsex-dspy-parity-campaign-*.json", "benchmarks/results/live-matched-model-matrix-*.json"]},
-      "notes": "The prerelease runtime is tracking-only; ReqLLM transport is an Elixir-native boundary."
+      "notes": "The existing 3.3.0b1 differential identity remains immutable for retained artifacts. The separately pinned DSPy 3.3.1 stable inventory owns the normalized LMRequest/LMResponse/stream semantic disposition; Flex remains explicitly experimental and is mapped through the Optimize Anything opportunity rather than relabeled as parity."
     },
     {
       "id": "family.adapters_multimodal",
@@ -486,7 +486,7 @@
       "name": "Optimize Anything arbitrary artifact optimization",
       "kind": "optimizer",
       "surface_tokens": ["OptimizeAnything", "code_artifact", "agent_config", "scheduling_heuristic", "upstream_comparison", "artifact_portfolio"],
-      "upstream_surface_ids": ["optimization.anything"],
+      "upstream_surface_ids": ["optimization.anything", "modules.flex"],
       "coverage_matrix_concepts": ["Arbitrary artifact optimization"],
       "parity_lanes": ["Lane 3: Optimizer Lift Parity"],
       "upstream_repository": {"status": "release_and_commit_pinned", "repository": "https://github.com/gepa-ai/gepa", "version": "0.1.4", "git_ref": "refs/tags/v0.1.4", "commit": "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975", "source_paths": ["src/gepa/optimize_anything.py", "src/gepa/adapters/optimize_anything_adapter", "src/gepa/core", "src/gepa/strategies"], "source_manifest": {"path": "benchmarks/authority_sources/gepa-0.1.4-8b0ce6c.json", "sha256": "443ea361efc8c7b94589627d750325617b2174e4cb0988650f070ca45f2d5908", "file_count": 114}},
