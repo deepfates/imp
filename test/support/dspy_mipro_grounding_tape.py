@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit an exact DSPy 3.3.0b1 grounded-proposer decision tape without an LM."""
+"""Emit an exact DSPy 3.3.1 grounded-proposer decision tape without an LM."""
 
 import hashlib
 import json

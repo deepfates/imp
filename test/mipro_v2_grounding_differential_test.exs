@@ -6,7 +6,7 @@ defmodule Imp.Optimizer.MIPROv2GroundingDifferentialTest do
   @target "tmp/dspy-current-target"
   @runner "test/support/dspy_mipro_grounding_tape.py"
 
-  test "multi-predictor decision tape matches exact DSPy 3.3.0b1 grounding" do
+  test "multi-predictor decision tape matches exact DSPy 3.3.1 grounding" do
     unless File.exists?(@python) and File.dir?(Path.join(@target, "dspy")) do
       flunk("run scripts/setup_dspy_current_target.sh and scripts/setup_reference_test_env.sh")
     end
@@ -18,7 +18,7 @@ defmodule Imp.Optimizer.MIPROv2GroundingDifferentialTest do
       )
 
     upstream = Jason.decode!(output)
-    assert upstream["dspy_version"] == "3.3.0b1"
+    assert upstream["dspy_version"] == "3.3.1"
 
     assert upstream["grounded_proposer_sha256"] ==
              "c9900b74c0997410f915f2a470d39dcd9d55c1fa8b9cdf35799915ec0b1617e3"

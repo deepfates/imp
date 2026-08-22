@@ -72,7 +72,7 @@ defmodule Imp.CurrentDSPyTimeoutBoundaryTest do
 
     dspy = Jason.decode!(stdout)
 
-    assert dspy["dspy_version"] == "3.3.0b1"
+    assert dspy["dspy_version"] == "3.3.1"
     assert dspy["primitive"] == "dspy.asyncify + asyncio.wait_for"
     assert dspy["async_max_workers"] == 1
     assert dspy["caller_timed_out"]

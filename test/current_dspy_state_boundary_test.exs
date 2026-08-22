@@ -12,7 +12,7 @@ defmodule Imp.CurrentDSPyStateBoundaryTest do
 
     unless File.exists?(python) and File.dir?(target) do
       flunk(
-        "install the source-verified DSPy 3.3.0b1 target and venv documented in docs/internal/BENCHMARK_TRUTH.md"
+        "install the source-verified DSPy 3.3.1 target and venv documented in docs/internal/BENCHMARK_TRUTH.md"
       )
     end
 
@@ -23,7 +23,7 @@ defmodule Imp.CurrentDSPyStateBoundaryTest do
 
     dspy = Jason.decode!(stdout)
 
-    assert dspy["dspy_version"] == "3.3.0b1"
+    assert dspy["dspy_version"] == "3.3.1"
 
     assert dspy["scope"] == %{
              "provider_calls" => 0,
@@ -59,7 +59,7 @@ defmodule Imp.CurrentDSPyStateBoundaryTest do
 
     program = Imp.predict("question -> answer")
     candidate = Artifact.parameter_candidate("selected", program, score: 1.0)
-    artifact = Artifact.new(candidate, [], provenance: %{comparison: "dspy-3.3.0b1"})
+    artifact = Artifact.new(candidate, [], provenance: %{comparison: "dspy-3.3.1"})
 
     assert :ok = Artifact.write!(artifact, path)
     assert {:ok, %{mode: 0o100600}} = File.stat(path)

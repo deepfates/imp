@@ -499,8 +499,8 @@ def main() -> int:
     parser.add_argument("--response", required=True)
     args = parser.parse_args()
     payload = json.loads(Path(args.request).read_text(encoding="utf-8"))
-    if getattr(dspy, "__version__", None) != "3.3.0b1":
-        raise CampaignError(f"DSPy 3.3.0b1 required, got {getattr(dspy, '__version__', None)!r}")
+    if getattr(dspy, "__version__", None) != "3.3.1":
+        raise CampaignError(f"DSPy 3.3.1 required, got {getattr(dspy, '__version__', None)!r}")
     started = time.perf_counter()
     try:
         result = execute(payload)
