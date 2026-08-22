@@ -80,6 +80,17 @@ defmodule Imp.Optimizer.ParameterContractTest do
     end
   end
 
+  test "component patterns are compiled when the public constraint is built" do
+    parameter = Parameter.new("routing/code", :artifact, "R17")
+
+    assert %Component{constraints: %{"pattern" => "^R[0-9]+$"}} =
+             Component.new(parameter, constraints: %{"pattern" => "^R[0-9]+$"})
+
+    assert_raise Regex.CompileError, fn ->
+      Component.new(parameter, constraints: %{"pattern" => "["})
+    end
+  end
+
   test "set updates are atomic, digest-guarded, and revisioned" do
     first = Parameter.new("first", :instruction, "one")
     second = Parameter.new("second", :instruction, "two")

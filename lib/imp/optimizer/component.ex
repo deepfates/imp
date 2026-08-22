@@ -178,7 +178,7 @@ defmodule Imp.Optimizer.Component do
 
     case constraints["pattern"] do
       nil -> :ok
-      pattern when is_binary(pattern) -> Regex.compile!(pattern)
+      pattern when is_binary(pattern) -> pattern |> Regex.compile!() |> compiled_pattern!()
       value -> raise ArgumentError, "component pattern must be a string, got: #{inspect(value)}"
     end
 
@@ -186,6 +186,8 @@ defmodule Imp.Optimizer.Component do
     validate_bound_order!(constraints, "minLength", "maxLength")
     validate_bound_order!(constraints, "minItems", "maxItems")
   end
+
+  defp compiled_pattern!(%Regex{}), do: :ok
 
   defp validate_bound_order!(constraints, low, high) do
     case {constraints[low], constraints[high]} do
