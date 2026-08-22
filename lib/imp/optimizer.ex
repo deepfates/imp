@@ -192,11 +192,17 @@ defmodule Imp.Optimizer do
   end
 
   defp execute(optimizer, program, opts, capabilities) do
-    with :ok <- validate_datasets(capabilities, opts),
-         result <- invoke(optimizer, program, opts),
-         :ok <- validate_result(capabilities, result) do
-      result
-    end
+    Imp.Telemetry.span(
+      [:imp, :optimizer],
+      %{optimizer: optimizer.__struct__, kind: capabilities.kind},
+      fn ->
+        with :ok <- validate_datasets(capabilities, opts),
+             result <- invoke(optimizer, program, opts),
+             :ok <- validate_result(capabilities, result) do
+          result
+        end
+      end
+    )
   end
 
   defp validate_capabilities(%{

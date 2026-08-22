@@ -276,6 +276,14 @@ defmodule Imp.Evaluate do
   end
 
   def run(%__MODULE__{} = evaluator, program) do
+    Imp.Telemetry.span(
+      [:imp, :evaluate],
+      %{max_concurrency: evaluator.max_concurrency},
+      fn -> run_traced(evaluator, program) end
+    )
+  end
+
+  defp run_traced(evaluator, program) do
     case run_rows(evaluator, program) do
       {:completed, rows, errors} ->
         rows = Enum.reverse(rows)

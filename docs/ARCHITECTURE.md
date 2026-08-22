@@ -179,7 +179,9 @@ Runtime dependencies are deliberately justified and production-oriented:
   provider-specific option translation so Imp does not need to own those
   fast-moving concerns itself.
 - `:telemetry` is the stable observability boundary. Imp keeps a tiny wrapper
-  in `Imp.Telemetry` so tests can also attach process-local handlers.
+  in `Imp.Telemetry`, assigns call and parent-call IDs to nested spans, and
+  propagates lineage through supervised Imp tasks. This replaces Python-style
+  mutable callback stacks with host-native causal traces.
 - `ExDoc` is dev/test only and is part of the production gate because generated
   docs are treated as release artifacts.
 

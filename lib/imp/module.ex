@@ -66,19 +66,21 @@ defmodule Imp.Module do
   def call(other, _inputs), do: {:error, {:not_callable, other}}
 
   defp safe_call(module, program, inputs) do
-    case module.call(program, inputs) do
-      {:ok, %Imp.Prediction{} = prediction} ->
-        {:ok, prediction}
+    Imp.Telemetry.span([:imp, :module], %{module: module}, fn ->
+      case module.call(program, inputs) do
+        {:ok, %Imp.Prediction{} = prediction} ->
+          {:ok, prediction}
 
-      {:ok, other} ->
-        {:error, {:invalid_module_prediction, module, inspect(other)}}
+        {:ok, other} ->
+          {:error, {:invalid_module_prediction, module, inspect(other)}}
 
-      {:error, _reason} = error ->
-        error
+        {:error, _reason} = error ->
+          error
 
-      other ->
-        {:error, {:invalid_module_result, module, inspect(other)}}
-    end
+        other ->
+          {:error, {:invalid_module_result, module, inspect(other)}}
+      end
+    end)
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
     error -> {:error, {:module_call_failed, module, error_message(error)}}

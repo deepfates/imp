@@ -61,14 +61,14 @@ defmodule OTPStateSemanticsTest do
   end
 
   test "settings contexts snapshot all effective values at entry" do
-    Imp.configure(lm: :before, callbacks: [:before])
+    Imp.configure(lm: :before, stable: :before)
     parent = self()
 
     mutator =
       Task.async(fn ->
         receive do
           :mutate ->
-            Imp.configure(lm: :after, callbacks: [:after], added_later: true)
+            Imp.configure(lm: :after, stable: :after, added_later: true)
             send(parent, :mutated)
         end
       end)
@@ -85,7 +85,7 @@ defmodule OTPStateSemanticsTest do
 
     Task.await(mutator)
     assert captured.lm == :before
-    assert captured.callbacks == [:before]
+    assert captured.stable == :before
     assert captured.tenant == :outer
     assert captured.request_id == :inner
     refute Map.has_key?(captured, :added_later)
@@ -93,7 +93,7 @@ defmodule OTPStateSemanticsTest do
   end
 
   test "Imp tasks snapshot complete effective settings at submission" do
-    Imp.configure(lm: :global_before, callbacks: [:before], stable: :before)
+    Imp.configure(lm: :global_before, stable: :before)
     parent = self()
 
     task =
@@ -113,18 +113,17 @@ defmodule OTPStateSemanticsTest do
       end)
 
     assert_receive {:snapshot_worker_ready, worker_pid}
-    Imp.configure(lm: :global_after, callbacks: [:after], stable: :after, added_later: true)
+    Imp.configure(lm: :global_after, stable: :after, added_later: true)
     send(worker_pid, :read_snapshot)
 
     assert {base, nested} = Task.await(task)
     assert base.lm == :outer
-    assert base.callbacks == [:before]
     assert base.stable == :before
     assert base.tenant == :inner
     refute Map.has_key?(base, :added_later)
     assert nested.tenant == :worker_nested
     assert nested.lm == :outer
-    assert nested.callbacks == [:before]
+    assert nested.stable == :before
   end
 
   test "async_max_workers requires a positive integer" do

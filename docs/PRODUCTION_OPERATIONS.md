@@ -111,6 +111,13 @@ Operational advice:
 ## Telemetry Events
 
 Imp emits redacted `:telemetry` events through `Imp.Telemetry`.
+Every span carries a stable `call_id`; a nested span also carries the enclosing
+`parent_call_id`. Imp propagates that lineage through its supervised task boundary, so module,
+evaluation, optimizer, LM, tool, retriever, MCP, and training work can be
+reconstructed without installing mutable callbacks in program structs. Attach
+handlers with `:telemetry.attach/4` or `:telemetry.attach_many/4`; a
+`callbacks:` setting is rejected because it would otherwise imply observation
+that never occurs.
 
 Use `Imp.trace/2` to capture selected redacted runtime events around one
 operation without installing telemetry handlers manually. Use
@@ -134,6 +141,9 @@ artifact before release.
 
 Stable event families:
 
+- `[:imp, :module, :start | :stop | :exception]`
+- `[:imp, :evaluate, :start | :stop | :exception]`
+- `[:imp, :optimizer, :start | :stop | :exception]`
 - `[:imp, :lm, :start | :stop]`
 - `[:imp, :lm, :stream, :start | :chunk | :stop]`
 - `[:imp, :adapter, :parse, :retry | :error]`

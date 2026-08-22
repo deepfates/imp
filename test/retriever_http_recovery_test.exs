@@ -205,7 +205,15 @@ defmodule RetrieverHTTPRecoveryTest do
 
     assert_received {^ref, [:imp, :retriever, :http, :attempt], %{duration: duration}, metadata}
     assert is_integer(duration)
-    assert metadata == %{attempt: 1, max_attempts: 1, outcome: :retryable_status, status: 503}
+
+    assert Map.take(metadata, [:attempt, :max_attempts, :outcome, :status]) == %{
+             attempt: 1,
+             max_attempts: 1,
+             outcome: :retryable_status,
+             status: 503
+           }
+
+    assert is_binary(metadata.call_id)
 
     inspected = inspect(metadata)
     refute inspected =~ "password"

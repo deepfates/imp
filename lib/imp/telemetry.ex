@@ -5,8 +5,12 @@ defmodule Imp.Telemetry do
   Imp telemetry metadata is redacted before it reaches `:telemetry`, so traces
   can stay useful without leaking provider credentials. `span/3` emits
   `event_prefix ++ [:start]`, then either `[:stop]` with a result status or
-  `[:exception]` before re-raising the original failure.
+  `[:exception]` before re-raising the original failure. Every span carries a
+  stable `:call_id`; nested spans carry `:parent_call_id`, and ordinary events
+  emitted inside a span inherit its `:call_id`.
   """
+
+  @context_key :imp_telemetry_span_stack
 
   @doc """
   Emits a redacted telemetry event when the optional `:telemetry` dependency is available.
@@ -17,7 +21,7 @@ defmodule Imp.Telemetry do
   """
   def execute(event, measurements, metadata) do
     measurements = Imp.Redaction.redact(measurements)
-    metadata = Imp.Redaction.redact(metadata)
+    metadata = metadata |> inherit_lineage() |> Imp.Redaction.redact()
 
     if Code.ensure_loaded?(:telemetry) and function_exported?(:telemetry, :execute, 3) do
       apply(:telemetry, :execute, [event, measurements, metadata])
@@ -35,7 +39,12 @@ defmodule Imp.Telemetry do
   """
   def span(event_prefix, metadata, fun) when is_function(fun, 0) do
     started = System.monotonic_time()
-    execute(event_prefix ++ [:start], %{system_time: System.system_time()}, metadata)
+    previous = context()
+    parent_call_id = current_call_id(previous)
+    lineage = %{call_id: new_call_id(), parent_call_id: parent_call_id}
+    span_metadata = Map.merge(metadata, lineage)
+    execute(event_prefix ++ [:start], %{system_time: System.system_time()}, span_metadata)
+    Process.put(@context_key, [lineage | previous])
 
     try do
       result = fun.()
@@ -44,7 +53,7 @@ defmodule Imp.Telemetry do
       execute(
         event_prefix ++ [:stop],
         %{duration: duration},
-        Map.put(metadata, :result, result_status(result))
+        Map.put(span_metadata, :result, result_status(result))
       )
 
       result
@@ -55,7 +64,7 @@ defmodule Imp.Telemetry do
         execute(
           event_prefix ++ [:exception],
           %{duration: duration},
-          Map.merge(metadata, %{error: Exception.message(error)})
+          Map.merge(span_metadata, %{error: Exception.message(error)})
         )
 
         reraise error, __STACKTRACE__
@@ -67,12 +76,47 @@ defmodule Imp.Telemetry do
         execute(
           event_prefix ++ [:exception],
           %{duration: duration},
-          Map.merge(metadata, %{error: error_message({kind, reason})})
+          Map.merge(span_metadata, %{error: error_message({kind, reason})})
         )
 
         :erlang.raise(kind, reason, stacktrace)
+    after
+      restore_context(previous)
     end
   end
+
+  @doc false
+  def context, do: Process.get(@context_key, [])
+
+  @doc false
+  def with_context(context, fun) when is_list(context) and is_function(fun, 0) do
+    previous = Process.get(@context_key, :unset)
+    Process.put(@context_key, context)
+
+    try do
+      fun.()
+    after
+      case previous do
+        :unset -> Process.delete(@context_key)
+        value -> Process.put(@context_key, value)
+      end
+    end
+  end
+
+  defp inherit_lineage(metadata) do
+    case current_call_id(context()) do
+      nil -> metadata
+      call_id -> Map.put_new(metadata, :call_id, call_id)
+    end
+  end
+
+  defp current_call_id([%{call_id: call_id} | _rest]), do: call_id
+  defp current_call_id(_context), do: nil
+
+  defp new_call_id, do: :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
+
+  defp restore_context([]), do: Process.delete(@context_key)
+  defp restore_context(previous), do: Process.put(@context_key, previous)
 
   defp result_status({:ok, _value}), do: :ok
   defp result_status({:error, _reason}), do: :error

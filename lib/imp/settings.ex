@@ -17,7 +17,6 @@ defmodule Imp.Settings do
     lm: nil,
     adapter: Imp.Adapter.Chat,
     retriever: nil,
-    callbacks: [],
     async_max_workers: 8,
     max_errors: 10,
     track_usage: false,
@@ -275,6 +274,12 @@ defmodule Imp.Settings do
   defp put_validated_setting(_normalized, :max_errors, value, context) do
     raise ArgumentError,
           "#{context} expects :max_errors to be :infinity or a non-negative integer; got: #{inspect(value)}"
+  end
+
+  defp put_validated_setting(_normalized, :callbacks, value, context) do
+    raise ArgumentError,
+          "#{context} does not support :callbacks (got #{inspect(value)}); " <>
+            "attach handlers with :telemetry.attach/4 to Imp's [:imp, ...] events instead"
   end
 
   defp put_validated_setting(normalized, key, value, _context),

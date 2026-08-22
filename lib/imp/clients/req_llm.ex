@@ -300,20 +300,9 @@ defmodule Imp.Clients.ReqLLM do
   defp mark_cache_hit(metadata), do: Map.put(metadata, :cache_hit, true)
 
   defp generate_uncached(lm, messages, opts) do
-    started = System.monotonic_time()
-
-    Imp.Telemetry.execute([:imp, :lm, :start], %{system_time: System.system_time()}, %{
-      lm: redact_lm(lm)
-    })
-
-    result = do_generate_uncached(lm, messages, opts)
-
-    Imp.Telemetry.execute([:imp, :lm, :stop], %{duration: System.monotonic_time() - started}, %{
-      lm: redact_lm(lm),
-      result: elem(result, 0)
-    })
-
-    result
+    Imp.Telemetry.span([:imp, :lm], %{lm: redact_lm(lm)}, fn ->
+      do_generate_uncached(lm, messages, opts)
+    end)
   end
 
   defp do_generate_uncached(lm, messages, opts) do
