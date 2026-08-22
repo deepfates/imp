@@ -1,7 +1,7 @@
 ---
 id: imp-n8zn
 status: in_progress
-deps: [imp-0du1, imp-nenu]
+deps: [imp-0du1, imp-nenu, imp-9r8k, imp-d6s2, imp-yotq, imp-iuev]
 links: []
 created: 2026-08-22T13:38:01Z
 type: feature
