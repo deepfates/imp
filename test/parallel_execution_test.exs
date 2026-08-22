@@ -80,14 +80,23 @@ defmodule Imp.ParallelExecutionTest do
 
     assert {:ok, %Imp.Prediction{}} = Imp.call(parent, %{})
 
-    metadata = for _ <- 1..3, do: receive_module_start!()
+    # Telemetry handlers are global. Collect the events already delivered by
+    # this completed call, then correlate by its parent call ID so unrelated
+    # async tests cannot be mistaken for one of these children.
+    metadata = collect_module_starts([])
     parent_metadata = Enum.find(metadata, &(&1.module == ParentProgram))
-    child_metadata = Enum.filter(metadata, &(&1.module == Imp.Predict.Predict))
 
     assert is_binary(parent_metadata.call_id)
     assert parent_metadata.parent_call_id == nil
+
+    child_metadata =
+      Enum.filter(
+        metadata,
+        &(&1.module == Imp.Predict.Predict and
+            &1.parent_call_id == parent_metadata.call_id)
+      )
+
     assert length(child_metadata) == 2
-    assert Enum.all?(child_metadata, &(&1.parent_call_id == parent_metadata.call_id))
     assert child_metadata |> Enum.map(& &1.call_id) |> Enum.uniq() |> length() == 2
   end
 
@@ -109,11 +118,11 @@ defmodule Imp.ParallelExecutionTest do
     )
   end
 
-  defp receive_module_start! do
+  defp collect_module_starts(acc) do
     receive do
-      {:module_start, metadata} -> metadata
+      {:module_start, metadata} -> collect_module_starts([metadata | acc])
     after
-      1_000 -> flunk("expected module-start telemetry")
+      0 -> Enum.reverse(acc)
     end
   end
 end
