@@ -31,6 +31,14 @@ streamable predictor; local post-call chunking remains available when
 `provider_stream: true` is omitted. The packaged guides use the current
 `Imp.LM.Static.new/1` API and now include a complete signature type reference.
 
+Programs can now expose described, constrained JSON-safe optimizer components
+through paired `Imp.Module` callbacks. Predictor, playbook, ReAct tool, and
+custom component values share one digest-guarded atomic application path;
+generalized parameter artifacts revalidate them against freshly constructed
+trusted code without persisting callbacks or runtime authority. Existing
+predictor-only artifacts and GEPA's named instruction candidates remain
+compatible.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is

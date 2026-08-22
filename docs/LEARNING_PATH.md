@@ -310,11 +310,14 @@ end
 #=> {"security", :labeled_few_shot}
 ```
 
-The parameter artifact carries named predictor signatures, demonstrations,
-configs, and the canonical optimizer report. It does not carry your module,
-LMs, adapters, callbacks, credentials, or arbitrary runtime state. Applying it
-requires the fresh program to expose the same compatible named predictors; a
-mismatch fails instead of partially installing state. GEPA can produce the
+The parameter artifact carries compatible optimizer-visible component values
+and the canonical optimizer report. Predictor-only artifacts retain named
+signatures, demonstrations, and configs; programs with tool, playbook, or
+custom components carry a revisioned JSON-safe parameter set. It does not carry
+your module, LMs, adapters, callbacks, tool runners, policies, credentials, or
+arbitrary runtime state. Applying it requires the fresh program to expose the
+same compatible components; a mismatch or constraint failure stops without
+partially installing state. GEPA can produce the
 selected program, report, and artifact together with
 `Imp.Optimizer.GEPA.compile_with_artifact/5`; MIPROv2 and SIMBA use the shared
 `from_optimized_program/2` path demonstrated above after their own separate

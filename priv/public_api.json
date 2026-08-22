@@ -3942,7 +3942,15 @@
           "optional": false
         },
         {
+          "name": "optimizer_components/1",
+          "optional": true
+        },
+        {
           "name": "optimizer_predictors/1",
+          "optional": true
+        },
+        {
+          "name": "update_optimizer_components/2",
           "optional": true
         },
         {
@@ -3960,7 +3968,9 @@
       "signatures": {
         "callbacks": {
           "call/2": [],
+          "optimizer_components/1": [],
           "optimizer_predictors/1": [],
+          "update_optimizer_components/2": [],
           "update_optimizer_predictor/3": []
         },
         "functions": {
@@ -4706,6 +4716,51 @@
         "track_stats"
       ],
       "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "dump/1",
+        "id/1",
+        "new/2",
+        "validate_value!/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Component",
+      "signatures": {
+        "functions": {
+          "dump/1": [
+            "dump(component)"
+          ],
+          "id/1": [
+            "id(component)"
+          ],
+          "new/2": [
+            "new(parameter, opts \\\\ [])"
+          ],
+          "validate_value!/2": [
+            "validate_value!(value, value)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/component.ex",
+      "struct_fields": [
+        "constraints",
+        "dependencies",
+        "description",
+        "parameter"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -6960,7 +7015,9 @@
       "functions": [
         "apply_changes/2",
         "apply_changes_with_snapshot/2",
+        "components/1",
         "diff/2",
+        "instruction_components/1",
         "parameters/1",
         "playbooks/1",
         "predictors/1",
@@ -6985,8 +7042,14 @@
           "apply_changes_with_snapshot/2": [
             "apply_changes_with_snapshot(program, changes)"
           ],
+          "components/1": [
+            "components(program)"
+          ],
           "diff/2": [
             "diff(source, target)"
+          ],
+          "instruction_components/1": [
+            "instruction_components(program)"
           ],
           "parameters/1": [
             "parameters(program)"

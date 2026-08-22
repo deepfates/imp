@@ -142,6 +142,7 @@ defmodule PublicSurfaceTest do
     Imp.Optimizer.KNNFewShot,
     Imp.Optimizer.LabeledFewShot,
     Imp.Optimizer.MIPROv2,
+    Imp.Optimizer.Component,
     Imp.Optimizer.Parameter,
     Imp.Optimizer.Parameter.Change,
     Imp.Optimizer.Parameter.Set,

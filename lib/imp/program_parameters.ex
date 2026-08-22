@@ -18,6 +18,7 @@ defmodule Imp.ProgramParameters do
   alias Imp.Optimizer.Parameter
   alias Imp.Optimizer.Parameter.Change
   alias Imp.Optimizer.Parameter.Set
+  alias Imp.Optimizer.Component
 
   alias Imp.Predict.{
     Assertions,
@@ -39,6 +40,28 @@ defmodule Imp.ProgramParameters do
   @type name :: atom() | String.t()
   @type entry :: %{name: name(), predictor: struct()}
   @type playbook_entry :: %{name: name(), playbook: Imp.Playbook.t()}
+
+  @doc "Returns every described, typed component exposed by a program."
+  @spec components(struct()) :: [Component.t()]
+  def components(%_module{} = program) do
+    descriptors = descriptors(program)
+    validate_descriptor_graph!(descriptors)
+    Enum.map(descriptors, & &1.component)
+  end
+
+  @doc "Returns the textual instruction components consumed by GEPA."
+  @spec instruction_components(struct()) :: [%{name: name(), component: Component.t()}]
+  def instruction_components(%_module{} = program) do
+    descriptors(program)
+    |> validate_descriptor_graph!()
+    |> Enum.flat_map(fn
+      %{target: {:predictor_instruction, name}, component: component} ->
+        [%{name: name, component: component}]
+
+      _descriptor ->
+        []
+    end)
+  end
 
   @spec predictors(struct()) :: [entry()]
   def predictors(%module{} = program) do
@@ -135,8 +158,8 @@ defmodule Imp.ProgramParameters do
   @doc "Returns a revisioned, data-only snapshot of every exposed parameter."
   @spec snapshot(struct()) :: struct()
   def snapshot(%_module{} = program) do
-    descriptors = descriptors(program)
-    fresh = Set.new(program_id(program), Enum.map(descriptors, &descriptor_parameter/1))
+    components = components(program)
+    fresh = Set.new(program_id(program), Enum.map(components, & &1.parameter))
 
     case Imp.ProgramAccess.get_metadata(program, @parameter_state_key) do
       %Set{} = stored -> if(state_matches?(stored, fresh), do: stored, else: fresh)
@@ -165,7 +188,11 @@ defmodule Imp.ProgramParameters do
           {:ok, struct(), struct()} | {:error, term()}
   def apply_changes_with_snapshot(%_module{} = program, changes) when is_list(changes) do
     current = snapshot(program)
-    descriptors_by_id = descriptors(program) |> Map.new(&{&1.id, &1})
+
+    descriptors_by_id =
+      descriptors(program)
+      |> validate_descriptor_graph!()
+      |> Map.new(&{&1.component.parameter.id, &1})
 
     with {:ok, normalized_changes} <- normalize_changes(changes),
          {:ok, committed} <- Set.apply_changes(current, normalized_changes),
@@ -198,7 +225,10 @@ defmodule Imp.ProgramParameters do
   end
 
   defp descriptors(program) do
-    predictor_descriptors(program) ++ playbook_descriptors(program) ++ tool_descriptors(program)
+    predictor_descriptors(program) ++
+      playbook_descriptors(program) ++
+      tool_descriptors(program) ++
+      custom_component_descriptors(program)
   end
 
   defp predictor_descriptors(program) do
@@ -208,21 +238,36 @@ defmodule Imp.ProgramParameters do
 
       [
         %{
-          id: prefix <> "/instruction",
-          kind: :instruction,
-          value: predictor.signature.instructions,
+          component:
+            component(
+              prefix <> "/instruction",
+              :instruction,
+              predictor.signature.instructions,
+              "Instructions for predictor #{name}",
+              %{"type" => "string"}
+            ),
           target: {:predictor_instruction, name}
         },
         %{
-          id: prefix <> "/demos",
-          kind: :demos,
-          value: demos_value!(predictor.demos),
+          component:
+            component(
+              prefix <> "/demos",
+              :demos,
+              demos_value!(predictor.demos),
+              "Demonstrations for predictor #{name}",
+              %{"type" => "array"}
+            ),
           target: {:predictor_demos, name}
         },
         %{
-          id: prefix <> "/config",
-          kind: :config,
-          value: config_value!(predictor.config),
+          component:
+            component(
+              prefix <> "/config",
+              :config,
+              config_value!(predictor.config),
+              "Generation configuration for predictor #{name}",
+              %{"type" => "object"}
+            ),
           target: {:predictor_config, name}
         }
       ]
@@ -232,9 +277,14 @@ defmodule Imp.ProgramParameters do
   defp playbook_descriptors(program) do
     Enum.map(playbooks(program), fn %{name: name, playbook: playbook} ->
       %{
-        id: "playbook/#{stable_segment!(name, "playbook name")}",
-        kind: :playbook,
-        value: Imp.Playbook.dump(playbook),
+        component:
+          component(
+            "playbook/#{stable_segment!(name, "playbook name")}",
+            :playbook,
+            Imp.Playbook.dump(playbook),
+            "Persistent playbook #{name}",
+            %{"type" => "object"}
+          ),
         target: {:playbook, name}
       }
     end)
@@ -253,15 +303,26 @@ defmodule Imp.ProgramParameters do
 
       [
         %{
-          id: prefix <> "/description",
-          kind: :tool_description,
-          value: tool.description,
+          component:
+            component(
+              prefix <> "/description",
+              :tool_description,
+              tool.description,
+              "Provider-visible description for tool #{name}",
+              %{"type" => "string", "minLength" => 1}
+            ),
           target: {:tool_description, name}
         },
         %{
-          id: prefix <> "/schema",
-          kind: :tool_schema,
-          value: runtime_json_value!(tool.schema, "tool schema"),
+          component:
+            component(
+              prefix <> "/schema",
+              :tool_schema,
+              runtime_json_value!(tool.schema, "tool schema"),
+              "Input schema for tool #{name}",
+              %{"type" => "object"},
+              [prefix <> "/description"]
+            ),
           target: {:tool_schema, name}
         }
       ]
@@ -270,8 +331,70 @@ defmodule Imp.ProgramParameters do
 
   defp tool_descriptors(_program), do: []
 
-  defp descriptor_parameter(%{id: id, kind: kind, value: value}),
-    do: Parameter.new(id, kind, value)
+  defp component(id, kind, value, description, constraints, dependencies \\ []) do
+    Parameter.new(id, kind, value)
+    |> Component.new(
+      description: description,
+      constraints: constraints,
+      dependencies: dependencies
+    )
+  end
+
+  defp custom_component_descriptors(%module{} = program) do
+    case custom_component_contract!(module) do
+      :none ->
+        []
+
+      :custom ->
+        program
+        |> module.optimizer_components()
+        |> normalize_custom_components!()
+        |> Enum.map(&%{component: &1, target: {:custom_component, &1.parameter.id}})
+    end
+  end
+
+  defp validate_descriptor_graph!(descriptors) do
+    ids = Enum.map(descriptors, & &1.component.parameter.id)
+
+    if length(ids) != MapSet.size(MapSet.new(ids)) do
+      raise ArgumentError, "optimizer component IDs must be unique strings"
+    end
+
+    known = MapSet.new(ids)
+
+    Enum.each(descriptors, fn %{component: component} ->
+      unknown = Enum.reject(component.dependencies, &MapSet.member?(known, &1))
+
+      if unknown != [] do
+        raise ArgumentError,
+              "optimizer component #{inspect(component.parameter.id)} has unknown dependencies: #{inspect(unknown)}"
+      end
+    end)
+
+    dependencies = Map.new(descriptors, &{&1.component.parameter.id, &1.component.dependencies})
+    Enum.each(ids, &visit_dependency!(&1, dependencies, MapSet.new(), MapSet.new()))
+    descriptors
+  end
+
+  defp visit_dependency!(id, dependencies, visiting, visited) do
+    cond do
+      MapSet.member?(visited, id) ->
+        visited
+
+      MapSet.member?(visiting, id) ->
+        raise ArgumentError, "optimizer component dependencies contain a cycle at #{inspect(id)}"
+
+      true ->
+        visiting = MapSet.put(visiting, id)
+
+        visited =
+          Enum.reduce(Map.fetch!(dependencies, id), visited, fn dependency, current_visited ->
+            visit_dependency!(dependency, dependencies, visiting, current_visited)
+          end)
+
+        MapSet.put(visited, id)
+    end
+  end
 
   defp state_matches?(%Set{id: id, parameters: stored}, %Set{id: id, parameters: fresh}) do
     Enum.map(stored, &{&1.id, &1.kind, &1.digest}) ==
@@ -316,6 +439,27 @@ defmodule Imp.ProgramParameters do
     end
   end
 
+  defp custom_component_contract!(module) do
+    components? = callback_exported?(module, :optimizer_components, 1)
+    updater? = callback_exported?(module, :update_optimizer_components, 2)
+
+    case {components?, updater?} do
+      {true, true} ->
+        :custom
+
+      {false, false} ->
+        :none
+
+      {true, false} ->
+        raise ArgumentError,
+              "program #{inspect(module)} implements optimizer_components/1 but is missing the paired Imp.Module update_optimizer_components/2 callback"
+
+      {false, true} ->
+        raise ArgumentError,
+              "program #{inspect(module)} implements update_optimizer_components/2 but is missing the paired Imp.Module optimizer_components/1 callback"
+    end
+  end
+
   defp validate_custom_predictor_update!(module, %module{} = updated, name) do
     entries = updated |> module.optimizer_predictors() |> normalize_custom_predictors!()
 
@@ -356,13 +500,23 @@ defmodule Imp.ProgramParameters do
           {:halt, {:error, {:unknown_parameter, change.id}}}
 
         {:ok, descriptor} ->
-          case prepare_change(change, descriptor) do
+          case validate_and_prepare_change(change, descriptor) do
             {:ok, prepared_change} -> {:cont, {:ok, prepared ++ [prepared_change]}}
             {:error, reason} -> {:halt, {:error, {:invalid_parameter_value, change.id, reason}}}
           end
       end
     end)
   end
+
+  defp validate_and_prepare_change(change, descriptor) do
+    Component.validate_value!(descriptor.component, change.value)
+    prepare_change(change, descriptor)
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
+  end
+
+  defp prepare_change(%Change{} = change, %{target: {:custom_component, _id}} = descriptor),
+    do: {:ok, {change, descriptor, change.value}}
 
   defp prepare_change(%Change{kind: :instruction, value: value} = change, descriptor)
        when is_binary(value),
@@ -407,14 +561,56 @@ defmodule Imp.ProgramParameters do
     do: {:error, "parameter kind #{inspect(kind)} has no program lens"}
 
   defp apply_prepared_changes(program, prepared_changes) do
+    {custom, builtin} =
+      Enum.split_with(prepared_changes, fn {_change, descriptor, _value} ->
+        match?({:custom_component, _id}, descriptor.target)
+      end)
+
     updated =
-      Enum.reduce(prepared_changes, program, fn {_change, descriptor, value}, current ->
+      Enum.reduce(builtin, program, fn {_change, descriptor, value}, current ->
         apply_descriptor(current, descriptor.target, value)
       end)
+
+    updated = apply_custom_changes(updated, custom)
 
     {:ok, updated}
   rescue
     error in ArgumentError -> {:error, {:parameter_apply_failed, Exception.message(error)}}
+  end
+
+  defp apply_custom_changes(program, []), do: program
+
+  defp apply_custom_changes(%module{} = program, changes) do
+    replacements =
+      Map.new(changes, fn {_change, %{target: {:custom_component, id}}, value} -> {id, value} end)
+
+    case module.update_optimizer_components(program, replacements) do
+      %{__struct__: ^module} = updated ->
+        current =
+          Map.new(
+            custom_component_descriptors(updated),
+            &{&1.component.parameter.id, &1.component}
+          )
+
+        Enum.each(replacements, fn {id, expected} ->
+          case Map.fetch(current, id) do
+            {:ok, %{parameter: %{value: ^expected}}} ->
+              :ok
+
+            {:ok, _component} ->
+              raise ArgumentError, "custom component update did not apply #{inspect(id)}"
+
+            :error ->
+              raise ArgumentError, "custom component update removed #{inspect(id)}"
+          end
+        end)
+
+        updated
+
+      other ->
+        raise ArgumentError,
+              "update_optimizer_components/2 for #{inspect(module)} must return the same program struct, got: #{inspect(other)}"
+    end
   end
 
   defp apply_descriptor(program, {:predictor_instruction, name}, value),
@@ -775,6 +971,18 @@ defmodule Imp.ProgramParameters do
   defp normalize_custom_playbooks!(other) do
     raise ArgumentError,
           "optimizer_playbooks/1 must return a list, got: #{inspect(other)}"
+  end
+
+  defp normalize_custom_components!(components) when is_list(components) do
+    Enum.map(components, fn
+      %Component{} = component -> component
+      other -> raise ArgumentError, "invalid optimizer component entry: #{inspect(other)}"
+    end)
+  end
+
+  defp normalize_custom_components!(other) do
+    raise ArgumentError,
+          "optimizer_components/1 must return a list of Imp.Optimizer.Component values, got: #{inspect(other)}"
   end
 
   defp fetch_playbook!(program, name) do

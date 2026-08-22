@@ -173,6 +173,7 @@
         "Imp.Optimizer.KNNFewShot",
         "Imp.Optimizer.LabeledFewShot",
         "Imp.Optimizer.MIPROv2",
+        "Imp.Optimizer.Component",
         "Imp.Optimizer.Parameter",
         "Imp.Optimizer.Playbook",
         "Imp.Optimizer.RandomSearch",

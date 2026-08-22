@@ -14,6 +14,9 @@ defmodule Imp.Optimizer.Artifact do
 
   alias Imp.Optimizer.GEPA.EvaluationCache.Codec
   alias Imp.Optimizer.Artifact.ParameterSnapshot
+  alias Imp.Optimizer.Parameter
+  alias Imp.Optimizer.Parameter.Change
+  alias Imp.Optimizer.Parameter.Set
   alias Imp.Optimizer.Report
   alias Imp.{ProgramParameters, Redaction, Saving}
 
@@ -44,6 +47,10 @@ defmodule Imp.Optimizer.Artifact do
                           @common_candidate_keys,
                           MapSet.new(["kind", "value", "value_sha256"])
                         )
+  @parameter_set_candidate_keys MapSet.union(
+                                  @common_candidate_keys,
+                                  MapSet.new(["kind", "parameter_set", "parameter_set_sha256"])
+                                )
   @history_keys MapSet.new(["champion_id", "revision"])
 
   @type artifact :: %{required(String.t()) => term()}
@@ -104,14 +111,40 @@ defmodule Imp.Optimizer.Artifact do
   def parameter_candidate(id, program, opts \\ [])
 
   def parameter_candidate(id, program, opts) when is_struct(program) and is_list(opts) do
-    program
-    |> ParameterSnapshot.from_program()
-    |> then(&candidate(id, &1, opts))
+    if predictor_only_components?(program) do
+      program
+      |> ParameterSnapshot.from_program()
+      |> then(&candidate(id, &1, opts))
+    else
+      parameter_set_candidate(id, program, opts)
+    end
   end
 
   def parameter_candidate(id, program, opts) do
     raise ArgumentError,
           "optimizer parameter candidate requires a program struct and keyword options, got: #{Kernel.inspect({id, program, opts})}"
+  end
+
+  defp parameter_set_candidate(id, program, opts) do
+    validate_keyword!(opts, [:score, :report, :metadata], "parameter_candidate/3")
+
+    if not is_binary(id) or id == "" do
+      raise ArgumentError, "optimizer parameter candidate id must be a non-empty string"
+    end
+
+    state = program |> ProgramParameters.snapshot() |> Set.dump()
+
+    %{
+      "id" => id,
+      "kind" => "parameter_set",
+      "parameter_set" => state,
+      "parameter_set_sha256" => Codec.checksum(state),
+      "score" => validate_score!(Keyword.get(opts, :score)),
+      "report" => normalize_report(Keyword.get(opts, :report)),
+      "metadata" => opts |> Keyword.get(:metadata, %{}) |> sanitize()
+    }
+    |> json_normalize!("optimizer parameter candidate")
+    |> validate_candidate!(3)
   end
 
   @doc "Builds a checksummed candidate containing one canonical JSON value."
@@ -284,11 +317,12 @@ defmodule Imp.Optimizer.Artifact do
     artifact = validate!(artifact)
     left_candidate = fetch_candidate!(artifact, left)
     right_candidate = fetch_candidate!(artifact, right)
-    require_program_candidate!(left_candidate)
-    require_program_candidate!(right_candidate)
+    require_applicable_candidate!(left_candidate)
+    require_applicable_candidate!(right_candidate)
     left_parameters = parameters(left_candidate, opts)
     right_parameters = parameters(right_candidate, opts)
     names = Map.keys(left_parameters) |> Enum.concat(Map.keys(right_parameters)) |> Enum.uniq()
+    changed = Enum.filter(names, &(left_parameters[&1] != right_parameters[&1])) |> Enum.sort()
 
     %{
       left_id: left_candidate["id"],
@@ -296,8 +330,8 @@ defmodule Imp.Optimizer.Artifact do
       left_score: left_candidate["score"],
       right_score: right_candidate["score"],
       score_delta: score_delta(left_candidate["score"], right_candidate["score"]),
-      changed_predictors:
-        Enum.filter(names, &(left_parameters[&1] != right_parameters[&1])) |> Enum.sort()
+      changed_predictors: changed_predictors(left_candidate, changed),
+      changed_components: changed
     }
   end
 
@@ -305,7 +339,16 @@ defmodule Imp.Optimizer.Artifact do
   @spec apply(artifact(), struct(), selection(), keyword()) :: struct()
   def apply(artifact, program, selection \\ :champion, opts \\ []) do
     candidate = artifact |> validate!() |> fetch_candidate!(selection)
-    require_program_candidate!(candidate)
+    require_applicable_candidate!(candidate)
+
+    case candidate["kind"] do
+      "parameter_set" -> apply_parameter_set(candidate, program)
+      _program -> apply_program_candidate(candidate, program, opts)
+    end
+    |> attach_candidate_report(candidate)
+  end
+
+  defp apply_program_candidate(candidate, program, opts) do
     candidate_program = restore_program(candidate, opts)
 
     source = index_predictors(candidate_program)
@@ -338,7 +381,42 @@ defmodule Imp.Optimizer.Artifact do
         |> Map.put(:config, resolve_config(source_predictor.config, target_predictor.config))
       end)
     end)
-    |> attach_candidate_report(candidate)
+  end
+
+  defp apply_parameter_set(candidate, program) do
+    source = Set.load!(candidate["parameter_set"])
+    target = ProgramParameters.snapshot(program)
+
+    source_by_id = Map.new(source.parameters, &{&1.id, &1})
+    target_by_id = Map.new(target.parameters, &{&1.id, &1})
+
+    unless Map.keys(source_by_id) |> Enum.sort() == Map.keys(target_by_id) |> Enum.sort() do
+      raise ArgumentError,
+            "optimizer artifact parameter set is incompatible with the target program"
+    end
+
+    changes =
+      Enum.map(source.parameters, fn parameter ->
+        target_parameter = Map.fetch!(target_by_id, parameter.id)
+
+        if target_parameter.kind != parameter.kind do
+          raise ArgumentError,
+                "optimizer artifact parameter #{Kernel.inspect(parameter.id)} has an incompatible kind"
+        end
+
+        Change.new(parameter.id, parameter.kind, parameter.value,
+          base_digest: target_parameter.digest
+        )
+      end)
+
+    case ProgramParameters.apply_changes(program, changes) do
+      {:ok, updated} ->
+        updated
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "cannot apply optimizer parameter artifact: #{Kernel.inspect(reason)}"
+    end
   end
 
   @doc "Returns one selected portable value without restoring executable code."
@@ -499,9 +577,22 @@ defmodule Imp.Optimizer.Artifact do
     candidate
   end
 
+  defp validate_candidate!(%{"kind" => "parameter_set"} = candidate, 3) do
+    exact_keys!(
+      candidate,
+      @parameter_set_candidate_keys,
+      "optimizer artifact parameter candidate"
+    )
+
+    validate_candidate_common!(candidate)
+    Set.load!(candidate["parameter_set"])
+    validate_checksum!(candidate["parameter_set"], candidate["parameter_set_sha256"])
+    candidate
+  end
+
   defp validate_candidate!(candidate, 3) when is_map(candidate) do
     raise ArgumentError,
-          "optimizer artifact candidate kind must be \"program\" or \"value\", got: #{Kernel.inspect(candidate["kind"])}"
+          "optimizer artifact candidate kind must be \"program\", \"parameter_set\", or \"value\", got: #{Kernel.inspect(candidate["kind"])}"
   end
 
   defp validate_candidate!(candidate, _schema_version),
@@ -574,17 +665,26 @@ defmodule Imp.Optimizer.Artifact do
       )
 
   defp parameters(candidate, opts) do
-    candidate
-    |> restore_program(opts)
-    |> index_predictors()
-    |> Map.new(fn {identity, %{predictor: predictor}} ->
-      {identity,
-       %{
-         "signature" => Imp.Signature.dump(predictor.signature),
-         "demos" => Report.encode_term(predictor.demos),
-         "config" => Report.encode_term(predictor.config)
-       }}
-    end)
+    case candidate["kind"] do
+      "parameter_set" ->
+        candidate["parameter_set"]
+        |> Set.load!()
+        |> Map.fetch!(:parameters)
+        |> Map.new(&{&1.id, Parameter.dump(&1)})
+
+      _program ->
+        candidate
+        |> restore_program(opts)
+        |> index_predictors()
+        |> Map.new(fn {identity, %{predictor: predictor}} ->
+          {identity,
+           %{
+             "signature" => Imp.Signature.dump(predictor.signature),
+             "demos" => Report.encode_term(predictor.demos),
+             "config" => Report.encode_term(predictor.config)
+           }}
+        end)
+    end
   end
 
   defp restore_program(candidate, opts) do
@@ -592,12 +692,31 @@ defmodule Imp.Optimizer.Artifact do
     Saving.load(candidate["program"], saving_opts(opts))
   end
 
-  defp require_program_candidate!(%{"kind" => "value"}) do
+  defp require_applicable_candidate!(%{"kind" => "value"}) do
     raise ArgumentError,
           "optimizer artifact candidate contains a value; use value/2 instead of apply/4"
   end
 
-  defp require_program_candidate!(_program), do: :ok
+  defp require_applicable_candidate!(_program), do: :ok
+
+  defp predictor_only_components?(program) do
+    components = ProgramParameters.components(program)
+    predictors = ProgramParameters.predictors(program)
+
+    components != [] and predictors != [] and
+      Enum.all?(components, &(&1.parameter.kind in [:instruction, :demos, :config]))
+  end
+
+  defp changed_predictors(%{"kind" => "parameter_set"}, changed) do
+    Enum.flat_map(changed, fn id ->
+      case String.split(id, "/") do
+        ["predictor", segment, "instruction"] -> [URI.decode(segment)]
+        _other -> []
+      end
+    end)
+  end
+
+  defp changed_predictors(_program, changed), do: changed
 
   defp normalize_report(nil), do: nil
   defp normalize_report(%Report{} = report), do: report |> Report.dump() |> sanitize()

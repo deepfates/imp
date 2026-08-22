@@ -1,10 +1,59 @@
 defmodule Imp.Optimizer.ParameterContractTest do
   use ExUnit.Case, async: true
 
+  alias Imp.Optimizer.Component
   alias Imp.Optimizer.Parameter
   alias Imp.Optimizer.Parameter.{Change, Set}
   alias Imp.Predict.{Assertions, BestOfN, ReAct, ReActV2, Refine}
   alias Imp.ProgramParameters
+
+  defmodule ComponentProgram do
+    @behaviour Imp.Module
+    defstruct [:mode, :threshold, :runtime, :dependency_mode]
+
+    @impl true
+    def call(program, _inputs),
+      do: {:ok, Imp.Prediction.new(%{mode: program.mode, threshold: program.threshold})}
+
+    @impl true
+    def optimizer_components(program) do
+      mode =
+        Parameter.new("routing/mode", :artifact, program.mode)
+        |> Component.new(
+          description: "Routing strategy",
+          constraints: %{"type" => "string", "enum" => ["fast", "careful"]}
+        )
+
+      threshold_dependencies =
+        if program.dependency_mode == :unknown,
+          do: ["routing/missing"],
+          else: ["routing/mode"]
+
+      threshold =
+        Parameter.new("routing/threshold", :artifact, program.threshold)
+        |> Component.new(
+          description: "Minimum confidence",
+          constraints: %{"type" => "number", "minimum" => 0.0, "maximum" => 1.0},
+          dependencies: threshold_dependencies
+        )
+
+      if program.dependency_mode == :cycle do
+        [%{mode | dependencies: ["routing/threshold"]}, threshold]
+      else
+        [mode, threshold]
+      end
+    end
+
+    @impl true
+    def update_optimizer_components(program, replacements) do
+      send(self(), {:component_update, replacements})
+
+      Enum.reduce(replacements, program, fn
+        {"routing/mode", value}, current -> %{current | mode: value}
+        {"routing/threshold", value}, current -> %{current | threshold: value}
+      end)
+    end
+  end
 
   test "parameter and set persistence is deterministic and rejects tampering" do
     instruction = Parameter.new("predictor/main/instruction", :instruction, "Answer exactly.")
@@ -173,6 +222,125 @@ defmodule Imp.Optimizer.ParameterContractTest do
                "term" => %{"type" => "string"}
              }
     end
+  end
+
+  test "custom components are described, constrained, dependency-checked, and atomically applied" do
+    runtime = fn value -> {:trusted_runtime, value} end
+
+    program = %ComponentProgram{
+      mode: "fast",
+      threshold: 0.5,
+      runtime: runtime,
+      dependency_mode: :valid
+    }
+
+    [mode, threshold] = ProgramParameters.components(program)
+    assert mode.parameter.id == "routing/mode"
+    assert mode.description == "Routing strategy"
+    assert mode.constraints["enum"] == ["fast", "careful"]
+    assert threshold.dependencies == ["routing/mode"]
+
+    parameters = Map.new([mode, threshold], &{&1.parameter.id, &1.parameter})
+
+    changes = [
+      Change.new("routing/mode", :artifact, "careful",
+        base_digest: parameters["routing/mode"].digest
+      ),
+      Change.new("routing/threshold", :artifact, 0.9,
+        base_digest: parameters["routing/threshold"].digest
+      )
+    ]
+
+    assert {:ok, updated} = ProgramParameters.apply_changes(program, changes)
+    assert updated.mode == "careful"
+    assert updated.threshold == 0.9
+    assert updated.runtime === runtime
+
+    assert_received {:component_update,
+                     %{"routing/mode" => "careful", "routing/threshold" => 0.9}}
+
+    invalid = [
+      hd(changes),
+      Change.new("routing/threshold", :artifact, 2.0,
+        base_digest: parameters["routing/threshold"].digest
+      )
+    ]
+
+    assert {:error, {:invalid_parameter_value, "routing/threshold", message}} =
+             ProgramParameters.apply_changes(program, invalid)
+
+    assert message =~ "above maximum"
+    refute_received {:component_update, _replacements}
+    assert program.mode == "fast"
+    assert program.threshold == 0.5
+  end
+
+  test "component graphs reject unknown dependencies and cycles" do
+    base = %ComponentProgram{mode: "fast", threshold: 0.5, runtime: nil}
+
+    assert_raise ArgumentError, ~r/unknown dependencies/, fn ->
+      ProgramParameters.components(%{base | dependency_mode: :unknown})
+    end
+
+    assert_raise ArgumentError, ~r/contain a cycle/, fn ->
+      ProgramParameters.components(%{base | dependency_mode: :cycle})
+    end
+  end
+
+  test "custom components round-trip through an Artifact into fresh trusted code" do
+    selected_runtime = fn _ -> :selected_runtime_must_not_persist end
+
+    selected = %ComponentProgram{
+      mode: "careful",
+      threshold: 0.8,
+      runtime: selected_runtime,
+      dependency_mode: :valid
+    }
+
+    artifact =
+      "selected-components"
+      |> Imp.Optimizer.Artifact.parameter_candidate(selected, score: 1.0)
+      |> Imp.Optimizer.Artifact.new()
+
+    encoded = Jason.encode!(artifact)
+    refute encoded =~ "selected_runtime_must_not_persist"
+
+    assert get_in(artifact, ["payload", "candidates", "selected-components", "kind"]) ==
+             "parameter_set"
+
+    fresh_runtime = fn value -> {:fresh_runtime, value} end
+
+    fresh = %ComponentProgram{
+      mode: "fast",
+      threshold: 0.2,
+      runtime: fresh_runtime,
+      dependency_mode: :valid
+    }
+
+    applied = Imp.Optimizer.Artifact.apply(artifact, fresh)
+    assert applied.mode == "careful"
+    assert applied.threshold == 0.8
+    assert applied.runtime === fresh_runtime
+    assert applied.runtime.(applied.mode) == {:fresh_runtime, "careful"}
+
+    baseline_artifact =
+      "baseline-components"
+      |> Imp.Optimizer.Artifact.parameter_candidate(fresh, score: 0.0)
+
+    combined =
+      Imp.Optimizer.Artifact.new(baseline_artifact, [
+        get_in(artifact, ["payload", "candidates", "selected-components"])
+      ])
+
+    assert %{
+             changed_components: ["routing/mode", "routing/threshold"],
+             changed_predictors: []
+           } =
+             Imp.Optimizer.Artifact.compare(
+               combined,
+               "baseline-components",
+               "selected-components"
+             )
   end
 
   defp with_tools(%ReAct{} = program, tools), do: ReAct.with_tools(program, tools)

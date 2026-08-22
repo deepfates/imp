@@ -17,6 +17,12 @@ defmodule Imp.Module do
   return the same program struct after applying the supplied function to the
   named predictor. `Imp.ProgramParameters` validates this contract before an
   optimizer can use it.
+
+  Programs may additionally expose arbitrary data-only components with the
+  paired `optimizer_components/1` and `update_optimizer_components/2`
+  callbacks. Components carry descriptions, executable constraints, and
+  dependency identities. The batch update callback must be pure and return the
+  same program struct; Imp validates the complete change set before invoking it.
   """
 
   @type optimizer_predictor_name :: atom() | String.t()
@@ -36,7 +42,17 @@ defmodule Imp.Module do
               (optimizer_predictor() -> optimizer_predictor())
             ) :: struct()
 
-  @optional_callbacks optimizer_predictors: 1, update_optimizer_predictor: 3
+  @callback optimizer_components(struct()) :: [Imp.Optimizer.Component.t() | map()]
+
+  @callback update_optimizer_components(
+              struct(),
+              %{required(String.t()) => Imp.Optimizer.Parameter.json_value()}
+            ) :: struct()
+
+  @optional_callbacks optimizer_predictors: 1,
+                      update_optimizer_predictor: 3,
+                      optimizer_components: 1,
+                      update_optimizer_components: 2
 
   @doc """
   Calls an Imp executable program and normalizes its result shape.

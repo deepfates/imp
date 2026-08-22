@@ -590,6 +590,44 @@ The application owns the control flow. The optimizer sees two named predictors
 and may update only the one it targets. Imp validates that both callbacks agree
 before proposal or evaluation work begins.
 
+### Expose other optimizable components without exposing runtime authority
+
+Predictor instructions are not the only useful program state. A composed
+program may expose a routing policy, playbook, tool description, or another
+JSON-safe value through the paired `optimizer_components/1` and
+`update_optimizer_components/2` callbacks:
+
+```elixir
+alias Imp.Optimizer.{Component, Parameter}
+
+def optimizer_components(program) do
+  parameter = Parameter.new("router/mode", :artifact, program.mode)
+
+  [
+    Component.new(parameter,
+      description: "Routing strategy",
+      constraints: %{"type" => "string", "enum" => ["fast", "careful"]}
+    )
+  ]
+end
+
+def update_optimizer_components(program, %{"router/mode" => mode}),
+  do: %{program | mode: mode}
+```
+
+The updater receives the complete custom-component batch only after Imp has
+validated every digest, value constraint, and dependency graph. It must be a
+pure function returning the same program struct. Imp commits no partial result
+if validation or application fails.
+
+Descriptions and constraints belong to the freshly constructed trusted
+program. Artifacts contain only component IDs, kinds, JSON values, and hash
+lineage; they cannot serialize handlers, tools, policies, credentials, or
+weaken the rules used when they are applied. Built-in predictor, playbook, and
+ReAct tool lenses appear through the same `Imp.ProgramParameters.components/1`
+inventory. GEPA instruction candidates also apply through this atomic path
+while retaining their existing named-predictor API.
+
 The complete version in the [deployment example](../examples/deployment/README.md)
 adds typed intermediate metadata, persistence, hot reload, concurrent service,
 and failure containment.
@@ -627,6 +665,13 @@ selected_program = Imp.Optimizer.Artifact.apply(artifact, live_program)
 Use `Imp.save!/3` and `Imp.load!/2` when the entire program is one of Imp's
 portable built-in shapes. Use `Imp.Optimizer.Artifact` when application code
 owns a custom module and only selected parameters should be serialized.
+
+Predictor-only artifacts retain their compatible signatures, demonstrations,
+and configs. Programs exposing playbook, tool, or custom components instead
+carry the revisioned parameter set from `Imp.ProgramParameters.snapshot/1`.
+Applying either form to fresh code refuses incompatible component identities,
+kinds, constraints, or dependency graphs rather than partially installing
+state.
 
 Credentials and executable callbacks belong to runtime configuration, never
 inside either artifact.

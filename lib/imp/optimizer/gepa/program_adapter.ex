@@ -44,7 +44,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     %__MODULE__{
       program: program,
       metric: metric,
-      component_order: Enum.map(Imp.ProgramParameters.predictors(program), & &1.name),
+      component_order: Enum.map(Imp.ProgramParameters.instruction_components(program), & &1.name),
       component_feedback: component_feedback,
       reflection_record_mode: reflection_record_mode,
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
@@ -273,7 +273,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   defp validate_component_feedback!(callbacks, program) do
     case ComponentFeedback.validate(callbacks) do
       {:ok, callbacks} ->
-        known = program |> Imp.ProgramParameters.predictors() |> MapSet.new(& &1.name)
+        known = program |> Imp.ProgramParameters.instruction_components() |> MapSet.new(& &1.name)
         unknown = callbacks |> Map.keys() |> Enum.reject(&MapSet.member?(known, &1))
 
         if unknown == [] do

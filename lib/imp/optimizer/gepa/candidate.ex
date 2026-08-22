@@ -8,6 +8,7 @@ defmodule Imp.Optimizer.GEPA.Candidate do
   """
 
   alias Imp.ProgramParameters
+  alias Imp.Optimizer.Parameter.Change
 
   @type component_name :: ProgramParameters.name()
   @type t :: %{optional(component_name()) => String.t()}
@@ -15,16 +16,16 @@ defmodule Imp.Optimizer.GEPA.Candidate do
   @doc "Returns the current instruction of every optimizer-visible program component."
   @spec from_program(struct()) :: t()
   def from_program(program) do
-    case ProgramParameters.predictors(program) do
+    case ProgramParameters.instruction_components(program) do
       [] ->
         case Imp.Optimizer.InstructionSearch.current_instruction(program) do
           instruction when is_binary(instruction) -> %{main: instruction}
           _other -> %{}
         end
 
-      predictors ->
-        Map.new(predictors, fn %{name: name, predictor: predictor} ->
-          {name, predictor.signature.instructions}
+      components ->
+        Map.new(components, fn %{name: name, component: component} ->
+          {name, component.parameter.value}
         end)
     end
   end
@@ -32,14 +33,14 @@ defmodule Imp.Optimizer.GEPA.Candidate do
   @doc "Applies a complete named candidate to a program through `Imp.ProgramParameters`."
   @spec apply_to_program(struct(), t()) :: struct()
   def apply_to_program(program, candidate) when is_map(candidate) do
-    case ProgramParameters.predictors(program) do
+    case ProgramParameters.instruction_components(program) do
       [] -> apply_instruction_program(program, candidate)
-      predictors -> apply_predictor_program(program, predictors, candidate)
+      components -> apply_component_program(program, components, candidate)
     end
   end
 
-  defp apply_predictor_program(program, predictors, candidate) do
-    expected_names = predictors |> Enum.map(& &1.name) |> MapSet.new()
+  defp apply_component_program(program, components, candidate) do
+    expected_names = components |> Enum.map(& &1.name) |> MapSet.new()
 
     candidate_names = candidate |> validate!() |> Map.keys() |> MapSet.new()
 
@@ -50,9 +51,18 @@ defmodule Imp.Optimizer.GEPA.Candidate do
               inspect(MapSet.to_list(candidate_names))
     end
 
-    Enum.reduce(candidate, program, fn {name, text}, updated_program ->
-      ProgramParameters.put_instruction(updated_program, name, text)
-    end)
+    by_name = Map.new(components, &{&1.name, &1.component.parameter})
+
+    changes =
+      Enum.map(candidate, fn {name, text} ->
+        parameter = Map.fetch!(by_name, name)
+        Change.new(parameter.id, parameter.kind, text, base_digest: parameter.digest)
+      end)
+
+    case ProgramParameters.apply_changes(program, changes) do
+      {:ok, updated} -> updated
+      {:error, reason} -> raise ArgumentError, "cannot apply GEPA candidate: #{inspect(reason)}"
+    end
   end
 
   defp apply_instruction_program(program, candidate) do
