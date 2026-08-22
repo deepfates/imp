@@ -416,27 +416,27 @@ defmodule Imp.ProgramParameters do
     end)
 
     dependencies = Map.new(descriptors, &{&1.component.parameter.id, &1.component.dependencies})
-    Enum.each(ids, &visit_dependency!(&1, dependencies, MapSet.new(), MapSet.new()))
+    Enum.each(ids, &visit_dependency!(&1, dependencies, %{}, %{}))
     descriptors
   end
 
   defp visit_dependency!(id, dependencies, visiting, visited) do
     cond do
-      MapSet.member?(visited, id) ->
+      Map.has_key?(visited, id) ->
         visited
 
-      MapSet.member?(visiting, id) ->
+      Map.has_key?(visiting, id) ->
         raise ArgumentError, "optimizer component dependencies contain a cycle at #{inspect(id)}"
 
       true ->
-        visiting = MapSet.put(visiting, id)
+        visiting = Map.put(visiting, id, true)
 
         visited =
           Enum.reduce(Map.fetch!(dependencies, id), visited, fn dependency, current_visited ->
             visit_dependency!(dependency, dependencies, visiting, current_visited)
           end)
 
-        MapSet.put(visited, id)
+        Map.put(visited, id, true)
     end
   end
 

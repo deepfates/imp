@@ -14,8 +14,6 @@
 # - :rand seed format: {:exsss, [i | j]} improper list is :rand's own
 #   exsss export shape; the construction is intentional and correct.
 [
-  # defensive clause for non-covered content shapes
-  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {681, 8}},
   # defensive guard success typing proves redundant
   {"bench/imp/benchmark_truth/failure_campaign.ex", :guard_fail, {756, 38}},
   # defensive clause for non-covered result shapes
@@ -35,8 +33,6 @@
   {"bench/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 2072},
   # defensive guard success typing proves redundant
   {"bench/imp/benchmark_truth/gepa_metrics.ex", :guard_fail, 2221},
-  # defensive clause for non-covered task shapes
-  {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {343, 16}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"bench/imp/benchmark_truth/optimize_anything/pricing_policy.ex", :pattern_match, 1},
   # MapSet opacity: MapSet.equal? against a literal-typed expected set
@@ -60,11 +56,6 @@
   # defensive clause: ReqLLM.model/1 contracts to ok/error tuples only; the
   # catch-all turns any unexpected registry result into a loud error (#75)
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {156, 7}},
-  # defensive `|| %{}` on provider_meta success typing proves already a map
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1235},
-  # defensive fallback: sanitize_usage/1 clause for usage that is neither
-  # nil nor a map; success typing says those are the only shapes today
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1263, 8}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -74,24 +65,11 @@
   # defensive fallback paired with the 904 clause
   {"lib/imp/clients/training.ex", :pattern_match_cov, {1536, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/lm.ex", :pattern_match, {192, 8}},
-  # defensive fallback paired with the 187 clause
-  {"lib/imp/lm.ex", :pattern_match_cov, {193, 8}},
-  # defensive fallback: fetch_optional/3 non-atom-key clause; callers pass
-  # atom keys only today
-  {"lib/imp/mcp.ex", :pattern_match_cov, {951, 8}},
-  # MapSet opacity: MapSet.equal? against a literal-typed expected set
-  {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {626, 52}},
-  # defensive error clause on an always-ok internal call
   {"lib/imp/optimizer/better_together.ex", :pattern_match, {1280, 8}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/optimizer/better_together.ex", :pattern_match, {1283, 8}},
   # defensive fallback paired with the clauses above
   {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1295, 8}},
-  # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/ensemble.ex", :pattern_match, {67, 13}},
-  # defensive fallback paired with the 59 clause
-  {"lib/imp/optimizer/ensemble.ex", :pattern_match_cov, {76, 7}},
   # raise-only helper: every raise_parallel_worker_error/1 clause raises
   # (engine.ex:2469-2530); the catch-all covers these shapes at runtime
   {"lib/imp/optimizer/gepa/engine.ex", :call, {3961, 35}},
@@ -103,34 +81,14 @@
   {"lib/imp/optimizer/gepa/evaluation_cache/disk.ex", :call_without_opaque, {201, 49}},
   # defensive error clause on an always-ok proposal call
   {"lib/imp/optimizer/instruction_proposer.ex", :pattern_match, {459, 8}},
-  # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/knn_few_shot.ex", :pattern_match, {55, 13}},
   # defensive clause for non-list trainsets
   {"lib/imp/optimizer/knn_few_shot.ex", :pattern_match_cov, {23, 7}},
-  # defensive fallback paired with the 55 clause
-  {"lib/imp/optimizer/knn_few_shot.ex", :pattern_match_cov, {61, 7}},
-  # defensive clause for non-covered stage results
-  {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {896, 8}},
-  # MapSet opacity: MapSet.equal? against a literal-typed tag key set
-  {"lib/imp/optimizer/report.ex", :call_without_opaque, {736, 55}},
   # :rand seed format ([first | second]) at the seed_s call
   {"lib/imp/optimizer/sampling.ex", :improper_list_constr, {24, 11}},
   # defensive clause for non-covered bucket shapes
   {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {695, 8}},
-  # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/trajectory.ex", :pattern_match, {1302, 13}},
-  # defensive fallback paired with the 1226 clause
-  {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {1304, 7}},
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
-  # defensive clause for non-covered task results
-  {"lib/imp/predict/parallel.ex", :pattern_match_cov, {98, 7}},
-  # defensive error clause on an always-ok retriever call
-  {"lib/imp/predict/rag.ex", :pattern_match, {129, 13}},
-  # defensive fallback paired with the 129 clause
-  {"lib/imp/predict/rag.ex", :pattern_match_cov, {135, 7}},
-  # defensive clause for non-covered REPL outcomes
-  {"lib/imp/predict/rlm.ex", :pattern_match, {1554, 8}},
   # MapSet opacity on the redaction key set
   {"lib/imp/redaction.ex", :call_without_opaque, {500, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on
@@ -142,24 +100,18 @@
   {"lib/imp/retrieve.ex", :pattern_match_cov, {114, 8}},
   # behaviour callback specs term(); impl narrows on purpose (see retrieve.ex)
   {"lib/imp/retrievers/http.ex", :callback_arg_type_mismatch, {95, 7}},
-  # defensive clause for non-covered schema nodes
-  {"lib/imp/schema.ex", :pattern_match_cov, {358, 8}},
   # MapSet opacity on run-id sets typed through MLflow JSON
   {"lib/imp/tracking/mlflow.ex", :call_without_opaque, {361, 8}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"lib/mix/tasks/imp.benchmark.fast_slow.ex", :pattern_match, 1},
   # MapSet opacity on the hop-id set from analysis JSON
   {"lib/mix/tasks/imp.benchmark.hotpotqa_analysis.ex", :call_without_opaque, {159, 24}},
-  # defensive nil-result clause on an evaluate call that always scores
-  {"lib/mix/tasks/imp.benchmark.optimizer_lift.ex", :pattern_match, {635, 8}},
   # MapSet opacity on the run-index set from parity JSON
   {"lib/mix/tasks/imp.benchmark.parity.aggregate.ex", :call_without_opaque, {328, 24}},
   # raise-only helper: invalid_python!/1 exists to Mix.raise
   {"lib/mix/tasks/imp.benchmark.parity.ex", :no_return, {514, 8}},
   # defensive nil-fallback clause for env maps the task always populates
   {"lib/mix/tasks/imp.benchmark.parity.ex", :pattern_match, {715, 11}},
-  # MapSet opacity: MapSet.equal? against a literal-typed live-row id set
-  {"lib/mix/tasks/imp.benchmark.rag_tool_agent.ex", :call_without_opaque, {1018, 31}},
   # raise-only helper: invalid_snapshot!/2 exists to Mix.raise
   {"lib/mix/tasks/imp.public_api.ex", :no_return, {838, 8}},
   # dependency code: this file ships inside the req_llm package, not this
@@ -249,25 +201,36 @@
   {"bench/imp/benchmark_truth/musique_ans.ex", :unused_fun, {259, 8}},
   {"bench/imp/benchmark_truth/openrouter_free_guard.ex", :pattern_match_cov, {319, 8}},
   {"bench/imp/benchmark_truth/openrouter_free_guard.ex", :pattern_match_cov, {400, 8}},
-  {"bench/imp/benchmark_truth/papillon.ex", :pattern_match_cov, {156, 7}},
-  {"bench/imp/benchmark_truth/typed_format_canary.ex", :pattern_match_cov, {234, 8}},
   {"lib/imp/clients/mlx_lm_deployment.ex", :pattern_match, 1},
   {"lib/imp/clients/training.ex", :pattern_match, {1535, 8}},
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {29, 42}},
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {72, 30}},
   {"lib/imp/clients/trl_trainer.ex", :pattern_match_cov, {339, 20}},
-  # Defensive validation at the experiment boundary; Imp.evaluate/4's current
-  # success typing is narrower than the public Result score type.
-  {"lib/imp/experiment.ex", :pattern_match, 209},
   # URI.parse/1's success type makes the ordinary-port rejection branch look
   # unreachable; keep the public URL validator defensive at this trust boundary.
   {"lib/imp/optimizer/budget.ex", :pattern_match, 1},
-  {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {790, 53}},
   {"lib/imp/optimizer/gepa/random.ex", :improper_list_constr, {91, 17}},
   {"lib/imp/optimizer/mipro_v2.ex", :no_return, {150, 7}},
   {"lib/imp/optimizer/mipro_v2/python_random.ex", :call_without_opaque, {131, 55}},
   # MapSet opacity: the recursive sampler threads a MapSet accumulator whose
   # initial literal type dialyzer refuses to unify with the opaque internal
   {"lib/imp/optimizer/mipro_v2/python_random.ex", :call_with_opaque, {138, 14}},
-  {"lib/imp/optimizer/mipro_v2/python_random.ex", :call_without_opaque, {146, 23}}
+  {"lib/imp/optimizer/mipro_v2/python_random.ex", :call_without_opaque, {146, 23}},
+
+  # Defensive fallbacks and MapSet opacity retained at the 0.3 cut. These are
+  # individually pinned so a changed success type makes the gate ask again.
+  {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {341, 16}},
+  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {715, 8}},
+  {"lib/imp/adapter/xml.ex", :pattern_match_cov, {675, 8}},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1305},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1333, 8}},
+  {"lib/imp/lm.ex", :pattern_match, {260, 8}},
+  {"lib/imp/lm.ex", :pattern_match_cov, {261, 8}},
+  {"lib/imp/mcp.ex", :pattern_match_cov, {1046, 8}},
+  {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
+  {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
+  {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
+  {"lib/imp/optimizer/report.ex", :call_without_opaque, {744, 55}},
+  {"lib/imp/predict/rlm.ex", :pattern_match, {1645, 8}},
+  {"lib/imp/schema.ex", :pattern_match_cov, {459, 8}}
 ]

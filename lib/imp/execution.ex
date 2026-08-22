@@ -102,21 +102,20 @@ defmodule Imp.Execution do
 
   defp await_decision(task, owner, timeout) do
     owner_monitor = if is_pid(owner), do: Process.monitor(owner)
+    task_ref = task.ref
 
     try do
       receive do
-        {ref, {:decision, decision}} when ref == task.ref ->
-          Process.demonitor(task.ref, [:flush])
+        {^task_ref, {:decision, decision}} ->
           decision
 
-        {ref, {:callback_error, reason}} when ref == task.ref ->
-          Process.demonitor(task.ref, [:flush])
+        {^task_ref, {:callback_error, reason}} ->
           {:authorization_callback_exit, reason}
 
-        {:DOWN, ref, :process, _pid, reason} when ref == task.ref ->
+        {:DOWN, ^task_ref, :process, _pid, reason} ->
           {:authorization_callback_exit, reason}
 
-        {:DOWN, ref, :process, _pid, _reason} when ref == owner_monitor ->
+        {:DOWN, ^owner_monitor, :process, _pid, _reason} ->
           Task.shutdown(task, :brutal_kill)
           :authorization_owner_down
       after
