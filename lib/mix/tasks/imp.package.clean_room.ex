@@ -250,23 +250,6 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
       """
     )
 
-    File.write!(
-      Path.join(consumer_dir, "lib/runtime_lm.ex"),
-      """
-      defmodule ImpCleanRoom.RuntimeLM do
-        @behaviour Imp.LM
-
-        @impl true
-        def generate(_messages, opts) do
-          case Keyword.fetch!(opts, :api_key) do
-            "loader-runtime-secret" -> {:ok, %{answer: Keyword.fetch!(opts, :answer)}}
-            other -> raise "runtime credential was not rebound: \#{inspect(other)}"
-          end
-        end
-      end
-      """
-    )
-
     File.write!(Path.join(consumer_dir, "writer.exs"), writer_script())
     File.write!(Path.join(consumer_dir, "loader.exs"), loader_script())
     File.write!(Path.join(consumer_dir, "release_writer.exs"), release_writer_script())
@@ -312,13 +295,17 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     loader_registry = Imp.Saving.Registry.new(quality_metric: loader_metric)
     loaded = Imp.load!(artifact, registry: loader_registry)
 
-    runtime_lm = %{
-      module: ImpCleanRoom.RuntimeLM,
-      opts: [
-        api_key: System.fetch_env!("IMP_CLEAN_ROOM_API_KEY"),
-        answer: "loader-runtime"
-      ]
-    }
+    runtime_api_key = System.fetch_env!("IMP_CLEAN_ROOM_API_KEY")
+
+    runtime_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          case runtime_api_key do
+            "loader-runtime-secret" -> %{answer: "loader-runtime"}
+            other -> raise "runtime credential was not rebound: \#{inspect(other)}"
+          end
+        end
+      )
 
     rebound = Imp.with_lm(loaded, runtime_lm)
     {:ok, prediction} = Imp.call(rebound, %{question: "cross-VM persistence?"})
