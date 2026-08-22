@@ -20,6 +20,9 @@ credential-free ReqLLM descriptor; the fresh process binds a new budgeted
 runtime instead of serializing credentials or PIDs.
 Its bootstrap metric crosses the code/data boundary by a stable
 `Imp.Saving.Registry` key and is reconstructed from trusted code after restart.
+The fresh provider probe requires error-free useful behavior rather than
+byte-identical outputs: parameter identity is exact, but model sampling remains
+a runtime observation.
 
 From the repository root:
 
