@@ -18,6 +18,8 @@ one prospective request/token/dollar budget with retries and cache disabled.
 The KNN save replaces its process-owned live budget wrapper with a
 credential-free ReqLLM descriptor; the fresh process binds a new budgeted
 runtime instead of serializing credentials or PIDs.
+Its bootstrap metric crosses the code/data boundary by a stable
+`Imp.Saving.Registry` key and is reconstructed from trusted code after restart.
 
 From the repository root:
 

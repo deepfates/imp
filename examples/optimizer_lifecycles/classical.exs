@@ -90,7 +90,7 @@ defmodule ImpOptimizerLifecycles.Classical do
     # intentionally not serializable. Persist a credential-free ReqLLM
     # descriptor, then bind a new budgeted runtime in the fresh process.
     portable_knn = Imp.with_lm(knn, Imp.req_llm(@model))
-    :ok = Imp.save!(portable_knn, paths.knn_few_shot)
+    :ok = Imp.save!(portable_knn, paths.knn_few_shot, registry: saving_registry())
 
     arms = %{
       bootstrap_few_shot: arm(bootstrap, selection, test, metric),
@@ -141,7 +141,7 @@ defmodule ImpOptimizerLifecycles.Classical do
           artifact |> Artifact.read!() |> Artifact.apply(router(runtime_lm))
 
         "knn_few_shot" ->
-          artifact |> Imp.load!() |> Imp.with_lm(runtime_lm)
+          artifact |> Imp.load!(registry: saving_registry()) |> Imp.with_lm(runtime_lm)
 
         other ->
           raise "unknown family #{inspect(other)}"
@@ -279,6 +279,10 @@ defmodule ImpOptimizerLifecycles.Classical do
     @model
     |> Imp.req_llm(api_key: System.fetch_env!("OPENROUTER_API_KEY"))
     |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
+  end
+
+  defp saving_registry do
+    Imp.Saving.Registry.new(classical_metric: Imp.exact_match(:team))
   end
 
   defp budget(limits) do
