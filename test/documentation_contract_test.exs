@@ -259,7 +259,8 @@ defmodule DocumentationContractTest do
 
     assert body =~ "Imp.best_of_n/3"
     assert body =~ "Imp.refine/3"
-    assert body =~ "Imp.parallel/3"
+    assert body =~ "Imp.parallel/1,2,3"
+    assert body =~ "different programs in the same bounded pool"
     assert body =~ "Imp.knn/3"
     assert body =~ "Imp.nearest/2"
     assert body =~ "## Choose a program shape for the failure mode you need to control"

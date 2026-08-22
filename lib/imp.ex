@@ -201,8 +201,16 @@ defmodule Imp do
   @doc "Wraps a program with assertion-guided self-refinement."
   def assert(program, assertions, opts \\ []), do: Assertions.new(program, assertions, opts)
 
-  @doc "Runs a program over a batch of inputs through Imp's supervised task boundary."
-  def parallel(program, inputs, opts \\ []), do: Parallel.map(program, inputs, opts)
+  @doc "Runs heterogeneous `{program, inputs}` pairs through one supervised task pool."
+  def parallel(exec_pairs) when is_list(exec_pairs), do: Parallel.run(exec_pairs)
+
+  def parallel(exec_pairs, opts) when is_list(exec_pairs) and is_list(opts),
+    do: Parallel.run(exec_pairs, opts)
+
+  @doc "Runs one program over a batch of inputs through Imp's supervised task boundary."
+  def parallel(program, inputs), do: Parallel.map(program, inputs)
+
+  def parallel(program, inputs, opts), do: Parallel.map(program, inputs, opts)
 
   @doc """
   Builds a callable embedding-based KNN predictor over an example trainset

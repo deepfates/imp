@@ -407,6 +407,8 @@
         "optimize/4",
         "optimize/5",
         "optimizer_capabilities/1",
+        "parallel/1",
+        "parallel/2",
         "parallel/3",
         "predict/2",
         "prediction/1",
@@ -570,8 +572,14 @@
           "optimizer_capabilities/1": [
             "optimizer_capabilities(optimizer)"
           ],
+          "parallel/1": [
+            "parallel(exec_pairs)"
+          ],
+          "parallel/2": [
+            "parallel(exec_pairs, opts)"
+          ],
           "parallel/3": [
-            "parallel(program, inputs, opts \\\\ [])"
+            "parallel(program, inputs, opts)"
           ],
           "predict/2": [
             "predict(signature, opts \\\\ [])"
@@ -6452,7 +6460,8 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "map/3"
+        "map/3",
+        "run/2"
       ],
       "kind": "module",
       "macros": [],
@@ -6461,6 +6470,9 @@
         "functions": {
           "map/3": [
             "map(program, inputs, opts \\\\ [])"
+          ],
+          "run/2": [
+            "run(exec_pairs, opts \\\\ [])"
           ]
         }
       },

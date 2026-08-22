@@ -126,11 +126,12 @@ defmodule Imp.UpstreamFidelity do
         "programs are composable callable values",
         "Predict binds a signature to an LM and adapter",
         "ChainOfThought extends the output contract with reasoning",
-        "parallel execution preserves input order and failures"
+        "homogeneous and heterogeneous parallel execution preserves nesting, input order, causal lineage, and local failures"
       ],
       evidence: %{
         tests: [
           "test/public_surface_test.exs",
+          "test/parallel_execution_test.exs",
           "test/property_invariants_test.exs",
           "test/live_provider_e2e_test.exs"
         ],

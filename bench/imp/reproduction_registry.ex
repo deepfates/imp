@@ -137,7 +137,10 @@ defmodule Imp.ReproductionRegistry do
         values = [
           feature["name"],
           feature["classification"],
-          Enum.join(feature["protocol_ids"], "<br>"),
+          case feature["protocol_ids"] do
+            [] -> "none"
+            protocol_ids -> Enum.join(protocol_ids, "<br>")
+          end,
           String.upcase(evidence["tier"]),
           evidence["artifact"] || "none"
         ]
@@ -298,9 +301,8 @@ defmodule Imp.ReproductionRegistry do
 
     protocol_ids = feature["protocol_ids"]
 
-    unless is_list(protocol_ids) and protocol_ids != [] and
-             protocol_ids == Enum.uniq(protocol_ids),
-           do: raise(ArgumentError, "feature #{id} must name unique protocols")
+    unless is_list(protocol_ids) and protocol_ids == Enum.uniq(protocol_ids),
+      do: raise(ArgumentError, "feature #{id} protocols must be a unique list")
 
     Enum.each(protocol_ids, fn protocol_id ->
       unless Map.has_key?(protocols, protocol_id),

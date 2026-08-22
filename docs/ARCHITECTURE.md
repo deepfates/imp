@@ -90,7 +90,7 @@ All major program structs implement the `Imp.Module` behaviour.
 | `Imp.Predict.BestOfN` | Runs a program N times and keeps best by metric. |
 | `Imp.Predict.Refine` | Repeated attempts with reward threshold. |
 | `Imp.Predict.Search` | Request-local candidate execution, selection, budgets, and provenance shared by BestOfN and Refine. |
-| `Imp.Predict.Parallel` | Parallel map helpers. |
+| `Imp.Predict.Parallel` | Supervised homogeneous batches and heterogeneous/nested program-input execution. |
 
 ### Request-Local Search Boundary
 

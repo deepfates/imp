@@ -11,11 +11,11 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | Model/provider normalized runtime | native_extension | live_matrix | NONE | none |
 | Structured adapters and multimodal values | adaptation | multimodal_live | T2 | benchmarks/evidence/admitted/multimodal_live/02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e.json |
 | BFCL-shaped scorer benchmark infrastructure | adaptation | bfcl_shaped_scorer | T1 | benchmarks/evidence/admitted/bfcl_shaped_scorer/91b95e1d7308dafdfd62c20dbb133179c4722fe5e023ced013341f3c2c0849ea.json |
-| ReAct | adaptation | rag_agent<br>rag_failure_differential | NONE | none |
-| ReActV2 | adaptation | rag_agent | NONE | none |
-| MCP protocol boundary | native_extension | rag_agent | NONE | none |
-| CodeAct | adaptation | rag_agent | NONE | none |
-| ProgramOfThought | adaptation | rag_agent | NONE | none |
+| ReAct | adaptation | rag_failure_differential | NONE | none |
+| ReActV2 | adaptation | none | NONE | none |
+| MCP protocol boundary | native_extension | none | NONE | none |
+| CodeAct | adaptation | none | NONE | none |
+| ProgramOfThought | adaptation | none | NONE | none |
 | Recursive Language Models | adaptation | rlm_contract<br>rlm_runtime_differential<br>rlm_paper | T1 | benchmarks/evidence/admitted/rlm_runtime_differential/aa28970c8ed4d7d3b99d4ff0e4b472e878198465b97f31a74e7f7d0519e6333e.json |
 | Assertions and evaluation | adaptation | confidence_calibration | NONE | none |
 | SemanticF1 auto-evaluation | replication | auto_evaluation_contract | T1 | benchmarks/evidence/admitted/auto_evaluation_contract/9f7210133747e00ea2f0a187a90babb3ba8d41d558a410735f8185e8013b63c0.json |
@@ -40,7 +40,7 @@ The registry is an index, not a current-status ledger. `T0` means deterministic 
 | Ensemble | adaptation | optimizer_lift<br>ensemble_differential | T1 | benchmarks/evidence/admitted/ensemble_differential/df73a1f72a241214570e76b7a824ce5472c0dcff4dcc9bcc62c0d984df3866c8.json |
 | Fast-Slow orchestration and CISPO handoff | adaptation | fast_slow | NONE | none |
 | Optimize Anything | adaptation | optimize_anything | T2 | benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json |
-| Retrieval, RAG, embeddings, and datasets | adaptation | rag_agent | NONE | none |
+| Retrieval, RAG, embeddings, and datasets | adaptation | hotpot_retrieval | NONE | none |
 | Async, streaming, cache, telemetry, and overhead | native_extension | operations | NONE | none |
 | Persistence and protocol boundaries | native_extension | operations | NONE | none |
 | GSM8K | replication | parity | NONE | none |

@@ -639,15 +639,16 @@ half is n/a (lists of floats in Imp).
 
 ## tests/predict/test_parallel.py (7)
 
-`Imp.Predict.Parallel.map/3` is one-program-many-inputs; DSPy's
-`Parallel([(predictor, input), ...])` heterogeneous pair list has no Imp
-surface. Batch semantics are ported; pair-list shapes are blocked.
+`Imp.Predict.Parallel.map/3` is the homogeneous batch primitive.
+`Imp.Predict.Parallel.run/2` and `Imp.parallel/1,2` execute heterogeneous
+`{program, inputs}` trees through one bounded supervised pool, retain nesting,
+and propagate telemetry lineage into every worker.
 
 | Upstream test | Status | Note |
 |---|---|---|
 | test_parallel_module | pass (adapted) | Five parallel calls over one program each consume one scripted response; all five outputs come back (order-free set assertion, as upstream). |
 | test_batch_module | pass (adapted) | Second batch through an `input -> output, reasoning` program; each result's reasoning number matches its output number. |
-| test_nested_parallel_module | blocked | Nested heterogeneous (program, input) pair lists not expressible in `Parallel.map`'s contract. |
+| test_nested_parallel_module | pass (BEAM-native) | Nested heterogeneous `{program, inputs}` lists retain shape while their leaves share one supervised pool; no nested-pool deadlock. |
 | test_nested_batch_method | blocked | A module forward returning nested raw result lists violates `Imp.Module`'s Prediction-only return contract. |
 | test_batch_with_failed_examples | pass (adapted) | One raising input → its own `{:error, reason}` slot carrying "test error"; other slots succeed (DSPy: None slot + failed_examples/exceptions lists). |
 | test_parallel_timeout_and_straggler_limit_params | blocked | No `straggler_limit` (Python thread-pool machinery); `:timeout` exists but defaults to 30_000 ms, not DSPy's 120 s — parameter surface not mirrored. |

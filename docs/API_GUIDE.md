@@ -634,7 +634,7 @@ inside either artifact.
 | `Imp.best_of_n/3` | You can score several independent attempts and keep the best. |
 | `Imp.refine/3` | A failed attempt can improve from metric feedback. |
 | `Imp.assert/3` | A named constraint can drive bounded self-repair. |
-| `Imp.parallel/3` | Independent calls should run concurrently under a bound. |
+| `Imp.parallel/1,2,3` | Homogeneous batches or heterogeneous program/input pairs should run concurrently under one bound. |
 | `Imp.react/3` | The model should choose tools and submit a validated answer. |
 | `Imp.react_v2/3` | Parallel tool calls and truthful call IDs must survive in history. |
 | `Imp.avatar/3` | Each typed action needs its own timeout and failure isolation. |
@@ -787,6 +787,12 @@ preserve result order. Your application still owns admission policy, request
 timeouts, overload behavior, and the process that serves the current program.
 The [deployment example](../examples/deployment/README.md) shows one complete
 GenServer boundary.
+
+Use `Imp.parallel(program, inputs, opts)` for one program over a batch. Use
+`Imp.parallel([{program_a, inputs_a}, {program_b, inputs_b}], opts)` when a
+workflow needs different programs in the same bounded pool. Pair lists may be
+nested; the result retains that shape, and one failed call stays local to its
+slot.
 
 Wrap calls with `Imp.trace/2` when you need a retained trace, then use
 `Imp.inspect_history/2`, optimizer progress subscriptions, and telemetry to

@@ -12,8 +12,13 @@ defmodule Imp.ReproductionRegistryTest do
     registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
     authorities = Imp.EvidenceAuthorities.load!(@authorities)
 
+    research_authorities =
+      authorities["families"]
+      |> Enum.reject(&(&1["kind"] == "product"))
+      |> Enum.map(& &1["id"])
+
     assert Enum.sort(Enum.uniq(Enum.map(registry["features"], & &1["authority_family"]))) ==
-             Enum.sort(Enum.map(authorities["families"], & &1["id"]))
+             Enum.sort(research_authorities)
   end
 
   test "generated documentation agrees with the registry" do
@@ -47,6 +52,22 @@ defmodule Imp.ReproductionRegistryTest do
            }
 
     refute "bfcl_shaped_scorer" in react["protocol_ids"]
+  end
+
+  test "ordinary agentic surfaces do not borrow a neighboring research protocol" do
+    registry = ReproductionRegistry.load!(@registry, authority_path: @authorities)
+    features = Map.new(registry["features"], &{&1["id"], &1})
+
+    assert features["react"]["protocol_ids"] == ["rag_failure_differential"]
+
+    for id <- ~w(react_v2 mcp code_act program_of_thought) do
+      assert features[id]["protocol_ids"] == []
+      assert features[id]["admitted_evidence"]["tier"] == "none"
+    end
+
+    rendered = ReproductionRegistry.render(registry)
+    assert rendered =~ "| ReActV2 | adaptation | none | NONE | none |"
+    assert rendered =~ "| MCP protocol boundary | native_extension | none | NONE | none |"
   end
 
   test "COPRO isolation has pure provider-free admitted T1 evidence" do

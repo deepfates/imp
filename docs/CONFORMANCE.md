@@ -17,7 +17,7 @@ Elixir-native equivalents: 9
 Tracking: 2
 Gaps: 4
 Claim-specific non-blocking gaps: 4
-Invalid evidence: 6
+Invalid evidence: 0
 Invalid aggregate rows: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -100,11 +100,12 @@ Semantic invariants:
 - programs are composable callable values
 - Predict binds a signature to an LM and adapter
 - ChainOfThought extends the output contract with reasoning
-- parallel execution preserves input order and failures
+- homogeneous and heterogeneous parallel execution preserves nesting, input order, causal lineage, and local failures
 
 Executable evidence:
 
 - test: `test/public_surface_test.exs`
+- test: `test/parallel_execution_test.exs`
 - test: `test/property_invariants_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `../README.md`
@@ -310,7 +311,7 @@ Executable evidence:
 
 Indexed capability evidence:
 
-- `MCP`: invalid_evidence; claims: no indexed claim; receipts: mcp=INVALID
+- `MCP`: valid; claims: no indexed claim; receipts: mcp=valid
 
 
 Missing evidence or behavior:
@@ -346,10 +347,10 @@ Executable evidence:
 
 Indexed capability evidence:
 
-- `ReAct`: invalid_evidence; claims: claim.dspy_semantics.golden_trace (blocking), claim.agents.failure_injected.runtime_differential (blocking), claim.agents.failure_recovery.effectiveness (target); receipts: react=INVALID
-- `ReActV2`: invalid_evidence; claims: no indexed claim; receipts: react_v2=INVALID
-- `CodeAct`: invalid_evidence; claims: no indexed claim; receipts: code_act=INVALID
-- `ProgramOfThought`: invalid_evidence; claims: no indexed claim; receipts: program_of_thought=INVALID
+- `ReAct`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.agents.failure_injected.runtime_differential (blocking), claim.agents.failure_recovery.effectiveness (target); receipts: react=valid
+- `ReActV2`: valid; claims: no indexed claim; receipts: react_v2=valid
+- `CodeAct`: valid; claims: no indexed claim; receipts: code_act=valid
+- `ProgramOfThought`: valid; claims: no indexed claim; receipts: program_of_thought=valid
 
 
 Missing evidence or behavior:
@@ -783,7 +784,7 @@ Executable evidence:
 
 Indexed capability evidence:
 
-- `Embeddings`: invalid_evidence; claims: claim.embeddings.boundary_contract (informational); receipts: retrieval_rag=INVALID
+- `Embeddings`: valid; claims: claim.embeddings.boundary_contract (informational); receipts: retrieval_rag=valid
 
 
 Missing evidence or behavior:

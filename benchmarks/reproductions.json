@@ -201,6 +201,21 @@
         "arity": 2
       }
     },
+    "hotpot_retrieval": {
+      "mode": "provider_free",
+      "max_tier": "t1",
+      "task": "imp.benchmark.hotpot_retrieval",
+      "args": [
+        "--require-clean"
+      ],
+      "manifest": "benchmarks/config/hotpotqa-shared-retrieval-v1.json",
+      "artifact_validator": {
+        "mode": "module",
+        "module": "Elixir.Mix.Tasks.Imp.Benchmark.HotpotRetrieval",
+        "function": "validate_artifact!",
+        "arity": 2
+      }
+    },
     "rlm_contract": {
       "mode": "provider_free",
       "max_tier": "t1",
@@ -535,7 +550,6 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "rag_agent",
         "rag_failure_differential"
       ],
       "admitted_evidence": {
@@ -558,9 +572,7 @@
         "lib/imp/predict/react_v2.ex"
       ],
       "classification": "adaptation",
-      "protocol_ids": [
-        "rag_agent"
-      ],
+      "protocol_ids": [],
       "admitted_evidence": {
         "tier": "none",
         "artifact": null,
@@ -582,9 +594,7 @@
         "lib/imp/mcp.ex"
       ],
       "classification": "native_extension",
-      "protocol_ids": [
-        "rag_agent"
-      ],
+      "protocol_ids": [],
       "admitted_evidence": {
         "tier": "none",
         "artifact": null,
@@ -605,9 +615,7 @@
         "lib/imp/predict/code_act.ex"
       ],
       "classification": "adaptation",
-      "protocol_ids": [
-        "rag_agent"
-      ],
+      "protocol_ids": [],
       "admitted_evidence": {
         "tier": "none",
         "artifact": null,
@@ -628,9 +636,7 @@
         "lib/imp/predict/program_of_thought.ex"
       ],
       "classification": "adaptation",
-      "protocol_ids": [
-        "rag_agent"
-      ],
+      "protocol_ids": [],
       "admitted_evidence": {
         "tier": "none",
         "artifact": null,
@@ -1306,7 +1312,7 @@
       ],
       "classification": "adaptation",
       "protocol_ids": [
-        "rag_agent"
+        "hotpot_retrieval"
       ],
       "admitted_evidence": {
         "tier": "none",
