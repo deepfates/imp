@@ -1,0 +1,371 @@
+{
+  "artifact_type": "imp_optimizer_artifact",
+  "payload": {
+    "candidates": {
+      "support-signature_optimizer": {
+        "id": "support-signature_optimizer",
+        "kind": "program",
+        "metadata": {
+          "optimizer": "signature_optimizer"
+        },
+        "program": {
+          "predictors": [
+            {
+              "name": "main",
+              "predictor": {
+                "adapter": "Elixir.Imp.Adapter.Chat",
+                "config": [
+                  [
+                    "json_retries",
+                    1
+                  ]
+                ],
+                "demos": [],
+                "dynamic_adapter": true,
+                "dynamic_lm": true,
+                "lm": null,
+                "metadata": {},
+                "signature": {
+                  "inputs": [
+                    {
+                      "desc": null,
+                      "kind": "input",
+                      "metadata": {},
+                      "name": "ticket",
+                      "prefix": "Ticket:",
+                      "type": "string"
+                    }
+                  ],
+                  "instructions": "Route the support ticket to the correct squad based on its topic: atlas handles billing, invoices, and payment charges; harbor handles system outages, errors, performance, and delivery failures; beacon handles login, authentication, account access, and security; quill handles feature requests, how-to questions, documentation, and product usability. Respond with only the squad name: atlas, harbor, beacon, or quill.",
+                  "metadata": {},
+                  "outputs": [
+                    {
+                      "desc": null,
+                      "kind": "output",
+                      "metadata": {
+                        "constraints": {
+                          "enum": [
+                            "atlas",
+                            "harbor",
+                            "beacon",
+                            "quill"
+                          ]
+                        }
+                      },
+                      "name": "team",
+                      "prefix": "Team:",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "type": "predict"
+              }
+            }
+          ],
+          "type": "optimizer_parameter_snapshot"
+        },
+        "program_sha256": "sha256:759f227e319dcdbaf3177f54b9cd5e4606b6133bd7bcc422ff8e38564a2420e7",
+        "report": {
+          "best_score": 1.0,
+          "candidate_count": 4,
+          "candidates": [
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "predictor"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "main"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "instruction"
+                  },
+                  "Route the support ticket to the correct squad based on its topic: atlas handles billing, invoices, and payment charges; harbor handles system outages, errors, performance, and delivery failures; beacon handles login, authentication, account access, and security; quill handles feature requests, how-to questions, documentation, and product usability. Respond with only the squad name: atlas, harbor, beacon, or quill."
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.85
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "predictor"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "main"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "instruction"
+                  },
+                  "Route the support ticket to the correct internal team. Use 'atlas' for billing and invoicing issues, 'harbor' for infrastructure and performance problems, 'beacon' for authentication and account access concerns, or 'quill' for product features, documentation, and integrations."
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.9
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "predictor"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "main"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "instruction"
+                  },
+                  "Route the support ticket to the correct internal team. Use 'atlas' for billing and invoice issues, 'harbor' for infrastructure and reliability problems, 'beacon' for account access and security concerns, and 'quill' for product features and documentation requests."
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.55
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "predictor"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "main"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "instruction"
+                  },
+                  "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill."
+                ]
+              ]
+            }
+          ],
+          "errors": [],
+          "metadata": {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "search"
+                },
+                {
+                  "__imp_type__": "map",
+                  "entries": [
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "status"
+                      },
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ok"
+                      }
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "optimizer"
+                      },
+                      {
+                        "__imp_type__": "atom",
+                        "value": "instruction_search"
+                      }
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "successful_candidates"
+                      },
+                      4
+                    ]
+                  ]
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "predictor"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "main"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "proposal_mode"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "language_model"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline_score"
+                },
+                0.55
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "proposal_calls"
+                },
+                3
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "proposal_errors"
+                },
+                []
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "proposal_status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "ok"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "requested_candidates"
+                },
+                3
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "selected_instruction"
+                },
+                "Route the support ticket to the correct squad based on its topic: atlas handles billing, invoices, and payment charges; harbor handles system outages, errors, performance, and delivery failures; beacon handles login, authentication, account access, and security; quill handles feature requests, how-to questions, documentation, and product usability. Respond with only the squad name: atlas, harbor, beacon, or quill."
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "proposal_response_format"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "required"
+                }
+              ]
+            ]
+          },
+          "optimizer": {
+            "__imp_type__": "atom",
+            "value": "signature_optimizer"
+          }
+        },
+        "score": 1.0
+      }
+    },
+    "champion_id": "support-signature_optimizer",
+    "history": [],
+    "provenance": {
+      "optimizer": "signature_optimizer"
+    },
+    "revision": 1,
+    "security": {
+      "credentials_absent": true,
+      "functions_absent": true,
+      "json_safe": true,
+      "redaction_policy": "imp_default_v1"
+    }
+  },
+  "payload_sha256": "sha256:1bb79aad654af2a4e542f53856567144123ab5dda2c664416718862d8e42e0f8",
+  "schema_version": 3
+}

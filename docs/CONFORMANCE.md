@@ -608,7 +608,7 @@ Indexed capability evidence:
 
 Missing evidence or behavior:
 
-- whole-optimizer and held-out effectiveness evidence for InferRules, plus any upstream parity authority for the native SignatureOptimizer extension
+- matched whole-optimizer effectiveness evidence for InferRules, plus any upstream parity authority for the native SignatureOptimizer extension; one bounded live task now establishes useful held-out selection and fresh Artifact application for both native public paths
 - C3 multi-seed held-out SIMBA effectiveness and cross-task MIPROv2 generalization under matched controls
 - paper-scale lift evidence
 

@@ -1,0 +1,987 @@
+{
+  "scope": {
+    "claimed": "one natural live retained lifecycle for SignatureOptimizer and InferRules on the shipped support-routing task",
+    "not_claimed": [
+      "general optimizer effectiveness",
+      "DSPy parity",
+      "multi-seed evidence"
+    ]
+  },
+  "models": {
+    "task": "openrouter:openai/gpt-5.4-mini",
+    "optimizer": "openrouter:anthropic/claude-sonnet-4.6"
+  },
+  "schema_version": 1,
+  "dataset": {
+    "path": "priv/tutorial/support_tickets.json",
+    "sha256": "7ea5ae7ad724dc4311cf954bafeb48a4b7b284b619c33bc00b30d37ad6df6f87",
+    "counts": {
+      "test": 20,
+      "train": 20,
+      "selection": 20
+    }
+  },
+  "baseline": {
+    "test": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.3
+    },
+    "selection": {
+      "rows": 20,
+      "errors": 0,
+      "score": 0.5
+    }
+  },
+  "arms": {
+    "infer_rules": {
+      "report": {
+        "metadata": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "status"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "ok"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "durable"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "false"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "resumed"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "false"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "upstream"
+              },
+              "DSPy 3.2.1 InferRules"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "bootstrap"
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "optimizer"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "bootstrap_few_shot"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "best_score"
+                    },
+                    0.75
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "error_count"
+                    },
+                    0
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "candidate_count"
+                    },
+                    8
+                  ]
+                ]
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "num_rules"
+              },
+              8
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "run_status"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "complete"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "resume_state"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "nil"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "trainset_size"
+              },
+              20
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "implementation"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "native_rule_induction"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "num_candidates"
+              },
+              2
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "proposal_calls"
+              },
+              2
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "metric_identity"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "nil"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "predictor_names"
+              },
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "main"
+                }
+              ]
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "validation_size"
+              },
+              20
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "source_protected"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "true"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "proposal_attempts"
+              },
+              2
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "baseline_protected"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "true"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "explicit_candidates"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "false"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "completed_operations"
+              },
+              7
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "evaluation_max_errors"
+              },
+              8
+            ]
+          ]
+        },
+        "errors": [],
+        "candidates": [
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "index"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "source"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "rules"
+                },
+                {}
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                0.5
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "source"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "true"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "ok"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ]
+            ]
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "index"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "rules"
+                },
+                {}
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                0.8
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "source"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "ok"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "true"
+                }
+              ]
+            ]
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "index"
+                },
+                0
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "rules"
+                },
+                {
+                  "__imp_type__": "map",
+                  "entries": [
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "main"
+                      },
+                      "1. Route the ticket to **atlas** if it involves billing or invoicing matters, such as incorrect charges, duplicate payments, billing plan changes, invoice corrections, or requests for receipts and billing records.\n\n2. Route the ticket to **harbor** if it describes an active technical outage or system malfunction, such as API errors, timeouts, webhook delivery failures, slow performance degradation, or broken functionality following a deployment.\n\n3. Route the ticket to **beacon** if it concerns authentication or account security, including login failures, password reset issues, multi-factor authentication problems, locked accounts, unauthorized access, or suspicious account activity.\n\n4. Route the ticket to **quill** if it is a feature request, product improvement suggestion, how-to question, or general product usage inquiry that does not involve an active outage, billing issue, or security concern.\n\n5. Distinguish **harbor** (active system failure affecting functionality) from **quill** (general usage questions about how a feature works); if the user reports something is broken or degraded right now, prefer harbor.\n\n6. Distinguish **beacon** (security and authentication) from **harbor** (general technical outages); if the core issue is about identity verification, account access control, or suspicious credential activity, prefer beacon even if the symptom appears technical.\n\n7. Distinguish **atlas** (billing operations) from **harbor** (system failures); if automated billing emails or receipts are failing due to a deploy or system error rather than a billing data issue, prefer harbor.\n\n8. When a ticket combines elements of multiple teams (e.g., a billing question accompanied by a feature request), route based on the primary complaint or the most urgent issue described in the ticket."
+                    ]
+                  ]
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                0.95
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "source"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "ok"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ]
+            ]
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "index"
+                },
+                1
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "rules"
+                },
+                {
+                  "__imp_type__": "map",
+                  "entries": [
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "main"
+                      },
+                      "1. Route to **atlas** when the ticket concerns billing, invoices, charges, or subscription management (e.g., duplicate charges, incorrect invoice details, billing cycle changes, or cancellation disputes).\n\n2. Route to **harbor** when the ticket describes an active technical outage, system error, or degraded performance (e.g., API errors, slow load times, failed webhook delivery, or broken transactional emails following a deploy).\n\n3. Route to **beacon** when the ticket involves authentication or account access issues, including login failures, locked accounts, password resets, two-factor authentication problems, or unauthorized access concerns.\n\n4. Route to **quill** when the ticket is a feature request, product improvement suggestion, or integration idea with no urgent technical or billing component.\n\n5. Route to **quill** when the ticket asks a \"how do I\" or general usage question about product functionality, onboarding, or available API capabilities.\n\n6. Distinguish **harbor** from **atlas** for payment-related tickets: if the issue is a system-level payment processing failure (e.g., checkout timeouts affecting all users), route to **harbor**; if it is an individual billing discrepancy or invoice record issue, route to **atlas**.\n\n7. Distinguish **harbor** from **beacon** for email-related tickets: if users are not receiving system-generated emails due to a technical failure (e.g., no receipt emails since a deploy), route to **harbor**; if an unexpected security email was received (e.g., an unrequested password reset), route to **beacon**.\n\n8. Route to **beacon** when the ticket involves access control or security anomalies, such as a former employee retaining workspace access or suspicious account activity, even if no active login failure is reported."
+                    ]
+                  ]
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                1.0
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "source"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "ok"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ]
+            ]
+          }
+        ],
+        "optimizer": "infer_rules",
+        "best_score": 1.0,
+        "candidate_count": 4
+      },
+      "test": {
+        "rows": 20,
+        "errors": 0,
+        "score": 0.9
+      },
+      "selection": {
+        "rows": 20,
+        "errors": 0,
+        "score": 1.0
+      },
+      "selected_instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nPlease adhere to the following rules when making your prediction:\n1. Route to **atlas** when the ticket concerns billing, invoices, charges, or subscription management (e.g., duplicate charges, incorrect invoice details, billing cycle changes, or cancellation disputes).\n\n2. Route to **harbor** when the ticket describes an active technical outage, system error, or degraded performance (e.g., API errors, slow load times, failed webhook delivery, or broken transactional emails following a deploy).\n\n3. Route to **beacon** when the ticket involves authentication or account access issues, including login failures, locked accounts, password resets, two-factor authentication problems, or unauthorized access concerns.\n\n4. Route to **quill** when the ticket is a feature request, product improvement suggestion, or integration idea with no urgent technical or billing component.\n\n5. Route to **quill** when the ticket asks a \"how do I\" or general usage question about product functionality, onboarding, or available API capabilities.\n\n6. Distinguish **harbor** from **atlas** for payment-related tickets: if the issue is a system-level payment processing failure (e.g., checkout timeouts affecting all users), route to **harbor**; if it is an individual billing discrepancy or invoice record issue, route to **atlas**.\n\n7. Distinguish **harbor** from **beacon** for email-related tickets: if users are not receiving system-generated emails due to a technical failure (e.g., no receipt emails since a deploy), route to **harbor**; if an unexpected security email was received (e.g., an unrequested password reset), route to **beacon**.\n\n8. Route to **beacon** when the ticket involves access control or security anomalies, such as a former employee retaining workspace access or suspicious account activity, even if no active login failure is reported."
+    },
+    "signature_optimizer": {
+      "report": {
+        "metadata": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "search"
+              },
+              {
+                "__imp_type__": "map",
+                "entries": [
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "status"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "ok"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "optimizer"
+                    },
+                    {
+                      "__imp_type__": "atom",
+                      "value": "instruction_search"
+                    }
+                  ],
+                  [
+                    {
+                      "__imp_type__": "atom",
+                      "value": "successful_candidates"
+                    },
+                    4
+                  ]
+                ]
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "predictor"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "main"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "proposal_mode"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "language_model"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "baseline_score"
+              },
+              0.55
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "proposal_calls"
+              },
+              3
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "proposal_errors"
+              },
+              []
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "proposal_status"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "ok"
+              }
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "requested_candidates"
+              },
+              3
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "selected_instruction"
+              },
+              "Route the support ticket to the correct squad based on its topic: atlas handles billing, invoices, and payment charges; harbor handles system outages, errors, performance, and delivery failures; beacon handles login, authentication, account access, and security; quill handles feature requests, how-to questions, documentation, and product usability. Respond with only the squad name: atlas, harbor, beacon, or quill."
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "proposal_response_format"
+              },
+              {
+                "__imp_type__": "atom",
+                "value": "required"
+              }
+            ]
+          ]
+        },
+        "errors": [],
+        "candidates": [
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                1.0
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "predictor"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "main"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "instruction"
+                },
+                "Route the support ticket to the correct squad based on its topic: atlas handles billing, invoices, and payment charges; harbor handles system outages, errors, performance, and delivery failures; beacon handles login, authentication, account access, and security; quill handles feature requests, how-to questions, documentation, and product usability. Respond with only the squad name: atlas, harbor, beacon, or quill."
+              ]
+            ]
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                0.85
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "predictor"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "main"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "instruction"
+                },
+                "Route the support ticket to the correct internal team. Use 'atlas' for billing and invoicing issues, 'harbor' for infrastructure and performance problems, 'beacon' for authentication and account access concerns, or 'quill' for product features, documentation, and integrations."
+              ]
+            ]
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                0.9
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "predictor"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "main"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "instruction"
+                },
+                "Route the support ticket to the correct internal team. Use 'atlas' for billing and invoice issues, 'harbor' for infrastructure and reliability problems, 'beacon' for account access and security concerns, and 'quill' for product features and documentation requests."
+              ]
+            ]
+          },
+          {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "score"
+                },
+                0.55
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "true"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "predictor"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "main"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "instruction"
+                },
+                "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill."
+              ]
+            ]
+          }
+        ],
+        "optimizer": "signature_optimizer",
+        "best_score": 1.0,
+        "candidate_count": 4
+      },
+      "test": {
+        "rows": 20,
+        "errors": 0,
+        "score": 0.95
+      },
+      "selection": {
+        "rows": 20,
+        "errors": 0,
+        "score": 1.0
+      },
+      "selected_instruction": "Route the support ticket to the correct squad based on its topic: atlas handles billing, invoices, and payment charges; harbor handles system outages, errors, performance, and delivery failures; beacon handles login, authentication, account access, and security; quill handles feature requests, how-to questions, documentation, and product usability. Respond with only the squad name: atlas, harbor, beacon, or quill."
+    }
+  },
+  "git_sha": "a24a408660eaff7ac9b4ed2cd8691c5a177f8cf3",
+  "fresh_process": {
+    "infer_rules": {
+      "artifact_sha256": "cb596a511a0498aa28b86acfbe2133c3120dbc0c2d761ccef6368c4008843eee",
+      "budget": {
+        "active_reservations": 0,
+        "exhausted": null,
+        "limits": {
+          "input_tokens": 100000,
+          "output_tokens": 10000,
+          "requests": 24,
+          "usd": 0.25
+        },
+        "pricing": {
+          "input_per_million": 0.75,
+          "output_per_million": 4.5,
+          "source_url": "https://openrouter.ai/models/openai/gpt-5.4-mini"
+        },
+        "requests": 4,
+        "reservation_ledger_version": 2,
+        "reservations": [],
+        "reserved": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "usd": 0.0
+        },
+        "single_attempt_transport_enforced": true,
+        "transport_attempts": 4,
+        "usage": {
+          "input_tokens": 3308,
+          "output_tokens": 55,
+          "usd": 0.002728
+        }
+      },
+      "family": "infer_rules",
+      "fresh_os_process": true,
+      "score": {
+        "errors": 0,
+        "rows": 4,
+        "score": 1.0
+      },
+      "selected_instruction": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nPlease adhere to the following rules when making your prediction:\n1. Route to **atlas** when the ticket concerns billing, invoices, charges, or subscription management (e.g., duplicate charges, incorrect invoice details, billing cycle changes, or cancellation disputes).\n\n2. Route to **harbor** when the ticket describes an active technical outage, system error, or degraded performance (e.g., API errors, slow load times, failed webhook delivery, or broken transactional emails following a deploy).\n\n3. Route to **beacon** when the ticket involves authentication or account access issues, including login failures, locked accounts, password resets, two-factor authentication problems, or unauthorized access concerns.\n\n4. Route to **quill** when the ticket is a feature request, product improvement suggestion, or integration idea with no urgent technical or billing component.\n\n5. Route to **quill** when the ticket asks a \"how do I\" or general usage question about product functionality, onboarding, or available API capabilities.\n\n6. Distinguish **harbor** from **atlas** for payment-related tickets: if the issue is a system-level payment processing failure (e.g., checkout timeouts affecting all users), route to **harbor**; if it is an individual billing discrepancy or invoice record issue, route to **atlas**.\n\n7. Distinguish **harbor** from **beacon** for email-related tickets: if users are not receiving system-generated emails due to a technical failure (e.g., no receipt emails since a deploy), route to **harbor**; if an unexpected security email was received (e.g., an unrequested password reset), route to **beacon**.\n\n8. Route to **beacon** when the ticket involves access control or security anomalies, such as a former employee retaining workspace access or suspicious account activity, even if no active login failure is reported."
+    },
+    "signature_optimizer": {
+      "artifact_sha256": "fab23951b15367b6b2eec2676e1977dfe080f77736d4aa749d119e26646e0adc",
+      "budget": {
+        "active_reservations": 0,
+        "exhausted": null,
+        "limits": {
+          "input_tokens": 100000,
+          "output_tokens": 10000,
+          "requests": 24,
+          "usd": 0.25
+        },
+        "pricing": {
+          "input_per_million": 0.75,
+          "output_per_million": 4.5,
+          "source_url": "https://openrouter.ai/models/openai/gpt-5.4-mini"
+        },
+        "requests": 4,
+        "reservation_ledger_version": 2,
+        "reservations": [],
+        "reserved": {
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "usd": 0.0
+        },
+        "single_attempt_transport_enforced": true,
+        "transport_attempts": 4,
+        "usage": {
+          "input_tokens": 1100,
+          "output_tokens": 39,
+          "usd": 0.001001
+        }
+      },
+      "family": "signature_optimizer",
+      "fresh_os_process": true,
+      "score": {
+        "errors": 0,
+        "rows": 4,
+        "score": 1.0
+      },
+      "selected_instruction": "Route the support ticket to the correct squad based on its topic: atlas handles billing, invoices, and payment charges; harbor handles system outages, errors, performance, and delivery failures; beacon handles login, authentication, account access, and security; quill handles feature requests, how-to questions, documentation, and product usability. Respond with only the squad name: atlas, harbor, beacon, or quill."
+    }
+  },
+  "budgets": {
+    "task": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 1000000,
+        "output_tokens": 100000,
+        "requests": 500,
+        "usd": 1.0
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "output_per_million": 4.5,
+        "source_url": "https://openrouter.ai/models/openai/gpt-5.4-mini"
+      },
+      "requests": 288,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 288,
+      "usage": {
+        "input_tokens": 120631,
+        "output_tokens": 3297,
+        "usd": 0.10532500000000022
+      }
+    },
+    "optimizer": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 200000,
+        "output_tokens": 16384,
+        "requests": 16,
+        "usd": 1.0
+      },
+      "pricing": {
+        "input_per_million": 3.0,
+        "output_per_million": 15.0,
+        "source_url": "https://openrouter.ai/models/anthropic/claude-sonnet-4.6"
+      },
+      "requests": 5,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 5,
+      "usage": {
+        "input_tokens": 3933,
+        "output_tokens": 1742,
+        "usd": 0.037929
+      }
+    }
+  },
+  "artifacts": {
+    "infer_rules": {
+      "path": "infer_rules.parameters.json",
+      "bytes": 29340,
+      "sha256": "cb596a511a0498aa28b86acfbe2133c3120dbc0c2d761ccef6368c4008843eee"
+    },
+    "signature_optimizer": {
+      "path": "signature_optimizer.parameters.json",
+      "bytes": 12102,
+      "sha256": "fab23951b15367b6b2eec2676e1977dfe080f77736d4aa749d119e26646e0adc"
+    }
+  }
+}

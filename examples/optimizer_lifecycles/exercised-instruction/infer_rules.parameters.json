@@ -1,0 +1,806 @@
+{
+  "artifact_type": "imp_optimizer_artifact",
+  "payload": {
+    "candidates": {
+      "support-infer_rules": {
+        "id": "support-infer_rules",
+        "kind": "program",
+        "metadata": {
+          "optimizer": "infer_rules"
+        },
+        "program": {
+          "predictors": [
+            {
+              "name": "main",
+              "predictor": {
+                "adapter": "Elixir.Imp.Adapter.Chat",
+                "config": [
+                  [
+                    "json_retries",
+                    1
+                  ]
+                ],
+                "demos": [
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "harbor"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "Card payments have been timing out at checkout since 9am."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "beacon"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "I can't log in after resetting my password."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "quill"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "Can you add a dark mode to the dashboard?"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "harbor"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "The API is returning 502 errors intermittently."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "beacon"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "A former employee still has access to our workspace."
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  },
+                  {
+                    "__imp_type__": "example",
+                    "demos": [],
+                    "fields": {
+                      "__imp_type__": "map",
+                      "entries": [
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "team"
+                          },
+                          "quill"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "ticket"
+                          },
+                          "How do I export my data to CSV?"
+                        ],
+                        [
+                          {
+                            "__imp_type__": "atom",
+                            "value": "augmented"
+                          },
+                          {
+                            "__imp_type__": "atom",
+                            "value": "true"
+                          }
+                        ]
+                      ]
+                    },
+                    "input_keys": [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "ticket"
+                      }
+                    ]
+                  }
+                ],
+                "dynamic_adapter": true,
+                "dynamic_lm": true,
+                "lm": null,
+                "metadata": {},
+                "signature": {
+                  "inputs": [
+                    {
+                      "desc": null,
+                      "kind": "input",
+                      "metadata": {},
+                      "name": "ticket",
+                      "prefix": "Ticket:",
+                      "type": "string"
+                    }
+                  ],
+                  "instructions": "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill.\n\nPlease adhere to the following rules when making your prediction:\n1. Route to **atlas** when the ticket concerns billing, invoices, charges, or subscription management (e.g., duplicate charges, incorrect invoice details, billing cycle changes, or cancellation disputes).\n\n2. Route to **harbor** when the ticket describes an active technical outage, system error, or degraded performance (e.g., API errors, slow load times, failed webhook delivery, or broken transactional emails following a deploy).\n\n3. Route to **beacon** when the ticket involves authentication or account access issues, including login failures, locked accounts, password resets, two-factor authentication problems, or unauthorized access concerns.\n\n4. Route to **quill** when the ticket is a feature request, product improvement suggestion, or integration idea with no urgent technical or billing component.\n\n5. Route to **quill** when the ticket asks a \"how do I\" or general usage question about product functionality, onboarding, or available API capabilities.\n\n6. Distinguish **harbor** from **atlas** for payment-related tickets: if the issue is a system-level payment processing failure (e.g., checkout timeouts affecting all users), route to **harbor**; if it is an individual billing discrepancy or invoice record issue, route to **atlas**.\n\n7. Distinguish **harbor** from **beacon** for email-related tickets: if users are not receiving system-generated emails due to a technical failure (e.g., no receipt emails since a deploy), route to **harbor**; if an unexpected security email was received (e.g., an unrequested password reset), route to **beacon**.\n\n8. Route to **beacon** when the ticket involves access control or security anomalies, such as a former employee retaining workspace access or suspicious account activity, even if no active login failure is reported.",
+                  "metadata": {},
+                  "outputs": [
+                    {
+                      "desc": null,
+                      "kind": "output",
+                      "metadata": {
+                        "constraints": {
+                          "enum": [
+                            "atlas",
+                            "harbor",
+                            "beacon",
+                            "quill"
+                          ]
+                        }
+                      },
+                      "name": "team",
+                      "prefix": "Team:",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "type": "predict"
+              }
+            }
+          ],
+          "type": "optimizer_parameter_snapshot"
+        },
+        "program_sha256": "sha256:36220d61337e9736b2dbd28a533875b459ef0a51bdfe245fab9fc3f7cb53d478",
+        "report": {
+          "best_score": 1.0,
+          "candidate_count": 4,
+          "candidates": [
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "source"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "rules"
+                  },
+                  {}
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.5
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "source"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "status"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "ok"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "rules"
+                  },
+                  {}
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.8
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "source"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "status"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "ok"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "true"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "rules"
+                  },
+                  {
+                    "__imp_type__": "map",
+                    "entries": [
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "main"
+                        },
+                        "1. Route the ticket to **atlas** if it involves billing or invoicing matters, such as incorrect charges, duplicate payments, billing plan changes, invoice corrections, or requests for receipts and billing records.\n\n2. Route the ticket to **harbor** if it describes an active technical outage or system malfunction, such as API errors, timeouts, webhook delivery failures, slow performance degradation, or broken functionality following a deployment.\n\n3. Route the ticket to **beacon** if it concerns authentication or account security, including login failures, password reset issues, multi-factor authentication problems, locked accounts, unauthorized access, or suspicious account activity.\n\n4. Route the ticket to **quill** if it is a feature request, product improvement suggestion, how-to question, or general product usage inquiry that does not involve an active outage, billing issue, or security concern.\n\n5. Distinguish **harbor** (active system failure affecting functionality) from **quill** (general usage questions about how a feature works); if the user reports something is broken or degraded right now, prefer harbor.\n\n6. Distinguish **beacon** (security and authentication) from **harbor** (general technical outages); if the core issue is about identity verification, account access control, or suspicious credential activity, prefer beacon even if the symptom appears technical.\n\n7. Distinguish **atlas** (billing operations) from **harbor** (system failures); if automated billing emails or receipts are failing due to a deploy or system error rather than a billing data issue, prefer harbor.\n\n8. When a ticket combines elements of multiple teams (e.g., a billing question accompanied by a feature request), route based on the primary complaint or the most urgent issue described in the ticket."
+                      ]
+                    ]
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  0.95
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "source"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "status"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "ok"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ]
+              ]
+            },
+            {
+              "__imp_type__": "map",
+              "entries": [
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "index"
+                  },
+                  1
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "rules"
+                  },
+                  {
+                    "__imp_type__": "map",
+                    "entries": [
+                      [
+                        {
+                          "__imp_type__": "atom",
+                          "value": "main"
+                        },
+                        "1. Route to **atlas** when the ticket concerns billing, invoices, charges, or subscription management (e.g., duplicate charges, incorrect invoice details, billing cycle changes, or cancellation disputes).\n\n2. Route to **harbor** when the ticket describes an active technical outage, system error, or degraded performance (e.g., API errors, slow load times, failed webhook delivery, or broken transactional emails following a deploy).\n\n3. Route to **beacon** when the ticket involves authentication or account access issues, including login failures, locked accounts, password resets, two-factor authentication problems, or unauthorized access concerns.\n\n4. Route to **quill** when the ticket is a feature request, product improvement suggestion, or integration idea with no urgent technical or billing component.\n\n5. Route to **quill** when the ticket asks a \"how do I\" or general usage question about product functionality, onboarding, or available API capabilities.\n\n6. Distinguish **harbor** from **atlas** for payment-related tickets: if the issue is a system-level payment processing failure (e.g., checkout timeouts affecting all users), route to **harbor**; if it is an individual billing discrepancy or invoice record issue, route to **atlas**.\n\n7. Distinguish **harbor** from **beacon** for email-related tickets: if users are not receiving system-generated emails due to a technical failure (e.g., no receipt emails since a deploy), route to **harbor**; if an unexpected security email was received (e.g., an unrequested password reset), route to **beacon**.\n\n8. Route to **beacon** when the ticket involves access control or security anomalies, such as a former employee retaining workspace access or suspicious account activity, even if no active login failure is reported."
+                      ]
+                    ]
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "score"
+                  },
+                  1.0
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "source"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "status"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "ok"
+                  }
+                ],
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "baseline"
+                  },
+                  {
+                    "__imp_type__": "atom",
+                    "value": "false"
+                  }
+                ]
+              ]
+            }
+          ],
+          "errors": [],
+          "metadata": {
+            "__imp_type__": "map",
+            "entries": [
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "ok"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "durable"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "resumed"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "upstream"
+                },
+                "DSPy 3.2.1 InferRules"
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "bootstrap"
+                },
+                {
+                  "__imp_type__": "map",
+                  "entries": [
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "optimizer"
+                      },
+                      {
+                        "__imp_type__": "atom",
+                        "value": "bootstrap_few_shot"
+                      }
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "best_score"
+                      },
+                      0.75
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "error_count"
+                      },
+                      0
+                    ],
+                    [
+                      {
+                        "__imp_type__": "atom",
+                        "value": "candidate_count"
+                      },
+                      8
+                    ]
+                  ]
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "num_rules"
+                },
+                8
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "run_status"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "complete"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "resume_state"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "nil"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "trainset_size"
+                },
+                20
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "implementation"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "native_rule_induction"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "num_candidates"
+                },
+                2
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "proposal_calls"
+                },
+                2
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "metric_identity"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "nil"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "predictor_names"
+                },
+                [
+                  {
+                    "__imp_type__": "atom",
+                    "value": "main"
+                  }
+                ]
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "validation_size"
+                },
+                20
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "source_protected"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "true"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "proposal_attempts"
+                },
+                2
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "baseline_protected"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "true"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "explicit_candidates"
+                },
+                {
+                  "__imp_type__": "atom",
+                  "value": "false"
+                }
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "completed_operations"
+                },
+                7
+              ],
+              [
+                {
+                  "__imp_type__": "atom",
+                  "value": "evaluation_max_errors"
+                },
+                8
+              ]
+            ]
+          },
+          "optimizer": {
+            "__imp_type__": "atom",
+            "value": "infer_rules"
+          }
+        },
+        "score": 1.0
+      }
+    },
+    "champion_id": "support-infer_rules",
+    "history": [],
+    "provenance": {
+      "optimizer": "infer_rules"
+    },
+    "revision": 1,
+    "security": {
+      "credentials_absent": true,
+      "functions_absent": true,
+      "json_safe": true,
+      "redaction_policy": "imp_default_v1"
+    }
+  },
+  "payload_sha256": "sha256:a43e0f64a7570f1e9c245af54942a05be11685816f28c6dd392ea366e2a76bb0",
+  "schema_version": 3
+}

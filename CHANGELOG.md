@@ -63,6 +63,13 @@ checkpoints have private atomic write/read helpers for verified fresh-runtime
 restore. Compilation returns immutable state and never silently hot-promotes a
 serving process.
 
+Bounded live acceptance now covers the classical demonstration optimizers and
+the instruction/rule family on the shipped support-routing task. Selected
+BootstrapFewShot, RandomSearch, KNNFewShot, SignatureOptimizer, and InferRules
+states are retained with disjoint evaluation, explicit provider budgets, and
+fresh-process application. These are task-scoped product lifecycles, not broad
+effectiveness or parity claims.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is

@@ -67,3 +67,18 @@ OPENROUTER_API_KEY=... \
 IMP_INSTRUCTION_OUTPUT=/secure/imp-instruction-live \
 mix run examples/optimizer_lifecycles/instruction.exs
 ```
+
+The `exercised-instruction/` directory retains the complete clean-commit run
+from `a24a408660eaff7ac9b4ed2cd8691c5a177f8cf3`. The live zero-shot baseline
+scored `0.30` on the untouched test split. `SignatureOptimizer` selected at
+`1.00` and scored `0.95` on test; `InferRules` selected at `1.00` and scored
+`0.90` on test. Both had zero row errors and scored `1.00` on four fresh-OS
+probes after their exact private Artifacts were loaded into trusted program
+code. The main task and optimizer budgets recorded 293 single-attempt calls and
+`$0.143254`; fresh probes retain their own ledgers in `result.json`.
+
+An earlier clean attempt completed the same mechanisms but InferRules did not
+beat that run's `0.40` test baseline, and the acceptance runner asserted before
+persisting its complete receipt. That negative remains recorded on the owning
+ticket. The runner now writes the receipt before judging it; the retained run
+is a second exact treatment for instrumentation repair, not multi-seed evidence.
