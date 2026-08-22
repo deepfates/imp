@@ -18,3 +18,9 @@ Imp's existing conformance baseline predates current stable DSPy. Classify the c
 
 A source-pinned current-stable inventory covers LM/configuration, signatures/adapters, Predict and composed Module behavior, tools/ReAct, evaluation, prompt optimizers, save/load, async/streaming/cache/usage, and production entry points; every material difference has an executable differential or an explicit intentional BEAM disposition; central supported paths are implemented and exercised through Imp's public API; experimental code/weight optimization is classified downstream and cannot substitute for prompt-program parity.
 
+
+## Notes
+
+**2026-08-22T13:39:54Z**
+
+The owner ratified this as the first source-grounded dependency of the larger release objective on 2026-08-22. Complete the material stable DSPy 3.3.0 inventory from the exact pinned source, docs, tests, examples, and release delta. Treat symbol presence as insufficient: every material user capability needs an executable semantic differential, a tested BEAM-native alternative, an explicit downstream/experimental disposition, or an owned implementation gap.

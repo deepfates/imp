@@ -34,6 +34,18 @@ When DSPy publishes a new stable release, updating the baseline is a reviewed
 product change. The ledger must first account for every added, removed, or
 changed upstream surface and give each one a semantic contract and owner.
 
+The inventory is completed from pinned source, public documentation, tests,
+examples, and release deltas—not from exported symbol names alone. For each
+material surface, the audit must answer what a user can accomplish, which
+observable invariants define success, and how Imp proves them. The disposition
+is either an idiomatic public Imp implementation with an executable
+differential, a deliberate BEAM-native alternative with a user-value test, an
+explicit downstream/experimental boundary, or an owned missing capability.
+Absence cannot be accepted merely because upstream's Python shape is unfamiliar
+or inconvenient. Relevant gold data and provider conditions are acquired when
+needed to falsify a semantic claim rather than collected as a speculative
+corpus.
+
 ## Source Lineage
 
 - DSP and DSPy: `arXiv:2212.14024`, `arXiv:2310.03714`, and

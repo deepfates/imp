@@ -15,6 +15,16 @@ boundaries, expose operational failures, and teach the same path in its docs.
 Publishing the product does not authorize a comparative or paper claim.
 Research results retain their own frozen contracts and artifacts.
 
+The current release objective is larger than the already-frozen internal
+`0.3.0` candidate. That candidate proved packaging and a bounded lifecycle; it
+did not complete the library. Before publication, Imp must also account for the
+material current-stable DSPy surface, audit contemporary Optimize Anything and
+Ax concepts that belong in the intended product, exercise every advertised
+optimizer through a natural retained lifecycle, survive realistic composed
+multi-provider operation, and pass an adversarial cold-consumer completion
+pass. Bounded representative live comparisons follow those repairs. The full
+paper-scale benchmark program is not a prerequisite for this release.
+
 ## Convergence Standard
 
 The release process exists to help finish the product. It must not become a
@@ -50,19 +60,32 @@ second product.
 A candidate is coherent when a clean consumer can:
 
 - install Imp and define a realistic multi-stage program;
-- evaluate it and run the advertised supported optimizers through consistent
-  public concepts;
+- evaluate it and run every advertised optimizer family on a representative
+  task through consistent public concepts and its defining mechanism;
 - obtain an honestly selected result on data excluded from selection;
 - write the selected parameter artifact, restart, load it, and reproduce the
   served behavior;
+- compose named predictors and tools across materially different supported
+  provider routes, including genuine incremental streaming where promised;
 - cancel work and observe provider, parsing, metric, budget, and operational
   failures without leaked processes or credentials; and
-- follow the same path in the canonical tutorial and API documentation.
+- follow the same path in the canonical tutorial and API documentation without
+  workshop context, maintainer-only fixtures, or oral guidance.
 
-Each advertised optimizer must be labeled **supported and proven**,
-**supported with limited effectiveness evidence**, or **experimental** from
-actual public behavior. Counts, maturity rungs, package gates, and comparator
-receipts inform that judgment; none can replace it.
+Each optimizer advertised as a product capability must have a credible
+successful user story through its defining mechanism and public API. Failed
+treatments remain visible and must drive diagnosis, but do not by themselves
+complete a family. An integration may remain explicitly research-only when it
+cannot meet that standard; it must not be presented as a finished product
+optimizer. Counts, maturity rungs, package gates, and comparator receipts inform
+that judgment; none can replace it.
+
+For the present release, the root epic's dependency chain is the work ledger:
+stable DSPy and OA/Ax source audits precede optimizer lifecycles; realistic
+provider/OTP operation and those lifecycles precede the cold-consumer pass; the
+cold-consumer pass precedes bounded live comparison; and only then are the
+candidate gates rerun on the exact commit. A green predecessor candidate does
+not bypass that order.
 
 ## Candidate Gates
 

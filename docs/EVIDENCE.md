@@ -106,11 +106,17 @@ must be reported as two numbers, parse rate and score-given-parse; a single
 mean silently absorbs a format-robustness effect and cannot answer a question
 about optimizers.
 
-**A declared parity boundary.** imp's MIPROv2 implements only the startup phase
-of the pinned Optuna 4.9.0 TPE sampler and refuses more than 9 post-baseline
-objective trials rather than silently substituting a different search. Both
-arms therefore run 9 trials; paper-scale MIPROv2 is blocked on modeled TPE.
-This is the intended failure mode — a fidelity gap that announces itself.
+**A repaired parity boundary.** This rehearsal used Imp's explicitly
+startup-only Optuna mode, so both arms were limited to 9 post-baseline trials;
+that historical treatment remains exactly what its artifact records. Imp now
+also implements the pinned modeled Optuna 4.9.0 categorical TPE path and
+exercises startup, the first Bayesian opportunity, checkpoint resume, public
+compile, and minibatch selection against pinned upstream behavior. A documented
+floating-point tie boundary prevents a claim of bit-exact NumPy identity, but
+modeled TPE is no longer the blocker to normal source-scale MIPRO use. These
+differentials establish search mechanics, not broad live effectiveness; the
+latter still requires natural retained optimizer lifecycles and representative
+held-out evidence.
 
 **Where fidelity evidence actually comes from.** The C1 rung, not this campaign.
 Deterministic differential tests against pinned DSPy 3.2.1 and gepa 0.1.4 —

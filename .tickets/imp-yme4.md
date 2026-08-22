@@ -1,7 +1,7 @@
 ---
 id: imp-yme4
 status: in_progress
-deps: [imp-88sn, imp-0du1]
+deps: [imp-88sn, imp-0du1, imp-szhr]
 links: []
 created: 2026-07-25T16:21:13Z
 type: epic
@@ -22,10 +22,11 @@ Imp reaches this finish line when:
   saves the selected state, restarts, and reproduces concurrent served behavior;
 - public program, metric, dataset, optimizer, budget, report, result, and
   artifact concepts remain coherent across the supported optimizer families;
-- every advertised family executes its defining mechanism, fails safely, and
-  is classified from exercised public behavior and representative evidence as
-  stable, useful within named limits, or experimental—without facades or canned
-  substitutes;
+- every optimizer presented as a product capability executes its defining
+  mechanism, produces a credible successful user story through the public API,
+  and fails safely—without facades, canned substitutes, or a negative treatment
+  being mistaken for completion; research-only integrations are labeled and
+  kept outside that advertised product promise;
 - a credible, independently recomputable public benchmark portfolio across
   materially different problem types shows where current Imp produces useful
   held-out improvement, where it does not, and how it compares with coherent
@@ -46,30 +47,48 @@ Package gates, research rungs, comparator receipts, and dashboards are supportin
 
 The product center is real but the telos is open.
 
-### Capability dependency graph (2026-08-20 owner correction)
+### Ratified release objective and dependency graph (2026-08-22)
 
-The active order is architectural, not dashboard- or benchmark-driven:
+The owner has explicitly chosen the larger product promise as the release
+objective. The previously frozen `0.3.0` package is a completed predecessor
+milestone, not the finish line. We are not releasing merely because its gates
+were green, and we are not treating an experimental downstream integration such
+as MLX as the center of the product.
 
-1. provider configuration plus typed signatures and adapters;
-2. one executable-program boundary for Predict, composition, and tools;
-3. examples, metrics, disjoint evaluation, traces, and failure accounting;
-4. stable parameter identity plus public, spend-bounded optimization;
-5. selection, credential-free Artifact persistence, fresh trusted application,
-   and supervised concurrent operation;
-6. representative live usefulness through the packaged public API;
-7. current-stable DSPy semantic completion and broader optimizer fidelity;
-8. matched paper-scale research, resume economics, observatory work, and
-   provider/local weight training including MLX.
+The active order is architectural and user-facing:
 
-The 0.3.0 candidate depends on the bounded real-user loop and truthful evidence,
-not completion of the paper-scale research program. The epic still depends on
-broader usefulness and the stable DSPy delta; a scoped release cannot close it.
-TREC and current-source Optimize Anything are positive scoped evidence.
-Banking77 and HotPot are retained treatment-specific negatives. IFBench take 11
-is a terminal benchmark-instrument stop after selection, not optimizer
-effectiveness evidence. MLX is downstream and stays honestly gated, but it does
-not jump ahead of the shared prompt-program loop merely because its evidence is
-stale.
+1. complete the material current-stable DSPy inventory against pinned primary
+   sources, while auditing contemporary Optimize Anything and Ax for product
+   semantics worth adopting;
+2. repair any missing defining mechanisms and exercise every advertised
+   optimizer through a natural public lifecycle with separate selection and
+   untouched evaluation, retained state, reload, and fresh operation;
+3. exercise realistic composed programs across materially different providers,
+   streaming and tools, with budgets, persistence, concurrency, supervision,
+   cancellation, and adversarial failures;
+4. give the distributable package and public documentation to an adversarial
+   cold consumer, repair everything they cannot understand or accomplish, and
+   repeat from a new clean environment;
+5. run bounded representative live comparisons that can falsify central
+   optimizer behavior without expanding into the enormous paper-scale suite;
+6. freeze and publish the exact release only after those capabilities survive
+   the ordinary candidate gates.
+
+This order is encoded in the child dependency chain rather than in a parallel
+dashboard. `imp-0du1` and `imp-nenu` establish the source-grounded product
+surface; `imp-n8zn` and `imp-uhp2` make optimizer and operational user stories
+real; `imp-juni` attacks the cold-consumer boundary; and `imp-szhr` performs the
+bounded live falsification before this epic can close. Paper-scale Heavy/HoVer,
+observatory work, resume economics, and optional local weight integrations
+remain downstream research unless they expose an ordinary product defect.
+
+Acquire ground truth just in time for each semantic or user-story question:
+exact upstream commits and tests, immutable public or gold data with disjoint
+splits, at least two relevant provider conditions, and deliberate failure
+injection. Do not collect a broad corpus first or let benchmark infrastructure
+substitute for the capability. Positive TREC and Optimize Anything results,
+retained Banking77 and HotPot negatives, and the terminal IFBench instrument
+stop remain evidence inputs; none alone completes the work.
 
 ### Principal protocol audit (2026-08-06, after clean `612ee2aa`)
 
@@ -1395,3 +1414,7 @@ CONSEQUENCE, and it is structural, not a bug to fix casually: 'profile ready: tr
 **2026-08-22T12:53:54Z**
 
 2026-08-22 cleanup/cutover: removed the global benchmark dashboard, JSON gate-receipt wrappers, release-profile evaluator, composite evidence/production/heavy/campaign aliases, alias-string tests, and the legacy-identity allowlist audit (~7k lines). Product release now uses mix check plus distinct package/integration/protocol/live/docs/quality/dialyzer boundaries; research retains question-specific validators and immutable results, not an aggregate score. Decoupled product authorities from the research reproduction registry while preserving exact coverage for algorithm/benchmark families. A real OpenRouter live run then falsified ReActV2 native submit on recipient_name/parameters tool calls; normalized that provider shape at Imp.Adapter.Types, added deterministic regressions, and reran all 15 live cases green. Epic remains open: this subtraction improves the product/research boundary but does not complete stable DSPy audit or broad optimizer telos.
+
+**2026-08-22T13:39:59Z**
+
+Owner decision canonized on 2026-08-22: the release is intended to fulfill the larger library promise, not stop at the previously frozen scoped candidate. Required order is pinned stable-DSPy plus contemporary OA/Ax semantic audit; natural retained lifecycle for every advertised optimizer and repair of defining mechanisms; realistic composed multi-provider/OTP operation; adversarial cold-consumer completion; bounded representative live falsification; then exact-candidate freeze/publication. Full costly paper-scale research is excluded, but ordinary meaningful functionality is not downscoped. The new dependency chain encodes this decision.
