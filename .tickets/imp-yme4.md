@@ -1,6 +1,6 @@
 ---
 id: imp-yme4
-status: in_progress
+status: closed
 deps: [imp-szhr]
 links: []
 created: 2026-07-25T16:21:13Z
@@ -83,75 +83,66 @@ for these outcomes.
 - Typed signatures, examples, predictions, adapters, Predict/CoT and composed
   modules, tools and agent-style programs, evaluation, public optimizers,
   parameter/value artifacts, provider transport through ReqLLM, and supervised
-  operation all exist.
+  operation form one public lifecycle.
 - The defining mechanisms for the advertised DSPy optimizer families are
-  present, including modeled categorical TPE for MIPROv2. Optimize Anything has
-  a structured arbitrary-artifact path. Local weight-training integrations are
-  present but do not define the shared product center.
-- An installable `0.3.0` candidate was previously frozen and passed its bounded
-  package lifecycle. That is a completed predecessor milestone, not this epic.
+  present, including modeled categorical TPE for MIPROv2. Optimize Anything
+  optimizes structured arbitrary artifacts and Playbooks make verified changes
+  reusable. GRPO remains explicitly experimental rather than being counted as
+  a finished product optimizer.
+- ReActV2 and RLM share the typed program/evaluation path and can run through an
+  addressable, observable, cancellable execution boundary. External tool
+  authorization is explicit, source-owned, and fail-closed.
 
 ### Exercised
 
-- Clean-package install, optimization, Artifact reload, fresh-process service,
-  concurrency, cancellation, and provider smoke paths have passed on prior
-  exact commits.
-- TREC provides scoped positive held-out GEPA/MIPRO evidence. The current
-  Optimize Anything campaign provides scoped positive results across code,
-  agent configuration, and scheduling artifacts.
-- Banking77 and HotPot retain honest treatment-specific negatives. IFBench take
-  11 is a terminal instrument stop after optimization/selection, not a held-out
-  effectiveness result.
+- A package-only consumer has repeatedly completed typed composition, disjoint
+  evaluation and optimization, result inspection, Artifact reload across VMs,
+  tamper rejection, fresh OTP release startup, concurrent service, cancellation,
+  crash containment, and recovery without the maintainer checkout.
+- Natural live lifecycles now cover every optimizer advertised as a product
+  capability, with separate selection and held-out data, retained costs and
+  failures, parameter Artifacts, and fresh-state application. The exercised
+  portfolio includes prompt, demonstration, rule, population, ensemble,
+  finetuning, and arbitrary structured-artifact mechanisms.
+- Real OpenRouter and local Ollama routes have executed typed, composed,
+  streaming, tool-using, ReActV2, RLM, and cross-provider selected programs.
+- The final bounded live tutorial repeats improved held-out routing from
+  0.50/0.35/0.30 to 0.95/1.00/0.95. The compact pinned-DSPy TREC recomputation
+  independently reproduces GEPA +0.4000, MIPROv2 +0.1458, and an Imp-minus-DSPy
+  GEPA difference of -0.0083 for that frozen task.
+- Optimize Anything retains positive results across retry code, agent
+  configuration, and scheduling. Banking77, HotPot, local SIMBA/GRPO, classic
+  ReAct model-adherence, and the stopped IFBench rehearsal retain their scoped
+  negative or unresolved classifications rather than being euphemized away.
 
 See `docs/EVIDENCE.md` for claim scope and retained results. Historical run
 chronology belongs in Git, experiment artifacts, and the bounded research
 tickets—not in this active brief.
 
-### Not yet established
+### Release boundary
 
-- Source-current completion. The latest released authorities observed on
-  2026-08-22 are DSPy `3.3.1` (tag commit
-  `638e155cf725236fe5d01b5332394a7bc128881d`), GEPA `0.1.4` (tag commit
-  `8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`), and Ax `24.0.4` (tag commit
-  `a366e49759bd596c8217eca91dfdc9dd8382835d`). Existing Imp differentials
-  largely predate those exact surfaces. Current upstream `main` branches may be
-  inspected for important fixes and imminent concepts, but are not silently
-  promoted into stable compatibility requirements.
-- A credible successful retained lifecycle for every optimizer advertised as a
-  product capability. Deterministic mechanism tests and another family's
-  positive result do not satisfy this.
-- Realistic composed operation across materially different providers,
-  especially incremental streaming, async/tool failures, cache isolation,
-  actual-cost accounting, and selected-artifact application.
-- A final adversarial cold-consumer pass and the bounded live comparisons that
-  follow its repairs.
+The stable source authorities for this cut are DSPy `3.3.1` (tag commit
+`638e155cf725236fe5d01b5332394a7bc128881d`), GEPA `0.1.4` (tag commit
+`8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`), and Ax `24.0.4` (tag commit
+`a366e49759bd596c8217eca91dfdc9dd8382835d`). Their material user-facing
+semantics have executable differentials, BEAM-native implementations, or an
+explicit product disposition in the source audit.
 
-No blanket claim of whole-DSPy parity, broad optimizer effectiveness, or Imp
-superiority is currently justified.
+This completes the library-making epic, not every future research program.
+Paper-scale matched breadth, resume economics, observatory work, broader GRPO
+effectiveness, external adoption, and blanket superiority remain separate work.
+Publication channel, public repository visibility, final SemVer, tag, and Hex
+publication remain owner decisions. Release claims must stay at the scale of
+the retained product and task-specific evidence.
 
-## Work order
+## Cutover
 
-The ticket dependency graph is the operational plan:
-
-1. `imp-7yim` — run a thin clean-consumer spine probe immediately, before the
-   broader audits can hide ordinary product friction.
-2. `imp-0du1` — audit and implement the latest stable DSPy semantic delta.
-3. `imp-nenu` — audit contemporary Optimize Anything and Ax product semantics.
-   The two source audits and the early consumer probe can proceed together.
-4. `imp-n8zn` — make every advertised optimizer complete a natural retained
-   lifecycle. It depends on both audits.
-5. `imp-uhp2` — use the early consumer findings to exercise composed programs
-   across providers and OTP failures. It can proceed alongside the source
-   audits and optimizer lifecycles; the audits inform it rather than gate it.
-6. `imp-juni` — run the final adversarial cold-consumer completion pass after
-   both product tracks are sound.
-7. `imp-szhr` — run bounded representative live comparisons after cold-consumer
-   repairs, then rerun the exact candidate gates in
-   `docs/maintainers/RELEASE.md`.
-
-Paper-scale Heavy/HoVer campaigns, observatory work, resume-economics research,
-and optional local integrations do not block this release unless they expose a
-defect in an advertised ordinary path.
+The dependency-ordered capability work is complete: early cold consumption,
+stable-source audits, optimizer lifecycles, realistic provider/OTP operation,
+final cold consumption, and bounded comparison all closed on their own
+acceptance criteria. The next action is not another feature ticket. Freeze this
+exact state and run the candidate gates in `docs/maintainers/RELEASE.md`; if a
+gate falsifies the candidate, repair that concrete defect and repeat.
 
 ## How to work this epic
 
@@ -190,3 +181,9 @@ defect in an advertised ordinary path.
 
 Publication channel, public repository visibility, tag, and Hex publication
 remain owner decisions after the product reaches this finish line.
+
+## Notes
+
+**2026-08-22T21:35:30Z**
+
+Closed literally after all seven definition-of-done limbs were exercised and the dependency chain reached terminal: stable DSPy/GEPA/Ax/OA audits, real defining optimizer lifecycles, explicit experimental GRPO boundary, cross-provider/stream/tool/RLM/OTP operation, repeated package-only cold consumption, and bounded positive plus negative live comparison. The exact release candidate still must survive docs/maintainers/RELEASE.md gates; a red gate reopens the owning defect rather than changing this verdict by rhetoric.
