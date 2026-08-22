@@ -245,13 +245,18 @@ production and in script-style use.
 The built-in cancellation helper terminates a supervised task with a bounded
 wait.
 `Imp.Run` is the optional addressable execution boundary for hosts that need
-more than `Imp.call/2`. It owns an unlinked supervised task, ordered redacted
-`Imp.Run.Event` delivery, a barrier for terminal ordering, and cooperative
-cancellation hooks. ReActV2 and RLM emit reasoning and source-timed tool
-call/result events through this boundary; the same programs remain ordinary
-`Imp.Module` values when called without it. RLM registers its per-call budget
-owner so cancelling a run terminates active effect tasks before the outer task
-is stopped.
+more than `Imp.call/2`. It owns an unlinked supervised task and an independent
+control process for addressable cancellation, owner-death cleanup, and active
+effect registration. A separate run-owned delivery process invokes the event
+sink serially, preserving redacted `Imp.Run.Event` order and explicit delivery
+barriers without letting a slow observer occupy the cancellation control plane.
+Sinks should hand events to their host promptly: a blocked sink delays only its
+own later events and barriers, and run cancellation or owner death terminates it.
+ReActV2 and RLM emit reasoning and source-timed tool call/result events through
+this boundary; the same programs remain ordinary `Imp.Module` values when
+called without it. RLM registers its per-call budget owner so cancellation from
+the owner or another host process terminates active effects before the outer
+task is stopped.
 
 `Imp.Module.execute/3` is an optional capability-aware entry point sharing the
 same underlying program loop as `call/2`. `Imp.Run` constructs an explicit

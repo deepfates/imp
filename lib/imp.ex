@@ -274,6 +274,11 @@ defmodule Imp do
   `{:cancel, reason}`. A crash, timeout, malformed response, or vanished run
   owner denies the effect. Programs that do not support explicit execution
   capabilities fail closed when `:authorize` is present.
+
+  `event_sink: fun` receives redacted events serially from a run-owned delivery
+  process. A slow sink delays its own later events and delivery barriers, but it
+  cannot delay `cancel_run/3` or owner-death cleanup. Event sinks should normally
+  forward events to their host mailbox and return promptly.
   """
   defdelegate start_run(program, inputs, opts \\ []), to: Imp.Run, as: :start
 

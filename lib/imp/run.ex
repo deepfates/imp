@@ -8,7 +8,10 @@ defmodule Imp.Run do
   ReActV2/RLM tool effects. Observation and cancellation use the owned run
   context; security decisions are carried explicitly in `Imp.Execution`.
   Events describe Imp execution; they do not contain ACP, MCP, UI, or transport
-  concepts.
+  concepts. One run-owned delivery process invokes the event sink serially, so
+  a slow observer preserves event order without delaying cancellation or owner
+  cleanup. Sinks should still hand work off promptly: a permanently blocked
+  sink prevents its own later events and barriers from being delivered.
   """
 
   alias Imp.Run.Control
@@ -68,19 +71,24 @@ defmodule Imp.Run do
 
   @doc "Cancels registered effects before terminating the outer supervised task."
   @spec cancel(t(), term(), timeout()) :: :ok
-  def cancel(%__MODULE__{} = run, reason \\ :cancelled, timeout \\ 5_000) do
+  def cancel(run, reason \\ :cancelled, timeout \\ 5_000)
+
+  def cancel(%__MODULE__{} = run, reason, timeout)
+      when timeout == :infinity or (is_integer(timeout) and timeout > 0) do
     _ = Control.cancel(run.control, reason)
-    _ = Imp.Tasks.cancel(run.task, timeout)
-    stop(run)
+    terminate_task(run.task.pid, timeout)
+    Control.force_stop(run.control)
+  end
+
+  def cancel(%__MODULE__{}, _reason, timeout) do
+    raise ArgumentError,
+          "Imp.Run.cancel/3 expects :infinity or a positive timeout, got: #{inspect(timeout)}"
   end
 
   @doc "Releases the event/cancellation control process after a run completes."
   @spec stop(t()) :: :ok
   def stop(%__MODULE__{control: control}) do
-    if Process.alive?(control), do: GenServer.stop(control, :normal)
-    :ok
-  catch
-    :exit, _reason -> :ok
+    Control.stop(control)
   end
 
   @doc false
@@ -138,6 +146,23 @@ defmodule Imp.Run do
     prefix <> "_" <> Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
   end
 
+  defp terminate_task(pid, timeout) do
+    monitor = Process.monitor(pid)
+
+    if Process.alive?(pid), do: Process.exit(pid, :shutdown)
+
+    receive do
+      {:DOWN, ^monitor, :process, ^pid, _reason} -> :ok
+    after
+      timeout ->
+        Process.exit(pid, :kill)
+
+        receive do
+          {:DOWN, ^monitor, :process, ^pid, _reason} -> :ok
+        end
+    end
+  end
+
   defp new_id, do: new_event_id("run")
 end
 
@@ -179,7 +204,7 @@ defmodule Imp.Run.Control do
 
   use GenServer
 
-  alias Imp.Run.Event
+  alias Imp.Run.{Event, EventDelivery}
 
   def start(opts), do: GenServer.start(__MODULE__, opts)
   def emit(pid, kind, attrs), do: GenServer.call(pid, {:emit, kind, attrs})
@@ -189,14 +214,40 @@ defmodule Imp.Run.Control do
   def barrier(pid, receiver, tag), do: GenServer.call(pid, {:barrier, receiver, tag})
   def attach_task(pid, task_pid), do: GenServer.call(pid, {:attach_task, task_pid})
 
+  def stop(pid) do
+    if Process.alive?(pid) do
+      delivery = GenServer.call(pid, :delivery)
+
+      try do
+        EventDelivery.drain(delivery, 5_000)
+      catch
+        :exit, _reason -> :ok
+      end
+
+      force_stop(pid)
+    else
+      :ok
+    end
+  catch
+    :exit, _reason -> :ok
+  end
+
+  def force_stop(pid) do
+    if Process.alive?(pid), do: GenServer.stop(pid, :normal)
+    :ok
+  catch
+    :exit, _reason -> :ok
+  end
+
   @impl true
   def init(opts) do
     owner = Keyword.fetch!(opts, :owner)
+    {:ok, delivery} = EventDelivery.start_link(Keyword.fetch!(opts, :event_sink))
 
     {:ok,
      %{
        id: Keyword.fetch!(opts, :id),
-       sink: Keyword.fetch!(opts, :event_sink),
+       delivery: delivery,
        sequence: 0,
        cancellables: %{},
        owner: owner,
@@ -223,9 +274,11 @@ defmodule Imp.Run.Control do
         metadata: redact(Map.get(attrs, :metadata, %{}))
       }
 
-    safe_sink(state.sink, event)
+    EventDelivery.deliver(state.delivery, event)
     {:reply, :ok, %{state | sequence: state.sequence + 1}}
   end
+
+  def handle_call(:delivery, _from, state), do: {:reply, state.delivery, state}
 
   def handle_call({:register, fun}, _from, %{cancelled: nil} = state) do
     ref = make_ref()
@@ -253,7 +306,7 @@ defmodule Imp.Run.Control do
   def handle_call({:cancel, _reason}, _from, state), do: {:reply, :ok, state}
 
   def handle_call({:barrier, receiver, tag}, _from, state) do
-    send(receiver, {:imp_run_barrier, tag})
+    EventDelivery.barrier(state.delivery, receiver, tag)
     {:reply, :ok, state}
   end
 
@@ -268,13 +321,14 @@ defmodule Imp.Run.Control do
     {:stop, :normal, state}
   end
 
-  defp safe_sink(sink, event) do
-    _ = sink.(event)
+  @impl true
+  def terminate(_reason, state) do
+    if Process.alive?(state.delivery) do
+      Process.unlink(state.delivery)
+      Process.exit(state.delivery, :kill)
+    end
+
     :ok
-  rescue
-    _error -> :ok
-  catch
-    _kind, _reason -> :ok
   end
 
   defp safe_cancel(fun, reason) do
@@ -288,4 +342,41 @@ defmodule Imp.Run.Control do
 
   defp redact(nil), do: nil
   defp redact(value), do: Imp.Redaction.redact(value)
+end
+
+defmodule Imp.Run.EventDelivery do
+  @moduledoc false
+
+  use GenServer
+
+  def start_link(sink), do: GenServer.start_link(__MODULE__, sink)
+  def deliver(pid, event), do: GenServer.cast(pid, {:deliver, event})
+  def barrier(pid, receiver, tag), do: GenServer.cast(pid, {:barrier, receiver, tag})
+  def drain(pid, timeout), do: GenServer.call(pid, :drain, timeout)
+
+  @impl true
+  def init(sink), do: {:ok, sink}
+
+  @impl true
+  def handle_cast({:deliver, event}, sink) do
+    safe_sink(sink, event)
+    {:noreply, sink}
+  end
+
+  def handle_cast({:barrier, receiver, tag}, sink) do
+    send(receiver, {:imp_run_barrier, tag})
+    {:noreply, sink}
+  end
+
+  @impl true
+  def handle_call(:drain, _from, sink), do: {:reply, :ok, sink}
+
+  defp safe_sink(sink, event) do
+    _ = sink.(event)
+    :ok
+  rescue
+    _error -> :ok
+  catch
+    _kind, _reason -> :ok
+  end
 end

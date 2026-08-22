@@ -53,7 +53,11 @@ program, cancellation remains distinct, and callback failure, timeout, owner
 death, or run cancellation cannot execute the effect or leave a decision task
 alive. `Imp.Module.execute/3` is optional, shares each program's ordinary loop,
 and refuses an authorization-bearing run for modules that do not support the
-capability.
+capability. Ordered event sinks now execute in a separate run-owned delivery
+process rather than inside the cancellation controller: a blocked observer can
+delay its own later events and barriers, but cannot delay cross-process
+`cancel_run/3`, owner-death cleanup, or termination of the run task and delivery
+process.
 
 The persistent Playbook optimizer now has an ordinary reviewed-challenger
 lifecycle. Training weaknesses are exposed as grounded row and trajectory

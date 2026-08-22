@@ -89,6 +89,99 @@ defmodule Imp.RunTest do
     refute Process.alive?(run.control)
   end
 
+  test "a blocked event sink cannot delay cancellation or leak its delivery process" do
+    owner = self()
+    program = %BlockingProgram{signature: Imp.signature("question -> answer")}
+
+    assert {:ok, run} =
+             Imp.start_run(program, %{question: "wait"},
+               event_sink: fn event ->
+                 if event.kind == :run_started do
+                   send(owner, {:sink_blocked, self()})
+                   Process.sleep(:infinity)
+                 end
+               end
+             )
+
+    assert_receive {:sink_blocked, delivery}
+    refute delivery == run.control
+
+    delivery_monitor = Process.monitor(delivery)
+    task_monitor = Process.monitor(run.task.pid)
+    control_monitor = Process.monitor(run.control)
+
+    cancel = Task.async(fn -> Imp.cancel_run(run, :probe_cancel, 100) end)
+    assert :ok = Task.await(cancel, 500)
+
+    assert_receive {:DOWN, ^task_monitor, :process, _pid, _reason}, 500
+    assert_receive {:DOWN, ^control_monitor, :process, _pid, _reason}, 500
+    assert_receive {:DOWN, ^delivery_monitor, :process, _pid, _reason}, 500
+  end
+
+  test "event barriers follow sink delivery order without occupying the control plane" do
+    owner = self()
+    program = %NestedProgram{signature: Imp.signature("question -> answer")}
+
+    assert {:ok, run} =
+             Imp.start_run(program, %{question: "ordered"},
+               event_sink: fn event ->
+                 if event.kind == :run_started do
+                   send(owner, {:sink_waiting, self()})
+                   receive do: (:release_sink -> :ok)
+                 end
+
+                 send(owner, {:delivered, event.sequence})
+               end
+             )
+
+    assert_receive {:sink_waiting, delivery}
+    assert {:ok, _prediction} = Task.await(run.task)
+    assert :ok = Imp.Run.barrier(run, owner, :ordered)
+    refute_receive {:imp_run_barrier, :ordered}, 20
+
+    send(delivery, :release_sink)
+    assert_receive {:imp_run_barrier, :ordered}, 500
+    :ok = Imp.Run.stop(run)
+
+    delivered = receive_delivered([])
+    assert delivered == Enum.to_list(0..2)
+  end
+
+  test "run owner death cleans up a blocked observer and outer execution" do
+    test_pid = self()
+
+    owner =
+      spawn(fn ->
+        program = %BlockingProgram{signature: Imp.signature("question -> answer")}
+
+        {:ok, run} =
+          Imp.start_run(program, %{question: "wait"},
+            event_sink: fn event ->
+              if event.kind == :run_started do
+                send(test_pid, {:owner_sink_blocked, self()})
+                Process.sleep(:infinity)
+              end
+            end
+          )
+
+        send(test_pid, {:owner_blocked_run, run})
+        Process.sleep(:infinity)
+      end)
+
+    assert_receive {:owner_blocked_run, run}
+    assert_receive {:owner_sink_blocked, delivery}
+
+    task_monitor = Process.monitor(run.task.pid)
+    control_monitor = Process.monitor(run.control)
+    delivery_monitor = Process.monitor(delivery)
+
+    Process.exit(owner, :kill)
+
+    assert_receive {:DOWN, ^task_monitor, :process, _pid, _reason}, 500
+    assert_receive {:DOWN, ^control_monitor, :process, _pid, _reason}, 500
+    assert_receive {:DOWN, ^delivery_monitor, :process, _pid, _reason}, 500
+  end
+
   test "supervised child tasks inherit the active run event context" do
     owner = self()
     program = %NestedProgram{signature: Imp.signature("question -> answer")}
@@ -359,10 +452,11 @@ defmodule Imp.RunTest do
 
     assert_receive {:owned_run, run}
     task_monitor = Process.monitor(run.task.pid)
+    control_monitor = Process.monitor(run.control)
     send(owner, :crash)
 
     assert_receive {:DOWN, ^task_monitor, :process, _pid, :killed}, 1_000
-    refute Process.alive?(run.control)
+    assert_receive {:DOWN, ^control_monitor, :process, _pid, _reason}, 1_000
   end
 
   defp receive_events(events) do
@@ -370,6 +464,14 @@ defmodule Imp.RunTest do
       {:run_event, event} -> receive_events(events ++ [event])
     after
       0 -> events
+    end
+  end
+
+  defp receive_delivered(sequences) do
+    receive do
+      {:delivered, sequence} -> receive_delivered([sequence | sequences])
+    after
+      10 -> Enum.reverse(sequences)
     end
   end
 end
