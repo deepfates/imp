@@ -553,6 +553,65 @@ without broad positive results. The source repository's
 [evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
 records that distinction separately from this API cookbook.
 
+### Evolve a playbook as a reviewed challenger
+
+Wrap any executable program with `Imp.with_playbook/2` when it should receive a
+persistent body of operational guidance. `Imp.Optimizer.Playbook` evaluates the
+current program on training observations, gives only those rows and trajectories
+to your proposer, applies its typed `Imp.Playbook.Delta` privately, and compares
+the challenger with the baseline on separate promotion and audit splits:
+
+```elixir no_run
+optimizer =
+  Imp.Optimizer.Playbook.new(
+    proposer: &MyApp.Playbooks.propose/1,
+    evaluator: &MyApp.Playbooks.evaluate/3,
+    reservations: MyApp.Playbooks.stage_reservations(),
+    budget: MyApp.Playbooks.total_budget(),
+    min_lift: 0.05,
+    checkpoint_fn: fn checkpoint ->
+      # Persist started checkpoints for crash diagnosis; only completed ones restore.
+      MyApp.Playbooks.record_checkpoint(checkpoint)
+    end
+  )
+
+{:ok, result} =
+  Imp.Optimizer.run(optimizer, program,
+    trainset: training_rows,
+    promotionset: promotion_rows,
+    auditset: audit_rows
+  )
+
+review = Imp.Optimizer.Playbook.review(result)
+#=> %{decision: :promote | :reject, scores: ..., lifts: ..., usage: ...}
+
+:ok = Imp.Optimizer.Playbook.write_checkpoint!(result.checkpoint, checkpoint_path)
+
+{:ok, restored} =
+  checkpoint_path
+  |> Imp.Optimizer.Playbook.read_checkpoint!()
+  |> Imp.Optimizer.Playbook.restore(fresh_runtime_bound_program)
+
+# Deployment is an explicit application action; compile/6 does not hot-swap a server.
+selected_program = restored.program
+previous_program = Imp.Optimizer.Playbook.rollback(restored)
+```
+
+Inside `propose/1`, call
+`Imp.Optimizer.Playbook.observed_weaknesses(request)` to obtain the lowest-scoring
+training rows paired with their admitted feedback trajectories. The proposer
+must return `{:ok, %Imp.Playbook.Delta{}, usage}`. The evaluator receives
+`(program, rows, context)` and returns `{:ok, trajectories, usage}`. Every row
+needs stable `"id"`, `"source_id"`, `"group_id"`, and `"leakage_terms"` fields;
+Imp rejects overlap among all three splits, held-out content/provenance leakage,
+unbounded retained growth, undeclared usage, and challengers that miss the lift
+threshold on either promotion or audit data.
+
+The completed checkpoint contains both playbooks, trajectories, feedback,
+scores, usage, and rollback state. Store it as sensitive data. A promotion
+decision changes only the returned immutable value; application code still
+reviews the summary and decides whether and when to install it.
+
 ## Multi-stage programs are normal Elixir modules
 
 Real applications often need more than one model call. Define a struct that

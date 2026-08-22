@@ -155,14 +155,17 @@ structural cases. Its admitted T1 artifact does not satisfy GEPA operational,
 paper-reproduction, effectiveness, or full-parity claims.
 
 The ledger pins GEPA `v0.1.4` as the current algorithm authority and `v0.1.1`
-as a historical executable contract, Ax `23.0.0` as an independent
-implementation comparator, and ReqLLM `v1.17.1` as the BEAM runtime dependency.
-Comparator pins help detect accidental design assumptions; they do not create
-scientific parity claims.
+as a historical executable contract, Ax `23.0.0` as the immutable executable
+differential, and ReqLLM `v1.17.1` as the BEAM runtime dependency. The current
+Ax product-semantic audit separately pins npm `24.0.4` at registry `gitHead`
+`a366e49759bd596c8217eca91dfdc9dd8382835d`; it does not rewrite the historical
+differential. Comparator pins help detect accidental design assumptions; they
+do not create scientific parity claims.
 
-Ax's selected implementation files are bound by
+Ax 23.0.0's selected implementation files are bound by
 `benchmarks/authority_sources/ax-23.0.0-eb5835e.json`; the executable scope and
-intentional native deviations are documented in `docs/internal/AX_DIFFERENTIAL.md`.
+the separate content-bound 24.0.4 semantic audit are documented in
+`docs/internal/AX_DIFFERENTIAL.md`.
 
 ## Optimize Anything Protocol Pins
 

@@ -11,6 +11,11 @@ defmodule Imp.Optimizer.Playbook do
   This is an Elixir-native adaptation of the incremental context-learning loop
   explored by Dynamic Cheatsheet and ACE. It uses Imp's normal program
   parameter and trajectory contracts; it is not a second agent-memory runtime.
+
+  `compile/6` never mutates a serving process. It returns a `Result` containing
+  the baseline, challenger, decision, audit scores, usage, and exact rollback
+  state. Application code must review that result and explicitly install
+  `result.program` (or persist and restore its completed checkpoint).
   """
 
   alias Imp.Optimizer.Trajectory
@@ -198,6 +203,115 @@ defmodule Imp.Optimizer.Playbook do
     case fetch_playbook(program, parameter) do
       {:ok, %Context{hash: hash}} when hash == baseline.hash -> program
       _ -> raise ArgumentError, "playbook rollback state is inconsistent"
+    end
+  end
+
+  @doc "Returns a compact, data-only challenger review before deployment."
+  @spec review(struct()) :: map()
+  def review(%Result{} = result) do
+    %{
+      decision: if(result.promoted?, do: :promote, else: :reject),
+      scores: result.scores,
+      lifts: %{
+        promotion: result.scores.candidate_promotion - result.scores.baseline_promotion,
+        audit: result.scores.candidate_audit - result.scores.baseline_audit
+      },
+      rejection_reasons: result.rejection_reasons,
+      baseline: playbook_identity(result.baseline_playbook),
+      challenger: playbook_identity(result.candidate_playbook),
+      usage: result.usage
+    }
+  end
+
+  @doc """
+  Returns low-scoring training observations from a proposer request.
+
+  The result stays grounded in the exact training rows and admitted trajectories
+  passed to the proposer. Observations are ordered from lowest score to highest;
+  use `below:` to set the exclusive score threshold (default `1.0`). Promotion
+  and audit rows are never present in the request produced by this optimizer.
+  """
+  @spec observed_weaknesses(map(), keyword()) :: [map()]
+  def observed_weaknesses(request, opts \\ [])
+
+  def observed_weaknesses(%{rows: rows, trajectories: trajectories}, opts)
+      when is_list(rows) and is_list(trajectories) and is_list(opts) do
+    unless Keyword.keyword?(opts) and Keyword.keys(opts) -- [:below] == [] do
+      raise ArgumentError, "observed_weaknesses/2 expects only the :below option"
+    end
+
+    threshold = Keyword.get(opts, :below, 1.0)
+
+    unless valid_score?(threshold) do
+      raise ArgumentError, ":below must be a finite score between 0 and 1"
+    end
+
+    unless length(rows) == length(trajectories) do
+      raise ArgumentError, "playbook proposer rows and trajectories are not aligned"
+    end
+
+    rows
+    |> Enum.zip(trajectories)
+    |> Enum.filter(fn {_row, trajectory} -> trajectory.score < threshold end)
+    |> Enum.map(fn {row, trajectory} ->
+      %{
+        row: row,
+        trajectory: trajectory,
+        score: trajectory.score,
+        feedback: trajectory.feedback
+      }
+    end)
+    |> Enum.sort_by(&{&1.score, &1.trajectory.index})
+  end
+
+  def observed_weaknesses(_request, _opts) do
+    raise ArgumentError,
+          "observed_weaknesses/2 expects a playbook proposer request with aligned rows and trajectories"
+  end
+
+  @doc "Atomically writes a verified completed checkpoint as owner-readable JSON."
+  @spec write_checkpoint!(map(), Path.t()) :: :ok
+  def write_checkpoint!(checkpoint, path) when is_binary(path) do
+    case verify_checkpoint(checkpoint) do
+      {:ok, %{"status" => "complete"}} -> :ok
+      {:ok, %{"status" => status}} -> raise ArgumentError, "cannot persist #{status} checkpoint"
+      {:error, reason} -> raise ArgumentError, "invalid playbook checkpoint: #{inspect(reason)}"
+    end
+
+    File.mkdir_p!(Path.dirname(path))
+    temporary = path <> ".tmp-" <> Integer.to_string(System.unique_integer([:positive]))
+    io = File.open!(temporary, [:write, :binary, :exclusive])
+
+    try do
+      File.chmod!(temporary, 0o600)
+      :ok = IO.binwrite(io, Jason.encode!(checkpoint, pretty: true) <> "\n")
+      :ok = :file.sync(io)
+    after
+      File.close(io)
+    end
+
+    try do
+      File.rename!(temporary, path)
+      :ok
+    after
+      File.rm(temporary)
+    end
+  end
+
+  @doc "Reads and verifies a completed playbook optimizer checkpoint."
+  @spec read_checkpoint!(Path.t()) :: map()
+  def read_checkpoint!(path) when is_binary(path) do
+    checkpoint = path |> File.read!() |> Jason.decode!()
+
+    case verify_checkpoint(checkpoint) do
+      {:ok, %{"status" => "complete"}} ->
+        checkpoint
+
+      {:ok, %{"status" => status}} ->
+        raise ArgumentError, "expected completed checkpoint, got #{status}"
+
+      {:error, reason} ->
+        raise ArgumentError, "invalid playbook checkpoint: #{inspect(reason)}"
     end
   end
 
@@ -514,6 +628,10 @@ defmodule Imp.Optimizer.Playbook do
   defp changed_entries(baseline, candidate) do
     baseline_hashes = Map.new(baseline.entries, &{&1.id, &1.hash})
     Enum.reject(candidate.entries, &(baseline_hashes[&1.id] == &1.hash))
+  end
+
+  defp playbook_identity(playbook) do
+    %{id: playbook.id, revision: playbook.revision, hash: playbook.hash}
   end
 
   defp contains_normalized?(content, term) do

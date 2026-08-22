@@ -122,6 +122,13 @@ honest negative GEPA selection and successful fresh-service lifecycle; those
 research data, runners, results, and artifacts are deliberately excluded from
 the packaged example.
 
+Persistent playbooks use the same application-owned deployment posture. Their
+optimizer grounds proposals in training failures, requires lift on separate
+promotion and audit rows, returns a challenger review with authoritative usage
+and exact rollback, and restores a private checksummed checkpoint into freshly
+constructed runtime code. It returns immutable state; installing the selected
+playbook into a serving process remains an explicit application decision.
+
 ## Since v0.1.0
 
 - Packaged for Hex with the product guides, five Livebooks, provider-free

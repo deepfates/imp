@@ -45,6 +45,9 @@ defmodule Imp.Optimizer.PlaybookTest do
         proposer: fn request ->
           send(parent, {:proposal_rows, Enum.map(request.rows, & &1["id"])})
 
+          weaknesses = PlaybookOptimizer.observed_weaknesses(request)
+          send(parent, {:weaknesses, Enum.map(weaknesses, & &1.row["id"])})
+
           delta =
             Delta.new(
               [
@@ -91,6 +94,13 @@ defmodule Imp.Optimizer.PlaybookTest do
     assert PlaybookOptimizer.rollback(result).playbook.hash == baseline.hash
     assert PlaybookOptimizer.rollback(result) == result.baseline_program
     assert_receive {:proposal_rows, ["train-1", "train-2"]}
+    assert_receive {:weaknesses, ["train-1", "train-2"]}
+
+    assert %{
+             decision: :promote,
+             lifts: %{promotion: 1.0, audit: 1.0},
+             rejection_reasons: []
+           } = PlaybookOptimizer.review(result)
 
     checkpoints = collect_checkpoints([])
     assert length(checkpoints) == 7
@@ -106,6 +116,24 @@ defmodule Imp.Optimizer.PlaybookTest do
     assert restored.program.playbook == result.candidate_playbook
     assert restored.scores == result.scores
     assert Imp.Saving.load(Imp.Saving.dump(restored.program)) == restored.program
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-playbook-checkpoint-#{System.unique_integer([:positive])}.json"
+      )
+
+    try do
+      assert :ok = PlaybookOptimizer.write_checkpoint!(result.checkpoint, path)
+      assert {:ok, %File.Stat{mode: mode}} = File.stat(path)
+      assert Bitwise.band(mode, 0o777) == 0o600
+
+      persisted = PlaybookOptimizer.read_checkpoint!(path)
+      assert {:ok, from_disk} = PlaybookOptimizer.restore(persisted, fresh_program)
+      assert from_disk.program.playbook == result.candidate_playbook
+    after
+      File.rm(path)
+    end
   end
 
   test "rejects a challenger without replicated lift and preserves the baseline" do
@@ -141,6 +169,7 @@ defmodule Imp.Optimizer.PlaybookTest do
     assert result.program.playbook == baseline
     assert length(result.rejection_reasons) == 2
     assert PlaybookOptimizer.rollback(result).playbook == baseline
+    assert %{decision: :reject, rejection_reasons: [_, _]} = PlaybookOptimizer.review(result)
 
     portable = result.checkpoint |> Jason.encode!() |> Jason.decode!()
     assert {:ok, restored} = PlaybookOptimizer.restore(portable, wrapped_program(baseline))

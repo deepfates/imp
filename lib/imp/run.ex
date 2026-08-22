@@ -21,7 +21,7 @@ defmodule Imp.Run do
   @type t :: %__MODULE__{task: Task.t(), control: pid(), id: String.t()}
 
   @doc "Starts an unlinked supervised program run owned by the calling process."
-  @spec start(Imp.Module.t(), map() | keyword(), keyword()) :: {:ok, t()} | {:error, term()}
+  @spec start(struct(), map() | keyword(), keyword()) :: {:ok, t()} | {:error, term()}
   def start(program, inputs, opts \\ []) when is_list(opts) do
     event_sink = Keyword.get(opts, :event_sink, fn _event -> :ok end)
     authorize = Keyword.get(opts, :authorize)

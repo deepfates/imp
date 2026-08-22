@@ -216,7 +216,7 @@ semantics, or produces useful held-out improvement.
 | --- | --- | --- |
 | [DSPy](https://github.com/stanfordnlp/dspy) | Primary compatibility authority for signatures, modules, runtime semantics, and named optimizers. | Pin an exact release, commit, source hashes, and relevant tests for each claim. Current instruction-optimizer gates use `3.3.0b1` at `b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f`. |
 | [GEPA](https://github.com/gepa-ai/gepa) | Primary standalone implementation authority for generic reflective text optimization. | Current release `v0.1.4` resolves to `8b0ce6cd99a234f6b74daf37558a2ac0ce18f975`; `v0.1.1` remains an explicitly historical differential contract. |
-| [Ax](https://github.com/ax-llm/ax) | Strongest independent implementation comparator for a typed TypeScript interpretation of DSPy-style programming. | Release `23.0.0` resolves to `eb5835e54ba0c5b2fbac380daed1cb87faeefd5e`. Use for API and behavioral comparison, not as scientific authority. |
+| [Ax](https://github.com/ax-llm/ax) | Strongest independent implementation comparator for a typed TypeScript interpretation of DSPy-style programming. | Current product-semantic audit: npm `24.0.4`, registry `gitHead` `a366e49759bd596c8217eca91dfdc9dd8382835d`. Historical executable differential: `23.0.0` at `eb5835e54ba0c5b2fbac380daed1cb87faeefd5e`. Use for API and behavioral comparison, not as scientific authority. |
 | [BAML](https://github.com/BoundaryML/baml) | Comparator for compiler diagnostics, generated typed clients, and partial structured streaming. | Study its contracts; do not add a separate Imp language unless Elixir modules and macros are demonstrably insufficient. |
 | [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow), [TextGrad](https://github.com/zou-group/textgrad), and [SAMMO](https://github.com/microsoft/sammo) | Comparators for explicit parameter graphs, textual feedback, and structure-aware prompt transformations. | Borrow mechanisms only after pinning code and paper protocols independently. |
 | [ReqLLM](https://github.com/agentjido/req_llm) | Preferred BEAM provider substrate. | Release `v1.17.1` resolves to `33840077c2f1332eb6dff2d268dff02393014da4`. Integrate its provider, multimodal, tool, stream, usage, error, and telemetry contracts instead of rebuilding them. |
@@ -276,8 +276,9 @@ P0 work on the current finish line:
 
 P1 work after those blockers:
 
-1. Maintain the pinned Ax `23.0.0` differential in `docs/internal/AX_DIFFERENTIAL.md` as
-   an independent implementation check without promoting Ax to scientific
+1. Maintain the pinned Ax `23.0.0` executable differential and current
+   `24.0.4` product-semantic audit in `docs/internal/AX_DIFFERENTIAL.md` as
+   independent implementation checks without promoting Ax to scientific
    authority.
 2. Add operational failure campaigns for cancellation, timeout, retries,
    partial streams, checkpoint resume, idempotency, process failure, and

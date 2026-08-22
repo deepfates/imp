@@ -51,6 +51,14 @@ alive. `Imp.Module.execute/3` is optional, shares each program's ordinary loop,
 and refuses an authorization-bearing run for modules that do not support the
 capability.
 
+The persistent Playbook optimizer now has an ordinary reviewed-challenger
+lifecycle. Training weaknesses are exposed as grounded row and trajectory
+pairs; promotion requires separate disjoint promotion and audit lift; review
+shows the decision, score deltas, usage, and exact identities; and completed
+checkpoints have private atomic write/read helpers for verified fresh-runtime
+restore. Compilation returns immutable state and never silently hot-promotes a
+serving process.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is
