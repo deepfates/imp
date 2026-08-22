@@ -70,7 +70,8 @@ specific questions they answer. They are not combined into a release score:
 - optimizer lift checks through `mix benchmark.optimizer_lift.check`
 - GEPA paper-family artifact validation through
   `mix benchmark.gepa_replication.check`
-- RAG/tool/agent checks through `mix benchmark.rag_tool_agent.check`
+- RAG/tool checks through focused ReAct, RLM, tool-schema, MCP, retrieval,
+  task-supervision, and integration tests
 - matched provider-free RAG/tool failure traces through
   `mix benchmark.rag_tool_failure.check`
 - repeated deterministic timeout, cancellation, backpressure, partial-stream,

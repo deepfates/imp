@@ -154,21 +154,6 @@ defmodule ToolSchemaRuntimeTest do
     refute_received {:schema_tool_called, _input}
   end
 
-  test "Agent returns validation errors on its existing tool-error trace path" do
-    parent = self()
-
-    agent =
-      Imp.Agent.new(
-        :schema_agent,
-        fn agent, _input, runtime -> Imp.Agent.call_tool(agent, :lookup, %{}, runtime) end,
-        tools: [schema_tool(parent)]
-      )
-
-    assert {:error, {:missing_required, ["query"]}, runtime} = Imp.Agent.run(agent, %{})
-    assert Enum.map(runtime.traces, & &1.type) == [:tool_error, :agent_error]
-    refute_received {:schema_tool_called, _input}
-  end
-
   defp schema_tool(parent) do
     Imp.Tool.new(
       :lookup,

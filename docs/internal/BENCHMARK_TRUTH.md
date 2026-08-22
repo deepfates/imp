@@ -668,41 +668,16 @@ claiming AMPS_Hard parity. The default bridge is
 `scripts/livebench_math_score.py`; pin `IMP_LIVEBENCH_MATH_PYTHON` and, when
 needed, `IMP_LIVEBENCH_MATH_BRIDGE` for research campaigns.
 
-## Run RAG, Tool, And Agent Parity
+## Run RAG And Tool Differentials
 
-```sh
-mix benchmark.rag_tool_agent.check
-```
+The former aggregate RAG/tool/agent evaluator was removed in 0.3 with the
+disconnected `Imp.Agent` runtime. Ordinary product behavior is tested at its
+canonical boundaries: ReAct/ReActV2, RLM, `Imp.Tool`, tool policy, MCP,
+retrieval, streaming, persistence, and supervised tasks. The remaining
+source-bound runners below exist only where an external differential adds
+information that those direct product tests cannot.
 
-This provider-free lane directly compares Imp and DSPy on deterministic RAG
-retrieval/answering and ReAct lookup-tool semantics. It also records Imp
-production-semantics evidence for HTTP retriever protocol shape, MCP import
-through agents, tool policy denial traces, ReAct error traces, CodeAct,
-ProgramOfThought success and sandbox rejection, streaming incremental fields,
-BEAM async execution, and save/load redaction. Provider behavior over real
-models can be measured directly in the same artifact:
-
-The provider-free artifact is a bounded C2 operational-contract proof. It
-requires exactly the two declared DSPy comparison rows, rejects missing or
-duplicate rows, exercises the actual `Imp.rag` wrapper, and includes a
-ReActV2 trajectory that recovers from failing, unknown, and malformed tool
-calls before bounded submission. A source-bound candidate must be run from a
-clean checkout and binds the Imp revision, pinned DSPy 3.2.1 authority, task
-and sidecar hashes, and the provider-free fixture:
-
-```sh
-mix imp.benchmark.rag_tool_agent \
-  --require-clean \
-  --out benchmarks/runs/rag-tool-agent
-```
-
-The operational artifact does not measure HotPotQA answer/supporting-fact
-quality or BFCL tool name/argument accuracy. The separate matched failure
-differential below closes the missing provider-free schedule contract, but it
-does not close comparative effectiveness because its actions are queued rather
-than model-selected.
-
-The separate provider-free HotPotQA retrieval differential uses the pinned
+The provider-free HotPotQA retrieval differential uses the pinned
 first ten `fullwiki` validation rows and materializes one shared corpus of 100
 uniquely titled passages. It binds the dataset, split manifest, scorer/config,
 Imp task, Python sidecar, and DSPy 3.2.1 authority by SHA-256. Both runtimes use
@@ -789,36 +764,6 @@ quality, native retry/idempotency features, latency, transport timeouts, or
 research effectiveness parity. Its validator recomputes rows, summaries,
 limitations, source hashes, and exact scenario order instead of trusting pass
 booleans.
-
-```sh
-mix imp.benchmark.rag_tool_agent \
-  --live \
-  --model anthropic:claude-haiku-4-5-20251001 \
-  --dspy-model anthropic/claude-haiku-4-5-20251001 \
-  --env-file .env \
-  --python tmp/dspy-parity-venv/bin/python \
-  --out benchmarks/runs/rag-tool-agent
-```
-
-Live mode adds one retrieval-conditioned answer and one ReAct lookup row under
-matched model identity, provider-equivalent wire APIs, effective generation
-controls, exact outputs/traces, and complete provider-reported usage. Imp uses
-its reserved `submit` tool while DSPy ReAct uses `finish`; the artifact records
-and admits only that explicit runtime adaptation under one semantic prompt
-contract. The Imp row imports an MCP catalog tool. `LIVE_PROVIDER=1 mix
-live.check` separately proves the same provider/ReAct composition through an
-HTTP MCP JSON-RPC server. `full_rag_tool_agent_parity` remains false unless all
-provider-free and live rows pass. Quota or provider errors are retained as
-failed evidence, never converted into missing or passing rows.
-
-The tracked pre-cutover run under `benchmarks/results/rag-tool-agent-live/`
-binds the runner to commit `7105b5e63d326a0cdae5086ed9ff91d56c41ca4d`,
-uses `claude-haiku-4-5-20251001` over Anthropic Messages on both runtimes, and
-passes 15/15 rows. The two matched live rows record exact answers and traces,
-complete provider usage, and about $0.0076 total cost. It is historical evidence
-for that revision, not current-release admission or research-scale retrieval or
-tool-use quality. Fresh candidates are written under
-`benchmarks/runs/rag-tool-agent/`.
 
 ## Run RLM Benchmark Parity
 

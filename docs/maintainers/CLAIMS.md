@@ -147,16 +147,14 @@ implied.
 
 Failure-recovery operational evidence is limited to two required local rows:
 provider-shaped timeout/retry/idempotency and integration retrieval plus exact
-tool-agent failure/retry/submit recovery. The campaign uses injected local
+ReAct failure/retry/submit recovery. The campaign uses injected local
 transports, a static LM, and dummy canaries only. It makes no external-provider
 or live provider-training claim.
 
-RAG, tool, and agent evidence is split into individual C1 claims for the exact
-provider-free RAG, ReAct, ReActV2, MCP import, agent policy, CodeAct,
-ProgramOfThought, streaming, async, and credential-redaction rows. Exact DSPy
-comparison is claimed only for memory RAG and successful ReAct lookup; the
-other rows are explicitly Imp-native fixture contracts. Bounded HotPotQA
-retrieval is a separate differential. The CC0 BFCL-shaped scorer check is only C1/T1
+Ordinary RAG, ReAct, ReActV2, MCP, CodeAct, ProgramOfThought, streaming,
+supervision, and credential-redaction behavior belongs to direct product tests,
+not individual scientific claims or an aggregate evidence evaluator. Bounded
+HotPotQA retrieval is a separate differential. The CC0 BFCL-shaped scorer check is only C1/T1
 fixture agreement: independent Elixir and Python implementations score twelve
 original positives and nine mutations. It executes neither official BFCL nor
 DSPy scorer code and establishes no model generation/tool-selection quality,

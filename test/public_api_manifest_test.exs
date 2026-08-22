@@ -113,8 +113,8 @@ defmodule PublicAPIManifestTest do
     refute "normalize_demos!/2" in modules["Imp.Example"]["functions"]
     refute "__struct__/0" in modules["Imp.Example"]["functions"]
     refute "child_spec/1" in modules["Imp.Cache"]["functions"]
-    assert "Imp.Agent" in excluded
-    assert "Imp.Agent.Runtime" in excluded
+    refute "Imp.Agent" in excluded
+    refute "Imp.Agent.Runtime" in excluded
     assert modules["Imp.Saving.Registry"]["category"] == "stable"
     refute "Imp.Saving.Registry" in excluded
   end

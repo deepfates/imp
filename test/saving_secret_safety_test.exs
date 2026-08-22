@@ -100,34 +100,6 @@ defmodule Imp.SavingSecretSafetyTest do
     assert Imp.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "beam"
   end
 
-  test "agent schemas preserve semantic credential names and sanitize mixed tagged envelopes" do
-    handler = fn inputs, runtime -> {:ok, inputs, runtime} end
-    registry = Imp.Saving.Registry.new(schema_handler: handler)
-    typed_key = %{"__imp_type__" => "atom", "value" => "api_key"}
-
-    hostile =
-      Map.new([
-        {:__imp_type__, "noop"},
-        {"__imp_type__", "map"},
-        {:entries, [[typed_key, "CANARY_SAVING_COLLISION"]]},
-        {"entries", []}
-      ])
-
-    agent =
-      Imp.Agent.new(:schema_agent, handler,
-        input_schema: %{token: :string, api_key: :string, hostile: hostile},
-        output_schema: %{authorization: :string}
-      )
-
-    state = Imp.dump(agent, registry: registry)
-    refute inspect(state) =~ "CANARY_SAVING_COLLISION"
-
-    loaded = Imp.load(state, registry: registry)
-    assert loaded.input_schema.token == :string
-    assert loaded.input_schema.api_key == :string
-    assert loaded.output_schema.authorization == :string
-  end
-
   test "tool closures fail with an actionable registry requirement" do
     tool = Imp.tool(:lookup, "lookup", fn args -> args end)
     program = Imp.react("question -> answer", [tool])

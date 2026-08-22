@@ -40,16 +40,6 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Agent",
-      "source": "lib/imp/agent.ex"
-    },
-    {
-      "category": "internal",
-      "module": "Imp.Agent.Runtime",
-      "source": "lib/imp/agent/runtime.ex"
-    },
-    {
-      "category": "internal",
       "module": "Imp.Deadline",
       "source": "lib/imp/deadline.ex"
     },

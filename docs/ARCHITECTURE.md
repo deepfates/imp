@@ -218,7 +218,7 @@ structs. The supervised runtime boundary currently owns:
 - `Imp.TaskSupervisor`, the named task supervisor used by linked provider
   async and parallel prediction fan-out;
 - `Imp.UnlinkedTaskSupervisor`, the named task supervisor used by unlinked
-  event workers such as agent event streaming.
+  bounded workers whose callers own cancellation and result collection.
 
 In production releases, start the `:imp` application under the host
 supervision tree. Mix does this automatically for normal applications, but
@@ -326,9 +326,9 @@ Arbitrary artifact optimization lives under `Imp.Optimize.*`:
 ## Agents, Tools, MCP
 
 `Imp.Tool` wraps callable functionality; the react-family programs compose
-tools under explicit policies. An explicit agent runtime exists internally,
-but the packaged surface is the react/rlm spectrum plus your own supervised
-Elixir around `Imp.Tool.call/2`.
+tools under explicit policies. The packaged agent surface is the react/RLM
+spectrum plus ordinary supervised Elixir around `Imp.call/2` and
+`Imp.Tool.call/2`; Imp does not ship a second generic agent runtime.
 
 `Imp.MCP` imports in-process, HTTP, stdio, or Streamable HTTP tool catalogs
 into `Imp.Tool` values. Transport clients use JSON-RPC 2.0 envelopes,

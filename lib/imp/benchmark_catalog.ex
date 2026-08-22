@@ -39,7 +39,6 @@ defmodule Imp.BenchmarkCatalog do
       status: "provider_free_implemented",
       commands: [
         "mix benchmark.truth.check",
-        "mix benchmark.rag_tool_agent.check",
         "mix benchmark.parity.check"
       ],
       next_step:
@@ -71,7 +70,6 @@ defmodule Imp.BenchmarkCatalog do
       tiers: ["smoke", "research"],
       status: "provider_free_implemented",
       commands: [
-        "mix benchmark.rag_tool_agent.check",
         "mix imp.benchmark.rag_tool_failure_differential",
         "mix protocol.retriever.check"
       ],
@@ -88,7 +86,6 @@ defmodule Imp.BenchmarkCatalog do
       status: "provider_free_implemented",
       commands: [
         "mix benchmark.trace.check",
-        "mix benchmark.rag_tool_agent.check",
         "mix imp.benchmark.rag_tool_failure_differential",
         "mix integration.check"
       ],
@@ -107,7 +104,6 @@ defmodule Imp.BenchmarkCatalog do
       status: "deterministic_implemented",
       commands: [
         "mix test test/rlm_test.exs",
-        "mix benchmark.rag_tool_agent.check",
         "mix integration.check"
       ],
       next_step:

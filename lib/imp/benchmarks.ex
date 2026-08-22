@@ -1,14 +1,13 @@
 defmodule Imp.Benchmarks do
   @moduledoc false
 
-  alias Imp.Agent
   alias Imp.Optimize.Anything
   alias Imp.Optimize.Anything.{Config, Result}
 
   def run do
     [
       structured_extraction(),
-      agent_tool_task(),
+      supervised_tool_policy_task(),
       prompt_optimization(),
       program_reward_optimization(),
       arbitrary_artifact_optimization()
@@ -33,7 +32,7 @@ defmodule Imp.Benchmarks do
   def negative_controls do
     [
       structured_extraction_negative(),
-      agent_tool_task_negative(),
+      supervised_tool_policy_task_negative(),
       prompt_optimization_negative(),
       program_reward_optimization_negative(),
       arbitrary_artifact_optimization_negative()
@@ -74,22 +73,13 @@ defmodule Imp.Benchmarks do
     result(:structured_extraction, score)
   end
 
-  defp agent_tool_task do
+  defp supervised_tool_policy_task do
     tool = Imp.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+    :ok = Imp.ToolPolicy.authorize([:double], tool.name, %{x: 4})
+    task = Imp.Tasks.async(fn -> Imp.Tool.call(tool, %{x: 4}) end)
 
-    agent =
-      Agent.new(
-        :doubler,
-        fn agent, %{x: x}, runtime ->
-          Agent.call_tool(agent, :double, %{x: x}, runtime)
-        end,
-        tools: [tool]
-      )
-
-    {:ok, %{y: 8}, runtime} = Agent.run(agent, %{x: 4})
-
-    score = if Enum.any?(runtime.traces, &(&1.type == :tool)), do: 1.0, else: 0.0
-    result(:agent_tool_task, score)
+    score = if Task.await(task) == %{y: 8}, do: 1.0, else: 0.0
+    result(:supervised_tool_policy_task, score)
   end
 
   defp prompt_optimization do
@@ -173,26 +163,14 @@ defmodule Imp.Benchmarks do
     result(:structured_extraction_negative, score)
   end
 
-  defp agent_tool_task_negative do
-    tool = Imp.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
-
-    agent =
-      Agent.new(
-        :doubler_locked,
-        fn agent, %{x: x}, runtime ->
-          Agent.call_tool(agent, :double, %{x: x}, runtime)
-        end,
-        tools: [tool],
-        tool_policy: []
-      )
-
+  defp supervised_tool_policy_task_negative do
     score =
-      case Agent.run(agent, %{x: 4}) do
-        {:ok, %{y: 8}, _runtime} -> 1.0
-        {:error, {:tool_denied, :double}, _runtime} -> 0.0
+      case Imp.ToolPolicy.authorize([], :double, %{x: 4}) do
+        :ok -> 1.0
+        {:error, {:tool_denied, :double}} -> 0.0
       end
 
-    result(:agent_tool_task_negative, score)
+    result(:supervised_tool_policy_task_negative, score)
   end
 
   defp prompt_optimization_negative do

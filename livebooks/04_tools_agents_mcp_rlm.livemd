@@ -39,11 +39,11 @@ live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ## Tools
 
 Livebook 03 handled improvement loops. This chapter adds action boundaries:
-tools, ReAct, MCP imports, agents, and RLM all let an Imp program do controlled
+tools, ReAct, MCP imports, and RLM all let an Imp program do controlled
 work outside a single LM completion.
 
-Tools are ordinary named functions with metadata. Agents, ReAct, and RLM all
-use the same tool struct, which keeps policy and tracing consistent.
+Tools are ordinary named functions with metadata. ReAct and RLM use the same
+tool struct, which keeps policy and tracing consistent.
 
 ```elixir
 lookup =

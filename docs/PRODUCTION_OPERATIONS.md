@@ -29,11 +29,12 @@ Supervised Imp runtime state:
 - `Imp.Settings` owns global defaults. Prefer `Imp.context/2` for scoped
   overrides in request code and tests. Plain BEAM tasks keep ordinary
   process-local semantics; Imp-owned fan-out through `Parallel`, provider async,
-  and agent event streams inherits the caller's Imp context.
+  evaluation, and optimizer tasks inherits the caller's Imp context.
 - `Imp.Cache` owns the ETS table used by the built-in response cache.
 - supervised task owners hold linked async helpers, including provider async
   and parallel prediction fan-out.
-- a separate unlinked worker owner handles agent event streaming.
+- a separate unlinked task supervisor handles bounded workers whose callers
+  own cancellation and result collection.
 - host applications still own higher-level orchestration lifetimes and
   cancellation policy.
 
@@ -95,9 +96,9 @@ Security-sensitive defaults:
 - default `:httpc` transport verifies TLS peer certificates
 - default `:httpc` transport applies finite HTTP timeouts unless overridden
 - unknown external keys are not converted with `String.to_atom/1`
-- prediction, program, agent, ReAct, CodeAct, and RLM traces redact common
+- prediction, program, ReAct, CodeAct, and RLM traces redact common
   secret keys and secret-shaped values
-- agents and ReAct/RLM support tool policies
+- ReAct-family and RLM programs support tool policies
 
 Operational advice:
 

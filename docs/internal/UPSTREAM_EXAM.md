@@ -283,7 +283,7 @@ n/a wholesale.
 | test_toolcalls_vague_match | pass (partial) | Single dict → ToolCall, list → ToolCalls, invalid raises. The bare `{"tool_calls": [...]}` dict shape has no single validator on the type (it is handled in the chat adapter's history normalizer) — that case blocked. |
 | test_tool_convert_input_schema_to_tool_args_no_input_params | blocked | No `convert_input_schema_to_tool_args` equivalent; Imp.MCP keeps schemas as maps. |
 | test_tool_convert_input_schema_to_tool_args_lang_chain | blocked | Same. |
-| test_tool_call_execute | blocked | No `ToolCall.execute` helper; execution lives in the ReAct/agent runtime. |
+| test_tool_call_execute | blocked | No `ToolCall.execute` helper; execution lives in `Imp.Tool.call/2` and the ReAct-family runtimes. |
 | test_tool_call_execute_with_local_functions | n/a | Python locals()/globals() frame walking. |
 
 ## tests/adapters/test_two_step_adapter.py (4)

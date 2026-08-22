@@ -1,7 +1,6 @@
 defmodule MCPImportTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Agent
   alias Imp.MCP
 
   defmodule MCPTransport do
@@ -175,7 +174,7 @@ defmodule MCPImportTest do
     defstruct [:name]
   end
 
-  test "imports MCP-style catalog tools and runs them through an agent" do
+  test "imports MCP-style catalog tools through the canonical tool boundary" do
     # MCP spec, Tool definition: camelCase "inputSchema" is the spec dialect.
     catalog =
       MCP.Catalog.new([
@@ -191,21 +190,7 @@ defmodule MCPImportTest do
     assert tool.name == :lookup
     assert tool.schema == %{"required" => ["key"]}
 
-    agent =
-      Agent.new(
-        :lookup_agent,
-        fn %{key: key}, runtime ->
-          Agent.call_tool(agent_ref(), :lookup, %{key: key}, runtime)
-        end,
-        tools: [tool]
-      )
-
-    Process.put(:agent_ref, agent)
-
-    assert {:ok, %{value: "value:abc"}, runtime} = Agent.run(agent, %{key: "abc"})
-    assert [%{type: :tool, tool: :lookup}, %{type: :agent}] = runtime.traces
-  after
-    Process.delete(:agent_ref)
+    assert %{value: "value:abc"} = Imp.Tool.call(tool, %{key: "abc"})
   end
 
   test "MCP client constructors reject invalid positional boundaries" do
@@ -568,8 +553,6 @@ defmodule MCPImportTest do
     assert {:error, {:json_rpc_error, %{"code" => -32_000, "message" => "remote failed"}}} =
              Imp.Tool.call(tool, %{})
   end
-
-  defp agent_ref, do: Process.get(:agent_ref)
 
   defp receive_requests(count) do
     Enum.map(1..count, fn _ ->

@@ -328,19 +328,6 @@ defmodule Imp.Saving do
 
   defp dump_state(%Trajectory{} = trajectory), do: Trajectory.dump(trajectory)
 
-  defp dump_state(%Imp.Agent{} = agent) do
-    %{
-      "type" => "agent",
-      "name" => Imp.Optimizer.Report.encode_term(agent.name),
-      "handler" => dump_callback!(agent.handler, "agent #{agent.name} handler"),
-      "tools" => dump_tools(agent.tools, "agent #{agent.name}"),
-      "children" => agent.children |> Map.values() |> Enum.map(&dump/1),
-      "input_schema" => Imp.Optimizer.Report.encode_term(agent.input_schema),
-      "output_schema" => Imp.Optimizer.Report.encode_term(agent.output_schema),
-      "tool_policy" => dump_tool_policy(agent.tool_policy, "agent #{agent.name} tool policy")
-    }
-  end
-
   defp dump_state(program) do
     raise ArgumentError,
           "unsupported Imp program for saving: #{inspect(program_name(program))}; " <>
@@ -757,45 +744,6 @@ defmodule Imp.Saving do
       end)
 
     Imp.Optimizer.Artifact.ParameterSnapshot.new(entries)
-  end
-
-  def load(%{"type" => "agent"} = state) do
-    require_keys!(state, [
-      "type",
-      "name",
-      "handler",
-      "tools",
-      "children",
-      "input_schema",
-      "output_schema",
-      "tool_policy"
-    ])
-
-    name = Imp.Optimizer.Report.decode_term(state["name"])
-
-    children =
-      state
-      |> require_list!("children")
-      |> Enum.map(fn child ->
-        case load(child) do
-          %Imp.Agent{} = agent ->
-            agent
-
-          other ->
-            raise ArgumentError,
-                  "saved agent child must be an Agent, got: #{inspect(program_name(other))}"
-        end
-      end)
-
-    Imp.Agent.new(
-      name,
-      load_callback!(state["handler"], [2, 3], "agent #{name} handler"),
-      tools: Map.values(load_tools!(state["tools"], "agent #{name}")),
-      children: children,
-      input_schema: Imp.Optimizer.Report.decode_term(state["input_schema"]),
-      output_schema: Imp.Optimizer.Report.decode_term(state["output_schema"]),
-      tool_policy: load_tool_policy!(state["tool_policy"], "agent #{name} tool policy")
-    )
   end
 
   def load(%{"type" => "imp_optimizer_trajectory"} = state), do: Trajectory.load!(state)

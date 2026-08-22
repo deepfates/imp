@@ -6,7 +6,7 @@ defmodule BenchmarkTest do
 
     assert Enum.map(results, & &1.name) == [
              :structured_extraction,
-             :agent_tool_task,
+             :supervised_tool_policy_task,
              :prompt_optimization,
              :program_reward_optimization,
              :arbitrary_artifact_optimization
@@ -20,7 +20,7 @@ defmodule BenchmarkTest do
 
     assert Enum.map(results, & &1.name) == [
              :structured_extraction_negative,
-             :agent_tool_task_negative,
+             :supervised_tool_policy_task_negative,
              :prompt_optimization_negative,
              :program_reward_optimization_negative,
              :arbitrary_artifact_optimization_negative

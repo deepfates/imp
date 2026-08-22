@@ -27,7 +27,7 @@ defmodule ClaimsInventoryTest do
     product_package
     protocol_gates
     provider_free_overhead
-    rag_tool_agent
+    rag_tool_runtime
     random_search_differential
     mmgrpo_differential
     rlm_benchmark
@@ -151,10 +151,10 @@ defmodule ClaimsInventoryTest do
     assert claim["statement"] =~ "exact paper authority"
   end
 
-  test "RAG, tool, agent, BFCL, and failure claims stay separated by capacity and rung" do
+  test "ordinary runtime contracts stay out of the scientific claims inventory" do
     claims = Map.new(read_claims!(), &{&1["id"], &1})
 
-    capacity_claims = ~w(
+    ordinary_contracts = ~w(
       rag.provider_free_contract
       react.provider_free_tool_contract
       react_v2.provider_free_recovery_contract
@@ -167,12 +167,7 @@ defmodule ClaimsInventoryTest do
       persistence.credential_redaction_contract
     )
 
-    for id <- capacity_claims do
-      claim = claims["claim.#{id}"]
-      assert claim["claim_state"] == "asserted"
-      assert claim["target_rung"] == "C1"
-      assert [%{"evidence" => "passing", "lane" => "rag_tool_agent"}] = claim["requirements"]
-    end
+    for id <- ordinary_contracts, do: refute(Map.has_key?(claims, "claim.#{id}"))
 
     refute Map.has_key?(claims, "claim.rag_tools_agents.provider_free_operational")
 

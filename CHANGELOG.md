@@ -237,10 +237,11 @@ installs from a source checkout, not from Hex.
   with an explicit seed.
 - The conformance report is byte-reproducible by its generator: repository-
   only link annotations are rendered package-aware instead of hand-edited.
-- `Imp.Agent` is internal: the packaged agent story is the react-family
-  spectrum (`react`, `react_v2`, `avatar`, `code_act`, `rlm`) plus your own
-  supervised Elixir around `Imp.Tool.call/2`. The module still ships and
-  works, but it is no longer documented public API and may change freely.
+- Breaking in 0.3: removed the disconnected `Imp.Agent` and
+  `Imp.Agent.Runtime` APIs. The packaged agent story is the react-family
+  spectrum (`react`, `react_v2`, `avatar`, `code_act`, `rlm`) plus ordinary
+  supervised Elixir around `Imp.call/2` and `Imp.Tool.call/2`. No replacement
+  event/runtime abstraction was introduced without a real consumer.
 - Five internal modules that carried `@moduledoc false` now have short,
   accurate moduledocs marked `Internal.`
 - CI runs four parallel gates over a deterministic dependency cache warmed
@@ -262,9 +263,6 @@ installs from a source checkout, not from Hex.
   been hiding are fixed.
 - Two dashboard runs in the same second can no longer silently overwrite the
   same evidence artifact; output paths are allocated exclusively.
-- Agent event-sink crashes surface instead of disappearing, and missing
-  context references are errors.
-
 ## 0.1.0 — 2026-07-16
 
 First tagged release (Git tag install; not yet published to Hex). The source

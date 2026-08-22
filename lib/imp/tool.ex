@@ -1,10 +1,10 @@
 defmodule Imp.Tool do
   @moduledoc """
-  Tool definition for ReAct-style programs and Imp agents.
+  Tool definition for ReAct-style programs and supervised Elixir workflows.
 
   A tool is a named, schema-described Elixir function. ReAct programs expose
-  tools to the language model, while `Imp.Agent` handlers can call the same
-  tool values directly through the runtime. The useful Imp habit is to keep the
+  tools to the language model, while ordinary Elixir code can call the same
+  tool values directly. The useful Imp habit is to keep the
   boundary explicit: the tool name is the action, the description is for the
   model or human reader, the schema is the input contract, and the function is
   ordinary Elixir.

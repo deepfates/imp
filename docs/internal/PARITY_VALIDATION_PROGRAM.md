@@ -382,7 +382,7 @@ Pass condition:
   intentional algorithmic deviation is documented
 - Imp reports enough trace/evidence to debug every optimizer decision
 
-## Lane 4: RAG, Tools, Agents, and Production Semantics
+## Lane 4: RAG, Tools, Agentic Programs, and Production Semantics
 
 DSPy parity includes program composition, retrieval, tools, tracing, and
 production behavior. These paths need their own evidence because they fail in
@@ -400,35 +400,21 @@ Required coverage:
 - save/load/rebind of programs
 - observability and redaction
 
-Initial executable command:
+Executable checks:
 
 ```sh
-mix benchmark.rag_tool_agent.check
 mix benchmark.rag_tool_failure.check
-mix imp.benchmark.rag_tool_agent \
-  --live \
-  --model anthropic:claude-haiku-4-5-20251001 \
-  --dspy-model anthropic/claude-haiku-4-5-20251001 \
-  --env-file .env \
-  --python tmp/dspy-parity-venv/bin/python \
-  --out benchmarks/runs/rag-tool-agent
 mix benchmark.rlm.check
+mix test test/react_contract_test.exs test/rlm_test.exs \
+  test/tool_schema_runtime_test.exs test/mcp_import_test.exs \
+  test/task_supervision_test.exs test/telemetry_lineage_contract_test.exs
 ```
 
-The current artifact directly compares Imp and DSPy on deterministic RAG
-retrieval/answering and ReAct lookup-tool semantics. It also records Imp
-production-semantics proofs for HTTP retriever protocol shape, MCP import
-through agents, agent tool policy denial traces, ReAct error traces, CodeAct,
-ProgramOfThought success and sandbox rejection, streaming incremental fields,
-BEAM async execution, and save/load credential redaction. This is full
-provider-free production evidence. Explicit live mode adds matched Imp/DSPy
-retrieval and tool-use behavior with provider usage and fail-closed control
-matching. The two runtimes retain their native ReAct terminators (`submit` and
-`finish`) under a shared semantic contract. The tracked pre-cutover Haiku 4.5
-artifact under `benchmarks/results/` passed all 15 rows for its bound revision,
-but it does not authorize the current revision. A fresh run belongs under
-`benchmarks/runs/rag-tool-agent/` and still does not imply research-scale
-retrieval or tool-use quality.
+The aggregate RAG/tool/agent evaluator and disconnected generic agent runtime
+were removed for 0.3. Product semantics now live in direct tests of the
+canonical ReAct/RLM/tool/MCP/task/persistence boundaries. Retained differentials
+must add an external comparison, not rebundle already-tested behavior into a
+second pass/fail dashboard.
 
 The separate `mix imp.benchmark.rag_tool_failure_differential` lane runs one
 six-scenario queued-action schedule through actual Imp ReAct and

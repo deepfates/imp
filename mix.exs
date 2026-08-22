@@ -87,7 +87,6 @@ defmodule Imp.MixProject do
           "benchmark.fast_slow.check": :test,
           "benchmark.overhead.check": :test,
           "benchmark.search.check": :test,
-          "benchmark.rag_tool_agent.check": :test,
           "benchmark.bfcl_scorer.check": :test,
           "benchmark.copro_isolation.check": :test,
           "benchmark.rag_tool_failure.check": :test,
@@ -449,9 +448,6 @@ defmodule Imp.MixProject do
       ],
       "benchmark.optimize_anything.check": [
         "imp.benchmark.optimize_anything --smoke --out tmp/optimize-anything"
-      ],
-      "benchmark.rag_tool_agent.check": [
-        "imp.benchmark.rag_tool_agent --out tmp/rag-tool-agent"
       ],
       "benchmark.bfcl_scorer.check": [
         "imp.benchmark.bfcl_adapted --no-require-clean --out tmp/bfcl-shaped-scorer"

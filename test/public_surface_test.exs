@@ -14,8 +14,6 @@ defmodule PublicSurfaceTest do
     Imp.Adapter.Types.ToolCallResults,
     Imp.Adapter.Types.ToolCalls,
     Imp.Adapter.Types.ToolResult,
-    Imp.Agent,
-    Imp.Agent.Runtime,
     Imp.Cache,
     Imp.Capabilities,
     Imp.Clients.DatabricksTrainer,

@@ -391,7 +391,7 @@
       },
       "cost_ceiling_usd": 8.0,
       "preflight": {
-        "command": "mix imp.benchmark.rag_tool_agent --out /tmp/imp-rag-tool-agent-preflight",
+        "command": "mix imp.benchmark.rag_tool_failure_differential --no-require-clean --out /tmp/imp-rag-tool-failure-preflight",
         "manifest": null
       }
     },

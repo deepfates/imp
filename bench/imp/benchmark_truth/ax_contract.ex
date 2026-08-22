@@ -1,7 +1,6 @@
 defmodule Imp.BenchmarkTruth.AxContract do
   @moduledoc false
 
-  alias Imp.Agent.Runtime
   alias Imp.BenchmarkTruth.{ArtifactFile, RunContext}
   alias Imp.Optimizer.GEPA.ModuleSelector
   alias Imp.Signature
@@ -124,11 +123,8 @@ defmodule Imp.BenchmarkTruth.AxContract do
     tool = Imp.Tool.new(:lookup, "Lookup a value", &%{found: true, key: &1.key})
     tool_result = Imp.Tool.call(tool, %{key: "alpha"})
 
-    agent =
-      Imp.Agent.new(:fixture, fn _inputs, runtime -> {:ok, :ok, runtime} end, tools: [tool])
-
-    {:error, {:unknown_tool, :missing}, _runtime} =
-      Imp.Agent.call_tool(agent, :missing, %{}, Runtime.new())
+    tools = Imp.Tool.index_tools!([tool], "Ax contract")
+    nil = Imp.Tool.resolve_name(tools, :missing)
 
     usage =
       ReqLLM.Usage.normalize(%{

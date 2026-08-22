@@ -1,7 +1,7 @@
 # Advanced Imp
 
 This guide covers Imp's advanced program-building tools: arbitrary artifact
-optimization, Pareto-guided reflection, agent runtimes, MCP-style tool
+optimization, Pareto-guided reflection, agentic programs, MCP-style tool
 catalogs, schema constraints, and deterministic regression coverage.
 
 ## Optimize Anything
@@ -215,9 +215,9 @@ returns the server's `structuredContent` exactly when present—including falsey
 or empty JSON values—and otherwise uses the text conversion. MCP error results
 are returned as tool errors before conversion.
 
-Runtime sessions support memory, large context references, tool failures, child
-agents, tool policies, final-output streams, incremental trace-event streams,
-and trace capture.
+ReAct-family and RLM programs support tool policies and durable prediction
+traces. Host applications own longer-lived sessions and supervision around
+ordinary `Imp.call/2` invocations.
 
 ## Protocol Clients
 
@@ -560,7 +560,7 @@ application API; what ships is behavior covered by deterministic regression
 tests. That coverage includes:
 
 - Ax-style structured extraction with schema constraints.
-- Agent/tool execution with trace evidence.
+- Supervised tool execution with policy and telemetry evidence.
 - GEPA prompt optimization.
 - Program optimization with a scripted reward where the baseline fails and the
   compiled program passes.

@@ -633,166 +633,6 @@
       "requirements": [{"id": "optimize_anything.upstream_comparative.full", "kind": "research_replication", "lane": "optimize_anything", "evidence": "full", "threshold": "a matched multi-domain upstream comparison satisfies the preregistered paper-portfolio policy"}]
     },
     {
-      "id": "claim.rag.provider_free_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "The source-bound provider-free memory-retrieval row shared with DSPy plus Imp-native two-hop retrieval and injected HTTP retriever protocol-shape rows.",
-      "limitations": ["This fixture contract does not establish HotPotQA answer quality, broad retrieval quality, a public HTTP service, or live provider behavior."],
-      "statement": "Imp passes the named deterministic RAG retrieval and retriever-protocol fixture contracts.",
-      "category": "tools_agents_rag",
-      "surface": ["rag", "retrieval", "retriever_protocol"],
-      "claim_type": "conformance",
-      "comparison": "dspy_for_memory_retrieval_and_imp_native_elsewhere",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/BENCHMARK_TRUTH.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "rag.provider_free_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact rag_memory_retrieval, rag_multi_hop_retrieval, and http_retriever_protocol_shape rows pass in a source-bound provider-free artifact"}]
-    },
-    {
-      "id": "claim.react.provider_free_tool_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "The exact provider-free lookup-tool trajectory shared with DSPy and the Imp unknown-tool terminal trace.",
-      "limitations": ["Queued actions are fixed; this does not establish model-selected tool-use quality, BFCL performance, or live provider behavior."],
-      "statement": "Imp passes the named deterministic ReAct lookup and unknown-tool trace contracts.",
-      "category": "tools_agents_rag",
-      "surface": ["react", "tools"],
-      "claim_type": "conformance",
-      "comparison": "dspy_for_successful_lookup_and_imp_native_for_unknown_tool",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "react.provider_free_tool_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact react_lookup_tool and react_unknown_tool_error_trace rows pass in a source-bound provider-free artifact"}]
-    },
-    {
-      "id": "claim.react_v2.provider_free_recovery_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "One Imp-native deterministic trajectory that records failing, unknown, and malformed calls before a bounded successful submit.",
-      "limitations": ["This is an Imp-native scripted recovery contract, not a DSPy comparison or evidence of model-selected recovery effectiveness."],
-      "statement": "Imp ReActV2 preserves the named error observations and reaches the declared submit terminal in the bounded fixture.",
-      "category": "tools_agents_rag",
-      "surface": ["react_v2", "failure_recovery"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "react_v2.provider_free_recovery_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact react_v2_recovers_from_tool_and_submit_errors row passes and terminates by submit"}]
-    },
-    {
-      "id": "claim.mcp.in_process_import_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "One provider-free in-process MCP catalog import executed through an Imp agent with an exact tool and agent trace.",
-      "limitations": ["This row does not exercise a public MCP endpoint, stdio process, Streamable HTTP session, or external network recovery."],
-      "statement": "Imp passes the named in-process MCP import and agent trace fixture.",
-      "category": "tools_agents_rag",
-      "surface": ["mcp", "agents"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "mcp.in_process_import_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact mcp_import_agent_trace row passes in a source-bound provider-free artifact"}]
-    },
-    {
-      "id": "claim.agents.policy_denial_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "One Imp-native deterministic agent policy denial with exact tool_denied and agent_error trace events.",
-      "limitations": ["This fixture does not establish child-agent effectiveness, autonomous planning quality, or provider-backed behavior."],
-      "statement": "Imp records the declared denial events for the named bounded agent policy fixture.",
-      "category": "tools_agents_rag",
-      "surface": ["agents"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "agents.policy_denial_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact agent_tool_policy_denial row passes with the declared denial trace"}]
-    },
-    {
-      "id": "claim.code_act.provider_free_execution_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "One Imp-native provider-free CodeAct fixture that executes a typed tool then a BEAM-safe sandbox expression.",
-      "limitations": ["No Python code execution, DSPy comparison, model-selected program quality, or live provider behavior is claimed."],
-      "statement": "Imp CodeAct passes the named typed-tool and BEAM-safe expression fixture.",
-      "category": "tools_agents_rag",
-      "surface": ["code_act", "tools"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "code_act.provider_free_execution_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact code_act_tool_program row passes with the declared two-step trace"}]
-    },
-    {
-      "id": "claim.program_of_thought.safe_eval_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "Two Imp-native provider-free ProgramOfThought fixtures: a safe arithmetic expression and rejection of an unsafe remote command AST.",
-      "limitations": ["No Python execution parity, generated-program effectiveness, or live provider behavior is claimed."],
-      "statement": "Imp ProgramOfThought evaluates the named safe expression and rejects the named unsafe AST fixture.",
-      "category": "tools_agents_rag",
-      "surface": ["program_of_thought"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "program_of_thought.safe_eval_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact program_of_thought_safe_eval and program_of_thought_rejects_unsafe_remote_call rows pass"}]
-    },
-    {
-      "id": "claim.streaming.incremental_field_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "One Imp-native provider-free incremental field parsing fixture with exact answer and rationale events.",
-      "limitations": ["This row does not establish provider streaming transport parity, throughput, or partial-stream recovery."],
-      "statement": "Imp emits the declared incremental field events for the named deterministic streaming fixture.",
-      "category": "runtime",
-      "surface": ["streaming"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "streaming.incremental_field_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact streaming_incremental_fields row passes with the declared events"}]
-    },
-    {
-      "id": "claim.async.ordered_stream_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "One Imp-native provider-free Task stream fixture with three exact ordered successful results.",
-      "limitations": ["This row does not establish throughput, all concurrency modes, cancellation, or provider-backed asynchronous behavior."],
-      "statement": "Imp preserves the declared ordered results for the named deterministic asynchronous stream fixture.",
-      "category": "runtime",
-      "surface": ["async"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "async.ordered_stream_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact tasks_async_stream_ordered_results row passes with the declared ordered results"}]
-    },
-    {
-      "id": "claim.persistence.credential_redaction_contract",
-      "claim_state": "asserted",
-      "target_rung": "C1",
-      "release": "v0.1",
-      "scope": "One provider-free save/load fixture proving that its dummy provider secret is absent from the persisted representation.",
-      "limitations": ["This single fixture does not substitute for the broader hostile redaction audit or establish compatibility for every serializable program graph."],
-      "statement": "Imp omits the dummy provider secret from the named deterministic save/load fixture.",
-      "category": "persistence",
-      "surface": ["save_load", "redaction"],
-      "claim_type": "conformance",
-      "comparison": "imp_native",
-      "gate_policy": "blocking",
-      "sources": ["docs/internal/COVERAGE_MATRIX.md", "test/rag_tool_agent_artifact_test.exs"],
-      "requirements": [{"id": "persistence.credential_redaction_contract", "kind": "conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the exact save_load_redacts_provider_secret row passes without persisting its dummy secret"}]
-    },
-    {
       "id": "claim.rag.hotpot_retrieval.differential",
       "claim_state": "asserted",
       "target_rung": "C1",
@@ -806,7 +646,7 @@
       "comparison": "dspy",
       "gate_policy": "blocking",
       "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json", "test/hotpot_retrieval_artifact_test.exs"],
-      "requirements": [{"id": "rag.hotpot_retrieval.differential", "kind": "retrieval_conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "the source-bound ten-row HotPotQA retrieval differential passes exact retrieval and supporting-fact checks"}]
+      "requirements": [{"id": "rag.hotpot_retrieval.differential", "kind": "retrieval_conformance", "lane": "rag_tool_runtime", "evidence": "passing", "threshold": "the source-bound ten-row HotPotQA retrieval differential passes exact retrieval and supporting-fact checks"}]
     },
     {
       "id": "claim.rag.hotpot_retrieval.effectiveness",
@@ -822,7 +662,7 @@
       "comparison": "dspy",
       "gate_policy": "blocking",
       "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/hotpotqa-shared-retrieval-v1.json"],
-      "requirements": [{"id": "rag.hotpot_retrieval.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "held-out HotPotQA answer and supporting-fact quality satisfy the preregistered matched comparison"}]
+      "requirements": [{"id": "rag.hotpot_retrieval.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_runtime", "evidence": "full", "threshold": "held-out HotPotQA answer and supporting-fact quality satisfy the preregistered matched comparison"}]
     },
     {
       "id": "claim.tools.bfcl_scorer.conformance",
@@ -838,7 +678,7 @@
       "comparison": "independent_reference_scorer",
       "gate_policy": "blocking",
       "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/bfcl-adapted-differential-v1.json", "test/bfcl_adapted_artifact_test.exs"],
-      "requirements": [{"id": "tools.bfcl_scorer.conformance", "kind": "scorer_conformance", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "all twelve positive fixtures and nine mutations agree across the Elixir and independent Python scorers"}]
+      "requirements": [{"id": "tools.bfcl_scorer.conformance", "kind": "scorer_conformance", "lane": "rag_tool_runtime", "evidence": "passing", "threshold": "all twelve positive fixtures and nine mutations agree across the Elixir and independent Python scorers"}]
     },
     {
       "id": "claim.tools.bfcl_selection.effectiveness",
@@ -854,7 +694,7 @@
       "comparison": "dspy",
       "gate_policy": "blocking",
       "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/bfcl-adapted-differential-v1.json"],
-      "requirements": [{"id": "tools.bfcl_selection.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "a pinned BFCL protocol scores model-produced tool calls and satisfies the preregistered matched policy"}]
+      "requirements": [{"id": "tools.bfcl_selection.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_runtime", "evidence": "full", "threshold": "a pinned BFCL protocol scores model-produced tool calls and satisfies the preregistered matched policy"}]
     },
     {
       "id": "claim.agents.failure_injected.runtime_differential",
@@ -870,7 +710,7 @@
       "comparison": "dspy",
       "gate_policy": "blocking",
       "sources": ["docs/internal/COVERAGE_MATRIX.md", "benchmarks/config/rag-tool-failure-differential-v1.json", "test/rag_tool_failure_differential_test.exs"],
-      "requirements": [{"id": "agents.failure_injected.runtime_differential", "kind": "operational_contract", "lane": "rag_tool_agent", "evidence": "passing", "threshold": "all six source-authenticated queued-action scenarios match exact observations and terminals"}]
+      "requirements": [{"id": "agents.failure_injected.runtime_differential", "kind": "operational_contract", "lane": "rag_tool_runtime", "evidence": "passing", "threshold": "all six source-authenticated queued-action scenarios match exact observations and terminals"}]
     },
     {
       "id": "claim.agents.failure_recovery.effectiveness",
@@ -886,7 +726,7 @@
       "comparison": "dspy",
       "gate_policy": "blocking",
       "sources": ["docs/internal/COVERAGE_MATRIX.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md", "benchmarks/config/rag-tool-failure-differential-v1.json"],
-      "requirements": [{"id": "agents.failure_recovery.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_agent", "evidence": "full", "threshold": "an identical model-selected matched failure schedule satisfies preregistered recovery and task-completion thresholds"}]
+      "requirements": [{"id": "agents.failure_recovery.effectiveness", "kind": "comparative_effectiveness", "lane": "rag_tool_runtime", "evidence": "full", "threshold": "an identical model-selected matched failure schedule satisfies preregistered recovery and task-completion thresholds"}]
     },
     {
       "id": "claim.rlm.provider_free_benchmark",

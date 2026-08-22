@@ -58,8 +58,6 @@
     {
       "category": "internal",
       "modules": [
-        "Imp.Agent",
-        "Imp.Agent.Runtime",
         "Imp.Adapter.OutputFields",
         "Imp.Deadline",
         "Imp.FieldSelector",

@@ -38,14 +38,6 @@
         "arity": 2
       }
     },
-    "rag_agent": {
-      "mode": "provider_free",
-      "max_tier": "t1",
-      "task": "imp.benchmark.rag_tool_agent",
-      "args": [],
-      "manifest": null,
-      "artifact_validator": null
-    },
     "bfcl_shaped_scorer": {
       "mode": "provider_free",
       "max_tier": "t1",

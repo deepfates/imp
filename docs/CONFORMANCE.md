@@ -17,7 +17,7 @@ Elixir-native equivalents: 9
 Tracking: 2
 Gaps: 4
 Claim-specific non-blocking gaps: 4
-Invalid evidence: 0
+Invalid evidence: 6
 Invalid aggregate rows: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
@@ -310,7 +310,7 @@ Executable evidence:
 
 Indexed capability evidence:
 
-- `MCP`: valid; claims: claim.mcp.in_process_import_contract (blocking); receipts: mcp=valid
+- `MCP`: invalid_evidence; claims: no indexed claim; receipts: mcp=INVALID
 
 
 Missing evidence or behavior:
@@ -346,10 +346,10 @@ Executable evidence:
 
 Indexed capability evidence:
 
-- `ReAct`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.react.provider_free_tool_contract (blocking), claim.agents.failure_injected.runtime_differential (blocking), claim.agents.failure_recovery.effectiveness (target); receipts: react=valid
-- `ReActV2`: valid; claims: claim.react_v2.provider_free_recovery_contract (blocking); receipts: react_v2=valid
-- `CodeAct`: valid; claims: claim.code_act.provider_free_execution_contract (blocking); receipts: code_act=valid
-- `ProgramOfThought`: valid; claims: claim.program_of_thought.safe_eval_contract (blocking); receipts: program_of_thought=valid
+- `ReAct`: invalid_evidence; claims: claim.dspy_semantics.golden_trace (blocking), claim.agents.failure_injected.runtime_differential (blocking), claim.agents.failure_recovery.effectiveness (target); receipts: react=INVALID
+- `ReActV2`: invalid_evidence; claims: no indexed claim; receipts: react_v2=INVALID
+- `CodeAct`: invalid_evidence; claims: no indexed claim; receipts: code_act=INVALID
+- `ProgramOfThought`: invalid_evidence; claims: no indexed claim; receipts: program_of_thought=INVALID
 
 
 Missing evidence or behavior:
@@ -783,7 +783,7 @@ Executable evidence:
 
 Indexed capability evidence:
 
-- `Embeddings`: valid; claims: claim.embeddings.boundary_contract (informational); receipts: retrieval_rag=valid
+- `Embeddings`: invalid_evidence; claims: claim.embeddings.boundary_contract (informational); receipts: retrieval_rag=INVALID
 
 
 Missing evidence or behavior:

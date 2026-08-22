@@ -736,37 +736,6 @@ defmodule ProductionAdapterPersistenceTest do
     end)
   end
 
-  test "recursive agent graphs round-trip through the named registry" do
-    parent_handler = fn _agent, inputs, runtime -> {:ok, %{answer: inputs.question}, runtime} end
-    child_handler = fn inputs, runtime -> {:ok, %{child: inputs.value}, runtime} end
-    lookup = fn %{query: query} -> String.upcase(query) end
-
-    registry =
-      Imp.Saving.Registry.new(
-        parent_handler: parent_handler,
-        child_handler: child_handler,
-        lookup_runner: lookup
-      )
-
-    child = Imp.Agent.new(:child, child_handler)
-    tool = Imp.tool(:lookup, "uppercase", lookup)
-
-    parent =
-      Imp.Agent.new(:parent, parent_handler,
-        children: [child],
-        tools: [tool],
-        input_schema: %{required: [:question]},
-        output_schema: %{required: [:answer]},
-        tool_policy: [:lookup]
-      )
-
-    loaded = parent |> Imp.dump(registry: registry) |> Imp.load(registry: registry)
-
-    assert %Imp.Agent{children: %{child: %Imp.Agent{}}, tools: %{lookup: %Imp.Tool{}}} = loaded
-    assert {:ok, %{answer: "hello"}, _runtime} = Imp.Agent.run(loaded, %{question: "hello"})
-    assert Imp.Tool.call(loaded.tools.lookup, %{query: "beam"}) == "BEAM"
-  end
-
   test "loaded pinned provider programs can be rebound through the public facade" do
     original =
       Imp.predict("question -> answer",
