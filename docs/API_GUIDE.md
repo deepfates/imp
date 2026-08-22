@@ -46,6 +46,12 @@ The signature is more than prompt text. The adapter uses it to render the
 request and validate the response. An output outside the declared enum is an
 error, not a string your application discovers later.
 
+Most applications call programs, not language models directly. Internally each
+call crosses the provider-neutral `Imp.Core.LMRequest` / `Imp.Core.LMResponse`
+boundary before ReqLLM transport. `Imp.LM.request/2` exposes that normalized
+envelope when an integration needs usage or response metadata; the established
+`Imp.LM.generate/3` API continues to return the raw model value.
+
 ### Signature type DSL
 
 Each field is `name`, `name: type`, or `name: type "description"`. An untyped

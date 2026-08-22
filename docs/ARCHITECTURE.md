@@ -157,6 +157,14 @@ Elixir `req_llm` ecosystem. Imp keeps the declarative programming layer:
 signatures, adapters, modules, optimizers, evaluation, traces, persistence, and
 redacted telemetry.
 
+Every ordinary model call crosses `Imp.Core.LMRequest` and
+`Imp.Core.LMResponse` inside `Imp.LM`. Existing LM implementations may keep the
+small `generate/2` callback and are adapted losslessly; request-aware clients
+can implement `request/2`, and callers that need normalized usage and metadata
+can use `Imp.LM.request/2` directly. This is an execution boundary, not a second
+provider stack: multipart value conversion and provider-specific options remain
+owned by adapters and ReqLLM.
+
 Production provider access goes through ReqLLM. Imp does not maintain a
 parallel OpenAI-compatible provider client stack; deterministic provider tests
 use ReqLLM test modules or the live ReqLLM-backed gates.

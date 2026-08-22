@@ -184,6 +184,16 @@ defmodule Imp.Clients.ReqLLM do
   def configured_option(%__MODULE__{opts: opts}, key), do: Keyword.fetch(opts, key)
 
   @impl true
+  def request(%__MODULE__{} = lm, %Imp.Core.LMRequest{} = request) do
+    {messages, opts} = Imp.Core.request_parts(request)
+
+    with {:ok, raw} <- generate(lm, messages, opts),
+         {:ok, response} <- Imp.Core.response(raw) do
+      {:ok, response}
+    end
+  end
+
+  @impl true
   def generate(messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/2")
 

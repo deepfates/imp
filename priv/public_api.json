@@ -2301,14 +2301,23 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.Assistant",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "content",
         "metadata",
         "tool_calls"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2317,13 +2326,22 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.Developer",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "content",
         "metadata"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2332,17 +2350,27 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.LMConfig",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "extra",
         "max_tokens",
         "model",
+        "options",
         "response_format",
         "temperature",
         "tools"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2351,14 +2379,23 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.LMRequest",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "config",
         "messages",
         "metadata"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2367,15 +2404,25 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.LMResponse",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "cost",
+        "metadata",
         "outputs",
         "raw",
         "usage"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2384,14 +2431,23 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.Message",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "content",
         "metadata",
         "role"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2400,13 +2456,22 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.System",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "content",
         "metadata"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2415,14 +2480,23 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.ToolCall",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "arguments",
         "id",
         "name"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2431,7 +2505,11 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.ToolResult",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "id",
@@ -2439,7 +2517,12 @@
         "name",
         "result"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2448,13 +2531,22 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Core.User",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "content",
         "metadata"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -3388,6 +3480,10 @@
           "optional": false
         },
         {
+          "name": "request/2",
+          "optional": true
+        },
+        {
           "name": "stream/3",
           "optional": true
         }
@@ -3395,6 +3491,7 @@
       "category": "spi",
       "functions": [
         "generate/3",
+        "request/2",
         "validate_lm/1"
       ],
       "kind": "behaviour",
@@ -3403,11 +3500,15 @@
       "signatures": {
         "callbacks": {
           "generate/2": [],
+          "request/2": [],
           "stream/3": []
         },
         "functions": {
           "generate/3": [
             "generate(lm, messages, opts \\\\ [])"
+          ],
+          "request/2": [
+            "request(lm, request)"
           ],
           "validate_lm/1": [
             "validate_lm(module)"

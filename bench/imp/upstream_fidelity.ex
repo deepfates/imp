@@ -177,15 +177,15 @@ defmodule Imp.UpstreamFidelity do
       ticket: "de-tt5j",
       imp: [Imp.Core.LMRequest, Imp.Core.LMResponse],
       invariants: [
-        "stable DSPy remains the release baseline until 3.3 is final",
-        "declared normalized request and response structs are not an exercised runtime until an ordinary provider path consumes and returns them"
+        "ordinary Imp.LM and ReqLLM calls cross the normalized request/response boundary without changing the legacy raw return contract",
+        "the richer stable 3.3 multipart and stream-event model remains explicitly tracked rather than inferred from request envelopes"
       ],
       evidence: %{
-        tests: ["test/public_surface_test.exs"],
+        tests: ["test/public_surface_test.exs", "test/normalized_lm_runtime_test.exs"],
         docs: ["docs/internal/UPSTREAM_FIDELITY_AUDIT.md"],
         missing: [
-          "ordinary Imp.LM/ReqLLM request-to-provider-to-response execution through LMRequest and LMResponse",
-          "LMStream normalized runtime type and ordinary streaming execution"
+          "stable 3.3 typed multipart request and response values",
+          "LMStream event model and ordinary streaming execution through that model"
         ]
       }
     },

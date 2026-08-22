@@ -5,8 +5,10 @@ defmodule Imp.LM do
 
   @callback generate(messages :: list(map()), opts :: keyword()) ::
               {:ok, map() | binary() | Imp.Prediction.t() | list()} | {:error, term()}
+  @callback request(lm :: term(), request :: Imp.Core.LMRequest.t()) ::
+              {:ok, Imp.Core.LMResponse.t()} | {:error, term()}
   @callback stream(lm :: term(), messages :: list(map()), opts :: keyword()) :: Enumerable.t()
-  @optional_callbacks stream: 3
+  @optional_callbacks request: 2, stream: 3
 
   @doc false
   # The LM's response-format capability (internal), the Imp analog of DSPy's
@@ -64,15 +66,27 @@ defmodule Imp.LM do
 
   def generate(lm, messages, opts) do
     opts = validate_opts!(opts, "Imp.LM.generate/3")
+    request = Imp.Core.request(messages, opts, lm)
 
-    case dispatch_generate(lm, messages, opts) do
-      {:ok, value} = success ->
-        Imp.Usage.maybe_record(value)
-        success
+    case request(lm, request) do
+      {:ok, %Imp.Core.LMResponse{} = response} ->
+        {:ok, Imp.Core.legacy_response(response)}
 
       other ->
         other
     end
+  end
+
+  @doc "Executes one provider-neutral LM request and returns a normalized response."
+  def request(lm, %Imp.Core.LMRequest{} = request) do
+    with {:ok, response} <- dispatch_request(lm, request) do
+      Imp.Usage.maybe_record(Imp.Core.legacy_response(response))
+      {:ok, response}
+    end
+  end
+
+  def request(_lm, request) do
+    {:error, {:invalid_lm_request, request}}
   end
 
   def validate_lm(nil), do: {:ok, nil}
@@ -186,6 +200,38 @@ defmodule Imp.LM do
   end
 
   defp dispatch_generate(lm, _messages, _opts), do: {:error, {:not_an_lm, lm}}
+
+  defp dispatch_request(%module{} = lm, %Imp.Core.LMRequest{} = request) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :request, 2) do
+      call_request(fn -> module.request(lm, request) end, module)
+    else
+      fallback_request(lm, request)
+    end
+  end
+
+  defp dispatch_request(lm, %Imp.Core.LMRequest{} = request), do: fallback_request(lm, request)
+
+  defp fallback_request(lm, request) do
+    {messages, opts} = Imp.Core.request_parts(request)
+
+    with {:ok, raw} <- dispatch_generate(lm, messages, opts),
+         {:ok, response} <- Imp.Core.response(raw) do
+      {:ok, response}
+    end
+  end
+
+  defp call_request(fun, lm) do
+    case fun.() do
+      {:ok, %Imp.Core.LMResponse{} = response} -> {:ok, response}
+      {:error, _reason} = error -> error
+      other -> {:error, {:invalid_lm_response, lm_name(lm), other}}
+    end
+  rescue
+    safety in Imp.OperationalSafetyError -> {:error, safety}
+    error -> {:error, {:lm_failed, lm_name(lm), error_message(error)}}
+  catch
+    kind, reason -> {:error, {:lm_failed, lm_name(lm), error_message({kind, reason})}}
+  end
 
   defp call_lm(fun, lm) do
     case fun.() do

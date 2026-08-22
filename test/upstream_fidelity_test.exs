@@ -32,7 +32,8 @@ defmodule Imp.UpstreamFidelityTest do
     assert by_id["models.normalized_runtime_prerelease"].status == :tracking
 
     assert by_id["models.normalized_runtime_prerelease"].evidence.tests == [
-             "test/public_surface_test.exs"
+             "test/public_surface_test.exs",
+             "test/normalized_lm_runtime_test.exs"
            ]
 
     assert by_id["tools.typed_calls"].status == :elixir_native_equivalent
