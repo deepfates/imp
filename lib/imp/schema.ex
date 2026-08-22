@@ -21,10 +21,11 @@ defmodule Imp.Schema do
       |> fetch_meta(:constraints, %{})
       |> normalize_constraints()
 
-    optional = fetch_meta(field.metadata, :optional, false)
+    optional = Imp.Adapter.OutputFields.optional?(field)
+    nil_default? = Imp.Adapter.OutputFields.fetch_default(field) == {:ok, nil}
 
     cond do
-      is_nil(value) and optional ->
+      is_nil(value) and (optional or nil_default?) ->
         []
 
       is_nil(value) ->
@@ -55,7 +56,7 @@ defmodule Imp.Schema do
 
     required =
       fields
-      |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
+      |> Enum.filter(&Imp.Adapter.OutputFields.required?/1)
       |> Enum.map(&to_string(&1.name))
 
     %{
@@ -235,6 +236,7 @@ defmodule Imp.Schema do
       |> normalize_constraints()
 
     %{"type" => json_type(field.type)}
+    |> maybe_put_default(field)
     |> maybe_put("enum", fetch_meta(constraints, :enum))
     |> maybe_put("x-imp-answerShape", fetch_meta(constraints, :answer_shape))
     |> maybe_put("minimum", fetch_meta(constraints, :min))
@@ -244,6 +246,20 @@ defmodule Imp.Schema do
     |> maybe_put("pattern", fetch_meta(constraints, :pattern))
     |> maybe_put("items", json_nested(fetch_meta(constraints, :items)))
     |> put_object_contract(fetch_meta(constraints, :properties))
+    |> maybe_nullable(field)
+  end
+
+  defp maybe_nullable(schema, field) do
+    if Imp.Adapter.OutputFields.optional?(field),
+      do: %{"anyOf" => [schema, %{"type" => "null"}]},
+      else: schema
+  end
+
+  defp maybe_put_default(schema, field) do
+    case Imp.Adapter.OutputFields.fetch_default(field) do
+      {:ok, default} -> Map.put(schema, "default", default)
+      :error -> schema
+    end
   end
 
   defp json_nested(nil), do: nil

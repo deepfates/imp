@@ -27,3 +27,7 @@ From a new temporary Mix project using the built package and public docs, a cold
 **2026-08-22T15:39:33Z**
 
 Independent package-only cold consumer succeeded from /tmp without source tests/tickets/runners: authored a two-stage Imp.Module, union-shaped labeled rows with disjoint train/selection/test, Static LM, LabeledFewShot Experiment, Report inspection, Artifact write/read/apply to fresh trusted code, and call. Observed selection 0.0 -> 1.0, untouched 1.0, credentials_absent true, mode-0600 19,660-byte artifact, no Imp errors. Remaining product friction: the shortest spine is scattered across docs; named-predictor example projection is unspecified; Static/no-call cost is not represented through one stable result field; Report.best_score nil vs outer admission score is unexplained; k is per predictor but metadata selected_count was 2; reports/artifacts can expose training content and need a sensitivity warning; install remains mutable/heavy. Repair these before closing.
+
+**2026-08-22T15:52:56Z**
+
+Cold-consumer friction repaired in the owning public guide: required vs nullable vs default output semantics now have a runnable structured-signature example; omitted nullable outputs are explicit nil; output defaults round-trip; false/zero/empty values override defaults; ReActV2 stricter submit behavior and BEAM default_factory disposition are stated. This closes that specific ambiguity but not the remaining composed-spine/report/cost/sensitivity/install friction.

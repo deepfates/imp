@@ -251,9 +251,16 @@ defmodule Imp.Predict.ReActV2 do
           else: {Map.put(outputs, name, value), missing}
       end)
 
-    if missing == [],
-      do: {outputs, false},
-      else: {{:error, {:missing_output_fields, missing}}, true}
+    cond do
+      missing != [] ->
+        {{:error, {:missing_output_fields, missing}}, true}
+
+      true ->
+        case Imp.Adapter.Chat.parse(signature, outputs, []) do
+          {:ok, prediction} -> {Imp.Prediction.to_map(prediction), false}
+          {:error, reason} -> {{:error, {:invalid_submit_outputs, reason}}, true}
+        end
+    end
   end
 
   defp validate_submit(_signature, arguments),
@@ -350,7 +357,13 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp tool_description(%Imp.Tool{name: :submit} = tool, signature),
-    do: provider_tool(tool, Imp.Signature.json_schema(signature))
+    do:
+      provider_tool(
+        tool,
+        signature
+        |> Imp.Signature.json_schema()
+        |> Map.put("required", Enum.map(signature.outputs, &to_string(&1.name)))
+      )
 
   defp tool_description(%Imp.Tool{schema: schema} = tool, _signature) when map_size(schema) > 0,
     do: provider_tool(tool, schema)

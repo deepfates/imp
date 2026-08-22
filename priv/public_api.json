@@ -35,6 +35,11 @@
   "excluded_modules": [
     {
       "category": "internal",
+      "module": "Imp.Adapter.OutputFields",
+      "source": "lib/imp/adapter/output_fields.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Agent",
       "source": "lib/imp/agent.ex"
     },

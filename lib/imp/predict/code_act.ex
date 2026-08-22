@@ -233,11 +233,14 @@ defmodule Imp.Predict.CodeAct do
   end
 
   defp finished_state(%Prediction{fields: fields}) do
-    cond do
-      Map.has_key?(fields, :finished) -> Map.fetch!(fields, :finished)
-      Map.has_key?(fields, "finished") -> Map.fetch!(fields, "finished")
-      true -> :direct
-    end
+    value =
+      cond do
+        Map.has_key?(fields, :finished) -> Map.fetch!(fields, :finished)
+        Map.has_key?(fields, "finished") -> Map.fetch!(fields, "finished")
+        true -> nil
+      end
+
+    if is_nil(value), do: :direct, else: value
   end
 
   defp next_inputs(inputs, observation, trace) do

@@ -645,6 +645,83 @@ defmodule UpstreamExam.AdaptersTest do
   # tests/adapters/test_xml_adapter.py
   # ---------------------------------------------------------------------------
 
+  describe "DSPy 3.3.1 optional and defaulted output fields" do
+    defp optional_output_signature do
+      Imp.signature(%{
+        inputs: [:question],
+        outputs: [
+          %{name: :answer, type: :string},
+          %{name: :note, type: :string, default: "No note"},
+          %{name: :tags, type: :array, default: []},
+          %{name: :maybe, type: :string, optional: true}
+        ]
+      })
+    end
+
+    test "chat, JSON, and XML fill omitted output defaults and nullable fields" do
+      signature = optional_output_signature()
+
+      assert {:ok, chat} =
+               Imp.Adapter.Chat.parse(signature, "[[ ## answer ## ]]\n42", [])
+
+      assert {:ok, json} = Imp.Adapter.JSON.parse(signature, ~s({"answer":"42"}), [])
+      assert {:ok, xml} = Imp.Adapter.XML.parse(signature, "<answer>42</answer>", [])
+
+      for prediction <- [chat, json, xml] do
+        assert Imp.to_map(prediction) == %{
+                 answer: "42",
+                 note: "No note",
+                 tags: [],
+                 maybe: nil
+               }
+      end
+    end
+
+    test "present falsey values override defaults and nullable nil is preserved" do
+      signature = optional_output_signature()
+
+      assert {:ok, prediction} =
+               Imp.Adapter.JSON.parse(
+                 signature,
+                 ~s({"answer":"","note":"","tags":[],"maybe":null}),
+                 []
+               )
+
+      assert Imp.to_map(prediction) == %{answer: "", note: "", tags: [], maybe: nil}
+    end
+
+    test "a missing required output remains a loud error" do
+      signature = optional_output_signature()
+
+      assert {:error, {:missing_output_fields, [:answer]}} =
+               Imp.Adapter.JSON.parse(signature, ~s({"note":"present"}), [])
+    end
+
+    test "output fallbacks and nullability survive signature serialization" do
+      signature = optional_output_signature()
+
+      restored =
+        signature
+        |> Imp.Signature.dump()
+        |> Jason.encode!()
+        |> Jason.decode!()
+        |> Imp.Signature.load()
+
+      assert {:ok, prediction} = Imp.Adapter.JSON.parse(restored, ~s({"answer":"42"}), [])
+      assert Imp.to_map(prediction) == %{answer: "42", note: "No note", tags: [], maybe: nil}
+
+      schema = Imp.Signature.json_schema(restored)
+      refute "note" in schema["required"]
+      refute "maybe" in schema["required"]
+      assert schema["properties"]["note"]["default"] == "No note"
+      assert schema["properties"]["tags"]["default"] == []
+
+      assert schema["properties"]["maybe"] == %{
+               "anyOf" => [%{"type" => "string"}, %{"type" => "null"}]
+             }
+    end
+  end
+
   describe "test_xml_adapter.py" do
     # Upstream: tests/adapters/test_xml_adapter.py::test_xml_adapter_format_and_parse_basic
     # (format_field_with_value is internal in Imp; the same rendering is

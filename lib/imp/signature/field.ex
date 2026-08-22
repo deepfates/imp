@@ -86,13 +86,19 @@ defmodule Imp.Signature.Field do
 
     metadata = if is_nil(language), do: metadata, else: Map.put(metadata, :language, language)
 
+    metadata =
+      case fetch_attr(attrs, :optional) do
+        {:ok, optional} -> Map.put(metadata, :optional, optional)
+        :error -> metadata
+      end
+
     metadata = validate_code_language!(metadata, type)
 
     # DSPy InputField(default=...): an input field may carry a default value
     # that fills the input when the caller omits it (Predict fills it before
     # the missing-field check; test_input_field_default_value). Key presence,
     # not truthiness, decides — an explicit nil default is a real default.
-    case fetch_default(attrs) do
+    case fetch_default_attr(attrs) do
       {:ok, default} -> Map.put(metadata, :default, default)
       :error -> metadata
     end
@@ -117,10 +123,14 @@ defmodule Imp.Signature.Field do
 
   defp validate_code_language!(metadata, _type), do: metadata
 
-  defp fetch_default(attrs) do
-    case Map.fetch(attrs, :default) do
-      {:ok, default} -> {:ok, default}
-      :error -> Map.fetch(attrs, "default")
+  defp fetch_default_attr(attrs) do
+    fetch_attr(attrs, :default)
+  end
+
+  defp fetch_attr(attrs, key) do
+    case Map.fetch(attrs, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(attrs, Atom.to_string(key))
     end
   end
 

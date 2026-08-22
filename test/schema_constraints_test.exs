@@ -106,10 +106,15 @@ defmodule SchemaConstraintsTest do
                "confidence" => %{"type" => "number", "minimum" => 0, "maximum" => 1},
                "items" => %{"type" => "array", "items" => %{"type" => "integer"}},
                "meta" => %{
-                 "type" => "object",
-                 "additionalProperties" => false,
-                 "properties" => %{"source" => %{"type" => "string"}},
-                 "required" => ["source"]
+                 "anyOf" => [
+                   %{
+                     "type" => "object",
+                     "additionalProperties" => false,
+                     "properties" => %{"source" => %{"type" => "string"}},
+                     "required" => ["source"]
+                   },
+                   %{"type" => "null"}
+                 ]
                }
              }
            }

@@ -67,7 +67,9 @@ defmodule Imp.Adapter.Chat do
   defp do_parse(_signature, %Imp.Prediction{} = prediction), do: {:ok, prediction}
   defp do_parse(signature, map) when is_map(map), do: build_prediction(signature, map)
 
-  # Faithful port of DSPy 3.2.1 ChatAdapter.parse (dspy/adapters/chat_adapter.py):
+  # DSPy ChatAdapter parsing through 3.3.1: marker sections are parsed by first
+  # occurrence, then missing output defaults and nullable fallbacks are filled
+  # before a loud completeness check.
   # the completion is split into `[[ ## field ## ]]`-headed sections; the FIRST
   # section for each output field wins; a completion whose sections do not cover
   # every output field is a LOUD parse error. There is deliberately no
@@ -89,39 +91,28 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp build_prediction(signature, fields) do
-    required =
-      signature.outputs
-      |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
-      |> Enum.map(& &1.name)
-
-    # PRESENT fields (even present-nil) are collected, then coerced with DSPy's
-    # parse_value semantics BEFORE the required-field check: a str-annotated
-    # field renders a present nil as "None" (Python str(None)); any field left
-    # nil after coercion is genuinely absent/unusable and feeds the loud
-    # missing-fields error.
+    # PRESENT fields (even present-nil) are collected and coerced before the
+    # shared fallback/completeness pass. Key presence, never truthiness, decides
+    # whether a model value overrides a default.
     fields =
       signature.outputs
       |> Enum.filter(&field_present?(fields, &1.name))
       |> Map.new(fn field -> {field.name, fetch_field(fields, field.name)} end)
       |> then(&coerce_fields(signature, &1))
-      |> Enum.reject(fn {_name, value} -> is_nil(value) end)
-      |> Map.new()
 
-    missing = Enum.reject(required, &Map.has_key?(fields, &1))
-
-    with true <- missing == [],
-         :ok <- Imp.Schema.validate_fields(signature.outputs, fields) do
-      {:ok, Imp.Prediction.new(fields)}
+    with {:ok, completed} <- Imp.Adapter.OutputFields.complete(signature, fields),
+         :ok <- Imp.Schema.validate_fields(signature.outputs, completed) do
+      {:ok, Imp.Prediction.new(completed)}
     else
-      false ->
-        {:error, {:missing_output_fields, missing}}
-
-      {:error, errors} ->
+      {:error, errors} when is_list(errors) ->
         {:error,
          %Imp.AdapterParseError{
            message: Imp.Schema.retry_feedback(errors),
            reason: fields
          }}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -140,6 +131,9 @@ defmodule Imp.Adapter.Chat do
   # coercion clauses below.
   defp coerce_field(field, value) do
     cond do
+      is_nil(value) and Imp.Adapter.OutputFields.optional?(field) ->
+        nil
+
       code_field?(field) ->
         coerce_code(value, code_language(field))
 

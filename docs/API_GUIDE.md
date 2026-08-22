@@ -73,6 +73,37 @@ names across the input/output arrow fail when the signature is built. The map
 form below additionally supports `type: :code` with an optional `language:`;
 custom Pydantic-style model and tuple types are not part of Imp's string DSL.
 
+### Required, nullable, and default fields
+
+Fields are required unless their structured declaration says otherwise. Use
+`optional: true` for a nullable field; if the model omits it, the prediction
+contains the field with value `nil`. Use `default:` when omission should produce
+a concrete fallback. Defaults work for both inputs and outputs and are preserved
+through `Imp.Signature.dump/1` and `load/1`.
+
+```elixir
+signature =
+  Imp.signature(%{
+    inputs: [%{name: :question, type: :string, default: "Summarize this."}],
+    outputs: [
+      %{name: :answer, type: :string},
+      %{name: :note, type: :string, default: "No note"},
+      %{name: :citation, type: :string, optional: true}
+    ]
+  })
+```
+
+Fallbacks apply only when a key is absent: `false`, `0`, `""`, `[]`, and an
+explicit nullable `nil` are retained. Elixir values are immutable, so a literal
+`default: []` or `default: %{}` already has the fresh-value safety for which
+Python commonly needs `default_factory`. Imp therefore keeps defaults as plain,
+portable signature data instead of persisting executable factories.
+
+ReActV2 final submission is intentionally stricter: the `submit` tool requires
+every output key, including nullable or defaulted fields, and validates the
+submitted values. This matches the current DSPy contract and makes the final
+tool call explicit rather than silently repairing it.
+
 ### Adapter wire-format wording
 
 When `Imp.Adapter.Chat` or `Imp.Adapter.JSON` renders a non-string output, the

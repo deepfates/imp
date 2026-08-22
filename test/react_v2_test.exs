@@ -266,6 +266,57 @@ defmodule ReActV2Test do
              event.tool_call_results
   end
 
+  test "submit requires every output and validates present values even when adapters allow fallbacks" do
+    signature =
+      Imp.signature(%{
+        inputs: [:question],
+        outputs: [
+          %{name: :answer, type: :string},
+          %{name: :count, type: :integer, default: 0},
+          %{name: :maybe, type: :string, optional: true}
+        ]
+      })
+
+    parent = self()
+
+    lm =
+      action_lm(
+        [
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "ok"}}]},
+          %{tool_calls: []}
+        ],
+        parent
+      )
+
+    assert {:ok, incomplete} =
+             Imp.Predict.ReActV2.new(signature, [], lm: lm, max_iters: 1)
+             |> Imp.call(%{question: "q"})
+
+    assert %Imp.History{messages: [event]} = Imp.get(incomplete, :history)
+
+    assert [%{error: true, result: {:error, {:missing_output_fields, [:count, :maybe]}}}] =
+             event.tool_call_results
+
+    assert_received {:lm_call, opts}
+    submit = Enum.find(opts[:tools], &(&1.function.name == "submit"))
+    assert submit.function.parameters["required"] == ["answer", "count", "maybe"]
+
+    invalid_lm =
+      action_lm([
+        %{tool_calls: [%{name: "submit", arguments: %{answer: "ok", count: "no", maybe: nil}}]},
+        %{tool_calls: []}
+      ])
+
+    assert {:ok, invalid} =
+             Imp.Predict.ReActV2.new(signature, [], lm: invalid_lm, max_iters: 1)
+             |> Imp.call(%{question: "q"})
+
+    assert %Imp.History{messages: [invalid_event]} = Imp.get(invalid, :history)
+
+    assert [%{error: true, result: {:error, {:invalid_submit_outputs, _reason}}}] =
+             invalid_event.tool_call_results
+  end
+
   test "accepts serialized history and reserves submit" do
     assert_raise ArgumentError, ~r/submit is reserved/, fn ->
       submit = Imp.tool(:submit, "not allowed", & &1)

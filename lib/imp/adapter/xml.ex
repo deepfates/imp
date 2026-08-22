@@ -1,6 +1,6 @@
 defmodule Imp.Adapter.XML do
   @moduledoc """
-  Faithful port of DSPy 3.2.1 `XMLAdapter` (`dspy/adapters/xml_adapter.py`).
+  XML adapter with DSPy's field dialect and current output-completion contract.
 
   One XML-only dialect end to end: the system message renders the interaction
   structure as `<field>\\n{field}\\n</field>` blocks (no `[[ ## ]]` markers and
@@ -9,10 +9,9 @@ defmodule Imp.Adapter.XML do
   the main request ends with DSPy's exact output requirement sentence
   ("Respond with the corresponding output fields wrapped in XML tags ...").
 
-  Parse requires EVERY output field to be present in tags and returns
-  `{:error, {:missing_output_fields, missing}}` otherwise, mirroring DSPy's
-  `AdapterParseError` contract; tag-free prose is a loud error, never silently
-  stuffed into a field.
+  Parse fills declared output defaults and omitted nullable fields, then returns
+  `{:error, {:missing_output_fields, missing}}` if any required output remains
+  absent. Tag-free prose is a loud error, never silently stuffed into a field.
 
   Rendering is byte-verified against real DSPy 3.2.1 by the golden-trace
   differential (`test/fixtures/golden_trace/cases.json`, `xml_*` cases).
@@ -62,7 +61,12 @@ defmodule Imp.Adapter.XML do
     # `if fields.keys() != signature.output_fields.keys(): raise ...`.
     # Tag-free prose must be a loud parse error (feeding the retry path),
     # never silently stuffed into an output field via the Chat fallback.
-    case Enum.reject(output_names, &Map.has_key?(fields, &1)) do
+    required_names =
+      signature.outputs
+      |> Enum.filter(&Imp.Adapter.OutputFields.required?/1)
+      |> Enum.map(& &1.name)
+
+    case Enum.reject(required_names, &Map.has_key?(fields, &1)) do
       [] -> Imp.Adapter.Chat.parse(signature, fields, opts)
       missing -> {:error, {:missing_output_fields, missing}}
     end
