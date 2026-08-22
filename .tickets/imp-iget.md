@@ -23,7 +23,7 @@ A public example optimizes an actually executed ReAct, RLM, or composed tool pro
 
 **2026-08-22T19:33:01Z**
 
-2026-08-22: In progress. The public packaged sandbox story and provider-free execution contract are implemented locally. A bounded dirty-tree live run used real ReActV2 tool execution plus ordered Imp.Run events, natural Claude Sonnet 4.6 component proposals, GPT-5.4 Mini task calls, disjoint 3/3/4 train-selection-test rows, parameter Artifact reload, and a fresh BEAM. Baseline heldout 0.90, selected 1.00, fresh 1.00; 3 reflection and 76 task requests, observed combined cost about /bin/zsh.076. This is diagnostic until rerun from exact clean code. Sandbox/replay-default is demonstrated; generalized pre-effect authorization for external side effects is not, so the full ticket remains open.
+2026-08-22: In progress. The public packaged sandbox story and provider-free execution contract are implemented locally. A bounded dirty-tree live run used real ReActV2 tool execution plus ordered Imp.Run events, natural Claude Sonnet 4.6 component proposals, GPT-5.4 Mini task calls, disjoint 3/3/4 train-selection-test rows, parameter Artifact reload, and a fresh BEAM. Baseline heldout 0.90, selected 1.00, fresh 1.00; 3 reflection and 76 task requests, observed combined cost about USD 0.076. This is diagnostic until rerun from exact clean code. Sandbox/replay-default is demonstrated; generalized pre-effect authorization for external side effects is not, so the full ticket remains open.
 
 **2026-08-22T19:37:38Z**
 

@@ -32,12 +32,12 @@ component value maps and export the selected state through the same parameter
 Artifact boundary. The compatibility, public-surface, and package suites are
 green.
 
-Do not close this ticket from those mechanics alone. The remaining acceptance
-proof is an ordinary action-aware ReAct/RLM or composed consumer lifecycle that
-uses these components through real optimization, held-out selection, Artifact
-reload, and fresh execution. The isolated ACP runtime branch owns ReActV2/RLM
-event and cancellation edits; integrate that seam before choosing the smallest
-non-conflicting consumer proof.
+Commit `788c971c` supplied the missing ordinary consumer proof: a packaged
+ReActV2 program used natural Optimize Anything proposals, disjoint selection
+and held-out rows, action-aware scoring, a parameter Artifact, and fresh trusted
+execution. The exact result is recorded below and in `docs/EVIDENCE.md`.
+External-effect authorization remains separate work in `imp-iget`; it is not a
+missing part of this component protocol.
 
 ## Notes
 
