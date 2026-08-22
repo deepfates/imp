@@ -698,8 +698,8 @@ defmodule OptimizerReportTest do
     assert report.optimizer == :labeled_few_shot
     assert report.best_score == nil
     assert report.candidate_count == 1
-    assert report.metadata.requested_k == 1
-    assert report.metadata.selected_count == 1
+    assert report.metadata.k_per_predictor == 1
+    assert report.metadata.selected_assignment_count == 1
     assert [%{index: 0, selected?: true, example: example}] = report.candidates
     assert Imp.Example.get(example, :answer) == "Paris"
     assert length(compiled.demos) == 1
@@ -979,7 +979,7 @@ defmodule OptimizerReportTest do
 
     assert compiled.demos == [existing_demo]
     assert report.metadata.status == :trainset_error
-    assert report.metadata.selected_count == 0
+    assert report.metadata.selected_assignment_count == 0
     assert [%{stage: :trainset, reason: reason}] = report.errors
     assert String.contains?(reason, "Enumerable")
   end

@@ -130,6 +130,8 @@ defmodule LabeledFewShotSelectionTest do
 
     report = Imp.Optimizer.Report.fetch(compiled)
     assert report.candidate_count == 10
+    assert report.metadata.k_per_predictor == 5
+    assert report.metadata.selected_assignment_count == 10
     assert report.metadata.selected_by_predictor == %{first: 5, second: 5}
   end
 
@@ -146,7 +148,7 @@ defmodule LabeledFewShotSelectionTest do
       |> Imp.Optimizer.LabeledFewShot.compile(program, [])
 
     assert demos(compiled) == []
-    assert Imp.Optimizer.Report.fetch(compiled).metadata.selected_count == 0
+    assert Imp.Optimizer.Report.fetch(compiled).metadata.selected_assignment_count == 0
   end
 
   test "Datasets.split/2 default shuffle is seeded: repeated splits are identical" do

@@ -533,6 +533,20 @@ report = Imp.Optimizer.Report.fetch(compiled)
 {report.best_score, report.metadata}
 ```
 
+`best_score` means a score computed *inside that optimizer*. It is `nil` for
+transform-only optimizers such as `LabeledFewShot`: compilation makes zero LM
+calls, attaches examples without evaluating them, and therefore has exactly
+zero provider cost rather than a missing usage record. Scores used to select
+and test that program live on the surrounding `Imp.Experiment.Result` as
+`baseline_selection`, `optimized_selection`, and `test`.
+
+For `LabeledFewShot`, `k` is the maximum per predictor. A training example may
+contain the union of fields for a multi-stage program; each predictor renders
+only fields declared by its own signature. Its report counts
+predictor-example assignments, so `candidate_count` and
+`metadata.selected_assignment_count` can be larger than the number of unique
+training rows. Inspect `metadata.selected_by_predictor` for the per-stage view.
+
 The optimizer modules remain pre-1.0 surfaces. Some have strong task-scoped
 effectiveness results; others currently have lifecycle or mechanism evidence
 without broad positive results. The source repository's
@@ -679,7 +693,9 @@ artifact_path = "/secure/support-router-parameters.json"
 
 Both writers use private permissions and atomic replacement. Results contain
 scores, counts, redacted provenance, and artifact linkage by default—not raw
-dataset rows.
+dataset rows. Optimizer reports and parameter artifacts can contain selected
+demonstrations, instructions, outputs, and error details, however, so treat
+them as sensitive application data rather than harmless configuration.
 
 In a fresh process, reconstruct the trusted program and live clients, then
 apply the selected parameters:

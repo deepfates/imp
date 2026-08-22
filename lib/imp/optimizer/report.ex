@@ -1,5 +1,13 @@
 defmodule Imp.Optimizer.Report do
-  @moduledoc "Optimizer candidate history and diagnostic metadata."
+  @moduledoc """
+  Optimizer candidate history and diagnostic metadata.
+
+  `best_score` is the best score computed inside the optimizer. It is `nil` for
+  transform-only optimizers such as `LabeledFewShot`, which attach parameters
+  without evaluating them. When `Imp.Experiment.check/5` performs the outer
+  admission and held-out measurement, those scores live in
+  `Imp.Experiment.Result.baseline_selection`, `optimized_selection`, and `test`.
+  """
 
   @image_schema_version 1
   @code_schema_version 1

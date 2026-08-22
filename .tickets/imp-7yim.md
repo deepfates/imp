@@ -1,6 +1,6 @@
 ---
 id: imp-7yim
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-22T14:33:28Z
@@ -31,3 +31,11 @@ Independent package-only cold consumer succeeded from /tmp without source tests/
 **2026-08-22T15:52:56Z**
 
 Cold-consumer friction repaired in the owning public guide: required vs nullable vs default output semantics now have a runnable structured-signature example; omitted nullable outputs are explicit nil; output defaults round-trip; false/zero/empty values override defaults; ReActV2 stricter submit behavior and BEAM default_factory disposition are stated. This closes that specific ambiguity but not the remaining composed-spine/report/cost/sensitivity/install friction.
+
+**2026-08-22T20:22:02Z**
+
+Closed on current candidate after the independently authored package-only consumer was rerun against a freshly rebuilt 0.3.0 package. It again completed the full two-stage custom Imp.Module -> disjoint Experiment -> LabeledFewShot -> selection/test -> Artifact write/read/apply -> fresh call path, with selection 0.0 -> 1.0 and untouched test 1.0.
+
+The discovered friction is now repaired or classified at its owning boundary: LabeledFewShot documents that k is per predictor, union-shaped examples are projected through each predictor signature, compilation makes zero provider calls, and best_score is nil because it does not score; metadata now names predictor-example assignment counts explicitly. The API Guide points to the Experiment scores, warns that reports/artifacts may contain sensitive demos/instructions/outputs/errors, and already contains the composed named-predictor contract. The built package uses private atomic artifacts and the consumer observed the renamed fields after a clean dependency compile. Source-path mutability is not a package defect: README already requires exact-commit pins until the owner chooses publication.
+
+Verification: 66 focused optimizer/report tests passed; mix imp.package.clean_room passed the unpacked package/tutorial/cross-VM artifact/tamper/release/concurrency/failure lifecycle; /tmp/imp-cold-consumer.LtldUi passed against that rebuilt package (artifact 19,675 bytes). This closes the early probe exactly, not final release acceptance or broad optimizer effectiveness.

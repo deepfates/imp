@@ -5,8 +5,18 @@ defmodule Imp.Optimizer.LabeledFewShot do
 
   This optimizer does not call the language model or score candidates. It is the
   deterministic few-shot baseline: select up to `k` examples from the trainset
-  for every exposed predictor and attach them as demonstrations. The compiled
-  program carries an optimizer report that records every selected example.
+  for every exposed predictor and attach them as demonstrations. Its report
+  therefore has `best_score: nil`; scores used to admit the compiled program
+  belong to the surrounding evaluation or `Imp.Experiment.Result`.
+
+  `k` applies independently to each predictor. Report `candidate_count` and
+  `metadata.selected_assignment_count` count predictor-example assignments, so
+  a two-predictor program with `k: 1` can report two selected assignments. The
+  `selected_by_predictor` map gives the corresponding per-predictor counts.
+
+  A trainset example may contain the union of fields needed by a composed
+  program. Each predictor's adapter renders only the input and output fields in
+  that predictor's own signature; unrelated fields are ignored.
 
   ## Selection behavior and determinism
 
@@ -95,11 +105,11 @@ defmodule Imp.Optimizer.LabeledFewShot do
         candidates: candidates,
         errors: errors,
         metadata: %{
-          requested_k: optimizer.k,
+          k_per_predictor: optimizer.k,
           sample: optimizer.sample,
           seed: optimizer.seed,
           predictor_count: length(selections),
-          selected_count: length(candidates),
+          selected_assignment_count: length(candidates),
           selected_by_predictor: Map.new(selections, &{&1.predictor, length(&1.demos)}),
           status: if(errors == [], do: :ok, else: :trainset_error)
         }
