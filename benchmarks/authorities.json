@@ -191,14 +191,14 @@
       "kind": "product",
       "surface_tokens": ["package", "public_api", "docs", "README", "livebooks"],
       "upstream_surface_ids": ["product.learning_path", "product.release"],
-      "coverage_matrix_concepts": ["Public facade", "Production gate", "Evidence dashboard and profile readiness gate", "Live inference gate", "Local integration gate", "Documentation and Livebooks"],
-      "parity_lanes": ["Lane 6: Evidence Dashboard and Release Gate"],
+      "coverage_matrix_concepts": ["Public facade", "Ordinary source check", "Live inference gate", "Local integration gate", "Documentation and Livebooks"],
+      "parity_lanes": [],
       "upstream_repository": {"status": "release_and_commit_pinned", "repository": "https://github.com/stanfordnlp/dspy", "version": "3.2.1", "git_ref": "refs/tags/3.2.1", "commit": "29448ae12756abdd14bd8796c819247ebb83673c", "source_paths": ["docs/docs", "pyproject.toml", "README.md"], "source_manifest": {"path": "benchmarks/authority_sources/dspy-3.2.1-29448ae.json", "sha256": "c12bec921bb00be7a19fbf98c4de4b9e17e2d90405cf9e30fe1ed7d6b3463f3a", "file_count": 296}},
       "primary_authority": {"status": "no_primary_authority", "locator": null, "revision": null, "title": null},
       "upstream_tests": {"status": "present", "references": ["tests/docs/test_mkdocs_links.py#sha256=20591b9b45fedb526777f6ffee4ff3c863f368b5e9187369394d25e1f2bda915"]},
       "dataset_protocol": {"status": "not_applicable", "references": [], "immutable_digests": []},
-      "local_differential": {"status": "partial", "artifacts": ["test/package_contract_test.exs", "test/livebook_contract_test.exs", "benchmarks/results/parity-dashboard-*.json"]},
-      "notes": "DSPy 3.2.1 documentation and package metadata are the immutable upstream comparison surface; Imp Hex and GitHub publication remain Imp-owned release evidence."
+      "local_differential": {"status": "partial", "artifacts": ["test/package_contract_test.exs", "test/livebook_contract_test.exs"]},
+      "notes": "DSPy 3.2.1 documentation and package metadata are the pinned upstream comparison surface; Imp publication remains an owner action and is verified through its release procedure rather than a research profile."
     },
     {
       "id": "family.dspy_core_programming",

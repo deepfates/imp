@@ -5,7 +5,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
       mix imp.benchmark.overhead
 
   Evidence capture requires a clean checkout by default. `--no-require-clean`
-  is available only for diagnostics; the dashboard rejects that dirty envelope.
+  is available only for diagnostics; a dirty envelope is not admissible evidence.
 
   This benchmark deliberately excludes provider latency. It measures local
   library overhead for formatting, parsing, validation, evaluation, optimizer

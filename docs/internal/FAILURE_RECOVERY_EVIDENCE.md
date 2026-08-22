@@ -30,11 +30,11 @@ The operational campaign is intentionally local, bounded, and provider-free:
   error, succeeds on the exact retry, and then calls `submit` exactly once. The
   complete normalized history is part of the verified evidence.
 
-The dashboard verifies the run envelope, recomputes every deterministic and
+The artifact validator verifies the run envelope, recomputes every deterministic and
 operational row from outcomes, and ignores reported summary booleans. At least two
 iterations, zero flakes, zero resource leaks, balanced telemetry, and a clean
 dummy-canary scan are required for full evidence. The canonical task requires a
-clean current-source checkout by default, and the dashboard rejects dirty or
+clean current-source checkout by default, and the validator rejects dirty or
 non-reproducible RunContext envelopes even when their Git revision matches.
 
 This campaign makes no provider, paid-training, public MCP, external-network,
@@ -58,7 +58,7 @@ mix imp.benchmark.failure_campaign \
   --out benchmarks/runs/failure-recovery
 ```
 
-Then point the dashboard at the result directory. The artifact’s signed payload
+Then validate and retain the result. The artifact's payload
 hash, exact Git revision, clean workspace state, attempt counts, time bounds,
 exact tool history, canary digest, telemetry, and resource deltas are the
 authority inputs.

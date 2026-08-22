@@ -121,7 +121,7 @@ The audited upstream tree has adjacent bootstrap and grounded-proposer tests,
 but no dedicated MIPROv2 or SIMBA test suite. Consequently, released source is
 the control-flow authority and the MIPROv2 paper is the research authority. The
 matched structural task is implemented, but the local differential remains
-`partial` until a fresh artifact passes the dashboard authority and freshness
+`partial` until a fresh artifact passes its authority, provenance, and protocol
 checks.
 
 ## GEPA Current And Historical Pins
@@ -196,4 +196,4 @@ each authority dimension independently. They must not collapse the row to a
 single green/red status. A repository pin cannot substitute for a dataset pin;
 an upstream test cannot substitute for a local differential; and an artifact
 path cannot substitute for validating the artifact's schema, provenance,
-freshness, scope, and verdict through the benchmark dashboard.
+freshness, scope, and verdict through its own protocol validator.

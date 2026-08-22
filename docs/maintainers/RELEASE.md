@@ -1,9 +1,8 @@
 # Imp Release Procedure
 
-This is the sole human release procedure for Imp. Executable gate definitions
-live in `mix.exs` and their Mix task modules. Public claim scope and proof
-obligations live in `benchmarks/claims.json`. The generated dashboard reports
-current evidence; this document does not maintain a status snapshot.
+This is the sole human release procedure for Imp. It intentionally calls the
+same behavioral checks used during development; it does not create a second
+layer of gate receipts or release profiles.
 
 ## Product Standard
 
@@ -13,9 +12,8 @@ immutable artifact, execute through public APIs, preserve typed program and
 runtime contracts, avoid persisting credentials, survive save/load and BEAM
 boundaries, expose operational failures, and teach the same path in its docs.
 
-Product readiness and research completion are separate profiles. Publishing
-the product does not authorize a comparative or paper claim. A red telos claim
-blocks telos completion but does not falsify a narrower proven product claim.
+Publishing the product does not authorize a comparative or paper claim.
+Research results retain their own frozen contracts and artifacts.
 
 ## Convergence Standard
 
@@ -27,9 +25,8 @@ second product.
    observable result. Private construction, module identity, and call graphs
    are diagnostics, not substitutes for that test.
 2. **Keep one owner for each fact.** Git owns source identity, lockfiles own
-   resolved dependencies, the claim ledger owns declared claims, `tk` owns
-   unfinished work, and an experiment artifact owns its frozen inputs and
-   result. A generated view may project those facts but must not become another
+   resolved dependencies, `tk` owns unfinished work, and an experiment artifact
+   owns its frozen inputs and result. A generated view must not become another
    editable registry.
 3. **Separate product, compatibility, research, and external smoke checks.**
    Product tests cover ordinary use. Compatibility fixtures compare observable
@@ -84,16 +81,17 @@ Run from a clean candidate commit:
 
 ```sh
 PYTHON=python3.12 scripts/setup_reference_test_env.sh
-mix production.check
+mix check
 mix integration.check
 mix protocol.check
 mix package.check
 mix livebook.execute.check
 mix quality.check
+mix dialyzer.check
 ```
 
-Load the ignored local environment and run the candidate-bound live provider
-gate:
+Copy `.env.example` to an ignored `.env`, choose a model, add one provider key,
+then run the candidate-bound live provider gate:
 
 ```sh
 set -a
@@ -102,21 +100,10 @@ set +a
 LIVE_PROVIDER=1 mix live.check
 ```
 
-Capture source-bound evidence and evaluate the product profile:
-
-```sh
-mix gate.package.evidence
-mix gate.livebook.evidence
-mix gate.protocol.evidence
-mix gate.live_provider.evidence
-mix benchmark.dashboard
-mix benchmark.dashboard.ready
-```
-
-`profile_ready: true` means every blocking claim in the selected profile has
-its declared evidence. It never means complete DSPy or paper parity, and it is
-not sufficient by itself for product release: the finish line above must also
-work through the ordinary consumer path.
+When compatibility with a pinned upstream is part of the release claim, also
+provision that reference environment and run `mix differential.check`.
+Individual benchmark commands remain available for the scientific questions
+they were built to answer, but they are not aggregated into a release score.
 
 ## Publication
 
@@ -129,21 +116,17 @@ work through the ordinary consumer path.
    channel.
 6. Replace mutable Git installation instructions with the immutable tag or
    package coordinate.
-7. Generate the final dashboard from the tagged source and attach its digest
-   to the release record; do not commit it as timeless status.
+7. Record the tag, package checksum, and publication destination in the release
+   record.
 
 If any exact-candidate gate fails, the candidate is not ready. Narrow the claim
 only when the product decision genuinely changes, never to obtain a green bit.
 
 ## Research Completion
 
-`mix benchmark.dashboard.telos.ready` evaluates the cumulative research
-profile retained for compatibility with existing artifacts. Its C0-C5 terms
-grade narrow claims; they are not product phases, priorities, or a mandate to
-run every possible benchmark. C1 conformance should precede effectiveness
-spend; C3 uses held-out data; C4 requires exact public authority; C5 requires
-powered paired evidence. Unavailable exact authority narrows the research
-claim and does not block a separately named useful product demonstration.
+Research completion is judged from the question, frozen protocol, raw result,
+and independently reproducible analysis for that study. It is not inferred
+from the release checklist or from a cumulative repository score.
 
 All unfinished work and dependencies live in `tk`. Markdown must not carry a
 parallel roadmap or progress table.

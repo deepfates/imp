@@ -171,7 +171,12 @@ defmodule Imp.ReproductionRegistry do
 
   defp validate_exact_authority_coverage!(features, authority_by_id) do
     covered = features |> Enum.map(& &1["authority_family"]) |> Enum.uniq() |> Enum.sort()
-    expected = authority_by_id |> Map.keys() |> Enum.sort()
+
+    expected =
+      authority_by_id
+      |> Enum.reject(fn {_id, authority} -> authority["kind"] == "product" end)
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.sort()
 
     unless covered == expected do
       raise ArgumentError,
@@ -181,18 +186,20 @@ defmodule Imp.ReproductionRegistry do
 
   defp validate_surface_token_coverage!(features, authority_by_id) do
     Enum.each(authority_by_id, fn {family_id, authority} ->
-      covered =
-        features
-        |> Enum.filter(&(&1["authority_family"] == family_id))
-        |> Enum.flat_map(& &1["surface_tokens"])
-        |> Enum.uniq()
-        |> Enum.sort()
+      if authority["kind"] != "product" do
+        covered =
+          features
+          |> Enum.filter(&(&1["authority_family"] == family_id))
+          |> Enum.flat_map(& &1["surface_tokens"])
+          |> Enum.uniq()
+          |> Enum.sort()
 
-      expected = Enum.sort(authority["surface_tokens"])
+        expected = Enum.sort(authority["surface_tokens"])
 
-      unless covered == expected do
-        raise ArgumentError,
-              "surface token coverage differs for #{family_id}: missing=#{inspect(expected -- covered)} extra=#{inspect(covered -- expected)}"
+        unless covered == expected do
+          raise ArgumentError,
+                "surface token coverage differs for #{family_id}: missing=#{inspect(expected -- covered)} extra=#{inspect(covered -- expected)}"
+        end
       end
     end)
   end

@@ -188,7 +188,7 @@ defmodule EvidenceProvenanceTest do
 
   # Repo-relative paths an artifact records as provenance receipts: checkpoint
   # files it claims a reader can open. tmp/ paths are ephemeral by contract and
-  # judged by the dashboard's lane logic instead.
+  # judged by the owning protocol validator instead.
   defp checkpoint_paths(node), do: collect_checkpoints(node, [])
 
   defp collect_checkpoints(%{} = map, acc) do

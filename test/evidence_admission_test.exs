@@ -151,7 +151,7 @@ defmodule Imp.BenchmarkTruth.EvidenceAdmissionTest do
         artifact_path: @artifact,
         protocol_id: "auto_evaluation_contract",
         tier: "t1",
-        feature_ids: ["product_release"],
+        feature_ids: ["dspy_programming_model"],
         registry_path: registry_path
       )
     end

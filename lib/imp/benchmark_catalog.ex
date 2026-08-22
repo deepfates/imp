@@ -168,7 +168,7 @@ defmodule Imp.BenchmarkCatalog do
       commands: [
         "mix test test/operations_stress_test.exs test/adversarial_security_stress_test.exs",
         "mix benchmark.failure_campaign.check",
-        "mix production.check",
+        "mix check",
         "mix integration.check",
         "mix benchmark.overhead.check"
       ],

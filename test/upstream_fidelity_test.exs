@@ -116,7 +116,7 @@ defmodule Imp.UpstreamFidelityTest do
     assert report.summary.manifest_duplicates == 0
     assert report.summary.gaps > 0
     assert report.summary.non_blocking_gaps == report.summary.gaps
-    assert report.summary.release_blockers == 0
+    assert report.summary.conformance_blockers == 0
     assert report.summary.passing
     assert report.blocking_ids == []
 

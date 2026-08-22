@@ -146,18 +146,6 @@
   {"lib/imp/schema.ex", :pattern_match_cov, {358, 8}},
   # MapSet opacity on run-id sets typed through MLflow JSON
   {"lib/imp/tracking/mlflow.ex", :call_without_opaque, {361, 8}},
-  # MapSet opacity on gate-name sets typed through evidence JSON
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1241, 33}},
-  # MapSet opacity on gate-name sets typed through evidence JSON
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1982, 59}},
-  # MapSet opacity on gate-name sets typed through evidence JSON
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :call_without_opaque, {1986, 22}},
-  # defensive clause: policy_candidate?/3 :age policy clause; callers pass
-  # a narrower policy set today
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :pattern_match, {2827, 8}},
-  # defensive clause: policy_candidate?/3 :immutable_admission clause, same
-  # narrowed policy set as 2575
-  {"lib/mix/tasks/imp.benchmark.dashboard.ex", :pattern_match, {2832, 8}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"lib/mix/tasks/imp.benchmark.fast_slow.ex", :pattern_match, 1},
   # MapSet opacity on the hop-id set from analysis JSON

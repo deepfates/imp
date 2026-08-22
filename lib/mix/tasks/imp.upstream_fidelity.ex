@@ -66,18 +66,17 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     """
     # Imp Audited Upstream Conformance Ledger
 
-    This generated report answers whether the selected upstream-conformance
-    profile has unresolved blocking rows. It is not the product release verdict
-    or work queue; the source repository's maintainer release procedure owns
-    the ordinary consumer finish line and `tk` owns unfinished work.
+    This generated report audits asserted upstream-conformance statements. It
+    is not the product release verdict or work queue; the source repository's
+    maintainer release procedure owns the ordinary consumer finish line and
+    `tk` owns unfinished work.
 
     Each status below is a maintainer-authored disposition. The generator checks
-    that named evidence exists, that claim and reproduction registries are
-    internally valid, and that gaps obey the selected profile; it does not infer
+    that named evidence exists and that claim and reproduction registries are
+    internally valid; it does not infer
     semantic conformance merely because the named test files pass.
 
     Baseline: DSPy #{report.baseline.version} (`#{report.baseline.git_sha}`)
-    Release profile: #{report.release_profile["id"]}
     Total: #{report.summary.total}
     Conformant: #{report.summary.conformant}
     Elixir-native equivalents: #{report.summary.elixir_native_equivalent}
@@ -88,8 +87,8 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     Invalid aggregate rows: #{report.summary.invalid_rows}
     Missing manifest surfaces: #{report.summary.manifest_missing}
     Duplicate manifest owners: #{report.summary.manifest_duplicates}
-    Selected-profile blockers: #{report.summary.release_blockers}
-    Conformance profile passing: #{report.summary.passing}
+    Asserted conformance blockers: #{report.summary.conformance_blockers}
+    Asserted conformance passing: #{report.summary.passing}
 
     | ID | Category | Maintainer disposition | Product gate | Upstream surfaces |
     | --- | --- | --- | --- | --- |
@@ -162,8 +161,14 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
       |> Enum.map_join("\n", fn capability ->
         claims =
           case capability.claims do
-            [] -> "no current-profile claim"
-            items -> Enum.map_join(items, ", ", &"#{&1.id} (#{&1.gate_policy})")
+            [] ->
+              "no indexed claim"
+
+            items ->
+              Enum.map_join(items, ", ", fn claim ->
+                label = if claim.claim_state == "asserted", do: claim.gate_policy, else: "target"
+                "#{claim.id} (#{label})"
+              end)
           end
 
         receipts =
@@ -183,7 +188,7 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     capability_section =
       if capabilities == "",
         do: "",
-        else: "\nCurrent-profile capability evidence:\n\n#{capabilities}\n"
+        else: "\nIndexed capability evidence:\n\n#{capabilities}\n"
 
     rationale =
       case Map.get(surface, :rationale) do

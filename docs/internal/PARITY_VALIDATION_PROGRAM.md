@@ -145,8 +145,8 @@ The matrix marks whether Imp has release-quality evidence for:
 - a historical/research-style lane with a fresh matched research sample, or an
   explicit missing/unavailable note
 
-The dashboard consumes this matrix. A smoke matrix is useful wiring evidence,
-but it is not live parity. A lane passes only when its policy is met with
+The matrix is a research result. A smoke matrix is useful wiring evidence, but
+it is not live parity. A lane passes only when its policy is met with
 current prompt contracts, matched effective generation, score/error parity,
 latency ratios, and cost reporting.
 When several models are present in one lane, the lane summary reports the
@@ -305,7 +305,7 @@ records the installed component-feedback identity.
 For source-checkout campaigns, use `mix imp.benchmark.gepa_replication
 --from-gepa-artifact ... --upstream-evidence ... --imp-input ...
 --protocol-classification exact_paper_replication` to convert upstream GEPA artifact
-`Baseline`, `GEPA`, and `MIPROv2-Heavy` outputs into dashboard rows. The
+`Baseline`, `GEPA`, and `MIPROv2-Heavy` outputs into retained result rows. The
 `--imp-input` file must come from Imp's own GEPA run and provide the
 `imp_gepa` result plus provenance fields; the converter does not synthesize
 Imp scores.
@@ -365,7 +365,7 @@ be validated in the research campaign Python environment before claiming
 AMPS_Hard parity.
 
 Upstream comparator evidence is an archive-derived sidecar, not a manually
-completed dashboard field. Run `scripts/extract_gepa_upstream_evidence.py` with
+completed result field. Run `scripts/extract_gepa_upstream_evidence.py` with
 the immutable `experiment_runs_data` archive, the matching GEPA artifact
 checkout, selected model, and an output path. The extractor requires all six
 family/program pairs and `Baseline`, `GEPA`, and `MIPROv2-Heavy` seed-0 runs;
@@ -507,57 +507,16 @@ Pass condition:
 - no speed claim is inferred from a budget or ratio
 - regressions have tracked remediation before release
 
-## Lane 6: Evidence Dashboard and Release Gate
+## Reading Results
 
-The validation program must end in a single truth surface. Humans can read
-details, but release decisions need machine-readable artifacts.
+There is no aggregate parity or release score. Each lane retains the inputs,
+runtime identities, data digests, costs, raw outcomes, and interpretation needed
+for its own question. Full parity cannot be claimed unless every named surface
+has appropriate evidence; a green product check is not parity evidence.
 
-Required outputs:
-
-- `benchmarks/runs/parity-dashboard-*.json`
-- lane status: `missing`, `smoke`, `sample`, `full`, `passing`, `failing`
-- links to source artifacts
-- dataset digests
-- runtime versions
-- model/provider identities
-- score, lift, latency, cost, error, and throughput summaries
-- live runtime instrumentation summaries, including Imp LM-duration share,
-  local overhead, fallback/retry counts, DSPy history coverage, and
-  prompt/output size diagnostics with DSPy message-size provenance
-- explicit full-parity boolean
-- explicit performance-claim boolean
-
-Initial executable commands:
-
-```sh
-mix benchmark.dashboard
-mix benchmark.dashboard.ready
-mix benchmark.dashboard.telos
-mix benchmark.dashboard.telos.ready
-```
-
-`mix benchmark.dashboard` writes the latest v0.1-scoped machine-readable truth
-surface even when lanes are incomplete. `mix benchmark.dashboard.ready` is the
-v0.1 full-evidence gate: it reads the same artifacts and fails unless every
-required v0.1 lane has fresh, passing, full-evidence status. The explicit
-`benchmark.dashboard.telos` and `benchmark.dashboard.telos.ready` aliases select
-the broader cumulative telos scope for research review; a red telos gate does
-not block a v0.1 product release. These gates are intentionally stricter than
-`production.check`; a green deterministic gate is not a full DSPy-parity claim.
-When a profile-specific full gate fails, the terminal error summarizes the
-blocking lanes and requirements directly, such as missing live model lanes,
-remaining benchmark rows, stale prompt contracts, or incomplete runtime-shape
-evidence. The JSON dashboard remains the authoritative artifact for audit and
-automation.
-
-Pass condition:
-
-- release docs consume the dashboard
-- full parity cannot be claimed unless required lanes pass
-- performance improvement cannot be claimed unless provider-free benchmarks
-  support it
-- live latency conclusions identify whether observed gaps are provider/model
-  dominated, prompt/output-shape dominated, or Imp local-overhead dominated
+Performance statements must point to the benchmark that supports them. Live
+latency interpretations must distinguish provider/model time, prompt and output
+shape, and Imp-local overhead.
 
 ## What Counts As Done
 
@@ -571,8 +530,8 @@ Imp has full parity evidence only when:
    surface.
 4. RAG/tool/agent production semantics pass deterministic and live slices.
 5. Provider-free performance benchmarks support any speed claims.
-6. The dashboard reports `full_parity: true`.
-7. The release criteria link to the exact dashboard artifact.
+6. Every named lane meets its own protocol and the cross-lane interpretation
+   survives review of the underlying results.
 
 Until then, honest language is narrower: Imp may have a passing smoke lane,
 deterministic parity for specific surfaces, or performance wins on specific

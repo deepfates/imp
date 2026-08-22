@@ -46,5 +46,5 @@ mix imp.benchmark.better_together_differential
 
 The tasks refuse dirty-source capture and bind the committed Imp optimizer, task, sidecar, fixture,
 authority manifest, and authority ledger hashes. Registry admission remains a separate step: this
-tranche intentionally does not edit the shared claims, authorities, reproductions, or dashboard
+tranche intentionally does not edit the shared claims, authorities, or reproductions
 registries while parallel work is active.

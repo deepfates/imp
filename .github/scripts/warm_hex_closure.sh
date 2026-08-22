@@ -3,7 +3,7 @@
 # lockfile: registry entry in cache.ets AND package tarball in packages/ for
 # every :hex entry in the lock.
 #
-# Why this exists: production.check's offline clean-room (HEX_OFFLINE=1
+# Why this exists: package.check's offline clean-room (HEX_OFFLINE=1
 # deps.get in mix imp.package.clean_room's consumer and deployment VMs) reads
 # BOTH pieces for every locked package. A ~/.hex restored from a CI cache is a
 # function of its ANCESTRY (whichever job saved it, from whatever partial

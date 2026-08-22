@@ -7,18 +7,15 @@ consumer-facing runtime guidance is [Production Operations](../PRODUCTION_OPERAT
 
 ## What The Gates Prove
 
-`mix production.check` runs:
+`mix check` runs:
 
 - format check
 - compile with warnings as errors
 - the deterministic non-live, non-integration, non-protocol test suite
-- package-boundary checks through `mix package.check`
-- Livebook syntax validation through `mix livebook.check`
-- clean documentation generation with ExDoc, so renamed modules or Livebooks
-  cannot leave stale pages in the ignored `doc/` output directory
 
 It intentionally does not run paid provider calls, dataset fetches, long
-campaigns, or parity dashboards.
+campaigns, package installation, or upstream differentials. Those have their
+own commands because they exercise different environments.
 
 `mix livebook.execute.check` runs every shipped notebook. Keep it out of the
 ordinary fast gate, but run it when changing public examples, notebook code, or
@@ -48,13 +45,9 @@ state:
   decoding, and trusted stdio MCP clients through imported tool discovery and
   tool-call execution.
 
-`mix legacy_identity.check` scans tracked live and package-facing surfaces for
-the retired identity, with only explicit historical benchmark/provenance
-exceptions. `mix quality.check` runs that audit plus the static warning and
-dependency advisory gate: Credo warning-level review plus Hex package audit.
-CI must run these checks alongside the deterministic release gates so identity
-drift, maintainability, and known dependency risks are caught before merge,
-not only during local release preparation.
+`mix quality.check` runs Credo's warning-level review plus the Hex dependency
+audit. Historical naming decisions are documentation, not a permanent release
+gate.
 
 `mix package.check` verifies the Hex package boundary. It checks that the
 installable package contains product modules, docs, and Livebooks while
@@ -67,10 +60,8 @@ DSPy `3.2.1` and `gepa-ai/gepa-artifact` commit
 `cbefbc1aa0f43dd39874ec4bf42211365dbda42e`; changing either pin requires an
 upstream-conformance review rather than an incidental dependency update.
 
-In a source checkout, `mix evidence.check` runs deterministic maintainer
-evidence. These commands are not shipped as package APIs:
-
-Source-checkout maintainer aliases:
+The following source-checkout benchmark commands remain available for the
+specific questions they answer. They are not combined into a release score:
 
 - benchmark truth harness tests through `mix benchmark.truth.check`
 - provider-free Imp-vs-DSPy golden trace parity through
@@ -89,11 +80,9 @@ Source-checkout maintainer aliases:
 - pinned executable upstream conformance through `mix upstream_fidelity.check`
 
 `mix benchmark.operations_stress.check` remains available as a test-only,
-single-process diagnostic. It is intentionally excluded from `mix
-evidence.check`: its timestamped JSON has no source-bound RunContext,
-environment identity, or tamper envelope and must not be cited as C0-C5 claim
-evidence. The underlying behaviors are enforced by ExUnit; source-bound
-operational claims use the failure-recovery and overhead lanes.
+single-process diagnostic. Its timestamped JSON has no source-bound RunContext,
+environment identity, or tamper envelope and must not be cited as research
+evidence. The underlying behaviors are enforced by ExUnit.
 
 The failure campaign writes normalized per-iteration outcomes and flake rates.
 The default alias is T0 provider-free evidence. The compatibility `--live`
@@ -160,13 +149,6 @@ Public surface failure:
 
 ```sh
 mix public_surface.check
-```
-
-Maintainer evidence failure:
-
-```sh
-# source checkout only
-mix evidence.check
 ```
 
 Local integration failure:

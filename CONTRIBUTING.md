@@ -11,10 +11,13 @@ Use Elixir 1.19, OTP 28, Python 3.12, and Deno 2.8.3, then run:
 ```sh
 mix deps.get
 scripts/setup_reference_test_env.sh
-mix production.check
+mix check
 mix integration.check
 mix protocol.check
+mix package.check
+mix livebook.execute.check
 mix quality.check
+mix dialyzer.check
 ```
 
 Documentation examples are executable and gated: the learning-path snippets
@@ -25,7 +28,8 @@ both green when changing public examples or notebooks.
 Provider-backed and research-scale tests are separate because they require
 credentials, external services, canonical datasets, or significant spend. See
 `docs/maintainers/RELEASE.md` and `docs/maintainers/EVIDENCE.md` before changing
-a provider, optimizer, benchmark, or fidelity claim.
+a provider, optimizer, benchmark, or fidelity claim. `.env.example` documents
+the supported live-test variables; keep real credentials in an ignored `.env`.
 
 ## Maintainer checks
 
@@ -48,18 +52,15 @@ validators resolve ancestor commit SHAs.
 
 ## Maintainer Authority
 
-The repository authority order is deliberately narrow:
+Public behavior belongs to code, tests, and user documentation. Pinned upstream
+semantics belong to `benchmarks/authorities.json`; reproducible research
+protocols and retained results belong to `benchmarks/reproductions.json` and
+`benchmarks/evidence/`. Tickets record unfinished work, not product truth.
 
-1. `benchmarks/claims.json` declares claim scope and proof obligations.
-2. `benchmarks/authorities.json` pins reference behavior.
-3. `benchmarks/reproductions.json` declares protocols and admitted artifacts.
-4. `mix benchmark.dashboard` computes evidence and profile readiness.
-5. `tk` owns unfinished work, dependencies, and priorities.
-
-Markdown explains contracts and methods; it does not maintain a parallel status
-or roadmap. Start with `docs/maintainers/CLAIMS.md`,
+`benchmarks/claims.json` is a scoped index for auditing unusually broad or
+comparative statements. It is not a release score. Read
 `docs/maintainers/AUTHORITIES.md`, `docs/maintainers/REPRODUCTIONS.md`, and
-`docs/maintainers/RESEARCH_PROTOCOLS.md`.
+`docs/maintainers/RESEARCH_PROTOCOLS.md` when changing those surfaces.
 
 ## Design Standard
 

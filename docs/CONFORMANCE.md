@@ -1,17 +1,16 @@
 # Imp Audited Upstream Conformance Ledger
 
-This generated report answers whether the selected upstream-conformance
-profile has unresolved blocking rows. It is not the product release verdict
-or work queue; the source repository's maintainer release procedure owns
-the ordinary consumer finish line and `tk` owns unfinished work.
+This generated report audits asserted upstream-conformance statements. It
+is not the product release verdict or work queue; the source repository's
+maintainer release procedure owns the ordinary consumer finish line and
+`tk` owns unfinished work.
 
 Each status below is a maintainer-authored disposition. The generator checks
-that named evidence exists, that claim and reproduction registries are
-internally valid, and that gaps obey the selected profile; it does not infer
+that named evidence exists and that claim and reproduction registries are
+internally valid; it does not infer
 semantic conformance merely because the named test files pass.
 
 Baseline: DSPy 3.2.1 (`29448ae12756abdd14bd8796c819247ebb83673c`)
-Release profile: v0.1
 Total: 26
 Conformant: 11
 Elixir-native equivalents: 9
@@ -22,8 +21,8 @@ Invalid evidence: 0
 Invalid aggregate rows: 0
 Missing manifest surfaces: 0
 Duplicate manifest owners: 0
-Selected-profile blockers: 0
-Conformance profile passing: true
+Asserted conformance blockers: 0
+Asserted conformance passing: true
 
 | ID | Category | Maintainer disposition | Product gate | Upstream surfaces |
 | --- | --- | --- | --- | --- |
@@ -79,7 +78,7 @@ Executable evidence:
 - docs: `livebooks/02_programming_not_prompting.livemd`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
 - `Signature`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.core.history_contract (informational), claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: dspy_programming_model=valid
 - `History`: valid; claims: claim.core.history_contract (informational); receipts: dspy_programming_model=valid
@@ -112,10 +111,10 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `Predict`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: dspy_programming_model=valid
-- `ChainOfThought`: valid; claims: claim.dspy_semantics.golden_trace (blocking); receipts: dspy_programming_model=valid
+- `Predict`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.live_matched_model.full_parity (target), claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: dspy_programming_model=valid
+- `ChainOfThought`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.live_matched_model.full_parity (target); receipts: dspy_programming_model=valid
 
 
 Missing evidence or behavior:
@@ -309,7 +308,7 @@ Executable evidence:
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
 - `MCP`: valid; claims: claim.mcp.in_process_import_contract (blocking); receipts: mcp=valid
 
@@ -345,9 +344,9 @@ Executable evidence:
 - docs: [docs/internal/REACT_V2_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/REACT_V2_FIDELITY.md) (repository only, not shipped in the package)
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `ReAct`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.react.provider_free_tool_contract (blocking), claim.agents.failure_injected.runtime_differential (blocking); receipts: react=valid
+- `ReAct`: valid; claims: claim.dspy_semantics.golden_trace (blocking), claim.react.provider_free_tool_contract (blocking), claim.agents.failure_injected.runtime_differential (blocking), claim.agents.failure_recovery.effectiveness (target); receipts: react=valid
 - `ReActV2`: valid; claims: claim.react_v2.provider_free_recovery_contract (blocking); receipts: react_v2=valid
 - `CodeAct`: valid; claims: claim.code_act.provider_free_execution_contract (blocking); receipts: code_act=valid
 - `ProgramOfThought`: valid; claims: claim.program_of_thought.safe_eval_contract (blocking); receipts: program_of_thought=valid
@@ -385,9 +384,9 @@ Executable evidence:
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `RLM`: valid; claims: no current-profile claim; receipts: rlm=valid
+- `RLM`: valid; claims: claim.rlm.provider_free_benchmark (target); receipts: rlm=valid
 
 
 Missing evidence or behavior:
@@ -420,10 +419,10 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `BestOfN`: valid; claims: no current-profile claim; receipts: refinement=valid
-- `Refine`: valid; claims: no current-profile claim; receipts: refinement=valid
+- `BestOfN`: valid; claims: claim.evaluation.refine_advice.effectiveness (target); receipts: refinement=valid
+- `Refine`: valid; claims: claim.evaluation.refine_advice.effectiveness (target); receipts: refinement=valid
 
 
 Missing evidence or behavior:
@@ -456,10 +455,10 @@ Executable evidence:
 - docs: `livebooks/03_evaluate_and_optimize.livemd`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `SemanticF1`: valid; claims: claim.evaluation.auto_evaluation.semantic_conformance (informational); receipts: semantic_f1=valid
-- `CompleteAndGrounded`: valid; claims: claim.evaluation.auto_evaluation.semantic_conformance (informational); receipts: complete_and_grounded=valid
+- `SemanticF1`: valid; claims: claim.evaluation.auto_evaluation.semantic_conformance (informational), claim.evaluation.natural_judge.effectiveness (target); receipts: semantic_f1=valid
+- `CompleteAndGrounded`: valid; claims: claim.evaluation.auto_evaluation.semantic_conformance (informational), claim.evaluation.natural_judge.effectiveness (target); receipts: complete_and_grounded=valid
 
 
 Missing evidence or behavior:
@@ -492,12 +491,12 @@ Executable evidence:
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
 - `LabeledFewShot`: valid; claims: claim.docs.tutorial_ticket_routing.optimizer_lift (informational); receipts: labeled_few_shot=valid
-- `BootstrapFewShot`: valid; claims: claim.optimizer.bootstrap_few_shot.semantic_conformance (informational); receipts: bootstrap_few_shot=valid
-- `BootstrapRS`: valid; claims: no current-profile claim; receipts: bootstrap_random_search=valid
-- `RandomSearch`: valid; claims: claim.optimizer.random_search.semantic_conformance (informational); receipts: bootstrap_random_search=valid
+- `BootstrapFewShot`: valid; claims: claim.optimizer.bootstrap_few_shot.semantic_conformance (informational), claim.optimizer.bootstrap_few_shot.effectiveness (target); receipts: bootstrap_few_shot=valid
+- `BootstrapRS`: valid; claims: no indexed claim; receipts: bootstrap_random_search=valid
+- `RandomSearch`: valid; claims: claim.optimizer.random_search.semantic_conformance (informational), claim.optimizer.random_search.effectiveness (target); receipts: bootstrap_random_search=valid
 
 
 Missing evidence or behavior:
@@ -527,9 +526,9 @@ Executable evidence:
 - docs: `docs/API_GUIDE.md`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `KNNFewShot`: valid; claims: no current-profile claim; receipts: knn_few_shot=valid
+- `KNNFewShot`: valid; claims: no indexed claim; receipts: knn_few_shot=valid
 
 
 Missing evidence or behavior:
@@ -564,13 +563,13 @@ Executable evidence:
 - artifact: `benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json`
 - artifact: `benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json`
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `COPRO`: valid; claims: claim.optimizer.copro.semantic_conformance (informational); receipts: copro=valid
-- `MIPROv2`: valid; claims: claim.optimizer.mipro_v2.matched_trec_effectiveness (informational); receipts: optimizer_miprov2=valid
-- `SIMBA`: valid; claims: no current-profile claim; receipts: optimizer_simba=valid
-- `InferRules`: valid; claims: no current-profile claim; receipts: infer_rules=valid
-- `SignatureOptimizer`: valid; claims: no current-profile claim; receipts: signature_optimizer=valid
+- `COPRO`: valid; claims: claim.optimizer.copro.semantic_conformance (informational), claim.optimizer.copro.effectiveness (target); receipts: copro=valid
+- `MIPROv2`: valid; claims: claim.optimizer.mipro_v2.matched_trec_effectiveness (informational), claim.gepa_replication.full (target); receipts: optimizer_miprov2=valid
+- `SIMBA`: valid; claims: claim.gepa_replication.full (target); receipts: optimizer_simba=valid
+- `InferRules`: valid; claims: no indexed claim; receipts: infer_rules=valid
+- `SignatureOptimizer`: valid; claims: no indexed claim; receipts: signature_optimizer=valid
 
 
 Missing evidence or behavior:
@@ -613,9 +612,9 @@ Executable evidence:
 - artifact: `benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json`
 - artifact: `benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json`
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `GEPA`: valid; claims: claim.optimizer.gepa.matched_trec_effectiveness (informational); receipts: optimizer_gepa=valid
+- `GEPA`: valid; claims: claim.optimizer.gepa.matched_trec_effectiveness (informational), claim.gepa_replication.full (target); receipts: optimizer_gepa=valid
 
 
 Missing evidence or behavior:
@@ -660,14 +659,14 @@ Executable evidence:
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json`
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `Avatar`: valid; claims: claim.optimizer.avatar_actor.api (blocking), claim.optimizer.avatar_actor.semantic_conformance (informational); receipts: avatar=valid
-- `AvatarOptimizer`: valid; claims: claim.optimizer.avatar_optimizer.api (blocking), claim.optimizer.avatar_optimizer.semantic_conformance (informational); receipts: avatar_optimizer=valid
-- `BootstrapFinetune`: valid; claims: claim.optimizer.bootstrap_finetune.api (blocking), claim.optimizer.bootstrap_finetune.semantic_conformance (informational), claim.local_mlx_weight_training.effectiveness (informational); receipts: bootstrap_finetune=valid
-- `GRPO`: valid; claims: claim.optimizer.mmgrpo.api (blocking), claim.optimizer.mmgrpo.semantic_conformance (informational); receipts: grpo=valid
-- `BetterTogether`: valid; claims: claim.optimizer.better_together.api (blocking), claim.optimizer.better_together.semantic_conformance (informational); receipts: better_together=valid
-- `Ensemble`: valid; claims: claim.optimizer.ensemble.api (blocking), claim.optimizer.ensemble.semantic_conformance (informational); receipts: ensemble=valid
+- `Avatar`: valid; claims: claim.optimizer.avatar_actor.api (blocking), claim.optimizer.avatar_actor.semantic_conformance (informational), claim.optimizer.avatar_actor.effectiveness (target); receipts: avatar=valid
+- `AvatarOptimizer`: valid; claims: claim.optimizer.avatar_optimizer.api (blocking), claim.optimizer.avatar_optimizer.semantic_conformance (informational), claim.optimizer.avatar_optimizer.effectiveness (target); receipts: avatar_optimizer=valid
+- `BootstrapFinetune`: valid; claims: claim.optimizer.bootstrap_finetune.api (blocking), claim.optimizer.bootstrap_finetune.semantic_conformance (informational), claim.optimizer.bootstrap_finetune.provider_effectiveness (target), claim.local_mlx_weight_training.effectiveness (informational); receipts: bootstrap_finetune=valid
+- `GRPO`: valid; claims: claim.optimizer.mmgrpo.api (blocking), claim.optimizer.mmgrpo.semantic_conformance (informational), claim.optimizer.mmgrpo.effectiveness (target); receipts: grpo=valid
+- `BetterTogether`: valid; claims: claim.optimizer.better_together.api (blocking), claim.optimizer.better_together.semantic_conformance (informational), claim.optimizer.better_together.effectiveness (target); receipts: better_together=valid
+- `Ensemble`: valid; claims: claim.optimizer.ensemble.api (blocking), claim.optimizer.ensemble.semantic_conformance (informational), claim.optimizer.ensemble.effectiveness (target); receipts: ensemble=valid
 
 
 Missing evidence or behavior:
@@ -748,9 +747,9 @@ Executable evidence:
 - artifact: `benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json`
 - artifact: `benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json`
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
-- `optimize_anything`: valid; claims: claim.optimize_anything.operational_lifecycle (informational), claim.optimize_anything.retry_policy_task_effectiveness (informational), claim.optimize_anything.non_prompt_effectiveness (informational); receipts: optimize_anything=valid
+- `optimize_anything`: valid; claims: claim.optimize_anything.operational_lifecycle (informational), claim.optimize_anything.retry_policy_task_effectiveness (informational), claim.optimize_anything.non_prompt_effectiveness (informational), claim.optimize_anything.upstream_comparative_effectiveness (target); receipts: optimize_anything=valid
 
 
 Missing evidence or behavior:
@@ -782,7 +781,7 @@ Executable evidence:
 - docs: `docs/ARCHITECTURE.md`
 
 
-Current-profile capability evidence:
+Indexed capability evidence:
 
 - `Embeddings`: valid; claims: claim.embeddings.boundary_contract (informational); receipts: retrieval_rag=valid
 
@@ -926,7 +925,6 @@ Semantic invariants:
 Executable evidence:
 
 - test: `test/package_contract_test.exs`
-- test: `test/gate_contract_test.exs`
 - test: `test/production_hardening_test.exs`
 - test: `test/deployment_reference_test.exs`
 - docs: `../README.md`

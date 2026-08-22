@@ -184,7 +184,15 @@ defmodule ReActV2Test do
   test "normalizes atom- and string-keyed tool-call collection wrappers" do
     for wrapped <- [
           %{tool_calls: [%{name: "submit", arguments: %{answer: "atom"}}]},
-          %{"tool_calls" => [%{"name" => "submit", "arguments" => %{"answer" => "string"}}]}
+          %{"tool_calls" => [%{"name" => "submit", "arguments" => %{"answer" => "string"}}]},
+          %{
+            "tool_calls" => [
+              %{
+                "recipient_name" => "functions.submit",
+                "parameters" => %{"answer" => "recipient"}
+              }
+            ]
+          }
         ] do
       lm = action_lm([Imp.Prediction.new(%{tool_calls: wrapped})])
 
@@ -192,7 +200,7 @@ defmodule ReActV2Test do
                Imp.react_v2("question -> answer", [], lm: lm)
                |> Imp.call(%{question: "q"})
 
-      assert Imp.get(prediction, :answer) in ["atom", "string"]
+      assert Imp.get(prediction, :answer) in ["atom", "string", "recipient"]
       assert [event] = Imp.get(prediction, :history).messages
 
       assert [%{id: "call_0_0", name: "submit"}] = event.tool_calls.tool_calls

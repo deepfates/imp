@@ -131,8 +131,8 @@ Base/CodeAct/iterative-compaction/coding-agent matrix, or separate RLM depths
 In addition, the paper's frozen S-NIAH instances, BrowseComp+ query/document
 selection, and promised OOLONG-Pairs scorer are not public. Operator-generated
 substitutes are useful T2 protocols but cannot satisfy the paper-exact T3 gate.
-The upstream-fidelity ledger and dashboard therefore keep RLM red even when T0,
-T1, deterministic tests, and live provider workflows pass.
+The exact T3 claim therefore remains open even when T0, T1, deterministic
+tests, and live provider workflows pass.
 
 ## T2/T3 Campaign Runner
 
@@ -316,8 +316,8 @@ command and limitations are recorded in
 
 ## Mechanical T3 Gate
 
-Neither the runner nor dashboard trusts `paper_protocol_complete`. The shared
-gate recomputes all of these conditions from artifact content:
+Neither the runner nor validator trusts `paper_protocol_complete`. The shared
+check recomputes all of these conditions from artifact content:
 
 - 50 S-NIAH, 150 BrowseComp+ rows with exactly 1,000 documents and evidence,
   50 OOLONG `trec_coarse`, 20 OOLONG-Pairs queries at all 11 context sizes, and

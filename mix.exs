@@ -54,10 +54,7 @@ defmodule Imp.MixProject do
 
   defp source_checkout_preferred_envs do
     base_preferred_envs = [
-      "production.check": :test,
-      "fast.check": :test,
-      "heavy.check": :test,
-      "campaign.check": :test,
+      check: :test,
       "docs.check": :test,
       "parity.check": :test,
       "public_surface.check": :test,
@@ -77,14 +74,9 @@ defmodule Imp.MixProject do
     if benchmark_tasks_available?() do
       base_preferred_envs ++
         [
-          "evidence.check": :test,
           "benchmark.failure_campaign.check": :test,
           "benchmark.truth.check": :test,
           "benchmark.live.check": :test,
-          "benchmark.dashboard": :test,
-          "benchmark.dashboard.ready": :test,
-          "benchmark.dashboard.telos": :test,
-          "benchmark.dashboard.telos.ready": :test,
           "benchmark.live_matrix": :test,
           "imp.benchmark.hotpotqa_analysis": :test,
           "benchmark.hotpotqa_analysis": :test,
@@ -323,30 +315,9 @@ defmodule Imp.MixProject do
         "imp.public_api --check",
         "test test/public_api_manifest_test.exs test/public_surface_test.exs"
       ],
-      "production.check": [
+      check: [
         "format --check-formatted",
-        "clean",
         "compile --warnings-as-errors",
-        "legacy_identity.check",
-        "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package",
-        "benchmark.failure_campaign.check",
-        "package.check",
-        "livebook.check",
-        "docs.clean",
-        "docs"
-      ],
-      # Quick merge signal for path-filtered CI (dee-4g0z): format + compile +
-      # the deterministic unit suite (same exclusions as production.check's test
-      # step), minus failure_campaign/package/livebooks/docs. No Python/Deno
-      # reference runtimes required.
-      "fast.check": [
-        "format --check-formatted",
-        "clean",
-        "compile --warnings-as-errors",
-        "legacy_identity.check",
-        # dspy_parity additionally excluded here (not in production.check):
-        # those tests need the pinned DSPy parity env + example-project deps,
-        # which the CI differential lane provisions and fast runners lack.
         "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package --exclude dspy_parity"
       ],
       # The pinned-DSPy differential suite (imp-sqkr): everything tagged
@@ -354,26 +325,6 @@ defmodule Imp.MixProject do
       # scripts/setup_dspy_stable_source.sh have provisioned the environment.
       "differential.check": [
         "test --raise --only dspy_parity"
-      ],
-      # Heavy gates without the unit suite (dee-9k5m). fast.check is the sole
-      # unit-suite gate in CI; production.check keeps the suite for local
-      # one-shot use, but the CI production lane runs these parts instead so
-      # the 110s suite is not paid twice per PR. In CI the parts run as three
-      # parallel jobs (campaign.check / package.check / docs.check); this
-      # alias is the serial local equivalent.
-      "heavy.check": [
-        "benchmark.failure_campaign.check",
-        "package.check",
-        "livebook.check",
-        "docs.clean",
-        "docs"
-      ],
-      # CI campaign lane (dee-9k5m): the failure campaign plus the
-      # prompt-template parity gate, which needs the tmp/dspy-parity-venv
-      # reference runtime the campaign CI job builds (or restores from cache).
-      "campaign.check": [
-        "benchmark.failure_campaign.check",
-        "parity.check"
       ],
       # Docs-only path for path-filtered CI (dee-4g0z): render docs + validate
       # livebooks, without the package build / campaign / Python differentials.
@@ -412,9 +363,8 @@ defmodule Imp.MixProject do
       ],
       "package.check": [
         "package.clean",
-        # cmd, not a plain "test" step: Mix runs each task once per invocation,
-        # so inside production.check (whose suite run already consumed "test")
-        # a plain step would silently no-op and this gate would never execute.
+        # Use a child Mix invocation so this alias remains independently
+        # runnable even after another test task in the same VM.
         "cmd mix test test/package_contract_test.exs",
         "cmd mix hex.build --unpack --output tmp/package-check",
         "imp.package.clean_room --package tmp/package-check"
@@ -426,9 +376,6 @@ defmodule Imp.MixProject do
       "livebook.execute.check": [
         "test.livebooks --path livebooks --execute"
       ],
-      "legacy_identity.check": [
-        "run scripts/legacy_identity_audit.exs"
-      ],
       # Static type gate (de-xmi1). Runs in dev (PLTs are built per-env; dev
       # matches local use). Fails on any warning not pinned with a reason in
       # .dialyzer_ignore.exs, and reports ignore entries that stopped
@@ -437,21 +384,8 @@ defmodule Imp.MixProject do
         "dialyzer"
       ],
       "quality.check": [
-        "legacy_identity.check",
         "credo --only warning",
         "cmd mix hex.audit"
-      ],
-      "gate.package.evidence": [
-        "imp.gate_evidence --gate product_package --mix-task package.check --out tmp/gate-evidence"
-      ],
-      "gate.livebook.evidence": [
-        "imp.gate_evidence --gate livebook_execute --mix-task livebook.execute.check --out tmp/gate-evidence"
-      ],
-      "gate.protocol.evidence": [
-        "imp.gate_evidence --gate protocol_gates --mix-task protocol.check --out tmp/gate-evidence"
-      ],
-      "gate.live_provider.evidence": [
-        "imp.gate_evidence --gate live_provider_smoke --mix-task live.check --env-file .env --env LIVE_PROVIDER=1 --out tmp/gate-evidence"
       ]
     ]
 
@@ -464,26 +398,6 @@ defmodule Imp.MixProject do
 
   defp benchmark_aliases do
     [
-      "evidence.check": [
-        "reproduction.check",
-        "research.portfolio.check",
-        "benchmark.truth.check",
-        "benchmark.trace.check",
-        "benchmark.failure_campaign.check",
-        "benchmark.search.check",
-        "benchmark.optimizer_lift.check",
-        "benchmark.instruction_optimizer.contract.check",
-        "benchmark.gepa_replication.check",
-        "benchmark.fast_slow.check",
-        "benchmark.optimize_anything.check",
-        "benchmark.rag_tool_agent.check",
-        "benchmark.bfcl_scorer.check",
-        "benchmark.copro_isolation.check",
-        "benchmark.rag_tool_failure.check",
-        "benchmark.rlm.check",
-        "benchmark.rlm.contract.check",
-        "upstream_fidelity.check"
-      ],
       "upstream_fidelity.check": [
         "imp.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-conformant"
       ],
@@ -561,18 +475,6 @@ defmodule Imp.MixProject do
       ],
       "benchmark.hotpotqa_analysis": [
         "imp.benchmark.hotpotqa_analysis"
-      ],
-      "benchmark.dashboard": [
-        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard"
-      ],
-      "benchmark.dashboard.ready": [
-        "imp.benchmark.dashboard --profile v0.1 --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
-      ],
-      "benchmark.dashboard.telos": [
-        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard"
-      ],
-      "benchmark.dashboard.telos.ready": [
-        "imp.benchmark.dashboard --profile telos --trace-dir tmp/golden-trace --failure-campaign-dir tmp/failure-campaign --overhead-dir tmp/overhead --optimizer-dir tmp/optimizer-lift --instruction-optimizer-dir tmp/instruction-optimizer-contract --gepa-dir tmp/gepa-replication --optimize-anything-dir benchmarks/evidence/admitted/optimize_anything --rlm-dir tmp/rlm-benchmark --live-matrix-dir tmp/live-matrix --results-dir benchmarks/runs --gate-dir tmp/gate-evidence --out tmp/dashboard --require-ready"
       ],
       "benchmark.live.check": [
         "imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",

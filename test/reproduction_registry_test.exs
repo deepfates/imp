@@ -238,9 +238,6 @@ defmodule Imp.ReproductionRegistryTest do
              by_id["semantic_f1"]["evidence_errors"],
              &String.contains?(&1, "content-addressed path")
            )
-
-    assert by_id["product_release"]["evidence_valid"]
-    assert by_id["product_release"]["evidence_errors"] == []
   end
 
   test "rejects nonexistent tasks, wildcard artifacts, and inflated claims" do
@@ -326,12 +323,12 @@ defmodule Imp.ReproductionRegistryTest do
     }
 
     valid =
-      put_in(registry, ["protocols", "package_gate", "artifact_validator"], validator)
+      put_in(registry, ["protocols", "core_trace", "artifact_validator"], validator)
 
     assert ReproductionRegistry.validate!(valid, authorities, File.cwd!()) == valid
 
     malformed =
-      put_in(registry, ["protocols", "package_gate", "artifact_validator"], %{
+      put_in(registry, ["protocols", "core_trace", "artifact_validator"], %{
         validator
         | "arity" => 1
       })

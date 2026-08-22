@@ -129,10 +129,8 @@ defmodule DocumentationContractTest do
 
     assert body =~ "All unfinished work and dependencies live in `tk`"
     assert body =~ ~r/Markdown must not carry a\s+parallel roadmap/
-    assert body =~ "mix production.check"
-    assert body =~ "mix benchmark.dashboard.ready"
+    assert body =~ "mix check"
     assert body =~ "mix livebook.execute.check"
-    assert body =~ "benchmarks/claims.json"
   end
 
   test "parity validation program describes evidence lanes instead of ticket bookkeeping" do
@@ -148,7 +146,7 @@ defmodule DocumentationContractTest do
     readme = File.read!("docs/README.md")
     contributing = File.read!("CONTRIBUTING.md")
 
-    assert contributing =~ "authority order is deliberately narrow"
+    assert contributing =~ "Public behavior belongs to code, tests, and user documentation"
     refute readme =~ "ADAPTER_FIDELITY.md"
     assert body =~ "DSPy `ChatAdapter` uses `[[ ## field_name ## ]]` delimiters"
     assert body =~ "JSON fallback"

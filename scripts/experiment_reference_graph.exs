@@ -210,6 +210,7 @@ defmodule ImpExperimentReferenceGraph do
       output
       |> String.split(<<0>>, trim: true)
       |> Enum.filter(&String.ends_with?(&1, [".ex", ".exs", ".py", ".json", ".md"]))
+      |> Enum.filter(&File.regular?(Path.join(root, &1)))
       |> Enum.reject(&(&1 == @script))
 
     active_archives =

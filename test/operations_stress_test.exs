@@ -57,10 +57,6 @@ defmodule OperationsStressTest do
   end
 
   test "operations stress stays outside evidence admission and public claims" do
-    aliases = Mix.Project.config() |> Keyword.fetch!(:aliases)
-
-    refute "benchmark.operations_stress.check" in Keyword.fetch!(aliases, :"evidence.check")
-
     protocol =
       "benchmarks/reproductions.json"
       |> File.read!()
@@ -69,15 +65,6 @@ defmodule OperationsStressTest do
 
     assert protocol["evidence_classification"] == "test_only_diagnostic"
     assert protocol["artifact_validator"] == nil
-
-    assert_raise ArgumentError, ~r/protocol operations has no pure artifact validator/, fn ->
-      Imp.BenchmarkTruth.EvidenceAdmission.admit!(
-        artifact_path: Path.join(System.tmp_dir!(), "nonexistent-operations-artifact.json"),
-        protocol_id: "operations",
-        tier: "t0",
-        feature_ids: ["runtime_performance"]
-      )
-    end
 
     operations_preflight =
       "benchmarks/research_portfolio.json"
@@ -98,11 +85,9 @@ defmodule OperationsStressTest do
     refute File.read!("benchmarks/claims.json") =~ "operations_stress"
 
     benchmark_truth = File.read!("docs/internal/BENCHMARK_TRUTH.md")
-    gates = File.read!("docs/maintainers/GATES.md")
 
     assert benchmark_truth =~ "deliberately outside the evidence"
     assert benchmark_truth =~ "must not be admitted or cited at any C0-C5 level"
-    assert gates =~ "intentionally excluded from `mix\nevidence.check`"
   end
 
   defp tmp_dir(name) do

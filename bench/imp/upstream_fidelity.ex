@@ -930,7 +930,6 @@ defmodule Imp.UpstreamFidelity do
       evidence: %{
         tests: [
           "test/package_contract_test.exs",
-          "test/gate_contract_test.exs",
           "test/production_hardening_test.exs",
           "test/deployment_reference_test.exs"
         ],
@@ -964,18 +963,12 @@ defmodule Imp.UpstreamFidelity do
   def report(opts \\ []) do
     root = Keyword.get(opts, :root, File.cwd!())
 
-    profile =
-      opts
-      |> Keyword.get(:profile, Imp.BenchmarkTruth.ReleaseProfile.default())
-      |> Imp.BenchmarkTruth.ReleaseProfile.fetch!()
-
     claims =
       opts
       |> Keyword.get(:claims_path, "benchmarks/claims.json")
       |> File.read!()
       |> Jason.decode!()
       |> Map.fetch!("claims")
-      |> Imp.BenchmarkTruth.ReleaseProfile.select_claims(profile)
 
     reproduction_audit =
       Imp.ReproductionRegistry.audit!(
@@ -1005,7 +998,6 @@ defmodule Imp.UpstreamFidelity do
       generated_at: DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601(),
       baseline: stable_baseline,
       prerelease_tracking: prerelease_tracking,
-      release_profile: profile,
       reproduction_evidence: %{
         valid: reproduction_audit["valid"],
         invalid_features:
@@ -1032,7 +1024,7 @@ defmodule Imp.UpstreamFidelity do
         invalid_rows: Enum.count(rows, &(&1.status == :invalid_evidence)),
         manifest_missing: length(manifest_missing),
         manifest_duplicates: length(manifest_duplicates),
-        release_blockers: length(blocking) + length(manifest_blockers),
+        conformance_blockers: length(blocking) + length(manifest_blockers),
         non_blocking_gaps:
           Enum.count(rows, &(&1.status in [:gap, :invalid_evidence] and not &1.release_blocking)),
         passing: blocking == [] and manifest_blockers == []
@@ -1120,7 +1112,7 @@ defmodule Imp.UpstreamFidelity do
     release_blocking =
       Enum.any?(capabilities, fn capability ->
         Enum.any?(capability.claims, fn claim ->
-          claim.gate_policy == "blocking" and
+          claim.claim_state == "asserted" and claim.gate_policy == "blocking" and
             (claim.evidence_errors != [] or status == :gap or status == :invalid_evidence)
         end)
       end)

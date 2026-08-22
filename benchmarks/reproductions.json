@@ -9,19 +9,6 @@
     "t3": "Paper-scale, multi-seed reproduction under the declared protocol."
   },
   "protocols": {
-    "package_gate": {
-      "mode": "provider_free",
-      "max_tier": "t0",
-      "task": "imp.gate_evidence",
-      "args": [
-        "--gate",
-        "product_package",
-        "--mix-task",
-        "package.check"
-      ],
-      "manifest": null,
-      "artifact_validator": null
-    },
     "core_trace": {
       "mode": "provider_free",
       "max_tier": "t1",
@@ -421,37 +408,6 @@
     }
   },
   "features": [
-    {
-      "id": "product_release",
-      "name": "Package, public API, docs, and livebooks",
-      "authority_family": "family.product_release_docs",
-      "surface_tokens": [
-        "package",
-        "public_api",
-        "docs",
-        "README",
-        "livebooks"
-      ],
-      "public_surfaces": [
-        "mix.exs:package",
-        "README.md",
-        "docs",
-        "livebooks"
-      ],
-      "implementation_paths": [
-        "mix.exs",
-        "README.md"
-      ],
-      "classification": "native_extension",
-      "protocol_ids": [
-        "package_gate"
-      ],
-      "admitted_evidence": {
-        "tier": "none",
-        "artifact": null,
-        "protocol_id": null
-      }
-    },
     {
       "id": "dspy_programming_model",
       "name": "Signature, Predict, and ChainOfThought",

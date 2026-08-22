@@ -38,6 +38,7 @@ __pycache__/
 # Local provider credentials.
 .env
 .env.*
+!.env.example
 
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump

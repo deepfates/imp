@@ -8,7 +8,7 @@ description: >
 # CACHE POISONING HISTORY — four instances of one bug class. Read before
 # touching the cache config.
 #
-# production.check runs an OFFLINE clean-room (HEX_OFFLINE=1 deps.get inside
+# package.check runs an OFFLINE clean-room (HEX_OFFLINE=1 deps.get inside
 # mix imp.package.clean_room's consumer and deployment VMs, both using the
 # main mix.lock). That needs ~/.hex to hold, for EVERY locked package, both
 # the registry entry (cache.ets) and the tarball (packages/). Failures:
@@ -36,11 +36,11 @@ description: >
 #   a) NO restore-keys prefix fallback. Exact lock match or cold. A partial
 #      ancestor cache can no longer seed a new key. Cost: a mix.lock change
 #      cold-compiles all four gates once (~3-4 min); a poisoned cache costs
-#      far more (nondeterministic production.check failures until the next
+#      far more (nondeterministic package.check failures until the next
 #      key bump).
 #   b) Single deterministic cache writer: only package.check saves (the
 #      save-cache input below; before the heavy job was split it was
-#      production.check). The other gates restore read-only, so a fast
+#      package.check). The other gates restore read-only, so a fast
 #      gate can never define ~/.hex for the job that actually needs it.
 #   c) The warm step below runs EVERY time and makes ~/.hex a deterministic
 #      function of mix.lock, independent of cache ancestry: it guarantees

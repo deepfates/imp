@@ -1,21 +1,21 @@
 # Imp Evidence Handbook
 
-This is the maintainer operating model for claims, authorities, protocols,
-artifacts, and generated status.
+This is the maintainer operating model for authorities, protocols, and retained
+scientific or compatibility artifacts.
 
 ## Authority Order
 
-1. `benchmarks/claims.json` declares claim scope, target rung, and proof
-   obligations.
-2. `benchmarks/authorities.json` pins the strongest reference behavior.
-3. `benchmarks/reproductions.json` declares executable protocols and artifact
+1. Code, tests, and public documentation own ordinary product behavior.
+2. `benchmarks/authorities.json` pins external reference behavior.
+3. `benchmarks/reproductions.json` indexes executable protocols and artifact
    validators. It is an index, not proof.
 4. Validated immutable artifacts provide evidence facts.
-5. `mix benchmark.dashboard` computes evidence state and profile readiness.
-6. `tk` owns unfinished work, dependencies, and priorities.
+5. `benchmarks/claims.json` scopes unusually broad, comparative, or scientific
+   statements when a simple behavioral test is insufficient.
+6. `tk` records unfinished work, dependencies, and priorities.
 
-Documentation explains contracts and methods. It never overrides these
-sources or caches current red/yellow/green state.
+No generated dashboard sits above these sources, and no aggregate score decides
+whether a release's documented user stories work.
 
 ## Evidence Rungs
 
@@ -35,9 +35,8 @@ result cannot excuse a C1 semantic mismatch.
 ## Artifact Lifecycle
 
 ```text
-protocol -> run envelope -> candidate eligibility -> lane validator
-         -> explicit immutable admission -> typed evidence facts
-         -> claim requirements -> computed evidence state -> profile gate
+question -> protocol -> bounded run -> validator -> retained result
+         -> interpretation at the result's exact scope
 ```
 
 Candidate eligibility reports source compatibility, recency when relevant,
@@ -47,19 +46,17 @@ validator, feature ownership, and evidence tier before installing an immutable
 content-addressed artifact. Historical admitted evidence does not become
 unadmitted when the current checkout or clock changes.
 
-Dashboard lanes using the `immutable_admission` policy do not apply an age
-timeout. They may use that policy only after loading the content-addressed
-selection from the reproduction registry and running its pure protocol
-validator against the current implementation. Live results and disposable
-candidate runs must continue to use source, age, or source-and-age freshness.
+An immutable admitted result does not expire because a clock advances. Reuse it
+only after loading the content-addressed selection from the reproduction
+registry and running its pure protocol validator. A current product assertion
+still needs a current behavioral check when relevant.
 
 Filesystem mtime is never scientific provenance. It may only break ties between
 otherwise valid disposable candidates. A newer malformed or ineligible run must
 not mask an older eligible candidate, and neither candidate automatically
 becomes admitted evidence.
 
-Scratch runs belong outside admitted evidence and must never change a dashboard
-merely because `tmp/` was cleaned. Accepted artifacts are immutable and bound
+Scratch runs belong outside admitted evidence. Accepted artifacts are immutable and bound
 to protocol, authority revisions, source identity, model identity, data,
 budgets, and payload digest. Historical pre-cutover artifacts retain their
 original bytes and are labeled historical rather than rewritten.
@@ -73,8 +70,8 @@ benchmarks/checkpoints/         ignored resumable state
 tmp/                            replaceable build and cache material
 ```
 
-`benchmarks/results/` contains tracked pre-cutover records only. New writers,
-dashboard defaults, and operator commands must use `runs/` or `checkpoints/`;
+`benchmarks/results/` contains tracked pre-cutover records only. New writers
+and operator commands must use `runs/` or `checkpoints/`;
 release evidence moves into `evidence/admitted/` only through explicit
 admission.
 
@@ -107,8 +104,8 @@ through its pure protocol validator.
 6. Use held-out selection and uncertainty appropriate to the unit of
    independence.
 7. Require powered paired evidence for superiority.
-8. Generate status; never hand-edit current counts into Markdown or maintain a
-   second registry. Documentation explains how to read the generated result.
+8. Do not maintain aggregate red/yellow/green counts. Record the conclusion in
+   the owning result, product documentation, or ticket.
 9. Keep scientific admission out of normal product architecture. A public
    feature test should remain useful if its implementation is replaced while
    preserving behavior. Source-bound receipts belong to the narrow
@@ -120,6 +117,5 @@ through its pure protocol validator.
     as a timeless dollar amount. Do not transmit bulk private corpora, print or
     persist keys, or treat spend authority as permission to publish results.
 
-Use `mix evidence.check` to validate registries and generated projections. Use
-the profile commands in `docs/maintainers/RELEASE.md` to evaluate product or
-telos readiness.
+Use the protocol's own validator or reproduction command for research evidence.
+Use `docs/maintainers/RELEASE.md` for product release checks.

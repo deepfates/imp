@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "purpose": "Canonical inventory of asserted Imp claims and telos targets. This file declares scope and proof obligations; current evidence state is computed by the dashboard and is never stored here. claim_state=asserted is a maintainer attestation, not a computed result: on a fresh checkout the dashboard recomputes state from committed evidence alone and many asserted rows compute as blocked until their maintainer-run lane evidence is regenerated (see docs/EVIDENCE.md, Reconciliation).",
+  "purpose": "Scoped index of unusually broad, comparative, or scientific Imp statements and their proof obligations. It is not a release score or current-status ledger; ordinary product behavior belongs to code, tests, and public documentation.",
   "claim_state_vocabulary": {
-    "asserted": "A claim intended for the named product profile; it is publishable only when its computed evidence state is proven.",
+    "asserted": "A statement intended for its declared scope; its linked behavior or retained result must support it.",
     "target": "A declared telos target that is not a current product capability.",
     "retired": "A deliberately withdrawn claim retained only for audit history."
   },
@@ -1137,7 +1137,7 @@
           "kind": "operational_contract",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "test/req_llm_batch_test.exs passes in the source-checkout suite gated by mix production.check, including the round-tripped message-role regression, and the packaged public API remains consumable"
+          "threshold": "test/req_llm_batch_test.exs passes in the source-checkout suite gated by mix check, including the round-tripped message-role regression, and the packaged public API remains consumable"
         }
       ]
     },
@@ -1206,7 +1206,7 @@
           "kind": "feature_completeness",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "test/history_test.exs passes in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+          "threshold": "test/history_test.exs passes in the source-checkout suite gated by mix check and the packaged public API remains consumable"
         }
       ]
     },
@@ -1241,7 +1241,7 @@
           "kind": "feature_completeness",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "test/playbook_test.exs, test/playbook_with_context_test.exs, and test/playbook_optimizer_test.exs pass in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+          "threshold": "test/playbook_test.exs, test/playbook_with_context_test.exs, and test/playbook_optimizer_test.exs pass in the source-checkout suite gated by mix check and the packaged public API remains consumable"
         }
       ]
     },
@@ -1274,7 +1274,7 @@
           "kind": "feature_completeness",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "the Imp.Embeddings boundary tests in test/completion_surface_test.exs pass in the source-checkout suite gated by mix production.check and the packaged public API remains consumable"
+          "threshold": "the Imp.Embeddings boundary tests in test/completion_surface_test.exs pass in the source-checkout suite gated by mix check and the packaged public API remains consumable"
         }
       ]
     },
@@ -1307,7 +1307,7 @@
           "kind": "conformance",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "test/logprobs_capabilities_test.exs and test/req_llm_confidence_metadata_test.exs pass in the source-checkout suite gated by mix production.check"
+          "threshold": "test/logprobs_capabilities_test.exs and test/req_llm_confidence_metadata_test.exs pass in the source-checkout suite gated by mix check"
         }
       ]
     },
@@ -1342,7 +1342,7 @@
           "kind": "conformance",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "test/confidence_test.exs, test/confidence_scoring_test.exs, and test/confidence_calibration_test.exs pass in the source-checkout suite gated by mix production.check"
+          "threshold": "test/confidence_test.exs, test/confidence_scoring_test.exs, and test/confidence_calibration_test.exs pass in the source-checkout suite gated by mix check"
         }
       ]
     },
@@ -1379,7 +1379,7 @@
           "kind": "optimizer_effectiveness",
           "lane": "product_package",
           "evidence": "passing",
-          "threshold": "the committed content-addressed tutorial artifact verifies dataset provenance, positive held-out lift, exact single-attempt transport accounting, and fresh-process concurrent Artifact service, enforced by test/tutorial_ticket_routing_artifact_test.exs in the suite gated by mix production.check"
+          "threshold": "the committed content-addressed tutorial artifact verifies dataset provenance, positive held-out lift, exact single-attempt transport accounting, and fresh-process concurrent Artifact service, enforced by test/tutorial_ticket_routing_artifact_test.exs in the suite gated by mix check"
         }
       ]
     }

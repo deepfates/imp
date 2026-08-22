@@ -143,8 +143,8 @@ mix benchmark.overhead.check
 
 The canonical alias requires a clean checkout. During development,
 `mix imp.benchmark.overhead --no-require-clean ...` may produce a diagnostic
-artifact, but the dashboard keeps its claim red and marks the candidate
-ineligible until the integrated source is committed and rerun cleanly.
+artifact, but it remains ineligible for a performance statement until the
+integrated source is committed and rerun cleanly.
 
 This lane compares Imp and Python DSPy without provider latency. It runs local
 runtime benchmarks for:
@@ -303,9 +303,9 @@ semantics. It explicitly does not establish paper reproduction, effectiveness,
 or full optimizer parity. The older v0.1.1 artifact remains immutable history,
 not the selected current contract.
 
-Optimizer lift is outcome evidence, not full optimizer parity. The dashboard
-keeps `full_optimizer_parity` false when the structural artifact is missing,
-stale, authority-mismatched, or failing. Even a passing T1 artifact does not
+Optimizer lift is outcome evidence, not full optimizer parity. A missing,
+stale, authority-mismatched, or failing structural artifact leaves parity
+unestablished. Even a passing T1 artifact does not
 replace held-out multi-seed T3 effectiveness evidence. Imp-only rows and equal
 scores under unmatched internal decision paths cannot satisfy that stronger
 claim.
@@ -351,8 +351,8 @@ lift, a strict majority of improving seeds for every family, positive live
 provider token and cost accounting, and per-run checkpoints. All seed
 outcomes remain in the artifact, including ties and regressions. `--smoke`
 proves campaign wiring and artifact validation only and never authorizes the
-effectiveness claim. The dashboard consumes full artifacts through its
-`optimize_anything` lane.
+effectiveness claim. Full artifacts are validated against the
+`optimize_anything` protocol.
 
 Live execution has no implicit spend allowance. It requires positive finite
 ceilings for requests, input tokens, output tokens, per-request output tokens,
@@ -465,8 +465,8 @@ full row must additionally include `metric_call_evidence` with basis
 all four required optimizer rows, and an affirmed enforced limit for each count.
 Copying configured budgets into an "actual" field, omitting runtime provenance,
 using a configured-only basis, or reporting an observed count above its limit
-keeps the dashboard GEPA lane red. Smoke evidence remains valid only at its
-explicit lower tier.
+fails the GEPA result contract. Smoke evidence remains valid only at its lower
+tier.
 
 Full rows must also include per-optimizer `seed_selection`. Accepted selection
 methods are a predeclared seed, dev-only best-seed selection, or an aggregate
@@ -509,7 +509,7 @@ than a custom component map. Campaign rows record the component-feedback
 identity so reviewers can distinguish these contracts.
 
 When upstream GEPA artifact experiments have been run, convert their
-`experiment_runs_data` output into Imp dashboard rows with:
+`experiment_runs_data` output into Imp result rows with:
 
 ```sh
 mix imp.benchmark.gepa_dataset \
@@ -995,7 +995,7 @@ contracts, incomplete current low-cost coverage, or unsatisfied research-sample
 lanes, Imp has not yet proven live matched model parity. Each model row and
 live-lane blocker reports covered rows,
 remaining rows, percent coverage, and estimated remaining/full Imp-plus-DSPy
-tokens so staged campaigns can be planned from the dashboard instead of hand
+tokens so staged campaigns can be planned from the result instead of hand
 calculated. Cost is token-only by default; set
 `IMP_BENCH_INPUT_USD_PER_1M` and `IMP_BENCH_OUTPUT_USD_PER_1M` when you want
 the matrix to include USD estimates from current provider pricing.
@@ -1003,14 +1003,14 @@ the matrix to include USD estimates from current provider pricing.
 When a lane has multiple candidate models, the lane-level `coverage` and `cost`
 headline the strongest candidate because one satisfying model is sufficient for
 that lane. The same objects retain a nested `cumulative` summary so operator
-dashboards can still see total evidence and spend across all candidates.
+tools can still see total evidence and spend across all candidates.
 
 The selected artifact for a model must also carry the current Imp benchmark
 prompt contract compiled into the benchmark truth runner. Older artifacts
 remain valuable history, but they are not release evidence after the task prompt
 or signature contract changes. The matrix exposes this as
-`summary.prompt_contract.complete`, and the dashboard reports
-`prompt_contract_incomplete` until every selected live model lane is current.
+`summary.prompt_contract.complete`; a non-current selected lane cannot support
+a current parity statement.
 
 When a dataset contract changes or a fresh full campaign supersedes older
 smoke evidence, filter the matrix to the intended lineage:
@@ -1212,8 +1212,8 @@ parallel on both the Imp and Python DSPy sides. It does not reduce the number
 of benchmark rows or provider calls, and reports record `max_concurrency` so
 serial and concurrent artifacts are auditable. Campaign aggregates require one
 consistent `max_concurrency` value before `full_parity` can be true; the live
-matrix and dashboard surface mixed or missing concurrency evidence as a release
-blocker because latency and throughput claims are not comparable otherwise.
+matrix surfaces mixed or missing concurrency evidence because latency and
+throughput claims are not comparable otherwise.
 
 Aggregate chunk artifacts into a campaign report:
 

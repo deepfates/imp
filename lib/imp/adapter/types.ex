@@ -137,13 +137,28 @@ defmodule Imp.Adapter.Types do
     end
 
     def from_map(%{} = call) do
-      name = Map.get(call, :name, Map.get(call, "name"))
+      name =
+        call
+        |> Map.get(:name, Map.get(call, "name"))
+        |> case do
+          nil -> Map.get(call, :recipient_name, Map.get(call, "recipient_name"))
+          value -> value
+        end
+        |> normalize_name()
 
       arguments =
         Map.get(
           call,
           :arguments,
-          Map.get(call, "arguments", Map.get(call, :args, Map.get(call, "args", %{})))
+          Map.get(
+            call,
+            "arguments",
+            Map.get(
+              call,
+              :args,
+              Map.get(call, "args", Map.get(call, :parameters, Map.get(call, "parameters", %{})))
+            )
+          )
         )
 
       id = Map.get(call, :id, Map.get(call, "id"))
@@ -187,6 +202,9 @@ defmodule Imp.Adapter.Types do
     defp normalize_arguments(nil), do: %{}
     defp normalize_arguments(arguments) when is_map(arguments), do: arguments
     defp normalize_arguments(arguments), do: arguments
+
+    defp normalize_name("functions." <> name), do: name
+    defp normalize_name(name), do: name
 
     defp maybe_put(map, _key, nil), do: map
     defp maybe_put(map, key, value), do: Map.put(map, key, value)

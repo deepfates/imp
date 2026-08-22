@@ -1,29 +1,19 @@
 # Claims And Proof Obligations
 
-`benchmarks/claims.json` is the sole machine-readable inventory of public Imp
-claims and research targets. It declares intended scope and proof obligations;
-it never stores current status. The benchmark dashboard evaluates those
-obligations against admitted artifacts and adds a `public_claims` profile-gate
-check.
+`benchmarks/claims.json` is a scoped index of broad product, conformance, and
+research statements. It exists to stop a narrow result from silently becoming
+a general claim. It is not a release profile, readiness score, roadmap, or
+substitute for exercising the product.
 
-This inventory governs product, conformance, comparative effectiveness, and
-benchmark claims. It is additive to the scoped product procedure in
-`docs/maintainers/RELEASE.md`; deferred research rows may keep
-`benchmark.dashboard.telos.ready` red without invalidating a product-only v0.1
-candidate, provided those claims are not presented as current capabilities.
+The release procedure is `docs/maintainers/RELEASE.md`. A product statement is
+owned by the public behavior and documentation it describes. Comparative and
+scientific statements additionally point to a pinned authority, protocol, and
+retained result. Unknown research remains unknown; it does not make an
+unrelated, honestly scoped product behavior false.
 
-The rule is simple: v0.1 release-blocking claims must trace to fresh passing
-evidence before `mix benchmark.dashboard.ready` passes. Broader telos claims
-must trace to fresh passing evidence before `mix benchmark.dashboard.telos.ready`
-passes. Claims that are true only for a narrower path must say so in the claim
-statement and in the linked docs.
-
-The inventory has two policy scopes. `v0.1` rows are scoped product claims for
-the named APIs, workflows, and evidence cases in those rows. `telos` rows are
-research targets for comparative effectiveness, conformance, or replication;
-they remain blocking within the `telos` profile and must not be read as current
-product capabilities. A `full` requirement means complete evidence for that
-row's precise scope, not blanket parity for a subsystem or upstream project.
+Claims that are true only for a narrower path must say so in the statement and
+linked documentation. A `full` requirement means complete evidence for that
+precise scope, never blanket parity for a subsystem or upstream project.
 
 ## Evidence Rungs
 
@@ -60,13 +50,14 @@ Each claim has:
 - `release`: the profile that owns the claim, such as `v0.1` or `telos`.
 - `scope`: the precise boundary of the claim.
 - `limitations`: explicit exclusions or evidence still required.
-- `gate_policy`: `blocking` or `informational`. Informational claims remain
-  visible but cannot block readiness.
+- `gate_policy`: retained historical classification; current release blocking
+  follows the release contract and public wording, not a computed profile.
 - `sources`: docs, tests, fixtures, or papers that explain the claim.
-- `requirements`: evidence rows the dashboard can evaluate.
+- `requirements`: concrete checks or result properties that can falsify the
+  statement.
 
-Requirements currently point at dashboard lanes and name the required evidence
-level:
+Some older requirements name evidence lanes. Treat those as coordinates to the
+underlying check or artifact, not as a global score:
 
 ```json
 {
@@ -78,31 +69,9 @@ level:
 }
 ```
 
-`"evidence": "full"` requires the lane to report `full_evidence: true`.
-`"evidence": "passing"` is reserved for claims whose wording only promises
-passing smoke or wiring evidence.
-
-## Operating Loop
-
-Run the dashboard before making release claims:
-
-```sh
-mix gate.package.evidence
-mix gate.livebook.evidence
-mix gate.protocol.evidence
-mix gate.live_provider.evidence
-mix benchmark.dashboard
-mix benchmark.dashboard.ready
-mix benchmark.dashboard.telos
-mix benchmark.dashboard.telos.ready
-```
-
-The `gate.*.evidence` aliases run real source-checkout gates and write
-`gate-evidence-*.json` artifacts under `tmp/gate-evidence/`. The dashboard
-consumes those artifacts as the `product_package`, `livebook_execute`,
-`protocol_gates`, and `live_provider_smoke` lanes. `gate.live_provider.evidence`
-loads `.env` and sets `LIVE_PROVIDER=1`; it still requires provider credentials
-in the ignored local `.env` file.
+`"evidence": "full"` means the result meets the complete protocol for the
+declared scope. `"evidence": "passing"` means a behavioral or operational check
+passed. Neither upgrades a fixture into effectiveness evidence.
 
 Live matched-model evidence also consumes `benchmarks/model_availability.json`
 for documented external model unavailability. That file can unblock a historical
@@ -116,12 +85,12 @@ markers. T0 fixture replay, T1 operational contracts, and sampled T2 evidence
 cannot be promoted to the exact T3 research claim while those authorities are
 unavailable.
 
-GEPA research claims use the `gepa_replication` lane, not the generic
-`optimizer_lift` lane. The dashboard only accepts those claims when a fresh
+GEPA research claims use the `gepa_replication` protocol, not the generic
+`optimizer_lift` protocol. The result supports those claims only when a fresh
 non-smoke `gepa-replication-*.json` artifact covers the required GEPA paper
 families and reports baseline, DSPy GEPA, Imp GEPA, MIPROv2, metric-call
 budget, token/cost, wall-clock, seed variance, and train/dev/test gap. The
-dashboard recomputes full evidence from the row contract: campaign provenance,
+validator recomputes the evidence from the row contract: campaign provenance,
 dataset scope, split counts, dataset checksums, source commits, concrete
 comparator sources, distinct split digests, and positive live token/cost
 accounting are required. Capped `--max-per-split` dataset roots are explicitly
@@ -198,16 +167,10 @@ an injected timeout exception do not establish model recovery effectiveness or
 wall-clock timeout parity.
 Historical selected live paths do not satisfy the C4 target.
 
-When a profile gate fails, the terminal error names both the
-blocking lane requirements and the blocked public claims. That failure is the
-work queue for that profile: either produce the missing evidence, narrow or
-remove the claim, or mark a genuinely impossible external dependency as
-unavailable in the relevant evidence artifact.
-
-Do not add a marketing or README claim without adding or updating a row in
-`benchmarks/claims.json`. Do not duplicate current state in this file,
-`benchmarks/reproductions.json`, or Markdown; regenerate the dashboard instead.
-Do not mark a claim non-blocking merely because its evidence is inconvenient.
-Unfinished telos work remains a `target` and blocking within that profile
-until its proof obligation passes or an explicit product decision changes the
-claim.
+For release or documentation review, read the actual public statement, run the
+smallest relevant behavioral check, and inspect the retained result for any
+comparative or effectiveness claim. Fix the product, narrow the statement, or
+preserve the result as negative/unknown according to what fails. Do not add a
+claim row for a routine API fact already owned clearly by code, tests, and
+documentation; reserve this index for statements whose scope could otherwise
+be overstated.

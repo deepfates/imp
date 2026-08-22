@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provider-free DSPy optimizer lift sidecar for Imp parity dashboards."""
+"""Provider-free DSPy optimizer lift sidecar for scoped parity checks."""
 
 from __future__ import annotations
 

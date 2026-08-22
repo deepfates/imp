@@ -2,12 +2,11 @@
 
 `benchmarks/reproductions.json` is the executable index of research-derived Imp surfaces. It links each canonical authority family to implementation files, runnable protocols, artifact validation, and immutable admitted evidence.
 
-The registry is an index, not a current-status ledger. `T0` means deterministic behavior, `T1` a pinned source differential, `T2` a live sample, and `T3` a paper-scale campaign. These artifact tiers are distinct from the C0-C5 claim ladder. Only the dashboard computes whether admitted evidence satisfies a claim.
+The registry is an index, not a current-status ledger. `T0` means deterministic behavior, `T1` a pinned source differential, `T2` a live sample, and `T3` a paper-scale campaign. These artifact tiers are distinct from the C0-C5 claim vocabulary. Read each admitted result at its declared scope.
 
 <!-- reproduction-registry:start -->
 | Feature | Class | Protocols | Admitted tier | Admitted artifact |
 | --- | --- | --- | --- | --- |
-| Package, public API, docs, and livebooks | native_extension | package_gate | NONE | none |
 | Signature, Predict, and ChainOfThought | adaptation | core_trace | NONE | none |
 | Model/provider normalized runtime | native_extension | live_matrix | NONE | none |
 | Structured adapters and multimodal values | adaptation | multimodal_live | T2 | benchmarks/evidence/admitted/multimodal_live/02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e.json |

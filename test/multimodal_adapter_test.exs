@@ -265,6 +265,11 @@ defmodule MultimodalAdapterTest do
              ]
            }
 
+    assert Types.ToolCall.from_map(%{
+             "recipient_name" => "functions.lookup",
+             "parameters" => %{"query" => "Paris"}
+           }) == %Types.ToolCall{name: "lookup", arguments: %{"query" => "Paris"}}
+
     assert_raise ArgumentError, ~r/tool call requires :name/, fn ->
       Types.ToolCall.from_map(%{arguments: %{query: "x"}})
     end

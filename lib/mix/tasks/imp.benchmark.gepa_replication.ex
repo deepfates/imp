@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Imp.Benchmark.GepaReplication do
         --protocol-classification exact_paper_replication
 
   The task does not fabricate benchmark results. It packages fresh GEPA
-  replication rows produced by a campaign runner into the dashboard contract and
+  replication rows produced by a campaign runner into the retained-result contract and
   fails unless every row includes the optimizer, budget, cost, seed, and split
   metadata needed for paper-level GEPA claims. Complete rows authorize C4 only
   when the caller explicitly classifies the separately frozen protocol as
