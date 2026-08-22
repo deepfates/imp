@@ -142,7 +142,9 @@ def rlm_row(example: Dict[str, Any]) -> Dict[str, Any]:
     dspy.configure(lm=lm, adapter=dspy.ChatAdapter())
 
     start = time.perf_counter()
-    prediction = dspy.RLM(QASignature, max_iterations=2, interpreter=interpreter)(
+    program = dspy.RLM(QASignature, max_iters=2)
+    prediction = program(
+        interpreter,
         question=example["question"],
         context=example["context"],
     )

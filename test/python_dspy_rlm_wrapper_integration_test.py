@@ -73,12 +73,16 @@ class BudgetLMRLMIntegrationTest(unittest.TestCase):
         interpreter = SubmitInterpreter()
         dspy.configure(lm=root, adapter=dspy.ChatAdapter())
 
-        prediction = dspy.RLM(
+        program = dspy.RLM(
             "context, question -> answer",
-            max_iterations=1,
+            max_iters=1,
             max_llm_calls=0,
-            interpreter=interpreter,
-        )(context="public context", question="return the fixture answer")
+        )
+        prediction = program(
+            interpreter,
+            context="public context",
+            question="return the fixture answer",
+        )
 
         self.assertEqual(prediction.answer, "wrapped-ok")
         self.assertEqual(len(prediction.trajectory), 1)

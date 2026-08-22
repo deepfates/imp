@@ -426,7 +426,7 @@ def execute_approach(
         program = dspy.RLM(
             "context, question, choices -> answer",
             sub_lm=sub,
-            max_iterations=int(settings.get("max_iterations", 20)),
+            max_iters=int(settings.get("max_iterations", 20)),
             max_llm_calls=max_llm_calls,
         )
         pred = program(

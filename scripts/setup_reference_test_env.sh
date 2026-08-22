@@ -7,6 +7,7 @@ DENO_VERSION="2.8.3"
 DSPY_PYTHON="${IMP_DSPY_PYTHON:-${PYTHON:-python3.12}}"
 DSPY_VENV="${IMP_DSPY_CURRENT_VENV:-tmp/dspy-current-venv}"
 DSPY_LOCK="benchmarks/requirements-dspy-rlm.lock"
+GEPA_ROOT="${IMP_GEPA_CURRENT_ROOT:-tmp/gepa-current}"
 
 if ! command -v deno >/dev/null 2>&1; then
   echo "Deno $DENO_VERSION is required by the pinned DSPy RLM runtime." >&2
@@ -36,20 +37,20 @@ if [ "$installed_dspy_version" != "$DSPY_CURRENT_VERSION" ]; then
   exit 1
 fi
 
-if [ -d tmp/gepa-artifact/.git ] &&
-  { ! git -C tmp/gepa-artifact diff --quiet HEAD -- ||
-    [ -n "$(git -C tmp/gepa-artifact ls-files --others --exclude-standard)" ]; }; then
-  echo "Rebuilding modified generated GEPA checkout at tmp/gepa-artifact"
-  rm -rf tmp/gepa-artifact
+if [ -d "$GEPA_ROOT/.git" ] &&
+  { ! git -C "$GEPA_ROOT" diff --quiet HEAD -- ||
+    [ -n "$(git -C "$GEPA_ROOT" ls-files --others --exclude-standard)" ]; }; then
+  echo "Rebuilding modified generated GEPA checkout at $GEPA_ROOT"
+  rm -rf "$GEPA_ROOT"
 fi
 
-if [ ! -d tmp/gepa-artifact/.git ]; then
-  rm -rf tmp/gepa-artifact
+if [ ! -d "$GEPA_ROOT/.git" ]; then
+  rm -rf "$GEPA_ROOT"
   GIT_LFS_SKIP_SMUDGE=1 git clone --filter=blob:none \
-    https://github.com/gepa-ai/gepa-artifact.git tmp/gepa-artifact
+    https://github.com/gepa-ai/gepa.git "$GEPA_ROOT"
 fi
 
-git -C tmp/gepa-artifact fetch --filter=blob:none origin "$GEPA_COMMIT"
-GIT_LFS_SKIP_SMUDGE=1 git -C tmp/gepa-artifact checkout --detach "$GEPA_COMMIT"
+git -C "$GEPA_ROOT" fetch --filter=blob:none origin "$GEPA_COMMIT"
+GIT_LFS_SKIP_SMUDGE=1 git -C "$GEPA_ROOT" checkout --detach "$GEPA_COMMIT"
 
 echo "Pinned Deno, DSPy, and GEPA reference environments are ready."
