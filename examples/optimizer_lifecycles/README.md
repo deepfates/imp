@@ -105,3 +105,17 @@ zero errors. A fresh OS process reloaded the exact three child Artifacts,
 reconstructed the ensemble, and scored `1.00` on four probes. The main run made
 140 single-attempt task calls and cost `$0.059145`; the fresh budget is retained
 separately.
+
+## SIMBA lifecycle
+
+`simba.exs` gives SIMBA natural task trajectories and semantic metric feedback
+on the training split, lets a separate reflection model propose named-predictor
+rules, selects only on the development split, and then opens the held-out test
+split. The selected parameter Artifact is reapplied to fresh trusted code in a
+new OS process. Task and reflection models have separate one-attempt budgets.
+
+```sh
+OPENROUTER_API_KEY=... \
+IMP_SIMBA_OUTPUT=/secure/imp-simba-live \
+mix run examples/optimizer_lifecycles/simba.exs
+```
