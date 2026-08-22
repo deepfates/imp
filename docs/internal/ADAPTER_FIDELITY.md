@@ -12,10 +12,11 @@ trying to byte-match Python prompt templates.
   chat parsing fails.
 - DSPy `JSONAdapter` requests structured JSON behavior and parses provider JSON
   into signature fields.
-- DSPy `XMLAdapter` emits a single XML-only system message and raises
-  `AdapterParseError` when required output tags are absent. `Imp.Adapter.XML`
-  ports this shape faithfully (dee-ovd3): byte-parity is measured per call in
-  the golden differential (`xml_*` cases). DSPy `TwoStepAdapter` sends a
+- DSPy `XMLAdapter` emits a single XML-only system message, recursively encodes
+  typed outputs, and raises `AdapterParseError` when required output tags are
+  absent. `Imp.Adapter.XML` retains the historical scalar prompt differential
+  and implements DSPy 3.3.1's recursive object/list/mapping/union semantics with
+  a real XML parser. DSPy `TwoStepAdapter` sends a
   free-form main prompt, then runs a second extraction LM with `ChatAdapter`
   over a synthesized `text -> outputs` signature. `Imp.Adapter.TwoStep` ports
   that shape faithfully (dee-qt5r): both stages are byte-parity-measured in
@@ -33,7 +34,7 @@ trying to byte-match Python prompt templates.
 | Chat field delimiters | `Imp.Adapter.Chat` renders and parses `[[ ## field ## ]]` blocks with DSPy `ChatAdapter.parse`'s exact section semantics: line-based headers, first occurrence wins, loud error on any missing output field (no single-output leniency, no label-line parsing — dee-coia) | `test/production_adapter_persistence_test.exs`, `test/upstream_exam/adapters_test.exs` |
 | JSON fallback | A failed chat parse retries through `Imp.Adapter.JSON` with a SECOND LM call in `Imp.Predict` (DSPy `ChatAdapter.__call__`'s fallback; disable with `config: [json_fallback: false]`); JSON parsing itself repairs Python-dict spellings via `Imp.Adapter.JSONRepair` (dee-16qm) | `test/upstream_exam/adapters_test.exs`, `test/production_adapter_persistence_test.exs` |
 | JSON structured-output options | `Imp.Adapter.JSON.lm_opts/2` requests JSON object or JSON Schema response formats | `test/schema_constraints_test.exs`, `test/production_adapter_persistence_test.exs` |
-| XML fields | `Imp.Adapter.XML` renders DSPy XMLAdapter's single XML-only dialect (XML-wrapped structure/inputs/demo outputs, no `[[ ## ]]` markers, no completed sentinel) and parses `<field>...</field>` through the shared schema path, rejecting missing tags loudly; parse failures retry through the JSON adapter exactly like DSPy's inherited fallback | `test/golden_trace_test.exs` (`xml_*` cases), `test/production_adapter_persistence_test.exs`, `test/silent_failure_regressions_test.exs` |
+| XML fields | `Imp.Adapter.XML` renders DSPy XMLAdapter's single XML-only dialect (XML-wrapped structure/inputs/demo outputs, no `[[ ## ]]` markers, no completed sentinel), recursively round-trips typed objects, arrays, repeated mapping values, empty collections, nullable/defaulted fields, and structured unions, preserves legacy JSON-in-tag values, rejects malformed/DTD/entity input, and sends parse failures through the ordinary JSON fallback | `test/upstream_exam/adapters_test.exs`, `test/golden_trace_test.exs` (`xml_*` scalar cases), `test/production_adapter_persistence_test.exs`, `test/silent_failure_regressions_test.exs` |
 | Two-step extraction | `Imp.Adapter.TwoStep` renders DSPy TwoStepAdapter's persona main prompt and runs the second extraction LM through the ChatAdapter path over the synthesized `text -> outputs` signature (JSONAdapter fallback included) | `test/golden_trace_test.exs` (`two_step_*` cases), `test/completion_surface_test.exs` |
 | Two-step planning (Imp extension) | `Imp.Adapter.PlanFirst` prepends a `plan` field before final outputs — an honest Imp extension, formerly misnamed `Imp.Adapter.TwoStep` | `test/completion_surface_test.exs` |
 | Demos/history | `Imp.Adapter.Chat` renders examples and `Imp.History` task turns as user/assistant turns, including partial demos with explicit missing-field markers | `test/production_adapter_persistence_test.exs`, `test/history_test.exs` |
@@ -42,11 +43,12 @@ trying to byte-match Python prompt templates.
 
 ## Declared Divergences (registered as gaps, not conformance)
 
-None currently. (`Imp.Adapter.XML` was listed here until dee-ovd3 landed the
-faithful XMLAdapter port; `Imp.Adapter.TwoStep` was listed until dee-qt5r
-landed the faithful TwoStepAdapter port — the old plan-prepend extension now
-lives honestly as `Imp.Adapter.PlanFirst`. Both ports' byte-parity is
-measured and locked in the golden differential.)
+No known material adapter-semantic divergence remains in the supported Imp type
+system. Python class identity, aliases, and mutable `default_factory` objects are
+represented as portable map schemas and immutable literal defaults rather than
+Python runtime objects. The current-stable audit remains open until the exact
+3.3.1 differential inventory is rerun; historical scalar prompt byte parity is
+not evidence for newly added upstream surfaces.
 
 ## Intentional Deviations
 
@@ -57,7 +59,7 @@ Those are provider transport concerns in Imp and are handled by
 format/parse behaviours and keeps side-effectful tool execution under explicit
 program modules.
 
-Imp prompt text IS byte-identical to DSPy 3.2.1 across the measured surface
+The historical prompt corpus is byte-identical to DSPy 3.2.1 across the measured surface
 (epic dee-8zev, 2026-07-18): 39 of 42 golden differential cases match real DSPy
 byte-for-byte on BOTH the rendered messages and the per-call request envelope
 (`mix imp.benchmark.trace` vs the pinned `dspy==3.2.1` venv) — predict,
@@ -80,6 +82,7 @@ remains stable and tested.
 
 Stream listeners select their adapter explicitly because normalized provider
 events do not carry adapter identity. JSON framing uses a bounded lexical parser
-rather than decoding an incomplete document; XML follows the adapter's exact
-tag model rather than claiming namespace-aware XML parsing. Custom framing
+rather than decoding an incomplete document; XML streaming frames declared
+top-level fields while completed responses are parsed by Saxy into recursive
+typed values. Custom framing
 accepts data delimiters only, never executable callbacks or regular expressions.

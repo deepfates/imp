@@ -112,6 +112,7 @@ defmodule Imp.MixProject do
       {:nimble_options, "~> 1.1"},
       {:req, "~> 0.6"},
       {:req_llm, "~> 1.17"},
+      {:saxy, "~> 1.6"},
       {:telemetry, "~> 1.3"},
       {:bandit, "~> 1.0", only: :test},
       {:plug, "~> 1.15", only: :test},

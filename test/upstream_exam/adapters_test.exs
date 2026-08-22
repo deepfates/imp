@@ -790,6 +790,218 @@ defmodule UpstreamExam.AdaptersTest do
                Imp.Adapter.XML.parse(signature, "<number>not_a_number</number>", [])
     end
 
+    test "xml adapter parses recursive object and list-of-object outputs" do
+      address = %{type: :object, properties: %{city: %{type: :string}}}
+
+      item = %{
+        type: :object,
+        properties: %{
+          value: %{type: :integer},
+          label: %{type: :string},
+          address: address
+        }
+      }
+
+      signature =
+        Imp.signature(%{
+          inputs: [],
+          outputs: [
+            %{name: :result, type: :object, constraints: Map.delete(item, :type)},
+            %{name: :items, type: :array, constraints: %{items: item}}
+          ]
+        })
+
+      completion =
+        "<result><value>5</value><label>foo</label><address><city>London</city></address></result>" <>
+          "<items><item><value>1</value><label>a</label><address><city>Paris</city></address></item>" <>
+          "<item><value>2</value><label>b</label><address><city>Rome</city></address></item></items>"
+
+      assert {:ok, prediction} = Imp.Adapter.XML.parse(signature, completion, [])
+
+      assert Imp.to_map(prediction) == %{
+               result: %{
+                 "address" => %{"city" => "London"},
+                 "label" => "foo",
+                 "value" => 5
+               },
+               items: [
+                 %{
+                   "address" => %{"city" => "Paris"},
+                   "label" => "a",
+                   "value" => 1
+                 },
+                 %{
+                   "address" => %{"city" => "Rome"},
+                   "label" => "b",
+                   "value" => 2
+                 }
+               ]
+             }
+
+      legacy =
+        ~s(<result>{"value":5,"label":"foo","address":{"city":"London"}}</result>) <>
+          ~s(<items>[{"value":1,"label":"a","address":{"city":"Paris"}}]</items>)
+
+      assert {:ok, legacy_prediction} = Imp.Adapter.XML.parse(signature, legacy, [])
+
+      assert Imp.get(legacy_prediction, :items) == [
+               %{"address" => %{"city" => "Paris"}, "label" => "a", "value" => 1}
+             ]
+    end
+
+    test "xml adapter parses repeated mapping values and empty collections" do
+      signature =
+        Imp.signature(%{
+          inputs: [],
+          outputs: [
+            %{
+              name: :counts,
+              type: :object,
+              constraints: %{
+                additional_properties: %{type: :array, constraints: %{items: %{type: :integer}}}
+              }
+            },
+            %{name: :items, type: :array, constraints: %{items: %{type: :string}}}
+          ]
+        })
+
+      completion =
+        "<counts><first>3</first><first>4</first><second>5</second></counts><items />"
+
+      assert {:ok, prediction} = Imp.Adapter.XML.parse(signature, completion, [])
+      assert Imp.to_map(prediction) == %{counts: %{"first" => [3, 4], "second" => [5]}, items: []}
+
+      mapping_signature =
+        Imp.signature(%{
+          inputs: [],
+          outputs: [
+            %{
+              name: :counts,
+              type: :object,
+              constraints: %{
+                additional_properties: %{type: :array, constraints: %{items: %{type: :integer}}}
+              }
+            }
+          ]
+        })
+
+      counts = %{
+        "postal code" => [3, 4],
+        "quoted \"key\" & more" => [5],
+        "line\nbreak" => [6],
+        "-status" => [7],
+        ".status" => [8]
+      }
+
+      [_system, _demo_user, %{role: :assistant, content: rendered}, _request] =
+        Imp.Adapter.XML.format(mapping_signature, %{}, demos: [%{counts: counts}])
+
+      assert rendered =~ ~s(<entry key="postal code"><item>3</item><item>4</item></entry>)
+      assert rendered =~ ~s(key="quoted &quot;key&quot; &amp; more")
+
+      assert {:ok, restored} = Imp.Adapter.XML.parse(mapping_signature, rendered, [])
+      assert Imp.get(restored, :counts) == counts
+    end
+
+    test "xml adapter renders nested schemas and safely round-trips text and mapping keys" do
+      signature =
+        Imp.signature(%{
+          inputs: [],
+          outputs: [
+            %{
+              name: :result,
+              type: :object,
+              constraints: %{
+                properties: %{
+                  code: %{type: :string},
+                  labels: %{type: :array, constraints: %{items: %{type: :string}}}
+                }
+              }
+            }
+          ]
+        })
+
+      [%{role: :system, content: system}, %{role: :user, content: request}] =
+        Imp.Adapter.XML.format(signature, %{}, [])
+
+      nested = "<result><code>...</code><labels><item>...</item></labels></result>"
+      assert system =~ nested
+      assert request =~ "Use this nested XML structure: #{nested}"
+
+      scalar = Imp.signature(%{inputs: [], outputs: [%{name: :code, type: :string}]})
+      value = "print('</code> & done')"
+
+      [_system, _demo_user, %{role: :assistant, content: rendered}, _request] =
+        Imp.Adapter.XML.format(scalar, %{}, demos: [%{code: value}])
+
+      assert rendered =~ "&lt;/code> &amp; done"
+      assert {:ok, prediction} = Imp.Adapter.XML.parse(scalar, rendered, [])
+      assert Imp.get(prediction, :code) == value
+
+      assert {:error, %Imp.AdapterParseError{message: message}} =
+               Imp.Adapter.XML.parse(scalar, "<code>print('</code>')</code>", [])
+
+      assert message =~ "Failed to parse XML"
+
+      assert {:error, %Imp.AdapterParseError{message: safety_message}} =
+               Imp.Adapter.XML.parse(
+                 scalar,
+                 ~s(<!DOCTYPE x [<!ENTITY secret SYSTEM "file:///etc/passwd">]><code>&secret;</code>),
+                 []
+               )
+
+      assert safety_message =~ "not allowed"
+
+      deep = String.duplicate("<x>", 65) <> "value" <> String.duplicate("</x>", 65)
+
+      assert {:error, %Imp.AdapterParseError{message: depth_message}} =
+               Imp.Adapter.XML.parse(scalar, "<code>#{deep}</code>", [])
+
+      assert depth_message =~ "exceeds depth"
+    end
+
+    test "xml adapter selects and validates structured union branches" do
+      count_branch = %{type: :object, properties: %{count: %{type: :integer}}}
+
+      labels_branch = %{
+        type: :object,
+        properties: %{
+          labels: %{type: :array, constraints: %{items: %{type: :string}}}
+        }
+      }
+
+      signature =
+        Imp.signature(%{
+          inputs: [],
+          outputs: [
+            %{
+              name: :choice,
+              type: :union,
+              constraints: %{any_of: [count_branch, labels_branch]}
+            }
+          ]
+        })
+
+      assert {:ok, first} =
+               Imp.Adapter.XML.parse(signature, "<choice><count>3</count></choice>", [])
+
+      assert Imp.get(first, :choice) == %{"count" => 3}
+
+      assert {:ok, second} =
+               Imp.Adapter.XML.parse(
+                 signature,
+                 "<choice><labels>one</labels><labels>two</labels></choice>",
+                 []
+               )
+
+      assert Imp.get(second, :choice) == %{"labels" => ["one", "two"]}
+
+      schema = Imp.Signature.json_schema(signature)
+
+      assert [%{"type" => "object"}, %{"type" => "object"}] =
+               schema["properties"]["choice"]["anyOf"]
+    end
+
     # Upstream: tests/adapters/test_xml_adapter.py::test_format_system_message
     test "xml format system message" do
       signature =
@@ -814,13 +1026,9 @@ defmodule UpstreamExam.AdaptersTest do
             "{question}",
             "</question>",
             "",
-            "<answers>",
-            "{answers}        # note: the value you produce must adhere to the JSON schema: {\"type\": \"array\", \"items\": {\"type\": \"string\"}}",
-            "</answers>",
+            "<answers><item>...</item></answers>",
             "",
-            "<scores>",
-            "{scores}        # note: the value you produce must adhere to the JSON schema: {\"type\": \"array\", \"items\": {\"type\": \"number\"}}",
-            "</scores>",
+            "<scores><item>...</item></scores>",
             "In adhering to this structure, your objective is: ",
             "        Answer the question with multiple answers and scores"
           ],

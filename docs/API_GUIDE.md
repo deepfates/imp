@@ -104,6 +104,33 @@ every output key, including nullable or defaulted fields, and validates the
 submitted values. This matches the current DSPy contract and makes the final
 tool call explicit rather than silently repairing it.
 
+The structured map form also supports unions when a field genuinely admits
+more than one wire shape:
+
+```elixir
+choice = %{
+  name: :choice,
+  type: :union,
+  constraints: %{
+    any_of: [
+      %{type: :object, properties: %{count: %{type: :integer}}},
+      %{
+        type: :object,
+        properties: %{
+          labels: %{type: :array, constraints: %{items: %{type: :string}}}
+        }
+      }
+    ]
+  }
+}
+```
+
+`Imp.Adapter.JSON` exports this as JSON Schema `anyOf`.
+`Imp.Adapter.XML` renders and parses the corresponding recursive XML for typed
+objects, arrays, mappings, and unions, while still accepting legacy JSON inside
+an outer XML output tag. XML declarations, doctypes, and custom entities are
+rejected; model output cannot use XML parsing to load a local or remote resource.
+
 ### Adapter wire-format wording
 
 When `Imp.Adapter.Chat` or `Imp.Adapter.JSON` renders a non-string output, the

@@ -134,6 +134,9 @@ defmodule Imp.Adapter.Chat do
       is_nil(value) and Imp.Adapter.OutputFields.optional?(field) ->
         nil
 
+      field.type in [:union, "union"] ->
+        coerce_union(field, value)
+
       code_field?(field) ->
         coerce_code(value, code_language(field))
 
@@ -143,6 +146,32 @@ defmodule Imp.Adapter.Chat do
           _no_enum -> coerce_value(value, field.type)
         end
     end
+  end
+
+  defp coerce_union(field, value) do
+    field.metadata
+    |> fetch_meta(:constraints, %{})
+    |> fetch_meta(:any_of, [])
+    |> Enum.reduce_while(value, fn branch, _original ->
+      branch_type = fetch_meta(branch, :type, :string)
+
+      branch_field =
+        Imp.Signature.Field.new(
+          %{
+            name: field.name,
+            type: branch_type,
+            constraints: drop_meta(branch, :type),
+            optional: fetch_meta(branch, :optional, false)
+          },
+          :output
+        )
+
+      coerced = coerce_field(branch_field, value)
+
+      if Imp.Schema.validate_field(branch_field, coerced) == [],
+        do: {:halt, coerced},
+        else: {:cont, value}
+    end)
   end
 
   defp coerce_code(value, language) do
@@ -673,6 +702,9 @@ defmodule Imp.Adapter.Chat do
     do: Map.get(map, key, Map.get(map, Atom.to_string(key), default))
 
   defp fetch_meta(map, key, default), do: Map.get(map, key, default)
+
+  defp drop_meta(map, key) when is_atom(key),
+    do: map |> Map.delete(key) |> Map.delete(Atom.to_string(key))
 
   defp normalize_constraints(%{} = constraints) do
     Map.new(constraints, fn

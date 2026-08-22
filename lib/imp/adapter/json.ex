@@ -371,6 +371,20 @@ defmodule Imp.Adapter.JSON do
   # `title` (field name titlecased). Scalars carry only `type`; composites route
   # through CompositeType.
   defp field_property_schema(field) do
+    if field.type in [:union, "union"] do
+      property =
+        %{inputs: [], outputs: [field]}
+        |> Imp.Signature.new()
+        |> Imp.Signature.json_schema()
+        |> get_in(["properties", to_string(field.name)])
+
+      {:ok, put_title(property, field.name)}
+    else
+      composite_field_property_schema(field)
+    end
+  end
+
+  defp composite_field_property_schema(field) do
     case Imp.Adapter.CompositeType.pydantic_schema_body(field) do
       :scalar ->
         {:ok, %{"type" => scalar_json_type(field.type)} |> put_title(field.name)}

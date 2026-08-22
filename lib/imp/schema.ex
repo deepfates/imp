@@ -34,6 +34,7 @@ defmodule Imp.Schema do
       true ->
         []
         |> validate_type(field, value)
+        |> validate_union(field, value, constraints)
         |> validate_enum(field, value, constraints)
         |> validate_answer_shape(field, value, constraints)
         |> validate_number(field, value, constraints)
@@ -79,12 +80,40 @@ defmodule Imp.Schema do
         :object -> is_map(value)
         :datetime -> match?(%DateTime{}, value) or match?(%NaiveDateTime{}, value)
         :code -> match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
+        :union -> true
+        "union" -> true
+        :null -> is_nil(value)
+        "null" -> is_nil(value)
         "code" -> match?(%Imp.Adapter.Types.Code{code: code} when is_binary(code), value)
         _ -> true
       end
 
     if valid?, do: errors, else: errors ++ [error(field, :type, "expected #{field.type}")]
   end
+
+  defp validate_union(errors, field, value, %{any_of: branches}) when is_list(branches) do
+    valid? =
+      Enum.any?(branches, fn branch ->
+        branch = normalize_constraints(branch)
+
+        pseudo = %{
+          field
+          | type: nested_type(branch, :any),
+            metadata: %{
+              constraints: delete_meta(branch, :type),
+              optional: fetch_meta(branch, :optional, false)
+            }
+        }
+
+        validate_field(pseudo, value) == []
+      end)
+
+    if valid?,
+      do: errors,
+      else: errors ++ [error(field, :union, "did not match any allowed type")]
+  end
+
+  defp validate_union(errors, _field, _value, _constraints), do: errors
 
   defp validate_enum(errors, field, value, %{enum: allowed}),
     do:
@@ -235,7 +264,7 @@ defmodule Imp.Schema do
       |> fetch_meta(:constraints, %{})
       |> normalize_constraints()
 
-    %{"type" => json_type(field.type)}
+    base_schema(field.type, constraints)
     |> maybe_put_default(field)
     |> maybe_put("enum", fetch_meta(constraints, :enum))
     |> maybe_put("x-imp-answerShape", fetch_meta(constraints, :answer_shape))
@@ -267,7 +296,13 @@ defmodule Imp.Schema do
   defp json_nested(spec) do
     spec = normalize_constraints(spec)
 
-    %{"type" => json_type(nested_type(spec, :string))}
+    spec =
+      spec
+      |> fetch_meta(:constraints, %{})
+      |> normalize_constraints()
+      |> Map.merge(delete_meta(spec, :constraints))
+
+    base_schema(nested_type(spec, :string), spec)
     |> maybe_put("enum", fetch_meta(spec, :enum))
     |> maybe_put("x-imp-answerShape", fetch_meta(spec, :answer_shape))
     |> maybe_put("minimum", fetch_meta(spec, :min))
@@ -278,6 +313,17 @@ defmodule Imp.Schema do
     |> maybe_put("items", json_nested(fetch_meta(spec, :items)))
     |> put_object_contract(fetch_meta(spec, :properties))
   end
+
+  defp base_schema(type, constraints) when type in [:union, "union"] do
+    branches =
+      constraints
+      |> fetch_meta(:any_of, [])
+      |> Enum.map(&json_nested/1)
+
+    %{"anyOf" => branches}
+  end
+
+  defp base_schema(type, _constraints), do: %{"type" => json_type(type)}
 
   defp json_properties(nil), do: nil
 
@@ -325,6 +371,8 @@ defmodule Imp.Schema do
   defp json_type("array"), do: "array"
   defp json_type("object"), do: "object"
   defp json_type("string"), do: "string"
+  defp json_type(:null), do: "null"
+  defp json_type("null"), do: "null"
   defp json_type(_), do: "string"
 
   defp nested_type(spec, default) do
@@ -340,6 +388,8 @@ defmodule Imp.Schema do
       "string" -> :string
       "str" -> :string
       "datetime" -> :datetime
+      "union" -> :union
+      "null" -> :null
       type -> type
     end
   end
@@ -400,6 +450,8 @@ defmodule Imp.Schema do
   defp normalize_constraint_key("minLength"), do: :min_length
   defp normalize_constraint_key("maxLength"), do: :max_length
   defp normalize_constraint_key("answerShape"), do: :answer_shape
+  defp normalize_constraint_key("anyOf"), do: :any_of
+  defp normalize_constraint_key("additionalProperties"), do: :additional_properties
   defp normalize_constraint_key("ge"), do: :min
   defp normalize_constraint_key("le"), do: :max
 
@@ -412,6 +464,8 @@ defmodule Imp.Schema do
               "lt",
               "multiple_of",
               "allow_inf_nan",
+              "any_of",
+              "additional_properties",
               "items",
               "properties",
               "type",
