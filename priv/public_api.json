@@ -4150,7 +4150,8 @@
       "functions": [
         "best_candidate/1",
         "run/3",
-        "to_artifact/2"
+        "to_artifact/2",
+        "to_program_artifact/3"
       ],
       "kind": "module",
       "macros": [],
@@ -4165,6 +4166,9 @@
           ],
           "to_artifact/2": [
             "to_artifact(result, opts \\\\ [])"
+          ],
+          "to_program_artifact/3": [
+            "to_program_artifact(result, program, opts \\\\ [])"
           ]
         }
       },
@@ -7023,6 +7027,8 @@
       "functions": [
         "apply_changes/2",
         "apply_changes_with_snapshot/2",
+        "apply_values!/2",
+        "apply_values/2",
         "components/1",
         "diff/2",
         "instruction_components/1",
@@ -7037,7 +7043,8 @@
         "put_tool_schema/3",
         "snapshot/1",
         "update_playbook/3",
-        "update_predictor/3"
+        "update_predictor/3",
+        "values/1"
       ],
       "kind": "module",
       "macros": [],
@@ -7049,6 +7056,12 @@
           ],
           "apply_changes_with_snapshot/2": [
             "apply_changes_with_snapshot(program, changes)"
+          ],
+          "apply_values!/2": [
+            "apply_values!(program, values)"
+          ],
+          "apply_values/2": [
+            "apply_values(program, values)"
           ],
           "components/1": [
             "components(program)"
@@ -7094,6 +7107,9 @@
           ],
           "update_predictor/3": [
             "update_predictor(program, name, update)"
+          ],
+          "values/1": [
+            "values(program)"
           ]
         },
         "types": {

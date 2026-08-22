@@ -101,6 +101,70 @@ defmodule Imp.Optimize.Anything do
           "Optimize Anything to_artifact/2 expects a Result and keyword options, got: #{inspect({result, opts})}"
   end
 
+  @doc """
+  Exports structured component candidates onto a trusted program Artifact.
+
+  Each Optimize Anything candidate must be the complete map returned by
+  `Imp.ProgramParameters.values/1`. Values are validated and applied through
+  the program's component contract before the parameter-only candidate is
+  created. Runtime callbacks, tools, clients, and credentials remain in the
+  supplied trusted program and are never serialized.
+  """
+  @spec to_program_artifact(struct(), struct(), keyword()) :: Imp.Optimizer.Artifact.artifact()
+  def to_program_artifact(result, program, opts \\ [])
+
+  def to_program_artifact(%Result{} = result, %_module{} = program, opts) when is_list(opts) do
+    unless Keyword.keyword?(opts), do: invalid_artifact_options!(opts)
+    unknown = Keyword.keys(opts) -- [:provenance]
+
+    if unknown != [],
+      do:
+        raise(
+          ArgumentError,
+          "unknown Optimize Anything program artifact options: #{inspect(unknown)}"
+        )
+
+    unless length(result.candidates) == length(result.validation_scores) do
+      raise ArgumentError,
+            "Optimize Anything result candidates and validation scores are misaligned"
+    end
+
+    champion_index = Result.best_index(result)
+    report = Result.to_map(result)
+
+    candidates =
+      result.candidates
+      |> Enum.zip(result.validation_scores)
+      |> Enum.with_index()
+      |> Enum.map(fn {{values, score}, index} ->
+        unless is_map(values) and not is_struct(values) do
+          raise ArgumentError,
+                "Optimize Anything program candidates must be complete component-value maps"
+        end
+
+        selected = Imp.ProgramParameters.apply_values!(program, values)
+
+        OptimizerArtifact.parameter_candidate(candidate_id(index), selected,
+          score: score,
+          report: if(index == champion_index, do: report),
+          metadata: %{
+            "candidate_index" => index,
+            "discovered_at_metric_call" => Enum.at(result.discovery_evaluation_counts, index),
+            "parent_indexes" => Enum.at(result.parents, index, [])
+          }
+        )
+      end)
+
+    champion = Enum.fetch!(candidates, champion_index)
+    challengers = List.delete_at(candidates, champion_index)
+    OptimizerArtifact.new(champion, challengers, provenance: Keyword.get(opts, :provenance, %{}))
+  end
+
+  def to_program_artifact(result, program, opts) do
+    raise ArgumentError,
+          "Optimize Anything to_program_artifact/3 expects a Result, trusted program struct, and keyword options, got: #{inspect({result, program, opts})}"
+  end
+
   @doc false
   def validate_resume_state(nil), do: {:ok, nil}
   def validate_resume_state(state) when is_map(state), do: {:ok, state}

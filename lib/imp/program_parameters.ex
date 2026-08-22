@@ -171,6 +171,50 @@ defmodule Imp.ProgramParameters do
   @spec parameters(struct()) :: [struct()]
   def parameters(program), do: snapshot(program).parameters
 
+  @doc "Returns the complete optimizer-visible state as a stable JSON map."
+  @spec values(struct()) :: %{required(String.t()) => Parameter.json_value()}
+  def values(program), do: Map.new(parameters(program), &{&1.id, &1.value})
+
+  @doc "Atomically replaces the complete optimizer-visible JSON state."
+  @spec apply_values(struct(), map()) :: {:ok, struct()} | {:error, term()}
+  def apply_values(%_module{} = program, values) when is_map(values) and not is_struct(values) do
+    parameters = parameters(program)
+    expected = MapSet.new(parameters, & &1.id)
+    supplied = Map.keys(values) |> MapSet.new()
+
+    if expected == supplied do
+      changes =
+        Enum.map(parameters, fn parameter ->
+          Change.new(parameter.id, parameter.kind, Map.fetch!(values, parameter.id),
+            base_digest: parameter.digest
+          )
+        end)
+
+      apply_changes(program, changes)
+    else
+      {:error,
+       {:parameter_value_ids_mismatch,
+        %{
+          missing: MapSet.difference(expected, supplied),
+          unknown: MapSet.difference(supplied, expected)
+        }}}
+    end
+  end
+
+  def apply_values(_program, values), do: {:error, {:parameter_values_must_be_a_map, values}}
+
+  @doc "Atomically replaces complete optimizer-visible state or raises."
+  @spec apply_values!(struct(), map()) :: struct()
+  def apply_values!(program, values) do
+    case apply_values(program, values) do
+      {:ok, updated} ->
+        updated
+
+      {:error, reason} ->
+        raise ArgumentError, "cannot apply optimizer component values: #{inspect(reason)}"
+    end
+  end
+
   @doc "Returns only the minimal digest-guarded changes from `source` to `target`."
   @spec diff(struct(), struct()) :: [struct()]
   def diff(source, target), do: Set.diff(snapshot(source), snapshot(target))

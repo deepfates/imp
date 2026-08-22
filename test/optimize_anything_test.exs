@@ -98,4 +98,61 @@ defmodule OptimizeAnythingTest do
     assert %{"outcome" => "retry", "value" => ^target} =
              receipt_path |> File.read!() |> Jason.decode!()
   end
+
+  test "exports component candidates onto fresh trusted executable code" do
+    selected_runner = fn %{query: query} -> "selected:" <> query end
+
+    selected_tool =
+      Imp.Tool.new(:lookup, "Search vaguely", selected_runner,
+        schema: %{"type" => "object", "properties" => %{"query" => %{"type" => "string"}}}
+      )
+
+    program = Imp.Predict.ReAct.new("question -> answer", [selected_tool])
+    baseline = Imp.ProgramParameters.values(program)
+    selected = Map.put(baseline, "tool/lookup/description", "Search the exact account record")
+
+    evaluator = fn values, _row ->
+      applied = Imp.ProgramParameters.apply_values!(program, values)
+
+      if applied.tools.lookup.description == selected["tool/lookup/description"],
+        do: 1.0,
+        else: 0.0
+    end
+
+    result =
+      Anything.run(baseline, evaluator,
+        dataset: [%{"case" => "training"}],
+        valset: [%{"case" => "selection"}],
+        config:
+          Config.new(
+            engine: [max_candidate_proposals: 1, seed: 17],
+            reflection: [module_selector: :all]
+          ),
+        fallback_proposer: fn _candidate, component, _records, _iteration ->
+          Map.fetch!(selected, component)
+        end
+      )
+
+    assert Result.best_candidate(result) == selected
+
+    artifact = Anything.to_program_artifact(result, program)
+
+    fresh_runner = fn %{query: query} -> "fresh:" <> query end
+
+    fresh_tool =
+      Imp.Tool.new(:lookup, "Search vaguely", fresh_runner,
+        schema: %{"type" => "object", "properties" => %{"query" => %{"type" => "string"}}}
+      )
+
+    fresh = Imp.Predict.ReAct.new("question -> answer", [fresh_tool])
+    applied = Imp.Optimizer.Artifact.apply(artifact, fresh)
+
+    assert applied.tools.lookup.description == "Search the exact account record"
+    assert applied.tools.lookup.run === fresh_runner
+    assert Imp.Tool.call(applied.tools.lookup, %{query: "A-42"}) == "fresh:A-42"
+
+    candidate = get_in(artifact, ["payload", "candidates", "candidate-0001"])
+    assert candidate["kind"] == "parameter_set"
+    refute Jason.encode!(artifact) =~ "selected:"
+  end
 end

@@ -27,7 +27,10 @@ tool, and custom-module enumeration; paired batch callbacks expose arbitrary
 consumer components; constraints and acyclic dependencies are enforced before
 any callback; generalized parameter artifacts apply to fresh trusted code; and
 GEPA instruction candidates use the same atomic digest-guarded change path.
-The compatibility, public-surface, and package suites are green.
+Structured Optimize Anything candidates can now execute through complete
+component value maps and export the selected state through the same parameter
+Artifact boundary. The compatibility, public-surface, and package suites are
+green.
 
 Do not close this ticket from those mechanics alone. The remaining acceptance
 proof is an ordinary action-aware ReAct/RLM or composed consumer lifecycle that

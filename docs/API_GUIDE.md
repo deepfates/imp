@@ -628,6 +628,31 @@ ReAct tool lenses appear through the same `Imp.ProgramParameters.components/1`
 inventory. GEPA instruction candidates also apply through this atomic path
 while retaining their existing named-predictor API.
 
+Optimize Anything can search the complete component state without learning a
+second application mechanism:
+
+```elixir
+seed = Imp.ProgramParameters.values(program)
+
+result =
+  Imp.Optimize.Anything.run(seed, fn values, example ->
+    candidate = Imp.ProgramParameters.apply_values!(program, values)
+    evaluate_candidate(candidate, example)
+  end,
+    dataset: training_rows,
+    valset: selection_rows,
+    config: oa_config
+  )
+
+artifact = Imp.Optimize.Anything.to_program_artifact(result, program)
+deployed = Imp.Optimizer.Artifact.apply(artifact, fresh_trusted_program)
+```
+
+The evaluator executes the candidate program; the optimizer sees only its
+bounded data. Use replayed or sandboxed tools during optimization. A tool with
+external effects should fail closed unless the evaluation explicitly supplies
+an authorized effect boundary.
+
 The complete version in the [deployment example](../examples/deployment/README.md)
 adds typed intermediate metadata, persistence, hot reload, concurrent service,
 and failure containment.

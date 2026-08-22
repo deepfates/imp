@@ -37,7 +37,10 @@ custom component values share one digest-guarded atomic application path;
 generalized parameter artifacts revalidate them against freshly constructed
 trusted code without persisting callbacks or runtime authority. Existing
 predictor-only artifacts and GEPA's named instruction candidates remain
-compatible.
+compatible. `Imp.ProgramParameters.values/1` and `apply_values/2` let structured
+Optimize Anything candidates execute through that same contract, and
+`Imp.Optimize.Anything.to_program_artifact/3` exports their selected state for
+fresh trusted application.
 
 ## 0.3.0 — 2026-07-31
 

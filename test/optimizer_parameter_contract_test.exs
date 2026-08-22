@@ -287,6 +287,27 @@ defmodule Imp.Optimizer.ParameterContractTest do
     end
   end
 
+  test "complete value maps reject omissions before invoking a component callback" do
+    program = %ComponentProgram{
+      mode: "fast",
+      threshold: 0.5,
+      runtime: nil,
+      dependency_mode: :valid
+    }
+
+    assert ProgramParameters.values(program) == %{
+             "routing/mode" => "fast",
+             "routing/threshold" => 0.5
+           }
+
+    assert {:error, {:parameter_value_ids_mismatch, mismatch}} =
+             ProgramParameters.apply_values(program, %{"routing/mode" => "careful"})
+
+    assert mismatch.missing == MapSet.new(["routing/threshold"])
+    assert mismatch.unknown == MapSet.new()
+    refute_received {:component_update, _replacements}
+  end
+
   test "custom components round-trip through an Artifact into fresh trusted code" do
     selected_runtime = fn _ -> :selected_runtime_must_not_persist end
 
