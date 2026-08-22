@@ -265,7 +265,16 @@ defmodule Imp do
   @doc "Calls any Imp program struct."
   defdelegate call(program, inputs), to: Imp.Module
 
-  @doc "Starts an addressable program run with optional ordered semantic events."
+  @doc """
+  Starts an addressable program run with ordered semantic events and cancellation.
+
+  Pass `authorize: fun` to require a protocol-neutral decision before each
+  validated external ReActV2 or RLM tool effect. The function receives an
+  `Imp.Execution.Authorization` and must return `:allow`, `{:deny, reason}`, or
+  `{:cancel, reason}`. A crash, timeout, malformed response, or vanished run
+  owner denies the effect. Programs that do not support explicit execution
+  capabilities fail closed when `:authorize` is present.
+  """
   defdelegate start_run(program, inputs, opts \\ []), to: Imp.Run, as: :start
 
   @doc "Cooperatively cancels an addressable program run and its supervised task."

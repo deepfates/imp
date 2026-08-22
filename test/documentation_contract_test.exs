@@ -389,7 +389,8 @@ defmodule DocumentationContractTest do
     assert learning =~ "Imp.Optimizer.Artifact.apply(fresh_router)"
     assert learning =~ "%Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(deployed)"
     assert learning =~ "Imp.Optimizer.GEPA.compile_with_artifact/5"
-    assert learning =~ "It does not carry your module,\nLMs, adapters, callbacks, credentials"
+    assert learning =~ "It does not carry\nyour module, LMs, adapters, callbacks"
+    assert learning =~ "tool runners, policies, credentials"
 
     assert learning =~
              "Artifact\nreproduction proves deployment behavior, not held-out improvement"

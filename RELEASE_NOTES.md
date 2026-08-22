@@ -33,6 +33,10 @@ owner actions.
   previous raising behavior.
 - `Imp.Adapters.Types` and its nested structs moved to `Imp.Adapter.Types`.
   Replace the `Imp.Adapters.` prefix with `Imp.Adapter.`.
+- The disconnected `Imp.Agent`/`Imp.Agent.Runtime` model was removed. Use the
+  ordinary ReActV2 or RLM program path; hosts needing ordered events,
+  cancellation, or explicit per-effect approval can use experimental
+  `Imp.start_run/3` without adopting a second agent abstraction.
 
 ## What you are getting
 

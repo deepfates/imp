@@ -215,10 +215,7 @@ defmodule Imp.Predict.RLM do
   metadata.
   """
   def call(%__MODULE__{} = rlm, inputs) when is_list(inputs) or is_map(inputs) do
-    with {:ok, vars} <- normalize_inputs(inputs),
-         :ok <- validate_required_inputs(rlm.signature, vars) do
-      call_with_environment(rlm, vars)
-    end
+    do_call(rlm, inputs, Imp.Execution.unrestricted())
   end
 
   def call(%__MODULE__{}, inputs),
@@ -226,6 +223,25 @@ defmodule Imp.Predict.RLM do
       {:error,
        {:invalid_rlm_inputs,
         "expected a map or keyword/list of input pairs, got: #{inspect(inputs)}"}}
+
+  @impl true
+  def execute(%__MODULE__{} = rlm, inputs, %Imp.Execution{} = execution)
+      when is_list(inputs) or is_map(inputs) do
+    do_call(rlm, inputs, execution)
+  end
+
+  def execute(%__MODULE__{}, inputs, %Imp.Execution{}),
+    do:
+      {:error,
+       {:invalid_rlm_inputs,
+        "expected a map or keyword/list of input pairs, got: #{inspect(inputs)}"}}
+
+  defp do_call(rlm, inputs, execution) do
+    with {:ok, vars} <- normalize_inputs(inputs),
+         :ok <- validate_required_inputs(rlm.signature, vars) do
+      call_with_environment(rlm, vars, execution)
+    end
+  end
 
   defp normalize_inputs(inputs) do
     {:ok, Map.new(inputs)}
@@ -246,7 +262,11 @@ defmodule Imp.Predict.RLM do
   defp input_present?(inputs, name),
     do: Map.has_key?(inputs, name) or Map.has_key?(inputs, to_string(name))
 
-  defp call_with_environment(%__MODULE__{persistent: true, session: session} = rlm, vars)
+  defp call_with_environment(
+         %__MODULE__{persistent: true, session: session} = rlm,
+         vars,
+         execution
+       )
        when is_pid(session) do
     Session.transaction(session, fn snapshot ->
       environment = Session.merge_inputs(snapshot, vars)
@@ -254,7 +274,8 @@ defmodule Imp.Predict.RLM do
       {result, state} =
         call_with_new_budget(rlm, environment.vars,
           protected_vars: Session.protected_vars(environment, rlm.compaction),
-          compaction_history: environment.compaction_history
+          compaction_history: environment.compaction_history,
+          execution: execution
         )
 
       environment = %{
@@ -281,12 +302,15 @@ defmodule Imp.Predict.RLM do
     end)
   end
 
-  defp call_with_environment(%__MODULE__{persistent: true}, _vars),
+  defp call_with_environment(%__MODULE__{persistent: true}, _vars, _execution),
     do: {:error, :rlm_persistent_session_closed}
 
-  defp call_with_environment(%__MODULE__{} = rlm, vars) do
+  defp call_with_environment(%__MODULE__{} = rlm, vars, execution) do
     {result, _state} =
-      call_with_new_budget(rlm, vars, protected_vars: protected_input_vars(vars))
+      call_with_new_budget(rlm, vars,
+        protected_vars: protected_input_vars(vars),
+        execution: execution
+      )
 
     result
   end
@@ -322,14 +346,17 @@ defmodule Imp.Predict.RLM do
     end
   end
 
-  defp call_with_budget(%__MODULE__{} = rlm, vars, budget, depth) do
-    {result, _state} = call_with_budget_state(rlm, vars, budget, depth, [])
+  defp call_with_budget(%__MODULE__{} = rlm, vars, budget, depth, execution) do
+    {result, _state} =
+      call_with_budget_state(rlm, vars, budget, depth, execution: execution)
+
     result
   end
 
   defp call_with_budget_state(%__MODULE__{} = rlm, vars, budget, depth, opts) do
     protected_vars = opts |> Keyword.get(:protected_vars, %{}) |> Map.new()
     compaction_history = Keyword.get(opts, :compaction_history, [])
+    execution = Keyword.get_lazy(opts, :execution, &Imp.Execution.unrestricted/0)
 
     {vars, protected_vars} =
       if rlm.compaction do
@@ -341,7 +368,7 @@ defmodule Imp.Predict.RLM do
         {vars, protected_vars}
       end
 
-    runtime = Runtime.new(rlm, budget, vars, depth)
+    runtime = Runtime.new(rlm, budget, vars, depth, execution)
 
     interpreter =
       Interpreter.new(vars, interpreter_callbacks(rlm), runtime,
@@ -957,11 +984,15 @@ defmodule Imp.Predict.RLM do
     depth + 1 < rlm.max_recursion_depth
   end
 
-  defp run_recursive_child(%{budget: budget, rlm: rlm, depth: parent_depth}, prompt, model) do
+  defp run_recursive_child(
+         %{budget: budget, rlm: rlm, depth: parent_depth} = runtime,
+         prompt,
+         model
+       ) do
     with {:ok, depth} <- Budget.enter_recursion(budget, parent_depth) do
       child = recursive_query_child(rlm, model)
 
-      case call_with_budget(child, %{context: prompt}, budget, depth) do
+      case call_with_budget(child, %{context: prompt}, budget, depth, runtime.execution) do
         {:ok, prediction} ->
           trace = get_in(prediction.metadata, [:rlm_trace]) || []
           {:ok, recursive_query_value(prediction), depth, trace}
@@ -1090,6 +1121,7 @@ defmodule Imp.Predict.RLM do
   defp hard_runtime_error?({:rlm_max_time_ms, _max, _trace}), do: true
   defp hard_runtime_error?({:rlm_cancelled, _reason}), do: true
   defp hard_runtime_error?({{:rlm_cancelled, _reason}, _trace}), do: true
+  defp hard_runtime_error?({:execution_cancelled, _reason}), do: true
   defp hard_runtime_error?(_reason), do: false
 
   defp interpreter_recurse(
@@ -1104,7 +1136,7 @@ defmodule Imp.Predict.RLM do
       # opt-in persistent root session cross a recursion branch boundary.
       child = %{rlm | signature: child_signature, persistent: false, session: nil}
 
-      case call_with_budget(child, inputs, budget, depth) do
+      case call_with_budget(child, inputs, budget, depth, runtime.execution) do
         {:ok, prediction} ->
           trace = get_in(prediction.metadata, [:rlm_trace]) || []
           runtime = Runtime.observe_recursion(runtime, depth, trace)
@@ -1155,7 +1187,12 @@ defmodule Imp.Predict.RLM do
         input: args
       )
 
-    case run_budgeted(runtime.budget, fn -> execute_tool_call(rlm, name, name, args) end) do
+    case run_budgeted(runtime.budget, fn ->
+           execute_tool_call(rlm, name, name, args, tool_call_id, runtime.execution)
+         end) do
+      {:cancel, reason} ->
+        {:error, {:execution_cancelled, reason}, runtime}
+
       {:error, reason} ->
         error = {:rlm_tool_error, reason}
 
@@ -1380,12 +1417,16 @@ defmodule Imp.Predict.RLM do
   end
 
   defp budget_error?({:rlm_cancelled, _reason}), do: true
+  defp budget_error?({:execution_cancelled, _reason}), do: true
   defp budget_error?(:rlm_time_budget_exceeded), do: true
   defp budget_error?({:rlm_max_llm_calls, 0}), do: true
   defp budget_error?(_reason), do: false
 
   defp attach_rlm_trace({:rlm_max_llm_calls, max}, state),
     do: {:rlm_max_llm_calls, max, Enum.reverse(state.trace)}
+
+  defp attach_rlm_trace({:execution_cancelled, reason}, _state),
+    do: {:execution_cancelled, reason}
 
   defp attach_rlm_trace(reason, state), do: {reason, Enum.reverse(state.trace)}
 
@@ -1751,16 +1792,35 @@ defmodule Imp.Predict.RLM do
     |> Enum.map(&%{name: &1.name, description: &1.description, schema: &1.schema})
   end
 
-  defp execute_tool_call(_rlm, nil, requested_name, _args),
+  defp execute_tool_call(_rlm, nil, requested_name, _args, _tool_call_id, _execution),
     do: {:error, {:unknown_tool, requested_name}}
 
-  defp execute_tool_call(rlm, name, _requested_name, args) do
-    case authorize_tool(rlm.tool_policy, name, args) do
-      :ok ->
-        call_known_tool(Map.fetch!(rlm.tools, name), args)
+  defp execute_tool_call(rlm, name, _requested_name, args, tool_call_id, execution) do
+    tool = Map.fetch!(rlm.tools, name)
 
-      {:error, reason} ->
-        {:error, reason}
+    with :ok <- authorize_tool(rlm.tool_policy, name, args),
+         :ok <- Imp.Tool.validate_input(tool, args) do
+      request = %Imp.Execution.Authorization{
+        run_id: execution.run_id,
+        tool_call_id: tool_call_id,
+        tool_name: tool.name,
+        arguments: args,
+        description: Imp.Execution.bounded_description(tool.description),
+        metadata: %{runtime: __MODULE__}
+      }
+
+      case Imp.Execution.authorize(execution, request) do
+        :allow ->
+          call_known_tool(tool, args)
+
+        {:deny, reason} ->
+          {:error, {:tool_authorization_denied, name, Imp.Redaction.redact(reason)}}
+
+        {:cancel, reason} ->
+          {:cancel, reason}
+      end
+    else
+      {:error, reason} -> {:error, reason}
     end
   end
 

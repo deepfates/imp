@@ -1,15 +1,16 @@
 defmodule Imp.Predict.RLM.Runtime do
   @moduledoc false
 
-  @enforce_keys [:budget, :rlm, :inputs, :depth]
-  defstruct [:budget, :rlm, :inputs, :depth, child_traces: [], max_observed_depth: 0]
+  @enforce_keys [:budget, :rlm, :inputs, :depth, :execution]
+  defstruct [:budget, :rlm, :inputs, :depth, :execution, child_traces: [], max_observed_depth: 0]
 
-  def new(program, budget, inputs, depth) do
+  def new(program, budget, inputs, depth, execution) do
     %__MODULE__{
       rlm: program,
       budget: budget,
       inputs: inputs,
       depth: depth,
+      execution: execution,
       max_observed_depth: depth
     }
   end

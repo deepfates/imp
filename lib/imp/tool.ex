@@ -140,13 +140,16 @@ defmodule Imp.Tool do
     end)
   end
 
+  @doc false
+  def validate_input(%__MODULE__{} = tool, input), do: do_validate_input(tool, input)
+
   # Empty schemas preserve the historical untyped-tool behavior. The error
   # tuples intentionally match the former MCP-only wrapper so every runtime
   # observes one contract without exposing a second public validation API.
-  defp validate_input(%__MODULE__{schema: schema}, _input) when map_size(schema) == 0,
+  defp do_validate_input(%__MODULE__{schema: schema}, _input) when map_size(schema) == 0,
     do: :ok
 
-  defp validate_input(%__MODULE__{schema: schema}, input) do
+  defp do_validate_input(%__MODULE__{schema: schema}, input) do
     with :ok <- validate_root(input, schema),
          :ok <- validate_required(input, schema),
          :ok <- validate_properties(input, schema) do

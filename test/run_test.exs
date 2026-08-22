@@ -104,6 +104,245 @@ defmodule Imp.RunTest do
     assert Enum.any?(receive_events([]), &(&1.kind == :nested and &1.output == "child"))
   end
 
+  test "authorization-aware runs fail closed for modules without execute/3" do
+    program = %NestedProgram{signature: Imp.signature("question -> answer")}
+
+    assert {:ok, run} =
+             Imp.start_run(program, %{question: "no implicit fallback"},
+               authorize: fn _request -> :allow end
+             )
+
+    assert {:error, {:execution_capability_unsupported, NestedProgram, :authorization}} =
+             Task.await(run.task)
+
+    :ok = Imp.Run.stop(run)
+  end
+
+  test "ReActV2 validates before authorization and turns denial into an observation" do
+    owner = self()
+    {:ok, responses} = Agent.start_link(fn -> :invalid end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          Agent.get_and_update(responses, fn
+            :invalid ->
+              {%{
+                 tool_calls: [
+                   %{id: "invalid-1", name: "lookup", arguments: %{}}
+                 ]
+               }, :denied}
+
+            :denied ->
+              {%{
+                 tool_calls: [
+                   %{id: "lookup-2", name: "lookup", arguments: %{query: "beam"}},
+                   %{id: "submit-2", name: "submit", arguments: %{answer: "denied safely"}}
+                 ]
+               }, :done}
+          end)
+        end
+      )
+
+    lookup =
+      Imp.tool(
+        :lookup,
+        "read external data",
+        fn args ->
+          send(owner, {:tool_executed, args})
+          "found"
+        end,
+        schema: %{
+          "type" => "object",
+          "required" => ["query"],
+          "properties" => %{"query" => %{"type" => "string"}}
+        }
+      )
+
+    program = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2)
+
+    assert {:ok, run} =
+             Imp.start_run(program, %{question: "lookup"},
+               authorize: fn request ->
+                 send(owner, {:authorization_requested, request})
+                 {:deny, :human_rejected}
+               end
+             )
+
+    assert {:ok, prediction} = Task.await(run.task)
+    :ok = Imp.Run.barrier(run, owner, :denied)
+    assert_receive {:imp_run_barrier, :denied}
+    :ok = Imp.Run.stop(run)
+
+    assert_receive {:authorization_requested,
+                    %Imp.Execution.Authorization{
+                      tool_call_id: "lookup-2",
+                      tool_name: :lookup,
+                      arguments: %{query: "beam"}
+                    }}
+
+    refute_received {:authorization_requested,
+                     %Imp.Execution.Authorization{tool_call_id: "invalid-1"}}
+
+    refute_received {:tool_executed, _args}
+    assert Imp.get(prediction, :answer) == "denied safely"
+
+    [first | _] = Imp.get(prediction, :history).messages
+
+    assert Enum.any?(first.tool_call_results, fn result ->
+             result.id == "invalid-1" and result.error
+           end)
+  end
+
+  test "an authorization cancellation stops ReActV2 without executing the effect" do
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{
+            tool_calls: [
+              %{id: "external-1", name: "external", arguments: %{value: "x"}}
+            ]
+          }
+        end
+      )
+
+    tool = Imp.tool(:external, "external write", fn args -> send(owner, {:effect, args}) end)
+    program = Imp.react_v2("question -> answer", [tool], lm: lm)
+
+    assert {:ok, run} =
+             Imp.start_run(program, %{question: "write"},
+               event_sink: fn event -> send(owner, {:run_event, event}) end,
+               authorize: fn _request -> {:cancel, :operator_cancelled} end
+             )
+
+    assert {:error, {:execution_cancelled, :operator_cancelled}} = Task.await(run.task)
+    :ok = Imp.Run.barrier(run, owner, :cancelled)
+    assert_receive {:imp_run_barrier, :cancelled}
+    :ok = Imp.Run.stop(run)
+
+    refute_received {:effect, _args}
+    events = receive_events([])
+    assert Enum.any?(events, &(&1.kind == :tool_call and &1.tool_call_id == "external-1"))
+    assert Enum.any?(events, &(&1.kind == :run_cancelled))
+    refute Enum.any?(events, &(&1.kind == :tool_result and &1.tool_call_id == "external-1"))
+  end
+
+  test "cancelling a run stops a blocked authorization callback without a late decision" do
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{tool_calls: [%{id: "external-blocked", name: "external", arguments: %{}}]}
+        end
+      )
+
+    tool = Imp.tool(:external, "external write", fn _args -> send(owner, :effect_executed) end)
+    program = Imp.react_v2("question -> answer", [tool], lm: lm)
+
+    assert {:ok, run} =
+             Imp.start_run(program, %{question: "write"},
+               authorize: fn _request ->
+                 send(owner, {:authorization_callback_started, self()})
+                 Process.sleep(:infinity)
+                 send(owner, :late_authorization_decision)
+                 :allow
+               end,
+               authorization_timeout: 5_000
+             )
+
+    assert_receive {:authorization_callback_started, callback}
+    callback_monitor = Process.monitor(callback)
+
+    assert :ok = Imp.cancel_run(run, :operator_cancelled)
+    assert_receive {:DOWN, ^callback_monitor, :process, ^callback, _reason}
+    refute Process.alive?(run.task.pid)
+    refute_received :effect_executed
+    refute_receive :late_authorization_decision, 20
+  end
+
+  test "run owner death stops a blocked authorization callback and outer execution" do
+    test_pid = self()
+
+    owner =
+      spawn(fn ->
+        lm =
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts ->
+              %{tool_calls: [%{id: "owner-down", name: "external", arguments: %{}}]}
+            end
+          )
+
+        tool =
+          Imp.tool(:external, "external write", fn _args -> send(test_pid, :effect_executed) end)
+
+        program = Imp.react_v2("question -> answer", [tool], lm: lm)
+
+        {:ok, run} =
+          Imp.start_run(program, %{question: "write"},
+            authorize: fn _request ->
+              send(test_pid, {:owner_authorization_started, self()})
+              Process.sleep(:infinity)
+              send(test_pid, :late_authorization_decision)
+              :allow
+            end,
+            authorization_timeout: 5_000
+          )
+
+        send(test_pid, {:owned_run, run})
+        Process.sleep(:infinity)
+      end)
+
+    assert_receive {:owned_run, run}
+    assert_receive {:owner_authorization_started, callback}
+    callback_monitor = Process.monitor(callback)
+    run_monitor = Process.monitor(run.task.pid)
+
+    Process.exit(owner, :kill)
+
+    assert_receive {:DOWN, ^callback_monitor, :process, ^callback, _reason}
+    assert_receive {:DOWN, ^run_monitor, :process, _run_pid, _reason}
+    refute_received :effect_executed
+    refute_receive :late_authorization_decision, 20
+  end
+
+  test "RLM explicitly carries authorization into its budgeted tool effect" do
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{code: ~S|external(%{value: "x"})|}
+        end
+      )
+
+    tool =
+      Imp.tool(:external, "external RLM write", fn args -> send(owner, {:rlm_effect, args}) end)
+
+    program = Imp.rlm("question -> answer", lm: lm, tools: [tool], max_iterations: 1)
+
+    assert {:ok, run} =
+             Imp.start_run(program, %{question: "write"},
+               authorize: fn request ->
+                 send(owner, {:rlm_authorization, request})
+                 {:cancel, :rlm_operator_cancelled}
+               end
+             )
+
+    assert {:error, {:execution_cancelled, :rlm_operator_cancelled}} = Task.await(run.task)
+    :ok = Imp.Run.stop(run)
+
+    assert_receive {:rlm_authorization,
+                    %Imp.Execution.Authorization{
+                      tool_name: :external,
+                      arguments: %{value: "x"}
+                    }}
+
+    refute_received {:rlm_effect, _args}
+  end
+
   test "an owner crash cannot orphan its unlinked outer run" do
     test_pid = self()
 

@@ -4,8 +4,11 @@ defmodule Imp.Run do
 
   `Imp.call/2` remains the minimal program boundary. `Imp.Run` is the optional
   runtime boundary for hosts that need to observe a composed program while it
-  is running or cancel its in-flight effects. Events describe Imp execution;
-  they do not contain ACP, MCP, UI, or transport concepts.
+  is running, cancel its in-flight effects, or explicitly authorize validated
+  ReActV2/RLM tool effects. Observation and cancellation use the owned run
+  context; security decisions are carried explicitly in `Imp.Execution`.
+  Events describe Imp execution; they do not contain ACP, MCP, UI, or transport
+  concepts.
   """
 
   alias Imp.Run.Control
@@ -21,22 +24,34 @@ defmodule Imp.Run do
   @spec start(Imp.Module.t(), map() | keyword(), keyword()) :: {:ok, t()} | {:error, term()}
   def start(program, inputs, opts \\ []) when is_list(opts) do
     event_sink = Keyword.get(opts, :event_sink, fn _event -> :ok end)
+    authorize = Keyword.get(opts, :authorize)
+    authorization_timeout = Keyword.get(opts, :authorization_timeout, 30_000)
 
     unless is_function(event_sink, 1) do
       raise ArgumentError, ":event_sink must be an arity-1 function"
     end
 
     id = Keyword.get_lazy(opts, :id, &new_id/0)
+    owner = self()
+
+    execution =
+      Imp.Execution.new(
+        run_id: id,
+        authorize: authorize,
+        authorization_timeout: authorization_timeout,
+        decision_owner: owner
+      )
 
     with {:ok, control} <- Control.start(owner: self(), id: id, event_sink: event_sink) do
       task =
         Imp.Tasks.async_nolink(fn ->
           with_context(control, fn ->
             emit(:run_started, component: program.__struct__)
-            result = Imp.call(program, inputs)
+            result = Imp.Module.execute(program, inputs, execution)
 
             case result do
               {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
+              {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
               {:error, reason} -> emit(:run_failed, error: reason)
               other -> emit(:run_failed, error: {:invalid_result, other})
             end

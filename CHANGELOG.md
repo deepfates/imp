@@ -42,6 +42,15 @@ Optimize Anything candidates execute through that same contract, and
 `Imp.Optimize.Anything.to_program_artifact/3` exports their selected state for
 fresh trusted application.
 
+Addressable `Imp.Run` execution now supports explicit, fail-closed authorization
+for validated ReActV2 and RLM tool effects. Durable tool policy and schema
+validation run before the per-execution decision; denial is observable to the
+program, cancellation remains distinct, and callback failure, timeout, owner
+death, or run cancellation cannot execute the effect or leave a decision task
+alive. `Imp.Module.execute/3` is optional, shares each program's ordinary loop,
+and refuses an authorization-bearing run for modules that do not support the
+capability.
+
 ## 0.3.0 — 2026-07-31
 
 Prepared as an unpublished internal release candidate. The exact candidate is
@@ -251,8 +260,10 @@ installs from a source checkout, not from Hex.
 - Breaking in 0.3: removed the disconnected `Imp.Agent` and
   `Imp.Agent.Runtime` APIs. The packaged agent story is the react-family
   spectrum (`react`, `react_v2`, `avatar`, `code_act`, `rlm`) plus ordinary
-  supervised Elixir around `Imp.call/2` and `Imp.Tool.call/2`. No replacement
-  event/runtime abstraction was introduced without a real consumer.
+  supervised Elixir around `Imp.call/2` and `Imp.Tool.call/2`. The later
+  experimental `Imp.Run` boundary was added only after ACP and executed-agent
+  optimization supplied two real consumers; it does not restore a competing
+  Agent program model.
 - Breaking in 0.3: removed the misleading
   `Imp.Streaming.Messages.StatusMessageProvider` list accumulator. It never
   implemented DSPy's execution-stage provider contract. Use

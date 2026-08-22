@@ -356,6 +356,33 @@ trace =
 Telemetry is an observation boundary, not an authorization boundary. Keep
 redaction on unless you are debugging a controlled local input.
 
+For a ReActV2 or RLM tool that can change the outside world, start an
+addressable run and make the decision at the validated effect boundary:
+
+```elixir
+{:ok, run} =
+  Imp.start_run(program, inputs,
+    authorize: fn request ->
+      case review_effect(request.tool_name, request.arguments) do
+        :approved -> :allow
+        :rejected -> {:deny, :operator_rejected}
+      end
+    end,
+    authorization_timeout: 30_000
+  )
+
+result = Task.await(run.task, 35_000)
+:ok = Imp.Run.stop(run)
+```
+
+The program's configured tool policy is checked first, then its argument
+schema, then the per-run callback. Invalid or statically forbidden calls never
+ask for approval. Callback failure, timeout, malformed response, or loss of the
+run owner denies the effect; `{:cancel, reason}` cancels the run distinctly.
+Ordinary `Imp.call/2` has no interactive approval step. Use replayed or sandboxed
+tools for optimization and require this explicit boundary when a deployed run
+may perform an external effect.
+
 ## 10. Deploy The Verified Artifact
 
 The `examples/deployment` OTP application shows the production shape: it

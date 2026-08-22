@@ -3039,6 +3039,72 @@
     },
     {
       "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "authorization_required?/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Execution",
+      "signatures": {
+        "functions": {
+          "authorization_required?/1": [
+            "authorization_required?(execution)"
+          ]
+        },
+        "types": {
+          "decision/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/execution.ex",
+      "struct_fields": [
+        "authorization_timeout",
+        "authorize",
+        "decision_owner",
+        "run_id"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "decision/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Execution.Authorization",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/execution.ex",
+      "struct_fields": [
+        "arguments",
+        "description",
+        "metadata",
+        "run_id",
+        "tool_call_id",
+        "tool_name"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
       "category": "stable",
       "functions": [
         "check/5"
@@ -3950,6 +4016,10 @@
           "optional": false
         },
         {
+          "name": "execute/3",
+          "optional": true
+        },
+        {
           "name": "optimizer_components/1",
           "optional": true
         },
@@ -3968,7 +4038,8 @@
       ],
       "category": "spi",
       "functions": [
-        "call/2"
+        "call/2",
+        "execute/3"
       ],
       "kind": "behaviour",
       "macros": [],
@@ -3976,6 +4047,7 @@
       "signatures": {
         "callbacks": {
           "call/2": [],
+          "execute/3": [],
           "optimizer_components/1": [],
           "optimizer_predictors/1": [],
           "update_optimizer_components/2": [],
@@ -3984,6 +4056,9 @@
         "functions": {
           "call/2": [
             "call(program, inputs)"
+          ],
+          "execute/3": [
+            "execute(program, inputs, execution)"
           ]
         },
         "types": {

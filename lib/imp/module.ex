@@ -34,6 +34,9 @@ defmodule Imp.Module do
   @callback call(struct(), map() | keyword()) ::
               {:ok, Imp.Prediction.t()} | {:error, term()}
 
+  @callback execute(struct(), map() | keyword(), Imp.Execution.t()) ::
+              {:ok, Imp.Prediction.t()} | {:error, term()}
+
   @callback optimizer_predictors(struct()) :: [optimizer_predictor_entry()]
 
   @callback update_optimizer_predictor(
@@ -52,7 +55,8 @@ defmodule Imp.Module do
   @optional_callbacks optimizer_predictors: 1,
                       update_optimizer_predictor: 3,
                       optimizer_components: 1,
-                      update_optimizer_components: 2
+                      update_optimizer_components: 2,
+                      execute: 3
 
   @doc """
   Calls an Imp executable program and normalizes its result shape.
@@ -81,9 +85,30 @@ defmodule Imp.Module do
 
   def call(other, _inputs), do: {:error, {:not_callable, other}}
 
+  @doc "Executes a program with explicit per-run capabilities when it supports them."
+  def execute(%module{} = program, inputs, %Imp.Execution{} = execution) do
+    cond do
+      Code.ensure_loaded?(module) and function_exported?(module, :execute, 3) ->
+        safe_dispatch(module, :execute, [program, inputs, execution])
+
+      Imp.Execution.authorization_required?(execution) ->
+        {:error, {:execution_capability_unsupported, module, :authorization}}
+
+      true ->
+        call(program, inputs)
+    end
+  end
+
+  def execute(program, _inputs, execution),
+    do: {:error, {:invalid_execution, program, execution}}
+
   defp safe_call(module, program, inputs) do
+    safe_dispatch(module, :call, [program, inputs])
+  end
+
+  defp safe_dispatch(module, function, arguments) do
     Imp.Telemetry.span([:imp, :module], %{module: module}, fn ->
-      case module.call(program, inputs) do
+      case apply(module, function, arguments) do
         {:ok, %Imp.Prediction{} = prediction} ->
           {:ok, prediction}
 

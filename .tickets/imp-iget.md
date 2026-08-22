@@ -1,6 +1,6 @@
 ---
 id: imp-iget
-status: in_progress
+status: closed
 deps: [imp-xct8]
 links: []
 created: 2026-08-22T15:39:33Z
@@ -28,3 +28,7 @@ A public example optimizes an actually executed ReAct, RLM, or composed tool pro
 **2026-08-22T19:37:38Z**
 
 2026-08-22 clean result supersedes the prior dirty diagnostic: commit 788c971ce761b25ed6533bc179765d985b17d0fc, heldout baseline 0.95, selected 0.975, fresh-process case 1.0; 77 task requests / 65,376 input / 3,076 output / USD 0.062874 plus 3 reflection requests / 1,020 input / 563 output / USD 0.011505. All heldout rows chose the expected action with no provider/tool errors; selected lookup ended by forced_submit and therefore scored 0.9. Raw result/artifact hashes are recorded in docs/EVIDENCE.md but remain local until the commit is promoted and ordinary admission is possible. Remaining acceptance gap is explicit fail-closed authorization for non-sandbox external effects; do not generalize from this one-seed four-row treatment.
+
+**2026-08-22T20:05:22Z**
+
+Completed the remaining explicit-effect boundary. Imp.start_run/3 now carries a protocol-neutral Imp.Execution into the shared ReActV2/RLM loop; configured tool policy and schema validation precede approval; denial is a repairable tool observation; cancellation is distinct; unsupported modules, callback crash/fatal exit/timeout/malformed response, owner death, and run cancellation fail closed. The authorization callback is linked atomically to the executing process and also registered for orderly cancellation, so no spawn-to-registration orphan or late decision remains. Public Learning Path/API/architecture docs describe the contract. Focused execution/ReActV2/RLM/run plus public/docs suites passed (58 and 134 tests respectively), including no-effect/no-late-decision probes. Together with the clean live executed-agent optimization result at 788c971c and fresh Artifact operation already recorded above, this fulfills the ticket without claiming broad agent effectiveness.

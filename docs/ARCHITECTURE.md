@@ -251,8 +251,22 @@ cancellation hooks. ReActV2 and RLM emit reasoning and source-timed tool
 call/result events through this boundary; the same programs remain ordinary
 `Imp.Module` values when called without it. RLM registers its per-call budget
 owner so cancelling a run terminates active effect tasks before the outer task
-is stopped. Protocol adapters translate these Imp-native events outside the
-core package.
+is stopped.
+
+`Imp.Module.execute/3` is an optional capability-aware entry point sharing the
+same underlying program loop as `call/2`. `Imp.Run` constructs an explicit
+`Imp.Execution`; ReActV2 and RLM carry it to each effect. The order is resolved
+tool, configured tool policy, argument/schema validation, per-execution
+authorization, then `Imp.Tool.call/2`. Authorization is never inferred from an
+event sink, telemetry, or process-local observation context. A run that supplies
+an authorizer fails closed when its module lacks `execute/3`; callback crash,
+timeout, malformed decision, owner death, and cancellation cannot release the
+effect or leave the decision task alive. Denial becomes a structured tool
+observation so the model may recover, while cancellation terminates execution.
+The reserved internal `submit` tool is output control flow, not an external
+effect, and remains governed by signature validation rather than host approval.
+Protocol adapters translate Imp-native events and authorization requests outside
+the core package.
 `Imp.Streaming.Messages.StreamListener.attach/2` observes normalized stream
 events while yielding the original chunks, including terminal and error events,
 unchanged. `Imp.Cache.configure/1` controls enablement, TTL, and maximum entry

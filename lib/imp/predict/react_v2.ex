@@ -85,6 +85,26 @@ defmodule Imp.Predict.ReActV2 do
 
   @impl true
   def call(%__MODULE__{} = react, inputs) when is_map(inputs) or is_list(inputs) do
+    do_call(react, inputs, Imp.Execution.unrestricted())
+  end
+
+  def call(%__MODULE__{}, inputs),
+    do:
+      {:error,
+       {:invalid_react_v2_inputs, "expected a map or field pairs, got: #{inspect(inputs)}"}}
+
+  @impl true
+  def execute(%__MODULE__{} = react, inputs, %Imp.Execution{} = execution)
+      when is_map(inputs) or is_list(inputs) do
+    do_call(react, inputs, execution)
+  end
+
+  def execute(%__MODULE__{}, inputs, %Imp.Execution{}),
+    do:
+      {:error,
+       {:invalid_react_v2_inputs, "expected a map or field pairs, got: #{inspect(inputs)}"}}
+
+  defp do_call(%__MODULE__{} = react, inputs, execution) do
     with {:ok, inputs} <- normalize_inputs(inputs),
          {max_iters, inputs} <- pop_max_iters(inputs, react.max_iters),
          :ok <- validate_call_max_iters(max_iters),
@@ -100,42 +120,50 @@ defmodule Imp.Predict.ReActV2 do
         |> Map.new(fn name -> {name, fetch_input(inputs, name)} end)
         |> Map.reject(fn {_key, value} -> is_nil(value) end)
 
-      run(react, history, pending, 0, max_iters)
+      run(react, history, pending, 0, max_iters, execution)
     end
   end
 
-  def call(%__MODULE__{}, inputs),
-    do:
-      {:error,
-       {:invalid_react_v2_inputs, "expected a map or field pairs, got: #{inspect(inputs)}"}}
+  defp run(react, history, pending, turn, max_iters, execution) when turn >= max_iters,
+    do: forced_submit(react, history, pending, :max_iters, turn, nil, execution)
 
-  defp run(react, history, pending, turn, max_iters) when turn >= max_iters,
-    do: forced_submit(react, history, pending, :max_iters, turn, nil)
-
-  defp run(react, history, pending, turn, max_iters) do
+  defp run(react, history, pending, turn, max_iters, execution) do
     case predict(react.react, react, history, pending) do
       {:ok, prediction} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
         emit_reasoning(prediction, turn)
 
         if calls.tool_calls == [] do
-          forced_submit(react, history, pending, :empty_tool_calls, turn, nil)
+          forced_submit(react, history, pending, :empty_tool_calls, turn, nil, execution)
         else
-          {results, final} = execute_calls(react, calls)
-          event = history_event(pending, prediction, calls, results, final)
-          history = Imp.History.append(history, event)
+          case execute_calls(react, calls, execution) do
+            {:cancel, reason} ->
+              {:error, {:execution_cancelled, reason}}
 
-          if final,
-            do: final_prediction(final, history, :submit),
-            else: run(react, history, %{}, turn + 1, max_iters)
+            {results, final} ->
+              event = history_event(pending, prediction, calls, results, final)
+              history = Imp.History.append(history, event)
+
+              if final,
+                do: final_prediction(final, history, :submit),
+                else: run(react, history, %{}, turn + 1, max_iters, execution)
+          end
         end
 
       {:error, reason} ->
-        forced_submit(react, history, pending, termination_reason(reason), turn, reason)
+        forced_submit(
+          react,
+          history,
+          pending,
+          termination_reason(reason),
+          turn,
+          reason,
+          execution
+        )
     end
   end
 
-  defp forced_submit(react, history, pending, reason, turn, initial_error) do
+  defp forced_submit(react, history, pending, reason, turn, initial_error, execution) do
     forced = %{
       react.react
       | config:
@@ -156,13 +184,18 @@ defmodule Imp.Predict.ReActV2 do
       if submit_calls.tool_calls == [] do
         incomplete_prediction(history, reason, initial_error)
       else
-        {results, final} = execute_calls(react, submit_calls)
-        event = history_event(pending, prediction, submit_calls, results, final)
-        history = Imp.History.append(history, event)
+        case execute_calls(react, submit_calls, execution) do
+          {:cancel, cancel_reason} ->
+            {:error, {:execution_cancelled, cancel_reason}}
 
-        if final,
-          do: final_prediction(final, history, :forced_submit),
-          else: incomplete_prediction(history, reason, initial_error)
+          {results, final} ->
+            event = history_event(pending, prediction, submit_calls, results, final)
+            history = Imp.History.append(history, event)
+
+            if final,
+              do: final_prediction(final, history, :forced_submit),
+              else: incomplete_prediction(history, reason, initial_error)
+        end
       end
     else
       {:error, forced_error} ->
@@ -201,8 +234,8 @@ defmodule Imp.Predict.ReActV2 do
     %ToolCalls{tool_calls: calls}
   end
 
-  defp execute_calls(react, %ToolCalls{tool_calls: calls}) do
-    Enum.reduce(calls, {[], nil}, fn call, {results, final} ->
+  defp execute_calls(react, %ToolCalls{tool_calls: calls}, execution) do
+    Enum.reduce_while(calls, {[], nil}, fn call, {results, final} ->
       :ok =
         Imp.Run.emit(:tool_call,
           component: __MODULE__,
@@ -211,27 +244,33 @@ defmodule Imp.Predict.ReActV2 do
           input: Imp.Tool.normalize_arguments(call.arguments)
         )
 
-      {result, error?} = execute_call(react, call)
+      case execute_call(react, call, execution) do
+        {:cancel, reason} ->
+          {:halt, {:cancel, reason}}
 
-      :ok =
-        Imp.Run.emit(:tool_result,
-          component: __MODULE__,
-          tool_call_id: call.id,
-          tool_name: call.name,
-          output: if(error?, do: nil, else: result),
-          error: if(error?, do: result, else: nil)
-        )
+        {result, error?} ->
+          :ok =
+            Imp.Run.emit(:tool_result,
+              component: __MODULE__,
+              tool_call_id: call.id,
+              tool_name: call.name,
+              output: if(error?, do: nil, else: result),
+              error: if(error?, do: result, else: nil)
+            )
 
-      result = %ToolResult{name: call.name, result: result, id: call.id}
+          result = %ToolResult{name: call.name, result: result, id: call.id}
 
-      final =
-        if submit?(call) and not error? and is_map(result.result), do: result.result, else: final
+          final =
+            if submit?(call) and not error? and is_map(result.result),
+              do: result.result,
+              else: final
 
-      {results ++ [Map.put(Map.from_struct(result), :error, error?)], final}
+          {:cont, {results ++ [Map.put(Map.from_struct(result), :error, error?)], final}}
+      end
     end)
   end
 
-  defp execute_call(react, %ToolCall{name: requested, arguments: arguments}) do
+  defp execute_call(react, %ToolCall{name: requested, arguments: arguments} = call, execution) do
     name = Imp.Tool.resolve_name(react.tools, requested)
     arguments = Imp.Tool.normalize_arguments(arguments)
 
@@ -240,11 +279,39 @@ defmodule Imp.Predict.ReActV2 do
         {{:error, {:unknown_tool, requested}}, true}
 
       true ->
-        case Imp.ToolPolicy.authorize(react.tool_policy, name, arguments) do
-          :ok when name == :submit -> validate_submit(react.signature, arguments)
-          :ok -> safe_tool_call(Map.fetch!(react.tools, name), arguments)
+        tool = Map.fetch!(react.tools, name)
+
+        with :ok <- Imp.ToolPolicy.authorize(react.tool_policy, name, arguments),
+             :ok <- Imp.Tool.validate_input(tool, arguments) do
+          authorize_and_call(react, tool, call, arguments, execution)
+        else
           {:error, reason} -> {{:error, reason}, true}
         end
+    end
+  end
+
+  defp authorize_and_call(react, %{name: :submit}, _call, arguments, _execution),
+    do: validate_submit(react.signature, arguments)
+
+  defp authorize_and_call(_react, tool, call, arguments, execution) do
+    request = %Imp.Execution.Authorization{
+      run_id: execution.run_id,
+      tool_call_id: call.id,
+      tool_name: tool.name,
+      arguments: arguments,
+      description: Imp.Execution.bounded_description(tool.description),
+      metadata: %{runtime: __MODULE__}
+    }
+
+    case Imp.Execution.authorize(execution, request) do
+      :allow ->
+        safe_tool_call(tool, arguments)
+
+      {:deny, reason} ->
+        {{:error, {:tool_authorization_denied, tool.name, Imp.Redaction.redact(reason)}}, true}
+
+      {:cancel, reason} ->
+        {:cancel, reason}
     end
   end
 

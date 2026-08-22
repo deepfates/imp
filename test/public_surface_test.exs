@@ -56,6 +56,8 @@ defmodule PublicSurfaceTest do
     Imp.ContextWindowExceededError,
     Imp.Error,
     Imp.Errors,
+    Imp.Execution,
+    Imp.Execution.Authorization,
     Imp.Evaluate,
     Imp.Evaluate.CompleteAndGrounded,
     Imp.Evaluate.Result,

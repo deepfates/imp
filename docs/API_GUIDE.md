@@ -590,7 +590,7 @@ The application owns the control flow. The optimizer sees two named predictors
 and may update only the one it targets. Imp validates that both callbacks agree
 before proposal or evaluation work begins.
 
-### Expose other optimizable components without exposing runtime authority
+### Expose other optimizable components without exposing runtime capabilities
 
 Predictor instructions are not the only useful program state. A composed
 program may expose a routing policy, playbook, tool description, or another
@@ -651,7 +651,14 @@ deployed = Imp.Optimizer.Artifact.apply(artifact, fresh_trusted_program)
 The evaluator executes the candidate program; the optimizer sees only its
 bounded data. Use replayed or sandboxed tools during optimization. A tool with
 external effects should fail closed unless the evaluation explicitly supplies
-an authorized effect boundary.
+an authorized effect boundary. In deployed ReActV2 and RLM programs,
+`Imp.start_run/3` accepts `authorize: fun`; durable tool policy and schema
+validation happen before the callback, and only `:allow` reaches the effect.
+Denial becomes a tool observation, `{:cancel, reason}` stops the run, and
+callback failure, timeout, malformed response, or owner loss denies. See
+[Inspect Runtime Behavior](LEARNING_PATH.md#9-inspect-runtime-behavior) for the
+complete public pattern. `Imp.call/2` remains the final-result contract and does
+not imply interactive external approval.
 
 The complete version in the [deployment example](../examples/deployment/README.md)
 adds typed intermediate metadata, persistence, hot reload, concurrent service,
