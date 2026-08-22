@@ -65,6 +65,20 @@ score moves from `0.25` to `1.0`. That number proves the application lifecycle,
 not model effectiveness. Replace the scripted model and datasets before using
 this example to make a claim about your own task.
 
+`agent_optimization.exs` is the corresponding bounded live agent story. It
+uses Optimize Anything to improve provider-visible descriptions on three
+sandboxed ReActV2 support actions, scores actual ordered tool events and final
+outcomes on disjoint train/selection/test rows, writes the selected component
+Artifact, and runs it with freshly reconstructed trusted tools in a second
+BEAM. It requires `OPENROUTER_API_KEY`; task and reflection traffic each have a
+strict one-dollar cap. This one treatment can falsify the public lifecycle, but
+it is not evidence of general agent or optimizer effectiveness.
+
+```sh
+export OPENROUTER_API_KEY=...
+IMP_PATH=../.. mix run agent_optimization.exs
+```
+
 ## The application owns code; the artifact owns selected parameters
 
 `ImpDeployment.SupportPipeline` remains normal source code in the release. The

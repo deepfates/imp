@@ -5,6 +5,7 @@ defmodule PackageContractTest do
 
   @deployment_files [
     "examples/deployment/README.md",
+    "examples/deployment/agent_optimization.exs",
     "examples/deployment/load_workflow.exs",
     "examples/deployment/mix.exs",
     "examples/deployment/mix.lock",

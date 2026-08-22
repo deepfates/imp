@@ -1,6 +1,6 @@
 ---
 id: imp-iget
-status: open
+status: in_progress
 deps: [imp-xct8]
 links: []
 created: 2026-08-22T15:39:33Z
@@ -18,3 +18,9 @@ Build the real agent user story over existing ReAct/RLM/composed programs and op
 
 A public example optimizes an actually executed ReAct, RLM, or composed tool program against task outcomes plus expected/forbidden actions, completion, errors, turns, usage, and traces; tool effects use replay or sandbox by default and live execution fails closed unless explicitly authorized; learned work keeps disjoint selection/test; the selected Artifact applies to reconstructed trusted code and runs after a fresh process restart; a bounded natural live treatment succeeds meaningfully and failures/costs remain inspectable.
 
+
+## Notes
+
+**2026-08-22T19:33:01Z**
+
+2026-08-22: In progress. The public packaged sandbox story and provider-free execution contract are implemented locally. A bounded dirty-tree live run used real ReActV2 tool execution plus ordered Imp.Run events, natural Claude Sonnet 4.6 component proposals, GPT-5.4 Mini task calls, disjoint 3/3/4 train-selection-test rows, parameter Artifact reload, and a fresh BEAM. Baseline heldout 0.90, selected 1.00, fresh 1.00; 3 reflection and 76 task requests, observed combined cost about /bin/zsh.076. This is diagnostic until rerun from exact clean code. Sandbox/replay-default is demonstrated; generalized pre-effect authorization for external side effects is not, so the full ticket remains open.

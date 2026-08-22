@@ -38,3 +38,9 @@ uses these components through real optimization, held-out selection, Artifact
 reload, and fresh execution. The isolated ACP runtime branch owns ReActV2/RLM
 event and cancellation edits; integrate that seam before choosing the smallest
 non-conflicting consumer proof.
+
+## Notes
+
+**2026-08-22T19:33:01Z**
+
+2026-08-22: The missing ordinary consumer now exists diagnostically on the current dirty tree: a packaged ReActV2 support program exposes three tool descriptions through the shared component protocol; natural Optimize Anything proposals select on disjoint rows; held-out action-aware scoring improved 0.90 to 1.00; the parameter Artifact ran at 1.00 in a fresh BEAM with reconstructed trusted tool functions. The run also falsified two treatment assumptions before succeeding: GPT-5.4 Mini rejected an unsupported temperature under strict OpenRouter routing, and the evaluator initially awarded partial credit to prediction_error/no-action results. Both were repaired, and a provider-free package test now proves description application preserves trusted callbacks and executes the intended sandbox action. This remains diagnostic until the exact clean code commit is rerun and durably admitted; do not close from the dirty result.

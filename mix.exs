@@ -193,6 +193,7 @@ defmodule Imp.MixProject do
   defp deployment_example_files do
     [
       "examples/deployment/README.md",
+      "examples/deployment/agent_optimization.exs",
       "examples/deployment/load_workflow.exs",
       "examples/deployment/mix.exs",
       "examples/deployment/mix.lock",
