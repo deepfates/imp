@@ -15,6 +15,9 @@ parameter artifacts for BootstrapFewShot and RandomSearch, writes the portable
 KNN program, and invokes a fresh OS BEAM that reconstructs the live LM and
 serves four representative probes from each retained state. Provider calls use
 one prospective request/token/dollar budget with retries and cache disabled.
+The KNN save replaces its process-owned live budget wrapper with a
+credential-free ReqLLM descriptor; the fresh process binds a new budgeted
+runtime instead of serializing credentials or PIDs.
 
 From the repository root:
 

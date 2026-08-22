@@ -86,7 +86,11 @@ defmodule ImpOptimizerLifecycles.Classical do
     |> Artifact.from_optimized_program(artifact_id: "support-random-search")
     |> Artifact.write!(paths.random_search)
 
-    :ok = Imp.save!(knn, paths.knn_few_shot)
+    # A live optimizer budget is process-owned runtime authority and is
+    # intentionally not serializable. Persist a credential-free ReqLLM
+    # descriptor, then bind a new budgeted runtime in the fresh process.
+    portable_knn = Imp.with_lm(knn, Imp.req_llm(@model))
+    :ok = Imp.save!(portable_knn, paths.knn_few_shot)
 
     arms = %{
       bootstrap_few_shot: arm(bootstrap, selection, test, metric),
