@@ -1,6 +1,6 @@
 ---
 id: imp-xct8
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-08-22T15:39:33Z
@@ -44,3 +44,7 @@ non-conflicting consumer proof.
 **2026-08-22T19:33:01Z**
 
 2026-08-22: The missing ordinary consumer now exists diagnostically on the current dirty tree: a packaged ReActV2 support program exposes three tool descriptions through the shared component protocol; natural Optimize Anything proposals select on disjoint rows; held-out action-aware scoring improved 0.90 to 1.00; the parameter Artifact ran at 1.00 in a fresh BEAM with reconstructed trusted tool functions. The run also falsified two treatment assumptions before succeeding: GPT-5.4 Mini rejected an unsupported temperature under strict OpenRouter routing, and the evaluator initially awarded partial credit to prediction_error/no-action results. Both were repaired, and a provider-free package test now proves description application preserves trusted callbacks and executes the intended sandbox action. This remains diagnostic until the exact clean code commit is rerun and durably admitted; do not close from the dirty result.
+
+**2026-08-22T19:37:38Z**
+
+2026-08-22 exact clean proof: commit 788c971ce761b25ed6533bc179765d985b17d0fc completed the packaged natural ReActV2/OA lifecycle. Held-out action-aware mean improved 0.95 -> 0.975 on four untouched rows; the baseline's extra account lookup before refund disappeared; the selected Artifact applied to reconstructed trusted tools in a fresh BEAM and scored 1.0. Provider-free package/example tests pass. Separate hard-capped budgets recorded 77 task + 3 reflection requests, about USD 0.0744 total. This fulfills this ticket's component-protocol acceptance; broader external-effect authorization remains imp-iget work.

@@ -14,7 +14,7 @@ asserted remains a **target**, the index's word for work not yet established.
 | Rung | What it proves |
 | --- | --- |
 | **C0** | The API exists and is callable. |
-| **C1** | Behavior conforms to a pinned authority for the declared scope — an executable differential against real DSPy 3.2.1 for the families that have one (the optimizer and adapter families), a behavioral conformance test otherwise. |
+| **C1** | Behavior conforms to a pinned authority for the declared scope — an executable differential against real DSPy 3.3.1 for the families that have one (the optimizer and adapter families), a behavioral conformance test otherwise. |
 | **C2** | The capability executes operationally through its real boundary (real transport, real process tree, real artifact round-trip). |
 | **C3** | Held-out evidence supports effectiveness for the declared task portfolio — a number on data nothing selected for. |
 | **C4** | An exact paper protocol is reproduced from public authoritative materials. |
@@ -50,6 +50,34 @@ one task never becomes general effectiveness.
 The discipline is simple: a public claim states its scope and points to
 observable evidence. Users should not need maintainer bookkeeping to decide
 whether the documented workflow works for them.
+
+## A live executed-agent lifecycle now works
+
+The packaged `examples/deployment/agent_optimization.exs` is the first ordinary
+Imp user story that optimizes an agent which actually takes actions. It exposes
+three sandboxed ReActV2 tool descriptions as program components, lets Optimize
+Anything propose natural replacements, selects on separate rows, evaluates on
+four untouched requests, writes the selected parameter Artifact, reconstructs
+the trusted tool functions in a fresh BEAM, and scores the actual ordered tool
+calls, results, termination, and final answer rather than trusting model prose.
+
+The clean run at `788c971ce761b25ed6533bc179765d985b17d0fc` improved the
+held-out mean from `0.95` to `0.975`. The baseline made an unnecessary account
+lookup before refunding one request; the selected program removed that action.
+The selected program's other imperfection was a correct lookup followed by a
+forced rather than explicit submit, which scored `0.9`. The fresh-process
+refund case scored `1.0`. The run used 77 task requests and three reflection
+requests for approximately `$0.0744` under separate one-dollar hard caps.
+
+This is one stochastic treatment over four held-out requests. It establishes a
+real component-optimization, action-observation, Artifact, and restart path; it
+does not establish general agent effectiveness, external-side-effect safety,
+multi-seed optimizer effectiveness, or DSPy/Ax parity. Its raw result and
+Artifact are currently candidate-bound local outputs (SHA-256
+`50bc9efee9adaf18b6a0c9fce2284d2c7b5b74205ccb4d333ca2824a0da1f7de`
+and `227cf2f78e35a5b0874095bbf6af6852aeb575d8db6bff078f46c6e0d4d75ce0`);
+they must not be promoted into admitted evidence until the source commit is on
+the release branch and the retained files pass the ordinary admission checks.
 
 ## Historical red results and their classifications
 
