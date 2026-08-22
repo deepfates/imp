@@ -82,3 +82,17 @@ beat that run's `0.40` test baseline, and the acceptance runner asserted before
 persisting its complete receipt. That negative remains recorded on the owning
 ticket. The runner now writes the receipt before judging it; the retained run
 is a second exact treatment for instrumentation repair, not multi-seed evidence.
+
+## Ensemble lifecycle
+
+`ensemble.exs` composes the retained BootstrapFewShot, SignatureOptimizer, and
+InferRules routers with the public `Ensemble` constructor and a stable majority
+reducer. It evaluates the children and composition on the held-out test split,
+then reconstructs trusted code and all three child Artifacts in a fresh OS
+process. This tests composition and operation without rerunning any search.
+
+```sh
+OPENROUTER_API_KEY=... \
+IMP_ENSEMBLE_OUTPUT=/secure/imp-ensemble-live \
+mix run examples/optimizer_lifecycles/ensemble.exs
+```
