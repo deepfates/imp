@@ -610,7 +610,7 @@ previous_program = Imp.Optimizer.Playbook.rollback(restored)
 
 Inside `propose/1`, call
 `Imp.Optimizer.Playbook.observed_weaknesses(request)` to obtain the lowest-scoring
-training rows paired with their admitted feedback trajectories. The proposer
+training rows paired with the feedback trajectories retained by the optimizer. The proposer
 must return `{:ok, %Imp.Playbook.Delta{}, usage}`. The evaluator receives
 `(program, rows, context)` and returns `{:ok, trajectories, usage}`. Every row
 needs stable `"id"`, `"source_id"`, `"group_id"`, and `"leakage_terms"` fields;

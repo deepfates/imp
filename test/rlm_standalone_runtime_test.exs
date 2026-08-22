@@ -703,7 +703,10 @@ missing()|},
           end)
         end)
       end)
-      |> Task.await_many(2_000)
+      # This assertion is about serialized value semantics, not a scheduler
+      # throughput promise. Leave enough wall-clock room for the full parallel
+      # suite while the transactions themselves still overlap and contend.
+      |> Task.await_many(10_000)
 
     assert Enum.sort(values) == Enum.to_list(1..20)
     assert Session.transaction(session, &Map.fetch!(&1.vars, :counter)) == 20
