@@ -58,9 +58,11 @@ and paired deltas. The original integer repetition form remains the uniform
 shorthand.
 
 Several scoped effectiveness results remain reviewable with source-repository
-artifacts: the [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)'s
-router improves from 25–30% to 85% on held-out data across three committed live
-runs, for about a cent. On a separately frozen matched TREC contract, Imp GEPA
+artifacts: the latest [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)
+run improves from 30–35% to 95–100% on held-out data across three live repeats,
+for about 1.3 cents per repeat. The older retained run recorded 25–30% to 85%;
+it remains historical evidence rather than the current tutorial result. On a
+separately frozen matched TREC contract, Imp GEPA
 improved
 its baseline by `+0.4000` and cleared the preregistered noninferiority margin
 against pinned DSPy GEPA; MIPROv2 improved its own baseline by `+0.1458`.

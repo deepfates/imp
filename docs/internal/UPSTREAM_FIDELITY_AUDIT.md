@@ -151,8 +151,10 @@ reliability, BEAM superiority, paid-provider training, or matched
 Avatar/AvatarOptimizer/BetterTogether parity. Those remain explicit
 claim-specific gaps until their own evidence exists.
 
-The product gate is conformant after the clean-checkout package, persistence,
-deployment, documentation, and production audits passed.
-Claim-specific rows stay red for their narrower claims without falsely making
-the whole package unshippable. Closing a ticket or adding a module name does not
-change status by itself.
+The bounded product gate passed on the previously frozen clean candidate after
+its package, persistence, deployment, documentation, and production audits. It
+is a retained predecessor result, not a verdict that the current release
+objective or latest-stable migration is complete. Claim-specific rows stay red
+for their narrower claims without being converted into blanket package
+failures. Closing a ticket or adding a module name does not change status by
+itself.

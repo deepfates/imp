@@ -2,12 +2,14 @@
 
 You know DSPy. This page maps what you know onto Imp, names what is
 deliberately different on the BEAM, and marks what is tracked rather than
-done. Imp follows DSPy 3.2.1 — not loosely. The few-shot and weight
-optimizer families and the adapters carry executable differential tests that
-run real DSPy 3.2.1 in a sidecar and compare arm to arm; other surfaces are
-held by behavioral conformance tests or are deliberate Elixir-native
-equivalents, and some surface groups are marked as honest gaps (missing
-exact-reproduction evidence or declared algorithmic deviations). A shared DSPy
+done. Imp's completed executable baseline is DSPy 3.2.1; the latest stable
+DSPy 3.3.1 migration is active work, so Imp does not currently claim
+whole-current-DSPy parity. The few-shot and weight optimizer families and the
+adapters carry executable differential tests that run their exact pinned DSPy
+sources in a sidecar and compare arm to arm; other surfaces are held by
+behavioral conformance tests or are deliberate Elixir-native equivalents, and
+some surface groups are marked as honest gaps (missing exact-reproduction
+evidence or declared algorithmic deviations). A shared DSPy
 name means that Imp implements the same user capability and identifies the
 pinned upstream mechanism; it does **not** by itself promise identical Python
 control flow or results. Each family is classified as conformant,
@@ -100,8 +102,11 @@ Imp is not the first BEAM attempt at this lineage —
 [dspy.ex](https://github.com/arthurcolle/dspy.ex) explored DSPy-style
 programming in Elixir earlier, and
 [gepa_ex](https://github.com/nshkrdotcom/gepa_ex) explored GEPA. Imp's
-distinction is scope and verification: the full optimizer bench, tracked
-against a pinned current upstream, with the receipts executable.
+distinction is the breadth of the shared programming and optimization model
+joined to BEAM-native persistence, supervision, and operation. Its source-bound
+differentials make specific compatibility claims reviewable; they do not turn
+the still-open 3.3.1 migration or optimizer-effectiveness work into completed
+parity.
 
 ## Coming from DSPy: the five-minute version
 

@@ -5,6 +5,16 @@ you can measure and run inside an ordinary OTP application. It brings the centra
 [DSPy](https://dspy.ai)—improving programs from examples rather than hand-editing
 prompts—to the BEAM.
 
+Imp is for an Elixir team moving an LM feature from a promising prompt into a
+production system it must improve and operate. The immediate project is not
+"adopt an AI framework"; it is to make one model-dependent behavior measurable,
+changeable, and safe to deploy without scattering prompt, parser, retry, and
+evaluation logic through the application or adding a separate Python service.
+If you only need one unmeasured model call, ReqLLM directly is usually the
+simpler choice. Imp becomes useful when you have examples or production
+corrections, a behavior you can score, and a reason to retain and operate the
+improved result inside OTP.
+
 <!-- "Imp with cards", Le Grand Etteilla (public domain, via Wikimedia Commons) -->
 <p align="center">
   <img src="assets/imp-with-cards.jpg" width="380"

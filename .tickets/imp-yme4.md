@@ -18,6 +18,34 @@ It aims for the useful semantics of current DSPy and its ecosystem, with better
 BEAM-native behavior where the runtime offers a real advantage. It is not a
 collection of optimizer names, benchmark harnesses, or Python-shaped facades.
 
+## Product pull hypothesis
+
+- **Situation:** an Elixir/OTP team has an LM feature that worked as a prompt
+  prototype and must now become a production behavior. The team has examples,
+  corrections, or traffic that reveal quality and reliability gaps.
+- **Urgent project:** make that behavior measurable, improve it systematically,
+  review what changed, and deploy the selected behavior safely in the existing
+  application.
+- **Options they would otherwise use:** keep hand-maintaining ReqLLM prompt,
+  parser, retry, and evaluation glue; operate DSPy/GEPA or Ax in another runtime;
+  buy an evaluation/observability tool that does not own the program lifecycle;
+  or build an internal compiler and artifact system.
+- **Why those options block the project:** manual glue drifts and does not
+  produce repeatable selected programs; another runtime splits deployment,
+  supervision, credentials, and failure handling; evaluation-only products do
+  not connect measurement to optimization and retained deployment; rebuilding
+  the stack costs time before the application behavior improves.
+- **What Imp must make possible:** one native loop from typed program through
+  measurement and optimization to inspectable selected state and supervised OTP
+  operation, without hiding provider cost or failure.
+- **Who should not choose it:** a team that needs only an unmeasured model call,
+  has no examples or behavior it can score, or is already satisfied operating
+  the Python/TypeScript alternatives.
+
+This is the current demand hypothesis, not customer-validation evidence. Cold
+consumer behavior and external adoption may falsify it; when they do, change
+the product story rather than explaining the user away.
+
 ## Definition of done
 
 This epic closes only when all of the following are true:
@@ -105,17 +133,19 @@ superiority is currently justified.
 
 The ticket dependency graph is the operational plan:
 
-1. `imp-0du1` — audit and implement the latest stable DSPy semantic delta.
-2. `imp-nenu` — audit contemporary Optimize Anything and Ax product semantics.
-   These two source audits can proceed together.
-3. `imp-n8zn` — make every advertised optimizer complete a natural retained
+1. `imp-7yim` — run a thin clean-consumer spine probe immediately, before the
+   broader audits can hide ordinary product friction.
+2. `imp-0du1` — audit and implement the latest stable DSPy semantic delta.
+3. `imp-nenu` — audit contemporary Optimize Anything and Ax product semantics.
+   The two source audits and the early consumer probe can proceed together.
+4. `imp-n8zn` — make every advertised optimizer complete a natural retained
    lifecycle. It depends on both audits.
-4. `imp-uhp2` — exercise composed programs across providers and OTP failures.
-   It depends on the DSPy audit and can proceed alongside optimizer lifecycles.
-5. `imp-juni` — run the final adversarial cold-consumer completion pass after
-   both product tracks are sound. Small cold-consumer probes should still be
-   used earlier whenever they can falsify an ordinary path cheaply.
-6. `imp-szhr` — run bounded representative live comparisons after cold-consumer
+5. `imp-uhp2` — use the early consumer findings to exercise composed programs
+   across providers and OTP failures. It can proceed alongside the source
+   audits and optimizer lifecycles; the audits inform it rather than gate it.
+6. `imp-juni` — run the final adversarial cold-consumer completion pass after
+   both product tracks are sound.
+7. `imp-szhr` — run bounded representative live comparisons after cold-consumer
    repairs, then rerun the exact candidate gates in
    `docs/maintainers/RELEASE.md`.
 
