@@ -68,6 +68,21 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule UsageStub do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_usage",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant("usage"),
+         usage: %{input_tokens: 3, output_tokens: 2, total_tokens: 5}
+       }}
+    end
+  end
+
   defmodule ObjectStub do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
@@ -593,7 +608,8 @@ defmodule ReqLLMClientTest do
              Imp.Clients.ReqLLM.cache_key(lm, messages, rollout_id: 18)
 
     assert {:ok, first} = Imp.Clients.ReqLLM.generate(lm, messages, rollout_id: 17)
-    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(lm, messages, rollout_id: 17)
+    assert {:ok, cached_first} = Imp.Clients.ReqLLM.generate(lm, messages, rollout_id: 17)
+    assert Imp.LM.Result.output(first) == Imp.LM.Result.output(cached_first)
     assert_received {:req_llm_generate, "openai:gpt-test", _messages, cached_opts}
     refute Keyword.has_key?(cached_opts, :rollout_id)
     refute_received {:req_llm_generate, "openai:gpt-test", _messages, _opts}
@@ -612,7 +628,9 @@ defmodule ReqLLMClientTest do
     lm = Imp.req_llm(model, test_pid: self(), req_module: TextStub)
 
     assert {:ok, first} = Imp.Clients.ReqLLM.generate(lm, messages, [])
-    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+    assert {:ok, second} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+    assert Imp.LM.Result.output(first) == Imp.LM.Result.output(second)
+    assert {:ok, %{req_llm: %{cache_hit: true, usage: %{}}}} = Imp.LM.Result.metadata(second)
     assert_received {:req_llm_generate, ^model, _messages, _opts}
     refute_received {:req_llm_generate, ^model, _messages, _opts}
 
@@ -674,6 +692,28 @@ defmodule ReqLLMClientTest do
              Imp.Clients.ReqLLM.cache_key(lm, messages,
                provider_options: mixed_envelope.("CANARY_COLLISION_SECOND")
              )
+  end
+
+  test "ReqLLM cache hits are marked and do not double-count provider usage" do
+    Imp.Cache.clear()
+    model = "openai:gpt-usage-cache-#{System.unique_integer([:positive])}"
+    messages = [%{role: :user, content: "same usage prompt"}]
+    lm = Imp.req_llm(model, test_pid: self(), req_module: UsageStub)
+
+    {{:ok, hit}, usage} =
+      Imp.Usage.track(fn ->
+        assert {:ok, _miss} = Imp.LM.generate(lm, messages, [])
+        Imp.LM.generate(lm, messages, [])
+      end)
+
+    assert {:ok, %{req_llm: %{cache_hit: true, usage: %{}}}} = Imp.LM.Result.metadata(hit)
+
+    assert usage == %{
+             "openai/#{model}" => %{input_tokens: 3, output_tokens: 2, total_tokens: 5}
+           }
+
+    assert_received {:req_llm_generate, ^model, _messages, _opts}
+    refute_received {:req_llm_generate, ^model, _messages, _opts}
   end
 
   test "ReqLLM cache behavior isolates endpoints and semantic secret-shaped values" do
@@ -759,7 +799,8 @@ defmodule ReqLLMClientTest do
     assert_received {:req_llm_generate, ^model, _messages, _opts}
     assert_received {:req_llm_generate, ^model, _messages, _opts}
 
-    assert {:ok, ^first} = Imp.Clients.ReqLLM.generate(credential_a, messages, [])
+    assert {:ok, cached_first} = Imp.Clients.ReqLLM.generate(credential_a, messages, [])
+    assert Imp.LM.Result.output(first) == Imp.LM.Result.output(cached_first)
     refute_received {:req_llm_generate, ^model, _messages, _opts}
 
     Imp.Cache.clear()
@@ -868,7 +909,8 @@ defmodule ReqLLMClientTest do
       assert_provider_call(provider_event)
       assert_provider_call(provider_event)
 
-      assert {:ok, ^first_response} = Imp.Clients.ReqLLM.generate(first_lm, messages, [])
+      assert {:ok, cached_first} = Imp.Clients.ReqLLM.generate(first_lm, messages, [])
+      assert Imp.LM.Result.output(first_response) == Imp.LM.Result.output(cached_first)
       refute_provider_call(provider_event)
     end
   end

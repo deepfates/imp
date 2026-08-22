@@ -533,7 +533,7 @@ defmodule ReActContractTest do
     assert [%{tool: :lookup, result: "observed"}] = Imp.Prediction.get(prediction, :history)
   end
 
-  test "dspy_3_2_1: truncates the oldest tool call across three context attempts" do
+  test "dspy_3_2_1: truncates the oldest tool call but retains the remaining call" do
     Process.put(:react_context_responses, [
       {:ok,
        %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "first"}}},
@@ -563,20 +563,21 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "done"
-    # After two truncations the earlier tool calls are dropped from the
-    # trajectory (react.py truncate_trajectory pops four keys per call), so the
-    # recorded history reflects only the retained finish call — exactly as DSPy's
-    # returned trajectory would.
-    assert [%{tool: :finish, result: "Completed."}] = Imp.Prediction.get(prediction, :history)
+    # The first overflow drops the oldest call. DSPy then refuses to truncate
+    # the one complete call that remains, so extraction and returned history
+    # retain that useful observation.
+    assert [%{tool: :lookup, arguments: %{query: "second"}, result: "second"}] =
+             Imp.Prediction.get(prediction, :history)
+
     assert Process.get(:react_context_responses) == []
 
     messages = for _ <- 1..6, do: receive(do: ({:react_context_messages, value} -> value))
-    # Attempt 1 renders the full trajectory; each truncation drops the oldest
-    # tool call (4 keys) and the truncated trajectory propagates forward.
+    # Attempt 1 renders the full trajectory; the first truncation drops the
+    # oldest tool call (4 keys), and later retries preserve the remaining call.
     assert inspect(Enum.at(messages, 2)) =~ "first"
     refute inspect(Enum.at(messages, 3)) =~ "first"
     assert inspect(Enum.at(messages, 3)) =~ "second"
-    refute inspect(Enum.at(messages, 4)) =~ "second"
+    assert inspect(Enum.at(messages, 4)) =~ "second"
   end
 
   test "dspy_3_2_1: reports an overflow when no trajectory can be truncated" do
@@ -592,6 +593,52 @@ defmodule ReActContractTest do
 
     assert {:error, {:react_trajectory_not_truncatable, ^error}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
+  end
+
+  test "dspy_3_2_1: context recovery retains the only completed tool call" do
+    Process.put(:react_single_call_context_responses, [
+      {:ok,
+       %{
+         next_thought: "look it up",
+         next_tool_name: "lookup",
+         next_tool_args: %{"query" => "fact"}
+       }},
+      {:error, %Imp.ContextWindowExceededError{message: "too long"}},
+      {:ok, %{reasoning: "Use the retained observation", answer: "fact"}}
+    ])
+
+    lm = fn messages, _opts ->
+      [next | rest] = Process.get(:react_single_call_context_responses)
+      Process.put(:react_single_call_context_responses, rest)
+      send(self(), {:react_single_call_context_messages, messages})
+      next
+    end
+
+    lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
+
+    agent =
+      Imp.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        mode: :dspy_3_2_1,
+        max_iters: 2
+      )
+
+    assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
+    assert Imp.Prediction.get(prediction, :answer) == "fact"
+    assert Imp.Prediction.get(prediction, :termination_reason) == :parse_failure
+
+    assert [%{tool: :lookup, arguments: %{query: "fact"}, result: "fact"}] =
+             Imp.Prediction.get(prediction, :history)
+
+    assert Process.get(:react_single_call_context_responses) == []
+
+    messages =
+      for _ <- 1..3,
+          do: receive(do: ({:react_single_call_context_messages, value} -> value))
+
+    assert inspect(Enum.at(messages, 1)) =~ "observation_0"
+    assert inspect(Enum.at(messages, 2)) =~ "observation_0"
+    assert inspect(Enum.at(messages, 2)) =~ "fact"
   end
 
   test "dspy_3_2_1: also truncates the extraction trajectory retries" do

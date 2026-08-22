@@ -717,6 +717,13 @@ defmodule Imp.Optimizer.Trajectory do
     }
   end
 
+  defp encode_term(%Imp.Adapter.Types.File{path: path}) when is_binary(path) do
+    decode_error!(
+      "trajectory cannot persist a deferred file path; read the trusted file into " <>
+        "%Imp.Adapter.Types.File{data: ...} before serialization"
+    )
+  end
+
   defp encode_term(%module{} = value)
        when module in [
               Imp.Adapter.Types.Image,
@@ -976,6 +983,12 @@ defmodule Imp.Optimizer.Trajectory do
   defp validate_decoded_struct!(%Failure{} = failure) do
     validate_failure!(failure)
     failure
+  end
+
+  defp validate_decoded_struct!(%Imp.Adapter.Types.File{path: path}) when is_binary(path) do
+    decode_error!(
+      "saved trajectory file values cannot carry deferred host paths; persist file data instead"
+    )
   end
 
   defp validate_decoded_struct!(value), do: value

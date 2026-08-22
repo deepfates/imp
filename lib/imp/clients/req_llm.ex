@@ -237,9 +237,51 @@ defmodule Imp.Clients.ReqLLM do
 
       value ->
         Imp.Telemetry.execute([:imp, :cache, :hit], %{count: 1}, %{key: cache_key})
-        value
+        cache_hit_result(value)
     end
   end
+
+  defp cache_hit_result(
+         {:ok,
+          %{
+            __imp_lm_output__: output,
+            __imp_lm_metadata__: metadata
+          }}
+       ) do
+    {:ok,
+     %{
+       __imp_lm_output__: output,
+       __imp_lm_metadata__: mark_cache_hit(metadata)
+     }}
+  end
+
+  defp cache_hit_result(
+         {:ok,
+          %{
+            "__imp_lm_output__" => output,
+            "__imp_lm_metadata__" => metadata
+          }}
+       ) do
+    {:ok,
+     %{
+       "__imp_lm_output__" => output,
+       "__imp_lm_metadata__" => mark_cache_hit(metadata)
+     }}
+  end
+
+  defp cache_hit_result(value), do: value
+
+  defp mark_cache_hit(%{req_llm: provider_meta} = metadata) when is_map(provider_meta) do
+    provider_meta = provider_meta |> Map.put(:usage, %{}) |> Map.put(:cache_hit, true)
+    Map.put(metadata, :req_llm, provider_meta)
+  end
+
+  defp mark_cache_hit(%{"req_llm" => provider_meta} = metadata) when is_map(provider_meta) do
+    provider_meta = provider_meta |> Map.put("usage", %{}) |> Map.put("cache_hit", true)
+    Map.put(metadata, "req_llm", provider_meta)
+  end
+
+  defp mark_cache_hit(metadata), do: Map.put(metadata, :cache_hit, true)
 
   defp generate_uncached(lm, messages, opts) do
     started = System.monotonic_time()

@@ -282,6 +282,52 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     assert {:error, %DecodeError{}} = wire |> Map.put("feedback", tagged) |> Trajectory.load()
   end
 
+  test "saved trajectories cannot smuggle deferred host file reads" do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-trajectory-host-read-#{System.unique_integer([:positive])}"
+      )
+
+    File.write!(path, "CANARY")
+    on_exit(fn -> File.rm(path) end)
+
+    trajectory =
+      Trajectory.project(:evaluation, %{
+        index: 0,
+        score: 0.0,
+        trace: [],
+        feedback: %Imp.Adapter.Types.File{data: Base.encode64("safe")}
+      })
+
+    wire = Trajectory.dump(trajectory)
+
+    hostile_file = %{
+      "__trajectory_type__" => "file",
+      "value" => %{
+        "path" => path,
+        "url" => nil,
+        "data" => nil,
+        "mime_type" => nil,
+        "metadata" => %{}
+      }
+    }
+
+    assert {:error, %DecodeError{message: message}} =
+             wire |> Map.put("feedback", hostile_file) |> Trajectory.load()
+
+    assert message =~ "cannot carry deferred host paths"
+
+    assert_raise DecodeError, ~r/cannot persist a deferred file path/, fn ->
+      trajectory
+      |> Map.put(:feedback, %Imp.Adapter.Types.File{path: path})
+      |> Trajectory.dump()
+    end
+
+    assert {:ok, restored} = Trajectory.load(wire)
+    assert restored.feedback == %Imp.Adapter.Types.File{data: Base.encode64("safe")}
+  end
+
   test "ordinary maps resembling wire tags round-trip as ordinary maps" do
     feedback = %{"__trajectory_type__" => "atom", "value" => "not_an_atom", "note" => true}
 

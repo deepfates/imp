@@ -770,7 +770,7 @@ defmodule Imp.Predict.ReAct do
     end
   end
 
-  defp truncate_trajectory_pairs(trajectory) when length(trajectory) < @trajectory_keys_per_call,
+  defp truncate_trajectory_pairs(trajectory) when length(trajectory) <= @trajectory_keys_per_call,
     do: :error
 
   defp truncate_trajectory_pairs(trajectory),
