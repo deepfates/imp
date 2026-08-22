@@ -50,8 +50,26 @@ defmodule MCPImportTest do
           "id" => _id,
           "params" => %{"arguments" => %{"key" => key}}
         } ->
-          {:ok,
-           %{status: 200, headers: [], body: Jason.encode!(%{"result" => %{"value" => key}})}}
+          result =
+            case key do
+              "structured-false" ->
+                %{
+                  "content" => [%{"type" => "text", "text" => "fallback"}],
+                  "structuredContent" => false,
+                  "isError" => false
+                }
+
+              "text-result" ->
+                %{
+                  "content" => [%{"type" => "text", "text" => "from MCP"}],
+                  "isError" => false
+                }
+
+              _other ->
+                %{"value" => key}
+            end
+
+          {:ok, %{status: 200, headers: [], body: Jason.encode!(%{"result" => result})}}
       end
     end
   end
@@ -384,6 +402,58 @@ defmodule MCPImportTest do
 
     assert {:error, {:json_rpc_error, %{"code" => -32_000, "message" => "remote failed"}}} =
              Imp.Tool.call(tool, %{})
+  end
+
+  test "MCP CallToolResult conversion matches DSPy text and structured modes" do
+    content = [%{"type" => "text", "text" => "fallback"}]
+
+    for value <- [%{"answer" => 42}, [1, 2], "answer", 3.5, false, nil, %{}, [], "", 0] do
+      result = %{"content" => content, "structuredContent" => value, "isError" => false}
+      assert MCP.tool_result(result, :structured) === value
+    end
+
+    assert MCP.tool_result(%{"content" => content}, :text) == "fallback"
+    assert MCP.tool_result(%{"content" => content}, :structured) == "fallback"
+
+    assert MCP.tool_result(%{
+             content: [
+               %{type: :image, data: "abc"},
+               %{type: :resource, uri: "file:///tmp/example"}
+             ],
+             is_error: false
+           }) == [
+             %{type: :image, data: "abc"},
+             %{type: :resource, uri: "file:///tmp/example"}
+           ]
+
+    assert {:error, {:mcp_tool_error, "boom"}} =
+             MCP.tool_result(
+               %{
+                 "content" => [%{"type" => "text", "text" => "boom"}],
+                 "structuredContent" => %{"ignored" => true},
+                 "isError" => true
+               },
+               :structured
+             )
+  end
+
+  test "HTTP MCP client applies its selected result mode to ordinary imported tools" do
+    [structured] =
+      "https://mcp.example/tools"
+      |> MCP.HTTPClient.new(transport: MCPTransport, result_mode: :structured)
+      |> MCP.import_tools()
+
+    [text] =
+      "https://mcp.example/tools"
+      |> MCP.HTTPClient.new(transport: MCPTransport, result_mode: :text)
+      |> MCP.import_tools()
+
+    assert Imp.Tool.call(structured, %{"key" => "structured-false"}) === false
+    assert Imp.Tool.call(text, %{"key" => "text-result"}) == "from MCP"
+
+    assert_raise ArgumentError, ~r/invalid value for :result_mode option/, fn ->
+      MCP.HTTPClient.new("https://mcp.example/tools", result_mode: :raw)
+    end
   end
 
   test "stdio MCP client encodes JSON-RPC lines for process transports" do

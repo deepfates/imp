@@ -248,8 +248,14 @@ For stdio or Streamable HTTP transports, point Imp at trusted services you own:
 
 ```elixir
 stdio = Imp.MCP.StdioClient.new("/path/to/server", args: ["--stdio"])
-streamable = Imp.MCP.StreamableHTTPClient.new("https://mcp.example/mcp")
+streamable =
+  Imp.MCP.StreamableHTTPClient.new("https://mcp.example/mcp", result_mode: :structured)
 ```
+
+The default `result_mode: :text` follows the DSPy MCP conversion. Structured
+mode returns an explicitly present `structuredContent` value without treating
+`nil`, `false`, `0`, or an empty value as missing; it falls back to text only
+when the field is absent.
 
 Both transports run the MCP lifecycle handshake: a full `initialize` request
 (protocol version, capabilities, client info) followed by the

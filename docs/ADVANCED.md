@@ -209,6 +209,12 @@ catalog =
 [tool] = Imp.MCP.import_tools(catalog)
 ```
 
+Wire clients accept `result_mode: :text | :structured`. Text mode returns one
+text block as a string and multiple text blocks as a list. Structured mode
+returns the server's `structuredContent` exactly when present—including falsey
+or empty JSON values—and otherwise uses the text conversion. MCP error results
+are returned as tool errors before conversion.
+
 Runtime sessions support memory, large context references, tool failures, child
 agents, tool policies, final-output streams, incremental trace-event streams,
 and trace capture.

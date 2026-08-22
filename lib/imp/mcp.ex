@@ -11,6 +11,14 @@ defmodule Imp.MCP do
   is optional. For in-process Elixir catalogs the snake_case `:input_schema`
   key is accepted as a documented back-compat fallback; wire transports always
   see spec-compliant servers use `inputSchema`.
+
+  Transport clients default to `result_mode: :text`, matching DSPy's MCP tool
+  boundary: one text block becomes a string, multiple text blocks become a
+  list, and non-text blocks are returned when no text is present. Set
+  `result_mode: :structured` to return `structuredContent` exactly when the
+  server includes it—even when its value is `nil`, `false`, `0`, or empty—and
+  fall back to the text conversion only when that field is absent. MCP error
+  results become tool errors before either conversion.
   """
 
   @client_info %{"name" => "imp", "version" => "0.1.0"}
@@ -46,6 +54,86 @@ defmodule Imp.MCP do
   def json_rpc_result(%{error: error}), do: {:error, {:json_rpc_error, error}}
   def json_rpc_result(%{result: result}), do: {:ok, result}
   def json_rpc_result(other), do: {:ok, other}
+
+  @doc false
+  def tool_result(result, mode \\ :text)
+
+  def tool_result(result, mode) when mode in [:text, :structured] and is_map(result) do
+    if call_tool_result?(result) do
+      text = text_content(result)
+
+      if fetch_field(result, :isError, false) do
+        {:error, {:mcp_tool_error, text}}
+      else
+        convert_tool_result(result, mode, text)
+      end
+    else
+      # Older in-process adapters sometimes return a bare application value
+      # instead of the MCP CallToolResult envelope. Keep that documented
+      # compatibility path while normalizing spec-compliant wire results.
+      result
+    end
+  end
+
+  def tool_result(result, mode) when mode in [:text, :structured], do: result
+
+  defp call_tool_result?(result) do
+    has_field?(result, :content) or has_field?(result, :structuredContent) or
+      has_field?(result, :isError)
+  end
+
+  defp convert_tool_result(result, :structured, text) do
+    case fetch_present(result, :structuredContent) do
+      {:ok, value} -> value
+      :error -> text_fallback(result, text)
+    end
+  end
+
+  defp convert_tool_result(result, :text, text), do: text_fallback(result, text)
+
+  defp text_fallback(result, []) do
+    result
+    |> fetch_field(:content, [])
+    |> Enum.reject(&text_content?/1)
+  end
+
+  defp text_fallback(_result, text), do: text
+
+  defp text_content(result) do
+    texts =
+      result
+      |> fetch_field(:content, [])
+      |> Enum.filter(&text_content?/1)
+      |> Enum.map(&fetch_field(&1, :text, ""))
+
+    case texts do
+      [text] -> text
+      texts -> texts
+    end
+  end
+
+  defp text_content?(content), do: fetch_field(content, :type, nil) in ["text", :text]
+
+  defp has_field?(map, name), do: match?({:ok, _value}, fetch_present(map, name))
+
+  defp fetch_field(map, name, default) do
+    case fetch_present(map, name) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
+
+  defp fetch_present(map, name) do
+    names = [name, Atom.to_string(name), snake_case(name), Atom.to_string(snake_case(name))]
+
+    Enum.find_value(names, :error, fn key ->
+      if Map.has_key?(map, key), do: {:ok, Map.fetch!(map, key)}
+    end)
+  end
+
+  defp snake_case(:structuredContent), do: :structured_content
+  defp snake_case(:isError), do: :is_error
+  defp snake_case(name), do: name
 
   defmodule HTTPRecovery do
     @moduledoc false
@@ -337,6 +425,7 @@ defmodule Imp.MCP do
       transport: Imp.HTTP.Hackneyless,
       headers: [],
       protocol_version: "2025-03-26",
+      result_mode: :text,
       max_attempts: 3,
       timeout: 5_000,
       retry_delay: 100,
@@ -349,7 +438,8 @@ defmodule Imp.MCP do
                      [
                        transport: [type: {:custom, Imp.HTTP, :validate_transport, []}],
                        headers: [type: {:list, {:tuple, [:any, :any]}}],
-                       protocol_version: [type: :string]
+                       protocol_version: [type: :string],
+                       result_mode: [type: {:in, [:text, :structured]}]
                      ],
                      Imp.MCP.HTTPRecovery.option_schema()
                    )
@@ -407,7 +497,7 @@ defmodule Imp.MCP do
                post_json(client, "tools/call", %{"name" => name, "arguments" => arguments}),
              {:ok, decoded} <- Jason.decode(response),
              {:ok, result} <- Imp.MCP.json_rpc_result(decoded) do
-          result
+          Imp.MCP.tool_result(result, client.result_mode)
         else
           {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
           {:error, reason} -> {:error, reason}
@@ -451,12 +541,14 @@ defmodule Imp.MCP do
       :command,
       args: [],
       protocol_version: "2025-03-26",
+      result_mode: :text,
       timeout: 5_000
     ]
 
     @option_schema [
       args: [type: {:list, :string}],
       protocol_version: [type: :string],
+      result_mode: [type: {:in, [:text, :structured]}],
       timeout: [type: :pos_integer]
     ]
 
@@ -468,6 +560,7 @@ defmodule Imp.MCP do
         command: command,
         args: Keyword.get(opts, :args, []),
         protocol_version: Keyword.get(opts, :protocol_version, "2025-03-26"),
+        result_mode: Keyword.get(opts, :result_mode, :text),
         timeout: Keyword.get(opts, :timeout, 5_000)
       }
     end
@@ -523,7 +616,7 @@ defmodule Imp.MCP do
                    client.timeout
                  ),
                {:ok, result} <- Imp.MCP.json_rpc_result(decoded) do
-            result
+            Imp.MCP.tool_result(result, client.result_mode)
           end
         after
           safe_close(port, os_pid)
@@ -631,6 +724,7 @@ defmodule Imp.MCP do
       transport: Imp.HTTP.Hackneyless,
       headers: [],
       protocol_version: "2025-03-26",
+      result_mode: :text,
       max_attempts: 3,
       timeout: 5_000,
       retry_delay: 100,
@@ -644,7 +738,8 @@ defmodule Imp.MCP do
                        transport: [type: {:custom, Imp.HTTP, :validate_transport, []}],
                        headers: [type: {:list, {:tuple, [:any, :any]}}],
                        session_id: [type: {:or, [:string, nil]}],
-                       protocol_version: [type: :string]
+                       protocol_version: [type: :string],
+                       result_mode: [type: {:in, [:text, :structured]}]
                      ],
                      Imp.MCP.HTTPRecovery.option_schema()
                    )
@@ -748,7 +843,7 @@ defmodule Imp.MCP do
         with {:ok, decoded} <-
                rpc(client, "tools/call", %{"name" => name, "arguments" => arguments}),
              {:ok, result} <- Imp.MCP.json_rpc_result(decoded) do
-          result
+          Imp.MCP.tool_result(result, client.result_mode)
         end
       end)
     end

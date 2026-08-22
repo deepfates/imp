@@ -624,7 +624,10 @@ runs one typed action per turn with per-tool timeout isolation.
 
 MCP catalogs import into the same `Imp.Tool` values through
 `Imp.MCP.import_tools/1`. Importing a tool does not make it safe; keep
-side-effecting tools behind an explicit policy.
+side-effecting tools behind an explicit policy. Transport clients convert MCP
+results to text by default. Use `result_mode: :structured` when the application
+needs the server's `structuredContent` value; an explicit `nil`, `false`, `0`,
+or empty value is data, while an absent field falls back to text.
 
 ## Retrieval is a program dependency, not hidden prompt state
 
