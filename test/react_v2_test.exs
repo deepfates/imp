@@ -42,6 +42,66 @@ defmodule ReActV2Test do
     end
   end
 
+  defmodule RequiredOnlyToolStub do
+    def generate_text(model, messages, opts) do
+      state = Keyword.fetch!(opts, :state)
+      test_pid = Keyword.fetch!(opts, :test_pid)
+      send(test_pid, {:required_only_tool_request, messages, opts})
+
+      Agent.get_and_update(state, fn
+        :initial ->
+          response =
+            response(model, messages, "resp_incomplete", "toolu_incomplete", "submit", "{}")
+
+          {{:ok, response}, :named_rejected}
+
+        :named_rejected ->
+          reason =
+            Keyword.get(
+              opts,
+              :reject_reason,
+              "Invalid tool_choice type: 'object'. Supported string values: none, auto, required"
+            )
+
+          error =
+            ReqLLM.Error.API.Request.exception(
+              status: 400,
+              reason: reason,
+              response_body: %{"error" => reason}
+            )
+
+          {{:error, error}, :required}
+
+        :required ->
+          response =
+            response(
+              model,
+              messages,
+              "resp_submit",
+              "toolu_submit",
+              "submit",
+              ~s({"answer":"Paris"})
+            )
+
+          {{:ok, response}, :done}
+      end)
+    end
+
+    defp response(model, messages, id, call_id, name, arguments) do
+      %ReqLLM.Response{
+        id: id,
+        model: to_string(model),
+        context: ReqLLM.Context.new(messages),
+        message:
+          ReqLLM.Context.assistant("",
+            tool_calls: [ReqLLM.ToolCall.new(call_id, name, arguments)]
+          ),
+        object: nil,
+        finish_reason: :tool_calls
+      }
+    end
+  end
+
   test "executes parallel calls, preserves IDs and results, and submits final outputs" do
     parent = self()
     lookup = Imp.tool(:lookup, "lookup", fn %{query: query} -> "found #{query}" end)
@@ -179,6 +239,61 @@ defmodule ReActV2Test do
     assert Enum.map(forced_messages, & &1.role) == [:system, :user, :assistant, :tool, :user]
     assert [%ReqLLM.ToolCall{id: "toolu_incomplete"}] = Enum.at(forced_messages, 2).tool_calls
     assert Enum.at(forced_messages, 3).tool_call_id == "toolu_incomplete"
+  end
+
+  test "falls back to required with only submit when named tool choice is unsupported" do
+    {:ok, state} = Agent.start_link(fn -> :initial end)
+
+    lm =
+      Imp.req_llm("openai:fixture",
+        req_module: RequiredOnlyToolStub,
+        state: state,
+        test_pid: self(),
+        cache: false
+      )
+
+    lookup = Imp.tool(:lookup, "Look up a fact", fn _args -> "unused" end)
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 1)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :forced_submit
+
+    assert_received {:required_only_tool_request, _initial_messages, initial_opts}
+    assert initial_opts[:tool_choice] == "auto"
+
+    assert_received {:required_only_tool_request, _named_messages, named_opts}
+    assert named_opts[:tool_choice] == %{type: "tool", name: "submit"}
+
+    assert_received {:required_only_tool_request, _fallback_messages, fallback_opts}
+    assert fallback_opts[:tool_choice] == "required"
+
+    assert [submit_tool] = fallback_opts[:tools]
+    assert submit_tool.name == "submit"
+  end
+
+  test "does not retry an unrelated provider rejection" do
+    {:ok, state} = Agent.start_link(fn -> :initial end)
+
+    lm =
+      Imp.req_llm("openai:fixture",
+        req_module: RequiredOnlyToolStub,
+        state: state,
+        test_pid: self(),
+        reject_reason: "Invalid request: model is unavailable",
+        cache: false
+      )
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :termination_reason) == :max_iters
+    assert_received {:required_only_tool_request, _initial_messages, _initial_opts}
+    assert_received {:required_only_tool_request, _named_messages, _named_opts}
+    refute_received {:required_only_tool_request, _fallback_messages, _fallback_opts}
   end
 
   test "normalizes atom- and string-keyed tool-call collection wrappers" do

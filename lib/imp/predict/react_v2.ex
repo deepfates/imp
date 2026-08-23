@@ -164,19 +164,7 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp forced_submit(react, history, pending, reason, turn, initial_error, execution) do
-    forced = %{
-      react.react
-      | config:
-          Keyword.merge(react.react.config,
-            # ReqLLM's provider-neutral form. OpenAI-compatible providers translate
-            # this to their nested `function` shape while Anthropic keeps the
-            # canonical `tool`/`name` pair.
-            tool_choice: %{type: "tool", name: "submit"},
-            reasoning_effort: nil
-          )
-    }
-
-    with {:ok, prediction} <- predict(forced, react, history, pending) do
+    with {:ok, prediction} <- forced_submit_prediction(react, history, pending) do
       calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
       emit_reasoning(prediction, turn, forced?: true)
       submit_calls = %ToolCalls{tool_calls: Enum.filter(calls.tool_calls, &submit?/1)}
@@ -205,6 +193,86 @@ defmodule Imp.Predict.ReActV2 do
         })
     end
   end
+
+  defp forced_submit_prediction(react, history, pending) do
+    forced = forced_submit_program(react, %{type: "tool", name: "submit"})
+
+    case predict(forced, react, history, pending) do
+      {:error, reason} = error ->
+        if named_tool_choice_unsupported?(reason) do
+          # Some OpenAI-compatible endpoints implement only the string
+          # none/auto/required subset. Restrict both the provider tools and the
+          # rendered tool inventory to submit before requiring a call; using
+          # "required" while other tools remain visible would not force final
+          # submission.
+          submit = Map.fetch!(react.tools, :submit)
+          submit_only = %{react | tools: %{submit: submit}}
+          fallback = forced_submit_program(submit_only, "required")
+          predict(fallback, submit_only, history, pending)
+        else
+          error
+        end
+
+      success ->
+        success
+    end
+  end
+
+  defp forced_submit_program(react, tool_choice) do
+    %{
+      react.react
+      | config:
+          Keyword.merge(react.react.config,
+            tools: Enum.map(Map.values(react.tools), &tool_description(&1, react.signature)),
+            tool_choice: tool_choice,
+            reasoning_effort: nil
+          )
+    }
+  end
+
+  defp named_tool_choice_unsupported?(reason) do
+    text = reason |> error_text() |> String.downcase()
+
+    String.contains?(text, "tool_choice") and
+      (String.contains?(text, "invalid") or String.contains?(text, "unsupported")) and
+      (String.contains?(text, "required") or String.contains?(text, "supported string"))
+  end
+
+  defp error_text(value) when is_binary(value), do: value
+
+  defp error_text(value) when is_exception(value), do: Exception.message(value)
+
+  defp error_text(value) when is_map(value) do
+    [
+      :reason,
+      "reason",
+      :message,
+      "message",
+      :response_body,
+      "response_body",
+      :error,
+      "error",
+      :errors,
+      "errors"
+    ]
+    |> Enum.flat_map(fn key ->
+      case Map.fetch(value, key) do
+        {:ok, nested} -> [nested]
+        :error -> []
+      end
+    end)
+    |> Enum.map_join(" ", &error_text/1)
+  end
+
+  defp error_text(value) when is_list(value), do: Enum.map_join(value, " ", &error_text/1)
+
+  defp error_text(value) when is_tuple(value) do
+    value
+    |> Tuple.to_list()
+    |> Enum.map_join(" ", &error_text/1)
+  end
+
+  defp error_text(value), do: inspect(value)
 
   defp predict(program, react, history, pending) do
     tools = Enum.map(Map.values(react.tools), &tool_description(&1, react.signature))
