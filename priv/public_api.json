@@ -7788,7 +7788,8 @@
         "collect/3",
         "incremental_fields/2",
         "stream/3",
-        "validate_chunker/1"
+        "validate_chunker/1",
+        "validate_stream_listeners/1"
       ],
       "kind": "module",
       "macros": [],
@@ -7806,6 +7807,9 @@
           ],
           "validate_chunker/1": [
             "validate_chunker(chunker)"
+          ],
+          "validate_stream_listeners/1": [
+            "validate_stream_listeners(listeners)"
           ]
         }
       },

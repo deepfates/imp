@@ -234,7 +234,6 @@ defmodule ImpFacadeTest do
              |> Imp.Signature.to_spec()
 
     assert Imp.ProgramAccess.output_names(pot) == [:doubled]
-    assert Imp.ProgramAccess.provider_stream_predict(pot) == nil
 
     cot = Imp.chain_of_thought("question -> answer")
 
@@ -242,8 +241,6 @@ defmodule ImpFacadeTest do
              cot
              |> Imp.ProgramAccess.task_signature()
              |> Imp.Signature.to_spec()
-
-    assert %Imp.Predict.Predict{} = Imp.ProgramAccess.provider_stream_predict(cot)
   end
 
   test "facade normalizes plain demo data and rejects malformed demos clearly" do

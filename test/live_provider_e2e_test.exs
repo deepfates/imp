@@ -59,12 +59,17 @@ defmodule LiveProviderE2ETest do
   test "live provider streams OpenAI-compatible chunks through Imp.Streaming" do
     program = Imp.predict("question -> answer", lm: live_lm(max_completion_tokens: 40))
 
-    chunks =
+    events =
       program
       |> Imp.Streaming.stream(
         %{question: "Stream exactly the word pong, with no punctuation."},
         provider_stream: true
       )
+      |> Enum.to_list()
+
+    chunks =
+      events
+      |> Enum.filter(&match?(%Imp.Streaming.Messages.StreamResponse{}, &1))
       |> Enum.map(& &1.chunk)
       |> Enum.reject(&is_nil/1)
 
@@ -72,6 +77,33 @@ defmodule LiveProviderE2ETest do
 
     assert chunks != []
     assert String.contains?(text, "pong")
+    assert %Imp.Prediction{} = List.last(events)
+  end
+
+  test "live provider streams selected fields through a real two-stage program" do
+    program =
+      Imp.TestSupport.TwoStageOptimizerProgram.new(live_lm(max_completion_tokens: 80))
+
+    listeners = [
+      Imp.Streaming.Messages.StreamListener.new(signature_field_name: :evidence),
+      Imp.Streaming.Messages.StreamListener.new(signature_field_name: :route)
+    ]
+
+    events =
+      program
+      |> Imp.stream(%{utterance: "A customer says an invoice link was changed unexpectedly."},
+        provider_stream: true,
+        stream_listeners: listeners
+      )
+      |> Enum.to_list()
+
+    chunks = Enum.filter(events, &match?(%Imp.Streaming.Messages.StreamResponse{}, &1))
+
+    assert Enum.any?(chunks, &(&1.metadata.predict_name == "analyze_intent"))
+    assert Enum.any?(chunks, &(&1.metadata.predict_name == "classify_route"))
+
+    assert %Imp.Prediction{} = prediction = List.last(events)
+    assert Imp.get(prediction, :route) in ["R17", "R42", "R68", "R93"]
   end
 
   test "live provider uses ReAct function tools and reserved submit" do

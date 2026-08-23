@@ -30,8 +30,8 @@ defmodule MoxContractTest do
       assert Keyword.fetch!(opts, :sample) == true
 
       [
-        %Imp.Streaming.Messages.StreamResponse{chunk: "po"},
-        %Imp.Streaming.Messages.StreamResponse{chunk: "ng", done: true}
+        %Imp.Streaming.Messages.StreamResponse{chunk: "[[ ## answer ## ]]\npo"},
+        %Imp.Streaming.Messages.StreamResponse{chunk: "ng\n\n[[ ## completed ## ]]", done: true}
       ]
     end)
 
@@ -41,10 +41,17 @@ defmodule MoxContractTest do
         config: [sample: true]
       )
 
-    assert ["po", "ng"] =
-             program
-             |> Imp.Streaming.stream(%{question: "say pong"}, provider_stream: true)
-             |> Enum.map(& &1.chunk)
+    events =
+      program
+      |> Imp.Streaming.stream(%{question: "say pong"}, provider_stream: true)
+      |> Enum.to_list()
+
+    assert Enum.map(Enum.drop(events, -1), & &1.chunk) == [
+             "[[ ## answer ## ]]\npo",
+             "ng\n\n[[ ## completed ## ]]"
+           ]
+
+    assert Imp.get(List.last(events), :answer) == "pong"
   end
 
   test "Imp.Streaming provider mode streams through ChainOfThought wrappers" do
@@ -55,17 +62,25 @@ defmodule MoxContractTest do
       assert rendered =~ "[[ ## answer ## ]]"
 
       [
-        %Imp.Streaming.Messages.StreamResponse{chunk: "because "},
-        %Imp.Streaming.Messages.StreamResponse{chunk: "Paris", done: true}
+        %Imp.Streaming.Messages.StreamResponse{
+          chunk: "[[ ## reasoning ## ]]\nbecause \n\n[[ ## answer ## ]]\n"
+        },
+        %Imp.Streaming.Messages.StreamResponse{
+          chunk: "Paris\n\n[[ ## completed ## ]]",
+          done: true
+        }
       ]
     end)
 
     program = Imp.chain_of_thought("question -> answer", lm: Imp.Test.LMMock)
 
-    assert ["because ", "Paris"] =
-             program
-             |> Imp.Streaming.stream(%{question: "France?"}, provider_stream: true)
-             |> Enum.map(& &1.chunk)
+    events =
+      program
+      |> Imp.Streaming.stream(%{question: "France?"}, provider_stream: true)
+      |> Enum.to_list()
+
+    assert Imp.get(List.last(events), :reasoning) == "because"
+    assert Imp.get(List.last(events), :answer) == "Paris"
   end
 
   test "Imp.Retrieve behaviour contract is verified by Mox" do

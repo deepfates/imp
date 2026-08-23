@@ -211,6 +211,28 @@ defmodule Imp.Tasks do
           "Imp.Tasks.async_nolink/1 expects a zero-arity function, got: #{inspect(fun)}"
   end
 
+  @doc false
+  def async_nolink_borrowed(fun) when is_function(fun, 0) do
+    case current_admission() do
+      {token, owner} when owner == self() ->
+        ensure_runtime!()
+
+        if @admission.owned_by?(token, owner) do
+          start_borrowed_task(token, owner, fun)
+        else
+          async_nolink(fun)
+        end
+
+      _other ->
+        async_nolink(fun)
+    end
+  end
+
+  def async_nolink_borrowed(fun) do
+    raise ArgumentError,
+          "Imp.Tasks.async_nolink_borrowed/1 expects a zero-arity function, got: #{inspect(fun)}"
+  end
+
   @doc "Cancels a supervised task and waits up to `timeout` milliseconds for termination."
   def cancel(task, timeout \\ 5_000)
 
@@ -246,6 +268,7 @@ defmodule Imp.Tasks do
     snapshot = Imp.Settings.snapshot()
     telemetry_context = Imp.Telemetry.context()
     run_context = Imp.Run.context()
+    streaming_context = Imp.Streaming.Execution.context()
     max_workers = Map.fetch!(snapshot, :async_max_workers)
     borrowed = current_admission()
     enumerator = self()
@@ -259,17 +282,39 @@ defmodule Imp.Tasks do
         {token, lease_owner} ->
           if direct_task_caller?(@supervisor, enumerator) and
                @admission.owned_by?(token, lease_owner) do
-            run_borrowed(snapshot, telemetry_context, run_context, token, lease_owner, fn ->
-              fun.(item)
-            end)
+            run_borrowed(
+              snapshot,
+              telemetry_context,
+              run_context,
+              streaming_context,
+              token,
+              lease_owner,
+              fn ->
+                fun.(item)
+              end
+            )
           else
-            run_admitted(snapshot, telemetry_context, run_context, max_workers, fn ->
-              fun.(item)
-            end)
+            run_admitted(
+              snapshot,
+              telemetry_context,
+              run_context,
+              streaming_context,
+              max_workers,
+              fn ->
+                fun.(item)
+              end
+            )
           end
 
         nil ->
-          run_admitted(snapshot, telemetry_context, run_context, max_workers, fn -> fun.(item) end)
+          run_admitted(
+            snapshot,
+            telemetry_context,
+            run_context,
+            streaming_context,
+            max_workers,
+            fn -> fun.(item) end
+          )
       end
     end
 
@@ -286,6 +331,7 @@ defmodule Imp.Tasks do
     snapshot = Imp.Settings.snapshot()
     telemetry_context = Imp.Telemetry.context()
     run_context = Imp.Run.context()
+    streaming_context = Imp.Streaming.Execution.context()
     max_workers = Map.fetch!(snapshot, :async_max_workers)
     ensure_runtime!()
     token = @admission.reserve!(max_workers)
@@ -300,7 +346,13 @@ defmodule Imp.Tasks do
 
           try do
             with_admission(token, self(), fn ->
-              with_runtime_context(snapshot, telemetry_context, run_context, fun)
+              with_runtime_context(
+                snapshot,
+                telemetry_context,
+                run_context,
+                streaming_context,
+                fun
+              )
             end)
           after
             @admission.release(token)
@@ -325,6 +377,25 @@ defmodule Imp.Tasks do
     end
   end
 
+  # A demand-driven producer called synchronously from an admitted task is not
+  # additional fan-out: its consumer is waiting while the producer owns the
+  # next step. Reuse that lease without transferring or releasing it. This is
+  # intentionally narrower than making arbitrary nested async work reentrant.
+  defp start_borrowed_task(token, owner, fun) do
+    snapshot = Imp.Settings.snapshot()
+    telemetry_context = Imp.Telemetry.context()
+    run_context = Imp.Run.context()
+    streaming_context = Imp.Streaming.Execution.context()
+
+    wrapped = fn ->
+      with_admission(token, owner, fn ->
+        with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun)
+      end)
+    end
+
+    Task.Supervisor.async_nolink(@unlinked_supervisor, wrapped)
+  end
+
   defp spawn_task(supervisor, link, wrapped, token) do
     try do
       case link do
@@ -338,29 +409,43 @@ defmodule Imp.Tasks do
     end
   end
 
-  defp run_admitted(snapshot, telemetry_context, run_context, max_workers, fun) do
+  defp run_admitted(snapshot, telemetry_context, run_context, streaming_context, max_workers, fun) do
     token = @admission.reserve!(max_workers)
     :ok = @admission.transfer(token, self())
 
     try do
       with_admission(token, self(), fn ->
-        with_runtime_context(snapshot, telemetry_context, run_context, fun)
+        with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun)
       end)
     after
       @admission.release(token)
     end
   end
 
-  defp run_borrowed(snapshot, telemetry_context, run_context, token, owner, fun) do
+  defp run_borrowed(
+         snapshot,
+         telemetry_context,
+         run_context,
+         streaming_context,
+         token,
+         owner,
+         fun
+       ) do
     with_admission(token, owner, fn ->
-      with_runtime_context(snapshot, telemetry_context, run_context, fun)
+      with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun)
     end)
   end
 
-  defp with_runtime_context(snapshot, telemetry_context, run_context, fun) do
+  defp with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun) do
     Imp.Telemetry.with_context(telemetry_context, fn ->
       Imp.Settings.with_snapshot(snapshot, fn ->
-        if is_pid(run_context), do: Imp.Run.with_context(run_context, fun), else: fun.()
+        run = fn ->
+          if is_pid(run_context), do: Imp.Run.with_context(run_context, fun), else: fun.()
+        end
+
+        if is_map(streaming_context),
+          do: Imp.Streaming.Execution.with_context(streaming_context, run),
+          else: run.()
       end)
     end)
   end

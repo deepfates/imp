@@ -72,11 +72,6 @@ defmodule Imp.ProgramAccess do
     end
   end
 
-  def provider_stream_predict(%Predict{} = predict), do: predict
-  def provider_stream_predict(%ChainOfThought{predict: predict}), do: predict
-  def provider_stream_predict(%Assertions{program: program}), do: provider_stream_predict(program)
-  def provider_stream_predict(_program), do: nil
-
   def internal_predictors(%RLM{} = rlm), do: RLM.internal_predictors(rlm)
   def internal_predictors(%Assertions{program: program}), do: internal_predictors(program)
   def internal_predictors(program), do: %{main: predict(program)}

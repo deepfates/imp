@@ -133,7 +133,13 @@ defmodule Imp.Predict.Predict do
            format_with_adapter(adapter, request_signature, inputs, demos: predict.demos),
          {:ok, lm_opts} <- adapter_lm_opts(adapter, request_signature, request_config, lm),
          {:ok, lm_opts} <- multi_completion_opts(lm_opts),
-         {:ok, raw} <- Imp.LM.generate(lm, messages, provider_lm_opts(lm_opts)),
+         {:ok, raw} <-
+           Imp.Streaming.Execution.generate(
+             predict,
+             lm,
+             messages,
+             provider_lm_opts(lm_opts)
+           ),
          :ok <- validate_completion_shape(lm_opts, raw),
          {:ok, prediction, trace_messages, trace_raw, trace_lm_metadata} <-
            parse_with_retry(

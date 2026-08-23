@@ -1136,7 +1136,7 @@ trace)` shape as a `%{example:, pred:, trace:}` map.
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_streamify_yields_expected_response_chunks | pass (adapted) | litellm test-server deltas → `Imp.Streaming.stream/3` local chunking; chunks assemble the full answer. |
+| test_streamify_yields_expected_response_chunks | pass (adapted) | Provider-backed `Imp.Streaming.stream/3` runs real composed control flow, observes selected fields at both named predictors, and returns the final typed prediction; the local Enumerable analogue also preserves full-answer assembly. |
 | test_streaming_response_yields_expected_response_chunks | n/a | `dspy.streaming.streaming_response` OpenAI-SSE re-encoding helper; no Imp counterpart by design (callers own their transport). |
 | test_default_status_streaming | native | Listener lifecycle plus causal `:telemetry`; no callback subclass. |
 | test_custom_status_streaming | native | Consumers attach ordinary telemetry handlers or `on_status`. |

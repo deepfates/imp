@@ -41,6 +41,7 @@ Imp-only behaviors normally carry Imp-only names
 | `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
 | `dspy.configure(lm=...)` | `Imp.configure(lm: ...)` sets a supervised node-local default; explicit `lm:` per program is the recommended style |
 | `dspy.context(lm=...)` | `Imp.context([lm: ...], fn -> ... end)` — process-scoped |
+| `dspy.streamify(program, stream_listeners=[...])` | `Imp.stream(program, inputs, provider_stream: true, stream_listeners: [...])` — runs the real composed program, streams selected named-predictor fields, and ends with the typed prediction |
 | `dspy.inspect_history()` | Plan ahead with `Imp.trace/2`, then render retained history with `Imp.inspect_history/2` or inspect `Imp.Observability.status/1`; Imp has no retroactive global last-call buffer |
 | `dspy.LM("openai/gpt-...")` (LiteLLM) | `Imp.req_llm("openai:gpt-...")` ([ReqLLM](https://hex.pm/packages/req_llm) providers) |
 | `DummyLM` in tests | `Imp.LM.Static` — scripted fields, everything else runs for real |

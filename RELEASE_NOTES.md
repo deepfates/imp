@@ -145,10 +145,12 @@ playbook into a serving process remains an explicit application decision.
   [evidence reconciliation](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
   for what a clean clone can verify from committed evidence alone.
 - Streaming promoted to the facade (`Imp.stream/3`, `Imp.collect/3`) with
-  provider token streaming and an explicit local fallback. Setting
-  `provider_stream: true` is strict: composed programs without a streamable
-  predictor return a terminal unsupported-program error instead of replaying a
-  completed response as if it were provider output.
+  provider token streaming and an explicit local fallback. Provider mode runs
+  the real composed program, can select intermediate fields by named predictor,
+  and ends with its typed prediction. It is demand-driven and cleans up on an
+  early halt or dead consumer. Programs with no named predictors return a
+  terminal unsupported-program error instead of replaying a completed response
+  as if it were provider output.
 - Known optimizer identities in `Imp.Optimizer.Report` retain their atom type
   after a checksummed Artifact write/read/apply cycle; unknown extension
   identifiers remain portable strings.

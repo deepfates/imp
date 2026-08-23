@@ -56,8 +56,8 @@ defmodule ReqLLMClientTest do
       {:ok,
        %ReqLLM.StreamResponse{
          stream: [
-           ReqLLM.StreamChunk.text("po"),
-           ReqLLM.StreamChunk.text("ng"),
+           ReqLLM.StreamChunk.text(~s({"answer":"po)),
+           ReqLLM.StreamChunk.text(~s(ng","score":7})),
            ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
          ],
          metadata_handle: self(),
@@ -79,6 +79,29 @@ defmodule ReqLLMClientTest do
          context: ReqLLM.Context.new(messages),
          message: ReqLLM.Context.assistant("usage"),
          usage: %{input_tokens: 3, output_tokens: 2, total_tokens: 5}
+       }}
+    end
+  end
+
+  defmodule StreamingUsageStub do
+    def generate_text(_model, _messages, _opts), do: {:error, :stream_expected}
+
+    def stream_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), {:req_llm_stream_usage, model})
+
+      {:ok,
+       %ReqLLM.StreamResponse{
+         stream: [
+           ReqLLM.StreamChunk.text("[[ ## answer ## ]]\npong\n\n[[ ## completed ## ]]"),
+           ReqLLM.StreamChunk.meta(%{
+             usage: %{input_tokens: 3, output_tokens: 2, total_tokens: 5},
+             finish_reason: "stop"
+           })
+         ],
+         metadata_handle: self(),
+         cancel: fn -> :ok end,
+         model: model,
+         context: ReqLLM.Context.new(messages)
        }}
     end
   end
@@ -182,7 +205,7 @@ defmodule ReqLLMClientTest do
        %ReqLLM.StreamResponse{
          stream: [
            ReqLLM.StreamChunk.thinking("native plan", %{provider: :anthropic}),
-           ReqLLM.StreamChunk.text("Paris"),
+           ReqLLM.StreamChunk.text(~s({"answer":"Paris"})),
            ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
          ],
          metadata_handle: self(),
@@ -1317,7 +1340,7 @@ defmodule ReqLLMClientTest do
   end
 
   test "ReqLLM stream chunks are exposed through Imp streaming vocabulary" do
-    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub, cache: false)
     program = Imp.predict("question -> answer", lm: lm)
 
     chunks =
@@ -1325,16 +1348,51 @@ defmodule ReqLLMClientTest do
       |> Imp.Streaming.stream(%{question: "pong"}, provider_stream: true)
       |> Enum.to_list()
 
-    assert Enum.map(chunks, & &1.chunk) |> Enum.reject(&is_nil/1) == ["po", "ng"]
-    assert Enum.any?(chunks, & &1.done)
+    stream_events = Enum.filter(chunks, &match?(%Imp.Streaming.Messages.StreamResponse{}, &1))
+
+    assert Enum.map(stream_events, & &1.chunk) |> Enum.reject(&is_nil/1) == [
+             ~s({"answer":"po),
+             ~s(ng","score":7})
+           ]
+
+    assert Enum.any?(stream_events, & &1.done)
+    assert Imp.get(List.last(chunks), :answer) == "pong"
 
     assert Imp.Streaming.collect(program, %{question: "pong"}, provider_stream: true) == "pong"
 
     assert_received {:req_llm_stream, "openai:gpt-test",
-                     [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
+                     [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], first_opts}
+
+    refute Keyword.has_key?(first_opts, :cache)
 
     assert_received {:req_llm_stream, "openai:gpt-test",
-                     [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], _opts}
+                     [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], second_opts}
+
+    refute Keyword.has_key?(second_opts, :cache)
+  end
+
+  test "composed provider streaming records terminal usage exactly once" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: StreamingUsageStub)
+    program = Imp.predict("question -> answer", lm: lm)
+
+    events =
+      Imp.context([track_usage: true], fn ->
+        program
+        |> Imp.Streaming.stream(%{question: "pong"}, provider_stream: true)
+        |> Enum.to_list()
+      end)
+
+    prediction = List.last(events)
+
+    assert Imp.Prediction.get_lm_usage(prediction) == %{
+             "openai/openai:gpt-test" => %{
+               input_tokens: 3,
+               output_tokens: 2,
+               total_tokens: 5
+             }
+           }
+
+    assert_received {:req_llm_stream_usage, "openai:gpt-test"}
   end
 
   test "ReqLLM thinking stream chunks are exposed as reasoning chunks" do
@@ -1351,9 +1409,12 @@ defmodule ReqLLMClientTest do
                chunk: %{reasoning: "native plan"},
                metadata: %{provider: :anthropic, type: :reasoning}
              },
-             %Imp.Streaming.Messages.StreamResponse{chunk: "Paris"},
-             %Imp.Streaming.Messages.StreamResponse{done: true}
+             %Imp.Streaming.Messages.StreamResponse{chunk: ~s({"answer":"Paris"})},
+             %Imp.Streaming.Messages.StreamResponse{done: true},
+             %Imp.Prediction{} = prediction
            ] = chunks
+
+    assert Imp.get(prediction, :answer) == "Paris"
   end
 
   test "ReqLLM tool-call stream chunks are exposed as normalized Imp chunks" do
@@ -1373,8 +1434,11 @@ defmodule ReqLLMClientTest do
                  ]
                }
              },
-             %Imp.Streaming.Messages.StreamResponse{done: true}
+             %Imp.Streaming.Messages.StreamResponse{done: true},
+             %Imp.Prediction{} = prediction
            ] = chunks
+
+    assert is_binary(Imp.get(prediction, :tool_calls))
   end
 
   test "ReqLLM client reports provider module failures without crashing callers" do

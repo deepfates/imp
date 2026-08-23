@@ -128,7 +128,12 @@ The stable source authorities for this cut are DSPy `3.3.1` (tag commit
 semantics have executable differentials, BEAM-native implementations, or an
 explicit product disposition in the source audit.
 
-This completes the library-making epic, not every future research program.
+An adversarial cutover review reopened and then completed the last stable
+product obligation: provider streaming now executes normal composed modules,
+observes selected fields at named intermediate predictors, and returns the
+typed final prediction. This closes the library-making epic, not every future
+research program.
+
 Paper-scale matched breadth, resume economics, observatory work, broader GRPO
 effectiveness, external adoption, and blanket superiority remain separate work.
 Publication channel, public repository visibility, final SemVer, tag, and Hex
@@ -139,10 +144,11 @@ the retained product and task-specific evidence.
 
 The dependency-ordered capability work is complete: early cold consumption,
 stable-source audits, optimizer lifecycles, realistic provider/OTP operation,
-final cold consumption, and bounded comparison all closed on their own
-acceptance criteria. The next action is not another feature ticket. Freeze this
-exact state and run the candidate gates in `docs/maintainers/RELEASE.md`; if a
-gate falsifies the candidate, repair that concrete defect and repeat.
+final cold consumption, bounded comparison, and the adversarial
+composed-streaming repair all closed on their own acceptance criteria. Freeze
+this exact state and rerun the candidate gates in
+`docs/maintainers/RELEASE.md`; if a gate falsifies the candidate, repair that
+concrete defect and repeat.
 
 ## How to work this epic
 
@@ -187,3 +193,16 @@ remain owner decisions after the product reaches this finish line.
 **2026-08-22T21:35:30Z**
 
 Closed literally after all seven definition-of-done limbs were exercised and the dependency chain reached terminal: stable DSPy/GEPA/Ax/OA audits, real defining optimizer lifecycles, explicit experimental GRPO boundary, cross-provider/stream/tool/RLM/OTP operation, repeated package-only cold consumption, and bounded positive plus negative live comparison. The exact release candidate still must survive docs/maintainers/RELEASE.md gates; a red gate reopens the owning defect rather than changing this verdict by rhetoric.
+
+**2026-08-22T21:04:00Z**
+
+Reclosed after the cutover review falsified the earlier composed-streaming
+disposition and the implementation was completed rather than bounded away.
+The real OpenRouter two-stage path streams both named predictors and returns its
+typed result; cancellation, dead-consumer cleanup, provider error, usage, and
+single-worker backpressure regressions pass. The full non-live suite is 2,771
+tests, 54 doctests, and 9 properties with zero failures; the 16-test live gate,
+integration, protocols, package clean room, executable livebooks, public
+surface, conformance, Credo, Hex audit, and Dialyzer are green on the candidate
+tree. Exact clean-commit identity and publication remain the release procedure,
+not unfinished library capability.

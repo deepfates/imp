@@ -3,6 +3,11 @@ defmodule Imp.Streaming do
 
   @option_schema [
     provider_stream: [type: :boolean, default: false],
+    stream_listeners: [
+      type: {:custom, __MODULE__, :validate_stream_listeners, []},
+      default: []
+    ],
+    include_final_prediction: [type: :boolean, default: true],
     chunker: [
       type: {:custom, __MODULE__, :validate_chunker, []}
     ]
@@ -11,36 +16,183 @@ defmodule Imp.Streaming do
   @doc """
   Streams one program call as an Enumerable of chunks.
 
-  With `provider_stream: true`, the program must expose a streamable predictor;
-  unsupported composed programs return a terminal
-  `{:provider_stream_unsupported, module}` error instead of silently replaying
-  a completed response as chunks. Without `provider_stream: true`, the program
-  runs once and the result is chunked locally (grapheme by grapheme, or through
-  the `:chunker` function when given).
+  With `provider_stream: true`, Imp executes the real program and streams from
+  its named predictors as they are reached. `:stream_listeners` can select
+  intermediate output fields; without listeners, normalized provider events
+  from every named predictor are yielded. The final typed prediction is yielded
+  by default and can be disabled with `include_final_prediction: false`.
+
+  Composed modules expose their predictor names through the ordinary
+  `Imp.Module.optimizer_predictors/1` contract. A program with no named
+  predictors returns a terminal `{:provider_stream_unsupported, module}` error.
+  Without `provider_stream: true`, the program runs once and the result is
+  chunked locally (grapheme by grapheme, or through the `:chunker` function).
   """
   def stream(program, inputs, opts \\ []) do
     owned_opts = validate_opts!(opts, "Imp.Streaming.stream/3")
 
     cond do
       owned_opts[:provider_stream] ->
-        case Imp.ProgramAccess.provider_stream_predict(program) do
-          %Imp.Predict.Predict{} = predict -> provider_stream(predict, inputs, opts)
-          nil -> provider_stream_unsupported(program)
-        end
+        provider_program_stream(program, inputs, owned_opts)
 
       true ->
         fallback_stream(program, inputs, opts)
     end
   end
 
-  defp provider_stream_unsupported(program) do
-    module =
-      if is_map(program),
-        do: Map.get(program, :__struct__, :unknown_program),
-        else: :unknown_program
-
-    error_response({:provider_stream_unsupported, module})
+  defp provider_program_stream(program, inputs, opts) do
+    with {:ok, inputs} <- normalize_inputs(inputs),
+         {:ok, program, targets} <- prepare_stream_program(program, opts[:stream_listeners]) do
+      program_stream(program, inputs, targets, opts[:include_final_prediction])
+    else
+      {:error, {:provider_stream_unsupported, _module} = reason} -> error_response(reason)
+      {:error, reason} -> error_response(reason)
+    end
   end
+
+  defp prepare_stream_program(%_module{} = program, listeners) do
+    predictors = Imp.ProgramParameters.predictors(program)
+
+    if predictors == [] do
+      {:error, {:provider_stream_unsupported, program.__struct__}}
+    else
+      targets = resolve_targets!(predictors, listeners)
+
+      tagged =
+        Enum.reduce(predictors, program, fn %{name: name}, current ->
+          Imp.ProgramParameters.update_predictor(current, name, fn predictor ->
+            %{
+              predictor
+              | metadata: Map.put(predictor.metadata, :stream_predict_name, to_string(name))
+            }
+          end)
+        end)
+
+      {:ok, tagged, targets}
+    end
+  rescue
+    error in ArgumentError -> {:error, {:provider_stream_configuration, Exception.message(error)}}
+  end
+
+  defp prepare_stream_program(program, _listeners),
+    do: {:error, {:provider_stream_unsupported, program}}
+
+  defp resolve_targets!(predictors, []) do
+    Map.new(predictors, fn %{name: name} -> {to_string(name), :raw} end)
+  end
+
+  defp resolve_targets!(predictors, listeners) do
+    Enum.reduce(listeners, %{}, fn listener, targets ->
+      name = resolve_listener_predictor!(predictors, listener)
+      Map.update(targets, name, [listener], &(&1 ++ [listener]))
+    end)
+  end
+
+  defp resolve_listener_predictor!(predictors, %{predict_name: name}) when not is_nil(name) do
+    wanted = to_string(name)
+
+    if Enum.any?(predictors, &(to_string(&1.name) == wanted)) do
+      wanted
+    else
+      raise ArgumentError,
+            "stream listener names unknown predictor #{inspect(name)}; available names: " <>
+              inspect(Enum.map(predictors, & &1.name))
+    end
+  end
+
+  defp resolve_listener_predictor!(predictors, %{signature_field_name: field})
+       when is_binary(field) do
+    matches =
+      Enum.filter(predictors, fn %{predictor: predictor} ->
+        Enum.any?(predictor.signature.outputs, &(to_string(&1.name) == field))
+      end)
+
+    case matches do
+      [%{name: name}] ->
+        to_string(name)
+
+      [] ->
+        raise ArgumentError,
+              "stream listener field #{inspect(field)} is not an output of any named predictor"
+
+      many ->
+        raise ArgumentError,
+              "stream listener field #{inspect(field)} is ambiguous across predictors " <>
+                inspect(Enum.map(many, & &1.name)) <> "; set :predict_name"
+    end
+  end
+
+  defp resolve_listener_predictor!(_predictors, _listener) do
+    raise ArgumentError,
+          "stream listeners used for program streaming require :signature_field_name"
+  end
+
+  defp program_stream(program, inputs, targets, include_final?) do
+    Stream.resource(
+      fn -> start_program_stream(program, inputs, targets, include_final?) end,
+      &next_program_stream/1,
+      &stop_program_stream/1
+    )
+  end
+
+  defp start_program_stream(program, inputs, targets, include_final?) do
+    owner = self()
+    ref = make_ref()
+    context = %{owner: owner, ref: ref, targets: targets}
+
+    task =
+      Imp.Tasks.async_nolink_borrowed(fn ->
+        Imp.Streaming.Execution.with_context(context, fn -> Imp.Module.call(program, inputs) end)
+      end)
+
+    %{task: task, ref: ref, include_final?: include_final?, done?: false, pending_ack: nil}
+  end
+
+  defp next_program_stream(%{done?: true} = state), do: {:halt, state}
+
+  defp next_program_stream(state) do
+    acknowledge(state.pending_ack)
+    state = %{state | pending_ack: nil}
+
+    receive do
+      {:imp_stream, ref, producer, acknowledgement, event} when ref == state.ref ->
+        {[event], %{state | pending_ack: {producer, acknowledgement}}}
+
+      {task_ref, {:ok, %Imp.Prediction{} = prediction}} when task_ref == state.task.ref ->
+        Process.demonitor(state.task.ref, [:flush])
+        events = if state.include_final?, do: [prediction], else: []
+        {events, %{state | done?: true}}
+
+      {task_ref, {:error, reason}} when task_ref == state.task.ref ->
+        Process.demonitor(state.task.ref, [:flush])
+        {error_response(reason), %{state | done?: true}}
+
+      {task_ref, other} when task_ref == state.task.ref ->
+        Process.demonitor(state.task.ref, [:flush])
+        {error_response({:invalid_stream_program_result, other}), %{state | done?: true}}
+
+      {:DOWN, task_ref, :process, _pid, reason} when task_ref == state.task.ref ->
+        {error_response({:stream_program_exited, reason}), %{state | done?: true}}
+    end
+  end
+
+  defp stop_program_stream(%{task: task, ref: ref, done?: false}) do
+    if Process.alive?(task.pid) do
+      send(task.pid, {:imp_stream_cancel, ref, :consumer_halted})
+
+      case Task.yield(task, 1_000) do
+        nil -> Imp.Tasks.cancel(task, 5_000)
+        _result -> :ok
+      end
+    end
+
+    :ok
+  end
+
+  defp stop_program_stream(_state), do: :ok
+
+  defp acknowledge(nil), do: :ok
+  defp acknowledge({producer, ref}), do: send(producer, {:imp_stream_ack, ref})
 
   defp fallback_stream(program, inputs, opts) do
     case Keyword.get(opts, :chunker) do
@@ -66,144 +218,8 @@ defmodule Imp.Streaming do
     end
   end
 
-  defp provider_stream(%Imp.Predict.Predict{} = program, inputs, opts) do
-    with {:ok, inputs} <- normalize_inputs(inputs) do
-      settings = Imp.Settings.get()
-
-      adapter =
-        if program.dynamic_adapter?,
-          do: settings.adapter,
-          else: program.adapter || settings.adapter
-
-      lm = if program.dynamic_lm?, do: settings.lm, else: program.lm
-      config = Keyword.merge(program.config, Keyword.drop(opts, [:provider_stream, :chunker]))
-
-      with {:ok, messages} <-
-             format_with_adapter(adapter, program.signature, inputs, demos: program.demos),
-           {:ok, lm_opts} <- adapter_lm_opts(adapter, program.signature, config, lm) do
-        stream_lm(lm, messages, lm_opts)
-      else
-        {:error, reason} -> error_response(reason)
-      end
-    else
-      {:error, reason} ->
-        [%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
-    end
-  end
-
-  defp stream_lm(%module{} = lm, messages, opts) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-      module.stream(lm, messages, opts)
-    else
-      generate_once(lm, messages, opts)
-    end
-  end
-
-  defp stream_lm(nil, _messages, _opts),
-    do: [%Imp.Streaming.Messages.StreamResponse{chunk: {:error, :lm_not_configured}, done: true}]
-
-  defp stream_lm(module, messages, opts) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-      module.stream(module, messages, opts)
-    else
-      generate_once(module, messages, opts)
-    end
-  end
-
-  defp stream_lm(%{module: module, opts: lm_opts} = lm, messages, opts) do
-    with {:ok, lm_opts} <- validate_lm_opts(lm_opts) do
-      opts = Keyword.merge(lm_opts, opts)
-
-      if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-        module.stream(lm, messages, opts)
-      else
-        generate_once(lm, messages, opts)
-      end
-    else
-      {:error, reason} -> error_response(reason)
-    end
-  end
-
-  defp stream_lm(fun, messages, opts) when is_function(fun, 2),
-    do: generate_once(fun, messages, opts)
-
-  defp stream_lm(lm, _messages, _opts), do: error_response({:not_an_lm, lm})
-
-  defp generate_once(lm, messages, opts) do
-    case lm |> Imp.LM.generate(messages, opts) |> Imp.LM.Result.unwrap() do
-      {:ok, value} ->
-        [%Imp.Streaming.Messages.StreamResponse{chunk: stream_value(value)}]
-
-      {:error, reason} ->
-        [%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
-    end
-  rescue
-    error ->
-      error_response({:lm_generate_failed, Exception.message(error)})
-  catch
-    kind, reason ->
-      error_response({:lm_generate_failed, inspect({kind, reason})})
-  end
-
   defp error_response(reason),
     do: [%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
-
-  defp format_with_adapter(adapter, signature, inputs, opts) do
-    with :ok <- ensure_adapter_loaded(adapter),
-         true <- function_exported?(adapter, :format, 3) do
-      {:ok, adapter.format(signature, inputs, opts)}
-    else
-      {:error, _reason} = error -> error
-      false -> {:error, {:invalid_adapter, adapter, :format}}
-    end
-  rescue
-    error -> {:error, {:adapter_format_failed, adapter, Exception.message(error)}}
-  catch
-    kind, reason -> {:error, {:adapter_format_failed, adapter, {kind, reason}}}
-  end
-
-  defp adapter_lm_opts(adapter, signature, config, lm) do
-    with :ok <- ensure_adapter_loaded(adapter),
-         true <-
-           function_exported?(adapter, :lm_opts, 3) or function_exported?(adapter, :lm_opts, 2),
-         {:ok, opts} <- call_adapter_lm_opts(adapter, signature, config, lm) do
-      {:ok, Keyword.merge(config, opts)}
-    else
-      false -> {:ok, config}
-      {:error, _reason} = error -> error
-    end
-  end
-
-  defp call_adapter_lm_opts(adapter, signature, config, lm) do
-    opts =
-      if function_exported?(adapter, :lm_opts, 3) do
-        adapter.lm_opts(signature, config, Imp.LM.response_format_capability(lm))
-      else
-        adapter.lm_opts(signature, config)
-      end
-
-    if Keyword.keyword?(opts) do
-      {:ok, opts}
-    else
-      {:error, {:invalid_adapter_lm_opts, adapter, opts}}
-    end
-  rescue
-    error -> {:error, {:adapter_lm_opts_failed, adapter, Exception.message(error)}}
-  catch
-    kind, reason -> {:error, {:adapter_lm_opts_failed, adapter, {kind, reason}}}
-  end
-
-  defp ensure_adapter_loaded(adapter) when is_atom(adapter) do
-    case Code.ensure_loaded(adapter) do
-      {:module, _module} -> :ok
-      {:error, reason} -> {:error, {:adapter_not_loaded, adapter, reason}}
-    end
-  end
-
-  defp ensure_adapter_loaded(adapter), do: {:error, {:invalid_adapter, adapter}}
-
-  defp stream_value(%Imp.Prediction{} = prediction), do: Imp.Prediction.to_map(prediction)
-  defp stream_value(value), do: value
 
   @doc """
   Collects stream chunks into a string.
@@ -221,8 +237,20 @@ defmodule Imp.Streaming do
       |> stream(inputs, opts)
       |> Enum.reduce_while([], fn value, chunks ->
         case stream_error(value) do
-          {:error, reason} -> {:halt, {:error, reason}}
-          nil -> {:cont, [collect_value(value, outputs) | chunks]}
+          {:error, reason} ->
+            {:halt, {:error, reason}}
+
+          nil ->
+            cond do
+              match?(%Imp.Prediction{}, value) ->
+                # A completed provider stream has now passed through the
+                # program's adapter and output contract. Prefer that typed
+                # final value over provider wire framing accumulated earlier.
+                {:cont, [collect_value(value, outputs)]}
+
+              true ->
+                {:cont, [collect_value(value, outputs) | chunks]}
+            end
         end
       end)
 
@@ -354,16 +382,18 @@ defmodule Imp.Streaming do
     {:error, "expected nil or an arity-1 function, got: #{inspect(chunker)}"}
   end
 
-  defp validate_lm_opts(opts) when is_list(opts) do
-    if Keyword.keyword?(opts) do
-      {:ok, opts}
+  def validate_stream_listeners(listeners) when is_list(listeners) do
+    if Enum.all?(listeners, &match?(%Imp.Streaming.Messages.StreamListener{}, &1)) do
+      {:ok, listeners}
     else
-      {:error, {:invalid_lm_options, "expected keyword options, got: #{inspect(opts)}"}}
+      {:error, "expected a list of Imp.Streaming.Messages.StreamListener structs"}
     end
   end
 
-  defp validate_lm_opts(opts),
-    do: {:error, {:invalid_lm_options, "expected keyword options, got: #{inspect(opts)}"}}
+  def validate_stream_listeners(listeners) do
+    {:error,
+     "expected a list of Imp.Streaming.Messages.StreamListener structs, got: #{inspect(listeners)}"}
+  end
 
   defp normalize_inputs(inputs) do
     {:ok, Map.new(inputs)}

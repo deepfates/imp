@@ -492,11 +492,13 @@ defmodule CompletionSurfaceTest do
   end
 
   test "provider streaming applies adapter supplied LM options" do
+    owner = self()
+
     lm = %{
       module: Imp.LM.Static,
       opts: [
         handler: fn _messages, opts ->
-          send(self(), {:streaming_lm_opts, opts})
+          send(owner, {:streaming_lm_opts, opts})
           %{answer: "ok"}
         end
       ]
@@ -504,9 +506,11 @@ defmodule CompletionSurfaceTest do
 
     program = Imp.predict("question -> answer", lm: lm, adapter: StreamingLMOptsAdapter)
 
-    assert [%Imp.Streaming.Messages.StreamResponse{chunk: %{answer: "ok"}}] =
+    assert [%Imp.Prediction{} = prediction] =
              Imp.Streaming.stream(program, %{question: "q"}, provider_stream: true)
              |> Enum.to_list()
+
+    assert Imp.get(prediction, :answer) == "unused"
 
     assert_received {:streaming_lm_opts, opts}
     assert Keyword.fetch!(opts, :marker) == :from_adapter
@@ -528,12 +532,11 @@ defmodule CompletionSurfaceTest do
     assert Enum.take(Imp.Streaming.stream(program, %{question: "order?"}), 6) == ~w(o n e t w o)
   end
 
-  test "provider streaming fails loudly for composed programs without a streamable predictor" do
+  test "provider streaming executes composed built-in programs and returns their final prediction" do
     lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "n * 2"} end)
     program = Imp.program_of_thought("n: integer -> doubled: integer", lm: lm)
 
-    assert Imp.Streaming.collect(program, %{n: 2}, provider_stream: true) ==
-             {:error, {:provider_stream_unsupported, Imp.Predict.ProgramOfThought}}
+    assert Imp.Streaming.collect(program, %{n: 2}, provider_stream: true) == "4"
   end
 
   test "streaming fallback collects wrapper outputs through their task contracts" do

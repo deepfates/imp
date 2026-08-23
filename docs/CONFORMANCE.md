@@ -608,7 +608,7 @@ Indexed capability evidence:
 
 Missing evidence or behavior:
 
-- matched whole-optimizer effectiveness evidence for InferRules, plus any upstream parity authority for the native SignatureOptimizer extension; one bounded live task now establishes useful held-out selection and fresh Artifact application for both native public paths
+- whole-optimizer and held-out effectiveness evidence for InferRules, plus any upstream parity authority for the native SignatureOptimizer extension
 - C3 multi-seed held-out SIMBA effectiveness and cross-task MIPROv2 generalization under matched controls
 - paper-scale lift evidence
 
@@ -835,18 +835,20 @@ Semantic invariants:
 
 - work is supervised and cancellable
 - stream events preserve final results and errors
-- provider streaming either reaches a streamable predictor or returns a terminal unsupported-program error
+- provider streaming executes real composed control flow and can select intermediate fields by named predictor
 - cache policy and usage accounting are configurable
 - provider-free overhead is measured against upstream
 
 Executable evidence:
 
 - test: `test/runtime_async_stream_cache_test.exs`
+- test: `test/composed_streaming_test.exs`
+- test: `test/upstream_exam/streaming_test.exs`
 - test: `test/completion_surface_test.exs`
 - test: `test/task_supervision_test.exs`
 - test: `test/production_hardening_test.exs`
 - docs: `docs/ARCHITECTURE.md`
-- docs: [docs/internal/PARITY_VALIDATION_PROGRAM.md](https://github.com/deepfates/imp/blob/main/docs/internal/PARITY_VALIDATION_PROGRAM.md) (repository only, not shipped in the package)
+- docs: `docs/API_GUIDE.md`
 
 
 

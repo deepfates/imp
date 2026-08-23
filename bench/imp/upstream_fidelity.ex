@@ -844,18 +844,20 @@ defmodule Imp.UpstreamFidelity do
       invariants: [
         "work is supervised and cancellable",
         "stream events preserve final results and errors",
-        "provider streaming either reaches a streamable predictor or returns a terminal unsupported-program error",
+        "provider streaming executes real composed control flow and can select intermediate fields by named predictor",
         "cache policy and usage accounting are configurable",
         "provider-free overhead is measured against upstream"
       ],
       evidence: %{
         tests: [
           "test/runtime_async_stream_cache_test.exs",
+          "test/composed_streaming_test.exs",
+          "test/upstream_exam/streaming_test.exs",
           "test/completion_surface_test.exs",
           "test/task_supervision_test.exs",
           "test/production_hardening_test.exs"
         ],
-        docs: ["docs/ARCHITECTURE.md", "docs/internal/PARITY_VALIDATION_PROGRAM.md"]
+        docs: ["docs/ARCHITECTURE.md", "docs/API_GUIDE.md"]
       }
     },
     %{

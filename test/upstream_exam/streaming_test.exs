@@ -51,10 +51,11 @@ defmodule UpstreamExam.StreamingTest do
   defp join_content(chunks), do: Enum.map_join(chunks, "", &(&1.chunk || ""))
 
   # ---------------------------------------------------------------------------
-  # test_streamify_yields_expected_response_chunks (adapted) — DSPy's
-  # streamify over a program; Imp's Imp.Streaming.stream/3 fallback chunks the
-  # completed answer locally. The port asserts the same contract: the stream
-  # yields chunks that concatenate to the program's full answer.
+  # test_streamify_yields_expected_response_chunks (adapted) — this checks the
+  # non-provider Enumerable analogue. The provider-backed composed-program
+  # contract from the same pinned suite is exercised in
+  # test/composed_streaming_test.exs: it observes both named predictors while
+  # preserving real control flow and the final typed prediction.
   # ---------------------------------------------------------------------------
   test "streamify: stream yields chunks that assemble the full answer" do
     program =

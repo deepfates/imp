@@ -877,7 +877,7 @@ fetching is deliberately not an implicit side effect of a runtime loader.
 semantic embedding provider must return one numeric vector for each input
 text.
 
-## Streaming sends partial output without changing the program
+## Streaming executes the program while partial output arrives
 
 `Imp.stream/3` can ask a capable provider for chunks. `Imp.collect/3` consumes
 the same path and joins the final text:
@@ -890,12 +890,37 @@ Enum.each(stream, fn chunk ->
 end)
 ```
 
-Provider-native thinking and tool-call chunks retain their type in metadata.
-`provider_stream: true` is strict for program shape: a composed program that
-does not expose a streamable predictor returns
-`{:error, {:provider_stream_unsupported, module}}` from `Imp.collect/3` rather
-than pretending a locally split final response arrived from the provider.
-Omit the option when post-call local chunking is the behavior you want.
+The stream ends with the program's typed `Imp.Prediction`. Earlier values are
+normalized provider events. Provider-native thinking and tool-call chunks
+retain their type in metadata.
+
+For a composed module, select intermediate fields with the same named
+predictors the optimizer uses:
+
+```elixir
+alias Imp.Streaming.Messages.StreamListener
+
+listeners = [
+  StreamListener.new(predict_name: :analyze_intent, signature_field_name: :evidence),
+  StreamListener.new(predict_name: :classify_route, signature_field_name: :route)
+]
+
+events =
+  Imp.stream(pipeline, %{utterance: ticket},
+    provider_stream: true,
+    stream_listeners: listeners
+  )
+  |> Enum.to_list()
+```
+
+Imp runs the pipeline's actual control flow: the second predictor receives the
+first predictor's completed typed output. Listener events carry
+`:predict_name` and `:signature_field_name` metadata. When a field name is
+unique, `:predict_name` may be omitted; ambiguous fields fail before the call.
+Early enumeration halt cancels the owned program and provider stream. Set
+`include_final_prediction: false` only when the caller intentionally does not
+need the terminal typed value. Omit `provider_stream: true` when post-call local
+chunking is the behavior you want.
 
 ## Conversation history is task-shaped data
 

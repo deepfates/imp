@@ -438,9 +438,21 @@ defmodule Imp.Clients.ReqLLM do
     opts =
       opts
       |> normalize_opts()
+      |> normalize_stream_cache()
       |> normalize_provider_profile_opts(lm.model)
 
     normalize_stream(lm, messages, opts)
+  end
+
+  # Imp's public boolean controls the Imp response cache. ReqLLM's :cache
+  # option instead expects a backend module. Streaming cannot replay Imp cache
+  # entries incrementally, so remove only the booleans and preserve an explicit
+  # ReqLLM backend when a caller supplies one.
+  defp normalize_stream_cache(opts) do
+    case Keyword.fetch(opts, :cache) do
+      {:ok, value} when is_boolean(value) -> Keyword.delete(opts, :cache)
+      _other -> opts
+    end
   end
 
   defp safe_stream(lm, messages, opts) do
@@ -1466,13 +1478,11 @@ defmodule Imp.Clients.ReqLLM do
     [%Imp.Streaming.Messages.StreamResponse{chunk: payload}]
   end
 
-  defp from_stream_chunk(%ReqLLM.StreamChunk{type: :meta, metadata: metadata}) do
-    if metadata[:finish_reason] || metadata["finish_reason"] do
-      [%Imp.Streaming.Messages.StreamResponse{done: true, metadata: metadata}]
-    else
-      []
-    end
-  end
+  # Metadata can arrive in several provider chunks (usage, model, finish
+  # reason, reasoning details). `next_stream_chunk/1` accumulates it and emits
+  # exactly one terminal event after the provider enumerable is exhausted, so
+  # callers never mistake an early finish-reason chunk for complete accounting.
+  defp from_stream_chunk(%ReqLLM.StreamChunk{type: :meta}), do: []
 
   defp from_stream_chunk(_chunk), do: []
 
@@ -1498,7 +1508,8 @@ defmodule Imp.Clients.ReqLLM do
           started?: false,
           completed?: false,
           failed?: false,
-          terminal_error: nil
+          terminal_error: nil,
+          metadata: %{}
         }
 
       {:error, reason} ->
@@ -1509,7 +1520,8 @@ defmodule Imp.Clients.ReqLLM do
           started?: false,
           completed?: false,
           failed?: true,
-          terminal_error: reason
+          terminal_error: reason,
+          metadata: %{}
         }
     end
   end
@@ -1525,17 +1537,24 @@ defmodule Imp.Clients.ReqLLM do
     case state.resume.() do
       {:suspended, chunk, continuation} ->
         chunks = from_stream_chunk(chunk)
+        metadata = accumulate_stream_metadata(state.metadata, chunk)
 
         {chunks,
          %{
            state
            | resume: fn -> continuation.({:cont, nil}) end,
              continuation: continuation,
-             started?: true
+             started?: true,
+             metadata: metadata
          }}
 
       {:done, _acc} ->
-        {:halt, %{state | continuation: nil, started?: true, completed?: true}}
+        {[
+           %Imp.Streaming.Messages.StreamResponse{
+             done: true,
+             metadata: state.metadata
+           }
+         ], %{state | continuation: nil, started?: true, completed?: true}}
 
       {:halted, _acc} ->
         {:halt, %{state | continuation: nil, started?: true, completed?: true}}
@@ -1549,6 +1568,15 @@ defmodule Imp.Clients.ReqLLM do
   defp suspend_stream(stream) do
     Enumerable.reduce(stream, {:cont, nil}, fn chunk, _acc -> {:suspend, chunk} end)
   end
+
+  defp accumulate_stream_metadata(metadata, %ReqLLM.StreamChunk{
+         type: :meta,
+         metadata: incoming
+       })
+       when is_map(incoming),
+       do: Map.merge(metadata, incoming)
+
+  defp accumulate_stream_metadata(metadata, _chunk), do: metadata
 
   defp stream_failure(state, error) do
     reason = {:req_llm_stream_failed, error_message(error)}

@@ -274,7 +274,18 @@ Protocol adapters translate Imp-native events and authorization requests outside
 the core package.
 `Imp.Streaming.Messages.StreamListener.attach/2` observes normalized stream
 events while yielding the original chunks, including terminal and error events,
-unchanged. `Imp.Cache.configure/1` controls enablement, TTL, and maximum entry
+unchanged. In provider mode, `Imp.Streaming.stream/3` runs the actual program
+once and marks its ordinary named predictors as observation points. Listeners
+can select fields from intermediate predictors while composed control flow
+continues; the stream ends with the program's typed `Imp.Prediction`. Delivery
+is demand-driven, so an early halt or dead consumer cancels the owned program
+and unwinds the provider stream instead of draining it in the background. This
+process-local streaming context is observation only, never authorization, and
+is propagated through the supervised task layer for composed modules that use
+owned child tasks. ReqLLM stream metadata is accumulated through the terminal provider
+event, so usage is recorded once for the completed streamed call.
+
+`Imp.Cache.configure/1` controls enablement, TTL, and maximum entry
 count; `Imp.Cache.stats/0` reports atomic hit, miss, write, bypass, expiration,
 and eviction counters. Cache reads and writes remain ETS hot paths while the
 owner process controls policy and table lifecycle.

@@ -29,11 +29,15 @@ Whole-program `Imp.save!/2,3` now matches parameter and Experiment persistence
 by writing through an exclusive, synced, mode-`0600` temporary file before
 atomic replacement; demonstrations and other saved program state are no longer
 created world-readable under a permissive process umask.
-Strict provider streaming now fails with
-`{:provider_stream_unsupported, module}` when a composed program exposes no
-streamable predictor; local post-call chunking remains available when
-`provider_stream: true` is omitted. The packaged guides use the current
-`Imp.LM.Static.new/1` API and now include a complete signature type reference.
+Provider streaming now executes the original composed program and can observe
+selected output fields at its named predictors before yielding the typed final
+prediction. Delivery is demand-driven: early halt or consumer death unwinds the
+owned program and provider stream, including when the caller already holds the
+sole supervised worker lease. Programs with no named predictors still fail
+explicitly, and local post-call chunking remains available when
+`provider_stream: true` is omitted. ReqLLM streams retain terminal usage exactly
+once. The packaged guides use the current `Imp.LM.Static.new/1` API and include
+a complete signature type reference.
 
 Programs can now expose described, constrained JSON-safe optimizer components
 through paired `Imp.Module` callbacks. Predictor, playbook, ReAct tool, and
