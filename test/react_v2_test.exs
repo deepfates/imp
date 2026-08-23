@@ -246,6 +246,37 @@ defmodule ReActV2Test do
     assert Enum.all?(first.tool_call_results, & &1.error)
   end
 
+  test "malformed provider tool calls become observations and cannot execute an effect" do
+    parent = self()
+    write = Imp.tool(:write, "write", fn arguments -> send(parent, {:write, arguments}) end)
+
+    lm =
+      action_lm([
+        %{tool_calls: [%{"command" => "cat", "args" => ["/dev/null"]}]},
+        %{
+          tool_calls: [
+            %{name: "write", arguments: %{path: "notes.txt"}},
+            %{name: "submit", arguments: %{answer: "recovered"}}
+          ]
+        }
+      ])
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [write], lm: lm, max_iters: 2)
+             |> Imp.call(%{question: "write and verify"})
+
+    assert Imp.get(prediction, :answer) == "recovered"
+    assert_received {:write, %{path: "notes.txt"}}
+    refute_received {:write, %{"command" => "cat"}}
+
+    assert %Imp.History{messages: [malformed, _recovered]} = Imp.get(prediction, :history)
+    assert [result] = malformed.tool_call_results
+    assert result.error
+
+    assert {:error, {:malformed_tool_call, %{"command" => "cat", "args" => ["/dev/null"]}}} =
+             result.result
+  end
+
   test "forces submit after empty calls and marks forced termination" do
     parent = self()
 

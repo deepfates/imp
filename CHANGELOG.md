@@ -85,6 +85,9 @@ tools-disabled typed extraction over the original inputs and accumulated
 history, mirroring ReAct's separation between evidence gathering and final
 output extraction. It does not accept provider prose as the task result, and
 other provider errors are not retried through the compatibility path.
+Malformed provider tool calls are retained as non-executable error observations
+so the model can correct them on its next turn; Imp never guesses a missing tool
+name or sends the malformed call through policy, authorization, or execution.
 
 The persistent Playbook optimizer now has an ordinary reviewed-challenger
 lifecycle. Training weaknesses are exposed as grounded row and trajectory

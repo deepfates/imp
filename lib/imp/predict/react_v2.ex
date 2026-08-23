@@ -13,6 +13,8 @@ defmodule Imp.Predict.ReActV2 do
 
   alias Imp.Adapter.Types.{ToolCall, ToolCalls, ToolResult}
 
+  @malformed_tool_call "__imp_malformed_tool_call__"
+
   defstruct [:signature, :react, tools: %{}, max_iters: 20, tool_policy: :allow]
 
   @type t :: %__MODULE__{}
@@ -413,8 +415,22 @@ defmodule Imp.Predict.ReActV2 do
   defp normalize_calls(%{tool_calls: calls}, turn), do: normalize_calls(calls, turn)
   defp normalize_calls(%{"tool_calls" => calls}, turn), do: normalize_calls(calls, turn)
 
-  defp normalize_calls(calls, turn),
-    do: calls |> List.wrap() |> ToolCalls.new() |> ensure_ids(turn)
+  defp normalize_calls(calls, turn) do
+    calls = Enum.map(List.wrap(calls), &normalize_call/1)
+    ensure_ids(%ToolCalls{tool_calls: calls}, turn)
+  end
+
+  defp normalize_call(%ToolCall{} = call), do: call
+
+  defp normalize_call(call) do
+    ToolCall.from_map(call)
+  rescue
+    ArgumentError ->
+      %ToolCall{
+        name: @malformed_tool_call,
+        arguments: %{received: call}
+      }
+  end
 
   defp ensure_ids(%ToolCalls{tool_calls: calls}, turn) do
     calls =
@@ -430,27 +446,31 @@ defmodule Imp.Predict.ReActV2 do
 
   defp execute_calls(react, %ToolCalls{tool_calls: calls}, execution) do
     Enum.reduce_while(calls, {[], nil}, fn call, {results, final} ->
-      :ok =
-        Imp.Run.emit(:tool_call,
-          component: __MODULE__,
-          tool_call_id: call.id,
-          tool_name: call.name,
-          input: Imp.Tool.normalize_arguments(call.arguments)
-        )
+      unless malformed_call?(call) do
+        :ok =
+          Imp.Run.emit(:tool_call,
+            component: __MODULE__,
+            tool_call_id: call.id,
+            tool_name: call.name,
+            input: Imp.Tool.normalize_arguments(call.arguments)
+          )
+      end
 
       case execute_call(react, call, execution) do
         {:cancel, reason} ->
           {:halt, {:cancel, reason}}
 
         {result, error?} ->
-          :ok =
-            Imp.Run.emit(:tool_result,
-              component: __MODULE__,
-              tool_call_id: call.id,
-              tool_name: call.name,
-              output: if(error?, do: nil, else: result),
-              error: if(error?, do: result, else: nil)
-            )
+          unless malformed_call?(call) do
+            :ok =
+              Imp.Run.emit(:tool_result,
+                component: __MODULE__,
+                tool_call_id: call.id,
+                tool_name: call.name,
+                output: if(error?, do: nil, else: result),
+                error: if(error?, do: result, else: nil)
+              )
+          end
 
           result = %ToolResult{name: call.name, result: result, id: call.id}
 
@@ -463,6 +483,13 @@ defmodule Imp.Predict.ReActV2 do
       end
     end)
   end
+
+  defp execute_call(
+         _react,
+         %ToolCall{name: @malformed_tool_call, arguments: %{received: received}},
+         _execution
+       ),
+       do: {{:error, {:malformed_tool_call, received}}, true}
 
   defp execute_call(react, %ToolCall{name: requested, arguments: arguments} = call, execution) do
     name = Imp.Tool.resolve_name(react.tools, requested)
@@ -483,6 +510,9 @@ defmodule Imp.Predict.ReActV2 do
         end
     end
   end
+
+  defp malformed_call?(%ToolCall{name: @malformed_tool_call}), do: true
+  defp malformed_call?(%ToolCall{}), do: false
 
   defp authorize_and_call(react, %{name: :submit}, _call, arguments, _execution),
     do: validate_submit(react.signature, arguments)
