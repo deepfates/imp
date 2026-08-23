@@ -76,7 +76,11 @@ program signature; an absent or invalid submit remains an error rather than
 being converted into an answer or retried indefinitely.
 OpenAI-compatible endpoints that reject named tool choice now receive one
 bounded fallback with only `submit` exposed and `tool_choice: "required"`.
-Other provider errors are not retried through that compatibility path.
+If a successful forced turn still contains no submit call, ReActV2 runs one
+tools-disabled typed extraction over the original inputs and accumulated
+history, mirroring ReAct's separation between evidence gathering and final
+output extraction. It does not accept provider prose as the task result, and
+other provider errors are not retried through the compatibility path.
 
 The persistent Playbook optimizer now has an ordinary reviewed-challenger
 lifecycle. Training weaknesses are exposed as grounded row and trajectory

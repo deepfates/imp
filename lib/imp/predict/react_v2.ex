@@ -1,10 +1,12 @@
 defmodule Imp.Predict.ReActV2 do
   @moduledoc """
-  Native-tool-aware ReAct loop with structured history and forced submission.
+  Native-tool-aware ReAct loop with structured history and typed completion.
 
   ReActV2 preserves parallel tool call IDs and results in `Imp.History`, keeps
-  unknown and failed tool calls as observations, and forces one final `submit`
-  call when the normal loop ends without final outputs.
+  unknown and failed tool calls as observations, and first forces a final
+  `submit` call when the normal loop ends without outputs. If a provider cannot
+  honor that tool contract, a tools-disabled typed extractor derives the task
+  outputs from the original inputs and accumulated history.
   """
 
   @behaviour Imp.Module
@@ -120,21 +122,30 @@ defmodule Imp.Predict.ReActV2 do
         |> Map.new(fn name -> {name, fetch_input(inputs, name)} end)
         |> Map.reject(fn {_key, value} -> is_nil(value) end)
 
-      run(react, history, pending, 0, max_iters, execution)
+      run(react, history, pending, pending, 0, max_iters, execution)
     end
   end
 
-  defp run(react, history, pending, turn, max_iters, execution) when turn >= max_iters,
-    do: forced_submit(react, history, pending, :max_iters, turn, nil, execution)
+  defp run(react, history, inputs, pending, turn, max_iters, execution) when turn >= max_iters,
+    do: forced_submit(react, history, inputs, pending, :max_iters, turn, nil, execution)
 
-  defp run(react, history, pending, turn, max_iters, execution) do
+  defp run(react, history, inputs, pending, turn, max_iters, execution) do
     case predict(react.react, react, history, pending) do
       {:ok, prediction} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
         emit_reasoning(prediction, turn)
 
         if calls.tool_calls == [] do
-          forced_submit(react, history, pending, :empty_tool_calls, turn, nil, execution)
+          forced_submit(
+            react,
+            history,
+            inputs,
+            pending,
+            :empty_tool_calls,
+            turn,
+            nil,
+            execution
+          )
         else
           case execute_calls(react, calls, execution) do
             {:cancel, reason} ->
@@ -146,7 +157,7 @@ defmodule Imp.Predict.ReActV2 do
 
               if final,
                 do: final_prediction(final, history, :submit),
-                else: run(react, history, %{}, turn + 1, max_iters, execution)
+                else: run(react, history, inputs, %{}, turn + 1, max_iters, execution)
           end
         end
 
@@ -154,6 +165,7 @@ defmodule Imp.Predict.ReActV2 do
         forced_submit(
           react,
           history,
+          inputs,
           pending,
           termination_reason(reason),
           turn,
@@ -163,29 +175,38 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  defp forced_submit(react, history, pending, reason, turn, initial_error, execution) do
+  defp forced_submit(
+         react,
+         history,
+         inputs,
+         pending,
+         reason,
+         turn,
+         initial_error,
+         execution
+       ) do
     with {:ok, prediction} <- forced_submit_prediction(react, history, pending) do
       calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
       emit_reasoning(prediction, turn, forced?: true)
-      submit_calls = %ToolCalls{tool_calls: Enum.filter(calls.tool_calls, &submit?/1)}
 
-      if submit_calls.tool_calls == [] do
-        incomplete_prediction(history, reason, initial_error)
-      else
-        case execute_calls(react, submit_calls, execution) do
-          {:cancel, cancel_reason} ->
-            {:error, {:execution_cancelled, cancel_reason}}
-
-          {results, final} ->
-            event = history_event(pending, prediction, submit_calls, results, final)
-            history = Imp.History.append(history, event)
-
-            if final,
-              do: final_prediction(final, history, :forced_submit),
-              else: incomplete_prediction(history, reason, initial_error)
-        end
-      end
+      finish_forced_submit(
+        react,
+        prediction,
+        calls,
+        history,
+        inputs,
+        pending,
+        reason,
+        initial_error,
+        execution
+      )
     else
+      {:extract, forced_error} ->
+        extract_final(react, inputs, history, reason, %{
+          initial: initial_error,
+          forced_submit: forced_error
+        })
+
       {:error, forced_error} ->
         incomplete_prediction(history, reason, %{
           initial: initial_error,
@@ -208,13 +229,60 @@ defmodule Imp.Predict.ReActV2 do
           submit = Map.fetch!(react.tools, :submit)
           submit_only = %{react | tools: %{submit: submit}}
           fallback = forced_submit_program(submit_only, "required")
-          predict(fallback, submit_only, history, pending)
+
+          case predict(fallback, submit_only, history, pending) do
+            {:ok, prediction} -> {:ok, prediction}
+            {:error, fallback_error} -> {:extract, fallback_error}
+          end
         else
           error
         end
 
-      success ->
-        success
+      {:ok, prediction} ->
+        {:ok, prediction}
+    end
+  end
+
+  defp finish_forced_submit(
+         react,
+         prediction,
+         calls,
+         history,
+         inputs,
+         pending,
+         reason,
+         initial_error,
+         execution
+       ) do
+    submit_calls = %ToolCalls{tool_calls: Enum.filter(calls.tool_calls, &submit?/1)}
+
+    if submit_calls.tool_calls == [] do
+      history = maybe_append_forced_observation(history, pending, prediction, calls)
+      extract_final(react, inputs, history, reason, initial_error)
+    else
+      case execute_calls(react, submit_calls, execution) do
+        {:cancel, cancel_reason} ->
+          {:error, {:execution_cancelled, cancel_reason}}
+
+        {results, final} ->
+          event = history_event(pending, prediction, submit_calls, results, final)
+          history = Imp.History.append(history, event)
+
+          if final,
+            do: final_prediction(final, history, :forced_submit),
+            else: incomplete_prediction(history, reason, initial_error)
+      end
+    end
+  end
+
+  defp maybe_append_forced_observation(history, pending, prediction, calls) do
+    thought = Imp.get(prediction, :next_thought)
+
+    if thought in [nil, ""] and calls.tool_calls == [] do
+      history
+    else
+      event = history_event(pending, prediction, calls, [], nil)
+      Imp.History.append(history, event)
     end
   end
 
@@ -228,6 +296,64 @@ defmodule Imp.Predict.ReActV2 do
             reasoning_effort: nil
           )
     }
+  end
+
+  defp extract_final(react, inputs, history, reason, initial_error) do
+    extractor = extraction_program(react)
+    extraction_inputs = Map.put(inputs, :history, history)
+
+    case Imp.Predict.ChainOfThought.call(extractor, extraction_inputs) do
+      {:ok, prediction} ->
+        final =
+          prediction
+          |> Imp.Prediction.to_map()
+          |> Map.take(Imp.Signature.output_names(react.signature))
+
+        case Imp.Schema.validate_fields(react.signature.outputs, final) do
+          :ok ->
+            final =
+              final
+              |> Map.put(:completion_mode, :typed_extraction)
+              |> Map.put(:termination_cause, reason)
+
+            final_prediction(final, history, :forced_submit)
+
+          {:error, errors} ->
+            incomplete_prediction(history, reason, %{
+              initial: initial_error,
+              extraction: Imp.Schema.retry_feedback(errors)
+            })
+        end
+
+      {:error, extraction_error} ->
+        incomplete_prediction(history, reason, %{
+          initial: initial_error,
+          extraction: extraction_error
+        })
+    end
+  end
+
+  defp extraction_program(react) do
+    signature = %Imp.Signature{
+      inputs: react.signature.inputs ++ [Imp.Signature.Field.new(:history, :input)],
+      outputs: react.signature.outputs,
+      instructions: react.signature.instructions
+    }
+
+    predict = react.react
+
+    opts = [
+      demos: [],
+      config: Keyword.drop(predict.config, [:tools, :tool_choice]),
+      metadata: predict.metadata
+    ]
+
+    opts = if predict.dynamic_lm?, do: opts, else: Keyword.put(opts, :lm, predict.lm)
+
+    opts =
+      if predict.dynamic_adapter?, do: opts, else: Keyword.put(opts, :adapter, predict.adapter)
+
+    Imp.Predict.ChainOfThought.new(signature, opts)
   end
 
   defp named_tool_choice_unsupported?(reason) do

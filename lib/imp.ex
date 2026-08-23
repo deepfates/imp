@@ -238,7 +238,7 @@ defmodule Imp do
   @doc "Creates an iterative provider-tool-call ReAct program with reserved submit."
   def react(signature, tools, opts \\ []), do: ReAct.new(signature, tools, opts)
 
-  @doc "Creates a native-tool-aware ReActV2 program with structured history and forced submit."
+  @doc "Creates a native-tool-aware ReActV2 program with structured history and typed completion."
   def react_v2(signature, tools, opts \\ []), do: ReActV2.new(signature, tools, opts)
 
   @doc "Creates a bounded action-history Avatar actor with a reserved Finish action."

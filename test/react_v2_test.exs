@@ -73,18 +73,76 @@ defmodule ReActV2Test do
           {{:error, error}, :required}
 
         :required ->
-          response =
-            response(
-              model,
-              messages,
-              "resp_submit",
-              "toolu_submit",
-              "submit",
-              ~s({"answer":"Paris"})
-            )
+          if Keyword.get(opts, :required_returns_prose, false) do
+            response = prose_response(model, messages, "I will submit Paris now.")
+            {{:ok, response}, :corrective}
+          else
+            response =
+              response(
+                model,
+                messages,
+                "resp_submit",
+                "toolu_submit",
+                "submit",
+                ~s({"answer":"Paris"})
+              )
 
-          {{:ok, response}, :done}
+            {{:ok, response}, :done}
+          end
+
+        :corrective ->
+          if Keyword.get(opts, :extraction_fails, false) do
+            error =
+              ReqLLM.Error.API.Request.exception(
+                status: 503,
+                reason: "extraction unavailable",
+                response_body: %{"error" => "extraction unavailable"}
+              )
+
+            {{:error, error}, :done}
+          else
+            {{:ok, extraction_response(model, messages, "Paris")}, :done}
+          end
+
+        :done ->
+          if Keyword.get(opts, :extraction_fails, false) do
+            error =
+              ReqLLM.Error.API.Request.exception(
+                status: 503,
+                reason: "extraction unavailable",
+                response_body: %{"error" => "extraction unavailable"}
+              )
+
+            {{:error, error}, :done}
+          else
+            {{:ok, extraction_response(model, messages, "Paris")}, :done}
+          end
       end)
+    end
+
+    defp prose_response(model, messages, text) do
+      %ReqLLM.Response{
+        id: "resp_prose",
+        model: to_string(model),
+        context: ReqLLM.Context.new(messages),
+        message: ReqLLM.Context.assistant(Jason.encode!(%{next_thought: text, tool_calls: []})),
+        object: nil,
+        finish_reason: :stop
+      }
+    end
+
+    defp extraction_response(model, messages, answer) do
+      %ReqLLM.Response{
+        id: "resp_extraction",
+        model: to_string(model),
+        context: ReqLLM.Context.new(messages),
+        message:
+          ReqLLM.Context.assistant(
+            Jason.encode!(%{reasoning: "The gathered evidence supports this.", answer: answer})
+          ),
+        object: nil,
+        finish_reason: :stop
+      }
     end
 
     defp response(model, messages, id, call_id, name, arguments) do
@@ -255,7 +313,11 @@ defmodule ReActV2Test do
     lookup = Imp.tool(:lookup, "Look up a fact", fn _args -> "unused" end)
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 1)
+             Imp.react_v2("question -> answer", [lookup],
+               lm: lm,
+               max_iters: 1,
+               config: [json_retries: 0]
+             )
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
@@ -287,13 +349,101 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+             Imp.react_v2("question -> answer", [],
+               lm: lm,
+               max_iters: 1,
+               config: [json_retries: 0]
+             )
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :termination_reason) == :max_iters
     assert_received {:required_only_tool_request, _initial_messages, _initial_opts}
     assert_received {:required_only_tool_request, _named_messages, _named_opts}
     refute_received {:required_only_tool_request, _fallback_messages, _fallback_opts}
+  end
+
+  test "uses tools-disabled typed extraction when required-only returns no submit" do
+    {:ok, state} = Agent.start_link(fn -> :initial end)
+
+    lm =
+      Imp.req_llm("openai:fixture",
+        req_module: RequiredOnlyToolStub,
+        state: state,
+        test_pid: self(),
+        required_returns_prose: true,
+        cache: false
+      )
+
+    lookup = Imp.tool(:lookup, "Look up a fact", fn _args -> "unused" end)
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [lookup],
+               lm: lm,
+               max_iters: 1,
+               config: [json_retries: 0]
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :forced_submit
+    assert Imp.get(prediction, :completion_mode) == :typed_extraction
+    assert Imp.get(prediction, :termination_cause) == :max_iters
+
+    requests =
+      for _ <- 1..5 do
+        assert_received {:required_only_tool_request, messages, opts}
+        {messages, opts}
+      end
+
+    assert Enum.any?(requests, fn {_messages, opts} -> opts[:tool_choice] == "auto" end)
+
+    assert Enum.any?(requests, fn {_messages, opts} ->
+             opts[:tool_choice] == %{type: "tool", name: "submit"}
+           end)
+
+    assert Enum.any?(requests, fn {_messages, opts} ->
+             opts[:tool_choice] == "required" and
+               match?([%ReqLLM.Tool{name: "submit"}], opts[:tools])
+           end)
+
+    assert {_extraction_messages, extraction_opts} =
+             Enum.find(requests, fn {_messages, opts} ->
+               opts[:tool_choice] == nil and opts[:tools] in [nil, []]
+             end)
+
+    assert extraction_opts[:tool_choice] == nil
+    assert extraction_opts[:tools] in [nil, []]
+  end
+
+  test "preserves missing output when typed extraction fails" do
+    {:ok, state} = Agent.start_link(fn -> :initial end)
+
+    lm =
+      Imp.req_llm("openai:fixture",
+        req_module: RequiredOnlyToolStub,
+        state: state,
+        test_pid: self(),
+        required_returns_prose: true,
+        extraction_fails: true,
+        cache: false
+      )
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [],
+               lm: lm,
+               max_iters: 1,
+               config: [json_retries: 0]
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == nil
+    assert Imp.get(prediction, :termination_reason) == :max_iters
+
+    for _ <- 1..5 do
+      assert_received {:required_only_tool_request, _messages, _opts}
+    end
+
+    refute_received {:required_only_tool_request, _messages, _opts}
   end
 
   test "normalizes atom- and string-keyed tool-call collection wrappers" do
