@@ -98,25 +98,23 @@ defmodule DocumentationContractTest do
     assert missing == []
   end
 
-  test "API guide is the canonical signature type DSL reference" do
-    body = File.read!("docs/API_GUIDE.md")
+  test "the learning path owns the signature type DSL" do
+    body = File.read!("docs/LEARNING_PATH.md")
 
     for spelling <-
           ~w(string str integer int float number boolean bool datetime object map dict array enum class yes_no short_span numeric_span) do
       assert body =~ "`#{spelling}", "missing signature type spelling #{spelling}"
     end
 
-    assert body =~ "custom Pydantic-style model and tuple types are not part"
-    assert File.read!("README.md") =~ "docs/API_GUIDE.md#signature-type-dsl"
-    assert File.read!("docs/GLOSSARY.md") =~ "API_GUIDE.md#signature-type-dsl"
+    assert body =~ "Unknown types and duplicate names fail"
+    assert body =~ "Imp.Signature.Field"
   end
 
-  test "user-facing docs keep the default HTTP transport out of the public vocabulary" do
+  test "user-facing docs keep the internal HTTP transport out of the public vocabulary" do
     docs =
       ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
       |> Enum.map_join("\n", &File.read!/1)
 
-    assert docs =~ "Imp.HTTP"
     refute docs =~ "Imp.HTTP.Hackneyless"
   end
 
@@ -143,11 +141,9 @@ defmodule DocumentationContractTest do
 
   test "adapter fidelity audit names upstream semantics and Imp evidence" do
     body = File.read!("docs/internal/ADAPTER_FIDELITY.md")
-    readme = File.read!("docs/README.md")
     contributing = File.read!("CONTRIBUTING.md")
 
     assert contributing =~ "Public behavior belongs to code, tests, and user documentation"
-    refute readme =~ "ADAPTER_FIDELITY.md"
     assert body =~ "DSPy `ChatAdapter` uses `[[ ## field_name ## ]]` delimiters"
     assert body =~ "JSON fallback"
     assert body =~ "Imp.Adapter.JSON.lm_opts/2"
@@ -165,7 +161,7 @@ defmodule DocumentationContractTest do
 
   test "the executable Livebook proof stays off the reader's front doors" do
     refute File.read!("README.md") =~ "mix livebook.execute.check"
-    refute File.read!("docs/README.md") =~ "mix livebook.execute.check"
+    refute File.read!("docs/LEARNING_PATH.md") =~ "mix livebook.execute.check"
     assert File.read!("CONTRIBUTING.md") =~ "mix livebook.execute.check"
     assert File.read!("docs/maintainers/GATES.md") =~ "mix livebook.execute.check"
   end
@@ -196,7 +192,7 @@ defmodule DocumentationContractTest do
 
   test "learner-facing docs do not foreground maintainer evidence commands" do
     learner_text =
-      ["README.md", "docs/README.md" | Path.wildcard("livebooks/*.livemd")]
+      ["README.md", "docs/LEARNING_PATH.md" | Path.wildcard("livebooks/*.livemd")]
       |> Enum.map_join("\n", &File.read!/1)
 
     refute learner_text =~ "mix evidence.check"
@@ -205,66 +201,44 @@ defmodule DocumentationContractTest do
   test "README opens with a real provider call and routes into the learning path" do
     readme = File.read!("README.md")
     learning = File.read!("docs/LEARNING_PATH.md")
-    docs = File.read!("docs/README.md")
 
     assert readme =~ "typed Elixir program"
     assert readme =~ "Imp.req_llm"
     assert readme =~ "OPENAI_API_KEY"
     assert readme =~ "docs/LEARNING_PATH.md"
-    assert readme =~ "docs/TUTORIAL_TICKET_ROUTING.md"
     # The front door shows a real model call, never the deterministic test double.
     refute readme =~ "Imp.LM.Static"
     # No quality-gate plumbing on the front door.
     refute readme =~ "test/learning_path_contract_test.exs"
     assert learning =~ "Imp.context/2"
     assert learning =~ "Imp.LM.Static"
-    assert docs =~ "livebooks/01_real_lm_front_door.livemd"
+    assert readme =~ "livebooks/01_real_lm_front_door.livemd"
     refute readme =~ "05_real_lm_wow_path"
   end
 
-  test "docs teach the cutover Livebook sequence with real LM first" do
+  test "the packaged reader surface stays small and starts with the real workflow" do
     readme = File.read!("README.md")
-    docs = File.read!("docs/README.md")
-    api = File.read!("docs/API_GUIDE.md")
-    philosophy = File.read!("docs/PHILOSOPHY.md")
+    learning = File.read!("docs/LEARNING_PATH.md")
+
+    product_docs =
+      Mix.Project.config()
+      |> Keyword.fetch!(:package)
+      |> Keyword.fetch!(:files)
+      |> Enum.filter(&String.starts_with?(&1, "docs/"))
+      |> Enum.sort()
 
     assert readme =~ "Learning Path"
-    assert docs =~ "## Learn the complete path with one example"
     assert readme =~ "docs/LEARNING_PATH.md"
-    assert docs =~ "[01 Real LM Front Door](../livebooks/01_real_lm_front_door.livemd)"
-    assert docs =~ "[05 Operate And Live Checks](../livebooks/05_operate_and_live_checks.livemd)"
+    assert learning =~ "## 1. Make A Real Call"
+    assert learning =~ "## 10. Deploy The Verified Artifact"
 
-    for concept <- ["signature", "program", "prediction", "example", "metric", "optimizer"] do
-      assert api =~ concept
-    end
-
-    assert philosophy =~ "signature, program, call"
+    assert product_docs == [
+             "docs/IMP_FOR_DSPY_USERS.md",
+             "docs/LEARNING_PATH.md",
+             "docs/PRODUCTION_OPERATIONS.md"
+           ]
 
     refute readme =~ "01_programming_not_prompting"
-    refute docs =~ "05 Real LM Wow Path"
-  end
-
-  test "canonical API guide teaches the react/rlm spectrum, not a resident agent runtime" do
-    body = File.read!("docs/API_GUIDE.md")
-
-    assert body =~ "## Tools stay typed and policy-controlled"
-    assert body =~ "`react/3` is the upstream-shaped fail-fast loop"
-    assert body =~ "`react_v2/3` records unknown"
-    assert body =~ "`avatar/3`\nruns one typed action"
-    refute body =~ "Imp.Agent"
-  end
-
-  test "API guide explains public program choices without duplicating the reference" do
-    body = File.read!("docs/API_GUIDE.md")
-
-    assert body =~ "Imp.best_of_n/3"
-    assert body =~ "Imp.refine/3"
-    assert body =~ "Imp.parallel/1,2,3"
-    assert body =~ "different programs in the same bounded pool"
-    assert body =~ "Imp.knn/3"
-    assert body =~ "Imp.nearest/2"
-    assert body =~ "## Choose a program shape for the failure mode you need to control"
-    assert body =~ "generated module reference is the exhaustive"
   end
 
   test "README common workflow snippets compose as one coherent path" do
@@ -336,44 +310,10 @@ defmodule DocumentationContractTest do
     assert Imp.get(agent_prediction, :answer) == "Paris"
   end
 
-  test "API guide keeps protocol clients out of the normal provider path" do
-    api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
-
-    assert api =~ "Imp.req_llm"
-    assert api =~ "Advanced provider jobs, resumable batches, and protocol details live"
-    assert api =~ "Operations Reference"
-    refute api =~ "OpenAITrainer.new"
-    refute api =~ "DatabricksTrainer"
-
-    assert advanced =~ "## Protocol Clients"
-    assert advanced =~ "Imp.Retrievers.HTTP.new"
-    assert advanced =~ "Imp.Clients.OpenAITrainer.new"
-    assert advanced =~ ~r/do not\s+train models in-process/
-    assert advanced =~ "Network-facing protocol clients share the same transport boundary"
-    assert advanced =~ "accepts an HTTP transport module or an arity-4 callback"
-
-    assert advanced =~
-             "SFT trainer options accept `nil`, a trainer\nmodule, a configured trainer struct, or an arity-3 callback"
-
-    assert advanced =~
-             "GRPO requires a trainer module or struct because its reinforcement\nlifecycle spans start, status, step, termination, and artifact callbacks"
-  end
-
-  test "GEPA documentation distinguishes the canonical program and artifact surfaces" do
-    api = File.read!("docs/API_GUIDE.md")
-    advanced = File.read!("docs/ADVANCED.md")
+  test "GEPA research records distinguish program and artifact evidence" do
     coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
     parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
-    assert api =~ "## Optimize Anything uses the same selection discipline for other artifacts"
-    assert api =~ "Imp.Optimize.Anything.run/3"
-    assert api =~ "Imp.Optimize.Anything.best_candidate"
-    assert api =~ "The validation set chooses a candidate"
-    assert api =~ "GEPA and COPRO do not fabricate local proposals"
-    assert advanced =~ "public frontend delegates to the production GEPA engine"
-    assert advanced =~ "Current implementation fidelity is pinned to GEPA v0.1.4"
-    assert advanced =~ "earlier comparisons\nagainst the v0.1.1 checkout are kept as history"
     assert coverage =~ "GEPA-style reflection"
     assert parity =~ "GEPA-style optimizer rows"
   end
@@ -396,25 +336,18 @@ defmodule DocumentationContractTest do
              "Artifact\nreproduction proves deployment behavior, not held-out improvement"
   end
 
-  test "instruction optimizer docs define durable run-level resume boundaries" do
-    ops = File.read!("docs/OPERATIONS_REFERENCE.md")
+  test "instruction optimizer fidelity defines durable run-level resume boundaries" do
     fidelity = File.read!("docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md")
 
-    assert ops =~ "`max_trials:` and the compile-time `max_steps:` cap only the new work"
-    assert ops =~ "Completed boundaries are not replayed"
-    assert ops =~ "not signatures, authentication,\nencryption, or a sandbox"
     assert fidelity =~ "## Durable Run-Level Resume"
     assert fidelity =~ "A trial is the atomic boundary"
     assert fidelity =~ "every completed finalist evaluation"
     assert fidelity =~ "### Rebinding And Trust Boundary"
   end
 
-  test "embedding documentation names the deterministic baseline and provider shape contract" do
-    api = File.read!("docs/API_GUIDE.md")
+  test "embedding evidence names the deterministic baseline and provider shape contract" do
     coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
 
-    assert api =~ "Imp.Embeddings.BagOfWords"
-    assert api =~ "Dataset\nloaders and embedding providers"
     assert coverage =~ "deterministic local baseline"
     assert coverage =~ "one numeric vector per input text"
   end
@@ -453,17 +386,7 @@ defmodule DocumentationContractTest do
     end
   end
 
-  test "API guide distinguishes runnable snippets from external-service sketches" do
-    api = File.read!("docs/API_GUIDE.md")
-    ops = File.read!("docs/OPERATIONS_REFERENCE.md")
-
-    assert api =~ "artifact_path = \"/secure/support-router-parameters.json\""
-    refute api =~ "tmp/program.json"
-    assert api =~ "Operations Reference"
-    assert ops =~ "point Imp at trusted services you own"
-  end
-
-  test "API guide ReAct example is executable with a deterministic tool-calling LM" do
+  test "the documented ReAct path executes with a deterministic tool-calling LM" do
     {:ok, actions} =
       Agent.start_link(fn ->
         [
@@ -504,7 +427,7 @@ defmodule DocumentationContractTest do
     assert Imp.get(prediction, :answer) == "Paris"
   end
 
-  test "API guide basic Predict and ChainOfThought examples are executable" do
+  test "the documented Predict and ChainOfThought paths execute" do
     predict_lm = %{
       module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
@@ -530,7 +453,7 @@ defmodule DocumentationContractTest do
     assert Imp.get(cot_pred, :answer) == "4"
   end
 
-  test "API guide evaluate and optimize examples are executable through the facade" do
+  test "the documented evaluate and optimize path executes through the facade" do
     lm = %{
       module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
@@ -557,7 +480,7 @@ defmodule DocumentationContractTest do
              Imp.Optimizer.Report.fetch(compiled)
   end
 
-  test "API guide Save And Load example uses a portable program" do
+  test "the documented save and load path uses a portable program" do
     path =
       Path.join(
         System.tmp_dir!(),
@@ -572,7 +495,7 @@ defmodule DocumentationContractTest do
     assert %Imp.Predict.Predict{} = Imp.Saving.load!(path)
   end
 
-  test "API guide RAG example retrieves context, records metadata, and stays portable" do
+  test "the documented RAG path retrieves context, records metadata, and stays portable" do
     docs = [
       %{text: "France has capital Paris."},
       %{text: "Germany has capital Berlin."}
@@ -620,7 +543,7 @@ defmodule DocumentationContractTest do
     assert %Imp.Predict.RAG{retriever: %Imp.Retrieve.Memory{}} = Imp.Saving.load!(path)
   end
 
-  test "API guide Optimize Anything example produces an improving result" do
+  test "the documented Optimize Anything path produces an improving result" do
     result =
       Imp.Optimize.Anything.run(
         "mode=slow",
@@ -639,8 +562,8 @@ defmodule DocumentationContractTest do
     assert Enum.max(result.validation_scores) == 1.0
   end
 
-  test "API guide MCP import example returns ordinary Imp tools" do
-    # Mirrors docs/API_GUIDE.md "MCP Import": spec dialect (camelCase
+  test "the documented MCP import path returns ordinary Imp tools" do
+    # MCP spec dialect: camelCase
     # "inputSchema", optional description per the MCP spec Tool definition).
     catalog =
       Imp.MCP.Catalog.new([
@@ -660,7 +583,7 @@ defmodule DocumentationContractTest do
     assert Imp.Tool.call(tool, %{key: "value"}) == %{key: "value"}
   end
 
-  test "API guide streaming example collects predictions and parses incremental fields" do
+  test "the documented streaming path collects predictions and parses incremental fields" do
     lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer", lm: lm)

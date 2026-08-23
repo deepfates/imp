@@ -362,15 +362,10 @@ defmodule PublicAPIManifestTest do
 
     references =
       [
-        "docs/OBSERVABILITY.md",
-        "docs/API_GUIDE.md",
-        "docs/ARCHITECTURE.md",
-        "docs/OPERATIONS_REFERENCE.md",
+        "README.md",
         "docs/PRODUCTION_OPERATIONS.md",
-        "docs/internal/TUTORIAL_EXAMPLE_PARITY.md",
         "docs/LEARNING_PATH.md",
-        "docs/internal/COMBEE_FIDELITY.md",
-        "docs/ADVANCED.md",
+        "docs/IMP_FOR_DSPY_USERS.md",
         "livebooks/03_evaluate_and_optimize.livemd"
       ]
       |> Enum.flat_map(fn path ->

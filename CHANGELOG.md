@@ -74,6 +74,9 @@ boundary. If an ordinary action turn returns no tool calls, Imp makes one
 provider-neutral forced `submit` turn and validates those arguments against the
 program signature; an absent or invalid submit remains an error rather than
 being converted into an answer or retried indefinitely.
+OpenAI-compatible endpoints that reject named tool choice now receive one
+bounded fallback with only `submit` exposed and `tool_choice: "required"`.
+Other provider errors are not retried through that compatibility path.
 
 The persistent Playbook optimizer now has an ordinary reviewed-challenger
 lifecycle. Training weaknesses are exposed as grounded row and trajectory
@@ -250,7 +253,7 @@ publication remain owner actions.
 ### Internal (repository, not shipped)
 
 - Documentation restructured: the API guide is a cookbook, deep operations
-  material moved to `docs/OPERATIONS_REFERENCE.md`, and maintainer gate
+  material moved to the source repository's operations reference, and maintainer gate
   docs to the repository-only
   [maintainer gate reference](https://github.com/deepfates/imp/blob/main/docs/maintainers/GATES.md).
 - CI gains an evidence-infrastructure lane, and `production.check` now runs
@@ -296,12 +299,13 @@ installs from a source checkout, not from Hex.
   install from the local checkout when run inside the repository; their
   standalone fallback targets the Hex release and works once it is
   published.
-- The documentation is now a reader-first book: the API guide teaches before
-  it specifies, the conformance report against pinned upstream DSPy remains a
+- The documentation is now reader-first: one learning path teaches the normal
+  lifecycle, generated module docs own exhaustive reference, and the
+  conformance report against pinned upstream DSPy remains a
   [repository audit document](https://github.com/deepfates/imp/blob/main/docs/CONFORMANCE.md),
-  and the prior-art lineage is stated in daylight (`docs/PRIOR_ART.md`). Internal fidelity and
+  and the prior-art lineage is stated in the source repository. Internal fidelity and
   evidence audits are repository-only — the package ships no
-  `docs/internal/` files; `docs/ADVANCED.md` and `docs/OBSERVABILITY.md`
+  source-only internal records; the former advanced and observability guides
   are promoted user docs.
 - Headline numbers cite committed evidence: the tutorial's optimizer lift is
   25–30% → 85% across three live repeats, from a content-addressed run

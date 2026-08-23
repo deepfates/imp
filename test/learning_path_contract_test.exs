@@ -4,8 +4,8 @@ defmodule LearningPathContractTest do
   @reader_docs [
     "README.md",
     "docs/LEARNING_PATH.md",
-    "docs/TUTORIAL_TICKET_ROUTING.md",
-    "docs/API_GUIDE.md",
+    "docs/IMP_FOR_DSPY_USERS.md",
+    "docs/PRODUCTION_OPERATIONS.md",
     "examples/deployment/README.md"
   ]
 
@@ -14,17 +14,6 @@ defmodule LearningPathContractTest do
         {code, index} <- path |> elixir_blocks() |> Enum.with_index() do
       Code.string_to_quoted!(code, file: "#{path}##{index}")
     end
-  end
-
-  test "the API guide's provider-free settings example uses the public program path" do
-    code =
-      "docs/API_GUIDE.md"
-      |> elixir_blocks()
-      |> Enum.find(&String.contains?(&1, "test_lm ="))
-
-    assert is_binary(code)
-    {result, _binding} = Code.eval_string(code, [], file: "docs/API_GUIDE.md#settings")
-    assert result == "Paris"
   end
 
   test "the learning path's provider-free examples retain their documented results" do
@@ -49,7 +38,7 @@ defmodule LearningPathContractTest do
   end
 
   test "live teaching pages say which credential they require" do
-    for path <- ["README.md", "docs/LEARNING_PATH.md", "docs/TUTORIAL_TICKET_ROUTING.md"] do
+    for path <- ["README.md", "docs/LEARNING_PATH.md"] do
       assert File.read!(path) =~ "OPENAI_API_KEY"
     end
   end
@@ -64,7 +53,7 @@ defmodule LearningPathContractTest do
     try do
       File.cd!(tmp)
 
-      for path <- ["README.md", "docs/LEARNING_PATH.md", "docs/TUTORIAL_TICKET_ROUTING.md"] do
+      for path <- ["README.md", "docs/LEARNING_PATH.md"] do
         path
         |> then(&Path.join(original, &1))
         |> elixir_blocks()

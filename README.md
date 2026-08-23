@@ -70,8 +70,9 @@ The usual path is:
 7. Save the selected parameters and load them into trusted application code.
 
 The [Learning Path](docs/LEARNING_PATH.md) grows the router above through that
-whole sequence. The [API Guide](docs/API_GUIDE.md) explains the concepts and
-shows the public calls for normal application code.
+whole sequence. Generated module documentation is the exhaustive API
+reference; the guide explains the public calls needed for normal application
+code.
 
 ## Imp programs fit ordinary Elixir applications
 
@@ -122,21 +123,18 @@ research gaps.
 
 ## Read next
 
-- [Learning Path](docs/LEARNING_PATH.md) — build one program from first call
-  through evaluation, optimization, tools, persistence, and deployment.
-- [API Guide](docs/API_GUIDE.md) — understand signatures, programs, metrics,
-  optimizers, experiments, artifacts, and the
-  [signature type DSL](docs/API_GUIDE.md#signature-type-dsl), including why
-  adapter prompts use [DSPy-compatible wire-format wording](docs/API_GUIDE.md#adapter-wire-format-wording).
-- [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md) — a complete
-  measured optimization example with real outputs and costs.
-- [TREC optimizer case study](docs/CASE_STUDY_TREC.md) — the strongest matched
-  result, its limitations, and the exact provider-free recomputation command.
+- [Learning Path](docs/LEARNING_PATH.md) — build one program from its first
+  call through evaluation, optimization, persistence, and deployment.
 - [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) — map familiar DSPy
-  concepts to Imp and see the intentional BEAM differences.
+  concepts to Imp and understand the intentional BEAM differences.
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md) — credentials,
-  telemetry, concurrency, and failure handling.
-- [Manual](docs/README.md) — every guide and runnable Livebook.
+  telemetry, concurrency, persistence, and failure handling.
+- [Runnable Livebooks](livebooks/01_real_lm_front_door.livemd) — inspect the
+  same progression in IEx-ready notebooks.
+
+Run `mix docs` for the exhaustive module and function reference. Research
+results, conformance records, and maintainer procedures remain in the source
+repository, but they are not part of the learning path or packaged manual.
 
 Imp follows DSPy's central idea—program the behavior you want and optimize it
 from examples—in an Elixir system built around immutable values, explicit

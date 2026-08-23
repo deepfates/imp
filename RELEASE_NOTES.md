@@ -17,8 +17,9 @@ install from a source checkout:
 {:imp, path: "path/to/imp"}
 ```
 
-The product manual, five Livebooks, provider-free tutorial, and deployment
-example are bundled for HexDocs. Research evidence and maintainer procedures
+Three focused product guides, five Livebooks, a provider-free tutorial, and a
+deployment example are bundled for HexDocs. Generated module documentation is
+the exhaustive API reference. Research evidence and maintainer procedures
 remain in the source repository.
 
 This source is an unpublished `0.3.0` internal candidate. It is not tagged and
@@ -62,7 +63,7 @@ and paired deltas. The original integer repetition form remains the uniform
 shorthand.
 
 Several scoped effectiveness results remain reviewable with source-repository
-artifacts: the latest [ticket-routing tutorial](docs/TUTORIAL_TICKET_ROUTING.md)
+artifacts: the latest ticket-routing study
 run improves from 30–35% to 95–100% on held-out data across three live repeats,
 for about 1.3 cents per repeat. The older retained run recorded 25–30% to 85%;
 it remains historical evidence rather than the current tutorial result. On a
@@ -72,7 +73,7 @@ its baseline by `+0.4000` and cleared the preregistered noninferiority margin
 against pinned DSPy GEPA; MIPROv2 improved its own baseline by `+0.1458`.
 The committed compact scored-row inputs let a third party rerun the frozen
 scoring and aggregation without publishing the 181 MB private provider traces.
-The packaged [TREC case study](docs/CASE_STUDY_TREC.md) gives the exact
+The source repository's TREC case study gives the exact
 source-checkout command, input hashes, and limitations. The rows and research
 program remain source-repository evidence rather than Hex runtime contents.
 Neither result is a general optimizer-effectiveness claim.
@@ -135,9 +136,10 @@ playbook into a serving process remains an explicit application decision.
   tutorial, and deployment example; research and internal audit material stay
   in the repository. Publication to hex.pm is still pending — until
   it happens, install from a source checkout.
-- Documentation rebuilt reader-first: new README, Learning Path, tutorial with
-  honest artifact-cited numbers, and DSPy-users mapping. The evidence ladder
-  remains a repository audit surface rather than part of the packaged manual.
+- Documentation rebuilt reader-first: the README, one Learning Path, a DSPy
+  migration guide, and one operations guide form the reader path; generated
+  module docs own exhaustive reference. The evidence ladder remains a
+  repository audit surface rather than part of the packaged manual.
 - Evidence campaign: nine new differential artifact families landed; every
   semantic-conformance claim in the ledger is now asserted (was 1 of 4).
   "Asserted" is a maintainer attestation, not a fresh-checkout replay — see

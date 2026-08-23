@@ -1073,7 +1073,7 @@ defmodule PublicSurfaceTest do
         # landscape, and the upstream exam (which must account for every
         # upstream test, including adapters we deliberately do not ship).
         &(&1 in [
-            "docs/PRIOR_ART.md",
+            "README.md",
             "docs/internal/RESEARCH_LANDSCAPE.md",
             "docs/internal/UPSTREAM_EXAM.md"
           ])

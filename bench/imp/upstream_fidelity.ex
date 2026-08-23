@@ -114,7 +114,7 @@ defmodule Imp.UpstreamFidelity do
       ],
       evidence: %{
         tests: ["test/imp_test.exs", "test/schema_constraints_test.exs", "test/history_test.exs"],
-        docs: ["docs/API_GUIDE.md", "livebooks/02_programming_not_prompting.livemd"]
+        docs: ["docs/LEARNING_PATH.md", "livebooks/02_programming_not_prompting.livemd"]
       }
     },
     %{
@@ -143,7 +143,7 @@ defmodule Imp.UpstreamFidelity do
           "test/property_invariants_test.exs",
           "test/live_provider_e2e_test.exs"
         ],
-        docs: ["README.md", "docs/API_GUIDE.md"]
+        docs: ["README.md", "docs/LEARNING_PATH.md"]
       }
     },
     %{
@@ -167,7 +167,7 @@ defmodule Imp.UpstreamFidelity do
           "test/otp_state_semantics_test.exs",
           "test/live_provider_test.exs"
         ],
-        docs: ["docs/ARCHITECTURE.md", "docs/PRODUCTION_OPERATIONS.md"]
+        docs: ["README.md", "docs/PRODUCTION_OPERATIONS.md"]
       }
     },
     %{
@@ -204,7 +204,7 @@ defmodule Imp.UpstreamFidelity do
           "test/runtime_async_stream_cache_test.exs",
           "test/stream_listener_incremental_test.exs"
         ],
-        docs: ["docs/ARCHITECTURE.md", "docs/API_GUIDE.md"]
+        docs: ["README.md", "docs/LEARNING_PATH.md"]
       }
     },
     %{
@@ -250,7 +250,7 @@ defmodule Imp.UpstreamFidelity do
       ],
       evidence: %{
         tests: ["test/production_adapter_persistence_test.exs", "test/golden_trace_test.exs"],
-        docs: ["docs/internal/ADAPTER_FIDELITY.md", "docs/API_GUIDE.md"]
+        docs: ["docs/internal/ADAPTER_FIDELITY.md", "docs/LEARNING_PATH.md"]
       }
     },
     %{
@@ -316,7 +316,7 @@ defmodule Imp.UpstreamFidelity do
           "test/multimodal_quality_benchmark_test.exs",
           "test/upstream_exam/adapters_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "docs/internal/MULTIMODAL_FIDELITY.md"],
+        docs: ["docs/LEARNING_PATH.md", "docs/internal/MULTIMODAL_FIDELITY.md"],
         missing: [
           "citation-enabled Document blocks plus native Citations response extraction and streaming",
           "audio quality remains an unsupported claim rather than an implied capability"
@@ -344,7 +344,7 @@ defmodule Imp.UpstreamFidelity do
           "test/mcp_import_test.exs",
           "test/protocol_mcp/provider_mcp_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "livebooks/04_tools_agents_mcp_rlm.livemd"],
+        docs: ["docs/LEARNING_PATH.md", "livebooks/04_tools_agents_mcp_rlm.livemd"],
         missing: [
           "first-class ToolCalls and ToolCallResults signature-field semantics matching DSPy",
           "ChatAdapter use_native_function_calling compatibility switch"
@@ -379,7 +379,7 @@ defmodule Imp.UpstreamFidelity do
           "test/completion_surface_test.exs",
           "test/live_provider_e2e_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "docs/internal/REACT_V2_FIDELITY.md"]
+        docs: ["docs/LEARNING_PATH.md", "docs/internal/REACT_V2_FIDELITY.md"]
       }
     },
     %{
@@ -406,8 +406,8 @@ defmodule Imp.UpstreamFidelity do
           "test/live_provider_e2e_test.exs"
         ],
         docs: [
-          "docs/API_GUIDE.md",
-          "docs/ARCHITECTURE.md",
+          "docs/LEARNING_PATH.md",
+          "README.md",
           "docs/internal/RLM_FIDELITY.md",
           "livebooks/04_tools_agents_mcp_rlm.livemd"
         ],
@@ -440,7 +440,7 @@ defmodule Imp.UpstreamFidelity do
           "test/assertions_test.exs",
           "test/live_provider_e2e_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md"],
+        docs: ["docs/LEARNING_PATH.md"],
         missing: [
           "matched-model advice quality and token-cost evidence"
         ]
@@ -480,7 +480,7 @@ defmodule Imp.UpstreamFidelity do
           "test/property_invariants_test.exs",
           "test/metrics_dspy_parity_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "livebooks/03_evaluate_and_optimize.livemd"],
+        docs: ["docs/LEARNING_PATH.md", "livebooks/03_evaluate_and_optimize.livemd"],
         missing: []
       }
     },
@@ -518,7 +518,7 @@ defmodule Imp.UpstreamFidelity do
           "test/classical_optimizer_differential_test.exs",
           "test/optimizer_lift_artifact_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "docs/internal/BENCHMARK_TRUTH.md"],
+        docs: ["docs/LEARNING_PATH.md", "docs/internal/BENCHMARK_TRUTH.md"],
         missing: ["family-specific held-out effectiveness under matched controls"]
       }
     },
@@ -542,7 +542,7 @@ defmodule Imp.UpstreamFidelity do
           "test/public_surface_test.exs",
           "test/optimizer_lift_artifact_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md"]
+        docs: ["docs/LEARNING_PATH.md"]
       }
     },
     %{
@@ -576,7 +576,7 @@ defmodule Imp.UpstreamFidelity do
           "test/instruction_optimizer_experiment_test.exs",
           "test/infer_rules_upstream_differential_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md"],
+        docs: ["docs/LEARNING_PATH.md"],
         artifacts: [
           "benchmarks/evidence/admitted/instruction_contract/0d032ab3266c2eb8aef9ea021a1a445688cbdc4e208d9bde9d57037b1f302a49.json",
           "benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json",
@@ -628,7 +628,7 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_replication_artifact_test.exs"
         ],
         docs: [
-          "docs/ADVANCED.md",
+          "docs/LEARNING_PATH.md",
           "examples/local_gepa_banking77/README.md",
           "docs/internal/RESEARCH_LANDSCAPE.md",
           ".tickets/imp-88sn.md"
@@ -692,7 +692,7 @@ defmodule Imp.UpstreamFidelity do
           "test/local_grpo_opaque_banking77_example_test.exs"
         ],
         docs: [
-          "docs/ADVANCED.md",
+          "docs/LEARNING_PATH.md",
           "docs/internal/COVERAGE_MATRIX.md",
           "docs/internal/UPSTREAM_FIDELITY_AUDIT.md"
         ],
@@ -740,7 +740,7 @@ defmodule Imp.UpstreamFidelity do
           "test/fast_slow_runner_test.exs",
           "test/fast_slow_campaign_test.exs"
         ],
-        docs: ["docs/internal/RESEARCH_LANDSCAPE.md", "docs/OPERATIONS_REFERENCE.md"],
+        docs: ["docs/internal/RESEARCH_LANDSCAPE.md", "docs/PRODUCTION_OPERATIONS.md"],
         missing: [
           "external-provider CISPO loss, optimizer execution, and content-bound model-artifact evidence",
           "matched prompt-only, slow-only, and combined provider effectiveness",
@@ -783,7 +783,11 @@ defmodule Imp.UpstreamFidelity do
           "test/gepa_evaluation_cache_backend_test.exs",
           "test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs"
         ],
-        docs: ["docs/ADVANCED.md", "docs/internal/BENCHMARK_TRUTH.md", ".tickets/imp-88sn.md"],
+        docs: [
+          "docs/LEARNING_PATH.md",
+          "docs/internal/BENCHMARK_TRUTH.md",
+          ".tickets/imp-88sn.md"
+        ],
         artifacts: [
           "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json",
           "benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json"
@@ -822,7 +826,7 @@ defmodule Imp.UpstreamFidelity do
           "test/datasets_contract_test.exs",
           "test/integration/local_service_e2e_test.exs"
         ],
-        docs: ["docs/API_GUIDE.md", "docs/ARCHITECTURE.md"]
+        docs: ["docs/LEARNING_PATH.md", "README.md"]
       }
     },
     %{
@@ -857,7 +861,7 @@ defmodule Imp.UpstreamFidelity do
           "test/task_supervision_test.exs",
           "test/production_hardening_test.exs"
         ],
-        docs: ["docs/ARCHITECTURE.md", "docs/API_GUIDE.md"]
+        docs: ["README.md", "docs/LEARNING_PATH.md"]
       }
     },
     %{
@@ -951,7 +955,7 @@ defmodule Imp.UpstreamFidelity do
         docs: [
           "README.md",
           "docs/LEARNING_PATH.md",
-          "docs/README.md",
+          "README.md",
           "livebooks/01_real_lm_front_door.livemd"
         ]
       }

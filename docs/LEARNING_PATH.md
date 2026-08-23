@@ -30,6 +30,38 @@ The enums guarantee the answer is one of your teams. When the model returns
 anything else, Imp rejects it against the declared type and retries once with
 the validation error (`json_retries: 1`) instead of handing you free text.
 
+Signatures use `name`, `name: type`, or `name: type "description"`. An
+untyped field is a string. The built-in scalar types are `string` (`str`),
+`integer` (`int`), `float`, `number`, `boolean` (`bool`), `datetime`, `object`
+(`map` or `dict`), `array`, `array[type]`, `enum[a,b]` (`class[a,b]`), `yes_no`,
+`short_span`, and `numeric_span`; types can be nested.
+Unknown types and duplicate names fail when the signature is built.
+
+Use the structured form when a field needs a default, nullability, a union, or
+other constraints:
+
+```elixir no_run
+signature =
+  Imp.signature(%{
+    inputs: [%{name: :ticket, type: :string}],
+    outputs: [
+      %{
+        name: :team,
+        type: :string,
+        constraints: %{enum: ~w[billing infrastructure security product]}
+      },
+      %{name: :note, type: :string, default: "No note"},
+      %{name: :citation, type: :string, optional: true}
+    ]
+  })
+```
+
+Fields are required unless declared otherwise. A default fills an absent input
+or output; an optional field is nullable and becomes `nil` when omitted.
+Present falsey values such as `false`, `0`, `""`, and `[]` are never replaced.
+See `Imp.Signature` and `Imp.Signature.Field` in the generated reference for
+the complete structured schema.
+
 ## 2. Measure Before Changing It
 
 Before touching the program, give it a number. An example is a row of named
@@ -60,25 +92,24 @@ that returns a boolean, number, or structured score.
 
 ## 3. Improve With Measured Lift
 
-An optimizer compiles your program into a better one, using training data and
-your metric. The [Ticket Routing Tutorial](TUTORIAL_TICKET_ROUTING.md) runs
-this workflow end to end on sixty labeled tickets, with a baseline, a
-held-out score (30–35% to 95–100% in the current committed runs, for about 1.3 cents), and a readable
-diff of what changed. The shape is:
+An optimizer compiles your program into a candidate program, using training
+data and your metric. The shape is:
 
 ```elixir
 compiled = Imp.optimize!(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
 ```
 
 `LabeledFewShot` attaches labeled examples as demonstrations and costs
-nothing to compile. (This line feeds it the four measurement examples just to
-show the shape — in a real run, train on data you are not scoring against, as
-the tutorial does.) Search optimizers — `RandomSearch`, `MIPROv2`, `GEPA` —
+nothing to compile. This line feeds it the four measurement examples just to
+show the shape; in a real run, train on data you are not scoring against.
+Search optimizers — `RandomSearch`, `MIPROv2`, `GEPA` —
 compare many candidate programs with the same metric. `RandomSearch` fits the
 `Imp.optimize!/3` shape above; `MIPROv2` and `GEPA` also require a validation
 set as a fourth argument (`Imp.optimize!/4`). They spend model calls, so they
-cost dollars and take minutes, and the tutorial states both for its runs. An optimization counts
-as an improvement when a held-out score shows it, and not before.
+can cost dollars and take minutes. Record a baseline, train only on the
+training split, choose among candidates on separate validation data, and open
+the test split once. An optimization counts as an improvement when that
+held-out score shows it, and not before.
 
 ## 4. Test It Without A Provider
 
@@ -321,8 +352,7 @@ partially installing state. GEPA can produce the
 selected program, report, and artifact together with
 `Imp.Optimizer.GEPA.compile_with_artifact/5`; MIPROv2 and SIMBA use the shared
 `from_optimized_program/2` path demonstrated above after their own separate
-train and validation evaluation. The [API Guide](API_GUIDE.md#optimize-a-program)
-shows both forms. Repository-only research case studies for
+train and validation evaluation. Repository-only research case studies for
 [GEPA](https://github.com/deepfates/imp/tree/main/examples/local_gepa_banking77),
 [MIPROv2](https://github.com/deepfates/imp/tree/main/examples/local_mipro_banking77),
 and [SIMBA](https://github.com/deepfates/imp/tree/main/examples/local_simba_banking77)
@@ -406,3 +436,12 @@ For your own deployment, keep the artifact path, model name, API key,
 concurrency limits, and retry policy in runtime configuration. Evaluate the
 candidate before promotion, rebind the live LM at startup, and watch status,
 latency, validation errors, and cost after rollout.
+
+## Reference
+
+The generated documentation is the exhaustive reference. Start with `Imp`,
+`Imp.Module`, `Imp.Signature`, `Imp.Evaluate`, `Imp.Optimizer`,
+`Imp.Optimizer.Artifact`, `Imp.Streaming`, `Imp.Run`, and `Imp.Telemetry`.
+Less common optimizers, provider training clients, MCP transports, and local
+training integrations are documented on their owning modules rather than in a
+second prose manual.

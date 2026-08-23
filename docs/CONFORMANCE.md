@@ -75,7 +75,7 @@ Executable evidence:
 - test: `test/imp_test.exs`
 - test: `test/schema_constraints_test.exs`
 - test: `test/history_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: `livebooks/02_programming_not_prompting.livemd`
 
 
@@ -110,7 +110,7 @@ Executable evidence:
 - test: `test/property_invariants_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `../README.md`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 
 
 Indexed capability evidence:
@@ -144,7 +144,7 @@ Executable evidence:
 - test: `test/req_llm_client_test.exs`
 - test: `test/otp_state_semantics_test.exs`
 - test: `test/live_provider_test.exs`
-- docs: `docs/ARCHITECTURE.md`
+- docs: `README.md`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
 
 
@@ -175,8 +175,8 @@ Executable evidence:
 - test: `test/req_llm_client_test.exs`
 - test: `test/runtime_async_stream_cache_test.exs`
 - test: `test/stream_listener_incremental_test.exs`
-- docs: `docs/ARCHITECTURE.md`
-- docs: `docs/API_GUIDE.md`
+- docs: `README.md`
+- docs: `docs/LEARNING_PATH.md`
 
 
 
@@ -227,7 +227,7 @@ Executable evidence:
 - test: `test/production_adapter_persistence_test.exs`
 - test: `test/golden_trace_test.exs`
 - docs: [docs/internal/ADAPTER_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/ADAPTER_FIDELITY.md) (repository only, not shipped in the package)
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 
 
 
@@ -307,7 +307,7 @@ Executable evidence:
 - test: `test/multimodal_adapter_test.exs`
 - test: `test/multimodal_quality_benchmark_test.exs`
 - test: `test/upstream_exam/adapters_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: [docs/internal/MULTIMODAL_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/MULTIMODAL_FIDELITY.md) (repository only, not shipped in the package)
 
 
@@ -338,7 +338,7 @@ Executable evidence:
 - test: `test/react_contract_test.exs`
 - test: `test/mcp_import_test.exs`
 - test: `test/protocol_mcp/provider_mcp_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
 
@@ -374,7 +374,7 @@ Executable evidence:
 - test: `test/react_contract_test.exs`
 - test: `test/completion_surface_test.exs`
 - test: `test/live_provider_e2e_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: [docs/internal/REACT_V2_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/REACT_V2_FIDELITY.md) (repository only, not shipped in the package)
 
 
@@ -412,8 +412,8 @@ Executable evidence:
 - test: `test/rlm_interpreter_test.exs`
 - test: `test/rlm_budget_test.exs`
 - test: `test/live_provider_e2e_test.exs`
-- docs: `docs/API_GUIDE.md`
-- docs: `docs/ARCHITECTURE.md`
+- docs: `docs/LEARNING_PATH.md`
+- docs: `README.md`
 - docs: [docs/internal/RLM_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/RLM_FIDELITY.md) (repository only, not shipped in the package)
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
@@ -450,7 +450,7 @@ Executable evidence:
 - test: `test/saving_best_of_n_refine_test.exs`
 - test: `test/assertions_test.exs`
 - test: `test/live_provider_e2e_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 
 
 Indexed capability evidence:
@@ -485,7 +485,7 @@ Executable evidence:
 - test: `test/imp_test.exs`
 - test: `test/property_invariants_test.exs`
 - test: `test/metrics_dspy_parity_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: `livebooks/03_evaluate_and_optimize.livemd`
 
 
@@ -521,7 +521,7 @@ Executable evidence:
 - test: `test/optimizer_behavioral_corpus_test.exs`
 - test: `test/classical_optimizer_differential_test.exs`
 - test: `test/optimizer_lift_artifact_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 
 
@@ -557,7 +557,7 @@ Executable evidence:
 - test: `test/knn_dspy_differential_test.exs`
 - test: `test/public_surface_test.exs`
 - test: `test/optimizer_lift_artifact_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 
 
 Indexed capability evidence:
@@ -592,7 +592,7 @@ Executable evidence:
 - test: `test/instruction_optimizer_contract_artifact_test.exs`
 - test: `test/instruction_optimizer_experiment_test.exs`
 - test: `test/infer_rules_upstream_differential_test.exs`
-- docs: `docs/API_GUIDE.md`
+- docs: `docs/LEARNING_PATH.md`
 - artifact: `benchmarks/evidence/admitted/instruction_contract/0d032ab3266c2eb8aef9ea021a1a445688cbdc4e208d9bde9d57037b1f302a49.json`
 - artifact: `benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json`
 - artifact: `benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json`
@@ -639,7 +639,7 @@ Executable evidence:
 - test: `test/local_gepa_banking77_example_test.exs`
 - test: `test/gepa_contract_artifact_test.exs`
 - test: `test/gepa_replication_artifact_test.exs`
-- docs: `docs/ADVANCED.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: [examples/local_gepa_banking77/README.md](https://github.com/deepfates/imp/blob/main/examples/local_gepa_banking77/README.md) (repository only, not shipped in the package)
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
 - docs: [.tickets/imp-88sn.md](https://github.com/deepfates/imp/blob/main/.tickets/imp-88sn.md) (repository only, not shipped in the package)
@@ -688,7 +688,7 @@ Executable evidence:
 - test: `test/trl_protocol_test.exs`
 - test: `test/trl_protocol_grpo_lifecycle_test.exs`
 - test: `test/local_grpo_opaque_banking77_example_test.exs`
-- docs: `docs/ADVANCED.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: [docs/internal/COVERAGE_MATRIX.md](https://github.com/deepfates/imp/blob/main/docs/internal/COVERAGE_MATRIX.md) (repository only, not shipped in the package)
 - docs: [docs/internal/UPSTREAM_FIDELITY_AUDIT.md](https://github.com/deepfates/imp/blob/main/docs/internal/UPSTREAM_FIDELITY_AUDIT.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json`
@@ -735,7 +735,7 @@ Executable evidence:
 - test: `test/fast_slow_runner_test.exs`
 - test: `test/fast_slow_campaign_test.exs`
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
-- docs: `docs/OPERATIONS_REFERENCE.md`
+- docs: `docs/PRODUCTION_OPERATIONS.md`
 
 
 
@@ -775,7 +775,7 @@ Executable evidence:
 - test: `test/gepa_module_selector_test.exs`
 - test: `test/gepa_evaluation_cache_backend_test.exs`
 - test: `test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs`
-- docs: `docs/ADVANCED.md`
+- docs: `docs/LEARNING_PATH.md`
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
 - docs: [.tickets/imp-88sn.md](https://github.com/deepfates/imp/blob/main/.tickets/imp-88sn.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json`
@@ -811,8 +811,8 @@ Executable evidence:
 - test: `test/external_retriever_test.exs`
 - test: `test/datasets_contract_test.exs`
 - test: `test/integration/local_service_e2e_test.exs`
-- docs: `docs/API_GUIDE.md`
-- docs: `docs/ARCHITECTURE.md`
+- docs: `docs/LEARNING_PATH.md`
+- docs: `README.md`
 
 
 Indexed capability evidence:
@@ -847,8 +847,8 @@ Executable evidence:
 - test: `test/completion_surface_test.exs`
 - test: `test/task_supervision_test.exs`
 - test: `test/production_hardening_test.exs`
-- docs: `docs/ARCHITECTURE.md`
-- docs: `docs/API_GUIDE.md`
+- docs: `README.md`
+- docs: `docs/LEARNING_PATH.md`
 
 
 
@@ -938,7 +938,7 @@ Executable evidence:
 - test: `test/documentation_contract_test.exs`
 - docs: `../README.md`
 - docs: `docs/LEARNING_PATH.md`
-- docs: `docs/README.md`
+- docs: `README.md`
 - docs: `livebooks/01_real_lm_front_door.livemd`
 
 

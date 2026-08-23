@@ -4,8 +4,8 @@ This document covers consumer runtime operations. Imp's release procedure and
 maintainer-only verification commands remain in the source repository rather
 than the Hex package.
 
-It is the final chapter of the same manual path used by the README, API guide,
-and Livebooks: after an Imp program has a signature, examples, metrics,
+It is the final chapter of the path used by the README, Learning Path, and
+Livebooks: after an Imp program has a signature, examples, metrics,
 optimization, and any needed tools, this page explains how applications run
 live providers without hiding credentials or transport behavior.
 

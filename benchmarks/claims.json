@@ -54,7 +54,7 @@
       "claim_type": "live_provider_proof",
       "comparison": "imp_native",
       "gate_policy": "blocking",
-      "sources": ["docs/README.md", "livebooks/*.livemd", "test/livebook_contract_test.exs"],
+      "sources": ["README.md", "livebooks/*.livemd", "test/livebook_contract_test.exs"],
       "requirements": [
         {
           "id": "livebooks.executable",
@@ -840,7 +840,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "imp_local_baseline",
       "gate_policy": "informational",
-      "sources": ["benchmarks/results/local-mlx-public-consumer-banking77-dd6f6ad.json", "docs/ADVANCED.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
+      "sources": ["benchmarks/results/local-mlx-public-consumer-banking77-dd6f6ad.json", "docs/LEARNING_PATH.md", "docs/internal/COVERAGE_MATRIX.md", "test/local_mlx_campaign_test.exs"],
       "requirements": [
         {
           "id": "local_mlx_weight_training.full",
@@ -969,7 +969,7 @@
       "sources": [
         "lib/imp/clients/req_llm_batch.ex",
         "test/req_llm_batch_test.exs",
-        "docs/API_GUIDE.md"
+        "docs/LEARNING_PATH.md"
       ],
       "requirements": [
         {
@@ -1038,7 +1038,7 @@
       "sources": [
         "lib/imp/history.ex",
         "test/history_test.exs",
-        "docs/API_GUIDE.md"
+        "docs/LEARNING_PATH.md"
       ],
       "requirements": [
         {
@@ -1073,7 +1073,7 @@
         "test/playbook_test.exs",
         "test/playbook_with_context_test.exs",
         "test/playbook_optimizer_test.exs",
-        "docs/API_GUIDE.md"
+        "docs/LEARNING_PATH.md"
       ],
       "requirements": [
         {
@@ -1106,7 +1106,7 @@
       "sources": [
         "lib/imp/embeddings.ex",
         "test/completion_surface_test.exs",
-        "docs/API_GUIDE.md"
+        "docs/LEARNING_PATH.md"
       ],
       "requirements": [
         {

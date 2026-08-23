@@ -214,19 +214,8 @@ defmodule Imp.MixProject do
 
   defp product_docs do
     [
-      "docs/README.md",
       "docs/LEARNING_PATH.md",
-      "docs/TUTORIAL_TICKET_ROUTING.md",
-      "docs/CASE_STUDY_TREC.md",
-      "docs/GLOSSARY.md",
-      "docs/PHILOSOPHY.md",
       "docs/IMP_FOR_DSPY_USERS.md",
-      "docs/PRIOR_ART.md",
-      "docs/ARCHITECTURE.md",
-      "docs/API_GUIDE.md",
-      "docs/ADVANCED.md",
-      "docs/OPERATIONS_REFERENCE.md",
-      "docs/OBSERVABILITY.md",
       "docs/PRODUCTION_OPERATIONS.md"
     ]
   end

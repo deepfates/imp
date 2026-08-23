@@ -12,5 +12,5 @@ roadmap. The active product standard and release finish line live in
 lives in `tk`. When an internal document duplicates a registry, generated view,
 or newer protocol, consolidate or retire it instead of synchronizing both.
 
-Start with the user manual at [docs/README.md](../README.md). Release and
+Start with the user manual at [README.md](../README.md). Release and
 claim-gate operating procedures live in [docs/maintainers/](../maintainers/).
