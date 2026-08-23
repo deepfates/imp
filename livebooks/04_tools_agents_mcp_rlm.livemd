@@ -30,7 +30,7 @@ if repo do
   Mix.install([{:imp, path: repo}], install_opts)
 else
   # Standalone notebook: install the private source release.
-  Mix.install([{:imp, github: "deepfates/imp", tag: "v0.3.0"}])
+  Mix.install([{:imp, github: "deepfates/imp", tag: "v0.3.1"}])
 end
 live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```
@@ -70,8 +70,8 @@ Imp.Tool.call(lookup, %{query: "capital-france"})
 
 Policy lives where the model chooses actions: any react-family program takes
 `tool_policy:`, and a tool outside the policy becomes a recorded denial
-instead of an execution — the ReAct section above demonstrated exactly that
-boundary.
+instead of an execution. The ReAct section below shows the action loop; use a
+deny policy when you want to exercise this boundary directly.
 
 ## MCP Catalog Import
 

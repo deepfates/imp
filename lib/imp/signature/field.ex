@@ -1,5 +1,35 @@
 defmodule Imp.Signature.Field do
-  @moduledoc "Metadata for one signature field."
+  @moduledoc """
+  Metadata and construction rules for one signature field.
+
+  Prefer the compact signature DSL for ordinary fields. Structured signatures
+  accept each field as an atom, a `"name: type"` string, `{name, options}`, or
+  a map. A field map accepts atom or string versions of these keys:
+
+    * `name` (required) and `type` (an atom or string, default `:string`)
+    * `kind` (`:input` or `:output`, normally supplied by the signature)
+    * `desc` and `prefix`
+    * `default`, `optional`, `constraints`, and `language`
+    * `metadata` for additional JSON-friendly field metadata
+
+  Nested types use the string grammar, for example `"array[string]"` or
+  `"array[object]"`; tuple forms such as `{:array, :string}` are not accepted.
+  Constraints are maps such as `%{enum: ["red", "blue"]}`, `%{minimum: 0}`,
+  or `%{maximum: 1}`. `default` fills an absent value. `optional: true` permits
+  omission and represents it as `nil`.
+
+      iex> field = Imp.Signature.Field.new(%{
+      ...>   name: :tags,
+      ...>   type: "array[string]",
+      ...>   optional: true
+      ...> }, :output)
+      iex> {field.name, field.type, field.metadata.optional}
+      {:tags, "array[string]", true}
+
+  Field declarations describe both sides of the program contract, but input
+  value type mismatches are warning-only at call time for DSPy compatibility.
+  Required input presence and all parsed outputs are enforced.
+  """
 
   @enforce_keys [:name, :kind]
   defstruct [:name, :kind, type: :string, desc: nil, prefix: nil, metadata: %{}]
@@ -13,6 +43,7 @@ defmodule Imp.Signature.Field do
           metadata: map()
         }
 
+  @doc "Builds a field from an existing field, name, typed name, tuple, or map."
   def new(%__MODULE__{} = field, _kind), do: field
 
   def new({name, opts}, kind) when is_list(opts) or is_map(opts),
@@ -52,6 +83,7 @@ defmodule Imp.Signature.Field do
           "Imp.Signature.Field.new/2 expects field name or map to use an atom or string name, got: #{inspect(name)}"
   end
 
+  @doc "Serializes a field to JSON-friendly data."
   def dump(%__MODULE__{} = field) do
     %{
       "name" => to_string(field.name),
@@ -63,12 +95,15 @@ defmodule Imp.Signature.Field do
     }
   end
 
+  @doc "Loads a field produced by `dump/1`."
   def load(map), do: new(map, map["kind"])
 
+  @doc "Adds output-validation constraints to a field."
   def constrained(%__MODULE__{} = field, constraints) do
     %__MODULE__{field | metadata: Map.put(field.metadata, :constraints, constraints)}
   end
 
+  @doc "Marks a field optional and nullable."
   def optional(%__MODULE__{} = field),
     do: %__MODULE__{field | metadata: Map.put(field.metadata, :optional, true)}
 

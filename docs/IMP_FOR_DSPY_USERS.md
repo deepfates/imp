@@ -14,7 +14,7 @@ updates, telemetry, and fresh-runtime artifact application.
 
 | You write in DSPy | You write in Imp |
 | --- | --- |
-| `dspy.Signature` / `"q -> a"` | `Imp.signature("q -> a")` — same string DSL, types included (`enum[...]`, lists, numbers) |
+| `dspy.Signature` / `"q -> a"` | `Imp.signature("q -> a")` — the same compact input/output idea with Imp type spellings such as `array[...]`, `enum[...]`, and `number` |
 | `dspy.Predict(sig)` | `Imp.predict(sig, lm: lm)` |
 | `dspy.ChainOfThought` | `Imp.chain_of_thought/2` |
 | `dspy.ReAct(sig, tools=[...])` | `Imp.react_v2(sig, tools, tool_policy: [...])` — typed tools, structured observations, and validated `submit` |
@@ -50,10 +50,12 @@ A slow provider call returns a timeout instead of hanging your program; a
 crashed interpreter restarts. The [deployment example](../examples/deployment/README.md)
 is a complete OTP application, not a snippet.
 
-**The sandboxes are Elixir.** `ProgramOfThought`, `CodeAct`, and RLM execute
-model-written code in a budgeted, allowlisted Elixir evaluator under
-supervision — the BEAM equivalent of DSPy's Python interpreter and
-experimental WASM sandbox, with process isolation as the safety boundary.
+**The restricted interpreters are Elixir-shaped, not OS sandboxes.**
+`ProgramOfThought`, `CodeAct`, and RLM parse model-written expressions through
+an allowlisted evaluator with bounded syntax, values, effects, and work. BEAM
+supervision contains crashes and timeouts, but processes share VM and host
+authority. Treat the allowlist plus host-enforced filesystem, network, tool,
+credential, and resource policy as the security boundary.
 
 **Artifacts are strict.** Saved programs are checksummed and never contain
 credentials; you rebind the live model at load time. This is the same
@@ -74,7 +76,7 @@ own held-out data.
 DSPy also has a larger Python integration ecosystem. Imp provides extension
 boundaries through `Imp.LM`, `Imp.Retrieve`, adapters, tools, and trainer
 clients; integrations written for Python do not automatically work on the
-BEAM. DSPy's Flex code optimizer is not included in `0.3.0`.
+BEAM. DSPy's Flex code optimizer is not included in `0.3.1`.
 
 ## Nearby Elixir work
 
@@ -88,7 +90,7 @@ lineage to a broad programming and optimization model built for OTP deployment.
 ## Coming from DSPy: the five-minute version
 
 ```elixir
-# pip install dspy            →  {:imp, github: "deepfates/imp", tag: "v0.3.0"}
+# pip install dspy            →  {:imp, github: "deepfates/imp", tag: "v0.3.1"}
 # dspy.configure(lm=lm)       →  lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: ...)
 # dspy.Predict("q -> a")      →  program = Imp.predict("q -> a", lm: lm)
 # program(q="...")            →  {:ok, pred} = Imp.call(program, %{q: "..."})

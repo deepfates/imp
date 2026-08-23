@@ -2,14 +2,16 @@
 
 Let's build a support-ticket router and grow it, step by step, into a
 measured, tested, deployable program. Every section is a small change to code
-you have already run. You need an OpenAI key in `OPENAI_API_KEY`; a full pass
-through this page costs a few cents of model calls with `gpt-5.4-mini`.
+you have already run. Sections that make real provider calls need an OpenAI
+key in `OPENAI_API_KEY` and cost a few cents with `gpt-5.4-mini`; the marked
+provider-free examples and deployment workflow run without credentials.
 
 ## 1. Make A Real Call
 
 Declare the task as a signature — named inputs, named outputs, types — and run
-it as a program. There is no prompt string to maintain; Imp renders the
-messages from the declaration and validates the model's output against it.
+it as a program. Instead of maintaining a separate prompt/parser pair, keep
+the task instructions and field descriptions on the signature; Imp renders
+the messages and validates the model's output against that declaration.
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -60,7 +62,7 @@ Fields are required unless declared otherwise. A default fills an absent input
 or output; an optional field is nullable and becomes `nil` when omitted.
 Present falsey values such as `false`, `0`, `""`, and `[]` are never replaced.
 See `Imp.Signature` and `Imp.Signature.Field` in the generated reference for
-the complete structured schema.
+the accepted field keys, nested-type spelling, and validation semantics.
 
 ## 2. Measure Before Changing It
 

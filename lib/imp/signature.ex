@@ -7,6 +7,12 @@ defmodule Imp.Signature do
   for models, schemas validate structured outputs, optimizers mutate programs
   around it, and persistence stores it as plain data.
 
+  Required input presence is enforced before an LM call. To preserve DSPy's
+  calling semantics, supplied input values that disagree with an explicitly
+  declared type warn by default and still proceed. Output values are parsed
+  and validated strictly. Validate untrusted application inputs at your own
+  boundary when rejection is required.
+
   The compact string form is ideal for most code:
 
       iex> signature = Imp.Signature.new("question: string -> answer: short_span")

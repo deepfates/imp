@@ -6,6 +6,14 @@ User-visible changes to Imp are recorded here.
 
 No changes yet.
 
+## 0.3.1 — 2026-08-23
+
+- Clarified the supported center versus pre-1.0 advanced workflows, the exact
+  meaning of typed inputs and outputs, and the restricted-interpreter security
+  boundary.
+- Completed the structured signature field reference and corrected cold-reader
+  prerequisites and cross-references.
+
 ## 0.3.0 — 2026-08-23
 
 Private Git source release. Imp is not published to Hex.

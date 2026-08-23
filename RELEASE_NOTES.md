@@ -1,4 +1,4 @@
-# Imp v0.3.0
+# Imp v0.3.1
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
 Declare a task as named inputs and outputs, call it like any other Elixir
@@ -7,11 +7,11 @@ selected program under OTP.
 
 ## Install
 
-`v0.3.0` is a private Git source release. GitHub credentials with access to the
+`v0.3.1` is a private Git source release. GitHub credentials with access to the
 repository are required.
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.3.0"}
+{:imp, github: "deepfates/imp", tag: "v0.3.1"}
 ```
 
 Imp is not published to Hex. Use a path dependency only while developing
@@ -61,8 +61,15 @@ their data, metric, budget, promotion rule, and operational policy.
 DSPy's Python integration ecosystem is larger. Imp exposes extension points
 for providers, retrievers, adapters, tools, and trainers, but Python-only
 integrations do not automatically work on the BEAM. DSPy's Flex code optimizer
-is not included in this release. GRPO and `Imp.Run` are experimental APIs and
-may change before 1.0.
+is not included in this release.
+
+The supported center is the `Imp` facade, signatures, adapters, evaluation,
+static and ReqLLM execution, tools, telemetry, saving, and the deployment
+pattern. Generated docs place optimizer implementations, parameter artifacts,
+agent loops, training integrations, and `Imp.Run` in **Experimental optimizers
+and advanced workflows**. These are implemented and tested APIs, not release
+promises of effectiveness or pre-1.0 shape stability. In particular, GRPO is
+an external-training boundary rather than an in-process gradient engine.
 
 ## Breaking changes from v0.2.1
 
@@ -81,7 +88,7 @@ may change before 1.0.
 2. Choose the returning or raising optimizer API explicitly.
 3. Replace `Imp.Agent` usage with a ReActV2/RLM program owned by your
    supervision tree.
-4. Rebuild saved artifacts with `0.3.0` before promotion.
+4. Rebuild saved artifacts with `0.3.1` before promotion.
 5. Run your held-out evaluation and application smoke test against the tagged
    dependency.
 

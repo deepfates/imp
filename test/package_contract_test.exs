@@ -113,11 +113,11 @@ defmodule PackageContractTest do
     assert_release_files(files)
   end
 
-  test "the 0.3.0 release surfaces agree" do
+  test "the 0.3.1 release surfaces agree" do
     version = Mix.Project.config()[:version]
     source_dependency = ~s({:imp, github: "deepfates/imp", tag: "v#{version}"})
 
-    assert version == "0.3.0"
+    assert version == "0.3.1"
     assert File.read!("RELEASE_NOTES.md") =~ "# Imp v#{version}"
     assert File.read!("CHANGELOG.md") =~ "## #{version}"
     assert File.read!("examples/deployment/mix.exs") =~ source_dependency

@@ -5,6 +5,12 @@ you can measure and run inside an ordinary OTP application. It brings the centra
 [DSPy](https://dspy.ai)—improving programs from examples rather than hand-editing
 prompts—to the BEAM.
 
+Here, “typed” means required inputs are checked and model outputs are parsed
+and validated against the signature before application code receives them.
+For DSPy compatibility, a supplied input whose value disagrees with its
+declared type produces a warning rather than rejecting the call; validate
+untrusted application inputs before calling the program.
+
 <!-- "Imp with cards", Le Grand Etteilla (public domain, via Wikimedia Commons) -->
 <p align="center">
   <img src="assets/imp-with-cards.jpg" width="380"
@@ -92,6 +98,14 @@ and optimizers for examples, instructions, prompts and weights. You do not
 need to adopt that whole surface at once. Start with a program and a metric;
 reach for a more powerful optimizer or runtime shape when the task earns it.
 
+The supported center is the `Imp` facade, signatures, adapters, evaluation,
+static and ReqLLM execution, tools, telemetry, saving, and the deployment
+pattern. Generated docs group optimizer implementations, parameter artifacts,
+agent loops, training integrations, and addressable runs under **Experimental
+optimizers and advanced workflows**. Those APIs are real and tested, but may
+change before 1.0; evaluate them against your own task before making them an
+application dependency.
+
 ## When Imp is a good fit
 
 Use Imp when a model performs a real application task with an output contract
@@ -114,12 +128,15 @@ Imp is not published to Hex. Install the private source release from its
 immutable tag (GitHub credentials with access to the repository are required):
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.3.0"}
+{:imp, github: "deepfates/imp", tag: "v0.3.1"}
 ```
 
 Use `{:imp, path: "path/to/imp"}` only while developing against a local
-checkout. Version `0.3.0` contains breaking changes from `0.2.1`; see the
-[release notes](RELEASE_NOTES.md) when upgrading.
+checkout. Imp requires Elixir `~> 1.19`. Commit your application's `mix.lock`;
+the Git tag fixes Imp's source, while normal Mix constraints may otherwise
+resolve newer compatible transitive versions. Version `0.3.1` contains the
+breaking `0.3` changes from `0.2.1`; see the [release notes](RELEASE_NOTES.md)
+when upgrading.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. You can run

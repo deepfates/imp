@@ -25,7 +25,7 @@ IMP_PATH=../.. mix run --no-start run_workflow.exs
 ```
 
 A copied application with access to the private repository can omit `IMP_PATH`
-and resolve the immutable `v0.3.0` Git dependency declared in `mix.exs`.
+and resolve the immutable `v0.3.1` Git dependency declared in `mix.exs`.
 
 The workflow:
 
