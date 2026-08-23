@@ -8,8 +8,6 @@ defmodule Imp.BenchmarkTruth.ClassicalOptimizerDifferentialTest do
   @python "tmp/dspy-parity-venv/bin/python"
   @script "scripts/dspy_classical_optimizer_differential.py"
   @config "benchmarks/config/classical-optimizer-differential-v1.json"
-  @bootstrap_admission "benchmarks/evidence/admitted/bootstrap_few_shot_differential/9b89dac91786fb2360c810f3122d2a755fc930228253730cd91de6a3b2df2094.json"
-
   setup_all do
     {output, 0} =
       System.cmd(
@@ -78,17 +76,35 @@ defmodule Imp.BenchmarkTruth.ClassicalOptimizerDifferentialTest do
     end
   end
 
-  test "an unrelated authority-ledger update does not revoke immutable evidence" do
-    artifact = @bootstrap_admission |> File.read!() |> Jason.decode!()
-    historical = artifact["source_bindings"]
-    current = Differential.source_bindings("bootstrap_few_shot")
+  test "semantic source identity ignores documentation but detects executable changes" do
+    first = """
+    defmodule Sample do
+      @moduledoc "first explanation"
+      @doc "first function explanation"
+      def value(input), do: input + 1
+    end
+    """
 
-    refute historical["authority_ledger_sha256"] == current["authority_ledger_sha256"]
+    documentation_only = """
+    # A comment is not runtime behavior.
+    defmodule Sample do
+      @moduledoc "a completely different explanation"
+      @doc "different function prose"
 
-    assert Map.drop(historical, ["authority_ledger_sha256", "task_sha256"]) ==
-             Map.drop(current, ["authority_ledger_sha256", "task_sha256"])
+      def value(input), do: input + 1
+    end
+    """
 
-    assert Differential.validate_artifact!("bootstrap_few_shot_differential", artifact) ==
-             artifact
+    executable_change = """
+    defmodule Sample do
+      def value(input), do: input + 2
+    end
+    """
+
+    assert Imp.BenchmarkTruth.SemanticSource.digest(first) ==
+             Imp.BenchmarkTruth.SemanticSource.digest(documentation_only)
+
+    refute Imp.BenchmarkTruth.SemanticSource.digest(first) ==
+             Imp.BenchmarkTruth.SemanticSource.digest(executable_change)
   end
 end

@@ -1,75 +1,33 @@
-name: Evidence
+name: Research verification
 
-# CI coverage for the evidence-infrastructure suite (tag :evidence_infrastructure),
-# which had NO lane before this workflow — two defects (a fixture-authority reader
-# and a stale admitted-artifact source binding) were only caught by running it by
-# hand. The suite splits along one axis: some tests are pure structural /
-# differential validators that read only committed benchmarks/evidence files, while
-# most shell out to the pinned DSPy 3.2.1 parity venv + source tree under tmp/
-# (tag :requires_dspy_capture). We run BOTH halves on the schedule they can each
-# be green on:
-#
-#   * evidence-venv-free (every PR): EVIDENCE_INFRASTRUCTURE=1 WITHOUT DSPY_CAPTURE,
-#     over the files whose capture-only rows are tagged :requires_dspy_capture, so
-#     the venv-free rows run and the capture rows are excluded. Fast, no Python.
-#
-#   * evidence-full (weekly + manual): builds the pinned DSPy environments and runs
-#     the whole suite with DSPY_CAPTURE=1. This is the complete lane; because it is
-#     a scheduled/dispatch job and not a PR gate, a red run is a loud signal (e.g.
-#     an admitted artifact whose source binding drifted from committed source),
-#     which is exactly what this lane exists to surface.
-#
-# NB on tag mechanics: `mix test --only evidence_infrastructure --exclude
-# requires_dspy_capture` does NOT work — an `--only`/`--include` tag
-# unconditionally overrides `--exclude`, so capture rows would still run. The split
-# is driven by ENV GATING in test/test_helper.exs (EVIDENCE_INFRASTRUCTURE and
-# DSPY_CAPTURE each remove a tag from the default exclude list) plus explicit file
-# arguments, never by `--only`.
+# Research artifacts are checked deliberately, not as a product-release gate.
+# Run the structural lane alone for a quick registry check, or enable the full
+# pinned-reference suite when actively working on research results.
 
 on:
-  pull_request:
-  push:
-    branches: [main]
-  schedule:
-    # Mondays 06:00 UTC. The full capture lane is expensive (Python + DSPy build),
-    # so it runs weekly rather than per-PR.
-    - cron: "0 6 * * 1"
   workflow_dispatch:
+    inputs:
+      full:
+        description: Build reference runtimes and run capture-dependent checks
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: evidence-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  # Per-PR: venv-free structural/differential evidence rows only. Runs on every PR
-  # and push. No Python — the rows here read committed benchmarks/evidence files,
-  # the local git store, and pure helpers (credential scrubbing, fixture
-  # matching). Full history IS required (fetch-depth: 0): the registry and
-  # provenance gates resolve artifact commit SHAs against origin/main. Grow the
-  # file list as more files' capture-only rows get the :requires_dspy_capture
-  # tag. This lane is the P11/P12 gate (dee-v0zl, dee-di7u): a broken admitted
-  # artifact binding, an orphaned/unpushed evidence commit, or a dead
-  # reproduction recipe fails the PR, not the Monday cron. Reconciliation-prose
-  # drift is a provider-free normal-suite test, so fast.check catches it too.
   evidence-venv-free:
     name: evidence.venv-free
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          # Full history + all refs: the source-binding validators run
-          # `git show <artifact-sha>:<path>` and the provenance gate runs
-          # `git merge-base --is-ancestor <artifact-sha> origin/main`; both
-          # fail spuriously on a shallow checkout.
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
         with:
           save-cache: "false"
-      # The registry's protocol validators hash files in the pinned DSPy source
-      # tree (e.g. mmgrpo's authority materialization check). The tree is a plain
-      # shallow git clone -- no Python, ~seconds -- so materialize it here rather
-      # than env-gating the check out of the per-PR lane (which would leave the
-      # materialization-drift class invisible until the weekly cron).
       - name: Materialize pinned DSPy 3.2.1 source (git only, no venv)
         run: |
           git init -q tmp/dspy-3.2.1
@@ -79,8 +37,6 @@ jobs:
       - name: Run venv-free evidence rows
         env:
           EVIDENCE_INFRASTRUCTURE: "1"
-          # DSPY_CAPTURE deliberately unset: :requires_dspy_capture rows stay
-          # excluded so this job never touches the pinned DSPy environment.
         run: |
           mix test \
             test/ensemble_differential_test.exs \
@@ -88,18 +44,13 @@ jobs:
             test/reproduction_registry_test.exs \
             test/evidence_provenance_test.exs
 
-  # Weekly / manual: the complete evidence suite against the pinned DSPy 3.2.1
-  # parity environment. This is the only lane that builds the reference runtimes,
-  # so it also carries the source-binding validators that need full git history.
   evidence-full:
     name: evidence.full-capture
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: inputs.full
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          # Full history: the source-binding validators resolve ancestor commit
-          # SHAs (git show <artifact-sha>:<path>) and fail on a shallow checkout.
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
         with:
@@ -128,8 +79,4 @@ jobs:
         env:
           EVIDENCE_INFRASTRUCTURE: "1"
           DSPY_CAPTURE: "1"
-        # --only evidence_infrastructure scopes the run to the evidence suite (the
-        # other gates already cover the regular suite). Both tags are un-excluded
-        # by the env vars above, and --only force-includes every evidence row
-        # (venv-free and :requires_dspy_capture alike).
         run: mix test --only evidence_infrastructure

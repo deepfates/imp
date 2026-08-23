@@ -126,7 +126,8 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
       raise ArgumentError, "COPRO C1 artifact is not bound to committed Imp source"
     end
 
-    unless semantic_bindings(artifact_bindings) == semantic_bindings(current_bindings) do
+    unless semantic_bindings(artifact_bindings) == semantic_bindings(current_bindings) and
+             optimizer_semantics_match?(artifact["git_sha"]) do
       raise ArgumentError, "COPRO C1 artifact does not match current semantic sources"
     end
 
@@ -432,8 +433,23 @@ defmodule Mix.Tasks.Imp.Benchmark.CoproIsolation do
 
   defp committed_sources_match?(_git_sha, _bindings), do: false
 
+  defp optimizer_semantics_match?(git_sha) do
+    with {historical, 0} <-
+           System.cmd("git", ["show", "#{git_sha}:#{@imp_source_path}"], stderr_to_stdout: true) do
+      Imp.BenchmarkTruth.SemanticSource.digest(historical) ==
+        @imp_source_path |> File.read!() |> Imp.BenchmarkTruth.SemanticSource.digest()
+    else
+      _ -> false
+    end
+  end
+
   defp semantic_bindings(bindings) when is_map(bindings),
-    do: Map.drop(bindings, ["authority_ledger_sha256", "task_sha256"])
+    do:
+      Map.drop(bindings, [
+        "authority_ledger_sha256",
+        "task_sha256",
+        "imp_copro_source_sha256"
+      ])
 
   defp default_python, do: Path.expand("tmp/dspy-parity-venv/bin/python")
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()

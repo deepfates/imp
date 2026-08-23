@@ -147,7 +147,8 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
       raise ArgumentError, "#{family} C1 artifact is not bound to committed Imp source"
     end
 
-    unless semantic_bindings(artifact_bindings) == semantic_bindings(current_bindings) do
+    unless semantic_bindings(artifact_bindings) == semantic_bindings(current_bindings) and
+             optimizer_semantics_match?(artifact["git_sha"], family) do
       raise ArgumentError, "#{family} C1 artifact does not match current semantic sources"
     end
 
@@ -445,13 +446,28 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
 
   defp committed_sources_match?(_, _, _), do: false
 
-  # The authority ledger is a multi-family inventory, and this task contains
-  # the validator itself. Changing either must not revoke an immutable artifact
-  # whose exact capture sources are still available at its recorded commit.
-  # The sidecar, fixture, authority manifest, and optimizer implementation stay
-  # in the current compatibility check; the task replays their observations.
+  defp optimizer_semantics_match?(git_sha, family) do
+    source_path = family_config!(family).source_path
+
+    with {historical, 0} <-
+           System.cmd("git", ["show", "#{git_sha}:#{source_path}"], stderr_to_stdout: true) do
+      Imp.BenchmarkTruth.SemanticSource.digest(historical) ==
+        source_path |> File.read!() |> Imp.BenchmarkTruth.SemanticSource.digest()
+    else
+      _ -> false
+    end
+  end
+
+  # The authority ledger and task are multi-family control files. The optimizer
+  # file is compared separately as normalized Elixir syntax so documentation,
+  # comments, and source locations do not masquerade as behavioral changes.
   defp semantic_bindings(bindings) when is_map(bindings),
-    do: Map.drop(bindings, ["authority_ledger_sha256", "task_sha256"])
+    do:
+      Map.drop(bindings, [
+        "authority_ledger_sha256",
+        "task_sha256",
+        "imp_optimizer_source_sha256"
+      ])
 
   defp default_python, do: Path.expand("tmp/dspy-parity-venv/bin/python")
   defp read_json!(path), do: path |> File.read!() |> Jason.decode!()
