@@ -94,15 +94,16 @@ reach for a more powerful optimizer or runtime shape when the task earns it.
 
 ## Install
 
-Imp is not yet published to Hex. Use a source checkout for now:
+Imp is not published to Hex. Install the private source release from its
+immutable tag (GitHub credentials with access to the repository are required):
 
 ```elixir
-{:imp, path: "path/to/imp"}
+{:imp, github: "deepfates/imp", tag: "v0.3.0"}
 ```
 
-`main` is an unpublished `0.3.0` internal candidate with breaking changes from
-`0.2.1`, so pin an exact commit when another project depends on it. Tagging and
-Hex publication remain explicit owner actions.
+Use `{:imp, path: "path/to/imp"}` only while developing against a local
+checkout. Version `0.3.0` contains breaking changes from `0.2.1`; Hex
+publication remains a separate owner action.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. You can run

@@ -1,4 +1,4 @@
-# Imp v0.3.0 — internal release candidate notes
+# Imp v0.3.0 — private source release
 
 Imp is DSPy for the BEAM: declare a language-model task as a typed Elixir
 program, then test, measure, improve, and operate it like any other code.
@@ -9,23 +9,22 @@ artifacts, and run under OTP supervision.
 
 ## Install
 
-Not yet published to Hex — `{:imp, "~> 0.3.0"}` becomes the install line
-once the package is published (an owner action still pending). Until then,
-install from a source checkout:
+Imp is not published to Hex. Install the private source release from its
+immutable tag (GitHub credentials with repository access are required):
 
 ```elixir
-{:imp, path: "path/to/imp"}
+{:imp, github: "deepfates/imp", tag: "v0.3.0"}
 ```
+
+Use a path dependency only for local development.
 
 Three focused product guides, five Livebooks, a provider-free tutorial, and a
 deployment example are bundled for HexDocs. Generated module documentation is
 the exhaustive API reference. Research evidence and maintainer procedures
 remain in the source repository.
 
-This source is an unpublished `0.3.0` internal candidate. It is not tagged and
-does not claim a Hex release; the exact candidate is its clean Git commit plus
-the SHA-256 of the built package. Public tagging and publication remain explicit
-owner actions.
+This is a private Git source release tagged `v0.3.0`, not a Hex release.
+Repository visibility remains private.
 
 ## Breaking changes from 0.2.1
 
@@ -177,5 +176,5 @@ their APIs may still converge with upstream semantics. A callable optimizer is
 not thereby proven effective; the task-scoped results above are the evidence
 boundary.
 
-The candidate described by these notes has package version `0.3.0`; its tag and
-Hex publication remain pending owner action.
+This release has package version `0.3.0` and private source tag `v0.3.0`.
+Hex publication remains a separate owner action.

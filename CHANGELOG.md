@@ -5,8 +5,13 @@ Versioning once the first public package is released.
 
 ## Unreleased
 
-The unpublished `0.3.0` candidate continues to receive corrections before its
-first public tag. Since the initial release-candidate checkpoint, Artifact
+No changes yet.
+
+## 0.3.0 — 2026-08-23
+
+Released as private Git source tag `v0.3.0`. It is not published to Hex.
+
+Since the initial release-candidate checkpoint, Artifact
 fresh-process portability, finite Experiment error budgets, fixed repeated
 outer evaluation with independent selection/test repetition counts, OpenRouter
 request/evidence handling, and pinned MIPROv2 minibatch/Optuna fidelity have
@@ -15,8 +20,7 @@ compatible Experiment Result schema 4; the existing integer shorthand and
 uniform-result schemas remain unchanged. Repository-only benchmark work added
 independently recomputable Optimize Anything evidence and provider-free
 MuSiQue readiness without adding those research surfaces to the Hex payload.
-These changes remain part of the unpublished candidate until an owner-approved
-release cut decides otherwise.
+These changes are included in the private `v0.3.0` source release.
 
 Signature fields can now use `type: :code` with explicit `language:` metadata.
 Chat, JSON, and XML adapters emit language-aware guidance, render source inputs,
@@ -112,12 +116,6 @@ grouped-reward, durable LoRA update, checkpoint selection, verified deployment,
 and fresh-rebind APIs remain available; multiple retained natural treatments
 did not produce positive held-out learning, so weight movement is not promoted
 as product usefulness.
-
-## 0.3.0 — 2026-07-31
-
-Prepared as an unpublished internal release candidate. The exact candidate is
-identified by its clean Git commit and built-package digest; tagging and Hex
-publication remain owner actions.
 
 ### Added
 
