@@ -59,6 +59,12 @@ delay its own later events and barriers, but cannot delay cross-process
 `cancel_run/3`, owner-death cleanup, or termination of the run task and delivery
 process.
 
+Stdio MCP discovery and tool calls now place each Port under an independent
+BEAM owner that monitors the caller and owns process-group teardown. Cancelling
+an addressable ReActV2/RLM run during a blocked MCP call reaps both a
+SIGTERM-ignoring server and its children instead of relying on an `after` block
+inside the task being terminated.
+
 The persistent Playbook optimizer now has an ordinary reviewed-challenger
 lifecycle. Training weaknesses are exposed as grounded row and trajectory
 pairs; promotion requires separate disjoint promotion and audit lift; review

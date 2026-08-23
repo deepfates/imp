@@ -267,5 +267,8 @@ server-assigned id supersedes it).
 
 Only connect MCP stdio clients to trusted local executables. The stdio client
 opens a process for discovery and opens a fresh process for each imported tool
-call. Imp treats MCP tools like ordinary `Imp.Tool` values, so use tool
-policies for anything with side effects.
+call. A separate BEAM owner holds each Port and reaps its complete process group
+after normal return, timeout, caller death, or addressable run cancellation;
+servers that ignore EOF and SIGTERM are escalated to KILL. Imp treats MCP tools
+like ordinary `Imp.Tool` values, so use tool policies for anything with side
+effects.

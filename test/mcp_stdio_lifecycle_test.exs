@@ -42,9 +42,53 @@ defmodule Imp.MCPStdioLifecycleTest do
     assert os_process_dead?(os_pid), "stdio tool-call server #{os_pid} survived teardown"
   end
 
+  test "Run cancellation reaps a blocked stdio tool process group", %{tmp_dir: tmp_dir} do
+    started_file = Path.join(tmp_dir, "cancel.started")
+    child_pid_file = Path.join(tmp_dir, "cancel.child.pid")
+
+    {pid_file, client} =
+      fake_server(tmp_dir, "cancel_blocked",
+        ignore_sigterm: true,
+        block_tool_call: {started_file, child_pid_file}
+      )
+
+    [tool] = MCP.import_tools(client)
+    File.rm(pid_file)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{
+            next_thought: "call the external tool",
+            tool_calls: [%{id: "stdio-blocked", name: "noop", arguments: %{}}]
+          }
+        end
+      )
+
+    program = Imp.react_v2("question -> answer", [tool], lm: lm)
+    assert {:ok, run} = Imp.start_run(program, %{question: "block"})
+    wait_for_file!(started_file)
+
+    os_pid = read_pid!(pid_file)
+    child_pid = read_pid!(child_pid_file)
+
+    on_exit(fn -> kill_process_group(os_pid) end)
+
+    cancellation = Task.async(fn -> Imp.cancel_run(run, :probe_cancel, 200) end)
+    assert :ok = Task.await(cancellation, 5_000)
+
+    assert os_process_dead?(os_pid),
+           "stdio tool-call server #{os_pid} survived Run cancellation"
+
+    assert os_process_dead?(child_pid),
+           "stdio tool-call child #{child_pid} survived process-group cancellation"
+  end
+
   # A JSON-RPC server that answers initialize/tools/list/tools/call, then
   # deliberately refuses to exit on stdin EOF (and optionally ignores SIGTERM).
-  defp fake_server(tmp_dir, label, ignore_sigterm: ignore_sigterm) do
+  defp fake_server(tmp_dir, label, opts) do
+    ignore_sigterm = Keyword.fetch!(opts, :ignore_sigterm)
+    block_tool_call = Keyword.get(opts, :block_tool_call)
     pid_file = Path.join(tmp_dir, "#{label}.pid")
     script = Path.join(tmp_dir, "#{label}.py")
 
@@ -53,10 +97,37 @@ defmodule Imp.MCPStdioLifecycleTest do
         do: "signal.signal(signal.SIGTERM, signal.SIG_IGN)",
         else: "pass"
 
+    tool_call_body =
+      case block_tool_call do
+        {started_file, child_pid_file} ->
+          """
+          with open(#{inspect(started_file)}, "w") as handle:
+              handle.write("started")
+          child = subprocess.Popen([
+              sys.executable,
+              "-c",
+              "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)",
+          ])
+          with open(#{inspect(child_pid_file)}, "w") as handle:
+              handle.write(str(child.pid))
+          time.sleep(300)
+          """
+
+        nil ->
+          """
+          response = {
+              "jsonrpc": "2.0",
+              "id": request.get("id"),
+              "result": {"ok": True},
+          }
+          """
+      end
+
     File.write!(script, """
     import json
     import os
     import signal
+    import subprocess
     import sys
     import time
 
@@ -87,11 +158,7 @@ defmodule Imp.MCPStdioLifecycleTest do
                 },
             }
         elif method == "tools/call":
-            response = {
-                "jsonrpc": "2.0",
-                "id": request.get("id"),
-                "result": {"ok": True},
-            }
+            #{tool_call_body |> String.trim() |> String.replace("\n", "\n        ")}
 
         if response is not None:
             sys.stdout.write(json.dumps(response) + "\\n")
@@ -123,6 +190,30 @@ defmodule Imp.MCPStdioLifecycleTest do
         Process.sleep(20)
         wait_for_pid_file(pid_file, deadline)
     end
+  end
+
+  defp wait_for_file!(path) do
+    deadline = System.monotonic_time(:millisecond) + 5_000
+    wait_for_file(path, deadline)
+  end
+
+  defp wait_for_file(path, deadline) do
+    if File.exists?(path) do
+      :ok
+    else
+      if System.monotonic_time(:millisecond) >= deadline do
+        raise "fake stdio server never wrote #{path}"
+      end
+
+      Process.sleep(20)
+      wait_for_file(path, deadline)
+    end
+  end
+
+  defp kill_process_group(os_pid) do
+    kill = System.find_executable("kill") || "/bin/kill"
+    _ = System.cmd(kill, ["-KILL", "--", "-#{os_pid}"], stderr_to_stdout: true)
+    :ok
   end
 
   # kill -0 probes existence without sending a signal. Poll briefly so process

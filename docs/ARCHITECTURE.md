@@ -370,7 +370,11 @@ spectrum plus ordinary supervised Elixir around `Imp.call/2` and
 into `Imp.Tool` values. Transport clients use JSON-RPC 2.0 envelopes,
 initialize before discovery, and expose remote `tools/list` / `tools/call`
 style flows through ordinary tools. Stdio clients spawn trusted local MCP
-server executables; they are not a sandbox for untrusted commands.
+server executables; they are not a sandbox for untrusted commands. Each stdio
+discovery or tool call has an independent BEAM owner that owns the Port,
+monitors its caller, and performs verified process-group TERM→KILL teardown on
+normal return, timeout, caller death, or `Imp.Run` cancellation. Killing a tool
+task therefore cannot strand an MCP server or one of its process-group children.
 
 ## RLM
 

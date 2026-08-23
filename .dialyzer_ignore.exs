@@ -226,7 +226,7 @@
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1333, 8}},
   {"lib/imp/lm.ex", :pattern_match, {260, 8}},
   {"lib/imp/lm.ex", :pattern_match_cov, {261, 8}},
-  {"lib/imp/mcp.ex", :pattern_match_cov, {1046, 8}},
+  {"lib/imp/mcp.ex", :pattern_match_cov, {1171, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},

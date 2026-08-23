@@ -537,6 +537,8 @@ defmodule Imp.MCP do
   defmodule StdioClient do
     @moduledoc "Stdio JSON-RPC MCP client that opens a process per discovery or tool call."
 
+    alias __MODULE__.Session
+
     defstruct [
       :command,
       args: [],
@@ -571,46 +573,40 @@ defmodule Imp.MCP do
     end
 
     def list_tools(%__MODULE__{} = client) do
-      {port, os_pid} = open_port(client)
-
-      try do
+      with_session(client, fn session ->
         with {:ok, _} <-
                request(
-                 port,
+                 session,
                  "initialize",
                  Imp.MCP.initialize_params(client.protocol_version),
                  client.timeout
                ),
-             :ok <- notify(port, "notifications/initialized", %{}),
-             {:ok, decoded} <- request(port, "tools/list", %{}, client.timeout),
+             :ok <- notify(session, "notifications/initialized", %{}),
+             {:ok, decoded} <- request(session, "tools/list", %{}, client.timeout),
              {:ok, tools} <- decode_tools(decoded) do
           Enum.map(tools, &attach_stdio_run(client, &1))
         else
           {:error, reason} -> raise ArgumentError, "MCP stdio failed: #{inspect(reason)}"
         end
-      after
-        safe_close(port, os_pid)
-      end
+      end)
     end
 
     defp attach_stdio_run(client, tool) do
       name = Map.get(tool, "name", Map.get(tool, :name))
 
       Map.put(tool, "run", fn arguments ->
-        {port, os_pid} = open_port(client)
-
-        try do
+        with_session(client, fn session ->
           with {:ok, _} <-
                  request(
-                   port,
+                   session,
                    "initialize",
                    Imp.MCP.initialize_params(client.protocol_version),
                    client.timeout
                  ),
-               :ok <- notify(port, "notifications/initialized", %{}),
+               :ok <- notify(session, "notifications/initialized", %{}),
                {:ok, decoded} <-
                  request(
-                   port,
+                   session,
                    "tools/call",
                    %{"name" => name, "arguments" => arguments},
                    client.timeout
@@ -618,86 +614,33 @@ defmodule Imp.MCP do
                {:ok, result} <- Imp.MCP.json_rpc_result(decoded) do
             Imp.MCP.tool_result(result, client.result_mode)
           end
-        after
-          safe_close(port, os_pid)
-        end
+        end)
       end)
     end
 
-    # Closing the port alone only closes stdin; a server that ignores stdin EOF
-    # (or is stuck past the request timeout) survives as an orphan OS process.
-    # Reuse the shared TERM -> grace -> KILL process-group teardown instead.
-    defp safe_close(port, os_pid) do
-      Imp.ExternalCommand.Lifecycle.terminate_port_group(port, os_pid)
-    end
+    defp with_session(client, fun) do
+      {:ok, session} = Session.start(client, self())
 
-    defp open_port(%__MODULE__{} = client) do
-      port =
-        Port.open({:spawn_executable, client.command}, [
-          :binary,
-          :exit_status,
-          :use_stdio,
-          :stderr_to_stdout,
-          args: client.args
-        ])
+      cancellation =
+        Imp.Run.register_cancellable(fn _reason -> Session.stop!(session) end)
 
-      os_pid =
-        case Port.info(port, :os_pid) do
-          {:os_pid, os_pid} -> os_pid
-          nil -> nil
-        end
-
-      {port, os_pid}
-    end
-
-    defp request(port, method, params, timeout) do
-      id = next_id()
-      deadline = System.monotonic_time(:millisecond) + timeout
-
-      Imp.Telemetry.span([:imp, :mcp, :stdio], %{method: method}, fn ->
-        Port.command(port, encode(method, params, id))
-        read_response(port, id, "", deadline)
-      end)
-    end
-
-    defp notify(port, method, params) do
-      body = Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params}) <> "\n"
-
-      Imp.Telemetry.span([:imp, :mcp, :stdio], %{method: method}, fn ->
-        Port.command(port, body)
-        :ok
-      end)
-    end
-
-    defp read_response(port, id, buffer, deadline) do
-      remaining = max(deadline - System.monotonic_time(:millisecond), 0)
-
-      receive do
-        {^port, {:data, data}} ->
-          buffer = buffer <> data
-
-          case decode_line(buffer, id) do
-            {:ok, decoded} -> {:ok, decoded}
-            :more -> read_response(port, id, buffer, deadline)
-            {:error, reason} -> {:error, reason}
-          end
-
-        {^port, {:exit_status, status}} ->
-          {:error, {:stdio_exit, status}}
+      try do
+        fun.(session)
       after
-        remaining -> {:error, :timeout}
+        Imp.Run.unregister_cancellable(cancellation)
+        Session.stop!(session)
       end
     end
 
-    defp decode_line(buffer, id) do
-      buffer
-      |> String.split("\n", trim: true)
-      |> Enum.find_value(:more, fn line ->
-        case Jason.decode(line) do
-          {:ok, %{"id" => ^id, "error" => error}} -> {:error, {:json_rpc_error, error}}
-          {:ok, %{"id" => ^id} = decoded} -> {:ok, decoded}
-          _other -> false
-        end
+    defp request(session, method, params, timeout) do
+      Imp.Telemetry.span([:imp, :mcp, :stdio], %{method: method}, fn ->
+        Session.request(session, method, params, timeout)
+      end)
+    end
+
+    defp notify(session, method, params) do
+      Imp.Telemetry.span([:imp, :mcp, :stdio], %{method: method}, fn ->
+        Session.notify(session, method, params)
       end)
     end
 
@@ -712,6 +655,188 @@ defmodule Imp.MCP do
     defp validate_command!(command) do
       raise ArgumentError,
             "#{inspect(__MODULE__)}.new/2 expects command to be a binary executable path; got: #{inspect(command)}"
+    end
+
+    defmodule Session do
+      @moduledoc false
+
+      use GenServer
+
+      def start(client, owner), do: GenServer.start(__MODULE__, {client, owner})
+
+      def request(pid, method, params, timeout) do
+        GenServer.call(pid, {:request, method, params, timeout}, timeout + 1_000)
+      catch
+        :exit, {:timeout, _details} -> {:error, :timeout}
+        :exit, reason -> {:error, {:stdio_session_exit, Imp.Redaction.redact(inspect(reason))}}
+      end
+
+      def notify(pid, method, params) do
+        GenServer.call(pid, {:notify, method, params})
+      catch
+        :exit, reason -> {:error, {:stdio_session_exit, Imp.Redaction.redact(inspect(reason))}}
+      end
+
+      def stop!(pid) do
+        case stop(pid) do
+          :ok -> :ok
+          {:error, reason} -> raise "MCP stdio cleanup failed: #{inspect(reason)}"
+        end
+      end
+
+      defp stop(pid) do
+        if Process.alive?(pid), do: GenServer.call(pid, :stop, 10_000), else: :ok
+      catch
+        :exit, {:noproc, _details} ->
+          :ok
+
+        :exit, {:normal, _details} ->
+          :ok
+
+        :exit, reason ->
+          {:error, {:stdio_session_stop_failed, Imp.Redaction.redact(inspect(reason))}}
+      end
+
+      @impl true
+      def init({client, owner}) do
+        port =
+          Port.open({:spawn_executable, client.command}, [
+            :binary,
+            :exit_status,
+            :use_stdio,
+            :stderr_to_stdout,
+            args: client.args
+          ])
+
+        os_pid =
+          case Port.info(port, :os_pid) do
+            {:os_pid, os_pid} -> os_pid
+            nil -> nil
+          end
+
+        {:ok,
+         %{
+           port: port,
+           os_pid: os_pid,
+           owner: owner,
+           owner_monitor: Process.monitor(owner),
+           pending: nil
+         }}
+      end
+
+      @impl true
+      def handle_call({:request, method, params, timeout}, from, %{pending: nil} = state) do
+        id = System.unique_integer([:positive])
+        true = Port.command(state.port, StdioClient.encode(method, params, id))
+        timer = Process.send_after(self(), {:request_timeout, id}, timeout)
+
+        pending = %{from: from, id: id, buffer: "", timer: timer}
+        {:noreply, %{state | pending: pending}}
+      end
+
+      def handle_call({:request, _method, _params, _timeout}, _from, state) do
+        {:reply, {:error, :stdio_request_in_flight}, state}
+      end
+
+      def handle_call({:notify, method, params}, _from, state) do
+        body =
+          Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params}) <>
+            "\n"
+
+        true = Port.command(state.port, body)
+        {:reply, :ok, state}
+      end
+
+      def handle_call(:stop, _from, state) do
+        state = reply_pending(state, {:error, :cancelled})
+
+        case cleanup(state) do
+          :ok ->
+            {:stop, :normal, :ok, %{state | port: nil, os_pid: nil}}
+
+          {:error, reason} ->
+            {:stop, :normal, {:error, reason}, %{state | port: nil, os_pid: nil}}
+        end
+      end
+
+      @impl true
+      def handle_info({port, {:data, data}}, %{port: port, pending: pending} = state)
+          when not is_nil(pending) do
+        pending = %{pending | buffer: pending.buffer <> data}
+
+        case decode_line(pending.buffer, pending.id) do
+          :more ->
+            {:noreply, %{state | pending: pending}}
+
+          result ->
+            cancel_timer(pending.timer)
+            GenServer.reply(pending.from, result)
+            {:noreply, %{state | pending: nil}}
+        end
+      end
+
+      def handle_info({port, {:data, _data}}, %{port: port, pending: nil} = state) do
+        {:noreply, state}
+      end
+
+      def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
+        state = reply_pending(state, {:error, {:stdio_exit, status}})
+        {:noreply, state}
+      end
+
+      def handle_info({:request_timeout, id}, %{pending: %{id: id}} = state) do
+        GenServer.reply(state.pending.from, {:error, :timeout})
+        {:noreply, %{state | pending: nil}}
+      end
+
+      def handle_info({:request_timeout, _id}, state), do: {:noreply, state}
+
+      def handle_info({:DOWN, monitor, :process, owner, _reason}, state)
+          when monitor == state.owner_monitor and owner == state.owner do
+        state = reply_pending(state, {:error, :owner_down})
+        _ = cleanup(state)
+        {:stop, :normal, %{state | port: nil, os_pid: nil}}
+      end
+
+      @impl true
+      def terminate(_reason, %{port: nil}), do: :ok
+
+      def terminate(_reason, state) do
+        _ = cleanup(state)
+        :ok
+      end
+
+      defp reply_pending(%{pending: nil} = state, _reply), do: state
+
+      defp reply_pending(state, reply) do
+        cancel_timer(state.pending.timer)
+        GenServer.reply(state.pending.from, reply)
+        %{state | pending: nil}
+      end
+
+      defp cleanup(%{port: nil}), do: :ok
+
+      defp cleanup(state) do
+        Imp.ExternalCommand.Lifecycle.terminate_port_group(state.port, state.os_pid)
+      rescue
+        error -> {:error, Exception.message(error)}
+      catch
+        kind, reason -> {:error, {kind, Imp.Redaction.redact(inspect(reason))}}
+      end
+
+      defp decode_line(buffer, id) do
+        buffer
+        |> String.split("\n", trim: true)
+        |> Enum.find_value(:more, fn line ->
+          case Jason.decode(line) do
+            {:ok, %{"id" => ^id, "error" => error}} -> {:error, {:json_rpc_error, error}}
+            {:ok, %{"id" => ^id} = decoded} -> {:ok, decoded}
+            _other -> false
+          end
+        end)
+      end
+
+      defp cancel_timer(timer), do: Process.cancel_timer(timer, async: false, info: false)
     end
   end
 
