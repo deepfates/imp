@@ -22,9 +22,9 @@ defmodule Imp.Streaming do
   from every named predictor are yielded. The final typed prediction is yielded
   by default and can be disabled with `include_final_prediction: false`.
 
-  Composed modules expose their predictor names through the ordinary
-  `Imp.Module.optimizer_predictors/1` contract. A program with no named
-  predictors returns a terminal `{:provider_stream_unsupported, module}` error.
+  Composed modules expose their predictor names through the ordinary optimizer
+  predictor callback in `Imp.Module`. A program with no named predictors
+  returns a terminal `{:provider_stream_unsupported, module}` error.
   Without `provider_stream: true`, the program runs once and the result is
   chunked locally (grapheme by grapheme, or through the `:chunker` function).
   """
