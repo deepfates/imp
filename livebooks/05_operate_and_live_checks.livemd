@@ -29,9 +29,8 @@ if repo do
 
   Mix.install([{:imp, path: repo}], install_opts)
 else
-  # Standalone notebook: install the Hex release (pending publication;
-  # until Imp is published to Hex this fallback cannot resolve).
-  Mix.install([{:imp, "~> 0.3.0"}])
+  # Standalone notebook: install the private source release.
+  Mix.install([{:imp, github: "deepfates/imp", tag: "v0.3.0"}])
 end
 live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```

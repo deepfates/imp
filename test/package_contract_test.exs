@@ -113,18 +113,18 @@ defmodule PackageContractTest do
     assert_release_files(files)
   end
 
-  test "the unpublished 0.3.0 candidate surfaces agree" do
-    assert Mix.Project.config()[:version] == "0.3.0"
+  test "the 0.3.0 release surfaces agree" do
+    version = Mix.Project.config()[:version]
+    source_dependency = ~s({:imp, github: "deepfates/imp", tag: "v#{version}"})
 
-    assert File.read!("RELEASE_NOTES.md") =~
-             "# Imp v0.3.0 — internal release candidate notes"
-
-    assert File.read!("CHANGELOG.md") =~ "## 0.3.0 — 2026-07-31"
-    assert File.read!("examples/deployment/mix.exs") =~ "{:imp, \"~> 0.3\"}"
+    assert version == "0.3.0"
+    assert File.read!("RELEASE_NOTES.md") =~ "# Imp v#{version}"
+    assert File.read!("CHANGELOG.md") =~ "## #{version}"
+    assert File.read!("examples/deployment/mix.exs") =~ source_dependency
 
     for path <- Path.wildcard("livebooks/*.livemd") do
-      assert File.read!(path) =~ "{:imp, \"~> 0.3.0\"}",
-             "#{path} does not pin the candidate package line"
+      assert File.read!(path) =~ source_dependency,
+             "#{path} does not install the released source tag"
     end
   end
 
@@ -323,21 +323,13 @@ defmodule PackageContractTest do
     assert unavailable == []
   end
 
-  test "README states the honest install: source checkout now, Hex pending publication" do
+  test "README gives the usable private source install" do
     readme = File.read!("README.md")
+    version = Mix.Project.config()[:version]
 
-    # Honesty pass (dee-6yen): the Hex package is not published and the
-    # repository is private, so the README may not advertise a Hex or
-    # github: install as currently working. The Hex line may appear only as
-    # the stated future install, and the working path is a source checkout.
-    assert readme =~ "not yet published to Hex"
-    assert readme =~ ~s({:imp, path:)
-    assert readme =~ "source checkout"
-    refute readme =~ ~s({:imp, github: "deepfates/imp")
+    assert readme =~ "not published to Hex"
+    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v#{version}"})
     refute readme =~ "Documentation lives at [hexdocs.pm/imp]"
-
-    # When the owner publishes to Hex (step 2 of dee-6yen), restore the
-    # Hex-first wording and re-pin this test to it.
   end
 
   defp assert_release_files(files) do
