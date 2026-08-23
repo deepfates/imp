@@ -79,6 +79,23 @@ export OPENROUTER_API_KEY=...
 IMP_PATH=../.. mix run agent_optimization.exs
 ```
 
+Choose both output paths when retaining a run; the result binds the Artifact's
+SHA-256 and basename:
+
+```sh
+IMP_AGENT_OPT_OUTPUT="$PWD/evidence/agent-optimization-result.json" \
+IMP_AGENT_OPT_ARTIFACT_OUTPUT="$PWD/evidence/agent-optimization-artifact.json" \
+IMP_PATH=../.. mix run agent_optimization.exs
+```
+
+The repository's retained clean
+[result](https://github.com/deepfates/imp/blob/main/examples/deployment/evidence/agent-optimization-result.json)
+improved the four-row untouched mean from `0.95` to `1.0`; the selected
+[Artifact](https://github.com/deepfates/imp/blob/main/examples/deployment/evidence/agent-optimization-artifact.json)
+scored `1.0` after application to a freshly reconstructed program in a second
+BEAM. They remain one scoped stochastic treatment, not a general agent or
+optimizer effectiveness claim.
+
 ## The application owns code; the artifact owns selected parameters
 
 `ImpDeployment.SupportPipeline` remains normal source code in the release. The

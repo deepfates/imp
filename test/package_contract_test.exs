@@ -87,6 +87,8 @@ defmodule PackageContractTest do
     "examples/deployment/banking77-gepa-selected-artifact.json",
     "examples/deployment/banking77_gepa.exs",
     "examples/deployment/banking77_mipro.exs",
+    "examples/deployment/evidence/agent-optimization-artifact.json",
+    "examples/deployment/evidence/agent-optimization-result.json",
     "examples/deployment/hotpotqa_gepa.exs",
     "examples/deployment/lib/imp_deployment/banking77_pipeline.ex",
     "examples/deployment/lib/imp_deployment/hotpotqa_pipeline.ex",

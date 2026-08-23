@@ -163,7 +163,15 @@ defmodule ImpDeployment.AgentOptimization.Runner do
     }
 
     path = System.get_env("IMP_AGENT_OPT_OUTPUT", @default_output)
-    :ok = Imp.Optimizer.Artifact.write!(artifact, path <> ".artifact.json")
+    artifact_path = System.get_env("IMP_AGENT_OPT_ARTIFACT_OUTPUT", path <> ".artifact.json")
+    :ok = Imp.Optimizer.Artifact.write!(artifact, artifact_path)
+
+    record =
+      Map.put(record, "artifact", %{
+        "path" => Path.basename(artifact_path),
+        "sha256" => "sha256:" <> file_sha256(artifact_path)
+      })
+
     File.write!(path, Jason.encode!(record, pretty: true) <> "\n")
     IO.puts(Jason.encode!(summary(record), pretty: true))
 
@@ -546,6 +554,13 @@ defmodule ImpDeployment.AgentOptimization.Runner do
   end
 
   defp ids(rows), do: Enum.map(rows, & &1.id)
+
+  defp file_sha256(path) do
+    path
+    |> File.read!()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
 
   defp summary(record) do
     %{

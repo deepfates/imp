@@ -1,0 +1,1801 @@
+{
+  "artifact": {
+    "path": "agent-optimization-artifact.json",
+    "sha256": "sha256:302c0bad389d87683c3d7c658e2d1e1cf8fb89f34966b24a66bd9d48cf639f9c"
+  },
+  "budgets": {
+    "optimizer": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 100000,
+        "output_tokens": 10000,
+        "requests": 6,
+        "usd": 1.0
+      },
+      "pricing": {
+        "input_per_million": 3.0,
+        "output_per_million": 15.0,
+        "source_url": "https://www.anthropic.com/pricing"
+      },
+      "requests": 3,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 3,
+      "usage": {
+        "input_tokens": 1013,
+        "output_tokens": 497,
+        "usd": 0.010494
+      }
+    },
+    "task": {
+      "active_reservations": 0,
+      "exhausted": null,
+      "limits": {
+        "input_tokens": 1000000,
+        "output_tokens": 60000,
+        "requests": 120,
+        "usd": 1.0
+      },
+      "pricing": {
+        "input_per_million": 0.75,
+        "output_per_million": 4.5,
+        "source_url": "https://openai.com/api/pricing/"
+      },
+      "requests": 72,
+      "reservation_ledger_version": 2,
+      "reservations": [],
+      "reserved": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "usd": 0.0
+      },
+      "single_attempt_transport_enforced": true,
+      "transport_attempts": 72,
+      "usage": {
+        "input_tokens": 57275,
+        "output_tokens": 2511,
+        "usd": 0.054251
+      }
+    }
+  },
+  "data": {
+    "selection": [
+      "select-refund",
+      "select-security",
+      "select-lookup"
+    ],
+    "test": [
+      "test-refund",
+      "test-security",
+      "test-lookup",
+      "test-security-2"
+    ],
+    "train": [
+      "train-refund",
+      "train-security",
+      "train-lookup"
+    ]
+  },
+  "fresh_process": {
+    "actions": [
+      "billing_remediation"
+    ],
+    "answer": "Refund queued for account G-744. Confirmation token: REFUND_QUEUED:G-744",
+    "completed": true,
+    "errors": 0,
+    "events": [
+      {
+        "error": null,
+        "kind": "run_started",
+        "output": null,
+        "sequence": 0,
+        "tool_call_id": null,
+        "tool_name": null
+      },
+      {
+        "error": null,
+        "kind": "tool_call",
+        "output": null,
+        "sequence": 1,
+        "tool_call_id": "call_mJtJ1nuoVjgo1r1l5eOExQEe",
+        "tool_name": "billing_remediation"
+      },
+      {
+        "error": null,
+        "kind": "tool_result",
+        "output": "REFUND_QUEUED:G-744",
+        "sequence": 2,
+        "tool_call_id": "call_mJtJ1nuoVjgo1r1l5eOExQEe",
+        "tool_name": "billing_remediation"
+      },
+      {
+        "error": null,
+        "kind": "tool_call",
+        "output": null,
+        "sequence": 3,
+        "tool_call_id": "call_eP30S3ex6xh4p4fgMtu63bl5",
+        "tool_name": "submit"
+      },
+      {
+        "error": null,
+        "kind": "tool_result",
+        "output": {
+          "answer": "Refund queued for account G-744. Confirmation token: REFUND_QUEUED:G-744"
+        },
+        "sequence": 4,
+        "tool_call_id": "call_eP30S3ex6xh4p4fgMtu63bl5",
+        "tool_name": "submit"
+      },
+      {
+        "error": null,
+        "kind": "final",
+        "output": null,
+        "sequence": 5,
+        "tool_call_id": null,
+        "tool_name": null
+      },
+      {
+        "error": null,
+        "kind": "run_finished",
+        "output": null,
+        "sequence": 6,
+        "tool_call_id": null,
+        "tool_name": null
+      }
+    ],
+    "feedback": "correct action, no forbidden action, and grounded final answer",
+    "id": "test-refund",
+    "returned_prediction": true,
+    "score": 1.0,
+    "termination_error": null,
+    "termination_reason": "submit"
+  },
+  "generated_at": "2026-08-23T02:47:53Z",
+  "git_sha": "8a6ce8fd8f5d67da90ab2defeddf7930b1a2a851",
+  "held_out": {
+    "baseline": {
+      "mean_score": 0.95,
+      "rows": [
+        {
+          "actions": [
+            "account_lookup",
+            "billing_remediation"
+          ],
+          "answer": "Refund queued for account G-744 due to the duplicate invoice charge.",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": "call_30aO7DL8mLgDiOiAbkoc4WS6",
+              "tool_name": "account_lookup"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "ACCOUNT_STATUS_OK:G-744",
+              "sequence": 2,
+              "tool_call_id": "call_30aO7DL8mLgDiOiAbkoc4WS6",
+              "tool_name": "account_lookup"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 3,
+              "tool_call_id": "call_eFJfsKZkDJJvXBv5DM3c1eOZ",
+              "tool_name": "billing_remediation"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "REFUND_QUEUED:G-744",
+              "sequence": 4,
+              "tool_call_id": "call_eFJfsKZkDJJvXBv5DM3c1eOZ",
+              "tool_name": "billing_remediation"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 5,
+              "tool_call_id": "call_bxVuneMza1UYFuEoVMQOlgmI",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "Refund queued for account G-744 due to the duplicate invoice charge."
+              },
+              "sequence": 6,
+              "tool_call_id": "call_bxVuneMza1UYFuEoVMQOlgmI",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 7,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 8,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "used forbidden actions account_lookup",
+          "id": "test-refund",
+          "returned_prediction": true,
+          "score": 0.8,
+          "termination_error": null,
+          "termination_reason": "submit"
+        },
+        {
+          "actions": [
+            "security_response"
+          ],
+          "answer": "Security response initiated for account H-851 due to suspected stolen credential usage.",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "reasoning",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 2,
+              "tool_call_id": "call_0_0",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "SECURITY_CASE_OPENED:H-851",
+              "sequence": 3,
+              "tool_call_id": "call_0_0",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 4,
+              "tool_call_id": "call_0_1",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "Security response initiated for account H-851 due to suspected stolen credential usage."
+              },
+              "sequence": 5,
+              "tool_call_id": "call_0_1",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 6,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 7,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "correct action, no forbidden action, and grounded final answer",
+          "id": "test-security",
+          "returned_prediction": true,
+          "score": 1.0,
+          "termination_error": null,
+          "termination_reason": "submit"
+        },
+        {
+          "actions": [
+            "account_lookup"
+          ],
+          "answer": "Account J-963 is active.",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": "call_RGI7utTyc3j2tsMiuDhtcvLH",
+              "tool_name": "account_lookup"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "ACCOUNT_STATUS_OK:J-963",
+              "sequence": 2,
+              "tool_call_id": "call_RGI7utTyc3j2tsMiuDhtcvLH",
+              "tool_name": "account_lookup"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 3,
+              "tool_call_id": "call_dRscMCWCLMhUF9H1GDyH3orv",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "Account J-963 is active."
+              },
+              "sequence": 4,
+              "tool_call_id": "call_dRscMCWCLMhUF9H1GDyH3orv",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 5,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 6,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "correct action, no forbidden action, and grounded final answer",
+          "id": "test-lookup",
+          "returned_prediction": true,
+          "score": 1.0,
+          "termination_error": null,
+          "termination_reason": "submit"
+        },
+        {
+          "actions": [
+            "security_response"
+          ],
+          "answer": "Security case opened for suspected compromise of account K-107.",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "reasoning",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 2,
+              "tool_call_id": "call_0_0",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "SECURITY_CASE_OPENED:K-107",
+              "sequence": 3,
+              "tool_call_id": "call_0_0",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 4,
+              "tool_call_id": "call_0_1",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "Security case opened for suspected compromise of account K-107."
+              },
+              "sequence": 5,
+              "tool_call_id": "call_0_1",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 6,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 7,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "correct action, no forbidden action, and grounded final answer",
+          "id": "test-security-2",
+          "returned_prediction": true,
+          "score": 1.0,
+          "termination_error": null,
+          "termination_reason": "submit"
+        }
+      ]
+    },
+    "selected": {
+      "mean_score": 1.0,
+      "rows": [
+        {
+          "actions": [
+            "billing_remediation"
+          ],
+          "answer": "A refund has been queued for account G-744 due to the duplicate charge. Confirmation token: REFUND_QUEUED:G-744",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": "call_3srLKiNeDP07MVRWWKxnu3fw",
+              "tool_name": "billing_remediation"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "REFUND_QUEUED:G-744",
+              "sequence": 2,
+              "tool_call_id": "call_3srLKiNeDP07MVRWWKxnu3fw",
+              "tool_name": "billing_remediation"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 3,
+              "tool_call_id": "call_vWMAT8VfFEvaXvmBzxqfRnL5",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "A refund has been queued for account G-744 due to the duplicate charge. Confirmation token: REFUND_QUEUED:G-744"
+              },
+              "sequence": 4,
+              "tool_call_id": "call_vWMAT8VfFEvaXvmBzxqfRnL5",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 5,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 6,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "correct action, no forbidden action, and grounded final answer",
+          "id": "test-refund",
+          "returned_prediction": true,
+          "score": 1.0,
+          "termination_error": null,
+          "termination_reason": "submit"
+        },
+        {
+          "actions": [
+            "security_response"
+          ],
+          "answer": "A security response has been initiated for account H-851 due to the stolen credential incident. If you’d like, I can also help with next steps or account review.",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": "call_q7rRsz5nUxYn5pnYEqEuiQtb",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "SECURITY_CASE_OPENED:H-851",
+              "sequence": 2,
+              "tool_call_id": "call_q7rRsz5nUxYn5pnYEqEuiQtb",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 3,
+              "tool_call_id": "call_i7QozGABNdpxM2qX0qUfYHgU",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "A security response has been initiated for account H-851 due to the stolen credential incident. If you’d like, I can also help with next steps or account review."
+              },
+              "sequence": 4,
+              "tool_call_id": "call_i7QozGABNdpxM2qX0qUfYHgU",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 5,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 6,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "correct action, no forbidden action, and grounded final answer",
+          "id": "test-security",
+          "returned_prediction": true,
+          "score": 1.0,
+          "termination_error": null,
+          "termination_reason": "submit"
+        },
+        {
+          "actions": [
+            "account_lookup"
+          ],
+          "answer": "Yes — account J-963 is active.",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": "call_HRNnxybjBQwHpQzS36NcGZS6",
+              "tool_name": "account_lookup"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "ACCOUNT_STATUS_OK:J-963",
+              "sequence": 2,
+              "tool_call_id": "call_HRNnxybjBQwHpQzS36NcGZS6",
+              "tool_name": "account_lookup"
+            },
+            {
+              "error": null,
+              "kind": "reasoning",
+              "output": null,
+              "sequence": 3,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 4,
+              "tool_call_id": "call_1_0",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "Yes — account J-963 is active."
+              },
+              "sequence": 5,
+              "tool_call_id": "call_1_0",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 6,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 7,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "correct action, no forbidden action, and grounded final answer",
+          "id": "test-lookup",
+          "returned_prediction": true,
+          "score": 1.0,
+          "termination_error": null,
+          "termination_reason": "submit"
+        },
+        {
+          "actions": [
+            "security_response"
+          ],
+          "answer": "Security case opened for account K-107. Reference: SECURITY_CASE_OPENED:K-107",
+          "completed": true,
+          "errors": 0,
+          "events": [
+            {
+              "error": null,
+              "kind": "run_started",
+              "output": null,
+              "sequence": 0,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 1,
+              "tool_call_id": "call_N0anAmliPPV7Y5DAVZA1vNIA",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": "SECURITY_CASE_OPENED:K-107",
+              "sequence": 2,
+              "tool_call_id": "call_N0anAmliPPV7Y5DAVZA1vNIA",
+              "tool_name": "security_response"
+            },
+            {
+              "error": null,
+              "kind": "tool_call",
+              "output": null,
+              "sequence": 3,
+              "tool_call_id": "call_SG7rfMjoKYlqaG9Vio4cKEoM",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "tool_result",
+              "output": {
+                "answer": "Security case opened for account K-107. Reference: SECURITY_CASE_OPENED:K-107"
+              },
+              "sequence": 4,
+              "tool_call_id": "call_SG7rfMjoKYlqaG9Vio4cKEoM",
+              "tool_name": "submit"
+            },
+            {
+              "error": null,
+              "kind": "final",
+              "output": null,
+              "sequence": 5,
+              "tool_call_id": null,
+              "tool_name": null
+            },
+            {
+              "error": null,
+              "kind": "run_finished",
+              "output": null,
+              "sequence": 6,
+              "tool_call_id": null,
+              "tool_name": null
+            }
+          ],
+          "feedback": "correct action, no forbidden action, and grounded final answer",
+          "id": "test-security-2",
+          "returned_prediction": true,
+          "score": 1.0,
+          "termination_error": null,
+          "termination_reason": "submit"
+        }
+      ]
+    }
+  },
+  "models": {
+    "optimizer": "openrouter:anthropic/claude-sonnet-4.6",
+    "task": "openrouter:openai/gpt-5.4-mini"
+  },
+  "optimizer": {
+    "best_candidate": {
+      "tool/account_lookup/description": "Read information related to a customer account.",
+      "tool/billing_remediation/description": "Queues a refund for a customer who has explicitly raised a billing dispute. Use this tool only when the customer is disputing a charge or requesting a refund; do not use it for general account questions, security concerns, or information lookups. Returns a confirmation token for the queued refund action.",
+      "tool/security_response/description": "Handle a situation that may require attention."
+    },
+    "candidates": [
+      {
+        "tool/account_lookup/description": "Read information related to a customer account.",
+        "tool/billing_remediation/description": "Make a change when a customer needs help.",
+        "tool/security_response/description": "Handle a situation that may require attention."
+      },
+      {
+        "tool/account_lookup/description": "Read information related to a customer account.",
+        "tool/billing_remediation/description": "Queues a refund for a customer who has explicitly raised a billing dispute. Use this tool only when the customer is disputing a charge or requesting a refund; do not use it for general account questions, security concerns, or information lookups. Returns a confirmation token for the queued refund action.",
+        "tool/security_response/description": "Handle a situation that may require attention."
+      }
+    ],
+    "history": [
+      {
+        "reason": "no_strict_improvement",
+        "status": "rejected",
+        "components": [
+          "tool/account_lookup/description"
+        ],
+        "iteration": 1,
+        "candidate": {
+          "tool/account_lookup/description": "Retrieve and return read-only information about a customer account (e.g., account status, plan details, contact information). Use this tool only when the customer's request is answered by reading account data alone. Do not use this tool for billing disputes, refund requests, or any issue requiring a corrective action — use billing_remediation or security_response instead for those cases.",
+          "tool/billing_remediation/description": "Make a change when a customer needs help.",
+          "tool/security_response/description": "Handle a situation that may require attention."
+        },
+        "parent_ids": [
+          0
+        ],
+        "minibatch_candidate_score": 0.9333333333333332,
+        "minibatch_parent_score": 0.9333333333333332,
+        "candidate_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account B-209"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account B-209"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account B-209"
+            }
+          ]
+        },
+        "parent_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup",
+                  "billing_remediation"
+                ]
+              },
+              "passed?": false,
+              "feedback": "used forbidden actions account_lookup"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup",
+                  "billing_remediation"
+                ]
+              },
+              "passed?": false,
+              "feedback": "used forbidden actions account_lookup"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup",
+                  "billing_remediation"
+                ]
+              },
+              "passed?": false,
+              "feedback": "used forbidden actions account_lookup"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ]
+        }
+      },
+      {
+        "status": "accepted",
+        "components": [
+          "tool/billing_remediation/description"
+        ],
+        "iteration": 2,
+        "candidate_id": 1,
+        "parent_ids": [
+          0
+        ],
+        "acceptance": "strict_improvement",
+        "minibatch_candidate_score": 1.0,
+        "minibatch_parent_score": 0.8666666666666667,
+        "validation_score": 0.9666666666666667
+      },
+      {
+        "reason": "no_strict_improvement",
+        "status": "rejected",
+        "components": [
+          "tool/security_response/description"
+        ],
+        "iteration": 3,
+        "candidate": {
+          "tool/account_lookup/description": "Read information related to a customer account.",
+          "tool/billing_remediation/description": "Queues a refund for a customer who has explicitly raised a billing dispute. Use this tool only when the customer is disputing a charge or requesting a refund; do not use it for general account questions, security concerns, or information lookups. Returns a confirmation token for the queued refund action.",
+          "tool/security_response/description": "Open a security case when the customer reports suspicious account access, unauthorized login attempts, compromised credentials, or potential account takeover. Use only for security-related incidents involving possible breach or unauthorized activity. Do not use for billing disputes or routine account information lookups. Returns a security case reference token."
+        },
+        "parent_ids": [
+          1
+        ],
+        "minibatch_candidate_score": 0.9666666666666667,
+        "minibatch_parent_score": 1.0,
+        "candidate_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ]
+        },
+        "parent_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ]
+        }
+      }
+    ],
+    "metric_calls": 24,
+    "reflection_calls": 3,
+    "rejected": [
+      {
+        "reason": "no_strict_improvement",
+        "status": "rejected",
+        "components": [
+          "tool/account_lookup/description"
+        ],
+        "iteration": 1,
+        "candidate": {
+          "tool/account_lookup/description": "Retrieve and return read-only information about a customer account (e.g., account status, plan details, contact information). Use this tool only when the customer's request is answered by reading account data alone. Do not use this tool for billing disputes, refund requests, or any issue requiring a corrective action — use billing_remediation or security_response instead for those cases.",
+          "tool/billing_remediation/description": "Make a change when a customer needs help.",
+          "tool/security_response/description": "Handle a situation that may require attention."
+        },
+        "parent_ids": [
+          0
+        ],
+        "minibatch_candidate_score": 0.9333333333333332,
+        "minibatch_parent_score": 0.9333333333333332,
+        "candidate_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account B-209"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account B-209"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account B-209"
+            }
+          ]
+        },
+        "parent_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup",
+                  "billing_remediation"
+                ]
+              },
+              "passed?": false,
+              "feedback": "used forbidden actions account_lookup"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup",
+                  "billing_remediation"
+                ]
+              },
+              "passed?": false,
+              "feedback": "used forbidden actions account_lookup"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup",
+                  "billing_remediation"
+                ]
+              },
+              "passed?": false,
+              "feedback": "used forbidden actions account_lookup"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ]
+        }
+      },
+      {
+        "reason": "no_strict_improvement",
+        "status": "rejected",
+        "components": [
+          "tool/security_response/description"
+        ],
+        "iteration": 3,
+        "candidate": {
+          "tool/account_lookup/description": "Read information related to a customer account.",
+          "tool/billing_remediation/description": "Queues a refund for a customer who has explicitly raised a billing dispute. Use this tool only when the customer is disputing a charge or requesting a refund; do not use it for general account questions, security concerns, or information lookups. Returns a confirmation token for the queued refund action.",
+          "tool/security_response/description": "Open a security case when the customer reports suspicious account access, unauthorized login attempts, compromised credentials, or potential account takeover. Use only for security-related incidents involving possible breach or unauthorized activity. Do not use for billing disputes or routine account information lookups. Returns a security case reference token."
+        },
+        "parent_ids": [
+          1
+        ],
+        "minibatch_candidate_score": 0.9666666666666667,
+        "minibatch_parent_score": 1.0,
+        "candidate_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": false,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": false,
+              "feedback": "run did not submit a clean answer grounded in account C-317"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ]
+        },
+        "parent_side_information": {
+          "tool/account_lookup/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/billing_remediation/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ],
+          "tool/security_response/description": [
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "account_lookup"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "security_response"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            },
+            {
+              "metadata": {
+                "errors": 0,
+                "completed": true,
+                "actions": [
+                  "billing_remediation"
+                ]
+              },
+              "passed?": true,
+              "feedback": "correct action, no forbidden action, and grounded final answer"
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": ":max_iterations",
+    "validation_scores": [
+      0.8666666666666667,
+      0.9666666666666667
+    ]
+  },
+  "schema_version": 1,
+  "scope": {
+    "claimed": "one bounded live ReActV2 component-optimization lifecycle with sandboxed tools, disjoint rows, action-aware scoring, Artifact reload, and fresh execution",
+    "not_claimed": [
+      "general agent effectiveness",
+      "external side-effect safety",
+      "multi-seed optimizer effectiveness",
+      "DSPy or Ax parity"
+    ]
+  },
+  "story": "sandboxed-react-v2-support-actions"
+}

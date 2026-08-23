@@ -61,25 +61,26 @@ four untouched requests, writes the selected parameter Artifact, reconstructs
 the trusted tool functions in a fresh BEAM, and scores the actual ordered tool
 calls, results, termination, and final answer rather than trusting model prose.
 
-The clean run at `788c971ce761b25ed6533bc179765d985b17d0fc` improved the
-held-out mean from `0.95` to `0.975`. The baseline made an unnecessary account
-lookup before refunding one request; the selected program removed that action.
-The selected program's other imperfection was a correct lookup followed by a
-forced rather than explicit submit, which scored `0.9`. The fresh-process
-refund case scored `1.0`. The run used 77 task requests and three reflection
-requests for approximately `$0.0744` under separate one-dollar hard caps.
+The clean rerun at `8a6ce8fd8f5d67da90ab2defeddf7930b1a2a851` improved the
+held-out mean from `0.95` to `1.0`. Its selected billing-action description
+removed the baseline's unnecessary account lookup on the refund case, and the
+selected Artifact scored `1.0` after application to freshly reconstructed
+trusted tools in a second BEAM. The run used 72 task requests and three
+reflection requests for `$0.054251` and `$0.010494` respectively, under
+separate one-dollar hard caps.
 
 This is one stochastic treatment over four held-out requests. It exercised a
 real component-optimization, action-observation, Artifact, and restart path; it
 does not establish general agent effectiveness, external-side-effect safety,
-multi-seed optimizer effectiveness, or DSPy/Ax parity. The source commit is now
-on the release branch, but the raw result and Artifact were not retained in the
-repository (their recorded local SHA-256 values were
-`50bc9efee9adaf18b6a0c9fce2284d2c7b5b74205ccb4d333ca2824a0da1f7de`
-and `227cf2f78e35a5b0874095bbf6af6852aeb575d8db6bff078f46c6e0d4d75ce0`);
-therefore these numbers are execution history, not admitted C3 evidence. A
-clean bounded rerun must retain and admit its result before publication claims
-use the outcome.
+multi-seed optimizer effectiveness, or DSPy/Ax parity. The
+[result](../examples/deployment/evidence/agent-optimization-result.json)
+(`6293a68b…`) binds the disjoint row identities, ordered action observations,
+budgets, source commit, and the retained parameter
+[Artifact](../examples/deployment/evidence/agent-optimization-artifact.json)
+(`302c0bad…`). A normal example test verifies the pair, applies the Artifact to
+trusted code, and scans both files for credential-shaped content. These files
+belong to the executable deployment story rather than the comparative research
+registry; their narrow result must not be promoted into a broad C3 claim.
 
 ## Historical red results and their classifications
 
