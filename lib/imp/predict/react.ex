@@ -397,8 +397,7 @@ defmodule Imp.Predict.ReAct do
         extract_final(agent, inputs, history, :empty_tool_calls)
 
       [] ->
-        final = project_outputs(agent.signature, prediction)
-        validate_final(agent.signature, final, history, :direct)
+        force_provider_submit(agent, inputs, history, prediction)
 
       calls ->
         {events, final, failure, submitted?} = execute_calls(agent, List.wrap(calls))
@@ -419,6 +418,58 @@ defmodule Imp.Predict.ReAct do
           true ->
             run_loop(agent, inputs, history, remaining - 1)
         end
+    end
+  end
+
+  # Provider-native ReAct has an explicit completion protocol: the model must
+  # call the reserved submit tool. Models occasionally emit ordinary assistant
+  # text after observing a tool result even when the prompt asks them to submit.
+  # Give that boundary one provider-neutral forced-tool turn instead of treating
+  # the absent structured outputs as the final result. This mirrors ReActV2's
+  # terminal behavior and does not spend another ordinary loop iteration.
+  defp force_provider_submit(agent, inputs, history, direct_prediction) do
+    forced = %{
+      agent
+      | react: %{
+          agent.react
+          | config:
+              Keyword.merge(agent.react.config,
+                tool_choice: %{type: "tool", name: "submit"},
+                reasoning_effort: nil
+              )
+        }
+    }
+
+    tool_descriptions =
+      forced.tools |> Map.values() |> Enum.map(&%{name: &1.name, description: &1.description})
+
+    case call_action(forced, inputs, history, tool_descriptions) do
+      {:ok, prediction, effective_history} ->
+        submit_calls =
+          prediction
+          |> Imp.Prediction.get(:tool_calls, [])
+          |> List.wrap()
+          |> Enum.filter(&(normalize_tool_name(forced.tools, tool_call_name(&1)) == :submit))
+
+        case execute_calls(forced, submit_calls) do
+          {events, final, failure, true} when not is_nil(final) ->
+            history = effective_history ++ events
+
+            if failure do
+              failure
+            else
+              prediction = Imp.Prediction.new(final)
+              validate_final(agent.signature, prediction, history, :forced_submit)
+            end
+
+          _other ->
+            direct = project_outputs(agent.signature, direct_prediction)
+            validate_final(agent.signature, direct, history, :direct)
+        end
+
+      {:error, _reason, _effective_history} ->
+        direct = project_outputs(agent.signature, direct_prediction)
+        validate_final(agent.signature, direct, history, :direct)
     end
   end
 

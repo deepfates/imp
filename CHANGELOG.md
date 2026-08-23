@@ -65,6 +65,12 @@ an addressable ReActV2/RLM run during a blocked MCP call reaps both a
 SIGTERM-ignoring server and its children instead of relying on an `after` block
 inside the task being terminated.
 
+Provider-native ReAct now enforces its documented structured completion
+boundary. If an ordinary action turn returns no tool calls, Imp makes one
+provider-neutral forced `submit` turn and validates those arguments against the
+program signature; an absent or invalid submit remains an error rather than
+being converted into an answer or retried indefinitely.
+
 The persistent Playbook optimizer now has an ordinary reviewed-challenger
 lifecycle. Training weaknesses are exposed as grounded row and trajectory
 pairs; promotion requires separate disjoint promotion and audit lift; review

@@ -33,6 +33,36 @@ defmodule ReActContractTest do
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
+  test "provider-native mode forces its reserved submit after an empty action" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn _messages, opts ->
+          turn = Agent.get_and_update(calls, &{&1, &1 + 1})
+
+          case turn do
+            0 ->
+              assert Keyword.get(opts, :tool_choice) == "auto"
+              %{tool_calls: []}
+
+            1 ->
+              assert Keyword.get(opts, :tool_choice) == %{type: "tool", name: "submit"}
+              %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
+          end
+        end
+      ]
+    }
+
+    agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
+
+    assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "capital?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+    assert Imp.Prediction.get(prediction, :termination_reason) == :forced_submit
+    assert [%{tool: :submit}] = Imp.Prediction.get(prediction, :history)
+  end
+
   test "max iteration exhaustion is an error with trace history" do
     lm = %{
       module: Imp.LM.Static,
