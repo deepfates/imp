@@ -69,15 +69,17 @@ forced rather than explicit submit, which scored `0.9`. The fresh-process
 refund case scored `1.0`. The run used 77 task requests and three reflection
 requests for approximately `$0.0744` under separate one-dollar hard caps.
 
-This is one stochastic treatment over four held-out requests. It establishes a
+This is one stochastic treatment over four held-out requests. It exercised a
 real component-optimization, action-observation, Artifact, and restart path; it
 does not establish general agent effectiveness, external-side-effect safety,
-multi-seed optimizer effectiveness, or DSPy/Ax parity. Its raw result and
-Artifact are currently candidate-bound local outputs (SHA-256
+multi-seed optimizer effectiveness, or DSPy/Ax parity. The source commit is now
+on the release branch, but the raw result and Artifact were not retained in the
+repository (their recorded local SHA-256 values were
 `50bc9efee9adaf18b6a0c9fce2284d2c7b5b74205ccb4d333ca2824a0da1f7de`
 and `227cf2f78e35a5b0874095bbf6af6852aeb575d8db6bff078f46c6e0d4d75ce0`);
-they must not be promoted into admitted evidence until the source commit is on
-the release branch and the retained files pass the ordinary admission checks.
+therefore these numbers are execution history, not admitted C3 evidence. A
+clean bounded rerun must retain and admit its result before publication claims
+use the outcome.
 
 ## Historical red results and their classifications
 

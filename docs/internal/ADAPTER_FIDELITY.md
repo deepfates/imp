@@ -43,15 +43,13 @@ trying to byte-match Python prompt templates.
 
 ## Declared Divergences (registered as gaps, not conformance)
 
-The current-stable audit has repaired output defaults, recursive XML, MCP result
-normalization, and explicit inert multimodal resource loading. Native typed
-reasoning remains a material open adapter semantic; do not infer complete 3.3.1
-adapter parity from the historical scalar corpus. Python class identity,
-aliases, and mutable `default_factory` objects are
-represented as portable map schemas and immutable literal defaults rather than
-Python runtime objects. The current-stable audit remains open until the exact
-3.3.1 differential inventory is rerun; historical scalar prompt byte parity is
-not evidence for newly added upstream surfaces.
+The completed current-stable audit repaired output defaults, recursive XML, MCP
+result normalization, explicit eager multimodal resource loading, and native
+typed reasoning. Exact DSPy 3.3.1 probes and the generated conformance ledger
+own those newer semantics; historical scalar prompt byte parity is not evidence
+for them. Python class identity, aliases, and mutable `default_factory` objects
+remain intentional language-level differences represented by portable map
+schemas and immutable literal defaults rather than Python runtime objects.
 
 ## Intentional Deviations
 

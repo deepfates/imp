@@ -108,9 +108,10 @@ programming in Elixir earlier, and
 [gepa_ex](https://github.com/nshkrdotcom/gepa_ex) explored GEPA. Imp's
 distinction is the breadth of the shared programming and optimization model
 joined to BEAM-native persistence, supervision, and operation. Its source-bound
-differentials make specific compatibility claims reviewable; they do not turn
-the still-open 3.3.1 migration or optimizer-effectiveness work into completed
-parity.
+differentials make specific compatibility claims reviewable. The material
+DSPy 3.3.1 product migration is complete at its declared BEAM-native boundary;
+that does not turn task-specific optimizer results into broad effectiveness,
+paper reproduction, superiority, or ecosystem parity.
 
 ## Coming from DSPy: the five-minute version
 

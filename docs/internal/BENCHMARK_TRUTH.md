@@ -411,7 +411,7 @@ secret-shaped values are rejected rather than redacted because the URL is part
 of source identity. Known profiles bind the exact provider, model, rates, and
 authority URL at the CLI, campaign, and pure admission layers.
 
-The immutable pre-v2 artifact `58ff84ac…` remains valid T2 evidence that a
+The immutable, archived pre-v2 artifact `58ff84ac…` remains valid T2 evidence that a
 live provider-backed campaign executed with recorded costs and checkpoints.
 It does not establish C3 effectiveness because it selected and finally scored
 candidates on the same development set. A later provider-backed retry-policy

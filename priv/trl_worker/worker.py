@@ -158,6 +158,7 @@ class Worker:
         self._verify_environment()
         model_identity = self._verify_model_tree()
 
+        import datasets
         import peft
         import torch
         import transformers
@@ -165,12 +166,14 @@ class Worker:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         expected = self.contract["dependencies"]
-        actual = {
+        available = {
+            "datasets": datasets.__version__,
             "trl": trl.__version__,
             "transformers": transformers.__version__,
             "peft": peft.__version__,
             "torch": torch.__version__.split("+", 1)[0],
         }
+        actual = {name: available.get(name) for name in expected}
         if actual != expected:
             raise WorkerError("dependency_identity_mismatch", f"expected {expected}, got {actual}")
         if not torch.backends.mps.is_available():

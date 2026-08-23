@@ -3,9 +3,10 @@ name = "imp-trl-worker"
 version = "0.1.0"
 requires-python = "==3.12.*"
 dependencies = [
+  "datasets==5.0.1",
   "peft==0.18.1",
-  "torch==2.10.0",
-  "transformers==4.57.6",
+  "torch==2.13.0",
+  "transformers==5.5.0",
   "trl==1.6.0",
 ]
 

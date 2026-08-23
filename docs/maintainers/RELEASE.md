@@ -15,15 +15,15 @@ boundaries, expose operational failures, and teach the same path in its docs.
 Publishing the product does not authorize a comparative or paper claim.
 Research results retain their own frozen contracts and artifacts.
 
-The current release objective is larger than the already-frozen internal
-`0.3.0` candidate. That candidate proved packaging and a bounded lifecycle; it
-did not complete the library. Before publication, Imp must also account for the
-material current-stable DSPy surface, audit contemporary Optimize Anything and
-Ax concepts that belong in the intended product, exercise every advertised
-optimizer through a natural retained lifecycle, survive realistic composed
-multi-provider operation, and pass an adversarial cold-consumer completion
-pass. Bounded representative live comparisons follow those repairs. The full
-paper-scale benchmark program is not a prerequisite for this release.
+The `0.3.0` product-completion chain has accounted for the material
+current-stable DSPy surface, audited the contemporary Optimize Anything and Ax
+concepts that belong in Imp, exercised every advertised product optimizer,
+survived realistic composed multi-provider operation, and passed adversarial
+cold-consumer completion. Those outcomes close the library-making milestone;
+they do not waive the exact-candidate gates below. Publication now requires one
+clean immutable candidate whose code, package, documentation, security posture,
+and retained claims agree. The full paper-scale benchmark program is not a
+prerequisite for this release.
 
 ## Convergence Standard
 

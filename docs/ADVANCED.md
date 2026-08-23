@@ -285,8 +285,14 @@ lift must not be presented as useful learned behavior.
 `Imp.Clients.TRLTrainer` is a local Apple-Silicon backend for real LoRA GRPO
 updates. Its default one-step contract pins Qwen2.5-0.5B-Instruct at revision
 `7ae557604adf67be50417f59c2c2f167def9a775`, CPython 3.12, TRL 1.6.0,
-Transformers 4.57.6, PEFT 0.18.1, and PyTorch 2.10.0 on MPS with CPU fallback
+Transformers 5.5.0, PEFT 0.18.1, and PyTorch 2.13.0 on MPS with CPU fallback
 disabled. Imp does not install those dependencies or download the model.
+
+The longer, result-bound contracts under `priv/trl_worker/` retain the exact
+older dependency identities used by their historical treatments. They are
+provenance, not the recommended environment for a new run; the default
+`qwen-one-update-contract.json` and `pyproject.toml` own the current executable
+environment.
 
 ```elixir
 trainer =

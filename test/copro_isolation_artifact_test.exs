@@ -155,12 +155,21 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
     end
   end
 
-  test "current authority-ledger binding validates the admitted receipt" do
+  test "admitted receipt binds its historical ledger while semantic sources remain current" do
     artifact = @admission |> File.read!() |> Jason.decode!()
     historical = artifact["source_bindings"]
     current = COPROArtifact.source_bindings()
 
-    assert historical["authority_ledger_sha256"] == current["authority_ledger_sha256"]
+    {ledger, 0} =
+      System.cmd("git", [
+        "show",
+        "#{artifact["git_sha"]}:benchmarks/authorities.json"
+      ])
+
+    historical_ledger_sha256 =
+      "sha256:" <> (:crypto.hash(:sha256, ledger) |> Base.encode16(case: :lower))
+
+    assert historical["authority_ledger_sha256"] == historical_ledger_sha256
 
     assert Map.drop(historical, ["authority_ledger_sha256", "task_sha256"]) ==
              Map.drop(current, ["authority_ledger_sha256", "task_sha256"])

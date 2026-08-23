@@ -180,6 +180,15 @@ defmodule Imp.TRLWorkerTest do
       )
 
     assert Path.basename(default.contract_path) == "qwen-one-update-contract.json"
+
+    assert default.contract_path |> File.read!() |> Jason.decode!() |> Map.fetch!("dependencies") ==
+             %{
+               "datasets" => "5.0.1",
+               "peft" => "0.18.1",
+               "torch" => "2.13.0",
+               "transformers" => "5.5.0",
+               "trl" => "1.6.0"
+             }
   end
 
   test "the local rollout LM cannot silently create a second worker" do

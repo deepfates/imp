@@ -30,9 +30,20 @@ defmodule EvidenceProvenanceTest do
     "benchmarks/evidence/admitted/multimodal_live/02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e.json" =>
       "checkpoint under benchmarks/results/multimodal-checkpoints/ is gitignored; a re-capture must commit its checkpoint or record a committed content address",
     "benchmarks/evidence/admitted/optimize_anything/080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653.json" =>
-      "historical dsex-era replication; run directory benchmarks/results/optimize-anything-runs/ was never committed (dee-1t1w)",
-    "benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json" =>
-      "checkpoints under benchmarks/checkpoints/ are gitignored by design; the artifact itself carries the checkpoint content hashes"
+      "historical dsex-era replication; run directory benchmarks/results/optimize-anything-runs/ was never committed (dee-1t1w)"
+  }
+
+  # Current admitted evidence may retain its checkpoint tree in a committed,
+  # content-addressed archive instead of adding a large generated directory to
+  # Git. The validator proves both the archive identity and that every path the
+  # artifact cites is actually present in that archive.
+  @committed_provenance_archives %{
+    "benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json" =>
+      %{
+        path:
+          "benchmarks/evidence/archive/optimize_anything/a4181fed7bfffd3be7299f75923ec96e8aafa843f7f121804718c857fe44fc40.tar.zst",
+        sha256: "a4181fed7bfffd3be7299f75923ec96e8aafa843f7f121804718c857fe44fc40"
+      }
   }
 
   # Reproduction commands recorded in immutable artifacts that no longer
@@ -43,7 +54,7 @@ defmodule EvidenceProvenanceTest do
   @dead_command_grandfathers %{
     {"benchmarks/evidence/admitted/optimize_anything/080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653.json",
      "dsex.benchmark.optimize_anything"} =>
-      "historical — recipe superseded by `mix imp.benchmark.optimize_anything --live` (see the 58ff84ac… artifact admitted for the same protocol)"
+      "historical — recipe superseded by `mix imp.benchmark.optimize_anything --live` (see the archived 58ff84ac… artifact for the same protocol)"
   }
 
   test "every admitted artifact's git_sha is an ancestor of origin/main" do
@@ -117,12 +128,19 @@ defmodule EvidenceProvenanceTest do
         |> Enum.reject(&committed?/1)
 
       grandfathered = Map.get(@uncommitted_provenance_grandfathers, file)
+      archive = Map.get(@committed_provenance_archives, file)
 
       cond do
         uncommitted == [] ->
           refute grandfathered,
                  "stale grandfather entry: #{file} no longer cites uncommitted " <>
                    "provenance paths; delete it from @uncommitted_provenance_grandfathers"
+
+          refute archive,
+                 "stale provenance archive entry: #{file} no longer cites uncommitted paths"
+
+        archive != nil ->
+          verify_provenance_archive!(file, uncommitted, archive)
 
         grandfathered != nil ->
           :ok
@@ -184,6 +202,35 @@ defmodule EvidenceProvenanceTest do
   defp committed?(path) do
     {_, status} = System.cmd("git", ["ls-files", "--error-unmatch", path], stderr_to_stdout: true)
     status == 0
+  end
+
+  defp verify_provenance_archive!(artifact, checkpoint_paths, archive) do
+    assert committed?(archive.path),
+           "#{artifact}: provenance archive is not committed: #{archive.path}"
+
+    assert sha256_file(archive.path) == archive.sha256,
+           "#{artifact}: provenance archive digest does not match its content address"
+
+    {listing, status} =
+      System.cmd("tar", ["--zstd", "-tf", archive.path], stderr_to_stdout: true)
+
+    assert status == 0,
+           "#{artifact}: cannot read provenance archive #{archive.path}: #{listing}"
+
+    entries = listing |> String.split("\n", trim: true) |> MapSet.new()
+
+    for checkpoint <- checkpoint_paths do
+      assert MapSet.member?(entries, checkpoint),
+             "#{artifact}: provenance archive #{archive.path} does not contain #{checkpoint}"
+    end
+  end
+
+  defp sha256_file(path) do
+    path
+    |> File.stream!([], 64 * 1024)
+    |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
   end
 
   # Repo-relative paths an artifact records as provenance receipts: checkpoint

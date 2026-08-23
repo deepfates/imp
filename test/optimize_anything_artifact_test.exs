@@ -16,7 +16,7 @@ defmodule OptimizeAnythingArtifactTest do
 
   test "the immutable pre-v2 campaign remains T2 evidence but cannot authorize effectiveness" do
     path =
-      "benchmarks/evidence/admitted/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json"
+      "benchmarks/evidence/archive/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json"
 
     artifact = path |> File.read!() |> Jason.decode!()
 

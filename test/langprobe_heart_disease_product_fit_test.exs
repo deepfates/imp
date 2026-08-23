@@ -203,7 +203,10 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseProductFitTest do
     task_sizes = Agent.get(task_calls, & &1) |> Enum.map(&byte_size(Jason.encode!(&1)))
     assert length(task_sizes) == 652
     assert Enum.min(task_sizes) == 1_633
-    assert Enum.max(task_sizes) == 3_368
+    # Typed LM envelopes retain an explicit empty tool-call list on each of the
+    # two demonstration responses. That is 32 intentional wire bytes beyond
+    # the original C12 census, with the task text and demo arms unchanged.
+    assert Enum.max(task_sizes) == 3_400
   end
 
   @tag :evidence_infrastructure
