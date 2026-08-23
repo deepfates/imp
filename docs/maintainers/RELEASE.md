@@ -89,16 +89,16 @@ not bypass that order.
 
 ## Candidate Gates
 
-Current `main` uses `0.3.0` package metadata for an unpublished internal
-candidate because it contains the breaking changes documented since `0.2.1`.
-An internal candidate is identified by all three of:
+Version `0.3.0` is released from the private immutable Git tag `v0.3.0`; it is
+not published to Hex. A candidate or private source release is identified by
+all three of:
 
 - an exact clean Git commit;
 - the SHA-256 of the unpacked/built Hex artifact produced from that commit;
 - passing candidate gates from that same commit.
 
-Package version alone is not candidate identity. A public tag, confirmation of
-the publication version, and publication remain separate owner actions.
+Package version alone is not release identity. Public repository visibility and
+Hex publication remain separate owner actions.
 
 Run from a clean candidate commit:
 

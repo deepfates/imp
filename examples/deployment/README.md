@@ -24,8 +24,8 @@ IMP_PATH=../.. mix deps.get
 IMP_PATH=../.. mix run --no-start run_workflow.exs
 ```
 
-After Imp is published, a copied application can omit `IMP_PATH` and resolve
-the declared Hex dependency normally.
+A copied application with access to the private repository can omit `IMP_PATH`
+and resolve the immutable `v0.3.0` Git dependency declared in `mix.exs`.
 
 The workflow:
 
