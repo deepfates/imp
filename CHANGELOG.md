@@ -88,6 +88,8 @@ other provider errors are not retried through the compatibility path.
 Malformed provider tool calls are retained as non-executable error observations
 so the model can correct them on its next turn; Imp never guesses a missing tool
 name or sends the malformed call through policy, authorization, or execution.
+The typed extractor is explicitly evidence-bound: proposed, malformed, and
+failed calls cannot be presented as successful actions or verification.
 
 The persistent Playbook optimizer now has an ordinary reviewed-challenger
 lifecycle. Training weaknesses are exposed as grounded row and trajectory

@@ -437,13 +437,25 @@ defmodule ReActV2Test do
                match?([%ReqLLM.Tool{name: "submit"}], opts[:tools])
            end)
 
-    assert {_extraction_messages, extraction_opts} =
+    assert {extraction_messages, extraction_opts} =
              Enum.find(requests, fn {_messages, opts} ->
                opts[:tool_choice] == nil and opts[:tools] in [nil, []]
              end)
 
     assert extraction_opts[:tool_choice] == nil
     assert extraction_opts[:tools] in [nil, []]
+
+    extraction_prompt =
+      extraction_messages
+      |> Enum.flat_map(&List.wrap(&1.content))
+      |> Enum.map_join("\n", fn
+        text when is_binary(text) -> text
+        %{text: text} when is_binary(text) -> text
+        part -> inspect(part)
+      end)
+
+    assert extraction_prompt =~ "only from the original inputs and successful tool"
+    assert extraction_prompt =~ "is not evidence that an action happened"
   end
 
   test "preserves missing output when typed extraction fails" do

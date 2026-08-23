@@ -339,7 +339,7 @@ defmodule Imp.Predict.ReActV2 do
     signature = %Imp.Signature{
       inputs: react.signature.inputs ++ [Imp.Signature.Field.new(:history, :input)],
       outputs: react.signature.outputs,
-      instructions: react.signature.instructions
+      instructions: extraction_instructions(react.signature.instructions)
     }
 
     predict = react.react
@@ -356,6 +356,21 @@ defmodule Imp.Predict.ReActV2 do
       if predict.dynamic_adapter?, do: opts, else: Keyword.put(opts, :adapter, predict.adapter)
 
     Imp.Predict.ChainOfThought.new(signature, opts)
+  end
+
+  defp extraction_instructions(task_instructions) do
+    """
+    #{task_instructions}
+
+    Produce the final outputs only from the original inputs and successful tool
+    results recorded in `history`. A proposed tool call, model reasoning, a
+    malformed call, or an error result is not evidence that an action happened.
+    Never claim that an action or verification succeeded unless `history`
+    contains its successful result. If the requested outcome is not established,
+    report that limitation honestly in the declared output fields. No tools are
+    available during this extraction step.
+    """
+    |> String.trim()
   end
 
   defp named_tool_choice_unsupported?(reason) do
