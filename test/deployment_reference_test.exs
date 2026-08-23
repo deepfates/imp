@@ -460,7 +460,6 @@ defmodule DeploymentReferenceTest do
     assert readme =~ "IMP_MODEL"
     assert readme =~ "IMP_MAX_CONCURRENCY"
     assert readme =~ "The example program has two stages"
-    assert readme =~ "Research case studies stay separate"
     assert readme =~ "reload_parameters/1"
     assert readme =~ "starts a second OS process"
     assert readme =~ "serves four\nconcurrent predictions"

@@ -3,10 +3,9 @@ defmodule Imp.Optimizer.RandomSearch do
   @moduledoc """
   DSPy 3.2.1 BootstrapFewShotWithRandomSearch / BootstrapRS.
 
-  Candidate seeds, baseline scheduling, chained labeled-demo sampling, and tie
-  ordering match the authority. Seeded draws use Imp's deterministic
-  BEAM-native sampler, so they do not claim Python MT19937 sequence parity.
-  Candidate evaluation scores use DSPy's rounded percentage scale.
+  Candidate seeds, baseline scheduling, chained labeled-demo sampling, tie
+  ordering, and rounded percentage scores follow DSPy 3.2.1. Seeded draws use
+  Imp's deterministic BEAM-native sampler rather than Python's MT19937 sequence.
 
   Durable invocations accept `:max_candidates`, `:checkpoint_fn`, and
   `:resume_state`. A candidate is sealed only after both its bootstrap/build

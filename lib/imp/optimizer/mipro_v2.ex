@@ -19,9 +19,9 @@ defmodule Imp.Optimizer.MIPROv2 do
   text is included only through the explicit `program_grounding: :module_source`
   or `program_grounding: {:text, context}` opt-in.
 
-  `:proposer_fidelity` defaults to Imp's documented `:beam_native` grounded
-  proposer. Set it to `:dspy_3_2_1` for the matched-comparison path with data/tip
-  awareness enabled. Program awareness requires explicit text grounding and
+  `:proposer_fidelity` defaults to Imp's `:beam_native` grounded proposer. Set
+  it to `:dspy_3_2_1` to use DSPy's pinned data- and tip-aware proposal flow.
+  Program awareness requires explicit text grounding and
   performs DSPy's program-description and module-description calls before each
   candidate; few-shot awareness uses the same ordered demo arms searched by the
   optimizer. Both zero-shot and joint instruction/demonstration search are
@@ -31,14 +31,14 @@ defmodule Imp.Optimizer.MIPROv2 do
   is semantically significant; unsupported values fail before proposer
   transport with their exact example path.
 
-  `:search_fidelity` separately controls parameter search. The legacy narrow
+  `:search_fidelity` separately controls parameter search. The startup-only
   `:dspy_3_2_1_optuna_4_9_0_startup` mode reproduces Optuna 4.9.0's NumPy
   RandomState startup sequence exactly and rejects configurations that would
   enter modeled TPE. `:dspy_3_2_1_optuna_4_9_0` continues through Optuna's
   multivariate categorical TPE phase with the pinned split, Parzen kernels,
-  candidate sampling, and independent NumPy RNG streams. Imp's default
-  categorical Parzen search remains a
-  BEAM-native algorithm and does not claim Optuna trial-sequence parity.
+  candidate sampling, and independent NumPy RNG streams. The default
+  categorical Parzen search is BEAM-native and produces its own deterministic
+  sequence for a given seed.
 
   An explicit compile-time `seed: 0` is a real seed in the default BEAM-native
   mode. The pinned `:dspy_3_2_1` proposer mode deliberately mirrors DSPy's

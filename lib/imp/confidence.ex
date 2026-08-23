@@ -12,8 +12,8 @@ defmodule Imp.Confidence do
   Missing logprobs fail closed by default. `fallback: :accuracy` must be
   selected explicitly to continue with accuracy only. In that mode the
   `:confidence_quality` objective is omitted and unavailability is recorded in
-  metric metadata. This intentionally avoids treating either missing evidence
-  or confidence in an incorrect prediction as optimization quality.
+  metric metadata. This avoids treating either missing logprobs or confidence
+  in an incorrect prediction as optimization quality.
   """
 
   alias Imp.Confidence.Scoring

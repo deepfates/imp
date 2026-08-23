@@ -92,6 +92,22 @@ and optimizers for examples, instructions, prompts and weights. You do not
 need to adopt that whole surface at once. Start with a program and a metric;
 reach for a more powerful optimizer or runtime shape when the task earns it.
 
+## When Imp is a good fit
+
+Use Imp when a model performs a real application task with an output contract
+you can name and behavior you can measure: extraction, classification,
+retrieval-augmented answers, multi-stage analysis, tool use, or a bounded agent
+loop. It is especially useful when the program must be tested without a
+provider, improved from examples, persisted without credentials, and operated
+inside an OTP system.
+
+Do not put deterministic application logic behind a model call. An optimizer
+also cannot invent the product requirement: you still need representative
+examples, a metric that rewards the behavior you want, and data kept out of
+training and selection. Imp provides the program and optimization machinery;
+your application owns its tools, authority, data, budgets, and promotion
+decision.
+
 ## Install
 
 Imp is not published to Hex. Install the private source release from its
@@ -102,25 +118,13 @@ immutable tag (GitHub credentials with access to the repository are required):
 ```
 
 Use `{:imp, path: "path/to/imp"}` only while developing against a local
-checkout. Version `0.3.0` contains breaking changes from `0.2.1`; Hex
-publication remains a separate owner action.
+checkout. Version `0.3.0` contains breaking changes from `0.2.1`; see the
+[release notes](RELEASE_NOTES.md) when upgrading.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. You can run
 the provider-free parts of the learning path and deployment example without
 an API key.
-
-## What the current evidence says
-
-The core program, evaluation, selection, Artifact, restart, and concurrent OTP
-serving path is exercised from an unpacked package, with failures retained as
-data instead of hidden. Task-scoped studies include positive held-out TREC
-results and honest negative or underpowered outcomes elsewhere; they do not
-establish broad optimizer effectiveness, and optimizer modules remain
-experimental before 1.0. The source repository's
-[evidence guide](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md)
-contains the contracts, exact results, withdrawn interpretation, and remaining
-research gaps.
 
 ## Read next
 
@@ -133,9 +137,7 @@ research gaps.
 - [Runnable Livebooks](livebooks/01_real_lm_front_door.livemd) — inspect the
   same progression in IEx-ready notebooks.
 
-Run `mix docs` for the exhaustive module and function reference. Research
-results, conformance records, and maintainer procedures remain in the source
-repository, but they are not part of the learning path or packaged manual.
+Run `mix docs` for the exhaustive module and function reference.
 
 Imp follows DSPy's central idea—program the behavior you want and optimize it
 from examples—in an Elixir system built around immutable values, explicit

@@ -20,7 +20,7 @@ repo =
 
 if repo do
   # Prefer the notebook's own Imp checkout even when Livebook was launched
-  # from an unrelated Mix project. Unpacked Hex artifacts intentionally omit
+  # from an unrelated Mix project. Unpacked package archives may omit
   # mix.lock, so pin it only when the source checkout actually provides it.
   install_opts =
     if File.regular?(Path.join(repo, "mix.lock")),
@@ -40,7 +40,7 @@ live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 Livebook 01 showed the real-provider shape. This chapter removes provider
 variance so you can inspect the same Imp ideas with a deterministic local LM.
 
-It also includes a live-provider proof cell near the end. The point is that
+It also includes a live-provider example near the end. The point is that
 `Imp.LM.Static` is a development tool, not a different product path.
 
 Imp-style programming means declaring the task boundary first:
@@ -152,7 +152,7 @@ example =
 {Imp.to_map(Imp.inputs(example)), Imp.to_map(Imp.labels(example))}
 ```
 
-## Live Provider Proof
+## Try A Live Provider
 
 This is the same programming model against a real LM. The cell validates the
 typed JSON result only when `LIVE_PROVIDER=1`, `OPENAI_API_KEY`, and
@@ -173,7 +173,7 @@ live_lm = fn opts ->
        )
      )}
   else
-    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live proof cell."}
+    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live provider cell."}
   end
 end
 ```

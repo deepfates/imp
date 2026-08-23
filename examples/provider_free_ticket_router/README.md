@@ -15,10 +15,5 @@ mix run run.exs
 The program reports `25% -> 100%` and shows that the compiled program retains
 four reviewable demonstrations and the exact
 `enum[atlas,harbor,beacon,quill]` output type. The deterministic LM is a teaching
-fixture built to expose the lifecycle; this result is not a claim that
-`LabeledFewShot` will improve a real model or your dataset. Use a real held-out
-set and metric to establish that claim for your program.
-
-When this example is exercised by Imp's package gate, it is copied out of the
-package and compiled as an ordinary consumer against the unpacked artifact with
-Hex forced offline.
+fixture for seeing exactly how compilation changes a program. Replace it with
+your provider, data, and metric to measure the behavior you care about.

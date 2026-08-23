@@ -112,27 +112,27 @@ defmodule DocumentationContractTest do
     assert body =~ "enforced per-PR in CI"
   end
 
-  test "the executable Livebook proof stays off the reader's front doors" do
+  test "the Livebook execution command stays in contributor documentation" do
     refute File.read!("README.md") =~ "mix livebook.execute.check"
     refute File.read!("docs/LEARNING_PATH.md") =~ "mix livebook.execute.check"
     assert File.read!("CONTRIBUTING.md") =~ "mix livebook.execute.check"
     assert File.read!("docs/maintainers/GATES.md") =~ "mix livebook.execute.check"
   end
 
-  test "internal process vocabulary stays off user surfaces" do
-    # CONFORMANCE.md is the receipts appendix, promoted from the conformance
-    # program; evidence vocabulary ("authority", "differential") is its
-    # subject matter, not a leak. EVIDENCE.md is the public definition of the
-    # C0-C5 ladder (owner ruling 2026-07-17: the ladder IS the maturity
-    # story), so the vocabulary is its subject matter too — everywhere else
-    # it stays banned.
+  test "shipped reader surfaces do not expose internal process coordinates" do
     user_surfaces =
-      ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")] --
-        ["docs/CONFORMANCE.md", "docs/EVIDENCE.md"]
+      [
+        "README.md",
+        "RELEASE_NOTES.md",
+        "CHANGELOG.md",
+        "docs/IMP_FOR_DSPY_USERS.md",
+        "docs/LEARNING_PATH.md",
+        "docs/PRODUCTION_OPERATIONS.md",
+        "examples/deployment/README.md",
+        "examples/provider_free_ticket_router/README.md"
+      ] ++ Path.wildcard("livebooks/*.livemd")
 
-    # "differential" left off the ban list deliberately: "executable
-    # differential tests" is the public conformance claim, not process vocab.
-    banned = ~r/\bC1\b|authorit|\badmitted\b|tranche|fixture/i
+    banned = ~r/\bimp-[a-z]*\d[a-z0-9]*\b|docs\/(?:internal|maintainers)|benchmarks\/|evidence\//i
 
     offenders =
       for path <- user_surfaces,
@@ -140,7 +140,7 @@ defmodule DocumentationContractTest do
           do: {path, hd(match)}
 
     assert offenders == [],
-           "internal vocabulary leaked onto user surfaces: #{inspect(offenders)}"
+           "internal coordinates leaked onto user surfaces: #{inspect(offenders)}"
   end
 
   test "learner-facing docs do not foreground maintainer evidence commands" do
@@ -183,7 +183,7 @@ defmodule DocumentationContractTest do
     assert readme =~ "Learning Path"
     assert readme =~ "docs/LEARNING_PATH.md"
     assert learning =~ "## 1. Make A Real Call"
-    assert learning =~ "## 10. Deploy The Verified Artifact"
+    assert learning =~ ~r/## 10\. .*Artifact/
 
     assert product_docs == [
              "docs/IMP_FOR_DSPY_USERS.md",
@@ -286,7 +286,7 @@ defmodule DocumentationContractTest do
     assert learning =~ "tool runners, policies, credentials"
 
     assert learning =~
-             "Artifact\nreproduction proves deployment behavior, not held-out improvement"
+             "Measure\nthe selected program on data unavailable to optimization before promotion."
   end
 
   test "instruction optimizer fidelity defines durable run-level resume boundaries" do

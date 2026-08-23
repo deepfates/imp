@@ -20,7 +20,7 @@ repo =
 
 if repo do
   # Prefer the notebook's own Imp checkout even when Livebook was launched
-  # from an unrelated Mix project. Unpacked Hex artifacts intentionally omit
+  # from an unrelated Mix project. Unpacked package archives may omit
   # mix.lock, so pin it only when the source checkout actually provides it.
   install_opts =
     if File.regular?(Path.join(repo, "mix.lock")),
@@ -173,7 +173,7 @@ result =
 IO.inspect(result, label: "Optimize Anything result")
 ```
 
-## Live Evaluation Proof
+## Evaluate A Live Provider
 
 This cell spends a few provider calls only when `LIVE_PROVIDER=1` and provider
 credentials are present. It proves that the same `evaluate -> optimize ->
@@ -194,7 +194,7 @@ live_lm = fn opts ->
        )
      )}
   else
-    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live proof cell."}
+    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live provider cell."}
   end
 end
 ```
@@ -234,7 +234,7 @@ case live_lm.(max_completion_tokens: 100) do
     baseline = Imp.evaluate(live_program, live_devset, live_metric)
 
     unless baseline.score == 1.0 do
-      raise "live provider failed the evaluation proof: #{inspect(baseline)}"
+      raise "live provider returned an invalid evaluation: #{inspect(baseline)}"
     end
 
     compiled =

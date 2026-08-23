@@ -127,29 +127,8 @@ defmodule LivebookContractTest do
     assert body =~ "Add OPENAI_API_KEY (see the setup cell) to watch this run."
   end
 
-  test "each later Livebook has a live-provider proof path" do
-    expected = %{
-      "livebooks/02_programming_not_prompting.livemd" => [
-        "## Live Provider Proof",
-        "live provider returned an invalid typed prediction"
-      ],
-      "livebooks/03_evaluate_and_optimize.livemd" => [
-        "## Live Evaluation Proof",
-        "live provider failed the evaluation proof"
-      ],
-      "livebooks/04_tools_agents_mcp_rlm.livemd" => [
-        "## Live ReAct Proof",
-        "## Live RLM Submit Proof",
-        "live ReAct proof failed",
-        "live RLM proof failed"
-      ],
-      "livebooks/05_operate_and_live_checks.livemd" => [
-        "## Live Operations Proof",
-        "live operations proof failed"
-      ]
-    }
-
-    for {path, snippets} <- expected do
+  test "each later Livebook can run its provider examples deliberately" do
+    for path <- Path.wildcard("livebooks/{02,03,04,05}_*.livemd") do
       body = File.read!(path)
 
       assert body =~ "OPENAI_API_KEY"
@@ -157,21 +136,21 @@ defmodule LivebookContractTest do
       assert body =~ "System.get_env(\"LIVE_PROVIDER\") == \"1\""
       assert body =~ "live_provider_enabled? && System.get_env(\"OPENAI_API_KEY\")"
 
-      ~r/```elixir\n(.*?)```/s
-      |> Regex.scan(body, capture: :all_but_first)
-      |> List.flatten()
-      |> Enum.filter(fn block ->
-        String.contains?(block, "Imp.req_llm") and
-          String.contains?(block, "System.fetch_env!(\"OPENAI_API_KEY\")")
-      end)
-      |> Enum.each(fn provider_block ->
+      provider_blocks =
+        ~r/```elixir\n(.*?)```/s
+        |> Regex.scan(body, capture: :all_but_first)
+        |> List.flatten()
+        |> Enum.filter(fn block ->
+          String.contains?(block, "Imp.req_llm") and
+            String.contains?(block, "System.fetch_env!(\"OPENAI_API_KEY\")")
+        end)
+
+      assert provider_blocks != [], "#{path} has no live provider example"
+
+      Enum.each(provider_blocks, fn provider_block ->
         assert provider_block =~
                  "live_provider_enabled? && System.get_env(\"OPENAI_API_KEY\")"
       end)
-
-      for snippet <- snippets do
-        assert body =~ snippet
-      end
     end
   end
 

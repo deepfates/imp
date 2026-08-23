@@ -352,17 +352,11 @@ partially installing state. GEPA can produce the
 selected program, report, and artifact together with
 `Imp.Optimizer.GEPA.compile_with_artifact/5`; MIPROv2 and SIMBA use the shared
 `from_optimized_program/2` path demonstrated above after their own separate
-train and validation evaluation. Repository-only research case studies for
-[GEPA](https://github.com/deepfates/imp/tree/main/examples/local_gepa_banking77),
-[MIPROv2](https://github.com/deepfates/imp/tree/main/examples/local_mipro_banking77),
-and [SIMBA](https://github.com/deepfates/imp/tree/main/examples/local_simba_banking77)
-exercise the save/apply/restart lifecycle with real model runtimes; they are
-not part of the packaged teaching surface.
+train and validation evaluation.
 
 Treat either artifact as deployable program state: review and version it
-alongside the metric and evaluation data that justified promoting it. Artifact
-reproduction proves deployment behavior, not held-out improvement; measure the
-selected program on data unavailable to optimization before making that claim.
+alongside the metric and evaluation data that justified promoting it. Measure
+the selected program on data unavailable to optimization before promotion.
 
 ## 9. Inspect Runtime Behavior
 
@@ -413,7 +407,7 @@ Ordinary `Imp.call/2` has no interactive approval step. Use replayed or sandboxe
 tools for optimization and require this explicit boundary when a deployed run
 may perform an external effect.
 
-## 10. Deploy The Verified Artifact
+## 10. Deploy The Selected Artifact
 
 The `examples/deployment` OTP application shows the production shape: it
 loads a checksummed artifact during supervised startup, binds credentials
@@ -426,11 +420,10 @@ declares and measures a typed two-predictor analysis → routing support
 program, compiles and inspects selected
 demonstrations, evaluates a disjoint test split, saves and hot-reloads the
 checksummed parameter artifact onto the trusted reconstructed module, serves
-concurrent calls, and proves a killed or timed-out
-worker does not take down the server. The planted static LM makes those product
-mechanics deterministic; its score is explicitly not real-model effectiveness.
-The package gate repeats the saved selected program's load and call in a second
-OS process against the unpacked artifact.
+concurrent calls, and demonstrates that a killed or timed-out worker does not
+take down the server. The deterministic LM keeps the example
+fast and reproducible; replace it with your configured provider when adopting
+the application shape.
 
 For your own deployment, keep the artifact path, model name, API key,
 concurrency limits, and retry policy in runtime configuration. Evaluate the

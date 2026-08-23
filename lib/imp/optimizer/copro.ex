@@ -4,9 +4,9 @@ defmodule Imp.Optimizer.COPRO do
   DSPy 3.2.1 coordinate prompt optimizer.
 
   COPRO searches, stores, compares, and deduplicates `(instruction, prefix)`
-  metadata exactly as the authority does. DSPy 3.2.1 simultaneously declares
-  field `prefix` deprecated and ineffective, and Imp's DSPy-compatible adapter
-  path likewise does not render it. Only instruction changes affect task prompts.
+  metadata as DSPy 3.2.1 does. DSPy declares `prefix` deprecated and does not
+  render it into task prompts; Imp behaves the same way. Only instruction
+  changes affect task prompts.
 
   A configured proposal LM may return the whole requested JSON batch. If it
   returns one candidate, Imp performs ordered, bounded fan-out with distinct

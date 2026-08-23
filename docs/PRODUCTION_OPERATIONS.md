@@ -1,13 +1,9 @@
 # Production Operations
 
-This document covers consumer runtime operations. Imp's release procedure and
-maintainer-only verification commands remain in the source repository rather
-than the Hex package.
-
-It is the final chapter of the path used by the README, Learning Path, and
-Livebooks: after an Imp program has a signature, examples, metrics,
-optimization, and any needed tools, this page explains how applications run
-live providers without hiding credentials or transport behavior.
+This is the operational companion to the Learning Path. After a program has a
+signature, examples, metrics, optimization, and any needed tools, this page
+explains how to run it with live providers, bounded concurrency, observable
+failures, and runtime-only credentials.
 
 ## Runtime Posture
 
@@ -55,23 +51,6 @@ Provider access uses `Imp.req_llm/2`, which delegates provider
 catalogs, Req/Finch transport, streaming, structured-output negotiation, and
 provider-specific option translation to `ReqLLM`. Imp does not maintain a
 parallel OpenAI-compatible provider client stack.
-
-Dependency policy:
-
-- runtime dependencies must own a real operational boundary or a stable
-  primitive Imp should not reimplement;
-- test/dev dependencies are encouraged when they strengthen contracts,
-  property coverage, local integration harnesses, or static review without
-  bloating production runtime;
-- docs and gate claims must name which paths are live-proven, deterministic
-  only, or reserved.
-
-## Maintainer verification
-
-Release gates, benchmark evidence, and gate-debugging instructions remain in
-the [source repository](https://github.com/deepfates/imp/blob/main/docs/maintainers/GATES.md).
-They are not installed as consumer Mix tasks and are not needed to run Imp in
-production.
 
 ## Secret Handling
 
@@ -138,7 +117,7 @@ checksummed program artifact during supervised startup, resolves callback names
 through a host-supplied callback allowlist, obtains provider configuration from runtime
 environment variables, and serves calls through a GenServer. The accompanying
 test executes the same server with a deterministic LM and registry-backed
-artifact before release.
+artifact.
 
 Stable event families:
 

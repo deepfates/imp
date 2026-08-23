@@ -4,9 +4,8 @@ defmodule Imp.Optimizer.BootstrapRS do
 
   DSPy exposes `BootstrapRS` / `BootstrapFewShotWithRandomSearch` as the
   random-search variant of bootstrap few-shot optimization. Imp keeps the
-  canonical implementation in `Imp.Optimizer.RandomSearch`; this module exists
-  so upstream-oriented users and conformance audits can use the familiar name
-  without learning a second implementation.
+  canonical implementation in `Imp.Optimizer.RandomSearch`; this alias keeps
+  DSPy examples and ports readable without introducing a second implementation.
   """
 
   defdelegate new(metric, opts \\ []), to: Imp.Optimizer.RandomSearch

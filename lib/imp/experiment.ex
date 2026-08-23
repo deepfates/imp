@@ -25,8 +25,9 @@ defmodule Imp.Experiment do
   Experiment admission and reporting boundary; an optimizer's internal
   candidate evaluations remain under that optimizer's own documented policy.
 
-  This boundary is for ordinary product checks and bounded scientific runs. It
-  does not turn a single result into a general optimizer-effectiveness claim.
+  A result describes this program, metric, data split, and run configuration.
+  Repeat the lifecycle across representative tasks and conditions before
+  generalizing an optimizer's effectiveness.
   """
 
   alias Imp.Experiment.{Bootstrap, Data, Result}

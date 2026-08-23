@@ -17,10 +17,9 @@ defmodule Imp.Optimizer.InferRules do
   signature-class state. Context-window failures retry with progressively fewer
   examples, matching upstream's user-visible recovery policy. Proposal and
   evaluation failures, including exhausted context retries, are retained in the
-  optimizer report instead of aborting the whole compile. Those are deliberate
-  native control-flow differences, not claims of exact whole-loop equivalence.
-  Imp also reuses a logical call's sequential rollout ID while its prompt
-  shrinks; DSPy draws a fresh random rollout ID for every retry.
+  optimizer report instead of aborting the whole compile. Imp also reuses a
+  logical call's sequential rollout ID while its prompt shrinks; DSPy draws a
+  fresh random rollout ID for every retry.
 
   Operational route, cost, budget, transport, and cancellation guards are
   never candidate-local: they remain fatal through both rule induction and

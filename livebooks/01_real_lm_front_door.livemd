@@ -20,7 +20,7 @@ repo =
 
 if repo do
   # Prefer the notebook's own Imp checkout even when Livebook was launched
-  # from an unrelated Mix project. Unpacked Hex artifacts intentionally omit
+  # from an unrelated Mix project. Unpacked package archives may omit
   # mix.lock, so pin it only when the source checkout actually provides it.
   install_opts =
     if File.regular?(Path.join(repo, "mix.lock")),

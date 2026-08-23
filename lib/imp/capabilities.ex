@@ -2,10 +2,10 @@ defmodule Imp.Capabilities do
   @moduledoc """
   Runtime capability checks for provider features that cannot be inferred safely.
 
-  Token logprob support is deliberately evidence-based. In the current ReqLLM
-  dependency path, only an OpenAI Chat Completions response with a nonempty
-  returned logprob list is accepted. OpenAI Responses, Anthropic, Google/Gemini,
-  and missing metadata are unsupported and fail closed.
+  Token logprob support is determined from the response metadata. The current
+  ReqLLM integration supports OpenAI Chat Completions responses with a nonempty
+  logprob list. OpenAI Responses, Anthropic, Google/Gemini, and responses without
+  logprob metadata return an explicit unsupported reason.
   """
 
   @type unavailable_reason ::

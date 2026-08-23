@@ -20,7 +20,7 @@ repo =
 
 if repo do
   # Prefer the notebook's own Imp checkout even when Livebook was launched
-  # from an unrelated Mix project. Unpacked Hex artifacts intentionally omit
+  # from an unrelated Mix project. Unpacked package archives may omit
   # mix.lock, so pin it only when the source checkout actually provides it.
   install_opts =
     if File.regular?(Path.join(repo, "mix.lock")),
@@ -119,7 +119,7 @@ react = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_pol
 Imp.to_map(pred)
 ```
 
-## Live ReAct Proof
+## Run ReAct With A Live Provider
 
 This cell proves the provider tool-call path with a real LM only when
 `LIVE_PROVIDER=1` and provider credentials are present.
@@ -139,7 +139,7 @@ live_lm = fn opts ->
        )
      )}
   else
-    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live proof cells."}
+    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live provider cells."}
   end
 end
 ```
@@ -174,7 +174,7 @@ case live_lm.(max_completion_tokens: 180) do
     history = Imp.get(live_prediction, :history)
 
     unless answer == "Paris" and Enum.any?(history, &(&1.tool == :lookup)) do
-      raise "live ReAct proof failed: #{inspect(Imp.to_map(live_prediction))}"
+      raise "live ReAct call returned an invalid result: #{inspect(Imp.to_map(live_prediction))}"
     end
 
     Imp.to_map(live_prediction)
@@ -331,11 +331,10 @@ rlm = Imp.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
 Imp.call(rlm, %{question: "loop?"})
 ```
 
-## Live RLM Submit Proof
+## Run RLM With A Live Provider
 
-This small live check asks the controller to emit constrained Elixir and submit
-from the persistent environment. The source-checkout live suite separately
-requires a real `llm_query/1` call from generated code.
+This example asks the controller to emit constrained Elixir and submit from
+the persistent environment.
 
 ```elixir
 case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"}) do
@@ -357,7 +356,7 @@ case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"
       })
 
     unless Imp.get(live_prediction, :answer) == "Paris" do
-      raise "live RLM proof failed: #{inspect(Imp.to_map(live_prediction))}"
+      raise "live RLM call returned an invalid result: #{inspect(Imp.to_map(live_prediction))}"
     end
 
     {Imp.to_map(live_prediction), live_prediction.metadata.rlm_trace}
@@ -367,6 +366,5 @@ case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"
 end
 ```
 
-Next: open `livebooks/05_operate_and_live_checks.livemd` to see how the same
-programs are guarded by source-checkout gates, live-provider checks, redaction,
-and persistence.
+Next: open `livebooks/05_operate_and_live_checks.livemd` to configure live
+providers, redaction, persistence, and runtime limits.

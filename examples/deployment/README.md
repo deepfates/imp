@@ -17,7 +17,7 @@ application code.
 
 ## Run the complete workflow without a provider
 
-From this directory in a source checkout or unpacked Hex artifact:
+From this directory in a source checkout or unpacked package:
 
 ```sh
 IMP_PATH=../.. mix deps.get
@@ -61,9 +61,8 @@ Both files are written with mode `0600`. The workflow refuses an incompatible
 Result/Artifact pair before applying parameters.
 
 The scripted model has planted routing rules, so the deterministic selection
-score moves from `0.25` to `1.0`. That number proves the application lifecycle,
-not model effectiveness. Replace the scripted model and datasets before using
-this example to make a claim about your own task.
+score moves from `0.25` to `1.0`. Replace it with your provider and datasets to
+measure and improve your own task.
 
 `agent_optimization.exs` is the corresponding bounded live agent story. It
 uses Optimize Anything to improve provider-visible descriptions on three
@@ -71,8 +70,7 @@ sandboxed ReActV2 support actions, scores actual ordered tool events and final
 outcomes on disjoint train/selection/test rows, writes the selected component
 Artifact, and runs it with freshly reconstructed trusted tools in a second
 BEAM. It requires `OPENROUTER_API_KEY`; task and reflection traffic each have a
-strict one-dollar cap. This one treatment can falsify the public lifecycle, but
-it is not evidence of general agent or optimizer effectiveness.
+strict one-dollar cap.
 
 ```sh
 export OPENROUTER_API_KEY=...
@@ -83,18 +81,10 @@ Choose both output paths when retaining a run; the result binds the Artifact's
 SHA-256 and basename:
 
 ```sh
-IMP_AGENT_OPT_OUTPUT="$PWD/evidence/agent-optimization-result.json" \
-IMP_AGENT_OPT_ARTIFACT_OUTPUT="$PWD/evidence/agent-optimization-artifact.json" \
+IMP_AGENT_OPT_OUTPUT="$PWD/agent-optimization-result.json" \
+IMP_AGENT_OPT_ARTIFACT_OUTPUT="$PWD/agent-optimization-artifact.json" \
 IMP_PATH=../.. mix run agent_optimization.exs
 ```
-
-The repository's retained clean
-[result](https://github.com/deepfates/imp/blob/main/examples/deployment/evidence/agent-optimization-result.json)
-improved the four-row untouched mean from `0.95` to `1.0`; the selected
-[Artifact](https://github.com/deepfates/imp/blob/main/examples/deployment/evidence/agent-optimization-artifact.json)
-scored `1.0` after application to a freshly reconstructed program in a second
-BEAM. They remain one scoped stochastic treatment, not a general agent or
-optimizer effectiveness claim.
 
 ## The application owns code; the artifact owns selected parameters
 
@@ -139,17 +129,6 @@ artifact before swapping server state. Calls already running keep their old
 program snapshot; later calls see the new one. `reload/1` is the corresponding
 whole-program operation for Imp's built-in portable program shapes.
 
-## Research case studies stay separate from the deployment template
-
-The source repository retains real-provider Banking77 and HotPotQA runs,
-including clean negative optimizer outcomes and their exact artifacts. They are
-research records rather than dependencies of this application template, so
-they are not shipped in the Hex package. See the repository's
-[deployment research directory](https://github.com/deepfates/imp/tree/main/examples/deployment)
-when you need those scoped results. The packaged workflow above remains the
-canonical executable example of selection, private persistence, restart, hot
-reload, concurrency, and failure containment.
-
 ## Build a whole-program artifact when parameters are not enough
 
 Imp can also serialize its built-in portable program shapes. Create that
@@ -170,6 +149,6 @@ Use a whole-program artifact for a supported portable Imp shape. Use
 `Imp.Optimizer.Artifact` when the application owns a custom program and only
 its selected predictor parameters should cross the persistence boundary.
 
-During source development set `IMP_PATH` to the Imp checkout. A published
-application will use the normal package dependency after Imp is released on
-Hex.
+During source development set `IMP_PATH` to the Imp checkout. Applications
+with access to the private repository use the tagged Git dependency in
+`mix.exs`.

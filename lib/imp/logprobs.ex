@@ -2,8 +2,7 @@ defmodule Imp.Logprobs do
   @moduledoc """
   Extracts joint token logprob for one enum-constrained JSON field.
 
-  The overlap rule is the exact rule used by `llm-structured-confidence` 0.4.5,
-  the extraction authority used by GEPA commit
+  The overlap rule comes from `llm-structured-confidence` 0.4.5 as used by GEPA commit
   `65df4325e3fb4781cf2ab17dd144d6ce2f7b98fe`: token span `[a, b)` contributes
   when `max(field_start, a) < min(field_end, b)`. String quotes are excluded.
 

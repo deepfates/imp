@@ -1,7 +1,7 @@
 defmodule Imp.Predict.KNN do
   @moduledoc """
-  Faithful port of DSPy 3.2.1 `KNN` (dspy/predict/knn.py): an embedding-based
-  nearest-neighbor retriever over a trainset.
+  An embedding-based nearest-neighbor retriever over a trainset, with the same
+  query and ranking semantics as DSPy 3.2.1 `KNN`.
 
   Construction embeds every trainset example ONCE through the required
   `:vectorizer` (any `Imp.Embeddings` provider — a module implementing
@@ -12,7 +12,7 @@ defmodule Imp.Predict.KNN do
   trainset by dot product; the top `k` examples return in descending-score
   order (upstream's `argsort()[-k:][::-1]`).
 
-  Deviations, declared:
+  Two details matter when moving data between Python and Elixir:
 
     * Field iteration order: Python dicts iterate in insertion order; Elixir
       maps do not preserve insertion order. Pass keyword-list inputs (or
@@ -22,8 +22,8 @@ defmodule Imp.Predict.KNN do
       index wins within a tie, matching a stable `argsort`); NumPy's default
       quicksort leaves ties unspecified.
 
-  The former token-overlap variant of this module lives on as the honestly
-  named `Imp.Retrievers.KNN` helper (which never claimed DSPy semantics).
+  For token-overlap retrieval without an embedding provider, use
+  `Imp.Retrievers.KNN`.
   """
 
   defstruct [:k, :trainset, :vectorizer, :trainset_vectors]

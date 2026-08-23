@@ -20,7 +20,7 @@ repo =
 
 if repo do
   # Prefer the notebook's own Imp checkout even when Livebook was launched
-  # from an unrelated Mix project. Unpacked Hex artifacts intentionally omit
+  # from an unrelated Mix project. Unpacked package archives may omit
   # mix.lock, so pin it only when the source checkout actually provides it.
   install_opts =
     if File.regular?(Path.join(repo, "mix.lock")),
@@ -40,8 +40,7 @@ live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 The earlier notebooks built Imp programs. This chapter is about the choices an
 application developer must make before putting provider calls in production:
 credentials, timeouts, retries, redaction, concurrency, cost limits, and
-failure behavior. Imp's own maintainer gates remain in the source repository;
-they are not consumer commands installed by the package.
+failure behavior.
 
 ## Application Checklist
 
@@ -118,7 +117,7 @@ The next cell is the consumer-facing live probe. It runs only when the three
 explicit environment variables above are present and otherwise stays
 provider-free.
 
-## Live Operations Proof
+## Exercise The Live Runtime
 
 This cell validates the same live provider path and asserts the expected output
 when credentials are present.
@@ -139,12 +138,12 @@ if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env(
   answer = prediction |> Imp.get(:answer, "") |> to_string() |> String.downcase()
 
   unless String.contains?(answer, "pong") do
-    raise "live operations proof failed: #{inspect(Imp.to_map(prediction))}"
+    raise "live runtime returned an invalid result: #{inspect(Imp.to_map(prediction))}"
   end
 
   Imp.to_map(prediction)
 else
-  {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL before running the live operations proof."}
+  {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL before running the live runtime cell."}
 end
 ```
 
