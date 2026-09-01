@@ -6,6 +6,14 @@ User-visible changes to Imp are recorded here.
 
 No changes yet.
 
+## 0.3.2 — 2026-09-01
+
+- Made the RLM controller prompt describe the restricted language actually
+  accepted by its interpreter, including supported repair paths and explicit
+  unsupported forms.
+- Preserved explicit no-retry provider policy across Req function, module, and
+  `{module, function, args}` adapters.
+
 ## 0.3.1 — 2026-08-23
 
 - Clarified the supported center versus pre-1.0 advanced workflows, the exact

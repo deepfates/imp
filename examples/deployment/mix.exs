@@ -11,7 +11,7 @@ defmodule ImpDeployment.MixProject do
 
   defp deps do
     case System.get_env("IMP_PATH") do
-      nil -> [{:imp, github: "deepfates/imp", tag: "v0.3.1"}]
+      nil -> [{:imp, github: "deepfates/imp", tag: "v0.3.2"}]
       path -> [{:imp, path: path}]
     end
   end

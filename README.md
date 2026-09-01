@@ -128,13 +128,13 @@ Imp is not published to Hex. Install the private source release from its
 immutable tag (GitHub credentials with access to the repository are required):
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.3.1"}
+{:imp, github: "deepfates/imp", tag: "v0.3.2"}
 ```
 
 Use `{:imp, path: "path/to/imp"}` only while developing against a local
 checkout. Imp requires Elixir `~> 1.19`. Commit your application's `mix.lock`;
 the Git tag fixes Imp's source, while normal Mix constraints may otherwise
-resolve newer compatible transitive versions. Version `0.3.1` contains the
+resolve newer compatible transitive versions. Version `0.3.2` contains the
 breaking `0.3` changes from `0.2.1`; see the [release notes](RELEASE_NOTES.md)
 when upgrading.
 

@@ -4,7 +4,7 @@ defmodule Imp.MixProject do
   def project do
     [
       app: :imp,
-      version: "0.3.1",
+      version: "0.3.2",
       elixir: "~> 1.19",
       name: "Imp",
       source_url: "https://github.com/deepfates/imp",

@@ -1,4 +1,4 @@
-# Imp v0.3.1
+# Imp v0.3.2
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
 Declare a task as named inputs and outputs, call it like any other Elixir
@@ -7,15 +7,19 @@ selected program under OTP.
 
 ## Install
 
-`v0.3.1` is a private Git source release. GitHub credentials with access to the
+`v0.3.2` is a private Git source release. GitHub credentials with access to the
 repository are required.
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.3.1"}
+{:imp, github: "deepfates/imp", tag: "v0.3.2"}
 ```
 
 Imp is not published to Hex. Use a path dependency only while developing
 against a local checkout.
+
+This patch release makes the RLM controller's language guide match its
+restricted interpreter and preserves explicit zero-retry provider policy for
+all Req adapter forms, including MFA adapters with arguments.
 
 ## What is included
 
@@ -88,7 +92,7 @@ an external-training boundary rather than an in-process gradient engine.
 2. Choose the returning or raising optimizer API explicitly.
 3. Replace `Imp.Agent` usage with a ReActV2/RLM program owned by your
    supervision tree.
-4. Rebuild saved artifacts with `0.3.1` before promotion.
+4. Rebuild saved artifacts with `0.3.2` before promotion.
 5. Run your held-out evaluation and application smoke test against the tagged
    dependency.
 

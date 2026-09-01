@@ -30,7 +30,7 @@ if repo do
   Mix.install([{:imp, path: repo}], install_opts)
 else
   # Standalone notebook: install the private source release.
-  Mix.install([{:imp, github: "deepfates/imp", tag: "v0.3.1"}])
+  Mix.install([{:imp, github: "deepfates/imp", tag: "v0.3.2"}])
 end
 
 api_key = System.get_env("OPENAI_API_KEY") || System.get_env("LB_OPENAI_API_KEY")
