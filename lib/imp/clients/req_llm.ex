@@ -1089,7 +1089,10 @@ defmodule Imp.Clients.ReqLLM do
         %{method: guarded_request.method, retry: false}
       )
 
-      adapter.(guarded_request)
+      case adapter do
+        adapter when is_function(adapter, 1) -> adapter.(guarded_request)
+        adapter when is_atom(adapter) -> adapter.run(guarded_request)
+      end
     end
 
     request

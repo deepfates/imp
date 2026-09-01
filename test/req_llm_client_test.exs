@@ -68,6 +68,13 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule ModuleTransportAdapter do
+    def run(request) do
+      send(Map.fetch!(request.private, :test_owner), :module_transport_adapter_called)
+      {request, %Req.Response{status: 200, body: "ok"}}
+    end
+  end
+
   defmodule UsageStub do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :test_pid), {:req_llm_generate, model, messages, opts})
@@ -1890,6 +1897,19 @@ defmodule ReqLLMClientTest do
 
     assert is_integer(system_time)
     refute_received {^ref, [:imp, :lm, :transport, :attempt], _, _}
+  end
+
+  test "explicit no-retry policy preserves Req module adapters" do
+    request = %Req.Request{
+      adapter: ModuleTransportAdapter,
+      private: %{test_owner: self()}
+    }
+
+    guarded = Imp.Clients.ReqLLM.enforce_explicit_no_retry_request(request)
+
+    assert is_function(guarded.adapter, 1)
+    assert {_, %Req.Response{status: 200}} = guarded.adapter.(guarded)
+    assert_received :module_transport_adapter_called
   end
 
   test "Imp input envelope is enforced before transport and never reaches ReqLLM options" do
