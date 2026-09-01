@@ -25,6 +25,7 @@ defmodule Imp.Predict.RLM.InterpreterTest do
 
     for {source, named_trap} <- [
           {"case true do true -> 1 end", "`case`"},
+          {"Enum.find([1, 2], 1)", "`Enum.find`"},
           {"hd([1])", "`hd`"},
           {~S|"value: #{1}"|, "binary `<<>>`"}
         ] do
