@@ -15,7 +15,7 @@ boundaries, expose operational failures, and teach the same path in its docs.
 Publishing the product does not authorize a comparative or paper claim.
 Research results retain their own frozen contracts and artifacts.
 
-The `0.3.0` product-completion chain has accounted for the material
+The `0.3` product-completion chain has accounted for the material
 current-stable DSPy surface, audited the contemporary Optimize Anything and Ax
 concepts that belong in Imp, exercised every advertised product optimizer,
 survived realistic composed multi-provider operation, and passed adversarial
@@ -89,9 +89,9 @@ not bypass that order.
 
 ## Candidate Gates
 
-Version `0.3.0` is released from the private immutable Git tag `v0.3.0`; it is
-not published to Hex. A candidate or private source release is identified by
-all three of:
+The current release, version `0.3.2`, is available from the private immutable
+Git tag `v0.3.2`; it is not published to Hex. A candidate or private source
+release is identified by all three of:
 
 - an exact clean Git commit;
 - the SHA-256 of the unpacked/built Hex artifact produced from that commit;
