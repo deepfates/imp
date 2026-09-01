@@ -1090,8 +1090,15 @@ defmodule Imp.Clients.ReqLLM do
       )
 
       case adapter do
-        adapter when is_function(adapter, 1) -> adapter.(guarded_request)
-        adapter when is_atom(adapter) -> adapter.run(guarded_request)
+        adapter when is_function(adapter, 1) ->
+          adapter.(guarded_request)
+
+        adapter when is_atom(adapter) ->
+          adapter.run(guarded_request)
+
+        {module, function, args}
+        when is_atom(module) and is_atom(function) and is_list(args) ->
+          apply(module, function, [guarded_request | args])
       end
     end
 

@@ -73,6 +73,11 @@ defmodule ReqLLMClientTest do
       send(Map.fetch!(request.private, :test_owner), :module_transport_adapter_called)
       {request, %Req.Response{status: 200, body: "ok"}}
     end
+
+    def run(request, marker) do
+      send(Map.fetch!(request.private, :test_owner), {:mfa_transport_adapter_called, marker})
+      {request, %Req.Response{status: 200, body: "ok"}}
+    end
   end
 
   defmodule UsageStub do
@@ -1900,16 +1905,25 @@ defmodule ReqLLMClientTest do
   end
 
   test "explicit no-retry policy preserves Req module adapters" do
-    request = %Req.Request{
-      adapter: ModuleTransportAdapter,
-      private: %{test_owner: self()}
-    }
+    request = Req.new(adapter: ModuleTransportAdapter)
+    request = Req.Request.put_private(request, :test_owner, self())
 
     guarded = Imp.Clients.ReqLLM.enforce_explicit_no_retry_request(request)
 
     assert is_function(guarded.adapter, 1)
     assert {_, %Req.Response{status: 200}} = guarded.adapter.(guarded)
     assert_received :module_transport_adapter_called
+  end
+
+  test "explicit no-retry policy preserves Req MFA adapters and arguments" do
+    request = Req.new(adapter: {ModuleTransportAdapter, :run, [:mfa_marker]})
+    request = Req.Request.put_private(request, :test_owner, self())
+
+    guarded = Imp.Clients.ReqLLM.enforce_explicit_no_retry_request(request)
+
+    assert is_function(guarded.adapter, 1)
+    assert {_, %Req.Response{status: 200}} = guarded.adapter.(guarded)
+    assert_received {:mfa_transport_adapter_called, :mfa_marker}
   end
 
   test "Imp input envelope is enforced before transport and never reaches ReqLLM options" do
