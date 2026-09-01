@@ -3,6 +3,102 @@ defmodule Imp.Predict.RLM.InterpreterTest do
 
   alias Imp.Predict.RLM.Interpreter
 
+  test "controller guide and interpreter agree on representative repair paths" do
+    guide = Interpreter.controller_language_guide()
+    interpreter = Interpreter.new(%{}, %{}, nil)
+
+    source = ~S"""
+    headings = for line <- ["body", "# Haven"], String.starts_with?(line, "#"), do: line
+    heading = headings |> Enum.at(0)
+    heading = if Enum.count(headings) > 0, do: heading, else: "missing"
+    submit(%{answer: "README: " <> heading})
+    """
+
+    assert {:final, %{answer: "README: # Haven"}, _interpreter} =
+             Interpreter.execute(interpreter, source)
+
+    assert guide =~ "`if condition, do: value, else: value`"
+    assert guide =~ "Enum.at/2"
+    assert guide =~ "String.starts_with?/2"
+    assert guide =~ "Pipelines with `|>` are supported"
+    assert guide =~ "string concatenation with `<>`"
+
+    for {source, named_trap} <- [
+          {"case true do true -> 1 end", "`case`"},
+          {"hd([1])", "`hd`"},
+          {~S|"value: #{1}"|, "binary `<<>>`"}
+        ] do
+      assert {:error, _reason, _interpreter} = Interpreter.execute(interpreter, source)
+      assert guide =~ named_trap
+    end
+  end
+
+  test "every advertised module call executes with representative valid arguments" do
+    interpreter = Interpreter.new(%{}, %{}, nil)
+
+    samples = %{
+      {:String, :contains?, 2} => ~S|String.contains?("abc", "b")|,
+      {:String, :downcase, 1} => ~S|String.downcase("ABC")|,
+      {:String, :ends_with?, 2} => ~S|String.ends_with?("abc", "c")|,
+      {:String, :length, 1} => ~S|String.length("abc")|,
+      {:String, :replace, 3} => ~S|String.replace("abc", "b", "x")|,
+      {:String, :slice, 2} => ~S|String.slice("abc", 1..2)|,
+      {:String, :slice, 3} => ~S|String.slice("abc", 1, 2)|,
+      {:String, :split, 1} => ~S|String.split("a b")|,
+      {:String, :split, 2} => ~S|String.split("a,b", ",")|,
+      {:String, :starts_with?, 2} => ~S|String.starts_with?("abc", "a")|,
+      {:String, :trim, 1} => ~S|String.trim(" a ")|,
+      {:String, :trim_leading, 1} => ~S|String.trim_leading(" a")|,
+      {:String, :trim_trailing, 1} => ~S|String.trim_trailing("a ")|,
+      {:String, :upcase, 1} => ~S|String.upcase("abc")|,
+      {:Enum, :at, 2} => ~S|Enum.at([1, 2], 0)|,
+      {:Enum, :at, 3} => ~S|Enum.at([], 0, "missing")|,
+      {:Enum, :chunk_every, 2} => ~S|Enum.chunk_every([1, 2], 1)|,
+      {:Enum, :chunk_every, 3} => ~S|Enum.chunk_every([1, 2, 3], 2, 1)|,
+      {:Enum, :concat, 1} => ~S|Enum.concat([[1], [2]])|,
+      {:Enum, :count, 1} => ~S|Enum.count([1, 2])|,
+      {:Enum, :drop, 2} => ~S|Enum.drop([1, 2], 1)|,
+      {:Enum, :join, 1} => ~S|Enum.join(["a", "b"])|,
+      {:Enum, :join, 2} => ~S|Enum.join(["a", "b"], ",")|,
+      {:Enum, :max, 1} => ~S|Enum.max([1, 2])|,
+      {:Enum, :member?, 2} => ~S|Enum.member?([1, 2], 2)|,
+      {:Enum, :min, 1} => ~S|Enum.min([1, 2])|,
+      {:Enum, :product, 1} => ~S|Enum.product([2, 3])|,
+      {:Enum, :reverse, 1} => ~S|Enum.reverse([1, 2])|,
+      {:Enum, :slice, 2} => ~S|Enum.slice([1, 2, 3], 1..2)|,
+      {:Enum, :sum, 1} => ~S|Enum.sum([1, 2])|,
+      {:Enum, :take, 2} => ~S|Enum.take([1, 2], 1)|,
+      {:Enum, :uniq, 1} => ~S|Enum.uniq([1, 1])|
+    }
+
+    capabilities = Interpreter.controller_language_capabilities()
+
+    advertised =
+      for {module, functions} <- [
+            {:String, capabilities.string_functions},
+            {:Enum, capabilities.enum_functions}
+          ],
+          {function, arities} <- functions,
+          arity <- List.wrap(arities),
+          into: MapSet.new(),
+          do: {module, function, arity}
+
+    assert advertised == samples |> Map.keys() |> MapSet.new()
+
+    for {capability, source} <- samples do
+      assert {:ok, _value, _interpreter} = Interpreter.execute(interpreter, source),
+             "advertised call failed: #{inspect(capability)}"
+    end
+
+    assert {:ok, "b", _interpreter} =
+             Interpreter.execute(interpreter, ~S|Access.get("abc", 1)|)
+
+    novel_atom = ":imp_rlm_controller_atom_that_does_not_exist_4f52e7"
+
+    assert {:ok, "imp_rlm_controller_atom_that_does_not_exist_4f52e7", _interpreter} =
+             Interpreter.execute(interpreter, novel_atom)
+  end
+
   test "Enum.sum and Enum.product are allowlisted aggregations" do
     interpreter = Interpreter.new(%{numbers: [1, 2, 3, 4, 5]}, %{}, nil)
 

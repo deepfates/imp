@@ -30,6 +30,26 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_actions)
   end
 
+  test "RLM gives the controller the interpreter-owned language guide" do
+    parent = self()
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:controller_system_prompt, hd(messages).content})
+          %{code: ~S|submit(%{answer: "done"})|}
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
+    assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+
+    assert_receive {:controller_system_prompt, system_prompt}
+    assert system_prompt =~ Imp.Predict.RLM.Interpreter.controller_language_guide()
+  end
+
   test "RLM unwraps canonical LM envelopes for controller and sub-LM outputs" do
     actions = [
       Jason.encode!(%{reasoning: "query", code: ~S|result = llm_query("question")|}),

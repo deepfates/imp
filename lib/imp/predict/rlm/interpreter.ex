@@ -19,6 +19,67 @@ defmodule Imp.Predict.RLM.Interpreter do
   @default_max_value_bytes 16_000_000
   @default_max_effects 100
 
+  @binary_operators [
+    :+,
+    :-,
+    :*,
+    :/,
+    :div,
+    :rem,
+    :==,
+    :!=,
+    :===,
+    :!==,
+    :<,
+    :<=,
+    :>,
+    :>=,
+    :<>,
+    :++,
+    :--,
+    :and,
+    :or,
+    :&&,
+    :||,
+    :in
+  ]
+  @unary_operators [:+, :-, :!, :not]
+
+  @string_functions %{
+    length: 1,
+    slice: [2, 3],
+    split: [1, 2],
+    trim: 1,
+    trim_leading: 1,
+    trim_trailing: 1,
+    downcase: 1,
+    upcase: 1,
+    replace: 3,
+    contains?: 2,
+    starts_with?: 2,
+    ends_with?: 2
+  }
+  @enum_functions %{
+    at: [2, 3],
+    slice: 2,
+    take: 2,
+    drop: 2,
+    chunk_every: [2, 3],
+    join: [1, 2],
+    count: 1,
+    reverse: 1,
+    uniq: 1,
+    concat: 1,
+    member?: 2,
+    min: 1,
+    max: 1,
+    # DSPy's sandbox is full Python, where sum() is a builtin; these are the
+    # function-free aggregations expressible in this fn-less interpreter
+    # (Enum.reduce needs a lambda, which generated code cannot write here).
+    sum: 1,
+    product: 1
+  }
+
   defstruct vars: %{},
             protected_vars: %{},
             callbacks: %{},
@@ -35,6 +96,29 @@ defmodule Imp.Predict.RLM.Interpreter do
             steps: 0
 
   @type t :: %__MODULE__{}
+
+  @doc false
+  def controller_language_capabilities do
+    %{
+      binary_operators: @binary_operators,
+      unary_operators: @unary_operators,
+      string_functions: @string_functions,
+      enum_functions: @enum_functions
+    }
+  end
+
+  @doc false
+  def controller_language_guide do
+    """
+    The controller executes a small Elixir-shaped language, not general Elixir.
+    Supported values and data are strings, numbers, booleans, nil, existing atom literals, lists, maps, tuples, and integer ranges; unfamiliar atom literals are represented as strings rather than creating VM atoms. Supported control is variable assignment, `if condition, do: value, else: value`, and bounded `for item <- items, do: expression` comprehensions. Pipelines with `|>` are supported. Supported operators are #{format_operators(@binary_operators ++ @unary_operators)}. Use `Access.get(container, key)` or `container[key]` for map/list/string access.
+    Only these String calls are available: #{format_allowlist(:String, @string_functions)}.
+    Only these Enum calls are available: #{format_allowlist(:Enum, @enum_functions)}.
+    Important traps: `case`, anonymous functions, arbitrary module calls, `Enum.find`, and `hd` are not supported. Use `if` instead of `case`, a comprehension plus `Enum.at(values, 0)` instead of `Enum.find` or `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
+    Registered tools and the built-ins named in the task prompt are the only effectful calls. A failed cell rolls back its assignments while retaining already-completed effects for deterministic repair.
+    """
+    |> String.trim()
+  end
 
   @doc "Creates an interpreter with persistent variables and callback runtime."
   def new(vars, callbacks, runtime, opts \\ []) do
@@ -345,34 +429,11 @@ defmodule Imp.Predict.RLM.Interpreter do
   end
 
   defp eval_node({operator, _, [left, right]}, state)
-       when operator in [
-              :+,
-              :-,
-              :*,
-              :/,
-              :div,
-              :rem,
-              :==,
-              :!=,
-              :===,
-              :!==,
-              :<,
-              :<=,
-              :>,
-              :>=,
-              :<>,
-              :++,
-              :--,
-              :and,
-              :or,
-              :&&,
-              :||,
-              :in
-            ] do
+       when operator in @binary_operators do
     eval_binary(operator, left, right, state)
   end
 
-  defp eval_node({operator, _, [value]}, state) when operator in [:+, :-, :!, :not] do
+  defp eval_node({operator, _, [value]}, state) when operator in @unary_operators do
     with {:ok, value, state} <- eval(value, state), do: apply_unary(operator, value, state)
   end
 
@@ -383,8 +444,8 @@ defmodule Imp.Predict.RLM.Interpreter do
     end
   end
 
-  defp eval_node({{:., _, [{:__aliases__, _, ["Access"]}, function]}, _, [container, key]}, state)
-       when function in [:get, "get"] do
+  defp eval_node({{:., _, [{:__aliases__, _, [module]}, function]}, _, [container, key]}, state)
+       when module in [:Access, "Access"] and function in [:get, "get"] do
     with {:ok, container, state} <- eval(container, state),
          {:ok, key, state} <- eval(key, state) do
       {:ok, access(container, key), state}
@@ -623,42 +684,6 @@ defmodule Imp.Predict.RLM.Interpreter do
     %{next | vars: vars}
   end
 
-  @string_functions %{
-    length: 1,
-    slice: [2, 3],
-    split: [1, 2],
-    trim: 1,
-    trim_leading: 1,
-    trim_trailing: 1,
-    downcase: 1,
-    upcase: 1,
-    replace: 3,
-    contains?: 2,
-    starts_with?: 2,
-    ends_with?: 2,
-    join: [1, 2]
-  }
-  @enum_functions %{
-    at: [2, 3],
-    slice: 2,
-    take: 2,
-    drop: 2,
-    chunk_every: [2, 3],
-    join: [1, 2],
-    count: 1,
-    reverse: 1,
-    uniq: 1,
-    concat: 1,
-    member?: 2,
-    min: 1,
-    max: 1,
-    # DSPy's sandbox is full Python, where sum() is a builtin; these are the
-    # function-free aggregations expressible in this fn-less interpreter
-    # (Enum.reduce needs a lambda, which generated code cannot write here).
-    sum: 1,
-    product: 1
-  }
-
   defp eval_allowlisted(module, function, args, state) do
     module = normalize_known_name(module)
     function = normalize_known_name(function)
@@ -679,6 +704,21 @@ defmodule Imp.Predict.RLM.Interpreter do
     else
       {:error, {:function_not_allowed, module, function, length(args)}, state}
     end
+  end
+
+  defp format_allowlist(module, functions) do
+    functions
+    |> Enum.sort_by(fn {name, _arities} -> to_string(name) end)
+    |> Enum.flat_map(fn {name, arities} ->
+      Enum.map(List.wrap(arities), &"#{module}.#{name}/#{&1}")
+    end)
+    |> Enum.join(", ")
+  end
+
+  defp format_operators(operators) do
+    operators
+    |> Enum.map_join(" ", &Atom.to_string/1)
+    |> then(&"`#{&1}`")
   end
 
   defp invoke_callback(name, args, state) do
