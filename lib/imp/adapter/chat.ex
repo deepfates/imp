@@ -777,6 +777,28 @@ defmodule Imp.Adapter.Chat do
   # demo/history assistant renderer resolves values through the SAME scalar
   # formatting so the adapters differ only in dialect (dee-ovd3).
   @doc false
+  @doc false
+  # The model reads tool results as prose. An error tuple such as
+  # {:error, {:tool_authorization_denied, :post, :client_denied}} rendered as
+  # Elixir syntax costs turns on retries the person will decline again.
+  def format_tool_result({:error, reason}), do: "Error: " <> error_prose(reason)
+  def format_tool_result(value), do: format_value(value)
+
+  defp error_prose({:tool_authorization_denied, name, :client_denied}),
+    do: "#{name} was not allowed; the person declined it."
+
+  defp error_prose({:tool_authorization_denied, name, reason}),
+    do: "#{name} was not allowed: #{error_prose(reason)}"
+
+  defp error_prose({:tool_error, name, message}), do: "#{name} failed: #{error_prose(message)}"
+  defp error_prose(reason) when is_binary(reason), do: reason
+
+  defp error_prose(reason) when is_atom(reason),
+    do: reason |> Atom.to_string() |> String.replace("_", " ")
+
+  defp error_prose(reason) when is_exception(reason), do: Exception.message(reason)
+  defp error_prose(reason), do: inspect(reason, limit: 20)
+
   def format_value(value) when is_binary(value), do: value
   def format_value(nil), do: "None"
   def format_value(true), do: "True"
@@ -903,7 +925,7 @@ defmodule Imp.Adapter.Chat do
 
         %{
           role: :tool,
-          content: result |> fetch_field(:result) |> format_value(),
+          content: result |> fetch_field(:result) |> format_tool_result(),
           tool_calls: [%{id: id}]
         }
       end)

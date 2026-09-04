@@ -228,6 +228,20 @@ defmodule ReActV2Test do
     refute log =~ "max_iters"
   end
 
+  test "denied and failed tool results reach the model as prose, not Elixir tuples" do
+    assert Imp.Adapter.Chat.format_tool_result(
+             {:error, {:tool_authorization_denied, :update_seen, :client_denied}}
+           ) == "Error: update_seen was not allowed; the person declined it."
+
+    assert Imp.Adapter.Chat.format_tool_result({:error, {:tool_error, :post, "boom"}}) ==
+             "Error: post failed: boom"
+
+    assert Imp.Adapter.Chat.format_tool_result({:error, :not_connected}) ==
+             "Error: not connected"
+
+    assert Imp.Adapter.Chat.format_tool_result(%{ok: true}) == inspect(%{ok: true})
+  end
+
   test "unknown and failing tools remain history observations instead of aborting the loop" do
     broken = Imp.tool(:broken, "broken", fn _args -> raise "boom" end)
 
