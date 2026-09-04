@@ -770,13 +770,6 @@ defmodule Imp.Adapter.Chat do
   defp append_content(content, suffix) when is_list(content),
     do: merge_adjacent_text_parts(content ++ [suffix])
 
-  # DSPy formats scalars via Python `str(...)` after `serialize_for_json`:
-  # `None -> "None"`, `True -> "True"`, `False -> "False"`. Elixir's
-  # `to_string/1` would give "" / "true" / "false", so these three are pinned.
-  # Public (`@doc false`) as an internal cross-adapter seam: the XML adapter's
-  # demo/history assistant renderer resolves values through the SAME scalar
-  # formatting so the adapters differ only in dialect (dee-ovd3).
-  @doc false
   @doc false
   # The model reads tool results as prose. An error tuple such as
   # {:error, {:tool_authorization_denied, :post, :client_denied}} rendered as
@@ -799,6 +792,13 @@ defmodule Imp.Adapter.Chat do
   defp error_prose(reason) when is_exception(reason), do: Exception.message(reason)
   defp error_prose(reason), do: inspect(reason, limit: 20)
 
+  # DSPy formats scalars via Python `str(...)` after `serialize_for_json`:
+  # `None -> "None"`, `True -> "True"`, `False -> "False"`. Elixir's
+  # `to_string/1` would give "" / "true" / "false", so these three are pinned.
+  # Public (`@doc false`) as an internal cross-adapter seam: the XML adapter's
+  # demo/history assistant renderer resolves values through the SAME scalar
+  # formatting so the adapters differ only in dialect (dee-ovd3).
+  @doc false
   def format_value(value) when is_binary(value), do: value
   def format_value(nil), do: "None"
   def format_value(true), do: "True"
