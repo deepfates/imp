@@ -770,6 +770,28 @@ defmodule Imp.Adapter.Chat do
   defp append_content(content, suffix) when is_list(content),
     do: merge_adjacent_text_parts(content ++ [suffix])
 
+  @doc false
+  # The model reads tool results as prose. An error tuple such as
+  # {:error, {:tool_authorization_denied, :post, :client_denied}} rendered as
+  # Elixir syntax costs turns on retries the person will decline again.
+  def format_tool_result({:error, reason}), do: "Error: " <> error_prose(reason)
+  def format_tool_result(value), do: format_value(value)
+
+  defp error_prose({:tool_authorization_denied, name, :client_denied}),
+    do: "#{name} was not allowed; the person declined it."
+
+  defp error_prose({:tool_authorization_denied, name, reason}),
+    do: "#{name} was not allowed: #{error_prose(reason)}"
+
+  defp error_prose({:tool_error, name, message}), do: "#{name} failed: #{error_prose(message)}"
+  defp error_prose(reason) when is_binary(reason), do: reason
+
+  defp error_prose(reason) when is_atom(reason),
+    do: reason |> Atom.to_string() |> String.replace("_", " ")
+
+  defp error_prose(reason) when is_exception(reason), do: Exception.message(reason)
+  defp error_prose(reason), do: inspect(reason, limit: 20)
+
   # DSPy formats scalars via Python `str(...)` after `serialize_for_json`:
   # `None -> "None"`, `True -> "True"`, `False -> "False"`. Elixir's
   # `to_string/1` would give "" / "true" / "false", so these three are pinned.
@@ -903,7 +925,7 @@ defmodule Imp.Adapter.Chat do
 
         %{
           role: :tool,
-          content: result |> fetch_field(:result) |> format_value(),
+          content: result |> fetch_field(:result) |> format_tool_result(),
           tool_calls: [%{id: id}]
         }
       end)
