@@ -720,11 +720,19 @@
     {
       "callbacks": [],
       "category": "stable",
-      "functions": [],
+      "functions": [
+        "format_tool_result/1"
+      ],
       "kind": "module",
       "macros": [],
       "module": "Imp.Adapter.Chat",
-      "signatures": {},
+      "signatures": {
+        "functions": {
+          "format_tool_result/1": [
+            "format_tool_result(value)"
+          ]
+        }
+      },
       "source": "lib/imp/adapter/chat.ex",
       "struct_fields": [],
       "types": []

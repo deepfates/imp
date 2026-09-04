@@ -770,10 +770,20 @@ defmodule Imp.Adapter.Chat do
   defp append_content(content, suffix) when is_list(content),
     do: merge_adjacent_text_parts(content ++ [suffix])
 
-  @doc false
-  # The model reads tool results as prose. An error tuple such as
-  # {:error, {:tool_authorization_denied, :post, :client_denied}} rendered as
-  # Elixir syntax costs turns on retries the person will decline again.
+  @doc """
+  Renders a tool result as the text a reader should see, whether that reader
+  is the model or a person looking at a host's tool card.
+
+  Successful results format like any other value. A failed result renders as
+  one sentence instead of an Elixir term: a denied call says who declined it,
+  a crashed tool names itself and its message, and an atom reason is spelled
+  out. Hosts that relay Imp tool results over a protocol boundary should use
+  this so the same words reach the person that reached the model.
+
+      iex> Imp.Adapter.Chat.format_tool_result({:error, {:tool_authorization_denied, :post, :client_denied}})
+      "Error: post was not allowed; the person declined it."
+  """
+  @spec format_tool_result(term()) :: String.t()
   def format_tool_result({:error, reason}), do: "Error: " <> error_prose(reason)
   def format_tool_result(value), do: format_value(value)
 
