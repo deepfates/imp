@@ -36,9 +36,11 @@
   # defensive clause dialyzer pins to the module head (line 1)
   {"bench/imp/benchmark_truth/optimize_anything/pricing_policy.ex", :pattern_match, 1},
   # MapSet opacity: MapSet.equal? against a literal-typed expected set
-  {"bench/imp/benchmark_truth/optimize_anything/scheduling_heuristic.ex", :call_without_opaque, {286, 30}},
+  {"bench/imp/benchmark_truth/optimize_anything/scheduling_heuristic.ex", :call_without_opaque,
+   {286, 30}},
   # defensive clause for non-covered differential rows
-  {"bench/imp/benchmark_truth/optimize_anything/upstream_differential.ex", :pattern_match_cov, {228, 10}},
+  {"bench/imp/benchmark_truth/optimize_anything/upstream_differential.ex", :pattern_match_cov,
+   {228, 10}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 21)
   {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 21}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 53)
@@ -55,6 +57,11 @@
   {"bench/imp/benchmark_truth/runner.ex", :guard_fail, {651, 55}},
   # defensive clause: ReqLLM.model/1 contracts to ok/error tuples only; the
   # catch-all turns any unexpected registry result into a loud error (#75)
+  # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
+  # struct, but its schema defaults the field to nil and Response.usage/1 is
+  # `map() | nil`, so the nil clause is reachable at runtime.
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1327},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1355, 8}},
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {156, 7}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
@@ -222,8 +229,6 @@
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {341, 16}},
   {"lib/imp/adapter/chat.ex", :pattern_match_cov, {715, 8}},
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {675, 8}},
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1317},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1345, 8}},
   {"lib/imp/lm.ex", :pattern_match, {260, 8}},
   {"lib/imp/lm.ex", :pattern_match_cov, {261, 8}},
   {"lib/imp/mcp.ex", :pattern_match_cov, {1171, 8}},
@@ -231,6 +236,5 @@
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
   {"lib/imp/optimizer/report.ex", :call_without_opaque, {744, 55}},
-  {"lib/imp/predict/rlm.ex", :pattern_match, {1645, 8}},
   {"lib/imp/schema.ex", :pattern_match_cov, {459, 8}}
 ]
