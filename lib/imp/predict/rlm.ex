@@ -1643,8 +1643,8 @@ defmodule Imp.Predict.RLM do
     end
   end
 
-  defp discard_pending_history_segment(%{pending_history_segment: []} = state), do: state
-
+  # Both callers append to the pending segment before discarding it, and
+  # Enum.drop/2 with -0 is the identity, so an empty segment needs no clause.
   defp discard_pending_history_segment(state) do
     count = length(state.pending_history_segment)
 
