@@ -1,16 +1,26 @@
 # Internal Docs
 
-Maintainer-facing evidence and protocol documents: upstream fidelity audits,
-benchmark truth and catalogs, parity validation programs, and design
-contracts. These documents describe how Imp's claims are checked against
-upstream systems and pinned sources. They are not part of the user manual and
-are excluded from the Hex package.
+These maintainer-facing protocols and reports explain how Imp's claims are
+tested against upstream systems, papers, and pinned datasets. They are not a
+second user manual or roadmap, and they are excluded from the package.
 
-These files are context and historical research support, not a parallel
-roadmap. The active product standard and release finish line live in
-[`docs/maintainers/RELEASE.md`](../maintainers/RELEASE.md); unfinished work
-lives in `tk`. When an internal document duplicates a registry, generated view,
-or newer protocol, consolidate or retire it instead of synchronizing both.
+Start with the question you are trying to answer:
 
-Start with the user manual at [README.md](../README.md). Release and
-claim-gate operating procedures live in [docs/maintainers/](../maintainers/).
+- **What does parity require?** Read the
+  [Parity Validation Program](PARITY_VALIDATION_PROGRAM.md) for the distinct
+  semantic, live-model, optimizer, production, and performance evidence lanes.
+- **How strong is a piece of evidence?** Read the
+  [evidence handbook](../maintainers/EVIDENCE.md) before treating product,
+  compatibility, operational, effectiveness, or paper evidence as equivalent.
+- **Why does one implementation differ from upstream?** Read the source-bound
+  fidelity note for that surface, such as
+  [adapters](ADAPTER_FIDELITY.md),
+  [instruction optimizers](INSTRUCTION_OPTIMIZER_FIDELITY.md), or
+  [RLM](RLM_FIDELITY.md).
+
+The repository [README](../../README.md) owns the user-facing purpose and path.
+The [release procedure](../maintainers/RELEASE.md) owns the current product
+finish line; machine-readable pins and artifact coordinates live under
+`benchmarks/`; unfinished work lives in `tk`. Dated reports and historical
+results remain useful at their recorded scope, but do not silently become
+current decisions.

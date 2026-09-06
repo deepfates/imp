@@ -215,6 +215,7 @@ the provider credential or executable application code.
 - Swap in your own tickets and teams: the whole experiment is the JSON file
   plus the code above.
 - When labeled demos stop helping, try the search optimizers in the
-  [API Guide](API_GUIDE.md) — same program, same metric, bigger budget.
+  [Learning Path](LEARNING_PATH.md#3-improve-with-measured-lift) — same program,
+  same metric, bigger budget.
 - [Livebook 03](../livebooks/03_evaluate_and_optimize.livemd) runs this
   workflow interactively.

@@ -1,11 +1,13 @@
-# Research Landscape
+# Research Landscape — 2026-08-06 Review
 
-This note records the outside view used to shape Imp. It separates scientific
-authorities, implementation comparators, production complements, and recent
-work that is promising but too new to become a release claim.
+This dated note records the outside view used to shape Imp. It separates
+scientific authorities, implementation comparators, production complements,
+and recent work that was promising but too new to become a release claim.
 
-The review was refreshed on 2026-08-06. Moving repositories must still be
-re-pinned before their behavior is used in a differential gate.
+It is evidence of what was reviewed on 2026-08-06, not a current authority
+registry or roadmap. Moving repositories must still be re-pinned before their
+behavior is used in a differential gate; current pins live in
+`benchmarks/authorities.json`.
 
 ## Current GEPA And Optimize Anything Snapshot
 
@@ -255,9 +257,9 @@ backpressure, cancellation, supervision, and fault isolation, but those runtime
 advantages count only when algorithmic behavior and effectiveness remain
 measurable against pinned authorities.
 
-## What Changes The Roadmap
+## Recommendations From This Review
 
-P0 work on the current finish line:
+The review proposed this first group of work:
 
 1. Finish and execute the MIPROv2/SIMBA structural differential.
 2. Preserve the complete six-family current-model table, but execute it
@@ -274,7 +276,7 @@ P0 work on the current finish line:
 5. Complete durable optimizer artifacts: inspect, compare, apply, rollback,
    champion/challenger, promote and roll back, and prove secret absence.
 
-P1 work after those blockers:
+It proposed this later group:
 
 1. Maintain the pinned Ax `23.0.0` executable differential and current
    `24.0.4` product-semantic audit in `docs/internal/AX_DIFFERENTIAL.md` as
@@ -286,14 +288,15 @@ P1 work after those blockers:
 3. Add persistent playbook or context parameters inspired by Dynamic Cheatsheet
    and ACE without creating an incompatible learning subsystem.
 
-MCE, Combee, SkillOpt, VISTA, PrefPO, JTPRO, Fast-Slow Training, and
-harness-level optimization follow the pinned core implementation in execution
-order. They remain part of the full telos through `de-s8uv` and their dedicated
-tickets: each mechanism must be pinned, tested at the decision-relevant level,
-and then integrated, represented by a concrete extension contract, or rejected
-with evidence and a revisit trigger. This sequencing prevents moving preprints
-from destabilizing the core while also preventing “future research” from
-becoming an informal out-of-scope bucket.
+The review treated MCE, Combee, SkillOpt, VISTA, PrefPO, JTPRO, Fast-Slow
+Training, and harness-level optimization as later candidates. Its criterion
+remains useful: each mechanism should be pinned, tested at the
+decision-relevant level, and then integrated, represented by a concrete
+extension contract, or rejected with evidence and a revisit trigger. The named
+ordering and ticket coordinates were recommendations from this review, not
+current priority. This sequencing rationale prevents moving preprints from
+destabilizing the core while also preventing “future research” from becoming
+an informal out-of-scope bucket.
 
 ## Claim Discipline
 
