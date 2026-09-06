@@ -1,9 +1,19 @@
 # Imp
 
 Imp is an Elixir framework that turns language-model behavior into a typed Elixir program
-you can measure and run inside an ordinary OTP application. It brings the central idea of
-[DSPy](https://dspy.ai)—improving programs from examples rather than hand-editing
-prompts—to the BEAM.
+you can measure, improve from examples, and run inside an
+ordinary OTP application. It brings the central idea of
+[DSPy](https://dspy.ai)—programming behavior and improving it from examples
+rather than hand-editing prompts—to the BEAM. Its longer aim is complete
+semantic parity with DSPy and its useful ecosystem at the level of observable
+program behavior, plus BEAM-native improvements rather than copies of Python
+mechanics.
+
+That aim is a per-surface obligation, not a blanket claim that every DSPy
+integration or paper result has been reproduced. The supported and
+experimental boundaries below describe the current product; [Imp for DSPy
+users](docs/IMP_FOR_DSPY_USERS.md) maps implemented semantics and intentional
+differences.
 
 Here, “typed” means required inputs are checked and model outputs are parsed
 and validated against the signature before application code receives them.
@@ -139,9 +149,10 @@ breaking `0.3` changes from `0.2.1`; see the [release notes](RELEASE_NOTES.md)
 when upgrading.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
-examples use OpenAI, but programs are not tied to that provider. You can run
-the provider-free parts of the learning path and deployment example without
-an API key.
+examples use OpenAI, but programs are not tied to that provider. The
+[provider-free ticket router](examples/provider_free_ticket_router/README.md)
+runs a complete evaluation-and-optimization path without an API key; the
+provider-free parts of the learning path and deployment example do too.
 
 ## Read next
 
