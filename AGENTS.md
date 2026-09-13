@@ -12,10 +12,11 @@ application rather than owning one.
 
 ## What Imp does not own
 
-Protocols. Imp has no ACP and no notion of an agent session, a host, or a
-conversation. `imp_acp` adapts an `Imp.Module` to a host over ACP; `dwell` gives
-an inhabitant continuity and character. Neither belongs inside Imp, and Imp
-should not grow an opinion about either.
+Product-specific characters, residents, accounts, inboxes, or chat threads.
+Imp now includes the optional `Imp.ACP` program adapter and the generic
+`Imp.MCP` tool integration. ExMCP owns both wire protocols. Imp owns typed
+program/tool conversion and execution; Dwell and hosts own product lifetimes.
+Ordinary Imp startup opens no protocol listeners or remote connections.
 
 ## The centre of the model
 
@@ -53,14 +54,17 @@ signalling and so can never deliver a handleable TERM.
 If that consolidation happens, graceful shutdown is a precondition, not a
 follow-up. Until then this is a documented divergence rather than an accident.
 
-## Imp also contains an MCP client
+## Protocol integration
 
-`lib/imp/mcp.ex` speaks MCP over HTTP, stdio and Streamable HTTP with SSE, with
-its own retry and backoff, and does not depend on `ex_mcp`. `imp_acp` uses
-`ExMCP.Client` for the same job while using `Imp.MCP` only for schema and result
-shaping, so a host running both has two MCP client implementations in one BEAM.
-That is a known duplication, not a design; nothing should be built on the
-assumption that it stays that way.
+`Imp.MCP.connect/2` opens explicitly authorized server descriptors through
+ExMCP. Its clients follow an explicit owner PID; tools retain original source
+identity in `metadata.mcp`, independently of model-facing names. `Imp.ACP.MCP`
+adds ACP presentation hints to that import; it is not another client.
+The shared ExMCP pin and its fork reasons live in `mix.exs`.
+
+`Imp.ACP` owns the default session/program adapter formerly shipped separately
+as imp_acp. Its namespace stays stable, but consumers depend on Imp directly.
+`docs/PRODUCTION_OPERATIONS.md` describes the MCP lifecycle/API migration.
 
 ## Checks
 

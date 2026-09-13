@@ -246,6 +246,13 @@
         "Imp.Training.FastSlow.Theta",
         "Imp.Usage"
       ]
+    },
+    {
+      "category": "experimental",
+      "prefixes": [
+        "Imp.ACP",
+        "Imp.MCP."
+      ]
     }
   ],
   "export_exclusions": {}

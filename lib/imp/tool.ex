@@ -23,10 +23,19 @@ defmodule Imp.Tool do
       "Paris"
   """
 
-  defstruct [:name, :description, :run, schema: %{}]
+  defstruct [:name, :description, :run, schema: %{}, metadata: %{}]
+
+  @type t :: %__MODULE__{
+          name: atom() | String.t(),
+          description: String.t(),
+          run: (map() -> term()),
+          schema: map(),
+          metadata: map()
+        }
 
   @option_schema [
-    schema: [type: {:map, :any, :any}, default: %{}]
+    schema: [type: {:map, :any, :any}, default: %{}],
+    metadata: [type: {:map, :any, :any}, default: %{}]
   ]
 
   @doc """
@@ -49,7 +58,8 @@ defmodule Imp.Tool do
       name: normalize_name(name),
       description: description,
       run: run,
-      schema: opts[:schema]
+      schema: opts[:schema],
+      metadata: opts[:metadata]
     }
   end
 

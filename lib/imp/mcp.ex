@@ -18,8 +18,13 @@ defmodule Imp.MCP do
   `result_mode: :structured` to return `structuredContent` exactly when the
   server includes it—even when its value is `nil`, `false`, `0`, or empty—and
   fall back to the text conversion only when that field is absent. MCP error
-  results become tool errors before either conversion.
+  results become `{:error, {:mcp_tool_error, original_envelope}}` before either
+  conversion. The original structured failure and content remain available;
+  uncertainty about an effect must not be collapsed into a retryable refusal.
   """
+
+  @doc "Connects authorized MCP servers; returns tools with source metadata and cleanup."
+  def connect(servers, opts \\ []), do: Imp.MCP.Connections.import_tools(servers, opts)
 
   @client_info %{"name" => "imp", "version" => "0.1.0"}
 
@@ -63,7 +68,7 @@ defmodule Imp.MCP do
       text = text_content(result)
 
       if fetch_field(result, :isError, false) do
-        {:error, {:mcp_tool_error, text}}
+        {:error, {:mcp_tool_error, result}}
       else
         convert_tool_result(result, mode, text)
       end
@@ -135,888 +140,81 @@ defmodule Imp.MCP do
   defp snake_case(:isError), do: :is_error
   defp snake_case(name), do: name
 
-  defmodule HTTPRecovery do
-    @moduledoc false
+  defmodule Client do
+    @moduledoc "An ExMCP-backed catalog. Close it when finished; owner exit also closes it."
+    defstruct [:import]
 
-    require Logger
+    def new(server, opts \\ []) do
+      opts = Keyword.put_new(opts, :trusted_servers, [server])
 
-    @transient_statuses [408, 429, 500, 502, 503, 504]
-
-    def option_schema do
-      [
-        max_attempts: [type: :pos_integer],
-        timeout: [type: :pos_integer],
-        retry_delay: [type: :non_neg_integer],
-        max_retry_after: [type: :non_neg_integer],
-        idempotency_key: [type: {:custom, __MODULE__, :validate_idempotency_key, []}],
-        transport_opts: [type: :keyword_list]
-      ]
-    end
-
-    def defaults do
-      [
-        max_attempts: 3,
-        timeout: 5_000,
-        retry_delay: 100,
-        max_retry_after: 1_000,
-        idempotency_key: nil,
-        transport_opts: []
-      ]
-    end
-
-    def validate_idempotency_key(nil), do: {:ok, nil}
-
-    def validate_idempotency_key(callback) when is_function(callback, 2),
-      do: {:ok, callback}
-
-    def validate_idempotency_key(_callback),
-      do: {:error, "expected nil or an arity-2 function"}
-
-    def request(client, event_prefix, method, params, headers) do
-      id = System.unique_integer([:positive])
-
-      body =
-        Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "method" => method, "params" => params})
-
-      with {:ok, replay} <- replay_contract(client, method, params) do
-        headers = add_idempotency_header(headers, replay)
-        max_attempts = effective_max_attempts(client, replay)
-
-        Imp.Telemetry.span(event_prefix, span_metadata(method, id, max_attempts, replay), fn ->
-          attempt(client, event_prefix, method, id, body, headers, replay, 1, max_attempts)
-        end)
+      case Imp.MCP.connect([server], opts) do
+        {:ok, imported} -> %__MODULE__{import: imported}
+        {:error, reason} -> raise ArgumentError, "MCP connection failed: #{inspect(reason)}"
       end
     end
 
-    def notification(client, event_prefix, method, params, headers) do
-      body = Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})
-      metadata = span_metadata(method, nil, 1, :never)
+    def close(%__MODULE__{import: imported}), do: imported.cleanup.()
 
-      Imp.Telemetry.span(event_prefix, metadata, fn ->
-        run_attempt(client, event_prefix, method, nil, body, headers, :never, 1, 1)
+    def list_tools(%__MODULE__{import: imported}) do
+      Enum.map(imported.tools, fn tool ->
+        %{
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.schema,
+          metadata: tool.metadata,
+          run: tool.run
+        }
       end)
     end
-
-    defp attempt(
-           client,
-           event_prefix,
-           method,
-           id,
-           body,
-           headers,
-           replay,
-           attempt,
-           max_attempts
-         ) do
-      result =
-        run_attempt(
-          client,
-          event_prefix,
-          method,
-          id,
-          body,
-          headers,
-          replay,
-          attempt,
-          max_attempts
-        )
-
-      if retry?(result, replay, attempt, max_attempts) do
-        Process.sleep(retry_delay(result, attempt, client))
-
-        attempt(
-          client,
-          event_prefix,
-          method,
-          id,
-          body,
-          headers,
-          replay,
-          attempt + 1,
-          max_attempts
-        )
-      else
-        result
-      end
-    end
-
-    defp run_attempt(
-           client,
-           event_prefix,
-           method,
-           id,
-           body,
-           headers,
-           replay,
-           attempt,
-           max_attempts
-         ) do
-      started = System.monotonic_time()
-
-      task =
-        Task.async(fn ->
-          opts =
-            client.transport_opts
-            |> Keyword.put(:timeout, client.timeout)
-            |> Keyword.put(:receive_timeout, client.timeout)
-            |> Keyword.put(:retry, false)
-
-          Imp.HTTP.post(client.transport, client.url, headers, body, opts)
-        end)
-
-      result =
-        case Task.yield(task, client.timeout) do
-          {:ok, result} ->
-            result
-
-          {:exit, reason} ->
-            {:error, {:transport_exit, reason}}
-
-          nil ->
-            Task.shutdown(task, :brutal_kill)
-            {:error, :timeout}
-        end
-
-      Imp.Telemetry.execute(
-        event_prefix ++ [:attempt],
-        %{duration: System.monotonic_time() - started},
-        %{
-          transport: :http,
-          method: method,
-          request_id: id,
-          attempt: attempt,
-          max_attempts: max_attempts,
-          replay: replay_kind(replay),
-          outcome: outcome(result)
-        }
-      )
-
-      result
-    end
-
-    defp replay_contract(_client, "tools/list", _params),
-      do: {:ok, :idempotent}
-
-    defp replay_contract(%{idempotency_key: nil}, _method, _params), do: {:ok, :never}
-
-    defp replay_contract(%{idempotency_key: callback}, method, params) do
-      case callback.(method, params) do
-        key when is_binary(key) and byte_size(key) > 0 -> {:ok, {:idempotency_key, key}}
-        nil -> {:ok, :never}
-        other -> {:error, {:invalid_idempotency_key, other}}
-      end
-    end
-
-    defp add_idempotency_header(headers, {:idempotency_key, key}) do
-      headers =
-        Enum.reject(headers, fn {name, _value} ->
-          name |> to_string() |> String.downcase() == "idempotency-key"
-        end)
-
-      [{"idempotency-key", key} | headers]
-    end
-
-    defp add_idempotency_header(headers, _replay), do: headers
-
-    defp effective_max_attempts(_client, :never), do: 1
-    defp effective_max_attempts(client, _replay), do: client.max_attempts
-
-    defp retry?(_result, :never, _attempt, _max_attempts), do: false
-    defp retry?(_result, _replay, attempt, max_attempts) when attempt >= max_attempts, do: false
-
-    defp retry?({:ok, %{status: status}}, _replay, _attempt, _max),
-      do: status in @transient_statuses
-
-    defp retry?({:error, reason}, _replay, _attempt, _max), do: transient_transport?(reason)
-    defp retry?(_result, _replay, _attempt, _max), do: false
-
-    defp transient_transport?(reason)
-         when reason in [
-                :timeout,
-                :econnrefused,
-                :closed,
-                :enetunreach,
-                :ehostunreach,
-                :pool_not_available,
-                :unprocessed
-              ],
-         do: true
-
-    defp transient_transport?({:http_transport_failed, _transport, reason}),
-      do: transient_transport?(reason)
-
-    defp transient_transport?({:failed_connect, details}) when is_list(details) do
-      Enum.any?(details, &transient_detail?/1)
-    end
-
-    defp transient_transport?(%Req.TransportError{reason: reason}),
-      do: transient_transport?(reason)
-
-    defp transient_transport?(_reason), do: false
-
-    defp transient_detail?(detail) when is_tuple(detail),
-      do: detail |> Tuple.to_list() |> Enum.any?(&transient_detail?/1)
-
-    defp transient_detail?(detail) when is_list(detail),
-      do: Enum.any?(detail, &transient_detail?/1)
-
-    defp transient_detail?(detail), do: transient_transport?(detail)
-
-    defp retry_delay({:ok, %{status: status, headers: headers}}, attempt, client)
-         when status in [429, 503] do
-      case req_retry_after(headers) do
-        delay when is_integer(delay) -> min(delay, client.max_retry_after)
-        nil -> backoff(client.retry_delay, client.max_retry_after, attempt - 1)
-      end
-    end
-
-    defp retry_delay(_result, attempt, client),
-      do: backoff(client.retry_delay, client.max_retry_after, attempt - 1)
-
-    defp req_retry_after(headers) do
-      headers =
-        Enum.map(headers, fn {name, value} ->
-          {name |> to_string() |> String.downcase(), to_string(value)}
-        end)
-
-      [headers: headers]
-      |> Req.Response.new()
-      |> Req.Response.get_retry_after()
-    rescue
-      # Only parse failures are rescued (Req raises ArgumentError on a
-      # Retry-After value that is neither delta-seconds nor an HTTP date).
-      # Anything else propagates. The fallback to exponential backoff is
-      # kept, but never silently.
-      error in ArgumentError ->
-        Logger.warning(
-          "Imp.MCP: unparsable Retry-After header " <>
-            "(#{Exception.message(error)}); falling back to exponential backoff"
-        )
-
-        nil
-    end
-
-    defp backoff(base, cap, exponent), do: min(base * Integer.pow(2, exponent), cap)
-
-    defp span_metadata(method, id, max_attempts, replay) do
-      %{
-        transport: :http,
-        method: method,
-        request_id: id,
-        max_attempts: max_attempts,
-        replay: replay_kind(replay)
-      }
-    end
-
-    defp replay_kind({:idempotency_key, _key}), do: :idempotency_key
-    defp replay_kind(replay), do: replay
-
-    defp outcome({:ok, %{status: status}}), do: {:http, status}
-    defp outcome({:error, reason}) when reason in [:timeout, :econnrefused, :closed], do: reason
-    defp outcome({:error, _reason}), do: :transport_error
-    defp outcome(_other), do: :invalid_transport_response
   end
 
   defmodule HTTPClient do
-    @moduledoc "JSON-RPC 2.0 transport-backed MCP-style catalog client."
-
-    defstruct [
-      :url,
-      transport: Imp.HTTP.Hackneyless,
-      headers: [],
-      protocol_version: "2025-03-26",
-      result_mode: :text,
-      max_attempts: 3,
-      timeout: 5_000,
-      retry_delay: 100,
-      max_retry_after: 1_000,
-      idempotency_key: nil,
-      transport_opts: []
-    ]
-
-    @option_schema Keyword.merge(
-                     [
-                       transport: [type: {:custom, Imp.HTTP, :validate_transport, []}],
-                       headers: [type: {:list, {:tuple, [:any, :any]}}],
-                       protocol_version: [type: :string],
-                       result_mode: [type: {:in, [:text, :structured]}]
-                     ],
-                     Imp.MCP.HTTPRecovery.option_schema()
-                   )
-
+    @moduledoc "MCP HTTP catalog backed by ExMCP; use Client.close/1 when finished."
     def new(url, opts \\ []) do
-      validate_url!(url)
-      opts = Imp.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
+      {headers, opts} = Keyword.pop(opts, :headers, [])
 
-      struct!(
-        __MODULE__,
-        Keyword.merge(
-          Imp.MCP.HTTPRecovery.defaults(),
-          opts
-        )
-        |> Keyword.put(:url, url)
-      )
-    end
-
-    def list_tools(%__MODULE__{} = client) do
-      with {:ok, :initialized} <- initialize(client),
-           {:ok, %{status: status, body: body}} when status in 200..299 <-
-             post_json(client, "tools/list", %{}),
-           {:ok, decoded} <- Jason.decode(body),
-           {:ok, tools} <- decode_tools(decoded) do
-        Enum.map(tools, &attach_remote_run(client, &1))
-      else
-        {:ok, %{status: status, body: body}} ->
-          raise ArgumentError, "MCP tools/list HTTP #{status}: #{body}"
-
-        {:error, reason} ->
-          raise ArgumentError, "MCP tools/list failed: #{inspect(reason)}"
-      end
-    end
-
-    defp decode_tools(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(%{"result" => %{"tools" => tools}}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(%{tools: tools}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(%{result: %{tools: tools}}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(other), do: {:error, {:missing_tools, other}}
-
-    defp initialize(client) do
-      with {:ok, %{status: status}} when status in 200..299 <-
-             post_json(client, "initialize", Imp.MCP.initialize_params(client.protocol_version)),
-           {:ok, %{status: status}} when status in 200..299 <-
-             post_notification(client, "notifications/initialized", %{}) do
-        {:ok, :initialized}
-      end
-    end
-
-    defp attach_remote_run(client, tool) do
-      name = Map.get(tool, "name", Map.get(tool, :name))
-
-      Map.put(tool, "run", fn arguments ->
-        with {:ok, %{status: status, body: response}} when status in 200..299 <-
-               post_json(client, "tools/call", %{"name" => name, "arguments" => arguments}),
-             {:ok, decoded} <- Jason.decode(response),
-             {:ok, result} <- Imp.MCP.json_rpc_result(decoded) do
-          Imp.MCP.tool_result(result, client.result_mode)
-        else
-          {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-          {:error, reason} -> {:error, reason}
-        end
-      end)
-    end
-
-    defp post_json(client, method, params) do
-      Imp.MCP.HTTPRecovery.request(client, [:imp, :mcp, :http], method, params, headers(client))
-    end
-
-    defp post_notification(client, method, params) do
-      Imp.MCP.HTTPRecovery.notification(
-        client,
-        [:imp, :mcp, :http],
-        method,
-        params,
-        headers(client)
-      )
-    end
-
-    defp headers(client),
-      do: [
-        {"content-type", "application/json"},
-        {"mcp-protocol-version", client.protocol_version}
-        | client.headers
-      ]
-
-    defp validate_url!(url) when is_binary(url), do: :ok
-
-    defp validate_url!(url) do
-      raise ArgumentError,
-            "#{inspect(__MODULE__)}.new/2 expects url to be a binary; got: #{inspect(url)}"
-    end
-  end
-
-  defmodule StdioClient do
-    @moduledoc "Stdio JSON-RPC MCP client that opens a process per discovery or tool call."
-
-    alias __MODULE__.Session
-
-    defstruct [
-      :command,
-      args: [],
-      protocol_version: "2025-03-26",
-      result_mode: :text,
-      timeout: 5_000
-    ]
-
-    @option_schema [
-      args: [type: {:list, :string}],
-      protocol_version: [type: :string],
-      result_mode: [type: {:in, [:text, :structured]}],
-      timeout: [type: :pos_integer]
-    ]
-
-    def new(command, opts \\ []) do
-      validate_command!(command)
-      opts = Imp.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
-
-      %__MODULE__{
-        command: command,
-        args: Keyword.get(opts, :args, []),
-        protocol_version: Keyword.get(opts, :protocol_version, "2025-03-26"),
-        result_mode: Keyword.get(opts, :result_mode, :text),
-        timeout: Keyword.get(opts, :timeout, 5_000)
+      server = %{
+        "name" => "http",
+        "type" => "http",
+        "url" => url,
+        "headers" =>
+          Enum.map(headers, fn {k, v} -> %{"name" => to_string(k), "value" => to_string(v)} end)
       }
+
+      Imp.MCP.Client.new(server, opts)
     end
 
-    def encode(method, params \\ %{}, id \\ next_id()) do
-      Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "method" => method, "params" => params}) <>
-        "\n"
-    end
-
-    def list_tools(%__MODULE__{} = client) do
-      with_session(client, fn session ->
-        with {:ok, _} <-
-               request(
-                 session,
-                 "initialize",
-                 Imp.MCP.initialize_params(client.protocol_version),
-                 client.timeout
-               ),
-             :ok <- notify(session, "notifications/initialized", %{}),
-             {:ok, decoded} <- request(session, "tools/list", %{}, client.timeout),
-             {:ok, tools} <- decode_tools(decoded) do
-          Enum.map(tools, &attach_stdio_run(client, &1))
-        else
-          {:error, reason} -> raise ArgumentError, "MCP stdio failed: #{inspect(reason)}"
-        end
-      end)
-    end
-
-    defp attach_stdio_run(client, tool) do
-      name = Map.get(tool, "name", Map.get(tool, :name))
-
-      Map.put(tool, "run", fn arguments ->
-        with_session(client, fn session ->
-          with {:ok, _} <-
-                 request(
-                   session,
-                   "initialize",
-                   Imp.MCP.initialize_params(client.protocol_version),
-                   client.timeout
-                 ),
-               :ok <- notify(session, "notifications/initialized", %{}),
-               {:ok, decoded} <-
-                 request(
-                   session,
-                   "tools/call",
-                   %{"name" => name, "arguments" => arguments},
-                   client.timeout
-                 ),
-               {:ok, result} <- Imp.MCP.json_rpc_result(decoded) do
-            Imp.MCP.tool_result(result, client.result_mode)
-          end
-        end)
-      end)
-    end
-
-    defp with_session(client, fun) do
-      {:ok, session} = Session.start(client, self())
-
-      cancellation =
-        Imp.Run.register_cancellable(fn _reason -> Session.stop!(session) end)
-
-      try do
-        fun.(session)
-      after
-        Imp.Run.unregister_cancellable(cancellation)
-        Session.stop!(session)
-      end
-    end
-
-    defp request(session, method, params, timeout) do
-      Imp.Telemetry.span([:imp, :mcp, :stdio], %{method: method}, fn ->
-        Session.request(session, method, params, timeout)
-      end)
-    end
-
-    defp notify(session, method, params) do
-      Imp.Telemetry.span([:imp, :mcp, :stdio], %{method: method}, fn ->
-        Session.notify(session, method, params)
-      end)
-    end
-
-    defp decode_tools(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(%{"result" => %{"tools" => tools}}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(other), do: {:error, {:missing_tools, other}}
-
-    defp next_id, do: System.unique_integer([:positive])
-
-    defp validate_command!(command) when is_binary(command), do: :ok
-
-    defp validate_command!(command) do
-      raise ArgumentError,
-            "#{inspect(__MODULE__)}.new/2 expects command to be a binary executable path; got: #{inspect(command)}"
-    end
-
-    defmodule Session do
-      @moduledoc false
-
-      use GenServer
-
-      def start(client, owner), do: GenServer.start(__MODULE__, {client, owner})
-
-      def request(pid, method, params, timeout) do
-        GenServer.call(pid, {:request, method, params, timeout}, timeout + 1_000)
-      catch
-        :exit, {:timeout, _details} -> {:error, :timeout}
-        :exit, reason -> {:error, {:stdio_session_exit, Imp.Redaction.redact(inspect(reason))}}
-      end
-
-      def notify(pid, method, params) do
-        GenServer.call(pid, {:notify, method, params})
-      catch
-        :exit, reason -> {:error, {:stdio_session_exit, Imp.Redaction.redact(inspect(reason))}}
-      end
-
-      def stop!(pid) do
-        case stop(pid) do
-          :ok -> :ok
-          {:error, reason} -> raise "MCP stdio cleanup failed: #{inspect(reason)}"
-        end
-      end
-
-      defp stop(pid) do
-        if Process.alive?(pid), do: GenServer.call(pid, :stop, 10_000), else: :ok
-      catch
-        :exit, {:noproc, _details} ->
-          :ok
-
-        :exit, {:normal, _details} ->
-          :ok
-
-        :exit, reason ->
-          {:error, {:stdio_session_stop_failed, Imp.Redaction.redact(inspect(reason))}}
-      end
-
-      @impl true
-      def init({client, owner}) do
-        port =
-          Port.open({:spawn_executable, client.command}, [
-            :binary,
-            :exit_status,
-            :use_stdio,
-            :stderr_to_stdout,
-            args: client.args
-          ])
-
-        os_pid =
-          case Port.info(port, :os_pid) do
-            {:os_pid, os_pid} -> os_pid
-            nil -> nil
-          end
-
-        {:ok,
-         %{
-           port: port,
-           os_pid: os_pid,
-           owner: owner,
-           owner_monitor: Process.monitor(owner),
-           pending: nil
-         }}
-      end
-
-      @impl true
-      def handle_call({:request, method, params, timeout}, from, %{pending: nil} = state) do
-        id = System.unique_integer([:positive])
-        true = Port.command(state.port, StdioClient.encode(method, params, id))
-        timer = Process.send_after(self(), {:request_timeout, id}, timeout)
-
-        pending = %{from: from, id: id, buffer: "", timer: timer}
-        {:noreply, %{state | pending: pending}}
-      end
-
-      def handle_call({:request, _method, _params, _timeout}, _from, state) do
-        {:reply, {:error, :stdio_request_in_flight}, state}
-      end
-
-      def handle_call({:notify, method, params}, _from, state) do
-        body =
-          Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params}) <>
-            "\n"
-
-        true = Port.command(state.port, body)
-        {:reply, :ok, state}
-      end
-
-      def handle_call(:stop, _from, state) do
-        state = reply_pending(state, {:error, :cancelled})
-
-        case cleanup(state) do
-          :ok ->
-            {:stop, :normal, :ok, %{state | port: nil, os_pid: nil}}
-
-          {:error, reason} ->
-            {:stop, :normal, {:error, reason}, %{state | port: nil, os_pid: nil}}
-        end
-      end
-
-      @impl true
-      def handle_info({port, {:data, data}}, %{port: port, pending: pending} = state)
-          when not is_nil(pending) do
-        pending = %{pending | buffer: pending.buffer <> data}
-
-        case decode_line(pending.buffer, pending.id) do
-          :more ->
-            {:noreply, %{state | pending: pending}}
-
-          result ->
-            cancel_timer(pending.timer)
-            GenServer.reply(pending.from, result)
-            {:noreply, %{state | pending: nil}}
-        end
-      end
-
-      def handle_info({port, {:data, _data}}, %{port: port, pending: nil} = state) do
-        {:noreply, state}
-      end
-
-      def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
-        state = reply_pending(state, {:error, {:stdio_exit, status}})
-        {:noreply, state}
-      end
-
-      def handle_info({:request_timeout, id}, %{pending: %{id: id}} = state) do
-        GenServer.reply(state.pending.from, {:error, :timeout})
-        {:noreply, %{state | pending: nil}}
-      end
-
-      def handle_info({:request_timeout, _id}, state), do: {:noreply, state}
-
-      def handle_info({:DOWN, monitor, :process, owner, _reason}, state)
-          when monitor == state.owner_monitor and owner == state.owner do
-        state = reply_pending(state, {:error, :owner_down})
-        _ = cleanup(state)
-        {:stop, :normal, %{state | port: nil, os_pid: nil}}
-      end
-
-      @impl true
-      def terminate(_reason, %{port: nil}), do: :ok
-
-      def terminate(_reason, state) do
-        _ = cleanup(state)
-        :ok
-      end
-
-      defp reply_pending(%{pending: nil} = state, _reply), do: state
-
-      defp reply_pending(state, reply) do
-        cancel_timer(state.pending.timer)
-        GenServer.reply(state.pending.from, reply)
-        %{state | pending: nil}
-      end
-
-      defp cleanup(%{port: nil}), do: :ok
-
-      defp cleanup(state) do
-        Imp.ExternalCommand.Lifecycle.terminate_port_group(state.port, state.os_pid)
-      rescue
-        error -> {:error, Exception.message(error)}
-      catch
-        kind, reason -> {:error, {kind, Imp.Redaction.redact(inspect(reason))}}
-      end
-
-      defp decode_line(buffer, id) do
-        buffer
-        |> String.split("\n", trim: true)
-        |> Enum.find_value(:more, fn line ->
-          case Jason.decode(line) do
-            {:ok, %{"id" => ^id, "error" => error}} -> {:error, {:json_rpc_error, error}}
-            {:ok, %{"id" => ^id} = decoded} -> {:ok, decoded}
-            _other -> false
-          end
-        end)
-      end
-
-      defp cancel_timer(timer), do: Process.cancel_timer(timer, async: false, info: false)
-    end
+    defdelegate list_tools(client), to: Imp.MCP.Client
+    defdelegate close(client), to: Imp.MCP.Client
   end
 
   defmodule StreamableHTTPClient do
-    @moduledoc "MCP Streamable HTTP client with session-aware headers and SSE decoding."
+    @moduledoc "MCP Streamable HTTP catalog using the shared ExMCP transport."
+    defdelegate new(url, opts \\ []), to: Imp.MCP.HTTPClient
+    defdelegate list_tools(client), to: Imp.MCP.Client
+    defdelegate close(client), to: Imp.MCP.Client
+  end
 
-    defstruct [
-      :url,
-      :session_id,
-      transport: Imp.HTTP.Hackneyless,
-      headers: [],
-      protocol_version: "2025-03-26",
-      result_mode: :text,
-      max_attempts: 3,
-      timeout: 5_000,
-      retry_delay: 100,
-      max_retry_after: 1_000,
-      idempotency_key: nil,
-      transport_opts: []
-    ]
+  defmodule StdioClient do
+    @moduledoc "One owned ExMCP stdio connection shared by discovery and tool calls."
+    def new(command, opts \\ []) do
+      {args, opts} = Keyword.pop(opts, :args, [])
+      {env, opts} = Keyword.pop(opts, :env, [])
 
-    @option_schema Keyword.merge(
-                     [
-                       transport: [type: {:custom, Imp.HTTP, :validate_transport, []}],
-                       headers: [type: {:list, {:tuple, [:any, :any]}}],
-                       session_id: [type: {:or, [:string, nil]}],
-                       protocol_version: [type: :string],
-                       result_mode: [type: {:in, [:text, :structured]}]
-                     ],
-                     Imp.MCP.HTTPRecovery.option_schema()
-                   )
+      server = %{
+        "name" => "stdio",
+        "type" => "stdio",
+        "command" => command,
+        "args" => args,
+        "env" =>
+          Enum.map(env, fn {k, v} -> %{"name" => to_string(k), "value" => to_string(v)} end)
+      }
 
-    def new(url, opts \\ []) do
-      validate_url!(url)
-      opts = Imp.Options.validate!(opts, @option_schema, "#{inspect(__MODULE__)}.new/2")
-
-      struct!(
-        __MODULE__,
-        Keyword.merge(
-          Imp.MCP.HTTPRecovery.defaults(),
-          opts
-        )
-        |> Keyword.put(:url, url)
-      )
+      Imp.MCP.Client.new(server, opts)
     end
 
-    def list_tools(%__MODULE__{} = client) do
-      with {:ok, client} <- initialize(client),
-           {:ok, decoded} <- rpc(client, "tools/list", %{}),
-           {:ok, tools} <- decode_tools(decoded) do
-        Enum.map(tools, &attach_remote_run(client, &1))
-      else
-        {:error, reason} -> raise ArgumentError, "MCP streamable HTTP failed: #{inspect(reason)}"
-      end
-    end
-
-    # MCP spec, Lifecycle + Streamable HTTP transport:
-    # 1. initialize carries full params (protocolVersion, capabilities, clientInfo);
-    # 2. if the server assigns an Mcp-Session-Id header on the initialize
-    #    response, the client MUST include it on all subsequent requests;
-    # 3. after a successful initialize the client MUST send the
-    #    notifications/initialized notification (the server responds 202
-    #    Accepted with no body, so the response is not JSON-decoded).
-    defp initialize(client) do
-      with {:ok, %{status: status, headers: response_headers, body: body}}
-           when status in 200..299 <-
-             Imp.MCP.HTTPRecovery.request(
-               client,
-               [:imp, :mcp, :streamable_http],
-               "initialize",
-               Imp.MCP.initialize_params(client.protocol_version),
-               headers(client)
-             ),
-           {:ok, decoded} <- decode_body(body),
-           {:ok, _result} <- Imp.MCP.json_rpc_result(decoded) do
-        client = capture_session(client, response_headers)
-        notify_initialized(client)
-      else
-        {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
-        {:error, reason} -> {:error, reason}
-      end
-    end
-
-    defp notify_initialized(client) do
-      case Imp.MCP.HTTPRecovery.notification(
-             client,
-             [:imp, :mcp, :streamable_http],
-             "notifications/initialized",
-             %{},
-             headers(client)
-           ) do
-        {:ok, %{status: status}} when status in 200..299 -> {:ok, client}
-        {:ok, %{status: status, body: body}} -> {:error, {:http_error, status, body}}
-        {:error, reason} -> {:error, reason}
-      end
-    end
-
-    # A server-assigned session id supersedes any preconfigured one; without a
-    # server assignment the configured session id (session resumption) stands.
-    defp capture_session(client, response_headers) do
-      case session_id(response_headers) do
-        nil -> client
-        session_id -> %{client | session_id: session_id}
-      end
-    end
-
-    defp session_id(headers) do
-      Enum.find_value(headers, fn {name, value} ->
-        if name |> to_string() |> String.downcase() == "mcp-session-id",
-          do: to_string(value)
-      end)
-    end
-
-    def headers(%__MODULE__{} = client) do
-      base = [
-        {"content-type", "application/json"},
-        {"accept", "application/json, text/event-stream"},
-        {"mcp-protocol-version", client.protocol_version}
-        | client.headers
-      ]
-
-      if client.session_id, do: [{"mcp-session-id", client.session_id} | base], else: base
-    end
-
-    defp attach_remote_run(client, tool) do
-      name = Map.get(tool, "name", Map.get(tool, :name))
-
-      Map.put(tool, "run", fn arguments ->
-        with {:ok, decoded} <-
-               rpc(client, "tools/call", %{"name" => name, "arguments" => arguments}),
-             {:ok, result} <- Imp.MCP.json_rpc_result(decoded) do
-          Imp.MCP.tool_result(result, client.result_mode)
-        end
-      end)
-    end
-
-    defp rpc(client, method, params) do
-      with {:ok, %{status: status, body: response}} when status in 200..299 <-
-             Imp.MCP.HTTPRecovery.request(
-               client,
-               [:imp, :mcp, :streamable_http],
-               method,
-               params,
-               headers(client)
-             ),
-           {:ok, decoded} <- decode_body(response) do
-        {:ok, decoded}
-      else
-        {:ok, %{status: status, body: response}} -> {:error, {:http_error, status, response}}
-        {:error, reason} -> {:error, reason}
-      end
-    end
-
-    defp decode_body(body) do
-      cond do
-        String.contains?(body, "\ndata:") or String.starts_with?(body, "data:") ->
-          body
-          |> String.split("\n")
-          |> Enum.filter(&String.starts_with?(&1, "data:"))
-          |> Enum.map(&String.trim_leading(&1, "data:"))
-          |> Enum.map(&String.trim/1)
-          |> Enum.reject(&(&1 == "" or &1 == "[DONE]"))
-          |> List.last()
-          |> Jason.decode()
-
-        true ->
-          Jason.decode(body)
-      end
-    end
-
-    defp decode_tools(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(%{"result" => %{"tools" => tools}}) when is_list(tools), do: {:ok, tools}
-    defp decode_tools(other), do: {:error, {:missing_tools, other}}
-
-    defp validate_url!(url) when is_binary(url), do: :ok
-
-    defp validate_url!(url) do
-      raise ArgumentError,
-            "#{inspect(__MODULE__)}.new/2 expects url to be a binary; got: #{inspect(url)}"
-    end
+    defdelegate list_tools(client), to: Imp.MCP.Client
+    defdelegate close(client), to: Imp.MCP.Client
   end
 
   @doc "Imports a catalog or list of tool schemas into `Imp.Tool` structs."
@@ -1079,7 +277,10 @@ defmodule Imp.MCP do
     input_schema = validate_input_schema!(fetch_input_schema!(schema, name), name)
     run = validate_run!(fetch_required!(schema, :run), name)
 
-    Imp.Tool.new(name, description, run, schema: input_schema)
+    Imp.Tool.new(name, description, run,
+      schema: input_schema,
+      metadata: Map.get(schema, "metadata", Map.get(schema, :metadata, %{}))
+    )
   end
 
   defp validate_unique_names!(tools) do

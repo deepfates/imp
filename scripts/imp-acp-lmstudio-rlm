@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+imp_acp_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+cd "$imp_acp_root"
+
+# Mix may compile before invoking a task. ACP reserves stdout for JSON-RPC, so
+# keep build diagnostics on stderr and run the already-compiled task afterward.
+mix compile 1>&2
+exec mix run --no-compile --no-start -e 'Mix.Task.run("imp_acp.lmstudio_rlm_demo")'

@@ -1031,10 +1031,11 @@ defmodule PublicSurfaceTest do
     assert %Imp.Clients.ReqLLM{} = Imp.req_llm("openai:gpt-test")
 
     assert %Imp.Retrievers.HTTP{} = Imp.Retrievers.HTTP.new("https://retriever.example")
-    assert %Imp.MCP.HTTPClient{} = Imp.MCP.HTTPClient.new("https://mcp.example")
-
-    assert %Imp.MCP.StreamableHTTPClient{} =
-             Imp.MCP.StreamableHTTPClient.new("https://mcp.example")
+    # Remote constructors now connect; avoid reaching a fictional network host.
+    assert {:ok, %Imp.MCP.Import{tools: [], cleanup: cleanup}} = Imp.MCP.connect([])
+    assert :ok = cleanup.()
+    assert function_exported?(Imp.MCP.HTTPClient, :new, 2)
+    assert function_exported?(Imp.MCP.StreamableHTTPClient, :new, 2)
 
     assert %Imp.Clients.HTTPTrainer{} =
              Imp.Clients.OpenAITrainer.new(training_file: "file-test")

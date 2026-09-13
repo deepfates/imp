@@ -154,6 +154,18 @@ examples use OpenAI, but programs are not tied to that provider. The
 runs a complete evaluation-and-optimization path without an API key; the
 provider-free parts of the learning path and deployment example do too.
 
+## Connect tools or expose a program
+
+`Imp.MCP.connect/2` imports authorized MCP servers through ExMCP, returning
+ordinary tools plus explicit connection cleanup. Source server/tool identities,
+schemas, and annotations remain in each tool's `metadata.mcp` even when names
+are qualified to avoid collisions.
+
+`Imp.ACP.start_link/1` and `Imp.ACP.run/1` expose an ordinary Imp program to
+an ACP host. These are optional entry points, now included in Imp; consumers
+no longer need the separate imp_acp package. Ordinary Imp startup starts no
+protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPERATIONS.md#protocol-integration-and-migration).
+
 ## Read next
 
 - [Learning Path](docs/LEARNING_PATH.md) — build one program from its first

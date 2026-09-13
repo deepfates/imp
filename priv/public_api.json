@@ -677,6 +677,146 @@
       "types": []
     },
     {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "capabilities/1",
+        "run/1",
+        "start_link/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.ACP",
+      "signatures": {
+        "functions": {
+          "capabilities/1": [
+            "capabilities(adapter_opts \\\\ [])"
+          ],
+          "run/1": [
+            "run(opts)"
+          ],
+          "start_link/1": [
+            "start_link(opts)"
+          ]
+        }
+      },
+      "source": "lib/imp/acp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "permission_policy/2",
+        "supported?/2",
+        "tools/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.ACP.Host",
+      "signatures": {
+        "functions": {
+          "permission_policy/2": [
+            "permission_policy(map, session)"
+          ],
+          "supported?/2": [
+            "supported?(host, atom)"
+          ],
+          "tools/2": [
+            "tools(host, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/acp/host.ex",
+      "struct_fields": [
+        "agent",
+        "client_capabilities",
+        "cwd",
+        "session_id"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "import_tools/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.ACP.MCP",
+      "signatures": {
+        "functions": {
+          "import_tools/2": [
+            "import_tools(servers, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/acp/mcp.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.ACP.MCP.Import",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/acp/mcp.ex",
+      "struct_fields": [
+        "annotations",
+        "cleanup",
+        "provenance",
+        "tool_kinds",
+        "tools"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "derive/1",
+        "derive_all/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.ACP.ToolKind",
+      "signatures": {
+        "functions": {
+          "derive/1": [
+            "derive(annotations)"
+          ],
+          "derive_all/1": [
+            "derive_all(annotations)"
+          ]
+        }
+      },
+      "source": "lib/imp/acp/tool_kind.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
       "callbacks": [
         {
           "name": "format/3",
@@ -3753,8 +3893,9 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
+        "connect/2",
         "import_tools/1"
       ],
       "kind": "module",
@@ -3762,6 +3903,9 @@
       "module": "Imp.MCP",
       "signatures": {
         "functions": {
+          "connect/2": [
+            "connect(servers, opts \\\\ [])"
+          ],
           "import_tools/1": [
             "import_tools(catalog)"
           ]
@@ -3773,7 +3917,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "list_tools/1",
         "new/1"
@@ -3799,16 +3943,83 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
+        "close/1",
         "list_tools/1",
         "new/2"
       ],
       "kind": "struct",
       "macros": [],
+      "module": "Imp.MCP.Client",
+      "signatures": {
+        "functions": {
+          "close/1": [
+            "close(client)"
+          ],
+          "list_tools/1": [
+            "list_tools(client)"
+          ],
+          "new/2": [
+            "new(server, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/mcp.ex",
+      "struct_fields": [
+        "import"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "import_tools/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.MCP.Connections",
+      "signatures": {
+        "functions": {
+          "import_tools/2": [
+            "import_tools(servers, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "context/0": [],
+          "server/0": []
+        }
+      },
+      "source": "lib/imp/mcp/connections.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "context/0"
+        },
+        {
+          "kind": "type",
+          "name": "server/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "close/1",
+        "list_tools/1",
+        "new/2"
+      ],
+      "kind": "module",
+      "macros": [],
       "module": "Imp.MCP.HTTPClient",
       "signatures": {
         "functions": {
+          "close/1": [
+            "close(client)"
+          ],
           "list_tools/1": [
             "list_tools(client)"
           ],
@@ -3818,36 +4029,50 @@
         }
       },
       "source": "lib/imp/mcp.ex",
-      "struct_fields": [
-        "headers",
-        "idempotency_key",
-        "max_attempts",
-        "max_retry_after",
-        "protocol_version",
-        "result_mode",
-        "retry_delay",
-        "timeout",
-        "transport",
-        "transport_opts",
-        "url"
-      ],
+      "struct_fields": [],
       "types": []
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.Import",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/mcp/connections.ex",
+      "struct_fields": [
+        "annotations",
+        "cleanup",
+        "provenance",
+        "tools"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
       "functions": [
-        "encode/3",
+        "close/1",
         "list_tools/1",
         "new/2"
       ],
-      "kind": "struct",
+      "kind": "module",
       "macros": [],
       "module": "Imp.MCP.StdioClient",
       "signatures": {
         "functions": {
-          "encode/3": [
-            "encode(method, params \\\\ %{}, id \\\\ next_id())"
+          "close/1": [
+            "close(client)"
           ],
           "list_tools/1": [
             "list_tools(client)"
@@ -3858,30 +4083,24 @@
         }
       },
       "source": "lib/imp/mcp.ex",
-      "struct_fields": [
-        "args",
-        "command",
-        "protocol_version",
-        "result_mode",
-        "timeout"
-      ],
+      "struct_fields": [],
       "types": []
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
-        "headers/1",
+        "close/1",
         "list_tools/1",
         "new/2"
       ],
-      "kind": "struct",
+      "kind": "module",
       "macros": [],
       "module": "Imp.MCP.StreamableHTTPClient",
       "signatures": {
         "functions": {
-          "headers/1": [
-            "headers(client)"
+          "close/1": [
+            "close(client)"
           ],
           "list_tools/1": [
             "list_tools(client)"
@@ -3892,20 +4111,7 @@
         }
       },
       "source": "lib/imp/mcp.ex",
-      "struct_fields": [
-        "headers",
-        "idempotency_key",
-        "max_attempts",
-        "max_retry_after",
-        "protocol_version",
-        "result_mode",
-        "retry_delay",
-        "session_id",
-        "timeout",
-        "transport",
-        "transport_opts",
-        "url"
-      ],
+      "struct_fields": [],
       "types": []
     },
     {
@@ -7986,16 +8192,25 @@
           "validate_tools/1": [
             "validate_tools(tools)"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/tool.ex",
       "struct_fields": [
         "description",
+        "metadata",
         "name",
         "run",
         "schema"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [

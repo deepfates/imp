@@ -1,9 +1,7 @@
 defmodule Imp.MCPStdioLifecycleTest do
-  # Regression for de-2bcy: the stdio transport used to tear down with
-  # Port.close/1 only, which merely closes stdin. Servers that ignore stdin EOF
-  # (or SIGTERM) accumulated as orphan OS processes. Teardown now goes through
-  # Imp.ExternalCommand.Lifecycle.terminate_port_group/3 (TERM -> grace -> KILL
-  # on the process group).
+  # The shared ExMCP transport owns a persistent server and its descendants.
+  # Explicit close must reap even servers that ignore EOF and SIGTERM;
+  # cancelling a request alone does not claim rollback or server termination.
   use ExUnit.Case, async: true
 
   alias Imp.MCP
@@ -14,9 +12,12 @@ defmodule Imp.MCPStdioLifecycleTest do
     {pid_file, client} = fake_server(tmp_dir, "eof_ignoring", ignore_sigterm: false)
 
     assert [%{"name" => "noop"}] =
-             Enum.map(MCP.StdioClient.list_tools(client), &Map.take(&1, ["name"]))
+             Enum.map(MCP.StdioClient.list_tools(client), fn tool ->
+               %{"name" => to_string(tool.name)}
+             end)
 
     os_pid = read_pid!(pid_file)
+    MCP.StdioClient.close(client)
     assert os_process_dead?(os_pid), "stdio server #{os_pid} survived teardown as an orphan"
   end
 
@@ -24,25 +25,30 @@ defmodule Imp.MCPStdioLifecycleTest do
     {pid_file, client} = fake_server(tmp_dir, "term_ignoring", ignore_sigterm: true)
 
     assert [%{"name" => "noop"}] =
-             Enum.map(MCP.StdioClient.list_tools(client), &Map.take(&1, ["name"]))
+             Enum.map(MCP.StdioClient.list_tools(client), fn tool ->
+               %{"name" => to_string(tool.name)}
+             end)
 
     os_pid = read_pid!(pid_file)
+    MCP.StdioClient.close(client)
     assert os_process_dead?(os_pid), "stdio server #{os_pid} survived TERM and KILL escalation"
   end
 
-  test "tool calls over stdio also reap the per-call server", %{tmp_dir: tmp_dir} do
+  test "tool calls reuse a connection until explicit close reaps it", %{tmp_dir: tmp_dir} do
     {pid_file, client} = fake_server(tmp_dir, "tool_call", ignore_sigterm: false)
 
     [tool] = MCP.import_tools(client)
-    File.rm(pid_file)
 
     assert %{"ok" => true} = Imp.Tool.call(tool, %{})
 
     os_pid = read_pid!(pid_file)
+    MCP.StdioClient.close(client)
     assert os_process_dead?(os_pid), "stdio tool-call server #{os_pid} survived teardown"
   end
 
-  test "Run cancellation reaps a blocked stdio tool process group", %{tmp_dir: tmp_dir} do
+  test "Run cancellation followed by owner cleanup reaps a noncooperative server", %{
+    tmp_dir: tmp_dir
+  } do
     started_file = Path.join(tmp_dir, "cancel.started")
     child_pid_file = Path.join(tmp_dir, "cancel.child.pid")
 
@@ -53,7 +59,6 @@ defmodule Imp.MCPStdioLifecycleTest do
       )
 
     [tool] = MCP.import_tools(client)
-    File.rm(pid_file)
 
     lm =
       Imp.LM.Static.new(
@@ -76,6 +81,8 @@ defmodule Imp.MCPStdioLifecycleTest do
 
     cancellation = Task.async(fn -> Imp.cancel_run(run, :probe_cancel, 200) end)
     assert :ok = Task.await(cancellation, 5_000)
+
+    MCP.StdioClient.close(client)
 
     assert os_process_dead?(os_pid),
            "stdio tool-call server #{os_pid} survived Run cancellation"
@@ -142,7 +149,7 @@ defmodule Imp.MCPStdioLifecycleTest do
         response = None
 
         if method == "initialize":
-            response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {}}
+            response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {"protocolVersion": "2025-03-26", "capabilities": {"tools": {}}, "serverInfo": {"name": "fixture", "version": "1"}}}
         elif method == "tools/list":
             response = {
                 "jsonrpc": "2.0",
@@ -159,6 +166,8 @@ defmodule Imp.MCPStdioLifecycleTest do
             }
         elif method == "tools/call":
             #{tool_call_body |> String.trim() |> String.replace("\n", "\n        ")}
+        elif request.get("id") is not None:
+            response = {"jsonrpc": "2.0", "id": request["id"], "error": {"code": -32601, "message": "Method not found"}}
 
         if response is not None:
             sys.stdout.write(json.dumps(response) + "\\n")

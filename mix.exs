@@ -105,6 +105,7 @@ defmodule Imp.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      ex_mcp_dependency(),
       {:jason, "~> 1.4"},
       {:jaxon, "~> 2.0.8"},
       {:jsv, "~> 0.21"},
@@ -114,13 +115,24 @@ defmodule Imp.MixProject do
       {:saxy, "~> 1.6"},
       {:telemetry, "~> 1.3"},
       {:bandit, "~> 1.0", only: :test},
-      {:plug, "~> 1.15", only: :test},
+      {:plug, "~> 1.16"},
       {:mox, "~> 1.2", only: :test},
       {:stream_data, "~> 1.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false}
     ]
+  end
+
+  # Shared constellation reference. This fork carries byte-safe stdio,
+  # caller-owned request/subprocess cleanup, ACP delivery barriers, and
+  # per-connection HTTP trust propagation. See its FORK.md for each failure
+  # and retirement condition; do not move this ref independently of consumers.
+  defp ex_mcp_dependency do
+    case System.get_env("EX_MCP_PATH") do
+      path when is_binary(path) and path != "" -> {:ex_mcp, path: path}
+      _ -> {:ex_mcp, github: "deepfates/ex_mcp", ref: "7222f0f5fa65c71988a946abe76c6b5fd5438342"}
+    end
   end
 
   defp dialyzer do

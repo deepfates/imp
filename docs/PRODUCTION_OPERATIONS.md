@@ -143,3 +143,68 @@ secret keys are replaced with `[REDACTED]`.
 
 Configure `OPENAI_API_KEY` and `OPENAI_MODEL` in the host application's secret
 store, then exercise the application's own bounded live smoke before rollout.
+
+
+## Protocol integration and migration
+
+Imp includes the `Imp.ACP` adapter formerly distributed as imp_acp. Remove the
+`imp_acp` dependency and depend directly on this Imp version; the `Imp.ACP`
+namespace and its program factory, permission, session-store, and cleanup
+contracts remain available. Existing scripts call `Imp.ACP.run/1` as before.
+Ordinary Imp boot starts supervision and ExMCP's runtime tables, but no protocol
+listeners, subprocess servers, or remote connections. `run/1` reserves stdout
+before application boot; release launchers must likewise keep logs on stderr.
+
+For remote capabilities, prefer an explicitly owned import:
+
+```elixir
+server = %{"name" => "account", "type" => "http", "url" => "http://127.0.0.1:4400/mcp"}
+{:ok, imported} = Imp.MCP.connect([server], trusted_servers: [server], owner: self())
+program = Imp.react_v2("question -> answer", imported.tools, lm: lm)
+# Run the program while its connection owner is alive.
+imported.cleanup.()
+```
+
+The exact server descriptor must be authorized. Host-supplied command, URL,
+headers, environment and working-directory claims remain untrusted input.
+Imported clients follow `:owner` (the importing process by default); a temporary
+import worker should name its long-lived owner explicitly. Cleanup is idempotent.
+Closed-client calls return errors rather than exiting their callers.
+
+`Imp.MCP.HTTPClient.new/2`, `StreamableHTTPClient.new/2`, and
+`StdioClient.new/2` are convenience constructors backed by the same ExMCP
+importer. They now connect during construction and return `Imp.MCP.Client`;
+close them with `Imp.MCP.Client.close/1`. Connection failures raise at
+construction; use `connect/2` for tagged error handling. A stdio server now
+stays alive across discovery and calls until cleanup or owner death. Code that
+relied on a fresh process per call must explicitly open and close a catalog per
+operation. Cancelling a call requests cancellation; a noncooperative server can
+continue remote work until its connection owner closes it. Cancellation is not
+rollback.
+
+Retired constructor options `:transport`, `:transport_opts`, `:protocol_version`,
+`:session_id`, `:max_attempts`, `:retry_delay`, `:max_retry_after`, and
+`:idempotency_key` are rejected, not ignored. ExMCP owns framing, negotiation,
+sessions and retries. Test the boundary with an actual local MCP server rather
+than injecting Imp's removed HTTP implementation. `:headers`, `:timeout`,
+`:result_mode`, ownership and catalog-filter options remain supported; stdio
+also accepts `:args`, `:env`, and `:cwd`.
+
+Imported tool calls explicitly disable generic transport retries and use
+ExMCP's `:safe_only` broken-stream policy. An ambiguous write is not repeated.
+Applications needing replay must establish a real server idempotency contract
+and deliberately use the protocol client's API; a stable request ID alone is
+not such a contract. Retired Imp-specific backoff/Retry-After knobs are not
+reimplemented above ExMCP. Discovery errors are returned to the caller, which
+can decide whether to retry a new import.
+
+Tool errors now return `{:error, {:mcp_tool_error, original_envelope}}`, retaining
+`content`, `structuredContent`, error codes and operation identifiers. This
+replaces the old text-only error tuple so refusal, authorization refusal and
+indeterminate effect outcomes remain distinguishable. Successful `:text` and
+`:structured` result conversion remains unchanged.
+
+Each imported tool carries `metadata.mcp` with `server_name`, `tool_name`,
+`schema`, and `annotations`. These describe its original source, regardless of
+its execution alias. Import results also index this provenance by execution
+name. This metadata contains no server credentials or connection descriptor.

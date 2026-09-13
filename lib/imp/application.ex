@@ -8,6 +8,7 @@ defmodule Imp.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {DynamicSupervisor, name: Imp.ACP.SessionSupervisor, strategy: :one_for_one},
       Imp.Settings,
       Imp.Cache,
       Imp.Tasks.Admission,
