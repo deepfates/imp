@@ -182,6 +182,7 @@
         "Imp.Execution.Authorization",
         "Imp.Run",
         "Imp.Run.Event",
+        "Imp.Trajectory",
         "Imp.Optimizer.SIMBA",
         "Imp.Optimizer.Sampling",
         "Imp.Optimizer.SignatureOptimizer",

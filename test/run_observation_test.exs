@@ -64,6 +64,24 @@ defmodule Imp.RunObservationTest do
     assert map["output"] == [%{"api_key" => "[REDACTED]"}, %{"ok" => true, "missing" => nil}]
   end
 
+  test "capture bounds are explicit and terminal evidence survives snapshot eviction" do
+    {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()}, max_events: 1, max_event_bytes: 1000)
+    assert_receive :waiting
+
+    Imp.Run.with_context(run.control, fn ->
+      Imp.Run.emit(:tool_result, output: String.duplicate("large", 1000))
+    end)
+
+    [gap, large] = Imp.Run.events(run)
+    assert gap.kind == :capture_gap
+    assert large.output == nil
+    assert large.metadata.capture.truncated
+    assert large.metadata.capture.original_bytes > 1000
+    {:ok, [gap, terminal]} = Imp.Run.cancel_with_events(run)
+    assert gap.metadata.dropped_events == 2
+    assert terminal.kind == :run_cancelled
+  end
+
   test "task death is recorded once by control even when the task cannot emit" do
     {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()})
     assert_receive :waiting

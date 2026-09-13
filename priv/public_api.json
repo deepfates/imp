@@ -7642,7 +7642,9 @@
       "category": "experimental",
       "functions": [
         "cancel/3",
+        "cancel_with_events/3",
         "emit/2",
+        "events/1",
         "start/3",
         "stop/1"
       ],
@@ -7654,8 +7656,14 @@
           "cancel/3": [
             "cancel(run, reason \\\\ :cancelled, timeout \\\\ 5000)"
           ],
+          "cancel_with_events/3": [
+            "cancel_with_events(run, reason \\\\ :cancelled, timeout \\\\ 5000)"
+          ],
           "emit/2": [
             "emit(kind, attrs \\\\ [])"
+          ],
+          "events/1": [
+            "events(run)"
           ],
           "start/3": [
             "start(program, inputs, opts \\\\ [])"
@@ -7684,11 +7692,18 @@
     {
       "callbacks": [],
       "category": "experimental",
-      "functions": [],
+      "functions": [
+        "to_map/1"
+      ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Run.Event",
       "signatures": {
+        "functions": {
+          "to_map/1": [
+            "to_map(event)"
+          ]
+        },
         "types": {
           "t/0": []
         }
@@ -7704,6 +7719,7 @@
         "reasoning",
         "run_id",
         "sequence",
+        "timestamp",
         "tool_call_id",
         "tool_name"
       ],
@@ -9448,6 +9464,26 @@
           "name": "t/0"
         }
       ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "to_atif/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Trajectory",
+      "signatures": {
+        "functions": {
+          "to_atif/2": [
+            "to_atif(events, opts \\\\ [])"
+          ]
+        }
+      },
+      "source": "lib/imp/trajectory.ex",
+      "struct_fields": [],
+      "types": []
     },
     {
       "callbacks": [],

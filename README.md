@@ -172,6 +172,8 @@ protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPER
   call through evaluation, optimization, persistence, and deployment.
 - [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) — map familiar DSPy
   concepts to Imp and understand the intentional BEAM differences.
+- [Execution evidence and ATIF](docs/TRAJECTORIES.md) — correlated traces, bounded
+  native run observations, cancellation evidence, and portable trajectories.
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md) — credentials,
   telemetry, concurrency, persistence, and failure handling.
 - [Runnable Livebooks](livebooks/01_real_lm_front_door.livemd) — inspect the

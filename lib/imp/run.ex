@@ -21,6 +21,12 @@ defmodule Imp.Run do
   that guarantee is needed. `Imp.Run.Event.to_map/1` serializes redacted events.
   Model request/response observations cover `Imp.LM.request/2`; ReActV2 and RLM
   provide their semantic tool call/result events.
+
+  Capture defaults to 64 KiB per event and a 512-event / 4 MiB snapshot. Configure
+  `:max_event_bytes`, `:max_events`, and `:max_snapshot_bytes` at start. Oversized
+  event payloads become explicit digest/size markers before sink delivery;
+  snapshot eviction adds a `:capture_gap` marker. Neither represents full evidence.
+  A sink receives all bounded events; the snapshot is a bounded recent window.
   """
 
   alias Imp.Run.Control
@@ -54,7 +60,13 @@ defmodule Imp.Run do
         decision_owner: owner
       )
 
-    with {:ok, control} <- Control.start(owner: self(), id: id, event_sink: event_sink) do
+    with {:ok, control} <-
+           Control.start(
+             owner: self(),
+             id: id,
+             event_sink: event_sink,
+             capture: Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes])
+           ) do
       task =
         Imp.Tasks.async_nolink(fn ->
           with_context(control, fn ->
@@ -223,6 +235,7 @@ defmodule Imp.Run.Event do
           sequence: non_neg_integer(),
           kind: atom(),
           component: module() | atom() | String.t() | nil,
+          timestamp: String.t() | nil,
           input: term(),
           output: term(),
           reasoning: term(),
@@ -277,6 +290,17 @@ defmodule Imp.Run.Control do
   @impl true
   def init(opts) do
     owner = Keyword.fetch!(opts, :owner)
+    capture = Keyword.get(opts, :capture, [])
+
+    limits = %{
+      max_events: Keyword.get(capture, :max_events, 512),
+      max_event_bytes: Keyword.get(capture, :max_event_bytes, 65_536),
+      max_snapshot_bytes: Keyword.get(capture, :max_snapshot_bytes, 4_194_304)
+    }
+
+    unless Enum.all?(limits, fn {_, n} -> is_integer(n) and n > 0 end),
+      do: raise(ArgumentError, "run capture limits must be positive integers")
+
     {:ok, delivery} = EventDelivery.start_link(Keyword.fetch!(opts, :event_sink))
 
     {:ok,
@@ -285,6 +309,9 @@ defmodule Imp.Run.Control do
        delivery: delivery,
        sequence: 0,
        events: [],
+       dropped_events: 0,
+       snapshot_bytes: 0,
+       limits: limits,
        terminal: nil,
        task_monitor: nil,
        cancellables: %{},
@@ -300,7 +327,32 @@ defmodule Imp.Run.Control do
     {:reply, :ok, record(state, kind, attrs)}
   end
 
-  def handle_call(:events, _from, state), do: {:reply, Enum.reverse(state.events), state}
+  def handle_call(:events, _from, state) do
+    events = Enum.reverse(state.events)
+
+    events =
+      if state.dropped_events > 0 do
+        first_sequence =
+          case events do
+            [first | _] -> first.sequence
+            [] -> state.sequence
+          end
+
+        [
+          %Event{
+            run_id: state.id,
+            sequence: first_sequence - 1,
+            kind: :capture_gap,
+            metadata: %{dropped_events: state.dropped_events, reason: :snapshot_capacity}
+          }
+          | events
+        ]
+      else
+        events
+      end
+
+    {:reply, events, state}
+  end
 
   def handle_call(:delivery, _from, state), do: {:reply, state.delivery, state}
 
@@ -386,9 +438,56 @@ defmodule Imp.Run.Control do
       metadata: redact(Map.get(attrs, :metadata, %{}))
     }
 
+    event = bound_event(event, state.limits.max_event_bytes)
     EventDelivery.deliver(state.delivery, event)
     terminal = if kind in [:run_finished, :run_failed, :run_cancelled], do: kind, else: nil
-    %{state | sequence: state.sequence + 1, events: [event | state.events], terminal: terminal}
+
+    %{
+      state
+      | sequence: state.sequence + 1,
+        events: [event | state.events],
+        terminal: terminal,
+        snapshot_bytes: state.snapshot_bytes + :erlang.external_size(event)
+    }
+    |> bound_snapshot()
+  end
+
+  defp bound_event(event, max_bytes) do
+    bytes = :erlang.external_size(event)
+
+    if bytes <= max_bytes do
+      event
+    else
+      digest = :crypto.hash(:sha256, :erlang.term_to_binary(event)) |> Base.encode16(case: :lower)
+
+      %{
+        event
+        | input: nil,
+          output: nil,
+          reasoning: nil,
+          error: nil,
+          metadata:
+            event.metadata
+            |> Map.take([:model_call_id])
+            |> Map.put(:capture, %{truncated: true, original_bytes: bytes, sha256: digest})
+      }
+    end
+  end
+
+  defp bound_snapshot(state) do
+    if length(state.events) > state.limits.max_events or
+         state.snapshot_bytes > state.limits.max_snapshot_bytes do
+      {last, events} = List.pop_at(state.events, -1)
+
+      bound_snapshot(%{
+        state
+        | events: events,
+          dropped_events: state.dropped_events + 1,
+          snapshot_bytes: state.snapshot_bytes - :erlang.external_size(last)
+      })
+    else
+      state
+    end
   end
 
   defp safe_cancel(fun, reason) do

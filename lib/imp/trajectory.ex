@@ -1,0 +1,297 @@
+defmodule Imp.Trajectory do
+  @moduledoc """
+  ATIF-v1.8 projection of ordered native `Imp.Run.Event` observations.
+
+  Initial model context retains its actual message roles, marked as copied
+  context. Later requests remain available in `extra.model_requests`, rather
+  than duplicating history as newly authored conversation. Model responses are
+  the observed typed outputs, not an invented final-prediction transcript.
+  Lifecycle events and capture gaps are diagnostics in `extra`, not dialogue.
+
+  Semantic tool dispatches have `llm_call_count: 0`; model responses leave the
+  count null (unknown), because a request may have hit a cache. No inference
+  count, metrics, reasoning, or tool result is invented from missing evidence.
+  Tool observations attach to their call step as ATIF requires, retaining native
+  sequence and time. Their IDs are scoped by run and event sequence. Reusing a
+  provider ID after a result is supported; overlapping reuse is rejected.
+
+  This is a projection, not replay or a durable effect ledger. Streaming paths
+  bypassing `Imp.LM.request/2` cannot become complete model episodes here.
+  Redaction runs again on export, including caller metadata, but prompts and
+  results remain private application data. Capture gaps remain explicit.
+  """
+
+  alias Imp.Run.Event
+
+  @kinds [
+    :run_started,
+    :run_finished,
+    :run_failed,
+    :run_cancelled,
+    :model_request,
+    :model_response,
+    :tool_call,
+    :tool_result,
+    :reasoning,
+    :final,
+    :capture_gap
+  ]
+
+  @doc "Builds a JSON-encodable ATIF document from one run's ordered events or stored event maps."
+  def to_atif(events, opts \\ []) when is_list(events) do
+    events = Enum.map(events, &native_event/1)
+    validate_events!(events)
+    [first | _] = events
+
+    state =
+      Enum.reduce(events, %{steps: [], pending: %{}, requests: [], diagnostics: []}, &project/2)
+
+    terminal =
+      Enum.find(Enum.reverse(events), &(&1.kind in [:run_finished, :run_failed, :run_cancelled]))
+
+    steps =
+      case state.steps do
+        [] ->
+          [
+            %{
+              source: "system",
+              message: "No complete interaction was captured.",
+              extra: %{diagnostic: true}
+            }
+          ]
+
+        steps ->
+          steps
+      end
+
+    %{
+      schema_version: "ATIF-v1.8",
+      session_id: first.run_id,
+      trajectory_id: first.run_id,
+      agent:
+        Keyword.get(opts, :agent, %{name: "Imp", version: to_string(Application.spec(:imp, :vsn))}),
+      steps:
+        Enum.with_index(steps, 1) |> Enum.map(fn {step, id} -> Map.put(step, :step_id, id) end),
+      extra: %{
+        outcome: if(terminal, do: terminal.kind, else: :unknown),
+        model_requests: state.requests,
+        diagnostics: state.diagnostics,
+        capture: "Native Imp execution observations; model inference counts are unknown"
+      }
+    }
+    |> Imp.Redaction.redact()
+    |> Imp.Observability.Inspection.json_safe()
+  end
+
+  defp project(%Event{kind: :model_request} = event, state) do
+    request = Map.merge(origin(event), %{messages: event.input, metadata: event.metadata})
+    steps = if state.requests == [], do: initial_context(event), else: []
+    state = %{state | steps: state.steps ++ steps, requests: state.requests ++ [request]}
+
+    if truncated?(event),
+      do: diagnostic(state, event, %{uncaptured_model_request: true}),
+      else: state
+  end
+
+  defp project(%Event{kind: :tool_result} = event, state) do
+    case Map.pop(state.pending, event.tool_call_id) do
+      {nil, _} ->
+        diagnostic(state, event, %{unmatched_tool_result: true})
+
+      {index, pending} ->
+        steps =
+          List.update_at(state.steps, index, fn step ->
+            [call] = step.tool_calls
+
+            result = %{
+              source_call_id: call.tool_call_id,
+              extra: Map.merge(origin(event), %{outcome: result_outcome(event)})
+            }
+
+            result =
+              if truncated?(event),
+                do: result,
+                else:
+                  Map.put(
+                    result,
+                    :content,
+                    text(if(is_nil(event.error), do: event.output, else: event.error))
+                  )
+
+            step
+            |> Map.put(:observation, %{results: [result]})
+            |> Map.update!(:extra, &Map.put(&1, :outcome, result_outcome(event)))
+          end)
+
+        %{state | steps: steps, pending: pending}
+    end
+  end
+
+  defp project(%Event{kind: :tool_call} = event, state) do
+    if Map.has_key?(state.pending, event.tool_call_id),
+      do:
+        raise(
+          ArgumentError,
+          "overlapping tool call IDs are ambiguous; preserve distinct native IDs"
+        )
+
+    unless is_binary(event.tool_call_id) and not is_nil(event.tool_name),
+      do: raise(ArgumentError, "tool call requires its native identity and name")
+
+    if truncated?(event) do
+      diagnostic(state, event, %{uncaptured_tool_arguments: true})
+    else
+      step = %{
+        source: "agent",
+        message: "",
+        timestamp: event.timestamp,
+        llm_call_count: 0,
+        tool_calls: [
+          %{
+            tool_call_id: "#{event.run_id}:#{event.sequence}",
+            function_name: to_string(event.tool_name),
+            arguments: event.input || %{},
+            extra: %{native_tool_call_id: event.tool_call_id}
+          }
+        ],
+        extra: Map.merge(origin(event), %{outcome: :unknown})
+      }
+
+      unless is_map(event.input) or is_nil(event.input),
+        do: raise(ArgumentError, "tool arguments must be a captured map")
+
+      %{
+        state
+        | steps: state.steps ++ [step],
+          pending: Map.put(state.pending, event.tool_call_id, length(state.steps))
+      }
+    end
+  end
+
+  defp project(%Event{kind: :model_response, error: nil} = event, state) do
+    if truncated?(event) do
+      diagnostic(state, event, %{uncaptured_model_response: true})
+    else
+      output =
+        case event.output do
+          [one] -> one
+          other -> other
+        end
+
+      step = %{
+        source: "agent",
+        message: text(output),
+        timestamp: event.timestamp,
+        llm_call_count: nil,
+        extra: Map.merge(origin(event), %{model_observation: event.metadata})
+      }
+
+      %{state | steps: state.steps ++ [step]}
+    end
+  end
+
+  defp project(%Event{kind: :reasoning} = event, state) do
+    if truncated?(event) or is_nil(event.reasoning) do
+      diagnostic(state, event, %{uncaptured_reasoning: true})
+    else
+      step = %{
+        source: "agent",
+        message: "",
+        timestamp: event.timestamp,
+        llm_call_count: nil,
+        reasoning_content: text(event.reasoning),
+        extra: origin(event)
+      }
+
+      %{state | steps: state.steps ++ [step]}
+    end
+  end
+
+  defp project(event, state), do: diagnostic(state, event, %{})
+
+  defp diagnostic(state, event, extra) do
+    # Prediction and input payloads have their own native storage. A terminal
+    # lifecycle record must not become a second fabricated assistant response.
+    entry =
+      Map.merge(origin(event), Map.merge(%{error: event.error, metadata: event.metadata}, extra))
+
+    %{state | diagnostics: state.diagnostics ++ [entry]}
+  end
+
+  defp initial_context(%Event{input: messages} = event) when is_list(messages) do
+    Enum.map(messages, fn message ->
+      role = get(message, :role)
+
+      source =
+        case role do
+          role when role in [:user, "user"] -> "user"
+          role when role in [:assistant, "assistant"] -> "agent"
+          _ -> "system"
+        end
+
+      %{
+        source: source,
+        message: text(get(message, :content)),
+        is_copied_context: true,
+        timestamp: event.timestamp,
+        extra: Map.merge(origin(event), %{context_role: role})
+      }
+    end)
+  end
+
+  defp initial_context(_), do: []
+
+  defp origin(event),
+    do: %{
+      event_kind: event.kind,
+      event_sequence: event.sequence,
+      event_timestamp: event.timestamp,
+      component: event.component
+    }
+
+  defp truncated?(event), do: get(get(event.metadata, :capture) || %{}, :truncated) == true
+
+  defp result_outcome(event) do
+    cond do
+      truncated?(event) -> :unknown
+      not is_nil(event.error) -> :error
+      true -> :returned
+    end
+  end
+
+  defp native_event(%Event{} = event), do: event
+
+  defp native_event(map) when is_map(map) do
+    kind = Enum.find(@kinds, :other, &(to_string(&1) == get(map, :kind)))
+
+    attrs =
+      Map.new(Map.keys(Map.from_struct(%Event{run_id: "", sequence: 0, kind: :other})), fn key ->
+        {key, get(map, key)}
+      end)
+
+    struct!(Event, Map.merge(attrs, %{kind: kind, metadata: get(map, :metadata) || %{}}))
+  end
+
+  defp get(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, to_string(key)))
+  defp get(_, _), do: nil
+
+  defp validate_events!([]),
+    do: raise(ArgumentError, "ATIF requires a nonempty run event sequence")
+
+  defp validate_events!([%Event{run_id: id} | _] = events) do
+    sequences =
+      Enum.map(events, fn
+        %Event{run_id: ^id, sequence: sequence} when is_integer(sequence) -> sequence
+        _ -> raise ArgumentError, "ATIF requires events from exactly one run"
+      end)
+
+    unless sequences == Enum.sort(Enum.uniq(sequences)),
+      do: raise(ArgumentError, "ATIF requires strictly ordered unique event sequences")
+  end
+
+  defp text(value) when is_binary(value), do: value
+  defp text(nil), do: ""
+
+  defp text(value),
+    do: value |> Imp.Observability.Inspection.json_safe() |> Jason.encode!(pretty: true)
+end
