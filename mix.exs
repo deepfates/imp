@@ -129,9 +129,18 @@ defmodule Imp.MixProject do
   # per-connection HTTP trust propagation. See its FORK.md for each failure
   # and retirement condition; do not move this ref independently of consumers.
   defp ex_mcp_dependency do
-    case System.get_env("EX_MCP_PATH") do
-      path when is_binary(path) and path != "" -> {:ex_mcp, path: path}
-      _ -> {:ex_mcp, github: "deepfates/ex_mcp", ref: "7222f0f5fa65c71988a946abe76c6b5fd5438342"}
+    bundled = Path.expand("vendor/ex_mcp", __DIR__)
+    override = System.get_env("EX_MCP_PATH")
+
+    cond do
+      File.regular?(Path.join(bundled, "mix.exs")) ->
+        {:ex_mcp, path: bundled}
+
+      is_binary(override) and override != "" ->
+        {:ex_mcp, path: override}
+
+      true ->
+        {:ex_mcp, github: "deepfates/ex_mcp", ref: "7222f0f5fa65c71988a946abe76c6b5fd5438342"}
     end
   end
 
@@ -186,6 +195,7 @@ defmodule Imp.MixProject do
     (runtime_source_files() ++
        deployment_example_files() ++
        Path.wildcard("examples/provider_free_ticket_router/**/*") ++
+       Path.wildcard("examples/workspace_agent/**/*") ++
        product_docs() ++
        livebooks() ++
        [
@@ -229,7 +239,8 @@ defmodule Imp.MixProject do
       "docs/LEARNING_PATH.md",
       "docs/IMP_FOR_DSPY_USERS.md",
       "docs/PRODUCTION_OPERATIONS.md",
-      "docs/TRAJECTORIES.md"
+      "docs/TRAJECTORIES.md",
+      "examples/workspace_agent/README.md"
     ]
   end
 

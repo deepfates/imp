@@ -184,3 +184,8 @@ Run `mix docs` for the exhaustive module and function reference.
 Imp follows DSPy's central idea—program the behavior you want and optimize it
 from examples—in an Elixir system built around immutable values, explicit
 effects, supervision, and concurrency.
+
+For an ordinary ACP workspace agent with bounded tools, see
+[examples/workspace_agent](examples/workspace_agent/README.md). It depends
+directly on this Imp package and includes a provider-free mode for checking
+its launcher and workspace boundary.

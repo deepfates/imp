@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+script_root=$(CDPATH= cd "$(dirname "$0")" && pwd)
+workspace=${1:-$PWD}
+workspace=$(CDPATH= cd "$workspace" && pwd)
+
+"$script_root/preflight" "$workspace"
+
+if toad=$(command -v toad 2>/dev/null); then
+  :
+elif [ -x "$HOME/.local/bin/toad" ]; then
+  toad="$HOME/.local/bin/toad"
+else
+  echo "workspace-agent: Toad was not found after preflight" >&2
+  exit 1
+fi
+
+exec "$toad" acp "$script_root/workspace-agent-acp" "$workspace"

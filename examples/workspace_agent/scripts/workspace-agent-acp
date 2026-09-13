@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+WORKSPACE_AGENT_ROOT=$PWD
+export WORKSPACE_AGENT_ROOT
+
+example_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+cd "$example_root"
+
+mix compile 1>&2
+exec mix run --no-compile --no-start -e 'Mix.Task.run("workspace_agent.acp")'

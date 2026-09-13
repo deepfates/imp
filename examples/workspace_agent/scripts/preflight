@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+example_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+cd "$example_root"
+
+mix deps.get
+mix compile
+exec mix workspace_agent.preflight "$@"
