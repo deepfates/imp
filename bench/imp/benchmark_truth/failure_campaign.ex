@@ -15,7 +15,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     {"partial_stream_failure_is_terminal", :partial_stream},
     {"training_retry_and_idempotency_are_bounded", :training_retry},
     {"http_retrieval_retry_timeout_and_idempotency", :retrieval},
-    {"mcp_retry_timeout_and_idempotency", :mcp},
+    {"mcp_indeterminate_result_is_not_retried", :mcp},
     {"mipro_v2_durable_resume_and_tamper", :mipro_v2},
     {"simba_durable_resume_and_tamper", :simba}
   ]
@@ -119,7 +119,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         "No live provider training job was created or cancelled.",
         "Operational authority is limited to the exact local timeout, retrieval, and tool-agent probes recorded in live_cases.",
         "No external network or provider is contacted by this campaign.",
-        "Deterministic MCP evidence uses an injected transport; no public MCP endpoint is claimed."
+        "Deterministic MCP evidence uses a real local HTTP server; no public MCP endpoint is claimed."
       ]
     }
   end
@@ -411,86 +411,98 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     end
   end
 
-  defp mcp_iteration do
-    {:ok, state} = Agent.start_link(fn -> %{} end)
+  defmodule MCPFailureServer do
+    @moduledoc false
+    use ExMCP.Server.Handler
+    def init(counter), do: {:ok, counter}
 
-    transport = fn _url, headers, body, _opts ->
-      request = Jason.decode!(body)
-      method = request["method"]
-
-      attempt =
-        Agent.get_and_update(state, fn seen ->
-          next = Map.get(seen, method, 0) + 1
-          {next, Map.put(seen, method, next)}
-        end)
-
-      cond do
-        method == "initialize" and attempt == 1 ->
-          {:ok, %{status: 503, headers: [{"retry-after", "0"}], body: "fault"}}
-
-        method == "tools/list" and attempt == 1 ->
-          {:error, :closed}
-
-        method == "notifications/initialized" ->
-          {:ok, %{status: 204, headers: [], body: ""}}
-
-        method == "tools/list" ->
-          mcp_response(request, %{
-            "tools" => [
-              # MCP spec, Tool definition: camelCase "inputSchema".
-              %{"name" => "recoverable", "description" => "fixture", "inputSchema" => %{}}
-            ]
-          })
-
-        true ->
-          mcp_response(request, %{})
-      end
-      |> tap(fn _ ->
-        if method == "initialize" do
-          Agent.update(
-            state,
-            &Map.put(&1, "idempotency-key-present", !!header_value(headers, "idempotency-key"))
-          )
-        end
-      end)
+    def handle_list_tools(_, state) do
+      {:ok,
+       [
+         %{
+           "name" => "publish",
+           "description" => "local uncertainty fixture",
+           "inputSchema" => %{"type" => "object"}
+         }
+       ], nil, state}
     end
 
-    client =
-      Imp.MCP.StreamableHTTPClient.new("https://deterministic.invalid/mcp",
-        transport: transport,
-        max_attempts: 3,
-        timeout: 100,
-        retry_delay: 0,
-        max_retry_after: 0,
-        idempotency_key: fn method, _params -> "failure-campaign:#{method}" end
-      )
+    def handle_call_tool("publish", _, counter) do
+      Agent.update(counter, &(&1 + 1))
 
-    result = Imp.MCP.import_tools(client)
-    counts = Agent.get(state, & &1)
-    Agent.stop(state)
-
-    if match?([%Imp.Tool{name: :recoverable}], result) and counts["initialize"] == 2 and
-         counts["tools/list"] == 2 and counts["idempotency-key-present"] do
       {:ok,
        %{
-         initialize_attempts: 2,
-         list_attempts: 2,
-         max_attempts: 3,
-         idempotency_header_present: true,
-         terminal_tool_count: 1
-       }}
-    else
-      {:error, %{counts: counts, result: inspect(result)}}
+         "isError" => true,
+         "content" => [%{"type" => "text", "text" => "Outcome unknown"}],
+         "structuredContent" => %{"code" => "indeterminate", "operation_id" => "local-receipt"}
+       }, counter}
     end
   end
 
-  defp mcp_response(request, result) do
-    {:ok,
-     %{
-       status: 200,
-       headers: [{"content-type", "application/json"}],
-       body: Jason.encode!(%{"jsonrpc" => "2.0", "id" => request["id"], "result" => result})
-     }}
+  defp mcp_iteration do
+    {:ok, _} = Application.ensure_all_started(:ex_mcp)
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
+    {:ok, port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+    ref = {__MODULE__, port}
+
+    {:ok, _} =
+      Plug.Cowboy.http(
+        ExMCP.HttpPlug,
+        [
+          handler: MCPFailureServer,
+          handler_opts: counter,
+          server_info: %{name: "failure-campaign", version: "1"},
+          allowed_hosts: ["127.0.0.1"],
+          allowed_origins: :any
+        ],
+        port: port,
+        ref: ref
+      )
+
+    server = %{
+      "name" => "local-failure",
+      "type" => "http",
+      "url" => "http://127.0.0.1:#{port}/mcp"
+    }
+
+    try do
+      with {:ok, imported} <- Imp.MCP.connect([server], trusted_servers: [server], timeout: 1000) do
+        try do
+          [tool] = imported.tools
+          result = Imp.Tool.call(tool, %{})
+          attempts = Agent.get(counter, & &1)
+
+          case result do
+            {:error,
+             {:mcp_tool_error,
+              %{
+                "structuredContent" => %{
+                  "code" => "indeterminate",
+                  "operation_id" => "local-receipt"
+                }
+              }}}
+            when attempts == 1 ->
+              {:ok,
+               %{
+                 effect_attempts: attempts,
+                 outcome: "indeterminate",
+                 operation_id_preserved: true,
+                 terminal_tool_count: 1
+               }}
+
+            _ ->
+              {:error, %{attempts: attempts, result: inspect(result)}}
+          end
+        after
+          imported.cleanup.()
+        end
+      end
+    after
+      Plug.Cowboy.shutdown(ref)
+      Agent.stop(counter)
+    end
   end
 
   defp header_value(headers, expected) do

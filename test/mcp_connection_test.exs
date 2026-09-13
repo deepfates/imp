@@ -1,5 +1,11 @@
 defmodule Imp.MCPConnectionTest do
   use ExUnit.Case, async: false
+
+  setup_all do
+    {:ok, _} = Application.ensure_all_started(:ex_mcp)
+    :ok
+  end
+
   @moduletag capture_log: true
 
   defmodule Server do

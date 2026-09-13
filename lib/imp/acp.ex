@@ -124,8 +124,10 @@ defmodule Imp.ACP do
   end
 
   defp ensure_runtime do
-    case Application.ensure_all_started(:imp) do
-      {:ok, _apps} -> :ok
+    with {:ok, _} <- Application.ensure_all_started(:imp),
+         {:ok, _} <- Application.ensure_all_started(:ex_mcp) do
+      :ok
+    else
       {:error, reason} -> {:error, {:application_start_failed, reason}}
     end
   end

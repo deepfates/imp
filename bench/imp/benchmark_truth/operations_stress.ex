@@ -319,7 +319,7 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
 
   defp detach_events(ref) do
     :telemetry.list_handlers([])
-    |> Enum.filter(&String.starts_with?(&1.id, "imp-ops-stress-"))
+    |> Enum.filter(&(is_binary(&1.id) and String.starts_with?(&1.id, "imp-ops-stress-")))
     |> Enum.each(&:telemetry.detach(&1.id))
 
     flush_events(ref)

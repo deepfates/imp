@@ -52,7 +52,8 @@ defmodule Imp.MCP.Connections do
       raise ArgumentError, ":owner must be a pid"
     end
 
-    with {:ok, bridge} <- Imp.MCP.Clients.start(owner: owner) do
+    with :ok <- ensure_runtime(servers),
+         {:ok, bridge} <- Imp.MCP.Clients.start(owner: owner) do
       case connect_isolated(servers, opts) do
         {:ok, clients} ->
           :ok = Imp.MCP.Clients.adopt(bridge, clients)
@@ -86,6 +87,15 @@ defmodule Imp.MCP.Connections do
   end
 
   def import_tools(servers, _opts), do: {:error, {:invalid_mcp_servers, shape(servers)}}
+
+  defp ensure_runtime([]), do: :ok
+
+  defp ensure_runtime(_) do
+    case Application.ensure_all_started(:ex_mcp) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, {:application_start_failed, reason}}
+    end
+  end
 
   # ExMCP may exit the connector on a bad handshake. Isolate connect so the ACP
   # session (or other :owner) survives, then adopt clients onto the session-owned
@@ -531,7 +541,7 @@ defmodule Imp.MCP.Connections do
   defp validate_options!(opts) do
     unknown = Keyword.keys(opts) -- @option_keys
 
-    if unknown != [], do: raise(ArgumentError, "unknown Imp.ACP.MCP options: #{inspect(unknown)}")
+    if unknown != [], do: raise(ArgumentError, "unknown Imp.MCP options: #{inspect(unknown)}")
 
     case Keyword.get(opts, :authorize) do
       nil -> :ok

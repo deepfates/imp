@@ -1,6 +1,11 @@
 defmodule Imp.ACPTest do
   use ExUnit.Case, async: false
 
+  setup_all do
+    {:ok, _} = Application.ensure_all_started(:ex_mcp)
+    :ok
+  end
+
   alias ExMCP.ACP.Agent.Transport.Memory
   alias ExMCP.ACP.Client
 

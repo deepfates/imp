@@ -518,7 +518,7 @@ defmodule ProductionHardeningTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp.MCP.HTTPClient\.new\/2: invalid value for :transport option: expected an HTTP transport module or arity-4 callback/,
+                 ~r/unknown Imp.MCP options: \[:transport\]/,
                  fn ->
                    Imp.MCP.HTTPClient.new("https://mcp.example", transport: %{bad: :transport})
                  end
@@ -530,7 +530,7 @@ defmodule ProductionHardeningTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp.MCP.StdioClient\.new\/2: invalid value for :timeout/,
+                 ~r/:timeout must be a positive integer/,
                  fn ->
                    Imp.MCP.StdioClient.new("/bin/cat", timeout: 0)
                  end

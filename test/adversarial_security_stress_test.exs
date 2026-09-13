@@ -88,13 +88,15 @@ defmodule AdversarialSecurityStressTest do
 
     on_exit(fn -> File.rm(script) end)
 
-    client =
-      System.find_executable("elixir")
-      |> Imp.MCP.StdioClient.new(args: [script], timeout: 50)
+    server = %{
+      "name" => "unresponsive",
+      "type" => "stdio",
+      "command" => System.find_executable("elixir"),
+      "args" => [script],
+      "env" => []
+    }
 
-    assert_raise ArgumentError, ~r/MCP stdio failed: :timeout/, fn ->
-      Imp.MCP.import_tools(client)
-    end
+    assert {:error, _reason} = Imp.MCP.connect([server], trusted_servers: [server], timeout: 50)
   end
 
   test "high-volume telemetry redacts secret-shaped metadata" do

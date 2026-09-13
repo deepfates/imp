@@ -188,7 +188,8 @@ defmodule DocumentationContractTest do
     assert product_docs == [
              "docs/IMP_FOR_DSPY_USERS.md",
              "docs/LEARNING_PATH.md",
-             "docs/PRODUCTION_OPERATIONS.md"
+             "docs/PRODUCTION_OPERATIONS.md",
+             "docs/TRAJECTORIES.md"
            ]
 
     refute readme =~ "01_programming_not_prompting"

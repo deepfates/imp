@@ -128,19 +128,25 @@ defmodule Imp.MixProject do
   # caller-owned request/subprocess cleanup, ACP delivery barriers, and
   # per-connection HTTP trust propagation. See its FORK.md for each failure
   # and retirement condition; do not move this ref independently of consumers.
+  # Protocol adapters start ExMCP explicitly; ordinary prediction and optimizer
+  # processes must neither start protocol services nor acquire their boot output.
+  # Releases using adapters include ex_mcp in :load mode (see operations docs).
   defp ex_mcp_dependency do
     bundled = Path.expand("vendor/ex_mcp", __DIR__)
     override = System.get_env("EX_MCP_PATH")
 
     cond do
       File.regular?(Path.join(bundled, "mix.exs")) ->
-        {:ex_mcp, path: bundled}
+        {:ex_mcp, path: bundled, runtime: false}
 
       is_binary(override) and override != "" ->
-        {:ex_mcp, path: override}
+        {:ex_mcp, path: override, runtime: false}
 
       true ->
-        {:ex_mcp, github: "deepfates/ex_mcp", ref: "7222f0f5fa65c71988a946abe76c6b5fd5438342"}
+        {:ex_mcp,
+         github: "deepfates/ex_mcp",
+         ref: "7222f0f5fa65c71988a946abe76c6b5fd5438342",
+         runtime: false}
     end
   end
 

@@ -207,7 +207,13 @@ defmodule Imp.ObservabilityInspectionTest do
   test "callbacks redact measurements even when telemetry bypasses Imp.Telemetry" do
     trace =
       Imp.Observability.trace(
-        fn -> :telemetry.execute([:imp, :tool, :stop], %{authorization: @secret}, %{}) end,
+        fn ->
+          trace_id = Enum.find_value(Imp.Telemetry.context(), &Map.get(&1, :trace_id))
+
+          :telemetry.execute([:imp, :tool, :stop], %{authorization: @secret}, %{
+            trace_id: trace_id
+          })
+        end,
         events: [[:imp, :tool, :stop]]
       )
 

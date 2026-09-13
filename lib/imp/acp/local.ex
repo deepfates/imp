@@ -23,7 +23,8 @@ defmodule Imp.ACP.Local do
     limit = Keyword.get(opts, :max_frame_bytes, 1_048_576)
     agent_opts = Keyword.get(opts, :agent_options, [])
 
-    with :ok <- validate_limit(limit),
+    with {:ok, _} <- Application.ensure_all_started(:ex_mcp),
+         :ok <- validate_limit(limit),
          :ok <- private_directory(Path.dirname(path)),
          :ok <- unused_path(path),
          {:ok, socket} <- :gen_tcp.listen(0, socket_options(path, limit)) do

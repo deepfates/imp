@@ -245,3 +245,13 @@ wire the pending prompt receives `stopReason: "refusal"` with
 proof that application work stopped. An application must keep independently
 owned work observable after this prompt response; ACP has no separate
 cancellation-error response for its notification.
+
+### Protocol runtime in releases
+
+Imp compiles against ExMCP but does not start its application during ordinary
+prediction, evaluation or optimization. ACP entry points and nonempty MCP
+connections start it explicitly. An OTP release using those features must
+include `applications: [ex_mcp: :load]` in its release definition; `:load` bundles
+the application and dependencies while preserving explicit startup. A release
+that already depends directly on ExMCP includes it normally. Plain Imp users
+need no protocol server or connection.
