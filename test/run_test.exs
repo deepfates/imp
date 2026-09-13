@@ -53,10 +53,12 @@ defmodule Imp.RunTest do
     :ok = Imp.Run.stop(run)
 
     events = receive_events([])
-    assert Enum.map(events, & &1.sequence) == Enum.to_list(0..7)
+    assert Enum.map(events, & &1.sequence) == Enum.to_list(0..9)
 
     assert [
              %{kind: :run_started},
+             %{kind: :model_request},
+             %{kind: :model_response},
              %{kind: :reasoning, reasoning: "look it up"},
              %{kind: :tool_call, tool_call_id: "provider-call-1", tool_name: "lookup"},
              %{kind: :tool_result, tool_call_id: "provider-call-1", output: "found beam"},

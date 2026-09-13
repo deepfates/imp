@@ -207,9 +207,11 @@ defmodule Imp.Redaction do
   end
 
   def redact([key, nested], keys) when is_atom(key) or is_binary(key) or is_map(key) do
-    if redacted_entry?(key, nested, keys),
-      do: [key, "[REDACTED]"],
-      else: [key, redact(nested, keys)]
+    cond do
+      redacted_entry?(key, nested, keys) -> [key, "[REDACTED]"]
+      is_map(key) and tagged_key_names(key) == [] -> [redact(key, keys), redact(nested, keys)]
+      true -> [key, redact(nested, keys)]
+    end
   end
 
   def redact([], _keys), do: []

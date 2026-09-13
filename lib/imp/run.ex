@@ -12,6 +12,15 @@ defmodule Imp.Run do
   a slow observer preserves event order without delaying cancellation or owner
   cleanup. Sinks should still hand work off promptly: a permanently blocked
   sink prevents its own later events and barriers from being delivered.
+
+  `events/1` reads the retained native sequence independently of sink progress.
+  `cancel_with_events/3` snapshots it before cleanup, including one owner-recorded
+  cancellation outcome. This is in-memory evidence, not a durable effects log:
+  node/owner death can lose it, and cancellation says nothing about whether an
+  unfinished remote write landed. Persist authorization before dispatch when
+  that guarantee is needed. `Imp.Run.Event.to_map/1` serializes redacted events.
+  Model request/response observations cover `Imp.LM.request/2`; ReActV2 and RLM
+  provide their semantic tool call/result events.
   """
 
   alias Imp.Run.Control
@@ -49,7 +58,7 @@ defmodule Imp.Run do
       task =
         Imp.Tasks.async_nolink(fn ->
           with_context(control, fn ->
-            emit(:run_started, component: program.__struct__)
+            emit(:run_started, component: program.__struct__, input: inputs)
             result = Imp.Module.execute(program, inputs, execution)
 
             case result do
@@ -75,14 +84,33 @@ defmodule Imp.Run do
 
   def cancel(%__MODULE__{} = run, reason, timeout)
       when timeout == :infinity or (is_integer(timeout) and timeout > 0) do
-    _ = Control.cancel(run.control, reason)
-    terminate_task(run.task.pid, timeout)
-    Control.force_stop(run.control)
+    {:ok, _events} = cancel_with_events(run, reason, timeout)
+    :ok
   end
 
   def cancel(%__MODULE__{}, _reason, timeout) do
     raise ArgumentError,
           "Imp.Run.cancel/3 expects :infinity or a positive timeout, got: #{inspect(timeout)}"
+  end
+
+  @doc "Returns the ordered redacted events retained by a running or completed run before stop."
+  def events(%__MODULE__{control: control}), do: Control.events(control)
+
+  @doc """
+  Cancels a run and returns its terminal event snapshot before releasing control.
+
+  This snapshot remains available even when an asynchronous event sink blocks.
+  Cancellation does not imply an unfinished external write did not happen.
+  """
+  def cancel_with_events(run, reason \\ :cancelled, timeout \\ 5_000)
+
+  def cancel_with_events(%__MODULE__{} = run, reason, timeout)
+      when timeout == :infinity or (is_integer(timeout) and timeout > 0) do
+    :ok = Control.cancel(run.control, reason)
+    terminate_task(run.task.pid, timeout)
+    events = Control.events(run.control)
+    Control.force_stop(run.control)
+    {:ok, events}
   end
 
   @doc "Releases the event/cancellation control process after a run completes."
@@ -175,6 +203,7 @@ defmodule Imp.Run.Event do
     :sequence,
     :kind,
     :component,
+    :timestamp,
     :input,
     :output,
     :reasoning,
@@ -183,6 +212,11 @@ defmodule Imp.Run.Event do
     :error,
     metadata: %{}
   ]
+
+  @doc "Serializes a native event for JSON storage, redacting again at the boundary."
+  def to_map(%__MODULE__{} = event) do
+    event |> Imp.Redaction.redact() |> Imp.Observability.Inspection.json_safe()
+  end
 
   @type t :: %__MODULE__{
           run_id: String.t(),
@@ -207,6 +241,7 @@ defmodule Imp.Run.Control do
   alias Imp.Run.{Event, EventDelivery}
 
   def start(opts), do: GenServer.start(__MODULE__, opts)
+  def events(pid), do: GenServer.call(pid, :events)
   def emit(pid, kind, attrs), do: GenServer.call(pid, {:emit, kind, attrs})
   def register(pid, fun), do: GenServer.call(pid, {:register, fun})
   def unregister(pid, ref), do: GenServer.call(pid, {:unregister, ref})
@@ -249,6 +284,9 @@ defmodule Imp.Run.Control do
        id: Keyword.fetch!(opts, :id),
        delivery: delivery,
        sequence: 0,
+       events: [],
+       terminal: nil,
+       task_monitor: nil,
        cancellables: %{},
        owner: owner,
        owner_monitor: Process.monitor(owner),
@@ -259,24 +297,10 @@ defmodule Imp.Run.Control do
 
   @impl true
   def handle_call({:emit, kind, attrs}, _from, state) do
-    event =
-      %Event{
-        run_id: state.id,
-        sequence: state.sequence,
-        kind: kind,
-        component: Map.get(attrs, :component),
-        input: redact(Map.get(attrs, :input)),
-        output: redact(Map.get(attrs, :output)),
-        reasoning: redact(Map.get(attrs, :reasoning)),
-        tool_call_id: Map.get(attrs, :tool_call_id),
-        tool_name: Map.get(attrs, :tool_name),
-        error: redact(Map.get(attrs, :error)),
-        metadata: redact(Map.get(attrs, :metadata, %{}))
-      }
-
-    EventDelivery.deliver(state.delivery, event)
-    {:reply, :ok, %{state | sequence: state.sequence + 1}}
+    {:reply, :ok, record(state, kind, attrs)}
   end
+
+  def handle_call(:events, _from, state), do: {:reply, Enum.reverse(state.events), state}
 
   def handle_call(:delivery, _from, state), do: {:reply, state.delivery, state}
 
@@ -295,11 +319,15 @@ defmodule Imp.Run.Control do
   end
 
   def handle_call({:attach_task, task_pid}, _from, state) when is_pid(task_pid) do
-    {:reply, :ok, %{state | task_pid: task_pid}}
+    {:reply, :ok, %{state | task_pid: task_pid, task_monitor: Process.monitor(task_pid)}}
   end
 
   def handle_call({:cancel, reason}, _from, %{cancelled: nil} = state) do
     Enum.each(state.cancellables, fn {_ref, fun} -> safe_cancel(fun, reason) end)
+
+    state =
+      record(state, :run_cancelled, %{error: reason, metadata: %{unfinished_effects: :unknown}})
+
     {:reply, :ok, %{state | cancelled: reason, cancellables: %{}}}
   end
 
@@ -311,6 +339,15 @@ defmodule Imp.Run.Control do
   end
 
   @impl true
+  def handle_info({:DOWN, monitor, :process, _task, reason}, %{task_monitor: monitor} = state) do
+    # A killed task cannot emit its own terminal event. The run owner can.
+    {:noreply,
+     record(state, :run_failed, %{
+       error: {:task_exit, reason},
+       metadata: %{unfinished_effects: :unknown}
+     })}
+  end
+
   def handle_info({:DOWN, monitor, :process, owner, reason}, state)
       when monitor == state.owner_monitor and owner == state.owner do
     Enum.each(state.cancellables, fn {_ref, fun} -> safe_cancel(fun, {:owner_down, reason}) end)
@@ -329,6 +366,29 @@ defmodule Imp.Run.Control do
     end
 
     :ok
+  end
+
+  defp record(%{terminal: terminal} = state, _kind, _attrs) when not is_nil(terminal), do: state
+
+  defp record(state, kind, attrs) do
+    event = %Event{
+      run_id: state.id,
+      sequence: state.sequence,
+      kind: kind,
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
+      component: Map.get(attrs, :component),
+      input: redact(Map.get(attrs, :input)),
+      output: redact(Map.get(attrs, :output)),
+      reasoning: redact(Map.get(attrs, :reasoning)),
+      tool_call_id: Map.get(attrs, :tool_call_id),
+      tool_name: Map.get(attrs, :tool_name),
+      error: redact(Map.get(attrs, :error)),
+      metadata: redact(Map.get(attrs, :metadata, %{}))
+    }
+
+    EventDelivery.deliver(state.delivery, event)
+    terminal = if kind in [:run_finished, :run_failed, :run_cancelled], do: kind, else: nil
+    %{state | sequence: state.sequence + 1, events: [event | state.events], terminal: terminal}
   end
 
   defp safe_cancel(fun, reason) do

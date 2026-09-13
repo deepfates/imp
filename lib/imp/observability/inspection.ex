@@ -76,9 +76,9 @@ defmodule Imp.Observability.Inspection do
   def json_safe(value) when is_tuple(value),
     do: value |> Tuple.to_list() |> Enum.map(&json_safe/1)
 
+  def json_safe(value) when is_nil(value) or is_boolean(value), do: value
   def json_safe(value) when is_atom(value), do: Atom.to_string(value)
-  def json_safe(value) when is_binary(value) or is_number(value) or is_boolean(value), do: value
-  def json_safe(nil), do: nil
+  def json_safe(value) when is_binary(value) or is_number(value), do: value
   def json_safe(value), do: Kernel.inspect(value)
 
   defp proper_list?([]), do: true

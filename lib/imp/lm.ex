@@ -79,14 +79,49 @@ defmodule Imp.LM do
 
   @doc "Executes one provider-neutral LM request and returns a normalized response."
   def request(lm, %Imp.Core.LMRequest{} = request) do
-    with {:ok, response} <- dispatch_request(lm, request) do
-      Imp.Usage.maybe_record(Imp.Core.legacy_response(response))
-      {:ok, response}
+    if Imp.Run.context() do
+      call_id = Imp.Run.new_event_id("model")
+
+      Imp.Run.emit(:model_request,
+        component: lm_name(lm),
+        input: elem(Imp.Core.request_parts(request), 0),
+        metadata: %{model_call_id: call_id, model: request.config.model}
+      )
+
+      result = perform_request(lm, request)
+
+      case result do
+        {:ok, response} ->
+          Imp.Run.emit(:model_response,
+            output: response.outputs,
+            metadata: %{
+              model_call_id: call_id,
+              model: request.config.model,
+              usage: response.usage,
+              cost: response.cost,
+              response: response.metadata
+            }
+          )
+
+        {:error, error} ->
+          Imp.Run.emit(:model_response, error: error, metadata: %{model_call_id: call_id})
+      end
+
+      result
+    else
+      perform_request(lm, request)
     end
   end
 
   def request(_lm, request) do
     {:error, {:invalid_lm_request, request}}
+  end
+
+  defp perform_request(lm, request) do
+    with {:ok, response} <- dispatch_request(lm, request) do
+      Imp.Usage.maybe_record(Imp.Core.legacy_response(response))
+      {:ok, response}
+    end
   end
 
   def validate_lm(nil), do: {:ok, nil}

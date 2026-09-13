@@ -103,15 +103,22 @@ defmodule Imp.Telemetry do
     end
   end
 
+  @doc false
+  def with_trace(id, fun) when is_binary(id) and is_function(fun, 0) do
+    with_context([%{trace_id: id} | context()], fun)
+  end
+
   defp inherit_lineage(metadata) do
+    trace_id = Enum.find_value(context(), &Map.get(&1, :trace_id))
+    metadata = if trace_id, do: Map.put(metadata, :trace_id, trace_id), else: metadata
+
     case current_call_id(context()) do
       nil -> metadata
       call_id -> Map.put_new(metadata, :call_id, call_id)
     end
   end
 
-  defp current_call_id([%{call_id: call_id} | _rest]), do: call_id
-  defp current_call_id(_context), do: nil
+  defp current_call_id(context), do: Enum.find_value(context, &Map.get(&1, :call_id))
 
   defp new_call_id, do: :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
 

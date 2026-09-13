@@ -22,10 +22,12 @@ defmodule Imp.Observability do
   @default_trace_events [
     [:imp, :lm, :start],
     [:imp, :lm, :stop],
+    [:imp, :lm, :exception],
     [:imp, :lm, :transport, :attempt],
     [:imp, :lm, :stream, :start],
     [:imp, :lm, :stream, :chunk],
     [:imp, :lm, :stream, :stop],
+    [:imp, :lm, :stream, :exception],
     [:imp, :tool, :start],
     [:imp, :tool, :stop],
     [:imp, :tool, :exception],
@@ -151,7 +153,14 @@ defmodule Imp.Observability do
     |> redact_status()
   end
 
-  @doc "Runs a function while collecting selected redacted Imp telemetry events."
+  @doc """
+  Collects selected redacted telemetry emitted in this function's trace context.
+
+  Owned `Imp.Tasks` children inherit correlation; unrelated processes do not.
+  Ordinary `Task`/`spawn` children require explicit `Imp.Telemetry.with_context/2`
+  propagation. Await owned children before returning. Nested traces have their
+  own correlation and do not contaminate their enclosing trace.
+  """
   def trace(fun, opts \\ [])
 
   def trace(fun, opts) when is_function(fun, 0) do
@@ -164,10 +173,10 @@ defmodule Imp.Observability do
 
     id = "imp-trace-#{System.unique_integer([:positive])}"
     {:ok, agent} = Agent.start_link(fn -> [] end)
-    :ok = :telemetry.attach_many(id, events, &__MODULE__.handle_trace_event/4, agent)
+    :ok = :telemetry.attach_many(id, events, &__MODULE__.handle_trace_event/4, {agent, id})
 
     try do
-      result = fun.()
+      result = Imp.Telemetry.with_trace(id, fun)
       %Trace{result: result, events: Agent.get(agent, &Enum.reverse/1)}
     after
       :telemetry.detach(id)
@@ -181,10 +190,12 @@ defmodule Imp.Observability do
   end
 
   @doc false
-  def handle_trace_event(event, measurements, metadata, agent) do
+  def handle_trace_event(event, measurements, %{trace_id: id} = metadata, {agent, id}) do
     event = {event, Imp.Redaction.redact(measurements), Imp.Redaction.redact(metadata)}
     Agent.update(agent, &[event | &1])
   end
+
+  def handle_trace_event(_event, _measurements, _metadata, _capture), do: :ok
 
   @doc "Subscribes the owner process to normalized optimizer progress events."
   def subscribe_optimizer(opts \\ []) do
