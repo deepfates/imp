@@ -156,6 +156,11 @@ provider-free parts of the learning path and deployment example do too.
 
 ## Connect tools or expose a program
 
+The integrated protocol APIs below are in this unreleased source tree; they are
+not part of the `v0.3.2` installation shown above. Until a coordinated release is
+published, use the reviewed private source bundle or an explicit local checkout
+for this feature. Do not expect the released tag to contain `Imp.ACP`.
+
 `Imp.MCP.connect/2` imports authorized MCP servers through ExMCP, returning
 ordinary tools plus explicit connection cleanup. Source server/tool identities,
 schemas, and annotations remain in each tool's `metadata.mcp` even when names
