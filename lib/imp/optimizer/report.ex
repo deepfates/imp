@@ -294,6 +294,11 @@ defmodule Imp.Optimizer.Report do
   @doc "Decodes a value produced by `encode_term/1`."
   def decode_term(value), do: load_value(value, :atoms)
 
+  # History is long-lived evidence, including results from removed capabilities.
+  # Keep its compatibility policy separate from strict optimizer artifacts.
+  @doc false
+  def decode_term_compatible(value), do: load_value(value, :compatible_atoms)
+
   @doc false
   def decode_term_portable(value), do: load_value(value, :strings)
 
@@ -695,6 +700,12 @@ defmodule Imp.Optimizer.Report do
   defp decode_atom("true", :strings), do: true
   defp decode_atom("false", :strings), do: false
   defp decode_atom(value, :strings), do: value
+
+  defp decode_atom(value, :compatible_atoms) do
+    decode_atom(value, :atoms)
+  rescue
+    ArgumentError -> value
+  end
 
   defp decode_atom(value, :atoms) do
     Map.get_lazy(@portable_optimizer_atoms, value, fn ->

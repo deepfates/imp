@@ -128,4 +128,96 @@ defmodule Imp.HistoryTest do
                  ~r/provider chat messages use Imp\.Adapter\.Types\.History/,
                  fn -> Types.to_openai(Imp.history([%{question: "Q?", answer: "A"}])) end
   end
+
+  test "history retains unknown symbolic names without weakening strict report decoding" do
+    typed = Imp.history([%{result: {:error, %{reason: :refused, retry: false}}, answer: 7}])
+    assert typed |> Imp.History.dump() |> Imp.History.load() == typed
+    name = "retired_history_symbol_#{System.unique_integer([:positive])}"
+    tag = %{"__imp_type__" => "atom", "value" => name}
+    assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+    assert_raise ArgumentError, fn -> Imp.Optimizer.Report.decode_term(tag) end
+    state = %{"messages" => [%{"result" => tag}]}
+    assert [%{result: ^name}] = Imp.History.load(state) |> Imp.History.messages()
+    assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+    dumped = Imp.History.load(state) |> Imp.History.dump()
+    assert [%{result: ^name}] = Imp.Optimizer.Report.decode_term(dumped["messages"])
+
+    collision = %{"__imp_type__" => "map", "entries" => [[tag, 1], [name, 2]]}
+
+    assert_raise ArgumentError, ~r/duplicate decoded key/, fn ->
+      Imp.History.load(%{"messages" => [%{"result" => collision}]})
+    end
+
+    assert_raise ArgumentError, fn ->
+      Imp.History.load(%{"messages" => [%{"result" => Map.put(tag, "extra", true)}]})
+    end
+  end
+
+  @tag :tmp_dir
+  test "cold restart continues a real ReAct history after its capability disappears", %{
+    tmp_dir: dir
+  } do
+    path = Path.join(dir, "history.json")
+    args = Path.wildcard(Path.expand("_build/test/lib/*/ebin")) |> Enum.flat_map(&["-pa", &1])
+
+    writer = """
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+    lm = Imp.LM.Static.new(handler: fn _, _ ->
+      n = Agent.get_and_update(counter, &{&1, &1 + 1})
+      if n == 0 do
+        %{tool_calls: [%{id: "old-call", name: "retired_fetch", arguments: %{}}]}
+      else
+        %{tool_calls: [%{id: "done", name: "submit", arguments: %{answer: "earlier answer"}}]}
+      end
+    end)
+    tool = Imp.tool(:retired_fetch, "retired capability", fn _ ->
+      {:error, {:history_retired_capability_failure, %{outcome: "unknown"}}}
+    end)
+    program = Imp.react_v2("intent -> answer", [tool], lm: lm)
+    {:ok, result} = Imp.call(program, %{intent: "earlier question"})
+    File.write!(#{inspect(path)}, result |> Imp.get(:history) |> Imp.History.dump() |> Jason.encode!())
+    """
+
+    assert {_, 0} =
+             System.cmd(System.find_executable("elixir"), args ++ ["-e", writer],
+               stderr_to_stdout: true
+             )
+
+    # The old tool and error atom are absent from this fresh VM. A string literal
+    # checks the symbol without accidentally interning it in the test itself.
+    reader = """
+    name = "history_retired_capability_failure"
+    absent = fn ->
+      try do
+        String.to_existing_atom(name)
+        raise "retired symbol was interned"
+      rescue
+        ArgumentError -> :ok
+      end
+    end
+    absent.()
+    history = File.read!(#{inspect(path)}) |> Jason.decode!() |> Imp.History.load()
+    absent.()
+    lm = Imp.LM.Static.new(handler: fn messages, _ ->
+      unless Enum.any?(messages, fn m ->
+        m.role == :tool and String.contains?(m.content, name) and String.contains?(m.content, "unknown")
+      end), do: raise("old tool observation missing from next turn")
+      unless Enum.any?(messages, &(Map.get(&1, :content, "") =~ "earlier question")),
+        do: raise("old intent missing")
+      %{tool_calls: [%{id: "new-done", name: "submit", arguments: %{answer: "continued"}}]}
+    end)
+    program = Imp.react_v2("intent -> answer", [], lm: lm)
+    {:ok, result} = Imp.call(program, %{intent: "continue", history: history})
+    "continued" = Imp.get(result, :answer)
+    absent.()
+    IO.puts("continued without retired capability")
+    """
+
+    assert {output, 0} =
+             System.cmd(System.find_executable("elixir"), args ++ ["-e", reader],
+               stderr_to_stdout: true
+             )
+
+    assert output =~ "continued without retired capability"
+  end
 end

@@ -66,16 +66,27 @@ defmodule Imp.History do
     }
   end
 
-  @doc "Loads a JSON-safe history map produced by `dump/1`."
+  @doc """
+  Loads a JSON-safe history map produced by `dump/1`.
+
+  Existing atoms and typed values are preserved. A symbolic atom whose owning
+  capability is no longer loaded becomes its exact name as a string; loading
+  history never creates atoms. This deliberately loses atom type for unknown
+  symbols so earlier observations remain usable after restart or capability
+  removal. Dumping the loaded history records that string representation.
+
+  Malformed tags and map-key collisions introduced by this conversion are
+  rejected. Strict optimizer-artifact decoding is unchanged.
+  """
   def load(%{"type" => "history", "messages" => messages}) when is_list(messages) do
     messages
-    |> Imp.Optimizer.Report.decode_term()
+    |> Imp.Optimizer.Report.decode_term_compatible()
     |> new()
   end
 
   def load(%{"messages" => messages}) when is_list(messages) do
     messages
-    |> Imp.Optimizer.Report.decode_term()
+    |> Imp.Optimizer.Report.decode_term_compatible()
     |> new()
   end
 
