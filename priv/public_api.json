@@ -749,6 +749,72 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
+        "relay/2",
+        "start_link/1"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.ACP.Local",
+      "signatures": {
+        "functions": {
+          "child_spec/1": [
+            "child_spec(init_arg)"
+          ],
+          "relay/2": [
+            "relay(path, opts \\\\ [])"
+          ],
+          "start_link/1": [
+            "start_link(opts)"
+          ]
+        }
+      },
+      "source": "lib/imp/acp/local.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "close/1",
+        "connect/1",
+        "connected?/1",
+        "receive_message/1",
+        "send_message/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.ACP.Local.Transport",
+      "signatures": {
+        "functions": {
+          "close/1": [
+            "close(state)"
+          ],
+          "connect/1": [
+            "connect(opts)"
+          ],
+          "connected?/1": [
+            "connected?(state)"
+          ],
+          "receive_message/1": [
+            "receive_message(state)"
+          ],
+          "send_message/2": [
+            "send_message(message, state)"
+          ]
+        }
+      },
+      "source": "lib/imp/acp/local.ex",
+      "struct_fields": [
+        "max_frame_bytes",
+        "socket"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
         "import_tools/2"
       ],
       "kind": "module",

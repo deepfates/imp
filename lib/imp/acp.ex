@@ -40,11 +40,20 @@ defmodule Imp.ACP do
   A session stored before `_meta` was carried has none, and resumes with `:meta`
   empty — as it always did.
 
+  Optional `:on_cancel` receives `(program, session_metadata)` only for an
+  explicit active `session/cancel`, never on disconnect or close. It must return
+  `:ok` to acknowledge application cancellation. `{:error, reason}`, invalid
+  returns, or exceptions refuse cancellation with `:cancel_callback_failed` and
+  leave the observer run active; the adapter does not claim the work stopped.
+  Keep this callback bounded and idempotent.
+
   External ReActV2 and RLM tool effects require an ACP client permission by
   default. Set `permission_policy: :unrestricted` only when the endpoint is
   deliberately trusted and the program's own `Imp.ToolPolicy` is sufficient.
   """
 
+  # :on_cancel is deliberately distinct from resource cleanup: an attachment
+  # closing must not imply cancellation of independently owned application work.
   @adapter_keys [
     :program,
     :program_factory,
@@ -53,6 +62,7 @@ defmodule Imp.ACP do
     :output_key,
     :output_renderer,
     :cleanup,
+    :on_cancel,
     :session_store,
     :permission_policy,
     :authorization_timeout,

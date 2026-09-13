@@ -208,3 +208,40 @@ Each imported tool carries `metadata.mcp` with `server_name`, `tool_name`,
 `schema`, and `annotations`. These describe its original source, regardless of
 its execution alias. Import results also index this provenance by execution
 name. This metadata contains no server credentials or connection descriptor.
+
+### Local ACP attachment
+
+A long-running application can supervise `Imp.ACP.Local` with
+`socket_path: "/short/private/path/acp.sock"` and `agent_options: [program_factory:
+factory]`. Each connection receives its own ACP adapter. The factory can return
+an `Imp.Module` wrapper for independently owned application work; the application
+owns that work and its MCP connections. A plain predictor still belongs to its
+ACP session and stops when that session closes.
+
+Configure an ordinary ACP client to run the application's executable that calls
+`Imp.ACP.Local.relay(socket_path)`. A release can expose this through its normal
+`eval` command; relay execution must remain in the foreground with exclusive
+stdio. This forwards existing ACP NDJSON without distributed Erlang or another
+application protocol. Disconnect ends the relay and its attachment. The service
+and other attachments remain alive. The relay ends on either stream's EOF.
+
+The socket directory must be private; an absent directory is created with mode
+0700 and the socket uses 0600. Use a short path within the operating system's
+UNIX socket path limit. Existing paths are refused, including stale sockets;
+remove one only after establishing independently that its owner is gone.
+Graceful listener shutdown removes only its own socket. Both directions bound
+frames to `:max_frame_bytes` (default 1 MiB); oversize input closes that
+attachment. This is local same-user access, not an internet transport.
+
+For independently owned work, `agent_options` may include
+`on_cancel: fn program, session_metadata -> ... end`. It runs only for an
+explicit cancellation of an active prompt, before the adapter stops its own
+observer run. Return `:ok` only after the application has accepted cancellation;
+ordinary session close and transport loss never call this hook. Any other return
+or exception refuses cancellation and leaves the observer active. On the ACP
+wire the pending prompt receives `stopReason: "refusal"` with
+`_meta.imp_acp.failure` containing `category: "cancel_callback_failed"` and
+`operation: "cancel"`. This describes refusal to cancel, not a model refusal or
+proof that application work stopped. An application must keep independently
+owned work observable after this prompt response; ACP has no separate
+cancellation-error response for its notification.

@@ -8,6 +8,7 @@ defmodule Imp.ACP.Options do
     :output_key,
     :output_renderer,
     :cleanup,
+    :on_cancel,
     :session_store,
     tool_kinds: %{},
     permission_policy: :client,
@@ -22,6 +23,7 @@ defmodule Imp.ACP.Options do
     input_mapper = optional_fun!(opts, :input_mapper, 2)
     output_renderer = optional_fun!(opts, :output_renderer, 2)
     cleanup = optional_fun!(opts, :cleanup, 1)
+    on_cancel = optional_fun!(opts, :on_cancel, 2)
     session_store = session_store!(opts)
     permission_policy = Keyword.get(opts, :permission_policy, :client)
     authorization_timeout = Keyword.get(opts, :authorization_timeout, 3_600_000)
@@ -49,6 +51,7 @@ defmodule Imp.ACP.Options do
       output_key: Keyword.get(opts, :output_key),
       output_renderer: output_renderer,
       cleanup: cleanup,
+      on_cancel: on_cancel,
       session_store: session_store,
       tool_kinds: tool_kinds,
       permission_policy: permission_policy,
@@ -430,6 +433,20 @@ defmodule Imp.ACP.Options do
     String.to_existing_atom(key)
   rescue
     ArgumentError -> nil
+  end
+
+  @doc false
+  def cancel(%__MODULE__{on_cancel: nil}, _program, _metadata), do: :ok
+
+  def cancel(%__MODULE__{on_cancel: callback}, program, metadata) do
+    case callback.(program, metadata) do
+      :ok -> :ok
+      _ -> {:error, :cancel_callback_failed}
+    end
+  rescue
+    _ -> {:error, :cancel_callback_failed}
+  catch
+    _, _ -> {:error, :cancel_callback_failed}
   end
 
   defp safe_cleanup(fun) do

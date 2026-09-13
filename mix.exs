@@ -228,7 +228,8 @@ defmodule Imp.MixProject do
     [
       "docs/LEARNING_PATH.md",
       "docs/IMP_FOR_DSPY_USERS.md",
-      "docs/PRODUCTION_OPERATIONS.md"
+      "docs/PRODUCTION_OPERATIONS.md",
+      "docs/TRAJECTORIES.md"
     ]
   end
 

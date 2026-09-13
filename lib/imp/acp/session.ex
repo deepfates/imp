@@ -154,8 +154,10 @@ defmodule Imp.ACP.Session do
   end
 
   def handle_call(:cancel, _from, state) do
-    state = cancel_active(state)
-    {:reply, :ok, state}
+    case Imp.ACP.Options.cancel(state.options, state.program, state.metadata) do
+      :ok -> {:reply, :ok, cancel_active(state)}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
   end
 
   def handle_call(:close, _from, state) do

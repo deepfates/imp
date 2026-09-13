@@ -69,8 +69,23 @@ defmodule Imp.ACP.Handler do
   def handle_cancel(session_id, _context, state) do
     case fetch_session(state, session_id) do
       {:ok, pid} ->
-        :ok = Imp.ACP.Session.cancel(pid)
-        {:reply, "cancelled", state}
+        case Imp.ACP.Session.cancel(pid) do
+          :ok ->
+            {:reply, "cancelled", state}
+
+          {:error, :cancel_callback_failed} ->
+            # ExMCP translates cancel-handler errors into "cancelled". An
+            # explicit refusal response preserves the unknown application state.
+            {:reply,
+             %{
+               "stopReason" => "refusal",
+               "_meta" => %{
+                 "imp_acp" => %{
+                   "failure" => %{"category" => "cancel_callback_failed", "operation" => "cancel"}
+                 }
+               }
+             }, state}
+        end
 
       {:error, _reason} ->
         {:reply, "cancelled", state}

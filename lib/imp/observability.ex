@@ -157,7 +157,7 @@ defmodule Imp.Observability do
   Collects selected redacted telemetry emitted in this function's trace context.
 
   Owned `Imp.Tasks` children inherit correlation; unrelated processes do not.
-  Ordinary `Task`/`spawn` children require explicit `Imp.Telemetry.with_context/2`
+  Ordinary `Task`/`spawn` children require explicit `Imp.Telemetry.with_context(context, fun)`
   propagation. Await owned children before returning. Nested traces have their
   own correlation and do not contaminate their enclosing trace.
   """
