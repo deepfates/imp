@@ -828,6 +828,11 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
   end
 
   defp prepare_runtime(opts) do
+    # The MCP lane explicitly consumes the optional protocol application. Start
+    # its shared supervisors before measuring per-operation resource leaks;
+    # ordinary Imp startup intentionally does not start ExMCP.
+    {:ok, _} = Application.ensure_all_started(:ex_mcp)
+
     if Keyword.get(opts, :live, false) do
       %{
         "performed" => true,
@@ -838,7 +843,13 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         "dummy_canary_sha256" => sha256(@dummy_canary)
       }
     else
-      %{"performed" => false}
+      %{
+        "performed" => true,
+        "authority" => "local_protocol_runtime",
+        "network_hosts" => [],
+        "external_network" => false,
+        "billable_generation" => false
+      }
     end
   end
 
