@@ -4,26 +4,46 @@ defmodule ProtocolMCPProviderTest do
   @moduletag :protocol_mcp
 
   test "protocol MCP gate exercises JSON-RPC HTTP and Streamable HTTP clients" do
-    ref =
-      Imp.Test.TelemetryHelpers.attach([
-        [:imp, :mcp, :http, :start],
-        [:imp, :mcp, :streamable_http, :start]
-      ])
+    owner = self()
 
     base_url =
       Imp.Test.LocalHTTP.start(fn request ->
         assert request.method == "POST"
-        assert request.headers["mcp-protocol-version"] == "2025-03-26"
 
         decoded = Jason.decode!(request.body)
         method = decoded["method"]
 
+        if method not in ["server/discover", "initialize"],
+          do: assert(request.headers["mcp-protocol-version"] == "2025-11-25")
+
         case {request.path, method} do
+          {_, "server/discover"} ->
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               error: %{code: -32601, message: "Method not found"}
+             }}
+
           {"/mcp-http", "initialize"} ->
             # MCP spec, Lifecycle: initialize MUST carry full params.
-            assert get_in(decoded, ["params", "protocolVersion"]) == "2025-03-26"
-            assert get_in(decoded, ["params", "clientInfo", "name"]) == "imp"
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: %{serverInfo: %{name: "http"}}}}
+            assert get_in(decoded, ["params", "protocolVersion"]) ==
+                     request.headers["mcp-protocol-version"]
+
+            assert is_map(get_in(decoded, ["params", "capabilities"]))
+            assert is_binary(get_in(decoded, ["params", "clientInfo", "name"]))
+            send(owner, {:initialized, request.path})
+
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{
+                 protocolVersion: "2025-11-25",
+                 capabilities: %{tools: %{}},
+                 serverInfo: %{name: "http", version: "1"}
+               }
+             }}
 
           {"/mcp-http", "notifications/initialized"} ->
             {200, %{jsonrpc: "2.0", result: %{}}}
@@ -34,20 +54,38 @@ defmodule ProtocolMCPProviderTest do
           {"/mcp-http", "tools/call"} ->
             assert get_in(decoded, ["params", "name"]) == "lookup_http"
             assert get_in(decoded, ["params", "arguments", "key"]) == "capital"
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: "Paris"}}
+
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{content: [%{type: "text", text: "Paris"}]}
+             }}
 
           {"/mcp-stream", "initialize"} ->
             assert request.headers["accept"] =~ "text/event-stream"
             # MCP spec, Lifecycle: initialize MUST carry full params.
-            assert get_in(decoded, ["params", "protocolVersion"]) == "2025-03-26"
-            assert get_in(decoded, ["params", "clientInfo", "name"]) == "imp"
+            assert get_in(decoded, ["params", "protocolVersion"]) ==
+                     request.headers["mcp-protocol-version"]
+
+            assert is_map(get_in(decoded, ["params", "capabilities"]))
+            assert is_binary(get_in(decoded, ["params", "clientInfo", "name"]))
+            send(owner, {:initialized, request.path})
             # No session exists before the server assigns one at initialize.
             refute Map.has_key?(request.headers, "mcp-session-id")
 
             # MCP spec, Streamable HTTP session management: the server assigns
             # the session id via the Mcp-Session-Id response header.
             {200, [{"mcp-session-id", "session-live-mcp"}],
-             %{jsonrpc: "2.0", id: decoded["id"], result: %{serverInfo: %{name: "stream"}}}}
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{
+                 protocolVersion: "2025-11-25",
+                 capabilities: %{tools: %{}},
+                 serverInfo: %{name: "stream", version: "1"}
+               }
+             }}
 
           {"/mcp-stream", "notifications/initialized"} ->
             # MCP spec, Lifecycle + Streamable HTTP: the client MUST send
@@ -63,7 +101,13 @@ defmodule ProtocolMCPProviderTest do
             assert request.headers["mcp-session-id"] == "session-live-mcp"
             assert get_in(decoded, ["params", "name"]) == "lookup_stream"
             assert get_in(decoded, ["params", "arguments", "key"]) == "runtime"
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: "BEAM"}}
+
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{content: [%{type: "text", text: "BEAM"}]}
+             }}
         end
       end)
 
@@ -85,9 +129,9 @@ defmodule ProtocolMCPProviderTest do
     assert stream_tool.name == :lookup_stream
     assert Imp.Tool.call(stream_tool, %{"key" => "runtime"}) == "BEAM"
 
-    assert_received {^ref, [:imp, :mcp, :http, :start], _, %{method: "initialize"}}
+    assert_received {:initialized, "/mcp-http"}
 
-    assert_received {^ref, [:imp, :mcp, :streamable_http, :start], _, %{method: "initialize"}}
+    assert_received {:initialized, "/mcp-stream"}
   end
 
   test "protocol MCP gate exercises trusted stdio client" do
@@ -96,12 +140,15 @@ defmodule ProtocolMCPProviderTest do
 
     File.write!(script, ~S"""
     Enum.each(IO.stream(:stdio, :line), fn request ->
-      method = Regex.run(~r/"method":"([^"]+)"/, request, capture: :all_but_first)
-      id = Regex.run(~r/"id":(\d+)/, request, capture: :all_but_first)
+      decoded = Jason.decode!(request)
+      method = [decoded["method"]]
+      id = if Map.has_key?(decoded, "id"), do: [Jason.encode!(decoded["id"])], else: nil
 
       response = case {method, id} do
+        {["server/discover"], [id]} ->
+          ~s({"jsonrpc":"2.0","id":#{id},"error":{"code":-32601,"message":"Method not found"}})
         {["initialize"], [id]} ->
-          ~s({"jsonrpc":"2.0","id":#{id},"result":{"serverInfo":{"name":"stdio"}}})
+          ~s({"jsonrpc":"2.0","id":#{id},"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"stdio","version":"1"}}})
 
         {["tools/list"], [id]} ->
           # MCP spec, Tool definition: camelCase "inputSchema".
@@ -109,7 +156,7 @@ defmodule ProtocolMCPProviderTest do
 
         {["tools/call"], [id]} ->
           [text] = Regex.run(~r/"text":"([^"]*)"/, request, capture: :all_but_first)
-          ~s({"jsonrpc":"2.0","id":#{id},"result":"#{text}"})
+          ~s({"jsonrpc":"2.0","id":#{id},"result":{"content":[{"type":"text","text":"#{text}"}]}})
 
         _ ->
           nil
@@ -123,7 +170,10 @@ defmodule ProtocolMCPProviderTest do
 
     [tool] =
       System.find_executable("elixir")
-      |> Imp.MCP.StdioClient.new(args: [script], timeout: 15_000)
+      |> Imp.MCP.StdioClient.new(
+        args: ["-pa", Path.join([Mix.Project.build_path(), "lib", "jason", "ebin"]), script],
+        timeout: 15_000
+      )
       |> Imp.MCP.import_tools()
 
     assert tool.name == :echo_stdio
