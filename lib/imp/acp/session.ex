@@ -242,11 +242,6 @@ defmodule Imp.ACP.Session do
   defp complete({:error, reason}, state), do: fail_turn(reason, state)
   defp complete(other, state), do: fail_turn({:invalid_imp_result, result_shape(other)}, state)
 
-  defp fail_turn(reason, %{active: nil} = state) do
-    Logger.debug("ignored failure for inactive Imp ACP turn", reason_shape: result_shape(reason))
-    state
-  end
-
   defp fail_turn(reason, state) do
     :ok = Imp.ACP.Options.after_turn(state.factory_cleanup)
     message = failure_message(reason)
@@ -343,9 +338,6 @@ defmodule Imp.ACP.Session do
 
   defp permission_decision({:error, reason}),
     do: {:deny, {:acp_permission_error, safe_reason_tag(reason)}}
-
-  defp permission_decision(other),
-    do: {:deny, {:invalid_acp_permission_response, result_shape(other)}}
 
   defp permission_outcome(%{"outcome" => "selected", "optionId" => "allow"}),
     do: :allow

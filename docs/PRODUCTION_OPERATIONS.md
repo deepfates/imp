@@ -130,7 +130,6 @@ Stable event families:
 - `[:imp, :cache, :hit | :miss | :coalesced | :retry | :producer_down | :producer_exception]`
 - `[:imp, :tool, :start | :stop | :exception]`
 - `[:imp, :retriever, :start | :stop | :exception]`
-- `[:imp, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
 - `[:imp, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
 - `[:imp, :optimizer, :trial, :start | :stop | :exception]` (RandomSearch,
   COPRO, SIMBA, and MIPROv2 candidate evaluations)
@@ -190,6 +189,14 @@ sessions and retries. Test the boundary with an actual local MCP server rather
 than injecting Imp's removed HTTP implementation. `:headers`, `:timeout`,
 `:result_mode`, ownership and catalog-filter options remain supported; stdio
 also accepts `:args`, `:env`, and `:cwd`.
+
+Known interoperability limit of the pinned ExMCP fork: when an HTTP server
+selects legacy version `2025-03-26`, the initial `notifications/initialized`
+request can still carry the client's `2025-11-25` header. Later requests use the
+selected version, but a strict older server may reject establishment. Current
+version peers and stdio do not have this particular limitation. The fork's
+connection manager must settle the HTTP version before sending that notification
+before compatibility with strict older HTTP servers can be claimed.
 
 Imported tool calls explicitly disable generic transport retries and use
 ExMCP's `:safe_only` broken-stream policy. An ambiguous write is not repeated.

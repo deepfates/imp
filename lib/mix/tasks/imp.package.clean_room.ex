@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Imp.Package.CleanRoom do
   @moduledoc """
-  Prove package deployment and persistence from isolated, offline consumer VMs.
+  Prove source package deployment and persistence from isolated consumer VMs.
 
-  By default the task builds an unpacked Hex package, creates a clean consumer,
+  By default the task stages the declared private source package, creates a clean consumer,
   runs the packaged provider-free tutorial from that consumer boundary, writes a
   callback-bearing artifact in one VM, and loads it in a second VM with a
   separately constructed callback registry. The loader explicitly supplies a
@@ -15,7 +15,8 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
       mix imp.package.clean_room --lock mix.lock
       mix imp.package.clean_room --skip-release --output tmp/persistence-proof
 
-  Dependency resolution is forced offline with `HEX_OFFLINE=1` and uses the
+  Hex dependency resolution uses `HEX_OFFLINE=1`; the declared Git fork may
+  still be fetched. Resolution uses the
   source checkout's `mix.lock` by default. Run `mix deps.get` in that checkout
   first so every locked Hex dependency is present in the local cache. Use
   `--lock` to supply a different lockfile. `--package` must name an unpacked
@@ -77,9 +78,29 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     package_dir == output or String.starts_with?(package_dir, output <> "/")
   end
 
+  @doc false
+  def stage_package!(destination, root) do
+    destination = Path.expand(destination)
+    # Preserve the real git dependency declaration. Hex refuses it, so this is
+    # a private source-consumption proof, not evidence of Hex publishability.
+    if File.exists?(destination),
+      do: Mix.raise("package destination already exists: #{destination}")
+
+    files = Mix.Project.config() |> Keyword.fetch!(:package) |> Keyword.fetch!(:files)
+    File.mkdir_p!(destination)
+
+    for relative <- files, File.regular?(Path.join(root, relative)) do
+      target = Path.join(destination, relative)
+      File.mkdir_p!(Path.dirname(target))
+      File.cp!(Path.join(root, relative), target)
+    end
+
+    destination
+  end
+
   defp prepare_package!(nil, output, root) do
     package_dir = Path.join(output, "package")
-    run!("mix", ["hex.build", "--unpack", "--output", package_dir], root, [])
+    stage_package!(package_dir, root)
     package_dir
   end
 

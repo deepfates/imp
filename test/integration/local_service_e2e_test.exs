@@ -121,8 +121,25 @@ defmodule LocalServiceE2ETest do
         decoded = Jason.decode!(request.body)
 
         case decoded["method"] do
+          "server/discover" ->
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               error: %{code: -32601, message: "Method not found"}
+             }}
+
           "initialize" ->
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: %{serverInfo: %{name: "local"}}}}
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{
+                 protocolVersion: "2025-03-26",
+                 capabilities: %{tools: %{}},
+                 serverInfo: %{name: "local", version: "1"}
+               }
+             }}
 
           "notifications/initialized" ->
             {200, %{jsonrpc: "2.0", result: %{}}}
@@ -151,7 +168,13 @@ defmodule LocalServiceE2ETest do
           "tools/call" ->
             assert get_in(decoded, ["params", "name"]) == "lookup"
             assert get_in(decoded, ["params", "arguments", "key"]) == "capital"
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: "Paris"}}
+
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{content: [%{type: "text", text: "Paris"}]}
+             }}
         end
       end)
 
@@ -173,13 +196,15 @@ defmodule LocalServiceE2ETest do
       request = Jason.decode!(line)
       response =
         case request["method"] do
+          "server/discover" ->
+            %{"jsonrpc" => "2.0", "id" => request["id"], "error" => %{"code" => -32601, "message" => "Method not found"}}
           "initialize" ->
-            %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{}}
+            %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{"protocolVersion" => "2025-03-26", "capabilities" => %{"tools" => %{}}, "serverInfo" => %{"name" => "fixture", "version" => "1"}}}
           "tools/list" ->
             # MCP spec, Tool definition: camelCase "inputSchema".
             %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{"tools" => [%{"name" => "echo", "description" => "Echo input", "inputSchema" => %{"type" => "object", "properties" => %{"text" => %{"type" => "string"}}, "required" => ["text"]}}]}}
           "tools/call" ->
-            %{"jsonrpc" => "2.0", "id" => request["id"], "result" => request["params"]["arguments"]["text"]}
+            %{"jsonrpc" => "2.0", "id" => request["id"], "result" => %{"content" => [%{"type" => "text", "text" => request["params"]["arguments"]["text"]}]}}
           _ ->
             nil
         end
@@ -208,8 +233,25 @@ defmodule LocalServiceE2ETest do
         decoded = Jason.decode!(request.body)
 
         case decoded["method"] do
+          "server/discover" ->
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               error: %{code: -32601, message: "Method not found"}
+             }}
+
           "initialize" ->
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: %{serverInfo: %{name: "local"}}}}
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{
+                 protocolVersion: "2025-03-26",
+                 capabilities: %{tools: %{}},
+                 serverInfo: %{name: "local", version: "1"}
+               }
+             }}
 
           "notifications/initialized" ->
             {200, %{jsonrpc: "2.0", result: %{}}}
@@ -238,7 +280,13 @@ defmodule LocalServiceE2ETest do
           "tools/call" ->
             assert get_in(decoded, ["params", "name"]) == "lookup"
             assert get_in(decoded, ["params", "arguments", "key"]) == "capital"
-            {200, %{jsonrpc: "2.0", id: decoded["id"], result: "Paris"}}
+
+            {200,
+             %{
+               jsonrpc: "2.0",
+               id: decoded["id"],
+               result: %{content: [%{type: "text", text: "Paris"}]}
+             }}
         end
       end)
 

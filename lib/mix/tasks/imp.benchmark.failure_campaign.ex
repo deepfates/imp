@@ -73,7 +73,11 @@ defmodule Mix.Tasks.Imp.Benchmark.FailureCampaign do
 
     unless artifact["summary"]["deterministic_complete"] and artifact["runtime"]["leak_free"] and
              (not live? or artifact["summary"]["live_complete"]) do
-      Mix.raise("deterministic failure campaign failed; inspect #{path}")
+      failed = artifact["cases"] |> Enum.filter(&(&1["passing"] == false)) |> Enum.map(& &1["id"])
+
+      Mix.raise(
+        "deterministic failure campaign failed; leaks=#{inspect(artifact["runtime"]["leaks"])} failed_lanes=#{inspect(failed)}; inspect #{path}"
+      )
     end
   end
 

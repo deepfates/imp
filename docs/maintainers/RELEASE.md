@@ -94,7 +94,7 @@ Git tag `v0.3.2`; it is not published to Hex. A candidate or private source
 release is identified by all three of:
 
 - an exact clean Git commit;
-- the SHA-256 of the unpacked/built Hex artifact produced from that commit;
+- the checksums of the staged source package files produced from that commit;
 - passing candidate gates from that same commit.
 
 Package version alone is not release identity. Public repository visibility and
@@ -153,3 +153,10 @@ from the release checklist or from a cumulative repository score.
 
 All unfinished work and dependencies live in `tk`. Markdown must not carry a
 parallel roadmap or progress table.
+
+`mix package.check` stages the existing `package.files` boundary and exercises
+its actual consumers and release in the clean-room gate. This source artifact
+retains the declared ExMCP Git dependency. `mix hex.build` currently refuses that
+dependency: the gate does not establish Hex publishability. That limitation ends
+when the required ExMCP implementation can be consumed as a released Hex package;
+do not remove protocol modules or erase the dependency to bypass it.

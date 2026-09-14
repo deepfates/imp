@@ -392,7 +392,6 @@ defmodule Imp.MCP.Connections do
   end
 
   defp tool_schemas(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
-  defp tool_schemas(%{tools: tools}) when is_list(tools), do: {:ok, tools}
 
   defp tool_schemas(other),
     do: {:error, {:invalid_mcp_tools_response, shape(other)}}

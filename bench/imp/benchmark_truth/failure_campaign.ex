@@ -420,9 +420,9 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
       {:ok,
        [
          %{
-           "name" => "publish",
-           "description" => "local uncertainty fixture",
-           "inputSchema" => %{"type" => "object"}
+           name: "publish",
+           description: "local uncertainty fixture",
+           inputSchema: %{"type" => "object"}
          }
        ], nil, state}
     end
@@ -828,6 +828,11 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
   end
 
   defp prepare_runtime(opts) do
+    # The MCP lane explicitly consumes the optional protocol application. Start
+    # its shared supervisors before measuring per-operation resource leaks;
+    # ordinary Imp startup intentionally does not start ExMCP.
+    {:ok, _} = Application.ensure_all_started(:ex_mcp)
+
     if Keyword.get(opts, :live, false) do
       %{
         "performed" => true,
@@ -838,7 +843,13 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         "dummy_canary_sha256" => sha256(@dummy_canary)
       }
     else
-      %{"performed" => false}
+      %{
+        "performed" => true,
+        "authority" => "local_protocol_runtime",
+        "network_hosts" => [],
+        "external_network" => false,
+        "billable_generation" => false
+      }
     end
   end
 
@@ -1281,7 +1292,8 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
   defp sha256(value),
     do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower) |> then(&("sha256:" <> &1))
 
-  defp runtime_snapshot do
+  @doc false
+  def runtime_snapshot do
     %{
       admission: Imp.Tasks.admission_status(),
       linked_tasks: active_children(Imp.Tasks.supervisor()),
@@ -1321,13 +1333,15 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     end)
   end
 
-  defp settle_runtime(baseline) do
+  @doc false
+  def settle_runtime(baseline) do
     Enum.reduce_while(1..500, :timeout, fn _, _ ->
       snapshot = runtime_snapshot()
 
       if snapshot.admission == %{active: 0, queued: 0} and
            MapSet.subset?(snapshot.linked_tasks, baseline.linked_tasks) and
            MapSet.subset?(snapshot.unlinked_tasks, baseline.unlinked_tasks) and
+           MapSet.subset?(snapshot.processes, baseline.processes) and
            MapSet.subset?(snapshot.ports, baseline.ports) and
            MapSet.subset?(snapshot.telemetry_handlers, baseline.telemetry_handlers) do
         {:halt, :ok}

@@ -125,7 +125,9 @@ defmodule Imp.GRPOStableCallbackTest do
       checkpoint_path: Path.join(root, "checkpoint.json"),
       num_train_steps: 1,
       num_rollouts_per_grpo_step: 2,
-      callback_timeout_ms: 100,
+      # Allow normal cold-VM work; the fixture's injected five-second hang
+      # still crosses this bound and exercises timeout recovery.
+      callback_timeout_ms: 1_000,
       status_poll_interval_ms: 0
     )
     trainset = [Imp.example(question: "q", answer: "ok") |> Imp.with_inputs(:question)]

@@ -155,7 +155,9 @@ defmodule Imp.MixProject do
       # PLTs live in a stable directory so CI can cache them across runs.
       plt_core_path: "priv/plts/core",
       plt_local_path: "priv/plts/local",
-      plt_add_apps: [:mix, :ex_unit],
+      # Protocol adapters compile against ExMCP even though ordinary Imp boot
+      # deliberately does not start it. Dialyzer still needs its contracts.
+      plt_add_apps: [:mix, :ex_unit, :ex_mcp, :plug_cowboy],
       # Every entry in the ignore file carries a one-line reason.
       ignore_warnings: ".dialyzer_ignore.exs",
       list_unused_filters: true
@@ -386,8 +388,7 @@ defmodule Imp.MixProject do
         # Use a child Mix invocation so this alias remains independently
         # runnable even after another test task in the same VM.
         "cmd mix test test/package_contract_test.exs",
-        "cmd mix hex.build --unpack --output tmp/package-check",
-        "imp.package.clean_room --package tmp/package-check"
+        "imp.package.clean_room"
       ],
       "package.clean": [&clean_package/1],
       "livebook.check": [

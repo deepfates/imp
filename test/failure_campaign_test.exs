@@ -5,6 +5,23 @@ defmodule Imp.FailureCampaignTest do
 
   @required_iterations 10
 
+  test "runtime settling waits for a plain process that final leak accounting includes" do
+    baseline = Imp.BenchmarkTruth.FailureCampaign.runtime_snapshot()
+
+    child =
+      spawn(fn ->
+        receive do
+          :finish -> :ok
+        end
+      end)
+
+    on_exit(fn -> if Process.alive?(child), do: Process.exit(child, :kill) end)
+    Process.send_after(child, :finish, 100)
+    assert Process.alive?(child)
+    assert :ok = Imp.BenchmarkTruth.FailureCampaign.settle_runtime(baseline)
+    refute Process.alive?(child)
+  end
+
   test "records ten clean deterministic iterations without claiming live completion" do
     artifact =
       Imp.BenchmarkTruth.FailureCampaign.run(

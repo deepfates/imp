@@ -237,20 +237,12 @@ defmodule PackageContractTest do
   end
 
   @tag timeout: 180_000
-  test "unpacked Hex artifact preserves the release boundary" do
+  test "staged source artifact preserves the release boundary" do
     output_dir = package_tmp_dir()
 
     on_exit(fn -> File.rm_rf(output_dir) end)
 
-    {output, status} =
-      System.cmd(
-        "mix",
-        ["hex.build", "--unpack", "--output", output_dir],
-        cd: File.cwd!(),
-        stderr_to_stdout: true
-      )
-
-    assert status == 0, output
+    Mix.Tasks.Imp.Package.CleanRoom.stage_package!(output_dir, File.cwd!())
 
     files =
       output_dir
