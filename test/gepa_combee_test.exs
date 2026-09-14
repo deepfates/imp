@@ -131,9 +131,7 @@ defmodule Imp.Optimizer.GEPA.ComBeeTest do
     policy = policy(1, max_concurrency: 1, timeout: :infinity)
 
     proposer = fn _candidate, component, _records, _iteration, metadata ->
-      send(owner, {:proposal_deadline_call, component, metadata.phase})
-      delay = if component == :alpha, do: 6, else: if(metadata.phase == :final, do: 20, else: 1)
-      Process.sleep(delay)
+      send(owner, {:proposal_deadline_call, component, metadata.phase, Imp.Deadline.current()})
       "update-#{metadata.phase}"
     end
 
@@ -145,29 +143,25 @@ defmodule Imp.Optimizer.GEPA.ComBeeTest do
       iteration: 1
     }
 
-    started = System.monotonic_time(:millisecond)
+    deadline = System.monotonic_time(:millisecond) + 5_000
 
-    assert [{:error, :timeout}] =
-             Imp.Optimizer.GEPA.Coordinator.run([:proposal], 25, fn :proposal ->
-               Imp.Optimizer.GEPA.Reflection.execute(proposer, parent, context, policy)
-             end)
-
-    assert System.monotonic_time(:millisecond) - started < 60
-
-    calls = receive_proposal_deadline_calls([])
-
-    assert calls != []
-
-    assert calls ==
-             Enum.take(
-               [
-                 {:alpha, :first_level},
-                 {:alpha, :final},
-                 {:beta, :first_level},
-                 {:beta, :final}
-               ],
-               length(calls)
+    assert [{:ok, %{status: :ok}}] =
+             Imp.Optimizer.GEPA.Coordinator.run(
+               [:proposal],
+               {:deadline, deadline},
+               fn :proposal ->
+                 Imp.Optimizer.GEPA.Reflection.execute(proposer, parent, context, policy)
+               end
              )
+
+    # Check the inherited budget itself; scheduler delays must not determine
+    # whether this propagation test passes. Cancellation is tested separately.
+    assert receive_proposal_deadline_calls([]) == [
+             {:alpha, :first_level, deadline},
+             {:alpha, :final, deadline},
+             {:beta, :first_level, deadline},
+             {:beta, :final, deadline}
+           ]
   end
 
   test "terminal failure stops queued dispatch and cancels active siblings" do
@@ -767,8 +761,8 @@ defmodule Imp.Optimizer.GEPA.ComBeeTest do
 
   defp receive_proposal_deadline_calls(calls) do
     receive do
-      {:proposal_deadline_call, component, phase} ->
-        receive_proposal_deadline_calls([{component, phase} | calls])
+      {:proposal_deadline_call, component, phase, deadline} ->
+        receive_proposal_deadline_calls([{component, phase, deadline} | calls])
     after
       25 -> Enum.reverse(calls)
     end

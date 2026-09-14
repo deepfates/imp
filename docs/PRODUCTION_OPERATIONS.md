@@ -130,7 +130,6 @@ Stable event families:
 - `[:imp, :cache, :hit | :miss | :coalesced | :retry | :producer_down | :producer_exception]`
 - `[:imp, :tool, :start | :stop | :exception]`
 - `[:imp, :retriever, :start | :stop | :exception]`
-- `[:imp, :mcp, :http | :stdio | :streamable_http, :start | :stop | :exception]`
 - `[:imp, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
 - `[:imp, :optimizer, :trial, :start | :stop | :exception]` (RandomSearch,
   COPRO, SIMBA, and MIPROv2 candidate evaluations)
