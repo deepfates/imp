@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Imp.Package.CleanRoom do
   @moduledoc """
-  Prove package deployment and persistence from isolated, offline consumer VMs.
+  Prove source package deployment and persistence from isolated consumer VMs.
 
   By default the task stages the declared private source package, creates a clean consumer,
   runs the packaged provider-free tutorial from that consumer boundary, writes a
