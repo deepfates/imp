@@ -243,7 +243,7 @@ defmodule Imp.ACP.Session do
   defp complete(other, state), do: fail_turn({:invalid_imp_result, result_shape(other)}, state)
 
   defp fail_turn(reason, %{active: nil} = state) do
-    Logger.debug("ignored failure for inactive Imp ACP turn", reason_shape: result_shape(reason))
+    Logger.debug("ignored failure for inactive Imp ACP turn: #{inspect(result_shape(reason))}")
     state
   end
 
