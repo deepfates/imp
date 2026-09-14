@@ -386,8 +386,7 @@ defmodule Imp.MixProject do
         # Use a child Mix invocation so this alias remains independently
         # runnable even after another test task in the same VM.
         "cmd mix test test/package_contract_test.exs",
-        "cmd mix hex.build --unpack --output tmp/package-check",
-        "imp.package.clean_room --package tmp/package-check"
+        "imp.package.clean_room"
       ],
       "package.clean": [&clean_package/1],
       "livebook.check": [
