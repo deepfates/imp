@@ -46,7 +46,9 @@ fi
 
 "$PYTHON" -m venv "$VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install -U pip setuptools wheel
-"$VENV_DIR/bin/python" -m pip install -U "dspy[optuna]==3.2.1" openai
+# The differential claims name both DSPy and Optuna versions. Use the retained
+# comparator environment; an unconstrained Optuna upgrade changes the reference.
+"$VENV_DIR/bin/python" -m pip install -r benchmarks/requirements-dspy-3.2.1-optuna-4.9.lock
 "$VENV_DIR/bin/python" - <<'PY'
 import dspy
 import importlib.metadata
