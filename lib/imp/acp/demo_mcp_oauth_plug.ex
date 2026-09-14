@@ -159,7 +159,7 @@ defmodule Imp.ACP.DemoMCPOAuthPlug do
       |> put_resp_header("location", location)
       |> send_resp(302, "")
     else
-      {:error, reason, conn} -> oauth_error(conn, 400, reason)
+      {:more, _body, conn} -> oauth_error(conn, 413, "invalid_request")
       {:error, reason} -> oauth_error(conn, 400, reason)
     end
   end
@@ -170,7 +170,7 @@ defmodule Imp.ACP.DemoMCPOAuthPlug do
          {:ok, token} <- issue_token(params, opts) do
       json(conn, 200, token)
     else
-      {:error, reason, conn} -> oauth_error(conn, 400, reason)
+      {:more, _body, conn} -> oauth_error(conn, 413, "invalid_request")
       {:error, reason} -> oauth_error(conn, 400, reason)
     end
   end

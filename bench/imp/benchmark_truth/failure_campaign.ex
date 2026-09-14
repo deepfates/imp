@@ -420,9 +420,9 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
       {:ok,
        [
          %{
-           "name" => "publish",
-           "description" => "local uncertainty fixture",
-           "inputSchema" => %{"type" => "object"}
+           name: "publish",
+           description: "local uncertainty fixture",
+           inputSchema: %{"type" => "object"}
          }
        ], nil, state}
     end
