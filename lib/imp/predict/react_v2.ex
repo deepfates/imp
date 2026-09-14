@@ -7,6 +7,15 @@ defmodule Imp.Predict.ReActV2 do
   `submit` call when the normal loop ends without outputs. If a provider cannot
   honor that tool contract, a tools-disabled typed extractor derives the task
   outputs from the original inputs and accumulated history.
+
+  On a recognized context-window refusal, up to eight smaller requests omit
+  oldest prior episodes from the prompt, preserving their full durable history.
+  Completed signature outputs delimit episodes; a trailing unfinished prior
+  group is kept together. Current-call tool observations are never omitted or
+  replayed. Omission counts appear in `:context_projection` and native
+  `:context_projected` events. If the current call and instructions alone exceed
+  the window, an incomplete prediction retains history and context diagnostics.
+  This is lossy prompt selection, not summarization or deletion of memory.
   """
 
   @behaviour Imp.Module
@@ -124,7 +133,15 @@ defmodule Imp.Predict.ReActV2 do
         |> Map.new(fn name -> {name, fetch_input(inputs, name)} end)
         |> Map.reject(fn {_key, value} -> is_nil(value) end)
 
-      run(react, history, pending, pending, 0, max_iters, execution)
+      run(
+        react,
+        history_context(history, react.signature),
+        pending,
+        pending,
+        0,
+        max_iters,
+        execution
+      )
     end
   end
 
@@ -133,7 +150,7 @@ defmodule Imp.Predict.ReActV2 do
 
   defp run(react, history, inputs, pending, turn, max_iters, execution) do
     case predict(react.react, react, history, pending) do
-      {:ok, prediction} ->
+      {:ok, prediction, history} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
         emit_reasoning(prediction, turn)
 
@@ -155,7 +172,7 @@ defmodule Imp.Predict.ReActV2 do
 
             {results, final} ->
               event = history_event(pending, prediction, calls, results, final)
-              history = Imp.History.append(history, event)
+              history = append_history(history, event)
 
               if final,
                 do: final_prediction(final, history, :submit),
@@ -163,17 +180,21 @@ defmodule Imp.Predict.ReActV2 do
           end
         end
 
-      {:error, reason} ->
-        forced_submit(
-          react,
-          history,
-          inputs,
-          pending,
-          termination_reason(reason),
-          turn,
-          reason,
-          execution
-        )
+      {:error, reason, history} ->
+        if context_window_exceeded?(reason) do
+          incomplete_prediction(history, :context_window_exceeded, reason)
+        else
+          forced_submit(
+            react,
+            history,
+            inputs,
+            pending,
+            termination_reason(reason),
+            turn,
+            reason,
+            execution
+          )
+        end
     end
   end
 
@@ -187,29 +208,33 @@ defmodule Imp.Predict.ReActV2 do
          initial_error,
          execution
        ) do
-    with {:ok, prediction} <- forced_submit_prediction(react, history, pending) do
-      calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
-      emit_reasoning(prediction, turn, forced?: true)
+    case forced_submit_prediction(react, history, pending) do
+      {:ok, prediction, history} ->
+        calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
+        emit_reasoning(prediction, turn, forced?: true)
 
-      finish_forced_submit(
-        react,
-        prediction,
-        calls,
-        history,
-        inputs,
-        pending,
-        reason,
-        initial_error,
-        execution
-      )
-    else
-      {:extract, forced_error} ->
+        finish_forced_submit(
+          react,
+          prediction,
+          calls,
+          history,
+          inputs,
+          pending,
+          reason,
+          initial_error,
+          execution
+        )
+
+      {:extract, forced_error, history} ->
         extract_final(react, inputs, history, reason, %{
           initial: initial_error,
           forced_submit: forced_error
         })
 
-      {:error, forced_error} ->
+      {:error, forced_error, history} ->
+        reason =
+          if context_window_exceeded?(forced_error), do: :context_window_exceeded, else: reason
+
         incomplete_prediction(history, reason, %{
           initial: initial_error,
           forced_submit: forced_error
@@ -221,7 +246,7 @@ defmodule Imp.Predict.ReActV2 do
     forced = forced_submit_program(react, %{type: "tool", name: "submit"})
 
     case predict(forced, react, history, pending) do
-      {:error, reason} = error ->
+      {:error, reason, history} = error ->
         if named_tool_choice_unsupported?(reason) do
           # Some OpenAI-compatible endpoints implement only the string
           # none/auto/required subset. Restrict both the provider tools and the
@@ -233,15 +258,20 @@ defmodule Imp.Predict.ReActV2 do
           fallback = forced_submit_program(submit_only, "required")
 
           case predict(fallback, submit_only, history, pending) do
-            {:ok, prediction} -> {:ok, prediction}
-            {:error, fallback_error} -> {:extract, fallback_error}
+            {:ok, prediction, history} ->
+              {:ok, prediction, history}
+
+            {:error, fallback_error, history} ->
+              if context_window_exceeded?(fallback_error),
+                do: {:error, fallback_error, history},
+                else: {:extract, fallback_error, history}
           end
         else
           error
         end
 
-      {:ok, prediction} ->
-        {:ok, prediction}
+      {:ok, prediction, history} ->
+        {:ok, prediction, history}
     end
   end
 
@@ -268,7 +298,7 @@ defmodule Imp.Predict.ReActV2 do
 
         {results, final} ->
           event = history_event(pending, prediction, submit_calls, results, final)
-          history = Imp.History.append(history, event)
+          history = append_history(history, event)
 
           if final,
             do: final_prediction(final, history, :forced_submit),
@@ -284,7 +314,7 @@ defmodule Imp.Predict.ReActV2 do
       history
     else
       event = history_event(pending, prediction, calls, [], nil)
-      Imp.History.append(history, event)
+      append_history(history, event)
     end
   end
 
@@ -302,10 +332,11 @@ defmodule Imp.Predict.ReActV2 do
 
   defp extract_final(react, inputs, history, reason, initial_error) do
     extractor = extraction_program(react)
-    extraction_inputs = Map.put(inputs, :history, history)
 
-    case Imp.Predict.ChainOfThought.call(extractor, extraction_inputs) do
-      {:ok, prediction} ->
+    case context_call(history, fn projected ->
+           Imp.Predict.ChainOfThought.call(extractor, Map.put(inputs, :history, projected))
+         end) do
+      {:ok, prediction, history} ->
         final =
           prediction
           |> Imp.Prediction.to_map()
@@ -327,7 +358,12 @@ defmodule Imp.Predict.ReActV2 do
             })
         end
 
-      {:error, extraction_error} ->
+      {:error, extraction_error, history} ->
+        reason =
+          if context_window_exceeded?(extraction_error),
+            do: :context_window_exceeded,
+            else: reason
+
         incomplete_prediction(history, reason, %{
           initial: initial_error,
           extraction: extraction_error
@@ -419,7 +455,10 @@ defmodule Imp.Predict.ReActV2 do
 
   defp predict(program, react, history, pending) do
     tools = Enum.map(Map.values(react.tools), &tool_description(&1, react.signature))
-    Imp.Predict.Predict.call(program, Map.merge(pending, %{history: history, tools: tools}))
+
+    context_call(history, fn projected ->
+      Imp.Predict.Predict.call(program, Map.merge(pending, %{history: projected, tools: tools}))
+    end)
   end
 
   defp normalize_calls(%ToolCalls{} = calls, turn), do: ensure_ids(calls, turn)
@@ -604,7 +643,8 @@ defmodule Imp.Predict.ReActV2 do
   defp final_prediction(final, history, reason) do
     prediction =
       final
-      |> Map.put(:history, history)
+      |> Map.put(:history, history.full)
+      |> projection_metadata(history)
       |> Map.put(:termination_reason, reason)
       |> Imp.Prediction.new()
 
@@ -613,7 +653,7 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp incomplete_prediction(history, reason, error) do
-    fields = %{history: history, termination_reason: reason}
+    fields = projection_metadata(%{history: history.full, termination_reason: reason}, history)
 
     fields =
       if error,
@@ -647,6 +687,101 @@ defmodule Imp.Predict.ReActV2 do
   defp termination_reason(%Imp.ContextWindowExceededError{}), do: :context_window_exceeded
   defp termination_reason(%Imp.AdapterParseError{}), do: :parse_error
   defp termination_reason(_reason), do: :prediction_error
+
+  # Full history remains the durable result. Only whole prior episode groups are
+  # eligible for prompt projection; tool observations appended in this call are
+  # protected even if they alone exceed the model window.
+  defp history_context(history, signature) do
+    outputs = Imp.Signature.output_names(signature)
+    size = length(history.messages)
+
+    boundaries =
+      history.messages
+      |> Enum.with_index(1)
+      |> Enum.filter(fn {entry, _} ->
+        outputs != [] and
+          Enum.all?(outputs, fn name ->
+            Map.has_key?(entry, name) or Map.has_key?(entry, to_string(name))
+          end)
+      end)
+      |> Enum.map(&elem(&1, 1))
+
+    boundaries =
+      if size > 0 and List.last(boundaries) != size, do: boundaries ++ [size], else: boundaries
+
+    %{full: history, boundaries: boundaries, omitted: 0, omitted_groups: 0, retries: 0}
+  end
+
+  defp append_history(context, event),
+    do: %{context | full: Imp.History.append(context.full, event)}
+
+  defp context_call(context, call) do
+    projected = %{context.full | messages: Enum.drop(context.full.messages, context.omitted)}
+
+    case call.(projected) do
+      {:ok, prediction} ->
+        {:ok, prediction, context}
+
+      {:error, reason} ->
+        if context_window_exceeded?(reason) do
+          remaining = Enum.drop_while(context.boundaries, &(&1 <= context.omitted))
+
+          if remaining != [] and context.retries < 8 do
+            drop =
+              if context.retries == 7,
+                do: length(remaining),
+                else: max(div(length(remaining) + 1, 2), 1)
+
+            cutoff = Enum.at(remaining, drop - 1)
+
+            context = %{
+              context
+              | omitted: cutoff,
+                omitted_groups: context.omitted_groups + drop,
+                retries: context.retries + 1
+            }
+
+            :ok =
+              Imp.Run.emit(:context_projected,
+                component: __MODULE__,
+                metadata: projection(context)
+              )
+
+            context_call(context, call)
+          else
+            diagnostic =
+              if remaining == [], do: :history_not_reducible, else: :recovery_budget_exhausted
+
+            {:error,
+             %Imp.ContextWindowExceededError{
+               message: "ReActV2 context cannot be reduced safely",
+               reason: %{diagnostic: diagnostic, cause: reason, projection: projection(context)}
+             }, context}
+          end
+        else
+          {:error, reason, context}
+        end
+    end
+  end
+
+  defp projection(context),
+    do: %{
+      reason: :context_window_exceeded,
+      omitted_prior_entries: context.omitted,
+      omitted_prior_groups: context.omitted_groups,
+      recovery_requests: context.retries
+    }
+
+  defp projection_metadata(fields, %{omitted: 0}), do: fields
+
+  defp projection_metadata(fields, context),
+    do: Map.put(fields, :context_projection, projection(context))
+
+  defp context_window_exceeded?(%Imp.ContextWindowExceededError{}), do: true
+  defp context_window_exceeded?({:lm_failed, _, reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?({:error, reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?(_), do: false
 
   defp coerce_history(nil), do: {:ok, Imp.History.new()}
   defp coerce_history(%Imp.History{} = history), do: {:ok, history}

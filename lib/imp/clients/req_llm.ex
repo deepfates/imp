@@ -14,6 +14,11 @@ defmodule Imp.Clients.ReqLLM do
   or capacity reservation; without a model tokenizer it is not treated as an
   exact token counter.
 
+  Non-streaming HTTP 400 errors with the structured code
+  `error.code = "context_length_exceeded"` become
+  `Imp.ContextWindowExceededError`. Other provider errors retain their original
+  shape; prose and generic HTTP 400 responses do not trigger context recovery.
+
   `:openrouter_reasoning` is an Imp-owned OpenRouter wire option for the
   documented nested `reasoning` object. It currently accepts exactly an
   `:effort` value and is removed before ReqLLM option validation. This avoids
@@ -327,7 +332,7 @@ defmodule Imp.Clients.ReqLLM do
         {:ok, from_response(response, lm.model)}
 
       {:error, reason} ->
-        {:error, reason}
+        {:error, normalize_context_refusal(reason)}
 
       other ->
         {:error, {:invalid_req_llm_response, inspect(other)}}
@@ -337,6 +342,35 @@ defmodule Imp.Clients.ReqLLM do
   catch
     kind, reason -> {:error, {:req_llm_generate_failed, error_message({kind, reason})}}
   end
+
+  # OpenAI-compatible providers name this refusal in the structured error code.
+  # General HTTP 400s and prose mentioning context are not safe retry signals.
+  defp normalize_context_refusal(
+         %ReqLLM.Error.API.Request{status: 400, response_body: body} = error
+       ) do
+    body =
+      if is_binary(body) do
+        case Jason.decode(body) do
+          {:ok, decoded} -> decoded
+          _ -> nil
+        end
+      else
+        body
+      end
+
+    case body do
+      %{"error" => %{"code" => "context_length_exceeded"}} ->
+        %Imp.ContextWindowExceededError{
+          message: "Provider refused the input context length",
+          reason: %{status: 400, code: "context_length_exceeded"}
+        }
+
+      _ ->
+        error
+    end
+  end
+
+  defp normalize_context_refusal(error), do: error
 
   def cache_key(%__MODULE__{} = lm, messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.cache_key/3")

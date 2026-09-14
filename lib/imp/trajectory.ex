@@ -34,7 +34,8 @@ defmodule Imp.Trajectory do
     :tool_result,
     :reasoning,
     :final,
-    :capture_gap
+    :capture_gap,
+    :context_projected
   ]
 
   @doc "Builds a JSON-encodable ATIF document from one run's ordered events or stored event maps."
