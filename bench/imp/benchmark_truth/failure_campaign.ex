@@ -1292,7 +1292,8 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
   defp sha256(value),
     do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower) |> then(&("sha256:" <> &1))
 
-  defp runtime_snapshot do
+  @doc false
+  def runtime_snapshot do
     %{
       admission: Imp.Tasks.admission_status(),
       linked_tasks: active_children(Imp.Tasks.supervisor()),
@@ -1332,13 +1333,15 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     end)
   end
 
-  defp settle_runtime(baseline) do
+  @doc false
+  def settle_runtime(baseline) do
     Enum.reduce_while(1..500, :timeout, fn _, _ ->
       snapshot = runtime_snapshot()
 
       if snapshot.admission == %{active: 0, queued: 0} and
            MapSet.subset?(snapshot.linked_tasks, baseline.linked_tasks) and
            MapSet.subset?(snapshot.unlinked_tasks, baseline.unlinked_tasks) and
+           MapSet.subset?(snapshot.processes, baseline.processes) and
            MapSet.subset?(snapshot.ports, baseline.ports) and
            MapSet.subset?(snapshot.telemetry_handlers, baseline.telemetry_handlers) do
         {:halt, :ok}
