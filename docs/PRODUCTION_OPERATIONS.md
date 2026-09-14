@@ -151,8 +151,9 @@ Imp includes the `Imp.ACP` adapter formerly distributed as imp_acp. Remove the
 `imp_acp` dependency and depend directly on this Imp version; the `Imp.ACP`
 namespace and its program factory, permission, session-store, and cleanup
 contracts remain available. Existing scripts call `Imp.ACP.run/1` as before.
-Ordinary Imp boot starts supervision and ExMCP's runtime tables, but no protocol
-listeners, subprocess servers, or remote connections. `run/1` reserves stdout
+Ordinary Imp boot starts its supervision without starting ExMCP. Protocol use
+starts ExMCP explicitly; listeners, subprocess servers, and remote connections
+require an explicit caller. `run/1` reserves stdout
 before application boot; release launchers must likewise keep logs on stderr.
 
 For remote capabilities, prefer an explicitly owned import:
