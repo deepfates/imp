@@ -55,7 +55,7 @@ validators resolve ancestor commit SHAs.
 Public behavior belongs to code, tests, and user documentation. Pinned upstream
 semantics belong to `benchmarks/authorities.json`; reproducible research
 protocols and retained results belong to `benchmarks/reproductions.json` and
-`benchmarks/evidence/`. Tickets record unfinished work, not product truth.
+`benchmarks/evidence/`. Unfinished work is a pull request on a topic branch; there is no ticket file in this repository.
 
 `benchmarks/claims.json` is a scoped index for auditing unusually broad or
 comparative statements. It is not a release score. Read
