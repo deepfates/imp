@@ -4,16 +4,13 @@ Imp is an Elixir framework that turns language-model behavior into a typed Elixi
 you can measure, improve from examples, and run inside an
 ordinary OTP application. It brings the central idea of
 [DSPy](https://dspy.ai)—programming behavior and improving it from examples
-rather than hand-editing prompts—to the BEAM. Its longer aim is complete
-semantic parity with DSPy and its useful ecosystem at the level of observable
-program behavior, plus BEAM-native improvements rather than copies of Python
-mechanics.
+rather than hand-editing prompts—to the BEAM.
 
-That aim is a per-surface obligation, not a blanket claim that every DSPy
-integration or paper result has been reproduced. The supported and
-experimental boundaries below describe the current product; [Imp for DSPy
-users](docs/IMP_FOR_DSPY_USERS.md) maps implemented semantics and intentional
-differences.
+**Release state.** The released tag `v0.3.2` does not contain `Imp.ACP`. The
+integrated protocol adapters — `Imp.ACP` and `Imp.MCP.connect/2`, absorbed from
+the retired `imp_acp` package — exist only on `main` until the next tag.
+Installing `v0.3.2` gives you the library described below without them; using
+the adapters today means a local checkout of `main`.
 
 Here, “typed” means required inputs are checked and model outputs are parsed
 and validated against the signature before application code receives them.
@@ -156,10 +153,8 @@ provider-free parts of the learning path and deployment example do too.
 
 ## Connect tools or expose a program
 
-The integrated protocol APIs below are in this unreleased source tree; they are
-not part of the `v0.3.2` installation shown above. Until a coordinated release is
-published, use the reviewed private source bundle or an explicit local checkout
-for this feature. Do not expect the released tag to contain `Imp.ACP`.
+Everything in this section is on `main` only, not in `v0.3.2` (see the release
+state at the top).
 
 `Imp.MCP.connect/2` imports authorized MCP servers through ExMCP, returning
 ordinary tools plus explicit connection cleanup. Source server/tool identities,
@@ -177,20 +172,18 @@ protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPER
   call through evaluation, optimization, persistence, and deployment.
 - [Imp for DSPy users](docs/IMP_FOR_DSPY_USERS.md) — map familiar DSPy
   concepts to Imp and understand the intentional BEAM differences.
-- [Execution evidence and ATIF](docs/TRAJECTORIES.md) — correlated traces, bounded
-  native run observations, cancellation evidence, and portable trajectories.
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md) — credentials,
-  telemetry, concurrency, persistence, and failure handling.
+  telemetry, concurrency, persistence, failure handling, and the protocol
+  adapters.
 - [Runnable Livebooks](livebooks/01_real_lm_front_door.livemd) — inspect the
   same progression in IEx-ready notebooks.
+- [Evidence](docs/EVIDENCE.md) — the research side: how far the DSPy parity
+  aim has actually been established, benchmark reproductions, execution
+  traces and portable trajectories, and what remains a target.
 
 Run `mix docs` for the exhaustive module and function reference.
 
-Imp follows DSPy's central idea—program the behavior you want and optimize it
-from examples—in an Elixir system built around immutable values, explicit
-effects, supervision, and concurrency.
-
 For an ordinary ACP workspace agent with bounded tools, see
 [examples/workspace_agent](examples/workspace_agent/README.md). It depends
-directly on this Imp package and includes a provider-free mode for checking
-its launcher and workspace boundary.
+directly on this Imp checkout (`main` only, like the adapters it uses) and
+includes a provider-free mode for checking its launcher and workspace boundary.
