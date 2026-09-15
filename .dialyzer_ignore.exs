@@ -232,4 +232,5 @@
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
   {"lib/imp/optimizer/report.ex", :call_without_opaque, {755, 55}},
   {"lib/imp/schema.ex", :pattern_match_cov, {459, 8}}
+  {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {168, 13}},
 ]
