@@ -35,7 +35,7 @@ second product.
    observable result. Private construction, module identity, and call graphs
    are diagnostics, not substitutes for that test.
 2. **Keep one owner for each fact.** Git owns source identity, lockfiles own
-   resolved dependencies, `tk` owns unfinished work, and an experiment artifact
+   resolved dependencies, pull requests own unfinished work, and an experiment artifact
    owns its frozen inputs and result. A generated view must not become another
    editable registry.
 3. **Separate product, compatibility, research, and external smoke checks.**
@@ -151,7 +151,7 @@ Research completion is judged from the question, frozen protocol, raw result,
 and independently reproducible analysis for that study. It is not inferred
 from the release checklist or from a cumulative repository score.
 
-All unfinished work and dependencies live in `tk`. Markdown must not carry a
+All unfinished work lives in pull requests. Markdown must not carry a
 parallel roadmap or progress table.
 
 `mix package.check` stages the existing `package.files` boundary and exercises

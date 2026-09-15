@@ -69,7 +69,7 @@ defmodule Mix.Tasks.Imp.UpstreamFidelity do
     This generated report audits asserted upstream-conformance statements. It
     is not the product release verdict or work queue; the source repository's
     maintainer release procedure owns the ordinary consumer finish line and
-    `tk` owns unfinished work.
+    unfinished work lives in pull requests.
 
     Each status below is a maintainer-authored disposition. The generator checks
     that named evidence exists and that claim and reproduction registries are

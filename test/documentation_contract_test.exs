@@ -78,7 +78,7 @@ defmodule DocumentationContractTest do
     refute body =~ "The production release scope is tracked under ticket"
     refute body =~ "tk ready -T imp"
 
-    assert body =~ "All unfinished work and dependencies live in `tk`"
+    assert body =~ "All unfinished work lives in pull requests"
     assert body =~ ~r/Markdown must not carry a\s+parallel roadmap/
     assert body =~ "mix check"
     assert body =~ "mix livebook.execute.check"

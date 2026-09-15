@@ -630,8 +630,7 @@ defmodule Imp.UpstreamFidelity do
         docs: [
           "docs/LEARNING_PATH.md",
           "examples/local_gepa_banking77/README.md",
-          "docs/internal/RESEARCH_LANDSCAPE.md",
-          ".tickets/imp-88sn.md"
+          "docs/internal/RESEARCH_LANDSCAPE.md"
         ],
         artifacts: [
           "benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json",
@@ -785,8 +784,7 @@ defmodule Imp.UpstreamFidelity do
         ],
         docs: [
           "docs/LEARNING_PATH.md",
-          "docs/internal/BENCHMARK_TRUTH.md",
-          ".tickets/imp-88sn.md"
+          "docs/internal/BENCHMARK_TRUTH.md"
         ],
         artifacts: [
           "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json",

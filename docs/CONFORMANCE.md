@@ -3,7 +3,7 @@
 This generated report audits asserted upstream-conformance statements. It
 is not the product release verdict or work queue; the source repository's
 maintainer release procedure owns the ordinary consumer finish line and
-`tk` owns unfinished work.
+unfinished work lives in pull requests.
 
 Each status below is a maintainer-authored disposition. The generator checks
 that named evidence exists and that claim and reproduction registries are
@@ -144,7 +144,7 @@ Executable evidence:
 - test: `test/req_llm_client_test.exs`
 - test: `test/otp_state_semantics_test.exs`
 - test: `test/live_provider_test.exs`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: `docs/PRODUCTION_OPERATIONS.md`
 
 
@@ -175,7 +175,7 @@ Executable evidence:
 - test: `test/req_llm_client_test.exs`
 - test: `test/runtime_async_stream_cache_test.exs`
 - test: `test/stream_listener_incremental_test.exs`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: `docs/LEARNING_PATH.md`
 
 
@@ -413,7 +413,7 @@ Executable evidence:
 - test: `test/rlm_budget_test.exs`
 - test: `test/live_provider_e2e_test.exs`
 - docs: `docs/LEARNING_PATH.md`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: [docs/internal/RLM_FIDELITY.md](https://github.com/deepfates/imp/blob/main/docs/internal/RLM_FIDELITY.md) (repository only, not shipped in the package)
 - docs: `livebooks/04_tools_agents_mcp_rlm.livemd`
 
@@ -642,7 +642,6 @@ Executable evidence:
 - docs: `docs/LEARNING_PATH.md`
 - docs: [examples/local_gepa_banking77/README.md](https://github.com/deepfates/imp/blob/main/examples/local_gepa_banking77/README.md) (repository only, not shipped in the package)
 - docs: [docs/internal/RESEARCH_LANDSCAPE.md](https://github.com/deepfates/imp/blob/main/docs/internal/RESEARCH_LANDSCAPE.md) (repository only, not shipped in the package)
-- docs: [.tickets/imp-88sn.md](https://github.com/deepfates/imp/blob/main/.tickets/imp-88sn.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/admitted/gepa_contract/3f188ccdc6e3ad7cd1b9f00f9096e62c3024097d6de654b90364712477ef8cc7.json`
 - artifact: `benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json`
 
@@ -777,7 +776,6 @@ Executable evidence:
 - test: `test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs`
 - docs: `docs/LEARNING_PATH.md`
 - docs: [docs/internal/BENCHMARK_TRUTH.md](https://github.com/deepfates/imp/blob/main/docs/internal/BENCHMARK_TRUTH.md) (repository only, not shipped in the package)
-- docs: [.tickets/imp-88sn.md](https://github.com/deepfates/imp/blob/main/.tickets/imp-88sn.md) (repository only, not shipped in the package)
 - artifact: `benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json`
 - artifact: `benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json`
 
@@ -812,7 +810,7 @@ Executable evidence:
 - test: `test/datasets_contract_test.exs`
 - test: `test/integration/local_service_e2e_test.exs`
 - docs: `docs/LEARNING_PATH.md`
-- docs: `README.md`
+- docs: `../README.md`
 
 
 Indexed capability evidence:
@@ -847,7 +845,7 @@ Executable evidence:
 - test: `test/completion_surface_test.exs`
 - test: `test/task_supervision_test.exs`
 - test: `test/production_hardening_test.exs`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: `docs/LEARNING_PATH.md`
 
 
@@ -938,7 +936,7 @@ Executable evidence:
 - test: `test/documentation_contract_test.exs`
 - docs: `../README.md`
 - docs: `docs/LEARNING_PATH.md`
-- docs: `README.md`
+- docs: `../README.md`
 - docs: `livebooks/01_real_lm_front_door.livemd`
 
 

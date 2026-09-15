@@ -12,7 +12,7 @@ scientific or compatibility artifacts.
 4. Validated immutable artifacts provide evidence facts.
 5. `benchmarks/claims.json` scopes unusually broad, comparative, or scientific
    statements when a simple behavioral test is insufficient.
-6. `tk` records unfinished work, dependencies, and priorities.
+6. Pull requests hold unfinished work.
 
 No generated dashboard sits above these sources, and no aggregate score decides
 whether a release's documented user stories work.

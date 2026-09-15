@@ -4,7 +4,7 @@ This document is generated from `benchmarks/research_portfolio.json`. The
 registry defines the capability each
 research lane must demonstrate before Imp makes an effectiveness or parity
 claim. It contains hypotheses and preregistered decision rules, never current
-status. `tk` owns work state; retained validated artifacts own experimental
+status. Pull requests own work state; retained validated artifacts own experimental
 outcomes.
 
 An exact paper reproduction is preferred when its implementation and artifacts
