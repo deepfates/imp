@@ -177,9 +177,11 @@ protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPER
   adapters.
 - [Runnable Livebooks](livebooks/01_real_lm_front_door.livemd) — inspect the
   same progression in IEx-ready notebooks.
-- [Evidence](docs/EVIDENCE.md) — the research side: how far the DSPy parity
-  aim has actually been established, benchmark reproductions, execution
-  traces and portable trajectories, and what remains a target.
+- [Evidence](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md) —
+  the research side: how far the DSPy parity aim has actually been
+  established, benchmark reproductions, execution traces and portable
+  trajectories, and what remains a target. It lives in the source repository,
+  not in the installed package.
 
 Run `mix docs` for the exhaustive module and function reference.
 
