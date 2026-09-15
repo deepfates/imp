@@ -15,7 +15,6 @@
 #   exsss export shape; the construction is intentional and correct.
 [
   # defensive clause for non-covered result shapes
-  {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {169, 13}},
   # MapSet opacity on the stopword set (this one renders only under
   # --format raw; the default formatter drops it, the count still sees it)
   {"bench/imp/benchmark_truth/hover_bm25.ex", :call_without_opaque, {191, 36}},
