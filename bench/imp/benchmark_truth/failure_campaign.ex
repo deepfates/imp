@@ -42,19 +42,15 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     validate_positive!(:iterations, iterations)
     validate_positive!(:max_concurrency, max_concurrency)
     validate_positive!(:iteration_timeout_ms, iteration_timeout_ms)
-    warmup = prepare_runtime(opts)
+    warmup = prepare_runtime(opts, max_concurrency, iteration_timeout_ms)
     baseline = runtime_snapshot()
     telemetry = start_telemetry_capture()
 
     cases =
-      Enum.map(@deterministic_lanes, fn
-        {id, :concurrency} ->
-          repeat(id, iterations, iteration_timeout_ms, fn ->
-            concurrency_iteration(max_concurrency)
-          end)
-
-        {id, handler} ->
-          repeat(id, iterations, iteration_timeout_ms, fn -> run_lane(handler) end)
+      Enum.map(@deterministic_lanes, fn {id, handler} ->
+        repeat(id, iterations, iteration_timeout_ms, fn ->
+          lane_iteration(handler, max_concurrency)
+        end)
       end)
 
     live_cases = run_live_cases(opts)
@@ -123,6 +119,9 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
       ]
     }
   end
+
+  defp lane_iteration(:concurrency, max_concurrency), do: concurrency_iteration(max_concurrency)
+  defp lane_iteration(handler, _max_concurrency), do: run_lane(handler)
 
   defp run_lane(:cancellation), do: cancellation_iteration()
   defp run_lane(:timeout), do: timeout_iteration()
@@ -827,30 +826,44 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
     end
   end
 
-  defp prepare_runtime(opts) do
+  defp prepare_runtime(opts, max_concurrency, iteration_timeout_ms) do
     # The MCP lane explicitly consumes the optional protocol application. Start
     # its shared supervisors before measuring per-operation resource leaks;
     # ordinary Imp startup intentionally does not start ExMCP.
     {:ok, _} = Application.ensure_all_started(:ex_mcp)
+    warmed_lanes = warm_deterministic_lanes(max_concurrency, iteration_timeout_ms)
+
+    warmup = %{
+      "performed" => true,
+      "warmed_lanes" => warmed_lanes,
+      "network_hosts" => [],
+      "external_network" => false,
+      "billable_generation" => false
+    }
 
     if Keyword.get(opts, :live, false) do
-      %{
-        "performed" => true,
+      Map.merge(warmup, %{
         "authority" => "local_injected_transport",
-        "network_hosts" => [],
-        "external_network" => false,
-        "billable_generation" => false,
         "dummy_canary_sha256" => sha256(@dummy_canary)
-      }
+      })
     else
-      %{
-        "performed" => true,
-        "authority" => "local_protocol_runtime",
-        "network_hosts" => [],
-        "external_network" => false,
-        "billable_generation" => false
-      }
+      Map.put(warmup, "authority", "local_protocol_runtime")
     end
+  end
+
+  # Run every deterministic lane once before the leak baseline is taken. The
+  # first real HTTP round trip in a VM lazily starts services that then live for
+  # the rest of the VM: Plug.Cowboy attaches its :plug_cowboy telemetry handler
+  # on first use, and the kernel starts inet_gethost_native (two processes and
+  # one port) on the first hostname lookup. Neither is a per-iteration leak, but
+  # a cold baseline counted both as leaks whenever this campaign happened to be
+  # the VM's first HTTP user, which depended on the test seed. Warmup results
+  # are discarded; the measured iterations report any lane failure.
+  defp warm_deterministic_lanes(max_concurrency, iteration_timeout_ms) do
+    Enum.map(@deterministic_lanes, fn {id, handler} ->
+      _ = normalize(fn -> lane_iteration(handler, max_concurrency) end, 0, iteration_timeout_ms)
+      id
+    end)
   end
 
   defp repeat_live(id, iterations, timeout_ms, fun) do

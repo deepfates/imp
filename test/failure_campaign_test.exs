@@ -47,6 +47,9 @@ defmodule Imp.FailureCampaignTest do
              "remaining_live_lanes" => 2
            }
 
+    assert get_in(artifact, ["configuration", "runtime_warmup", "warmed_lanes"]) ==
+             artifact["scope"]
+
     assert artifact["runtime"]["leak_free"]
 
     assert artifact["runtime"]["leaks"] == %{
