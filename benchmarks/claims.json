@@ -579,8 +579,7 @@
         "examples/local_optimize_anything_retry_policy/data/untouched-v2.jsonl",
         "benchmarks/evidence/archive/optimize_anything/retry-policy-v2/manifest.json",
         "test/local_optimize_anything_retry_policy_result_test.exs",
-        "test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs",
-        ".tickets/imp-88sn.md"
+        "test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs"
       ],
       "requirements": [
         {
@@ -605,7 +604,7 @@
       "claim_type": "functional_effectiveness",
       "comparison": "imp_baseline_and_authored_comparator",
       "gate_policy": "informational",
-      "sources": ["benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json", "benchmarks/evidence/archive/optimize_anything/a4181fed7bfffd3be7299f75923ec96e8aafa843f7f121804718c857fe44fc40.tar.zst", "docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md", ".tickets/imp-88sn.md", "test/optimize_anything_campaign_test.exs", "test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs"],
+      "sources": ["benchmarks/evidence/admitted/optimize_anything/0aa498b5ae3ab30ae53c74ddafb80e65f50604dd9d4766a1cc324f0b9fb2fd25.json", "benchmarks/evidence/archive/optimize_anything/a4181fed7bfffd3be7299f75923ec96e8aafa843f7f121804718c857fe44fc40.tar.zst", "docs/internal/BENCHMARK_TRUTH.md", "docs/internal/COVERAGE_MATRIX.md", "test/optimize_anything_campaign_test.exs", "test/local_optimize_anything_retry_policy_three_seed_evidence_test.exs"],
       "requirements": [
         {
           "id": "optimize_anything.non_prompt.full",

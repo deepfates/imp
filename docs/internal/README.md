@@ -21,6 +21,6 @@ Start with the question you are trying to answer:
 The repository [README](../../README.md) owns the user-facing purpose and path.
 The [release procedure](../maintainers/RELEASE.md) owns the current product
 finish line; machine-readable pins and artifact coordinates live under
-`benchmarks/`; unfinished work lives in `tk`. Dated reports and historical
+`benchmarks/`; unfinished work lives in pull requests. Dated reports and historical
 results remain useful at their recorded scope, but do not silently become
 current decisions.

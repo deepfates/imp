@@ -46,6 +46,9 @@ one task never becomes general effectiveness.
   named by their own SHA-256, and a validator suite replays each one.
 - The [conformance report](CONFORMANCE.md) is an audit aid generated from
   pinned authority and implementation mappings; it is not a release score.
+- Execution traces, bounded native run observations, cancellation evidence,
+  and portable ATIF trajectories are described in
+  [Execution evidence and ATIF](TRAJECTORIES.md).
 
 The discipline is simple: a public claim states its scope and points to
 observable evidence. Users should not need maintainer bookkeeping to decide
