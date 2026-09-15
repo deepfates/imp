@@ -62,6 +62,26 @@ jobs:
       - uses: ./.github/actions/elixir-setup
       - run: mix check
 
+  # `check` above restores the deps/_build cache when mix.lock matches, so on
+  # a cache hit it never proves that a cold checkout can fetch and build. This
+  # job does what a stranger does: clone, deps.get, mix check. No cache, no
+  # Hex warm step, nothing carried over from another run. Full history because
+  # `git clone` has it and some default tests read it.
+  stranger:
+    name: stranger.check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28"
+          elixir-version: "1.19"
+      - run: mix local.hex --force
+      - run: mix deps.get
+      - run: mix check
+
   package:
     name: package.check
     runs-on: ubuntu-latest
