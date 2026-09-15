@@ -1,0 +1,72 @@
+# Dependency-advisory ignores for `mix quality.check`.
+#
+# Format: one advisory id per line; `#` lines are comments. The gate reads this
+# file twice: `mix deps.audit --ignore-file .audit_ignore` (mix_audit) reads it
+# directly, and `mix hex.audit` reads it through audit_ignored_advisory_ids/0 in
+# mix.exs. hex.audit stays in the gate because mix_audit does not check for
+# retired packages; with these ids ignored it still fails on a retirement or on
+# any advisory not listed here.
+#
+# Every entry records what was verified, and the condition that retires it.
+# Verified 2026-09-15 against the ERLEF CNA records that hex.audit serves
+# (https://api.osv.dev/v1/vulns/<id>), the GitHub Advisory Database
+# (`gh api /advisories?cve_id=<cve>`), and the cowlib and cowboy sources at the
+# versions mix.lock pins.
+#
+# Shared facts. mix.lock pins cowlib 2.20.0, the newest release on Hex, and
+# cowboy 2.19.0. Both arrive only through ex_mcp, which imp declares
+# `runtime: false`; imp's own Plug.Cowboy call sites are tests, bench and the
+# source-checkout-only demo task, none of which ship in the Hex package. All
+# three ERLEF records carry an open-ended Hex range (introduced 2.9.0, no fixed
+# version), so hex.audit flags every cowlib release that exists, including the
+# ones that carry the fix. That is why the advisory gate moved to mix_audit.
+
+# EEF-CVE-2026-43971 / CVE-2026-43971 (MEDIUM) - Link header directive smuggling
+# via unescaped target/rel/attribute keys in cow_link:link/1.
+# VERIFIED FIXED in the version we ship. The ERLEF record names fix commit
+# 89da27ee4c241f5d649ba7d9b7f2188918af6cea ("Link: escape and validate values
+# when building", 2026-08-18); in ninenines/cowlib,
+# `git merge-base --is-ancestor 89da27ee 2.20.0` returns true, and the record's
+# own GIT range ends at that commit and lists every affected version up to
+# 2.19.0 but not 2.20.0. Only the open-ended Hex range still matches.
+# GHSA-gg23-fwhr-prjh carries no affected package ranges at all.
+# RETIRE when the ERLEF Hex range gains `fixed: 2.20.0`.
+EEF-CVE-2026-43971
+
+# EEF-CVE-2026-43966 / CVE-2026-43966 / GHSA-w4f7-4cxr-rv3c (MEDIUM) - HTTP
+# response splitting via non-VCHAR bytes in cow_http_struct_hd:escape_string/2.
+# NOT FIXED IN COWLIB: at tag 2.20.0 escape_string/2 still copies every other
+# byte through verbatim (`escape_string(<<C,R/bits>>, Acc) -> escape_string(R,
+# <<Acc/binary,C>>)`), escaping only \ and ", and the ERLEF GIT range has no
+# fixed event. The fix shipped one layer up, in cowboy: GitHub records cowboy
+# < 2.16.0 vulnerable, first patched 2.16.0, from commit f77cb9b5 "Add
+# invalid_response_headers HTTP/1 option". We pin cowboy 2.19.0, and
+# deps/cowboy/src/cowboy_http.erl defaults invalid_response_headers to
+# `error_terminate`, which refuses any response header value containing CR or
+# LF before it reaches the socket. Plug raises Plug.Conn.InvalidHeaderError on
+# the same bytes a layer above that. test/dependency_advisory_mitigation_test.exs
+# locks the cowboy floor, the Plug rejection, and that no :imp module calls
+# cow_http_struct_hd.
+# RETIRE when the ERLEF cowlib record gains a fixed range. If the lock ever
+# drops below cowboy 2.16.0 the mitigation test fails first.
+EEF-CVE-2026-43966
+
+# EEF-CVE-2026-43969 / CVE-2026-43969 / GHSA-g2wm-735q-3f56 (LOW) - Cookie
+# request-header injection via an unvalidated encoder in cow_cookie:cookie/1.
+# NOT FIXED IN COWLIB AND NO FIXED RELEASE EXISTS. cookie/1 at tag 2.20.0 is
+# still the unvalidated five-clause function, the ERLEF GIT range has no fixed
+# event, and the only patch that exists anywhere is erlef/cowlib commit
+# 177953dd "Preliminary patch for CVE-2026-43969" on a fork that upstream has
+# not merged. GitHub's record disagrees with the source: it bounds the
+# vulnerable range at cowlib <= 2.16.1 with no patched version, which is why
+# mix_audit does not flag our 2.20.0.
+# Reachability: cookie/1 builds an outgoing Cookie *request* header, so its
+# callers are HTTP clients such as gun, which is not in this dependency tree.
+# Nothing in deps/ outside cowlib itself calls it; imp speaks HTTP through
+# Req/Finch/Mint; test/dependency_advisory_mitigation_test.exs asserts no :imp
+# module imports cow_cookie:cookie/1.
+# This one is ignored because no upgrade can remove it, not because it is a
+# false positive. It is reported in PR #107 rather than buried here.
+# RETIRE the moment cowlib publishes a release that validates cookie/1, and
+# move the lock to that release.
+EEF-CVE-2026-43969
