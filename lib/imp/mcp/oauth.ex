@@ -603,10 +603,10 @@ defmodule Imp.MCP.OAuth do
     end
   end
 
-  defp token_field(token, key) when is_map(token),
+  # Every caller reads a token the flow has already decoded into a map; the
+  # keys may be atoms or strings depending on who decoded it.
+  defp token_field(token, key),
     do: Map.get(token, key) || Map.get(token, Atom.to_string(key))
-
-  defp token_field(_token, _key), do: nil
 
   defp ensure_ex_mcp do
     case Application.ensure_all_started(:ex_mcp) do
