@@ -229,6 +229,17 @@ defmodule Imp.MCPConnectionTest do
     port
   end
 
+  # A descriptor pointing at a socket that accepts the connection and then
+  # answers nothing. This is what a host behind a firewall that drops packets,
+  # or a wedged proxy, looks like from here — and it is what "down" usually is;
+  # a refused connection is the polite case.
+  defp silent_server(name) do
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false, backlog: 128])
+    {:ok, port} = :inet.port(socket)
+    on_exit(fn -> :gen_tcp.close(socket) end)
+    %{"name" => name, "type" => "http", "url" => "http://127.0.0.1:#{port}/mcp"}
+  end
+
   # Live ExMCP client processes, so "left out" can be told apart from "left
   # half-open": a client nothing imported from is a socket and a process that
   # nobody will ever close.
@@ -279,10 +290,12 @@ defmodule Imp.MCPConnectionTest do
 
     assert Enum.map(imported.tools, & &1.name) == [:look]
 
-    assert [%{server: "mute", reason: {:mcp_tools_list_failed, "mute", detail}}] =
+    assert [%{server: "mute", index: 0, reason: {:mcp_tools_list_failed, "mute", detail}}] =
              imported.unavailable
 
-    assert is_binary(detail)
+    # The message the server sent, not the JSON-RPC envelope it arrived in:
+    # this is read in a log line and in an operator's report.
+    assert detail == "Tools list failed"
     assert length(client_pids() -- before) == 1
   end
 
@@ -339,6 +352,74 @@ defmodule Imp.MCPConnectionTest do
 
     assert {:error, {:mcp_auth_unavailable, "keyed", _}} =
              Imp.MCP.connect(required, trusted_servers: required, on_failure: :drop)
+  end
+
+  test "a server that accepts the connection and never answers costs its own timeout" do
+    working = server("working")
+    servers = [silent_server("silent-a"), silent_server("silent-b"), working]
+    before = client_pids()
+
+    {micros, result} =
+      :timer.tc(fn ->
+        Imp.MCP.connect(servers, trusted_servers: servers, on_failure: :drop, timeout: 2_000)
+      end)
+
+    assert {:ok, imported} = result
+    on_exit(imported.cleanup)
+
+    # Each dial is bounded on its own, so two silent servers cost two timeouts
+    # and the working server behind them is still dialed. Under one budget for
+    # the whole list this was {:error, :mcp_import_timeout}, whatever
+    # :on_failure said.
+    assert Enum.map(imported.tools, & &1.name) == [:look]
+
+    assert [
+             %{server: "silent-a", index: 0, reason: {:mcp_connection_failed, :timeout}},
+             %{server: "silent-b", index: 1, reason: {:mcp_connection_failed, :timeout}}
+           ] = imported.unavailable
+
+    elapsed = div(micros, 1_000)
+    assert elapsed < 6_000, "two 2s dials took #{elapsed}ms; they are not bounded one at a time"
+
+    # Neither silent dial left a client behind when it was killed at its deadline.
+    assert length(client_pids() -- before) == 1
+  end
+
+  test "an absence names which descriptor was left out, not only what it is called" do
+    working = server("same")
+    servers = [closed_port_server("same"), working]
+
+    assert {:ok, imported} =
+             Imp.MCP.connect(servers, trusted_servers: servers, on_failure: :drop, timeout: 5_000)
+
+    on_exit(imported.cleanup)
+
+    # Two descriptors under one name. A caller told only "same is unavailable"
+    # cannot tell which of its own two descriptors that is, and matching by name
+    # discards the one that connected.
+    assert [%{server: "same", index: 0}] = imported.unavailable
+    assert Enum.map(imported.tools, & &1.name) == [:look]
+    assert Imp.Tool.call(hd(imported.tools), %{}) == "observed"
+  end
+
+  test "a :tool_filter that raises refuses the import, and is never dropped as the server's fault" do
+    servers = [server("working")]
+    before = client_pids()
+
+    filter = fn _server, _schema -> raise "the caller's filter is broken" end
+
+    # :drop is about servers that did not answer. What the caller's own code
+    # did with a catalog that arrived is the caller's answer, and swallowing it
+    # would report a healthy server as unavailable.
+    assert {:error, {:mcp_tool_import_failed, _detail}} =
+             Imp.MCP.connect(servers,
+               trusted_servers: servers,
+               on_failure: :drop,
+               tool_filter: filter,
+               timeout: 5_000
+             )
+
+    assert client_pids() -- before == []
   end
 
   test "an unknown on_failure setting is refused by name" do

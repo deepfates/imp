@@ -171,12 +171,21 @@ headers, environment and working-directory claims remain untrusted input.
 One server that cannot be reached fails the whole import, which is what a
 caller that needs all of its tools wants. A long-lived host whose servers are
 independent passes `on_failure: :drop` instead: a server whose transport or
-`initialize` fails, or which cannot answer `tools/list`, is closed and left
-out, `imported.unavailable` carries `%{server: name, reason: reason}` for it,
-and the rest of the catalog is imported. Dropping covers the connection only —
-a descriptor `:authorize` refused, one whose declared `auth` cannot produce a
-header (a `bearer_env` variable declared `required` and unset, say), and a
-malformed one still refuse the import.
+`initialize` fails, which accepts the connection and never answers, or which
+cannot answer `tools/list`, is closed and left out, `imported.unavailable`
+carries `%{server: name, index: index, reason: reason}` for it, and the rest of
+the catalog is imported. Match absences on `index` — the position of the
+descriptor in the list that was passed in — and print `server`: two descriptors
+may carry the same name, and one without a name is reported as `"unnamed"`.
+Dropping covers the connection and `tools/list` only — a descriptor
+`:authorize` refused, one whose declared `auth` cannot produce a header (a
+`bearer_env` variable declared `required` and unset, say), a malformed one, and
+anything the caller's own `:tool_filter` raises still refuse the import.
+
+Each dial is bounded by `:timeout` on its own, so a host that accepts the
+connection and then answers nothing — a firewall dropping packets, a wedged
+proxy — costs that server its timeout and no more. Budget a boot that dials n
+servers at `n * :timeout` in the worst case.
 Imported clients follow `:owner` (the importing process by default); a temporary
 import worker should name its long-lived owner explicitly. Cleanup is idempotent.
 Closed-client calls return errors rather than exiting their callers.

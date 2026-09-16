@@ -21,15 +21,32 @@ User-visible changes to Imp are recorded here.
   warning) when the variable is unset, unless `"required" => true`. Static
   `"headers"` are unchanged.
 - Added `on_failure: :drop` to `Imp.MCP.connect/2`. Under it a server whose
-  transport or `initialize` fails, or which cannot answer `tools/list`, is left
-  out with its client closed instead of failing the whole import: the tools of
-  the servers that did connect are returned, and the new `unavailable` field of
-  `Imp.MCP.Import` names each dropped server with a short reason. The default
-  `on_failure: :refuse` keeps the previous all-or-nothing behaviour, except
-  that a transport that refuses the connection is now reported as
-  `{:mcp_connection_failed, reason}` rather than as the import helper's exit.
-  A descriptor `:authorize` refused, one whose declared `auth` cannot produce a
-  header, and a malformed one refuse the import under both settings.
+  transport or `initialize` fails, which accepts the connection and never
+  answers, or which cannot answer `tools/list`, is left out with its client
+  closed instead of failing the whole import: the tools of the servers that did
+  connect are returned, and the new `unavailable` field of `Imp.MCP.Import`
+  names each dropped server with a short reason and with the `index` of its
+  descriptor in the list that was passed in. The default `on_failure: :refuse`
+  keeps the previous all-or-nothing behaviour, except that a transport that
+  refuses the connection is now reported as `{:mcp_connection_failed, reason}`
+  rather than as the import helper's exit. A descriptor `:authorize` refused,
+  one whose declared `auth` cannot produce a header, a malformed one, and
+  anything raised by the caller's own `:tool_filter` refuse the import under
+  both settings.
+- Each MCP dial is now bounded by `:timeout` on its own rather than sharing one
+  budget with the whole list. A host that accepts the connection and answers
+  nothing returns within neither `:handshake_timeout` nor `:era_probe_timeout`,
+  so two of them used to exhaust the shared budget and refuse the import as
+  `{:error, :mcp_import_timeout}` whatever `:on_failure` said; now each costs
+  its own timeout and is reported as `{:mcp_connection_failed, :timeout}`.
+- An abandoned dial no longer leaks its client. `ExMCP.Client` traps exits and
+  ignores the `EXIT` from the process that started it, so killing the import
+  helper at a timeout left every half-open client alive, holding its socket,
+  for the life of the node.
+- A `tools/list` body that is not a catalog is now reported as
+  `{:mcp_tools_list_failed, server, {:invalid_mcp_tools_response, shape}}`
+  rather than as a bare `{:invalid_mcp_tools_response, shape}` that named no
+  server.
 
 ## 0.3.2 — 2026-09-01
 

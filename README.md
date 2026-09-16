@@ -161,8 +161,8 @@ ordinary tools plus explicit connection cleanup. Source server/tool identities,
 schemas, and annotations remain in each tool's `metadata.mcp` even when names
 are qualified to avoid collisions. One unreachable server fails the whole
 import by default; pass `on_failure: :drop` when the servers are independent,
-and the import leaves the unreachable one out, names it in `unavailable`, and
-keeps the tools of the rest.
+and the import leaves the unreachable one out, names it in `unavailable` with
+the position of its descriptor, and keeps the tools of the rest.
 
 `Imp.ACP.start_link/1` and `Imp.ACP.run/1` expose an ordinary Imp program to
 an ACP host. These are optional entry points, now included in Imp; consumers
