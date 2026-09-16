@@ -9,11 +9,14 @@ defmodule Imp.MCP.Import do
 
   `index` is the position of the dropped descriptor in the list given to
   `import_tools/2`, and it is the only thing in the entry that identifies which
-  descriptor was left out. A name does not: names are not required to be unique
-  (`disambiguate_tool_names/2` exists because two servers collide), and a
-  descriptor with no `"name"` is reported as `"unnamed"`. `server` is for the
-  message an operator reads; `index` is for the caller deciding which of its own
-  descriptors is now absent.
+  descriptor was left out. A name does not: names are not required to be unique,
+  and a descriptor with no `"name"` is reported as `"unnamed"`. `server` is for
+  the message an operator reads; `index` is for the caller deciding which of its
+  own descriptors is now absent.
+
+  What is left out changes nothing about what the tools beside it are called:
+  names come from the declaration. See "What a tool is named" in
+  `Imp.MCP.Connections`.
   """
   defstruct tools: [], annotations: %{}, provenance: %{}, cleanup: nil, unavailable: []
 
@@ -82,13 +85,56 @@ defmodule Imp.MCP.Connections do
   A list of such servers used to spend one shared budget and refuse the whole
   import whatever `:on_failure` said.
 
+  ## What a tool is named
+
+  The declaration decides, and nothing else. A descriptor may carry a
+  `"tool_prefix"`:
+
+      %{"name" => "exa", "type" => "http", "url" => "…", "tool_prefix" => "exa_"}
+
+  Every tool that server offers is then named `exa_` <> its own name, always,
+  whether or not anything else is connected. A descriptor without a prefix
+  contributes its tools under the names the server gave them.
+
+  Nothing is ever renamed to resolve anything. If two connected servers without
+  prefixes offer the same tool name, the import refuses with
+  `{:mcp_tool_name_collision, tool, servers}` naming the tool and both servers,
+  and logs the fix — give one of them a `"tool_prefix"`. A tool whose name is
+  one the program has already taken (`:reserved_tool_names`) is refused the same
+  way.
+
+  The refusal stands under `on_failure: :drop`. Dropping is for what the network
+  did; two servers claiming one name is what the caller wrote, and continuing
+  without one of them would discard a capability the caller asked for.
+
+  This used to be decided by collision: a name two connected servers both
+  offered was qualified `mcp_<server>_<tool>`, and any other name was left
+  alone. That made the name a fact about which servers answered. Under
+  `on_failure: :drop` a second server going down took the qualification off
+  every tool of the server that did answer — a caller holding `mcp_kite_post`
+  yesterday held `post` today — and whatever addresses a tool by name moved with
+  it: an allowance, a stored record of what an agent may do, the demonstrations
+  in its own prompt.
+
+  The consequence to know about: a collision between two unprefixed servers can
+  go unnoticed for as long as one of them is absent, and then refuse a start on
+  the morning they both answer. That is the trade this makes. A refusal naming
+  the two servers, the tool and the fix is recoverable in one edit; a silent
+  rename of a name other things are addressing is not, and it happens on exactly
+  the same morning.
+
+  `Imp.Tool` provenance (`tool.metadata.mcp`) carries the server and the name
+  the server published, whatever the tool ended up called.
+
   Dropping covers failures of the connection and of `tools/list`, not of the
   declaration. A descriptor that `:authorize` refused, one whose `auth` cannot
   produce a header (a `bearer_env` variable declared `required` and unset, for
-  example), and one that is malformed all still refuse the import under either
-  setting: they are decisions the caller made before anything was dialed, and
-  silently continuing without them would discard the caller's own answer. So
-  does anything raised by the caller's own `:tool_filter`.
+  example), one whose `"tool_prefix"` is not a string, and one that is malformed
+  all still refuse the import under either setting: they are decisions the
+  caller made before anything was dialed, and silently continuing without them
+  would discard the caller's own answer. So does a tool name two servers both
+  claim, which is the same kind of defect found a moment later. So does anything
+  raised by the caller's own `:tool_filter`.
   """
 
   require Logger
@@ -278,7 +324,8 @@ defmodule Imp.MCP.Connections do
     # Authorization and header resolution are separated from the dial because
     # only the dial is droppable: the first two are answers the caller already
     # gave, and `client_options/3` raises on a descriptor nobody can address.
-    with :ok <- authorize(server, opts),
+    with :ok <- validate_tool_prefix(server),
+         :ok <- authorize(server, opts),
          {:ok, headers} <- connection_headers(server, opts),
          options = client_options(server, opts, headers),
          {:ok, client} <- dial(options, timeout(opts)) do
@@ -339,9 +386,6 @@ defmodule Imp.MCP.Connections do
 
               {:error, reason} ->
                 {:unreachable, {:mcp_connection_failed, reason}}
-
-              other ->
-                {:unreachable, {:mcp_connection_failed, other}}
             end
           catch
             kind, reason -> {:unreachable, {:mcp_connection_failed, {kind, reason}}}
@@ -388,7 +432,7 @@ defmodule Imp.MCP.Connections do
           {:cont, {:ok, acc ++ sourced, unavailable}}
 
         {:error, reason} ->
-          if drop?(opts) and droppable?(reason) do
+          if drop?(opts) do
             # This one answered the handshake and then could not say what it
             # offers, so it contributes nothing. Close it here: an open client
             # nothing imported from would otherwise live as long as the import.
@@ -401,7 +445,7 @@ defmodule Imp.MCP.Connections do
     end)
     |> case do
       {:ok, sourced_schemas, unavailable} ->
-        with {:ok, schemas} <- disambiguate_tool_names(sourced_schemas, opts) do
+        with {:ok, schemas} <- name_tools(sourced_schemas, opts) do
           {:ok, Imp.MCP.import_tools(schemas), declared_annotations(schemas),
            Enum.reverse(unavailable)}
         end
@@ -416,7 +460,11 @@ defmodule Imp.MCP.Connections do
   end
 
   # Everything the server itself got wrong about its catalog is reported under
-  # one tag naming it, including a `tools/list` body that is not a catalog: that
+  # one tag naming it, and that tag is the only error this returns. `:drop`
+  # therefore covers all of it and nothing else: what a caller is told about a
+  # dropped server is always the server's own catalog failure, never a fault of
+  # the caller's that happened to surface here. Including a `tools/list` body
+  # that is not a catalog: that
   # is the server answering badly, and a reason no caller can map back to a
   # server is a reason no caller can act on. Everything after the catalog —
   # the caller's own `:tool_filter` raising, for one — is left to the caller's
@@ -442,13 +490,6 @@ defmodule Imp.MCP.Connections do
   end
 
   defp drop?(opts), do: Keyword.get(opts, :on_failure, :refuse) == :drop
-
-  # What `:drop` covers once a server has connected. A catch-all here would
-  # hand the caller a reason its own reporting has never heard of — Dwell names
-  # a remedy per reason — and would quietly swallow failures that are not the
-  # server's at all.
-  defp droppable?({:mcp_tools_list_failed, _server, _detail}), do: true
-  defp droppable?(_reason), do: false
 
   # What the import says about a server it left out. The reason is the term the
   # refusal would have carried, with its detail summarized: a transport error
@@ -542,57 +583,116 @@ defmodule Imp.MCP.Connections do
   end
 
   # MCP tool names are scoped to one server, while an Imp program consumes one
-  # flat catalog. Preserve the ordinary unqualified name when it is unique. If
-  # independent servers publish the same name, qualify every conflicting tool
-  # with its ACP server name so neither capability is silently discarded.
-  defp disambiguate_tool_names(sourced_schemas, opts) do
-    frequencies =
-      Enum.frequencies_by(sourced_schemas, fn {_server, schema} ->
-        schema |> Map.get("name") |> to_string()
-      end)
+  # flat catalog. What a tool is called here is the caller's declaration and
+  # nothing else: a descriptor's `"tool_prefix"` is prepended to every tool that
+  # server offers, and a descriptor without one contributes its tools under the
+  # names the server gave them.
+  #
+  # Nothing is renamed to resolve anything. This used to qualify a name two
+  # connected servers both offered, which made the name a fact about which
+  # servers answered: under `on_failure: :drop` a second server going down took
+  # the qualification off every tool of the server that did answer, and whatever
+  # addresses a tool by name moved with it.
+  defp name_tools(sourced_schemas, opts) do
+    reserved = opts |> Keyword.get(:reserved_tool_names, []) |> MapSet.new(&to_string/1)
 
-    reserved_names =
-      opts
-      |> Keyword.get(:reserved_tool_names, [])
-      |> MapSet.new(&to_string/1)
-
-    sourced =
+    named =
       Enum.map(sourced_schemas, fn {server, schema} ->
-        original_name = schema |> Map.get("name") |> to_string()
-        server_name = server_name(server)
-
-        schema =
-          if Map.fetch!(frequencies, original_name) > 1 or
-               MapSet.member?(reserved_names, original_name) do
-            schema
-            |> Map.put("name", qualified_tool_name(server_name, original_name))
-            |> Map.update(
-              "description",
-              "MCP tool #{original_name} from #{server_name}",
-              &qualified_tool_description(&1, server_name, original_name)
-            )
-          else
-            schema
-          end
-
-        {server_name, original_name, schema}
+        original = schema |> Map.get("name") |> to_string()
+        name = server |> tool_prefix() |> Kernel.<>(original)
+        {server_name(server), original, prefixed_schema(schema, server, original, name)}
       end)
 
-    generated_frequencies =
-      Enum.frequencies_by(sourced, fn {_server, _original, schema} -> schema["name"] end)
+    with :ok <- refuse_duplicate_names(named),
+         :ok <- refuse_reserved_names(named, reserved) do
+      {:ok, Enum.map(named, fn {_server, _original, schema} -> schema end)}
+    end
+  end
 
-    schemas =
-      Enum.map(sourced, fn {server_name, original_name, schema} ->
+  # A name the server gave is left exactly as it is, description included. A
+  # prefixed one says where it came from, because the name the model sees is no
+  # longer the name the server published.
+  defp prefixed_schema(schema, _server, original, name) when name == original, do: schema
+
+  defp prefixed_schema(schema, server, original, name) do
+    server_name = server_name(server)
+
+    schema
+    |> Map.put("name", name)
+    |> Map.update(
+      "description",
+      "MCP tool #{original} from #{server_name}",
+      &qualified_tool_description(&1, server_name, original)
+    )
+  end
+
+  # Two servers offering one name is a defect in the declaration, so it refuses
+  # the import rather than being papered over -- and it refuses under
+  # `on_failure: :drop` too, which drops what the network did and never what the
+  # caller wrote. The error names the tool and every server that offered it; the
+  # log names the fix, because a term cannot carry a sentence.
+  defp refuse_duplicate_names(named) do
+    named
+    |> Enum.group_by(fn {_server, _original, schema} -> schema["name"] end)
+    |> Enum.find(fn {_name, entries} -> length(entries) > 1 end)
+    |> case do
+      nil ->
+        :ok
+
+      {name, entries} ->
+        servers = Enum.map(entries, fn {server, _original, _schema} -> server end)
+
+        Logger.error(
+          "MCP tool #{inspect(name)} is offered by #{Enum.join(servers, " and ")}; " <>
+            "give one of them a \"tool_prefix\" in its descriptor"
+        )
+
+        {:error, {:mcp_tool_name_collision, name, servers}}
+    end
+  end
+
+  # The same refusal against the names the program has already taken. A server
+  # whose `"tool_prefix"` moves its tool off the reserved name is no collision:
+  # the check is on the name the program will see.
+  defp refuse_reserved_names(named, reserved) do
+    named
+    |> Enum.filter(fn {_server, _original, schema} ->
+      MapSet.member?(reserved, schema["name"])
+    end)
+    |> case do
+      [] ->
+        :ok
+
+      entries ->
+        {_server, _original, schema} = hd(entries)
         name = schema["name"]
+        servers = Enum.map(entries, fn {server, _original, _schema} -> server end)
 
-        if Map.fetch!(generated_frequencies, name) > 1 or MapSet.member?(reserved_names, name) do
-          Map.put(schema, "name", collision_qualified_tool_name(server_name, original_name))
-        else
-          schema
-        end
-      end)
+        Logger.error(
+          "MCP tool #{inspect(name)} from #{Enum.join(servers, " and ")} is a name this " <>
+            "program reserves; give that server a \"tool_prefix\" in its descriptor"
+        )
 
-    ensure_unique_tool_names(schemas, reserved_names)
+        {:error, {:mcp_tool_name_collision, name, servers}}
+    end
+  end
+
+  # Declared, never derived. An absent or empty prefix means the server's own
+  # names; anything that is not a string is a declaration this cannot act on and
+  # is refused before anything is dialed (`validate_tool_prefix/1`).
+  defp tool_prefix(server) do
+    case Map.get(server, "tool_prefix") do
+      prefix when is_binary(prefix) -> prefix
+      _absent -> ""
+    end
+  end
+
+  defp validate_tool_prefix(server) do
+    case Map.get(server, "tool_prefix") do
+      nil -> :ok
+      prefix when is_binary(prefix) -> :ok
+      other -> {:error, {:invalid_tool_prefix, server_name(server), shape(other)}}
+    end
   end
 
   # The tool declares its own nature in `annotations`; MCP carries that in
@@ -624,61 +724,6 @@ defmodule Imp.MCP.Connections do
 
   defp qualified_tool_description(_description, server_name, original_name),
     do: "MCP server: #{server_name}; original tool: #{original_name}."
-
-  defp qualified_tool_name(server_name, tool_name) do
-    full =
-      "mcp_#{tool_name_segment(server_name, "server")}_#{tool_name_segment(tool_name, "tool")}"
-
-    bounded_tool_name(full)
-  end
-
-  defp collision_qualified_tool_name(server_name, tool_name) do
-    full = qualified_tool_name(server_name, tool_name)
-    digest_source = server_name <> <<0>> <> tool_name
-
-    digest =
-      :crypto.hash(:sha256, digest_source) |> Base.encode16(case: :lower) |> binary_part(0, 8)
-
-    bounded_tool_name(full, digest)
-  end
-
-  defp bounded_tool_name(full, digest \\ nil)
-
-  defp bounded_tool_name(full, nil) do
-    if byte_size(full) <= 64 do
-      full
-    else
-      digest = :crypto.hash(:sha256, full) |> Base.encode16(case: :lower) |> binary_part(0, 8)
-      binary_part(full, 0, 55) <> "_" <> digest
-    end
-  end
-
-  defp bounded_tool_name(full, digest) do
-    prefix_bytes = min(byte_size(full), 55)
-    binary_part(full, 0, prefix_bytes) <> "_" <> digest
-  end
-
-  defp ensure_unique_tool_names(schemas, reserved_names) do
-    names = Enum.map(schemas, & &1["name"])
-
-    case Enum.find(names, fn name ->
-           Enum.count(names, &(&1 == name)) > 1 or MapSet.member?(reserved_names, name)
-         end) do
-      nil -> {:ok, schemas}
-      name -> {:error, {:mcp_tool_name_collision, name}}
-    end
-  end
-
-  defp tool_name_segment(value, fallback) do
-    value
-    |> to_string()
-    |> String.replace(~r/[^A-Za-z0-9_]/u, "_")
-    |> String.trim("_")
-    |> case do
-      "" -> fallback
-      segment -> segment
-    end
-  end
 
   defp tool_schemas(%{"tools" => tools}) when is_list(tools), do: {:ok, tools}
 

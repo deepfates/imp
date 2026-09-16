@@ -1022,18 +1022,29 @@ defmodule Imp.ACPTest do
       "headers" => []
     }
 
-    assert {:ok, %Imp.ACP.MCP.Import{} = import} =
+    # A name the program has already taken refuses rather than being renamed,
+    # so the declaration is what says to call this server's tools something else.
+    assert {:error, {:mcp_tool_name_collision, "annotated_destructive", ["annotated"]}} =
              Imp.ACP.MCP.import_tools([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
                reserved_tool_names: ["annotated_destructive"]
              )
 
+    prefixed = Map.put(server, "tool_prefix", "note_")
+
+    assert {:ok, %Imp.ACP.MCP.Import{} = import} =
+             Imp.ACP.MCP.import_tools([prefixed],
+               cwd: File.cwd!(),
+               trusted_servers: [prefixed],
+               reserved_tool_names: ["annotated_destructive"]
+             )
+
     on_exit(import.cleanup)
 
     refute Map.has_key?(import.tool_kinds, "annotated_destructive")
-    assert import.tool_kinds["mcp_annotated_annotated_destructive"] == "delete"
-    assert import.tool_kinds["annotated_read"] == "read"
+    assert import.tool_kinds["note_annotated_destructive"] == "delete"
+    assert import.tool_kinds["note_annotated_read"] == "read"
     assert :ok = import.cleanup.()
   end
 
@@ -1169,17 +1180,29 @@ defmodule Imp.ACPTest do
     assert Imp.Tool.call(tool, %{}) == workspace_name
     assert :ok = cleanup.()
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: [qualified_tool], cleanup: qualified_cleanup}} =
+    # A name the program has already taken is refused, not renamed: the tool a
+    # caller addresses must be the one its declaration named.
+    assert {:error, {:mcp_tool_name_collision, "external_workspace_name", ["imp-acp-demo-http"]}} =
              Imp.ACP.MCP.import_tools([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
                reserved_tool_names: ["external_workspace_name"]
              )
 
-    on_exit(qualified_cleanup)
-    assert qualified_tool.name == "mcp_imp_acp_demo_http_external_workspace_name"
-    assert Imp.Tool.call(qualified_tool, %{}) == workspace_name
-    assert :ok = qualified_cleanup.()
+    # The declaration says what to call it instead.
+    prefixed = Map.put(server, "tool_prefix", "demo_")
+
+    assert {:ok, %Imp.ACP.MCP.Import{tools: [prefixed_tool], cleanup: prefixed_cleanup}} =
+             Imp.ACP.MCP.import_tools([prefixed],
+               cwd: File.cwd!(),
+               trusted_servers: [prefixed],
+               reserved_tool_names: ["external_workspace_name"]
+             )
+
+    on_exit(prefixed_cleanup)
+    assert to_string(prefixed_tool.name) == "demo_external_workspace_name"
+    assert Imp.Tool.call(prefixed_tool, %{}) == workspace_name
+    assert :ok = prefixed_cleanup.()
   end
 
   test "authorized Streamable HTTP MCP credentials reach the server on every request" do
@@ -1297,6 +1320,17 @@ defmodule Imp.ACPTest do
       }
     ]
 
+    # Undeclared, one name claimed twice is a defect in the declaration and
+    # refuses, naming both servers and the tool rather than renaming either.
+    assert {:error, {:mcp_tool_name_collision, "external_workspace_name", names}} =
+             Imp.ACP.MCP.import_tools(servers, cwd: File.cwd!(), trusted_servers: servers)
+
+    assert names == ["alpha-tools", "beta.tools"]
+
+    servers =
+      Enum.zip(servers, ["alpha_", "beta_"])
+      |> Enum.map(fn {server, prefix} -> Map.put(server, "tool_prefix", prefix) end)
+
     assert {:ok, %Imp.ACP.MCP.Import{tools: tools, cleanup: cleanup}} =
              Imp.ACP.MCP.import_tools(servers,
                cwd: File.cwd!(),
@@ -1305,9 +1339,9 @@ defmodule Imp.ACPTest do
 
     on_exit(cleanup)
 
-    assert Enum.map(tools, & &1.name) == [
-             "mcp_alpha_tools_external_workspace_name",
-             "mcp_beta_tools_external_workspace_name"
+    assert Enum.map(tools, &to_string(&1.name)) == [
+             "alpha_external_workspace_name",
+             "beta_external_workspace_name"
            ]
 
     assert Enum.map(tools, &Imp.Tool.call(&1, %{})) == [workspace_name, workspace_name]

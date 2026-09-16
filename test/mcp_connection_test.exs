@@ -69,6 +69,18 @@ defmodule Imp.MCPConnectionTest do
     end
   end
 
+  # A catalog that overlaps with nothing in `Server`, for the declaration whose
+  # servers happen not to collide.
+  defmodule OtherServer do
+    use ExMCP.Server.Handler
+    use ExMCP.Server.DSL, name: "other-fixture", version: "1"
+
+    tool "listen", "Listen to the fixture" do
+      annotations(%{readOnlyHint: true, openWorldHint: false})
+      run(fn _args, state -> {:ok, "heard", state} end)
+    end
+  end
+
   defmodule UnlistableServer do
     use ExMCP.Server.Handler
     def init(_), do: {:ok, %{}}
@@ -78,21 +90,167 @@ defmodule Imp.MCPConnectionTest do
   end
 
   defp server(name) do
+    {descriptor, _stop} = stoppable_server(name, Server)
+    descriptor
+  end
+
+  # The same fixture with a handle on its shutdown, for a test that needs one
+  # declared server to stop answering between two imports of the same list.
+  # Safe to call twice: `on_exit` calls it again.
+  defp stoppable_server(name, handler) do
     {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
     :gen_tcp.close(socket)
     ref = {__MODULE__, port}
-    {:ok, _pid} = Server.start_link(transport: :http, port: port, ranch_ref: ref, use_sse: false)
-    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
-    %{"name" => name, "type" => "http", "url" => "http://127.0.0.1:#{port}/mcp"}
+    {:ok, _pid} = handler.start_link(transport: :http, port: port, ranch_ref: ref, use_sse: false)
+
+    stop = fn ->
+      try do
+        _ = Plug.Cowboy.shutdown(ref)
+        :ok
+      catch
+        _kind, _reason -> :ok
+      end
+    end
+
+    on_exit(stop)
+    {%{"name" => name, "type" => "http", "url" => "http://127.0.0.1:#{port}/mcp"}, stop}
   end
 
-  test "generic import retains source identity while qualifying duplicate names" do
+  # The defect this falsifies: the name a tool executed under was decided by
+  # frequency over the catalogs that answered, so a server that failed renamed
+  # the tools of the servers that did not. With `on_failure: :drop` that is not
+  # a tidiness problem: everything that addresses a tool by name -- an allowance,
+  # a stored record of what an agent may do, the demonstrations in its own
+  # prompt -- moved on the morning a neighbour went down.
+  #
+  # Two imports of the SAME descriptor list are what show it, so the list is
+  # built once and the second server is stopped between them.
+  test "a prefixed server's tools keep their names when the server beside it is silent" do
+    {two, stop_two} = stoppable_server("two", Server)
+    servers = [Map.put(server("one"), "tool_prefix", "one_"), two]
+
+    assert {:ok, up} = Imp.MCP.connect(servers, trusted_servers: servers)
+    assert Enum.sort(Enum.map(up.tools, &to_string(&1.name))) == ["look", "one_look"]
+    assert :ok = up.cleanup.()
+
+    stop_two.()
+
+    assert {:ok, down} =
+             Imp.MCP.connect(servers,
+               trusted_servers: servers,
+               on_failure: :drop,
+               timeout: 1_000
+             )
+
+    on_exit(down.cleanup)
+
+    # The same list, one server short. The prefix is declared, so the tool that
+    # is there is named exactly as it was, and the one that is not contributes
+    # no name at all.
+    assert Enum.map(down.tools, &to_string(&1.name)) == ["one_look"]
+    assert [%{server: "two", index: 1}] = down.unavailable
+    assert Imp.Tool.call(hd(down.tools), %{}) == "observed"
+  end
+
+  # The same stability without any prefix, where the catalogs do not overlap.
+  # Nothing is added to these names when the neighbour answers and nothing is
+  # taken off when it does not.
+  test "two unprefixed servers whose catalogs do not overlap keep their own names" do
+    {other, stop_other} = stoppable_server("other", OtherServer)
+    servers = [server("one"), other]
+
+    assert {:ok, up} = Imp.MCP.connect(servers, trusted_servers: servers)
+    assert Enum.sort(Enum.map(up.tools, &to_string(&1.name))) == ["listen", "look"]
+    assert :ok = up.cleanup.()
+
+    stop_other.()
+
+    assert {:ok, down} =
+             Imp.MCP.connect(servers,
+               trusted_servers: servers,
+               on_failure: :drop,
+               timeout: 1_000
+             )
+
+    on_exit(down.cleanup)
+    assert Enum.map(down.tools, &to_string(&1.name)) == ["look"]
+    assert [%{server: "other", index: 1}] = down.unavailable
+  end
+
+  # What used to be silently resolved by renaming. Two servers claiming one name
+  # is a defect in the declaration, and the refusal names the tool, both servers
+  # and -- in the log -- the option that fixes it. It is a refusal under
+  # `on_failure: :drop` as well: dropping is for what the network did.
+  #
+  # This is the trade the rule makes, and it is stated in the moduledoc: while
+  # one of the two is absent the collision goes unnoticed, and the morning they
+  # both answer it refuses. A refusal in one edit beats a rename of a name other
+  # things are addressing, which happens on exactly the same morning.
+  test "two unprefixed servers offering one tool name refuse the import, naming both" do
     servers = [server("one"), server("two")]
+
+    assert {:error, {:mcp_tool_name_collision, "look", ["one", "two"]}} =
+             Imp.MCP.connect(servers, trusted_servers: servers)
+
+    assert {:error, {:mcp_tool_name_collision, "look", ["one", "two"]}} =
+             Imp.MCP.connect(servers, trusted_servers: servers, on_failure: :drop)
+
+    # And the fix is one word in the declaration.
+    fixed = [Map.put(hd(servers), "tool_prefix", "one_"), List.last(servers)]
+    assert {:ok, imported} = Imp.MCP.connect(fixed, trusted_servers: fixed)
+    on_exit(imported.cleanup)
+    assert Enum.sort(Enum.map(imported.tools, &to_string(&1.name))) == ["look", "one_look"]
+  end
+
+  # The names the program has already taken are refused the same way, rather
+  # than the server's tool being renamed out from under the caller. One declared
+  # server, so there is nothing else this could be a collision with.
+  test "a tool named after one the program reserves is refused, not renamed" do
+    only = server("only")
+
+    assert {:error, {:mcp_tool_name_collision, "look", ["only"]}} =
+             Imp.MCP.connect([only], trusted_servers: [only], reserved_tool_names: ["look"])
+
+    # Unreserved, the same declaration imports under the server's own name.
+    assert {:ok, plain} = Imp.MCP.connect([only], trusted_servers: [only])
+    assert Enum.map(plain.tools, & &1.name) == [:look]
+    assert :ok = plain.cleanup.()
+
+    # And a prefix moves it off the reserved name, because the check is on the
+    # name the program will see.
+    prefixed = [Map.put(only, "tool_prefix", "only_")]
+
+    assert {:ok, imported} =
+             Imp.MCP.connect(prefixed,
+               trusted_servers: prefixed,
+               reserved_tool_names: ["look"]
+             )
+
+    on_exit(imported.cleanup)
+    assert Enum.map(imported.tools, &to_string(&1.name)) == ["only_look"]
+  end
+
+  # A prefix that is not a string is a declaration this cannot act on, so it is
+  # refused before anything is dialed, like an auth shape it does not know.
+  test "a tool_prefix that is not a string refuses the import" do
+    servers = [Map.put(server("one"), "tool_prefix", 7)]
+
+    assert {:error, {:invalid_tool_prefix, "one", _shape}} =
+             Imp.MCP.connect(servers, trusted_servers: servers, on_failure: :drop)
+  end
+
+  test "generic import retains source identity under declared prefixes" do
+    servers = [
+      Map.put(server("one"), "tool_prefix", "one_"),
+      Map.put(server("two"), "tool_prefix", "two_")
+    ]
+
     assert {:ok, imported} = Imp.MCP.connect(servers, trusted_servers: servers)
     on_exit(imported.cleanup)
     assert length(imported.tools) == 2
     assert Enum.uniq_by(imported.tools, & &1.name) == imported.tools
+    assert Enum.sort(Enum.map(imported.tools, &to_string(&1.name))) == ["one_look", "two_look"]
 
     for tool <- imported.tools do
       source = tool.metadata.mcp
@@ -265,7 +423,9 @@ defmodule Imp.MCPConnectionTest do
 
     on_exit(imported.cleanup)
 
-    # The server after the failing one was still dialed, and its tool is here.
+    # The server after the failing one was still dialed, and its tool is here,
+    # under the name its own server gave it: nothing else claims that name, and
+    # nothing renames it for the one that did not answer.
     assert Enum.map(imported.tools, & &1.name) == [:look]
     assert Imp.Tool.call(hd(imported.tools), %{}) == "observed"
 
