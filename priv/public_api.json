@@ -7176,6 +7176,7 @@
       "source": "lib/imp/predict/predict.ex",
       "struct_fields": [
         "adapter",
+        "adapter_opts",
         "config",
         "demos",
         "dynamic_adapter?",
