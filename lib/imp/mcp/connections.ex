@@ -26,7 +26,9 @@ defmodule Imp.MCP.Connections do
       %{"type" => "oauth", "credential" => "readwise"}
 
   resolves through the `Imp.MCP.OAuth.Store` passed as the `:credentials`
-  option, refreshing the grant when it is near expiry. See `Imp.MCP.OAuth`.
+  option, refreshing the grant when it is near expiry. The credential must have
+  been authorized for this descriptor's `"url"`; naming another server's
+  credential is refused rather than resolved. See `Imp.MCP.OAuth`.
 
       %{"type" => "bearer_env", "variable" => "EXA_API_KEY"}
 
@@ -461,6 +463,14 @@ defmodule Imp.MCP.Connections do
           {:ok, static_headers(server) ++ resolved}
         end
 
+      {type, _auth} when type in ["http", "sse"] ->
+        {:error,
+         auth_unavailable(
+           server,
+           ~s(auth must be a map naming a type, for example %{"type" => "oauth", ) <>
+             ~s("credential" => "readwise"})
+         )}
+
       {_type, nil} ->
         {:ok, []}
 
@@ -475,7 +485,10 @@ defmodule Imp.MCP.Connections do
   defp resolve_auth(%{"type" => "oauth"} = auth, server, opts) do
     with {:ok, credential} <- auth_string(auth, "credential", server),
          {:ok, store} <- credential_store(server, opts) do
-      case Imp.MCP.OAuth.authorization_header(store, credential) do
+      # The descriptor's own url decides which credential may answer for it. A
+      # descriptor cannot name another server's credential and be handed that
+      # server's token.
+      case Imp.MCP.OAuth.authorization_header(store, credential, required_string!(server, "url")) do
         {:ok, header} -> {:ok, [header]}
         {:error, reason} -> {:error, auth_unavailable(server, reason)}
       end

@@ -4128,7 +4128,7 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "authorization_header/2",
+        "authorization_header/3",
         "await/2",
         "begin/3",
         "cancel/1",
@@ -4143,8 +4143,8 @@
       "module": "Imp.MCP.OAuth",
       "signatures": {
         "functions": {
-          "authorization_header/2": [
-            "authorization_header(store, credential)"
+          "authorization_header/3": [
+            "authorization_header(store, credential, resource_url)"
           ],
           "await/2": [
             "await(pending, timeout \\\\ 300_000)"

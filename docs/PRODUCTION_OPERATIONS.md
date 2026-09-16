@@ -251,11 +251,40 @@ server = %{
 
 The grant is one encrypted file per credential under the directory the host
 names. `Imp.MCP.connect/2` refreshes it when it is within a minute of expiry,
-using the stored refresh token and without asking the person again. A host
-that already owns an HTTP route for the redirect passes `redirect_uri:` to
-`begin/3` and calls `Imp.MCP.OAuth.complete/2` with the callback parameters
-instead. `Imp.MCP.OAuth` says in full what the encryption protects and what it
-does not.
+and also whenever the authorization server stated no usable lifetime at all,
+using the stored refresh token and without asking the person again. When the
+refresh token is gone — revoked, or already rotated — the error is
+`{:mcp_oauth_reauthorization_required, credential}`, which a host can tell
+apart from a transport failure worth retrying.
+
+A grant is bound to the exact URL it was authorized for. A descriptor for a
+different `"url"` that names the same credential is refused with
+`{:mcp_oauth_credential_binding_mismatch, credential}` rather than handed the
+token, so a credential cannot be pointed at another server.
+
+A host that already owns an HTTP route for the redirect passes `redirect_uri:`
+to `begin/3`, keeps the pending value, and calls `Imp.MCP.OAuth.complete/2`
+with the callback parameters; it dispatches each callback to the right pending
+value by `pending.state`. Otherwise `begin/3` opens a loopback listener on
+`127.0.0.1` that answers only the redirect carrying this flow's `state` and
+404s anything else, so a stray local request cannot consume it.
+
+### The host secret
+
+`Imp.MCP.OAuth.store/1` takes a secret, and the file encryption key is derived
+from it. Generate 32 or more random bytes once — `:crypto.strong_rand_bytes(32)`,
+or `openssl rand -base64 32` — and keep it for the life of the host: change it
+and the stored credentials can no longer be read, and every server has to be
+authorized again. Store it in a file with owner-only permissions next to the
+credential directory, or in the host's environment. Never commit it, and never
+log it.
+
+`Imp.MCP.OAuth` says in full what that encryption protects (a copy of the
+credential file taken without the secret) and what it does not (anyone who can
+read the secret, the host's memory, or run code as the host's user). It also
+says where a token can still appear despite this module: once the header is
+handed to `ExMCP.Client` it lives in that client's transport state, and an OTP
+crash report prints it — as it does for a static `"headers"` entry.
 
 A bearer token the host reads from its own environment:
 
