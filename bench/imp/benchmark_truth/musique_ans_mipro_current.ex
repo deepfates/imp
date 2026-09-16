@@ -165,14 +165,16 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
           [
             temperature: route.temperature,
             top_p: route.top_p,
-            openrouter_reasoning: %{effort: :none}
+            reasoning_effort: :none,
+            openrouter_reasoning_wire: :nested
           ]
 
         :proposer ->
           [
             temperature: route.temperature,
             top_p: route.top_p,
-            openrouter_reasoning: %{effort: :high}
+            reasoning_effort: :high,
+            openrouter_reasoning_wire: :nested
           ]
       end
 

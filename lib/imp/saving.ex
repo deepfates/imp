@@ -1367,7 +1367,8 @@ defmodule Imp.Saving do
     "base_url" => :base_url,
     "request_id" => :request_id,
     "input_envelope" => :input_envelope,
-    "openrouter_reasoning" => :openrouter_reasoning,
+    "reasoning_effort" => :reasoning_effort,
+    "openrouter_reasoning_wire" => :openrouter_reasoning_wire,
     "req_http_options" => :req_http_options
   }
 
@@ -1400,8 +1401,17 @@ defmodule Imp.Saving do
   defp decode_req_llm_option_value!(:input_envelope, value),
     do: decode_req_llm_input_envelope!(value)
 
-  defp decode_req_llm_option_value!(:openrouter_reasoning, value),
-    do: decode_req_llm_openrouter_reasoning!(value)
+  defp decode_req_llm_option_value!(:reasoning_effort, value),
+    do: require_reasoning_effort!(value)
+
+  defp decode_req_llm_option_value!(:openrouter_reasoning_wire, value)
+       when value in ~w(top_level nested),
+       do: String.to_atom(value)
+
+  defp decode_req_llm_option_value!(:openrouter_reasoning_wire, value) do
+    raise ArgumentError,
+          "saved ReqLLM openrouter_reasoning_wire is unsupported: #{inspect(value)}"
+  end
 
   defp decode_req_llm_option_value!(key, value), do: decode_config_value(key, value)
 
@@ -1428,32 +1438,13 @@ defmodule Imp.Saving do
           "saved ReqLLM input_envelope must be a list, got: #{inspect(value)}"
   end
 
-  defp decode_req_llm_openrouter_reasoning!(%{"effort" => effort} = value)
-       when map_size(value) == 1,
-       do: %{"effort" => require_openrouter_effort!(effort)}
-
-  defp decode_req_llm_openrouter_reasoning!(entries) when is_list(entries) do
-    entries
-    |> decode_allowlisted_entries!(
-      %{"effort" => :effort},
-      "saved ReqLLM openrouter_reasoning",
-      fn :effort, value -> require_openrouter_effort!(value) end
-    )
-    |> Map.new(fn {:effort, effort} -> {"effort", effort} end)
-  end
-
-  defp decode_req_llm_openrouter_reasoning!(value) do
-    raise ArgumentError,
-          "saved ReqLLM openrouter_reasoning must contain exactly effort, got: #{inspect(value)}"
-  end
-
-  defp require_openrouter_effort!(effort)
-       when effort in ~w(none minimal low medium high xhigh max),
+  defp require_reasoning_effort!(effort)
+       when effort in ~w(none minimal low medium high xhigh default),
        do: effort
 
-  defp require_openrouter_effort!(effort) do
+  defp require_reasoning_effort!(effort) do
     raise ArgumentError,
-          "saved ReqLLM openrouter_reasoning effort is unsupported: #{inspect(effort)}"
+          "saved ReqLLM reasoning_effort is unsupported: #{inspect(effort)}"
   end
 
   defp decode_req_http_options!(options) when is_list(options) do

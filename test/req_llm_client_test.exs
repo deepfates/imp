@@ -2012,7 +2012,7 @@ defmodule ReqLLMClientTest do
     end
   end
 
-  test "OpenRouter nested reasoning is serialized through the ordinary client boundary" do
+  test "reasoning_effort reaches OpenRouter as the nested reasoning object when the wire says so" do
     owner = self()
 
     adapter = fn request ->
@@ -2045,7 +2045,8 @@ defmodule ReqLLMClientTest do
         },
         api_key: "provider-disabled",
         cache: false,
-        openrouter_reasoning: %{effort: :high},
+        reasoning_effort: :high,
+        openrouter_reasoning_wire: :nested,
         max_retries: 0,
         req_http_options: [adapter: adapter, retry: false, max_retries: 0]
       )
@@ -2057,18 +2058,44 @@ defmodule ReqLLMClientTest do
     request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
     assert request["reasoning"] == %{"effort" => "high"}
     refute Map.has_key?(request, "reasoning_effort")
-    refute Map.has_key?(request, "openrouter_reasoning")
 
-    assert lm.opts[:openrouter_reasoning] == %{"effort" => "high"}
+    # A call-time effort, the form Imp.Predict uses for native reasoning
+    # fields, takes the same road as a configured one.
+    plain = Imp.req_llm(lm.model, Keyword.delete(lm.opts, :reasoning_effort))
+
+    assert {:ok, _response} =
+             Imp.Clients.ReqLLM.generate(plain, [%{role: :user, content: "reason"}],
+               reasoning_effort: "low"
+             )
+
+    assert_received {:openrouter_reasoning_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["reasoning"] == %{"effort" => "low"}
+    refute Map.has_key?(request, "reasoning_effort")
+
+    # The one option a client carries and the one a program sets are the same
+    # option, so a program's effort replaces the client's instead of colliding.
+    assert {:ok, _response} =
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "reason"}],
+               reasoning_effort: :low
+             )
+
+    assert_received {:openrouter_reasoning_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["reasoning"] == %{"effort" => "low"}
+
+    assert lm.opts[:reasoning_effort] == :high
 
     clean_high =
       Imp.req_llm(%{provider: :openrouter, id: "provider/model", model: "provider/model"},
-        openrouter_reasoning: %{effort: :high}
+        reasoning_effort: :high,
+        openrouter_reasoning_wire: :nested
       )
 
     clean_none =
       Imp.req_llm(%{provider: :openrouter, id: "provider/model", model: "provider/model"},
-        openrouter_reasoning: %{effort: :none}
+        reasoning_effort: :none,
+        openrouter_reasoning_wire: :nested
       )
 
     messages = [%{role: :user, content: "reason"}]
@@ -2076,67 +2103,73 @@ defmodule ReqLLMClientTest do
 
     refute Imp.Clients.ReqLLM.cache_key(clean_high, messages, clean_high.opts) ==
              Imp.Clients.ReqLLM.cache_key(clean_none, messages, clean_none.opts)
+
+    # Without the switch, the effort stays a ReqLLM option and OpenRouter's
+    # provider sends it as the top-level field.
+    top_level = Imp.req_llm("openrouter:provider/model", reasoning_effort: :low)
+    refute Keyword.has_key?(top_level.opts, :openrouter_reasoning_wire)
+    assert top_level.opts[:reasoning_effort] == :low
   end
 
-  test "OpenRouter nested reasoning rejects ambiguity, invalid values, and other providers early" do
-    for reasoning <- [
-          %{},
-          %{effort: :invented},
-          %{effort: :high, budget: 10},
-          [effort: :high, effort: :low],
-          %{"effort" => :low, effort: :high},
-          "high"
-        ] do
-      assert_raise ArgumentError, ~r/:openrouter_reasoning/, fn ->
-        Imp.req_llm("openrouter:provider/model", openrouter_reasoning: reasoning)
+  test "reasoning_effort rejects unknown values and duplicates early, on any provider" do
+    for effort <- [:invented, "invented", %{effort: :high}, 3] do
+      assert_raise ArgumentError, ~r/:reasoning_effort/, fn ->
+        Imp.req_llm("openrouter:provider/model", reasoning_effort: effort)
       end
     end
 
-    assert_raise ArgumentError, ~r/cannot be combined/, fn ->
+    assert_raise ArgumentError, ~r/duplicate :reasoning_effort options/, fn ->
       Imp.req_llm("openrouter:provider/model",
-        openrouter_reasoning: %{effort: :high},
-        reasoning_effort: :high
-      )
-    end
-
-    configured =
-      Imp.req_llm("openrouter:provider/model", openrouter_reasoning: %{effort: :high})
-
-    assert_raise ArgumentError, ~r/cannot be combined/, fn ->
-      Imp.Clients.ReqLLM.generate(
-        configured,
-        [%{role: :user, content: "ambiguous"}],
+        reasoning_effort: :high,
         reasoning_effort: :low
       )
     end
 
-    assert_raise ArgumentError, ~r/duplicate :openrouter_reasoning options/, fn ->
-      Imp.req_llm("openrouter:provider/model",
-        openrouter_reasoning: %{effort: :high},
-        openrouter_reasoning: %{effort: :low}
-      )
+    for wire <- [:sideways, "nested_", 1] do
+      assert_raise ArgumentError, ~r/:openrouter_reasoning_wire/, fn ->
+        Imp.req_llm("openrouter:provider/model", openrouter_reasoning_wire: wire)
+      end
     end
 
-    assert_raise ArgumentError, ~r/duplicate :openrouter_reasoning options/, fn ->
+    # The nested wire is an OpenRouter fact; another provider refuses it.
+    assert {:error, {:req_llm_generate_failed, message}} =
+             Imp.Clients.ReqLLM.generate(
+               Imp.req_llm(%{provider: :openai, id: "model", model: "model"},
+                 reasoning_effort: :low,
+                 openrouter_reasoning_wire: :nested,
+                 cache: false
+               ),
+               [%{role: :user, content: "no transport"}],
+               []
+             )
+
+    assert message =~ "supported only for an OpenRouter model"
+
+    configured = Imp.req_llm("openai:provider/model", reasoning_effort: :high)
+
+    assert_raise ArgumentError, ~r/duplicate :reasoning_effort options/, fn ->
       Imp.Clients.ReqLLM.generate(
         configured,
         [%{role: :user, content: "duplicate"}],
-        openrouter_reasoning: %{effort: :high},
-        openrouter_reasoning: %{effort: :low}
+        reasoning_effort: :high,
+        reasoning_effort: :low
       )
     end
 
-    lm =
-      Imp.req_llm(
-        %{provider: :openai, id: "model", model: "model"},
-        openrouter_reasoning: %{effort: :none},
+    # A non-OpenRouter model keeps the option for ReqLLM's own provider encoding.
+    owner = self()
+
+    stub =
+      Imp.req_llm("openai:gpt-test",
+        test_pid: owner,
+        req_module: TextStub,
+        reasoning_effort: :high,
         cache: false
       )
 
-    assert {:error, {:req_llm_generate_failed, message}} =
-             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "no transport"}], [])
-
-    assert message =~ "supported only for an OpenRouter model"
+    assert {:ok, _} = Imp.Clients.ReqLLM.generate(stub, [%{role: :user, content: "hi"}], [])
+    assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
+    assert Keyword.fetch!(opts, :reasoning_effort) == :high
   end
 
   test "ReqLLM lifecycle starts correspond to real Chat-to-JSON fallback transports" do

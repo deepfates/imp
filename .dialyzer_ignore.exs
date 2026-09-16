@@ -57,9 +57,9 @@
   # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
   # struct, but its schema defaults the field to nil and Response.usage/1 is
   # `map() | nil`, so the nil clause is reachable at runtime.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1361},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1389, 8}},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {161, 7}},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1381},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1409, 8}},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {169, 7}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -195,9 +195,9 @@
   {"bench/imp/benchmark_truth/gepa_suite.ex", :no_return, {169, 8}},
   {"bench/imp/benchmark_truth/gepa_suite.ex", :no_return, {266, 8}},
   {"bench/imp/benchmark_truth/hover_bm25.ex", :guard_fail, 387},
-  {"bench/imp/benchmark_truth/hover_gepa_no_merge_plan.ex", :call, {1272, 18}},
-  {"bench/imp/benchmark_truth/hover_gepa_no_merge_plan.ex", :no_return, {1271, 8}},
-  {"bench/imp/benchmark_truth/hover_gepa_no_merge_plan.ex", :no_return, {591, 7}},
+  {"bench/imp/benchmark_truth/hover_gepa_no_merge_plan.ex", :call, {1280, 18}},
+  {"bench/imp/benchmark_truth/hover_gepa_no_merge_plan.ex", :no_return, {1279, 8}},
+  {"bench/imp/benchmark_truth/hover_gepa_no_merge_plan.ex", :no_return, {599, 7}},
   {"bench/imp/benchmark_truth/musique_ans.ex", :call, {267, 15}},
   {"bench/imp/benchmark_truth/musique_ans.ex", :no_return, {180, 7}},
   {"bench/imp/benchmark_truth/musique_ans.ex", :no_return, {264, 8}},

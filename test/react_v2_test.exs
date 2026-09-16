@@ -316,6 +316,41 @@ defmodule ReActV2Test do
     assert Keyword.get(forced_opts, :reasoning_effort) == nil
   end
 
+  test "a forced submit on an OpenRouter client with a configured effort still runs" do
+    # The live failure: a resident's client carried an effort, ReAct's forced
+    # submit named `reasoning_effort: nil` for that one call, and the client
+    # refused the two as a collision. One option, and nil means none.
+    {:ok, state} = Agent.start_link(fn -> :initial end)
+
+    lm =
+      Imp.req_llm("openrouter:provider/model",
+        req_module: NativeToolStub,
+        state: state,
+        test_pid: self(),
+        reasoning_effort: :high,
+        openrouter_reasoning_wire: :nested,
+        cache: false
+      )
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :forced_submit
+
+    # The ordinary call carries the effort as OpenRouter's nested object (a
+    # request step), not as ReqLLM's top-level option.
+    assert_received {:native_tool_request, _initial_messages, initial_opts}
+    refute Keyword.has_key?(initial_opts, :reasoning_effort)
+    assert [_step] = get_in(initial_opts, [:req_http_options, :plugins])
+
+    # The forced submit spends no reasoning at all.
+    assert_received {:native_tool_request, _forced_messages, forced_opts}
+    refute Keyword.has_key?(forced_opts, :reasoning_effort)
+    assert get_in(forced_opts, [:req_http_options, :plugins]) in [nil, []]
+  end
+
   test "forces native submit through the provider-neutral ReqLLM tool choice" do
     {:ok, state} = Agent.start_link(fn -> :initial end)
 

@@ -92,18 +92,20 @@ defmodule Imp.SavingReqLLMTransportTest do
     end
   end
 
-  test "saved OpenRouter reasoning effort round-trips and remains narrowly allowlisted" do
+  test "saved reasoning effort round-trips and remains narrowly allowlisted" do
     program =
       Imp.predict("question -> answer",
         lm:
           Imp.req_llm("openrouter:provider/model",
-            openrouter_reasoning: %{effort: :high}
+            reasoning_effort: :high,
+            openrouter_reasoning_wire: :nested
           )
       )
 
     dumped = program |> Imp.dump() |> json_round_trip()
     loaded = Imp.load(dumped)
-    assert loaded.lm.opts[:openrouter_reasoning] == %{"effort" => "high"}
+    assert loaded.lm.opts[:reasoning_effort] == "high"
+    assert loaded.lm.opts[:openrouter_reasoning_wire] == :nested
 
     root = tmp_dir("openrouter-reasoning-fresh-beam")
     artifact = Path.join(root, "program.json")
@@ -125,22 +127,22 @@ defmodule Imp.SavingReqLLMTransportTest do
     assert status == 0, output
 
     fresh_opts = receipt |> File.read!() |> :erlang.binary_to_term([:safe])
-    assert fresh_opts[:openrouter_reasoning] == %{"effort" => "high"}
+    assert fresh_opts[:reasoning_effort] == "high"
 
     opts = get_in(dumped, ["lm", "opts"])
 
-    for invalid <- [
-          [["effort", "high"], ["effort", "low"]],
-          [["budget", 100]],
-          [["effort", "invented"]],
-          %{"effort" => "high", "budget" => 100}
-        ] do
-      assert_raise ArgumentError, ~r/openrouter_reasoning/, fn ->
+    for invalid <- ["invented", ["high"], %{"effort" => "high"}, 3] do
+      assert_raise ArgumentError, ~r/reasoning_effort/, fn ->
         dumped
-        |> put_in(
-          ["lm", "opts"],
-          replace_option(opts, "openrouter_reasoning", invalid)
-        )
+        |> put_in(["lm", "opts"], replace_option(opts, "reasoning_effort", invalid))
+        |> Imp.load()
+      end
+    end
+
+    for invalid <- ["sideways", ["nested"], 1] do
+      assert_raise ArgumentError, ~r/openrouter_reasoning_wire/, fn ->
+        dumped
+        |> put_in(["lm", "opts"], replace_option(opts, "openrouter_reasoning_wire", invalid))
         |> Imp.load()
       end
     end

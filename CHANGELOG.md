@@ -4,6 +4,15 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- `:reasoning_effort` is the one reasoning option on `Imp.Clients.ReqLLM`, at
+  construction or per call, and `:openrouter_reasoning` is gone. A call naming
+  `reasoning_effort: nil` spends no reasoning on that call, which is what
+  ReAct's forced submit asks for; previously that nil, combined with a
+  configured OpenRouter effort, raised and ended the turn without an answer.
+  Which OpenRouter wire field carries the effort is a separate switch,
+  `openrouter_reasoning_wire: :top_level | :nested` (default top-level, as
+  ReqLLM sends it); it names an encoding, never a value. Saved programs
+  allowlist both in place of `openrouter_reasoning`.
 - Added `Imp.MCP.OAuth`, a credential store for remote HTTP MCP servers that
   require a browser-authorized OAuth grant. It begins the flow, listens on
   `127.0.0.1` for the redirect, stores the grant encrypted as one file per
