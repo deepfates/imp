@@ -823,7 +823,80 @@ defmodule Imp.Adapter.Chat do
   def format_value(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   def format_value(%Imp.Adapter.Types.Code{} = value), do: Imp.Adapter.Types.Code.format(value)
 
-  def format_value(value), do: inspect(value)
+  # DSPy renders a dict or list value with `json.dumps(serialize_for_json(v),
+  # ensure_ascii=False)` (adapters/utils.py:61-63): complete, compact, Python's
+  # default separators. This was `inspect/1` at its default limit, which cut
+  # any structured tool result past fifty elements to an ellipsis the model
+  # could not count and no bound could measure.
+  def format_value(value) when is_list(value) or (is_map(value) and not is_struct(value)),
+    do: py_json_dumps(value)
+
+  def format_value(value), do: inspect(value, limit: :infinity, printable_limit: :infinity)
+
+  # Python `json.dumps(value, ensure_ascii=False)` with its default separators
+  # `", "` and `": "`. A term JSON cannot carry (a tuple, a PID, a struct with
+  # no encoder) renders as a complete `inspect`, never a cut one.
+  @doc false
+  def py_json_dumps(value) do
+    case dumps(value) do
+      {:ok, iodata} -> IO.iodata_to_binary(iodata)
+      :error -> inspect(value, limit: :infinity, printable_limit: :infinity)
+    end
+  end
+
+  defp dumps(nil), do: {:ok, "null"}
+  defp dumps(true), do: {:ok, "true"}
+  defp dumps(false), do: {:ok, "false"}
+  defp dumps(value) when is_binary(value), do: {:ok, Jason.encode!(value)}
+  defp dumps(value) when is_atom(value), do: {:ok, Jason.encode!(Atom.to_string(value))}
+  defp dumps(value) when is_integer(value), do: {:ok, Integer.to_string(value)}
+  defp dumps(value) when is_float(value), do: {:ok, Imp.PyFloat.repr(value)}
+  defp dumps(%DateTime{} = value), do: {:ok, Jason.encode!(DateTime.to_iso8601(value))}
+  defp dumps(%NaiveDateTime{} = value), do: {:ok, Jason.encode!(NaiveDateTime.to_iso8601(value))}
+
+  defp dumps(value) when is_list(value) do
+    with {:ok, items} <- dumps_all(value) do
+      {:ok, ["[", Enum.intersperse(items, ", "), "]"]}
+    end
+  end
+
+  defp dumps(value) when is_map(value) and not is_struct(value) do
+    with {:ok, pairs} <-
+           value
+           |> Enum.map(fn {key, item} -> {key, item} end)
+           |> Enum.reduce_while({:ok, []}, fn {key, item}, {:ok, acc} ->
+             with {:ok, key_json} <- dumps_key(key),
+                  {:ok, item_json} <- dumps(item) do
+               {:cont, {:ok, [[key_json, ": ", item_json] | acc]}}
+             else
+               :error -> {:halt, :error}
+             end
+           end) do
+      {:ok, ["{", pairs |> Enum.reverse() |> Enum.intersperse(", "), "}"]}
+    end
+  end
+
+  defp dumps(_value), do: :error
+
+  defp dumps_all(items) do
+    Enum.reduce_while(items, {:ok, []}, fn item, {:ok, acc} ->
+      case dumps(item) do
+        {:ok, json} -> {:cont, {:ok, [json | acc]}}
+        :error -> {:halt, :error}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      :error -> :error
+    end
+  end
+
+  # json.dumps turns a non-string key into its str(): True -> "true" is
+  # Python's rule for bools, numbers stay numbers in quotes.
+  defp dumps_key(key) when is_binary(key), do: {:ok, Jason.encode!(key)}
+  defp dumps_key(key) when is_atom(key), do: {:ok, Jason.encode!(Atom.to_string(key))}
+  defp dumps_key(key) when is_integer(key), do: {:ok, Jason.encode!(Integer.to_string(key))}
+  defp dumps_key(_key), do: :error
 
   defp code_field?(%{type: type}), do: type in [:code, "code"]
 

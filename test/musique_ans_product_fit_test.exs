@@ -163,7 +163,8 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsProductFitTest do
 
     offsets =
       for paragraph <- expected do
-        serialized = inspect(paragraph)
+        # A paragraph is a map, rendered the way the adapter renders every dict.
+        serialized = Imp.Adapter.Chat.format_value(paragraph)
         {offset, _} = :binary.match(answerer, serialized)
         assert length(:binary.matches(answerer, serialized)) == 1
         offset
