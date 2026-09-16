@@ -326,8 +326,16 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
 
     role_options =
       case role do
-        :task -> [temperature: 1.0, top_p: 1.0, openrouter_reasoning: %{effort: :none}]
-        :reflection -> [openrouter_reasoning: %{effort: :high}]
+        :task ->
+          [
+            temperature: 1.0,
+            top_p: 1.0,
+            reasoning_effort: :none,
+            openrouter_reasoning_wire: :nested
+          ]
+
+        :reflection ->
+          [reasoning_effort: :high, openrouter_reasoning_wire: :nested]
       end
 
     lm =

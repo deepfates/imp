@@ -19,10 +19,18 @@ defmodule Imp.Clients.ReqLLM do
   `Imp.ContextWindowExceededError`. Other provider errors retain their original
   shape; prose and generic HTTP 400 responses do not trigger context recovery.
 
-  `:openrouter_reasoning` is an Imp-owned OpenRouter wire option for the
-  documented nested `reasoning` object. It currently accepts exactly an
-  `:effort` value and is removed before ReqLLM option validation. This avoids
-  relying on ReqLLM's legacy top-level `reasoning_effort` encoding.
+  `:reasoning_effort` is the one reasoning option, on the client or on a call.
+  It takes `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `default`, as
+  an atom or a string. A call naming `nil` spends no reasoning on that call
+  whatever the client is configured with. Native reasoning fields
+  (`Imp.Predict`) set the same option, so a client configured with an effort
+  and a program that asks for one never disagree.
+
+  OpenRouter accepts the effort in two wire fields, and its endpoint catalog
+  says which one an endpoint supports: ReqLLM's top-level `reasoning_effort`
+  (the default here) or the nested `reasoning` object, which
+  `openrouter_reasoning_wire: :nested` selects. The switch names an encoding
+  only; the value is always `:reasoning_effort`.
   """
 
   @behaviour Imp.LM
@@ -71,7 +79,7 @@ defmodule Imp.Clients.ReqLLM do
     merged_opts =
       nested_opts
       |> Keyword.merge(Keyword.drop(opts, [:opts, :req_module]))
-      |> normalize_openrouter_reasoning_option!("#{inspect(__MODULE__)}.new/2")
+      |> normalize_reasoning_effort_option!("#{inspect(__MODULE__)}.new/2")
 
     validate_input_envelope_option!(merged_opts, "#{inspect(__MODULE__)}.new/2")
 
@@ -214,7 +222,8 @@ defmodule Imp.Clients.ReqLLM do
     {rollout_id, opts} =
       lm.opts
       |> Keyword.merge(opts)
-      |> normalize_openrouter_reasoning_option!("#{inspect(__MODULE__)}.generate/3")
+      |> normalize_reasoning_effort_option!("#{inspect(__MODULE__)}.generate/3")
+      |> drop_nil_reasoning_effort()
       |> Keyword.pop(:rollout_id)
 
     {input_envelope, opts} = Keyword.pop(opts, :input_envelope)
@@ -323,7 +332,7 @@ defmodule Imp.Clients.ReqLLM do
   defp do_generate_uncached(lm, messages, opts) do
     opts =
       opts
-      |> prepare_openrouter_reasoning!(lm.model)
+      |> encode_openrouter_reasoning(lm.model)
       |> cap_transport_timeouts()
       |> enforce_explicit_no_retry()
 
@@ -463,7 +472,8 @@ defmodule Imp.Clients.ReqLLM do
     {_rollout_id, opts} =
       lm.opts
       |> Keyword.merge(opts)
-      |> normalize_openrouter_reasoning_option!("#{inspect(__MODULE__)}.stream/3")
+      |> normalize_reasoning_effort_option!("#{inspect(__MODULE__)}.stream/3")
+      |> drop_nil_reasoning_effort()
       |> Keyword.pop(:rollout_id)
 
     {input_envelope, opts} = Keyword.pop(opts, :input_envelope)
@@ -492,7 +502,7 @@ defmodule Imp.Clients.ReqLLM do
   defp safe_stream(lm, messages, opts) do
     opts =
       opts
-      |> prepare_openrouter_reasoning!(lm.model)
+      |> encode_openrouter_reasoning(lm.model)
       |> cap_transport_timeouts()
       |> enforce_explicit_no_retry()
 
@@ -541,7 +551,7 @@ defmodule Imp.Clients.ReqLLM do
   defp validate_call_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
       validate_input_envelope_option!(opts, context)
-      normalize_openrouter_reasoning_option!(opts, context)
+      normalize_reasoning_effort_option!(opts, context)
     else
       raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
     end
@@ -558,104 +568,114 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  defp normalize_openrouter_reasoning_option!(opts, context) do
-    case Keyword.get_values(opts, :openrouter_reasoning) do
+  @reasoning_efforts ~w(none minimal low medium high xhigh default)
+  @reasoning_wires ~w(top_level nested)
+
+  defp normalize_reasoning_effort_option!(opts, context) do
+    opts =
+      case Keyword.get_values(opts, :reasoning_effort) do
+        [] ->
+          opts
+
+        # A call may name `nil` to spend no reasoning on that call whatever the
+        # client is configured with; ReAct does so on a forced submit. The nil
+        # stays until the call's options are merged over the client's, where
+        # `drop_nil_reasoning_effort/1` removes it.
+        [nil] ->
+          opts
+
+        [effort] ->
+          Keyword.put(opts, :reasoning_effort, normalize_reasoning_effort!(effort, context))
+
+        _values ->
+          raise ArgumentError, "#{context}: duplicate :reasoning_effort options"
+      end
+
+    case Keyword.get_values(opts, :openrouter_reasoning_wire) do
       [] ->
         opts
 
-      [reasoning] ->
-        normalized = normalize_openrouter_reasoning!(reasoning, context)
-
-        if Keyword.has_key?(opts, :reasoning_effort) do
-          raise ArgumentError,
-                "#{context}: :openrouter_reasoning cannot be combined with :reasoning_effort"
-        end
-
-        Keyword.put(opts, :openrouter_reasoning, normalized)
-
-      _values ->
-        raise ArgumentError, "#{context}: duplicate :openrouter_reasoning options"
-    end
-  end
-
-  defp normalize_openrouter_reasoning!(reasoning, context) when is_list(reasoning) do
-    if Keyword.keyword?(reasoning) do
-      keys = Keyword.keys(reasoning)
-
-      if length(keys) != length(Enum.uniq(keys)) do
-        raise ArgumentError, "#{context}: :openrouter_reasoning contains duplicate keys"
-      end
-
-      normalize_openrouter_reasoning!(Map.new(reasoning), context)
-    else
-      raise ArgumentError,
-            "#{context}: :openrouter_reasoning must be a map or keyword list"
-    end
-  end
-
-  defp normalize_openrouter_reasoning!(reasoning, context) when is_map(reasoning) do
-    entries = Enum.map(reasoning, fn {key, value} -> {to_string(key), value} end)
-
-    if length(entries) != length(Enum.uniq_by(entries, &elem(&1, 0))) do
-      raise ArgumentError, "#{context}: :openrouter_reasoning contains duplicate keys"
-    end
-
-    reasoning = Map.new(entries)
-
-    case reasoning do
-      %{"effort" => effort} when map_size(reasoning) == 1 ->
-        effort = to_string(effort)
-
-        if effort in ~w(none minimal low medium high xhigh max) do
-          %{"effort" => effort}
+      [wire] ->
+        if to_string(wire) in @reasoning_wires and (is_atom(wire) or is_binary(wire)) do
+          Keyword.put(opts, :openrouter_reasoning_wire, String.to_atom(to_string(wire)))
         else
           raise ArgumentError,
-                "#{context}: :openrouter_reasoning :effort is unsupported: #{inspect(effort)}"
+                "#{context}: :openrouter_reasoning_wire must be :top_level or :nested, got: #{inspect(wire)}"
         end
 
-      _ ->
-        raise ArgumentError,
-              "#{context}: :openrouter_reasoning requires exactly :effort"
+      _values ->
+        raise ArgumentError, "#{context}: duplicate :openrouter_reasoning_wire options"
     end
   end
 
-  defp normalize_openrouter_reasoning!(reasoning, context) do
-    raise ArgumentError,
-          "#{context}: :openrouter_reasoning must be a map or keyword list, got: #{inspect(reasoning)}"
+  defp drop_nil_reasoning_effort(opts) do
+    case Keyword.fetch(opts, :reasoning_effort) do
+      {:ok, nil} -> Keyword.delete(opts, :reasoning_effort)
+      _other -> opts
+    end
   end
 
-  defp prepare_openrouter_reasoning!(opts, model_spec) do
-    case Keyword.pop(opts, :openrouter_reasoning) do
-      {nil, opts} ->
+  defp normalize_reasoning_effort!(effort, _context)
+       when is_atom(effort) and not is_nil(effort) do
+    if to_string(effort) in @reasoning_efforts, do: effort, else: unsupported_effort!(effort)
+  end
+
+  defp normalize_reasoning_effort!(effort, _context) when is_binary(effort) do
+    if effort in @reasoning_efforts, do: effort, else: unsupported_effort!(effort)
+  end
+
+  defp normalize_reasoning_effort!(effort, _context), do: unsupported_effort!(effort)
+
+  defp unsupported_effort!(effort) do
+    raise ArgumentError,
+          ":reasoning_effort must be one of #{inspect(@reasoning_efforts)}, got: #{inspect(effort)}"
+  end
+
+  # With `openrouter_reasoning_wire: :nested` the effort leaves the ReqLLM
+  # options here and a request step writes it into the body as the nested
+  # `reasoning` object. Otherwise ReqLLM's OpenRouter provider sends the
+  # top-level `reasoning_effort` field. `default` means "say nothing".
+  defp encode_openrouter_reasoning(opts, model_spec) do
+    case Keyword.pop(opts, :openrouter_reasoning_wire) do
+      {wire, opts} when wire in [nil, :top_level] ->
         opts
 
-      {reasoning, opts} ->
-        reasoning = normalize_openrouter_reasoning!(reasoning, "Imp OpenRouter request")
-
+      {:nested, opts} ->
         unless openrouter_model?(model_spec) do
           raise ArgumentError,
-                ":openrouter_reasoning is supported only for an OpenRouter model"
+                "openrouter_reasoning_wire: :nested is supported only for an OpenRouter model"
         end
 
-        http_opts = Keyword.get(opts, :req_http_options, [])
-        plugins = Keyword.get(http_opts, :plugins, [])
+        case Keyword.pop(opts, :reasoning_effort) do
+          {nil, opts} ->
+            opts
 
-        plugin = fn request ->
-          Req.Request.append_request_steps(
-            request,
-            imp_openrouter_reasoning_wire: {
-              __MODULE__,
-              :prepare_openrouter_reasoning_wire,
-              [reasoning]
-            }
-          )
+          {effort, opts} ->
+            if to_string(effort) == "default" do
+              opts
+            else
+              reasoning = %{"effort" => to_string(effort)}
+              http_opts = Keyword.get(opts, :req_http_options, [])
+              plugins = Keyword.get(http_opts, :plugins, [])
+
+              plugin = fn request ->
+                Req.Request.append_request_steps(
+                  request,
+                  imp_openrouter_reasoning_wire: {
+                    __MODULE__,
+                    :prepare_openrouter_reasoning_wire,
+                    [reasoning]
+                  }
+                )
+              end
+
+              Keyword.put(
+                opts,
+                :req_http_options,
+                Keyword.put(http_opts, :plugins, plugins ++ [plugin])
+              )
+            end
         end
-
-        Keyword.put(
-          opts,
-          :req_http_options,
-          Keyword.put(http_opts, :plugins, plugins ++ [plugin])
-        )
     end
   end
 
