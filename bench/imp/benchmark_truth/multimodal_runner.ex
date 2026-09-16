@@ -1200,6 +1200,11 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
     end
   end
 
+  # Req 0.7 names the default adapter with the `Req.Finch` module; Req 0.6 and
+  # earlier used the captured `&Req.Steps.run_finch/1`. Either way the request
+  # left over the provider's own Finch transport.
+  defp default_finch_adapter?(Req.Finch), do: true
+
   defp default_finch_adapter?(adapter) when is_function(adapter, 1) do
     Function.info(adapter, :module) == {:module, Req.Steps} and
       Function.info(adapter, :name) == {:name, :run_finch}
