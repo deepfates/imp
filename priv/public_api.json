@@ -2634,6 +2634,7 @@
       },
       "source": "lib/imp/core.ex",
       "struct_fields": [
+        "billing",
         "cost",
         "metadata",
         "outputs",
