@@ -75,6 +75,8 @@ defmodule PublicSurfaceTest do
     Imp.MCP,
     Imp.MCP.Catalog,
     Imp.MCP.HTTPClient,
+    Imp.MCP.OAuth,
+    Imp.MCP.OAuth.Store,
     Imp.MCP.StdioClient,
     Imp.MCP.StreamableHTTPClient,
     Imp.Metrics,
