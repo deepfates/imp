@@ -23,6 +23,7 @@ defmodule Imp.MixProject do
         skip_code_autolink_to: &skip_filtered_doc_reference?/1
       ],
       start_permanent: Mix.env() == :prod,
+      hex: [ignore_advisories: audit_ignored_advisory_ids()],
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       aliases: aliases(),
@@ -120,7 +121,8 @@ defmodule Imp.MixProject do
       {:stream_data, "~> 1.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false}
+      {:ex_doc, "~> 0.35", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -404,8 +406,18 @@ defmodule Imp.MixProject do
       "dialyzer.check": [
         "dialyzer"
       ],
+      # Dependency advisories run through mix_audit, whose database records a
+      # fixed range per advisory. mix hex.audit serves the ERLEF feed, where the
+      # three open cowlib records are open-ended (introduced 2.9.0, no fixed
+      # version), so it flags every cowlib release that exists including the one
+      # carrying the fix. hex.audit stays in the gate for retired packages,
+      # which mix_audit does not check, with those ids ignored from
+      # .audit_ignore -- one file holding each id next to what was verified and
+      # what retires it. Both run as child invocations: mix deps.audit stops the
+      # VM when it finds something.
       "quality.check": [
         "credo --only warning",
+        "cmd mix deps.audit --ignore-file .audit_ignore",
         "cmd mix hex.audit"
       ]
     ]
@@ -507,6 +519,24 @@ defmodule Imp.MixProject do
         "imp.benchmark.parity --gsm8k benchmarks/data/gsm8k-test-0-1319.jsonl --hotpotqa benchmarks/data/hotpotqa-validation-0-7405.jsonl --max-examples 7405"
       ]
     ]
+  end
+
+  # Advisory ids the quality gate accepts, read from .audit_ignore so the ids,
+  # the reason each was verified to be safe to ignore, and the condition that
+  # retires it live in one file that both audit steps read. Absent in a Hex
+  # package checkout, where the gates do not run.
+  defp audit_ignored_advisory_ids do
+    path = Path.expand(".audit_ignore", __DIR__)
+
+    if File.regular?(path) do
+      path
+      |> File.read!()
+      |> String.split("\n")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))
+    else
+      []
+    end
   end
 
   defp benchmark_tasks_available? do
