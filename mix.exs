@@ -147,7 +147,7 @@ defmodule Imp.MixProject do
       true ->
         {:ex_mcp,
          github: "deepfates/ex_mcp",
-         ref: "7222f0f5fa65c71988a946abe76c6b5fd5438342",
+         ref: "b63318718d623f87a28a9723039233ca1627783b",
          runtime: false}
     end
   end
