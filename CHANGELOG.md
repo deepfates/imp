@@ -4,7 +4,18 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
-No changes yet.
+- Added `Imp.MCP.OAuth`, a credential store for remote HTTP MCP servers that
+  require a browser-authorized OAuth grant. It begins the flow, listens on
+  `127.0.0.1` for the redirect, stores the grant encrypted as one file per
+  credential under a directory the host names, and refreshes it without the
+  person.
+- Added two server descriptor auth forms that `Imp.MCP.connect/2` resolves to
+  headers at connect time: `%{"type" => "oauth", "credential" => ref}`, which
+  reads the store passed as the new `:credentials` option, and
+  `%{"type" => "bearer_env", "variable" => name}`, which reads the host's
+  environment and connects with no `Authorization` header (logging one
+  warning) when the variable is unset, unless `"required" => true`. Static
+  `"headers"` are unchanged.
 
 ## 0.3.2 — 2026-09-01
 

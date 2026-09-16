@@ -4128,6 +4128,112 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
+        "authorization_header/2",
+        "await/2",
+        "begin/3",
+        "cancel/1",
+        "complete/2",
+        "default_reference/1",
+        "forget/2",
+        "store/1",
+        "stored?/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.MCP.OAuth",
+      "signatures": {
+        "functions": {
+          "authorization_header/2": [
+            "authorization_header(store, credential)"
+          ],
+          "await/2": [
+            "await(pending, timeout \\\\ 300_000)"
+          ],
+          "begin/3": [
+            "begin(store, server_url, opts \\\\ [])"
+          ],
+          "cancel/1": [
+            "cancel(pending)"
+          ],
+          "complete/2": [
+            "complete(pending, callback_params)"
+          ],
+          "default_reference/1": [
+            "default_reference(server_url)"
+          ],
+          "forget/2": [
+            "forget(store, credential)"
+          ],
+          "store/1": [
+            "store(opts)"
+          ],
+          "stored?/2": [
+            "stored?(store, credential)"
+          ]
+        }
+      },
+      "source": "lib/imp/mcp/oauth.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.OAuth.Pending",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/mcp/oauth.ex",
+      "struct_fields": [
+        "authorization_url",
+        "credential",
+        "flow",
+        "listener",
+        "redirect_uri",
+        "resource_url",
+        "state",
+        "store"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.OAuth.Store",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/mcp/oauth.ex",
+      "struct_fields": [
+        "directory",
+        "key"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
         "close/1",
         "list_tools/1",
         "new/2"

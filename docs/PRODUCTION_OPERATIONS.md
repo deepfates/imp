@@ -217,6 +217,67 @@ Each imported tool carries `metadata.mcp` with `server_name`, `tool_name`,
 its execution alias. Import results also index this provenance by execution
 name. This metadata contains no server credentials or connection descriptor.
 
+### Authenticating a remote MCP server
+
+A descriptor may carry static `"headers"`, as before. It may instead name an
+auth kind, which Imp resolves to a header when the connection is built. The
+resolved header is never written back into the descriptor, so the
+authorization callback, `:call_meta`, and imported tool provenance never see a
+credential.
+
+OAuth, for a server a person authorizes in a browser — the official Readwise
+server, Scry, any MCP server with OAuth discovery:
+
+```elixir
+store = Imp.MCP.OAuth.store(directory: "~/.imp/mcp", secret: host_secret)
+
+{:ok, pending} =
+  Imp.MCP.OAuth.begin(store, "https://mcp2.readwise.io/mcp", credential: "readwise")
+
+# Open pending.authorization_url in a browser on this machine. begin/3 is
+# already listening on 127.0.0.1 for the redirect.
+{:ok, "readwise"} = Imp.MCP.OAuth.await(pending)
+
+server = %{
+  "name" => "readwise",
+  "type" => "http",
+  "url" => "https://mcp2.readwise.io/mcp",
+  "auth" => %{"type" => "oauth", "credential" => "readwise"}
+}
+
+{:ok, imported} =
+  Imp.MCP.connect([server], trusted_servers: [server], credentials: store)
+```
+
+The grant is one encrypted file per credential under the directory the host
+names. `Imp.MCP.connect/2` refreshes it when it is within a minute of expiry,
+using the stored refresh token and without asking the person again. A host
+that already owns an HTTP route for the redirect passes `redirect_uri:` to
+`begin/3` and calls `Imp.MCP.OAuth.complete/2` with the callback parameters
+instead. `Imp.MCP.OAuth` says in full what the encryption protects and what it
+does not.
+
+A bearer token the host reads from its own environment:
+
+```elixir
+server = %{
+  "name" => "exa",
+  "type" => "http",
+  "url" => "https://mcp.exa.ai/mcp",
+  "auth" => %{"type" => "bearer_env", "variable" => "EXA_API_KEY"}
+}
+```
+
+When the variable is set, its value becomes `Authorization: Bearer <value>`.
+When it is unset the server is connected with no `Authorization` header and
+one warning naming the server and the variable is logged: a server that
+answers anonymously with lower rate limits still works before the person has
+found a key. Add `"required" => true` when the server is useless without the
+key; the connection is then refused with a message naming the variable.
+
+Both forms apply to `"http"` and `"sse"` descriptors and may be combined with
+static `"headers"`. Static headers alone keep working exactly as before.
+
 ### Local ACP attachment
 
 A long-running application can supervise `Imp.ACP.Local` with

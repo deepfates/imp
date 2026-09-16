@@ -16,7 +16,33 @@ defmodule Imp.MCP.Connections do
   Connections belong to `:owner` (the caller by default), independently of any
   ACP session. Exact descriptors must be approved through `:authorize` or
   `:trusted_servers`; connection cleanup never depends on a model-visible name.
+
+  ## Authenticating an HTTP server
+
+  A descriptor carries static `"headers"` as before. It can instead name an
+  auth kind, which is resolved to a header when the connection is built and
+  never written back into the descriptor:
+
+      %{"type" => "oauth", "credential" => "readwise"}
+
+  resolves through the `Imp.MCP.OAuth.Store` passed as the `:credentials`
+  option, refreshing the grant when it is near expiry. See `Imp.MCP.OAuth`.
+
+      %{"type" => "bearer_env", "variable" => "EXA_API_KEY"}
+
+  reads the variable from the host's environment. When it is unset the server
+  is connected with no `Authorization` header and one warning naming the
+  server and the variable is logged — a server that works anonymously, with
+  rate limits, still works before the person has found a key. Add
+  `"required" => true` to refuse the connection instead, with a message naming
+  the variable.
+
+  Both forms may be combined with static `"headers"`; the resolved header is
+  appended. Tokens never appear in the descriptor, so authorization callbacks,
+  `:call_meta` and tool provenance never see one.
   """
+
+  require Logger
 
   alias Imp.MCP.Import
 
@@ -32,7 +58,8 @@ defmodule Imp.MCP.Connections do
     :reserved_tool_names,
     :owner,
     :call_meta,
-    :tool_filter
+    :tool_filter,
+    :credentials
   ]
 
   @doc """
@@ -152,7 +179,8 @@ defmodule Imp.MCP.Connections do
     server = stringify_keys(server)
 
     with :ok <- authorize(server, opts),
-         {:ok, client} <- ExMCP.Client.start_link(client_options(server, opts)) do
+         {:ok, headers} <- connection_headers(server, opts),
+         {:ok, client} <- ExMCP.Client.start_link(client_options(server, opts, headers)) do
       connect_all(rest, opts, [{server, client} | clients])
     else
       {:error, reason} -> {:error, reason, clients}
@@ -419,7 +447,110 @@ defmodule Imp.MCP.Connections do
 
   defp exact_server?(_trusted, _server), do: false
 
-  defp client_options(server, opts) do
+  # A descriptor may name an auth kind instead of carrying a token. The token is
+  # materialized here, when the connection is built, and is never written back
+  # into the descriptor: authorization callbacks, `:call_meta` and imported tool
+  # provenance all read the descriptor, and none of them should see a secret.
+  defp connection_headers(server, opts) do
+    case {server_type(server), Map.get(server, "auth")} do
+      {type, nil} when type in ["http", "sse"] ->
+        {:ok, static_headers(server)}
+
+      {type, auth} when type in ["http", "sse"] and is_map(auth) ->
+        with {:ok, resolved} <- resolve_auth(stringify_keys(auth), server, opts) do
+          {:ok, static_headers(server) ++ resolved}
+        end
+
+      {_type, nil} ->
+        {:ok, []}
+
+      {_type, _auth} ->
+        {:error, auth_unavailable(server, "auth applies to http and sse servers only")}
+    end
+  end
+
+  defp static_headers(server),
+    do: name_value_list!(Map.get(server, "headers", []), "headers")
+
+  defp resolve_auth(%{"type" => "oauth"} = auth, server, opts) do
+    with {:ok, credential} <- auth_string(auth, "credential", server),
+         {:ok, store} <- credential_store(server, opts) do
+      case Imp.MCP.OAuth.authorization_header(store, credential) do
+        {:ok, header} -> {:ok, [header]}
+        {:error, reason} -> {:error, auth_unavailable(server, reason)}
+      end
+    end
+  end
+
+  defp resolve_auth(%{"type" => "bearer_env"} = auth, server, _opts) do
+    with {:ok, variable} <- auth_string(auth, "variable", server),
+         {:ok, required?} <- auth_required(auth, server) do
+      case System.get_env(variable) do
+        value when is_binary(value) and value != "" ->
+          {:ok, [{"Authorization", "Bearer " <> value}]}
+
+        _unset when required? ->
+          {:error,
+           auth_unavailable(
+             server,
+             "environment variable #{variable} is unset and this server declares it required"
+           )}
+
+        _unset ->
+          # Some hosted MCP servers answer anonymously with lower rate limits.
+          # Connecting keyless is the useful default; say so once per connection
+          # so an unset key is visible without stopping the host.
+          Logger.warning(
+            "MCP server #{server_name(server)}: #{variable} is unset; " <>
+              "connecting with no Authorization header"
+          )
+
+          {:ok, []}
+      end
+    end
+  end
+
+  defp resolve_auth(auth, server, _opts),
+    do: {:error, auth_unavailable(server, {:unsupported_mcp_auth_type, Map.get(auth, "type")})}
+
+  defp auth_string(auth, key, server) do
+    case Map.get(auth, key) do
+      value when is_binary(value) and value != "" ->
+        {:ok, value}
+
+      _missing ->
+        {:error, auth_unavailable(server, "auth #{key} must be a non-empty string")}
+    end
+  end
+
+  defp auth_required(auth, server) do
+    case Map.get(auth, "required", false) do
+      required when is_boolean(required) ->
+        {:ok, required}
+
+      other ->
+        {:error, auth_unavailable(server, {:invalid_auth_required, shape(other)})}
+    end
+  end
+
+  defp credential_store(server, opts) do
+    case Keyword.get(opts, :credentials) do
+      %Imp.MCP.OAuth.Store{} = store ->
+        {:ok, store}
+
+      nil ->
+        {:error,
+         auth_unavailable(
+           server,
+           "oauth auth needs the :credentials option, an Imp.MCP.OAuth.store/1 value"
+         )}
+    end
+  end
+
+  defp auth_unavailable(server, reason),
+    do: {:mcp_auth_unavailable, server_name(server), reason}
+
+  defp client_options(server, opts, headers) do
     case server_type(server) do
       "stdio" ->
         command = required_string!(server, "command")
@@ -445,7 +576,7 @@ defmodule Imp.MCP.Connections do
         [
           transport: :http,
           url: url,
-          headers: name_value_list!(Map.get(server, "headers", []), "headers"),
+          headers: headers,
           security: %{trusted_origins: [http_origin!(url)]},
           use_sse: type == "sse",
           default_timeout: timeout(opts),
@@ -556,6 +687,18 @@ defmodule Imp.MCP.Connections do
 
     unless is_list(Keyword.get(opts, :trusted_servers, [])) do
       raise ArgumentError, ":trusted_servers must be a list of exact server maps"
+    end
+
+    case Keyword.get(opts, :credentials) do
+      nil ->
+        :ok
+
+      %Imp.MCP.OAuth.Store{} ->
+        :ok
+
+      _other ->
+        raise ArgumentError,
+              ":credentials must be an Imp.MCP.OAuth.Store from Imp.MCP.OAuth.store/1"
     end
 
     reserved_tool_names = Keyword.get(opts, :reserved_tool_names, [])
