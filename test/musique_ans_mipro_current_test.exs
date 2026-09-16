@@ -173,7 +173,8 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
 
     offsets =
       Enum.map(expected, fn item ->
-        {offset, _} = :binary.match(imp_answerer, inspect(item))
+        # A paragraph is a map, rendered the way the adapter renders every dict.
+        {offset, _} = :binary.match(imp_answerer, Imp.Adapter.Chat.format_value(item))
         offset
       end)
 
