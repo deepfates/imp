@@ -159,7 +159,7 @@ jobs:
       # define the result. The updated PLT is then saved under the new exact
       # key. This job is the only writer of this cache.
       - name: Cache dialyzer PLTs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: priv/plts
           key: plt-v1-${{ runner.os }}-otp${{ steps.setup.outputs.otp-version }}-elixir${{ steps.setup.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
