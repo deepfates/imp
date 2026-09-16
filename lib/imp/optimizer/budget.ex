@@ -698,6 +698,10 @@ defmodule Imp.LM.Budgeted do
 
   defp run_adapter(adapter, request) when is_function(adapter, 1), do: adapter.(request)
 
+  # Req 0.7 names adapters with a module that exports `run/1`; Req 0.6 and
+  # earlier passed a captured function.
+  defp run_adapter(adapter, request) when is_atom(adapter), do: adapter.run(request)
+
   defp run_adapter({module, function, args}, request)
        when is_atom(module) and is_atom(function) and is_list(args),
        do: apply(module, function, [request | args])
