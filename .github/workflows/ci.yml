@@ -179,7 +179,7 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # The :dspy_parity suite validates Imp against real pinned DSPy 3.2.1:
