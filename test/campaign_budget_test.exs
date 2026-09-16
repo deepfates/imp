@@ -407,8 +407,10 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
         max_retries: 0
       )
 
-    # Pinned ReqLLM currently overwrites the caller's zero with its default.
-    assert prepared.options.max_retries == 3
+    # req_llm 1.17.1 overwrote the caller's zero with its default of 3;
+    # 1.18.0 honours it. Pinned here so a dependency regression is loud,
+    # while the guard below keeps the attempt count correct either way.
+    assert prepared.options.max_retries == 0
 
     {:ok, budget} =
       CampaignBudget.start_link(
