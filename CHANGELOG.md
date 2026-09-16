@@ -20,6 +20,16 @@ User-visible changes to Imp are recorded here.
   environment and connects with no `Authorization` header (logging one
   warning) when the variable is unset, unless `"required" => true`. Static
   `"headers"` are unchanged.
+- Added `on_failure: :drop` to `Imp.MCP.connect/2`. Under it a server whose
+  transport or `initialize` fails, or which cannot answer `tools/list`, is left
+  out with its client closed instead of failing the whole import: the tools of
+  the servers that did connect are returned, and the new `unavailable` field of
+  `Imp.MCP.Import` names each dropped server with a short reason. The default
+  `on_failure: :refuse` keeps the previous all-or-nothing behaviour, except
+  that a transport that refuses the connection is now reported as
+  `{:mcp_connection_failed, reason}` rather than as the import helper's exit.
+  A descriptor `:authorize` refused, one whose declared `auth` cannot produce a
+  header, and a malformed one refuse the import under both settings.
 
 ## 0.3.2 — 2026-09-01
 

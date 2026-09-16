@@ -1,12 +1,21 @@
 defmodule Imp.MCP.Import do
-  @moduledoc "An owned remote tool catalog; cleanup closes its connections."
-  defstruct tools: [], annotations: %{}, provenance: %{}, cleanup: nil
+  @moduledoc """
+  An owned remote tool catalog; cleanup closes its connections.
+
+  `unavailable` is empty unless the import ran with `on_failure: :drop`, in
+  which case it holds one `%{server: name, reason: reason}` entry per server
+  that was left out. The tools of every server that did connect are in `tools`.
+  """
+  defstruct tools: [], annotations: %{}, provenance: %{}, cleanup: nil, unavailable: []
+
+  @type absence :: %{server: String.t(), reason: term()}
 
   @type t :: %__MODULE__{
           tools: [Imp.Tool.t()],
           annotations: map(),
           provenance: map(),
-          cleanup: (-> :ok)
+          cleanup: (-> :ok),
+          unavailable: [absence()]
         }
 end
 
@@ -42,6 +51,27 @@ defmodule Imp.MCP.Connections do
   Both forms may be combined with static `"headers"`; the resolved header is
   appended. Tokens never appear in the descriptor, so authorization callbacks,
   `:call_meta` and tool provenance never see one.
+
+  ## A server that cannot be reached
+
+  By default (`on_failure: :refuse`) one unreachable server fails the whole
+  import: every client is disconnected and an error is returned. That is right
+  for a caller that needs all of its tools or none.
+
+  `on_failure: :drop` is for a caller whose servers are independent — a
+  long-lived agent holding several third-party catalogs, where one of them
+  answering 503 this morning should cost that catalog and nothing else. A
+  server whose transport or `initialize` fails, or which cannot answer
+  `tools/list`, is left out: its client is closed, the servers beside it keep
+  their tools, and the returned `Imp.MCP.Import` names it in `unavailable`
+  with the reason the refusal would have carried, summarized to one short line.
+
+  Dropping covers failures of the connection, not of the declaration. A
+  descriptor that `:authorize` refused, one whose `auth` cannot produce a
+  header (a `bearer_env` variable declared `required` and unset, for example),
+  and one that is malformed all still refuse the import under either setting:
+  they are decisions the caller made before anything was dialed, and silently
+  continuing without them would discard the caller's own answer.
   """
 
   require Logger
@@ -61,7 +91,8 @@ defmodule Imp.MCP.Connections do
     :owner,
     :call_meta,
     :tool_filter,
-    :credentials
+    :credentials,
+    :on_failure
   ]
 
   @doc """
@@ -69,6 +100,9 @@ defmodule Imp.MCP.Connections do
 
   Returns an `Imp.MCP.Import` carrying the tools, the annotations each
   server declared for them, and stable source provenance independent of model-facing names.
+
+  With `on_failure: :drop` a server that cannot be connected is left out and
+  named in the import's `unavailable` list instead of failing the import.
   """
   @spec import_tools([server()], keyword()) :: {:ok, Import.t()} | {:error, term()}
   def import_tools(servers, opts \\ [])
@@ -84,18 +118,19 @@ defmodule Imp.MCP.Connections do
     with :ok <- ensure_runtime(servers),
          {:ok, bridge} <- Imp.MCP.Clients.start(owner: owner) do
       case connect_isolated(servers, opts) do
-        {:ok, clients} ->
+        {:ok, clients, unavailable} ->
           :ok = Imp.MCP.Clients.adopt(bridge, clients)
 
           case tools_from_clients(clients, opts) do
-            {:ok, tools, annotations} ->
+            {:ok, tools, annotations, unlisted} ->
               {:ok,
                %Import{
                  tools: tools,
                  annotations: annotations,
                  provenance:
                    Map.new(tools, fn tool -> {to_string(tool.name), tool.metadata.mcp} end),
-                 cleanup: cleanup_bridge(bridge)
+                 cleanup: cleanup_bridge(bridge),
+                 unavailable: unavailable ++ unlisted
                }}
 
             {:error, reason} ->
@@ -136,20 +171,27 @@ defmodule Imp.MCP.Connections do
 
     {pid, mon} =
       spawn_monitor(fn ->
+        # A client whose transport refuses the connection answers
+        # `ExMCP.Client.start_link/1` with an error and then exits, which kills
+        # a caller that is not trapping. Without this flag every failure
+        # reaches the caller as this helper's death, so no reason survives to
+        # be reported and no server after the failing one is ever dialed.
+        Process.flag(:trap_exit, true)
+
         result =
           try do
-            connect_all(servers, opts, [])
+            connect_all(servers, opts, [], [])
           catch
             kind, reason -> {:error, {:mcp_connection_failed, {kind, reason}}, []}
           end
 
         case result do
-          {:ok, clients} ->
+          {:ok, clients, unavailable} ->
             Enum.each(clients, fn {_server, client} ->
               if Process.alive?(client), do: Process.unlink(client)
             end)
 
-            send(parent, {ref, {:ok, clients}})
+            send(parent, {ref, {:ok, clients, unavailable}})
 
           {:error, reason, clients} ->
             Enum.each(clients, fn {_server, client} ->
@@ -175,17 +217,30 @@ defmodule Imp.MCP.Connections do
     end
   end
 
-  defp connect_all([], _opts, clients), do: {:ok, Enum.reverse(clients)}
+  defp connect_all([], _opts, clients, unavailable),
+    do: {:ok, Enum.reverse(clients), Enum.reverse(unavailable)}
 
-  defp connect_all([server | rest], opts, clients) when is_map(server) do
+  defp connect_all([server | rest], opts, clients, unavailable) when is_map(server) do
     server = stringify_keys(server)
 
+    # Authorization and header resolution are separated from the dial because
+    # only the dial is droppable: the first two are answers the caller already
+    # gave, and `client_options/3` raises on a descriptor nobody can address.
     with :ok <- authorize(server, opts),
          {:ok, headers} <- connection_headers(server, opts),
-         {:ok, client} <- ExMCP.Client.start_link(client_options(server, opts, headers)) do
-      connect_all(rest, opts, [{server, client} | clients])
+         options = client_options(server, opts, headers),
+         {:ok, client} <- start_client(options) do
+      connect_all(rest, opts, [{server, client} | clients], unavailable)
     else
-      {:error, reason} -> {:error, reason, clients}
+      {:unreachable, reason} ->
+        if drop?(opts) do
+          connect_all(rest, opts, clients, [absence(server, reason) | unavailable])
+        else
+          {:error, reason, clients}
+        end
+
+      {:error, reason} ->
+        {:error, reason, clients}
     end
   rescue
     exception -> {:error, {:mcp_connection_failed, Exception.message(exception)}, clients}
@@ -193,30 +248,45 @@ defmodule Imp.MCP.Connections do
     kind, reason -> {:error, {:mcp_connection_failed, {kind, reason}}, clients}
   end
 
-  defp connect_all([server | _rest], _opts, clients),
+  defp connect_all([server | _rest], _opts, clients, _unavailable),
     do: {:error, {:invalid_mcp_server, shape(server)}, clients}
+
+  # A failed dial leaves nothing behind: `start_link/1` answers with an error
+  # only after the client process has exited, and an exit it raises here is
+  # this helper's own, with no client to close.
+  defp start_client(options) do
+    case ExMCP.Client.start_link(options) do
+      {:ok, client} -> {:ok, client}
+      {:error, reason} -> {:unreachable, {:mcp_connection_failed, reason}}
+    end
+  catch
+    kind, reason -> {:unreachable, {:mcp_connection_failed, {kind, reason}}}
+  end
 
   defp tools_from_clients(clients, opts) do
     clients
-    |> Enum.reduce_while({:ok, []}, fn {server, client}, {:ok, acc} ->
-      case ExMCP.Client.list_tools(client, format: :map, timeout: timeout(opts)) do
-        {:ok, response} ->
-          with {:ok, schemas} <- tool_schemas(response),
-               {:ok, schemas} <- attach_client_runs(schemas, client, server, opts) do
-            sourced = Enum.map(schemas, &{server, &1})
-            {:cont, {:ok, acc ++ sourced}}
-          else
-            {:error, reason} -> {:halt, {:error, reason}}
-          end
+    |> Enum.reduce_while({:ok, [], []}, fn {server, client}, {:ok, acc, unavailable} ->
+      case server_tools(server, client, opts) do
+        {:ok, sourced} ->
+          {:cont, {:ok, acc ++ sourced, unavailable}}
 
         {:error, reason} ->
-          {:halt, {:error, {:mcp_tools_list_failed, server_name(server), reason}}}
+          if drop?(opts) do
+            # This one answered the handshake and then could not say what it
+            # offers, so it contributes nothing. Close it here: an open client
+            # nothing imported from would otherwise live as long as the import.
+            safe_disconnect(client)
+            {:cont, {:ok, acc, [absence(server, reason) | unavailable]}}
+          else
+            {:halt, {:error, reason}}
+          end
       end
     end)
     |> case do
-      {:ok, sourced_schemas} ->
+      {:ok, sourced_schemas, unavailable} ->
         with {:ok, schemas} <- disambiguate_tool_names(sourced_schemas, opts) do
-          {:ok, Imp.MCP.import_tools(schemas), declared_annotations(schemas)}
+          {:ok, Imp.MCP.import_tools(schemas), declared_annotations(schemas),
+           Enum.reverse(unavailable)}
         end
 
       {:error, reason} ->
@@ -226,6 +296,49 @@ defmodule Imp.MCP.Connections do
     exception -> {:error, {:mcp_tool_import_failed, Exception.message(exception)}}
   catch
     kind, reason -> {:error, {:mcp_tool_import_failed, {kind, reason}}}
+  end
+
+  defp server_tools(server, client, opts) do
+    case ExMCP.Client.list_tools(client, format: :map, timeout: timeout(opts)) do
+      {:ok, response} ->
+        with {:ok, schemas} <- tool_schemas(response),
+             {:ok, schemas} <- attach_client_runs(schemas, client, server, opts) do
+          {:ok, Enum.map(schemas, &{server, &1})}
+        end
+
+      {:error, reason} ->
+        {:error, {:mcp_tools_list_failed, server_name(server), reason}}
+    end
+  catch
+    kind, reason -> {:error, {:mcp_tools_list_failed, server_name(server), {kind, reason}}}
+  end
+
+  defp drop?(opts), do: Keyword.get(opts, :on_failure, :refuse) == :drop
+
+  # What the import says about a server it left out. The reason is the term the
+  # refusal would have carried, with its detail summarized: a transport error
+  # arrives as a nested struct whose inspection runs to several lines, and this
+  # is read in a log line and an operator's report.
+  defp absence(server, reason), do: %{server: server_name(server), reason: shorten(reason)}
+
+  defp shorten({tag, detail}) when is_atom(tag), do: {tag, summary(detail)}
+
+  defp shorten({tag, name, detail}) when is_atom(tag) and is_binary(name),
+    do: {tag, name, summary(detail)}
+
+  defp shorten(reason), do: reason
+
+  defp summary(detail) when is_atom(detail), do: detail
+
+  defp summary(detail) do
+    text =
+      if is_exception(detail),
+        do: Exception.message(detail),
+        else: inspect(detail, limit: 3, printable_limit: 120)
+
+    text = text |> String.replace(~r/\s+/u, " ") |> String.trim()
+
+    if String.length(text) > 120, do: String.slice(text, 0, 119) <> "…", else: text
   end
 
   defp attach_client_runs(schemas, client, server, opts) do
@@ -723,6 +836,10 @@ defmodule Imp.MCP.Connections do
 
     unless result_mode(opts) in [:text, :structured] do
       raise ArgumentError, ":result_mode must be :text or :structured"
+    end
+
+    unless Keyword.get(opts, :on_failure, :refuse) in [:refuse, :drop] do
+      raise ArgumentError, ":on_failure must be :refuse or :drop"
     end
 
     unless is_integer(timeout(opts)) and timeout(opts) > 0 do

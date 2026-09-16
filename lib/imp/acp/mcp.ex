@@ -3,7 +3,13 @@ defmodule Imp.ACP.MCP do
 
   defmodule Import do
     @moduledoc "The generic import plus ACP presentation hints."
-    defstruct tools: [], annotations: %{}, provenance: %{}, tool_kinds: %{}, cleanup: nil
+    defstruct tools: [],
+              annotations: %{},
+              provenance: %{},
+              tool_kinds: %{},
+              cleanup: nil,
+              unavailable: []
+
     @type t :: %__MODULE__{}
   end
 

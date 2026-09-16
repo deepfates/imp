@@ -167,6 +167,16 @@ imported.cleanup.()
 
 The exact server descriptor must be authorized. Host-supplied command, URL,
 headers, environment and working-directory claims remain untrusted input.
+
+One server that cannot be reached fails the whole import, which is what a
+caller that needs all of its tools wants. A long-lived host whose servers are
+independent passes `on_failure: :drop` instead: a server whose transport or
+`initialize` fails, or which cannot answer `tools/list`, is closed and left
+out, `imported.unavailable` carries `%{server: name, reason: reason}` for it,
+and the rest of the catalog is imported. Dropping covers the connection only —
+a descriptor `:authorize` refused, one whose declared `auth` cannot produce a
+header (a `bearer_env` variable declared `required` and unset, say), and a
+malformed one still refuse the import.
 Imported clients follow `:owner` (the importing process by default); a temporary
 import worker should name its long-lived owner explicitly. Cleanup is idempotent.
 Closed-client calls return errors rather than exiting their callers.
