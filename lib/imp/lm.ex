@@ -1,6 +1,20 @@
 defmodule Imp.LM do
   @moduledoc """
   Behaviour for language model clients.
+
+  Inside an `Imp.Run` context, `request/2` emits one `:model_request` and one
+  `:model_response` event per call. The response event's metadata carries the
+  money for that call in `:cost`: the provider's reported total in USD as a
+  non-negative float, or `nil` when the provider reported nothing Imp can read
+  as a number. A host summing spend reads that number and nothing else.
+
+  Providers report the total in several shapes — a bare number, a string, a
+  `Decimal`, or a cost breakdown map — and Imp reads the number out of all of
+  them, so no host has to learn a provider library's internal shape. When the
+  provider reported a breakdown, the whole breakdown map is also on the event
+  as `:billing`, untouched; when it reported none, there is no `:billing` key.
+  A breakdown's shape belongs to the provider, so it is evidence to inspect,
+  not a contract to depend on.
   """
 
   @callback generate(messages :: list(map()), opts :: keyword()) ::
@@ -94,13 +108,17 @@ defmodule Imp.LM do
         {:ok, response} ->
           Imp.Run.emit(:model_response,
             output: response.outputs,
-            metadata: %{
-              model_call_id: call_id,
-              model: request.config.model,
-              usage: response.usage,
-              cost: response.cost,
-              response: response.metadata
-            }
+            metadata:
+              maybe_put_billing(
+                %{
+                  model_call_id: call_id,
+                  model: request.config.model,
+                  usage: response.usage,
+                  cost: response.cost,
+                  response: response.metadata
+                },
+                response.billing
+              )
           )
 
         {:error, error} ->
@@ -116,6 +134,9 @@ defmodule Imp.LM do
   def request(_lm, request) do
     {:error, {:invalid_lm_request, request}}
   end
+
+  defp maybe_put_billing(metadata, nil), do: metadata
+  defp maybe_put_billing(metadata, billing), do: Map.put(metadata, :billing, billing)
 
   defp perform_request(lm, request) do
     with {:ok, response} <- dispatch_request(lm, request) do

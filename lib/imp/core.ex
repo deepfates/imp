@@ -97,14 +97,29 @@ defmodule Imp.Core do
   end
 
   defmodule LMResponse do
-    @moduledoc "Provider-neutral LM response: normalized outputs, usage, cost, and raw data."
+    @moduledoc """
+    Provider-neutral LM response: normalized outputs, usage, cost, and raw data.
 
-    defstruct outputs: [], usage: %{}, cost: nil, metadata: %{}, raw: nil
+    `cost` is the provider's reported total for this call in USD as a
+    non-negative float, or `nil` when the provider reported nothing Imp can
+    read as a number. Providers report that total in several shapes — a bare
+    number, a string, a `Decimal`, or a cost breakdown map carrying a `total`
+    — and Imp reads the number out of all of them here, so a host reading a
+    call's money never has to learn a provider library's private shape.
+
+    `billing` is the provider's cost breakdown map, untouched, when the
+    provider reported one, and `nil` otherwise. It is the detail behind `cost`
+    (line items, input and output splits); its shape belongs to the provider,
+    so it is evidence to inspect rather than a contract to depend on.
+    """
+
+    defstruct outputs: [], usage: %{}, cost: nil, billing: nil, metadata: %{}, raw: nil
 
     @type t :: %__MODULE__{
             outputs: list(),
             usage: map(),
             cost: number() | nil,
+            billing: map() | nil,
             metadata: map(),
             raw: term()
           }
@@ -129,11 +144,14 @@ defmodule Imp.Core do
     with {:ok, outputs, metadata} <- split_outputs(raw) do
       usage = response_usage(metadata)
 
+      reported = reported_cost(metadata, usage)
+
       {:ok,
        %LMResponse{
          outputs: outputs,
          usage: usage,
-         cost: response_cost(metadata, usage),
+         cost: cost_number(reported),
+         billing: billing_breakdown(reported),
          metadata: metadata,
          raw: raw
        }}
@@ -274,9 +292,40 @@ defmodule Imp.Core do
     end
   end
 
-  defp response_cost(metadata, usage) do
+  defp reported_cost(metadata, usage) do
     map_value(usage, :cost, map_value(metadata, :cost, nil))
   end
+
+  # A cost breakdown is the provider's own map. Anything else a provider
+  # reports as a cost is a value, not a breakdown, so there is nothing to keep.
+  defp billing_breakdown(%_struct{}), do: nil
+  defp billing_breakdown(reported) when is_map(reported), do: reported
+  defp billing_breakdown(_reported), do: nil
+
+  # The reported total as a non-negative float, or nil when it cannot be read
+  # as one. A negative total is not money Imp can account for, so it reads as
+  # nothing rather than as a credit.
+  defp cost_number(value) when is_number(value) and value >= 0, do: value * 1.0
+
+  defp cost_number(value) when is_struct(value, Decimal) do
+    cost_number(Decimal.to_float(value))
+  rescue
+    _error -> nil
+  end
+
+  defp cost_number(value) when is_struct(value), do: nil
+
+  defp cost_number(value) when is_map(value),
+    do: value |> map_value(:total, nil) |> cost_number()
+
+  defp cost_number(value) when is_binary(value) do
+    case Float.parse(String.trim(value)) do
+      {number, ""} -> cost_number(number)
+      _other -> nil
+    end
+  end
+
+  defp cost_number(_value), do: nil
 
   defp map_value(map, key, default) when is_map(map),
     do: Map.get(map, key, Map.get(map, Atom.to_string(key), default))

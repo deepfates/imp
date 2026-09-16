@@ -13,6 +13,17 @@ User-visible changes to Imp are recorded here.
   `openrouter_reasoning_wire: :top_level | :nested` (default top-level, as
   ReqLLM sends it); it names an encoding, never a value. Saved programs
   allowlist both in place of `openrouter_reasoning`.
+- Changed the cost a host reads off a model call to a plain number. The
+  `:model_response` event's `metadata.cost` is now the provider's reported
+  total in USD as a non-negative float, or `nil` when the provider reported
+  nothing Imp can read as a number; it was whatever the provider library put
+  there, most recently ReqLLM's private billing breakdown map. When the
+  provider reported a breakdown, the whole map is on the event as
+  `metadata.billing`, untouched; when it reported none, there is no
+  `:billing` key. `Imp.Core.LMResponse` carries the same pair as `:cost` and
+  the new `:billing` field, and reads a total given as a number, a string, a
+  `Decimal`, or a breakdown map. A host summing spend reads the number and no
+  longer has to know a provider library's internal shape.
 - Added `Imp.MCP.OAuth`, a credential store for remote HTTP MCP servers that
   require a browser-authorized OAuth grant. It begins the flow, listens on
   `127.0.0.1` for the redirect, stores the grant encrypted as one file per
