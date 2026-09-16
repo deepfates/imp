@@ -4,6 +4,12 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- A map or list value in a prompt, including a structured tool result, now
+  renders the way DSPy renders a dict: `json.dumps(..., ensure_ascii=False)`
+  with Python's default separators, complete. It was `inspect/1` at its
+  default limit, which cut any structured value past fifty elements to an
+  ellipsis the model could not count and no host bound could measure. A term
+  JSON cannot carry renders as a complete `inspect`.
 - `:reasoning_effort` is the one reasoning option on `Imp.Clients.ReqLLM`, at
   construction or per call, and `:openrouter_reasoning` is gone. A call naming
   `reasoning_effort: nil` spends no reasoning on that call, which is what

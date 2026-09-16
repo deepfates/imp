@@ -239,7 +239,8 @@ defmodule ReActV2Test do
     assert Imp.Adapter.Chat.format_tool_result({:error, :not_connected}) ==
              "Error: not connected"
 
-    assert Imp.Adapter.Chat.format_tool_result(%{ok: true}) == inspect(%{ok: true})
+    # A structured result renders as DSPy renders a dict: json.dumps, complete.
+    assert Imp.Adapter.Chat.format_tool_result(%{ok: true}) == ~s({"ok": true})
   end
 
   test "unknown and failing tools remain history observations instead of aborting the loop" do
