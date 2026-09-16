@@ -19,7 +19,7 @@ User-visible changes to Imp are recorded here.
   plus the newest exchange, which is what a provider's prompt cache is keyed
   on; before, the first user message changed shape between steps one and two
   and the roster was re-sent after the history on every call.
-- `Imp.Adapter.Chat.format/3` gains `:system_renderer` (a function of the
+- The chat adapter's format options (`Imp.Adapter.Chat`) gain `:system_renderer` (a function of the
   signature and the format options, default the DSPy system message),
   `:guidance` (rendered by the default system renderer the way ReAct's
   instructions used to read), and `:omit_empty_request` (end the request on
