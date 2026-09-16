@@ -43,6 +43,18 @@ family, delivery mode, asset byte count, MIME type, asset SHA-256, provider,
 endpoint, API, exact model, generation options, ReqLLM dependency, and pricing.
 Runtime ReqLLM version drift fails before dispatch.
 
+Because the ReqLLM dependency is part of the payload, bumping req_llm changes
+the manifest payload SHA-256. Both manifests now pin req_llm 1.18.0, so the
+OpenAI manifest hashes to
+`5ab0c61f176ba63279ca065c170a628596d0da1834bd970c1c6b61221b4db205` and the
+Google manifest to
+`c5ca53e2fc67757f07f65ab0109d57ffef9c1d0b16ef13206a394aa5010f33ec`. The
+admitted artifact above remains a valid record of the 1.17.1 run it names, but
+it is no longer reproducible from the manifests in the tree: a live re-run
+under 1.18.0 produces a new campaign identity, and admitting it means a new
+artifact plus a new `multimodal_manifest_sha256/0` in
+`Imp.BenchmarkTruth.ReproductionArtifactValidator`.
+
 All assets are synthetic and repository-owned. Images cover shape counting,
 spatial relation, and OCR. The native-document family sends the original
 two-page PDF and tests a table subtotal and a cross-page join. Rendered page

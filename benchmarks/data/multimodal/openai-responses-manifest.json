@@ -81,11 +81,11 @@
       "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
       "req_llm_dependency": {
         "package": "req_llm",
-        "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+        "package_sha256": "d610d4de14c7ef697a2aa4c30eada4e1ae172bec08bb3dea3bbe25f20feb5d40",
         "repository": "https://github.com/agentjido/req_llm",
         "source": "hexpm",
-        "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
-        "version": "1.17.1"
+        "source_revision": "9aa98a4e02da5083464d2eed268f48272f0d7180",
+        "version": "1.18.0"
       },
       "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
     },
@@ -178,5 +178,5 @@
       "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
     }
   },
-  "payload_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8"
+  "payload_sha256": "5ab0c61f176ba63279ca065c170a628596d0da1834bd970c1c6b61221b4db205"
 }

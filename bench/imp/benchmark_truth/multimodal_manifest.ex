@@ -15,11 +15,11 @@ defmodule Imp.BenchmarkTruth.MultimodalManifest do
   @deliveries ~w(typed_image_data_uri typed_native_file)
   @req_llm_dependency %{
     "package" => "req_llm",
-    "package_sha256" => "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+    "package_sha256" => "d610d4de14c7ef697a2aa4c30eada4e1ae172bec08bb3dea3bbe25f20feb5d40",
     "repository" => "https://github.com/agentjido/req_llm",
     "source" => "hexpm",
-    "source_revision" => "33840077c2f1332eb6dff2d268dff02393014da4",
-    "version" => "1.17.1"
+    "source_revision" => "9aa98a4e02da5083464d2eed268f48272f0d7180",
+    "version" => "1.18.0"
   }
   @provider_profiles %{
     "google-gemini-2.5-flash-generate-content" => %{

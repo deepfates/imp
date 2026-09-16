@@ -83,11 +83,11 @@
       "profile": "google-gemini-2.5-flash-generate-content",
       "req_llm_dependency": {
         "package": "req_llm",
-        "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
+        "package_sha256": "d610d4de14c7ef697a2aa4c30eada4e1ae172bec08bb3dea3bbe25f20feb5d40",
         "repository": "https://github.com/agentjido/req_llm",
         "source": "hexpm",
-        "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
-        "version": "1.17.1"
+        "source_revision": "9aa98a4e02da5083464d2eed268f48272f0d7180",
+        "version": "1.18.0"
       },
       "req_llm_model": "google:gemini-2.5-flash"
     },
@@ -180,5 +180,5 @@
       "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
     }
   },
-  "payload_sha256": "4b4c80497789d74dec60b2b26236f6eee2f1f9b29046f07ef95b3fa3faf8e50f"
+  "payload_sha256": "c5ca53e2fc67757f07f65ab0109d57ffef9c1d0b16ef13206a394aa5010f33ec"
 }
