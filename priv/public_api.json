@@ -849,7 +849,8 @@
         "cleanup",
         "provenance",
         "tool_kinds",
-        "tools"
+        "tools",
+        "unavailable"
       ],
       "types": [
         {
@@ -4107,6 +4108,7 @@
       "module": "Imp.MCP.Import",
       "signatures": {
         "types": {
+          "absence/0": [],
           "t/0": []
         }
       },
@@ -4115,9 +4117,14 @@
         "annotations",
         "cleanup",
         "provenance",
-        "tools"
+        "tools",
+        "unavailable"
       ],
       "types": [
+        {
+          "kind": "type",
+          "name": "absence/0"
+        },
         {
           "kind": "type",
           "name": "t/0"
