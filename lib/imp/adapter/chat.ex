@@ -20,7 +20,24 @@ defmodule Imp.Adapter.Chat do
     # mirrors that polymorphism (dee-ovd3). Arity 2: (field, formatted_value)
     # where formatted_value is Chat's field-aware formatted string (blob lists,
     # scalars) — the renderer only wraps it in the adapter's dialect.
-    input_section_renderer: [type: {:fun, 2}]
+    input_section_renderer: [type: {:fun, 2}],
+    # Optional renderer for the SYSTEM message. Arity 2: (signature, opts),
+    # where opts are these format options, so a renderer can read `:guidance`.
+    # Default: `render_system/2`, DSPy's field listing, marker template and
+    # objective. A host that wants the character first and the machinery last,
+    # in words, supplies this and leaves parsing alone.
+    system_renderer: [type: {:fun, 2}],
+    # Loop guidance a program passes as data rather than writing into
+    # `signature.instructions`: `%{finish_tool:, input_names:, output_names:,
+    # tool_names:}`. The default system renderer says it the way ReAct's
+    # instructions used to; another renderer may say it in its own words.
+    guidance: [type: {:or, [:map, nil]}],
+    # DSPy always ends a request with a user message, even an empty one, and
+    # the JSON and XML adapters append their output requirements to it. A
+    # native tool loop has nothing left to ask once every input is in the
+    # history; it sets this so the request ends on the newest tool result
+    # rather than on an empty message the provider would count as one.
+    omit_empty_request: [type: :boolean, default: false]
   ]
 
   @impl true
@@ -36,26 +53,29 @@ defmodule Imp.Adapter.Chat do
     # delegating Chat's marker rendering (dee-0bwu).
     output_renderer = Keyword.get(opts, :output_renderer) || (&render_demo_outputs/3)
     input_renderer = Keyword.get(opts, :input_section_renderer) || (&chat_input_section/2)
+    system_renderer = Keyword.get(opts, :system_renderer) || (&render_system/2)
 
     {history_messages, history_fields} =
       extract_history(signature, inputs, output_renderer, input_renderer)
 
-    [%{role: :system, content: render_system(signature)}] ++
+    request = %{
+      role: :user,
+      content:
+        append_content(
+          render_inputs(signature, inputs,
+            skip: history_fields,
+            section_renderer: input_renderer
+          ),
+          render_response_instruction(signature, response_instruction?)
+        )
+    }
+
+    trailing =
+      if opts[:omit_empty_request] and blank_message?(request), do: [], else: [request]
+
+    [%{role: :system, content: system_renderer.(signature, opts)}] ++
       render_demos(signature, demos, output_renderer, input_renderer) ++
-      history_messages ++
-      [
-        %{
-          role: :user,
-          content:
-            append_content(
-              render_inputs(signature, inputs,
-                skip: history_fields,
-                section_renderer: input_renderer
-              ),
-              render_response_instruction(signature, response_instruction?)
-            )
-        }
-      ]
+      history_messages ++ trailing
   end
 
   @impl true
@@ -558,7 +578,16 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  defp render_system(signature) do
+  # The default system message: DSPy's field listing, the marker template and
+  # the objective. Callable (`@doc false`) so a custom `:system_renderer` can
+  # fall back to it; an internal seam, not packaged API.
+  @doc false
+  def render_system(signature, opts \\ []) do
+    objective =
+      signature.instructions
+      |> with_guidance(Keyword.get(opts, :guidance))
+      |> Imp.Adapter.Instructions.objective_text()
+
     """
     Your input fields are:
     #{render_field_list(signature.inputs)}
@@ -567,7 +596,26 @@ defmodule Imp.Adapter.Chat do
     All interactions will be structured in the following way, with the appropriate values filled in.
 
     #{render_interaction_template(signature)}
-    In adhering to this structure, your objective is: #{Imp.Adapter.Instructions.objective_text(signature.instructions)}
+    In adhering to this structure, your objective is: #{objective}
+    """
+    |> String.trim()
+  end
+
+  # The sentences ReAct used to write into `signature.instructions`, rendered
+  # from the guidance it now passes as data, so a program's own instructions
+  # stay its own and the loop's mechanics have one owner.
+  defp with_guidance(instructions, nil), do: instructions
+
+  defp with_guidance(instructions, %{} = guidance) do
+    names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
+    finish = Map.get(guidance, :finish_tool, :submit)
+
+    """
+    #{instructions}
+    You are an Agent. Use the supplied tools to produce #{names.(:output_names)} from #{names.(:input_names)}.
+    Call tools when more information is needed.
+    When the final answer is ready, call `#{finish}` with #{names.(:output_names)}.
+    The available tools are: #{names.(:tool_names)}.
     """
     |> String.trim()
   end

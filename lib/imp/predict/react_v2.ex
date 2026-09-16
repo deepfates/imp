@@ -33,6 +33,9 @@ defmodule Imp.Predict.ReActV2 do
     adapter: [type: {:custom, Imp.Adapter, :validate_adapter, []}],
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
+    # Handed to the adapter beside the loop's own guidance; a host injects its
+    # renderers here (`Imp.Adapter.Chat` `:system_renderer`).
+    adapter_opts: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     max_iters: [type: :non_neg_integer, default: 20],
     tool_policy: [type: {:custom, Imp.ToolPolicy, :validate, []}, default: :allow]
@@ -54,25 +57,34 @@ defmodule Imp.Predict.ReActV2 do
       %Imp.Signature{
         inputs:
           Enum.map(signature.inputs, &Imp.Signature.Field.optional/1) ++
-            [
-              Imp.Signature.Field.new(%{name: :history, type: :history}, :input),
-              Imp.Signature.Field.new(%{name: :tools, type: :array}, :input)
-            ],
+            [Imp.Signature.Field.new(%{name: :history, type: :history}, :input)],
         outputs: [
           Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output),
           Imp.Signature.Field.new(%{name: :tool_calls, type: :array}, :output)
         ],
-        instructions: instructions(signature, tools)
+        instructions: signature.instructions
       }
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, signature))
+
+    # The roster goes to the provider once, natively, in `config`. The loop's
+    # guidance goes to the adapter as data. Nothing about tools is written into
+    # the signature or rendered into a user message, so a step's request is the
+    # previous step's request plus the newest exchange, which is what a
+    # provider's prompt cache is keyed on.
+    adapter_opts =
+      Keyword.merge(Keyword.get(opts, :adapter_opts, []),
+        guidance: guidance(signature, tools),
+        response_instruction: false,
+        omit_empty_request: true
+      )
 
     %__MODULE__{
       signature: signature,
       react:
         Imp.Predict.Predict.new(
           react_signature,
-          Keyword.merge(opts, config: config)
+          Keyword.merge(opts, config: config, adapter_opts: adapter_opts)
         ),
       tools: tools,
       max_iters: opts[:max_iters],
@@ -86,7 +98,9 @@ defmodule Imp.Predict.ReActV2 do
 
     react = %{
       agent.react
-      | config: Keyword.merge(agent.react.config, provider_tool_config(tools, agent.signature))
+      | config: Keyword.merge(agent.react.config, provider_tool_config(tools, agent.signature)),
+        adapter_opts:
+          Keyword.put(agent.react.adapter_opts, :guidance, guidance(agent.signature, tools))
     }
 
     %{agent | tools: tools, react: react}
@@ -453,11 +467,9 @@ defmodule Imp.Predict.ReActV2 do
 
   defp error_text(value), do: inspect(value)
 
-  defp predict(program, react, history, pending) do
-    tools = Enum.map(Map.values(react.tools), &tool_description(&1, react.signature))
-
+  defp predict(program, _react, history, pending) do
     context_call(history, fn projected ->
-      Imp.Predict.Predict.call(program, Map.merge(pending, %{history: projected, tools: tools}))
+      Imp.Predict.Predict.call(program, Map.put(pending, :history, projected))
     end)
   end
 
@@ -817,19 +829,15 @@ defmodule Imp.Predict.ReActV2 do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp instructions(signature, tools) do
-    inputs = signature |> Imp.Signature.input_names() |> Enum.map_join(", ", &"`#{&1}`")
-    outputs = signature |> Imp.Signature.output_names() |> Enum.map_join(", ", &"`#{&1}`")
-    names = tools |> Map.keys() |> Enum.map_join(", ", &"`#{&1}`")
-
-    """
-    #{signature.instructions}
-    You are an Agent. Use the supplied tools to produce #{outputs} from #{inputs}.
-    Call tools when more information is needed.
-    When the final answer is ready, call `submit` with #{outputs}.
-    The available tools are: #{names}.
-    """
-    |> String.trim()
+  # What the adapter needs to say about the loop, as data. `finish_tool` is the
+  # tool that ends the turn, so a renderer never has to know its name.
+  defp guidance(signature, tools) do
+    %{
+      finish_tool: :submit,
+      input_names: Imp.Signature.input_names(signature),
+      output_names: Imp.Signature.output_names(signature),
+      tool_names: tools |> Map.keys() |> Enum.sort()
+    }
   end
 
   defp provider_tool_config(tools, signature) do

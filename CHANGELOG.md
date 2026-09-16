@@ -10,6 +10,21 @@ User-visible changes to Imp are recorded here.
   default limit, which cut any structured value past fifty elements to an
   ellipsis the model could not count and no host bound could measure. A term
   JSON cannot carry renders as a complete `inspect`.
+- ReActV2 sends the tool roster once, natively, and never renders it as text;
+  it no longer declares a `tools` input field or writes "You are an Agent..."
+  into `signature.instructions`. The loop's guidance (`finish_tool`,
+  `input_names`, `output_names`, `tool_names`) travels to the adapter as data
+  through the new `:adapter_opts` on `Imp.Predict.Predict` and
+  `Imp.Predict.ReActV2`. Each step's request is now the previous step's request
+  plus the newest exchange, which is what a provider's prompt cache is keyed
+  on; before, the first user message changed shape between steps one and two
+  and the roster was re-sent after the history on every call.
+- The chat adapter's format options (`Imp.Adapter.Chat`) gain `:system_renderer` (a function of the
+  signature and the format options, default the DSPy system message),
+  `:guidance` (rendered by the default system renderer the way ReAct's
+  instructions used to read), and `:omit_empty_request` (end the request on
+  the newest history message rather than an empty user message; off by
+  default, so the JSON and XML adapters keep DSPy's shape).
 - `:reasoning_effort` is the one reasoning option on `Imp.Clients.ReqLLM`, at
   construction or per call, and `:openrouter_reasoning` is gone. A call naming
   `reasoning_effort: nil` spends no reasoning on that call, which is what

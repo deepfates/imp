@@ -34,6 +34,7 @@ defmodule Imp.Predict.Predict do
     :adapter,
     demos: [],
     config: [],
+    adapter_opts: [],
     traces: [],
     metadata: %{},
     dynamic_lm?: true,
@@ -53,6 +54,10 @@ defmodule Imp.Predict.Predict do
     adapter: [type: {:custom, Imp.Adapter, :validate_adapter, []}],
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
+    # Options handed to the adapter's format/3 on every call, beside `:demos`.
+    # This is how a program passes rendering data (ReAct's guidance) and how a
+    # host injects renderers without a second adapter module.
+    adapter_opts: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}]
   ]
 
@@ -65,6 +70,7 @@ defmodule Imp.Predict.Predict do
       adapter: predict_opts[:adapter],
       demos: Imp.Example.normalize_demos!(predict_opts[:demos], "Imp.Predict.Predict.new/2"),
       config: predict_opts[:config],
+      adapter_opts: predict_opts[:adapter_opts],
       metadata: predict_opts[:metadata],
       dynamic_lm?: not Keyword.has_key?(opts, :lm),
       dynamic_adapter?: not Keyword.has_key?(opts, :adapter)
@@ -130,7 +136,12 @@ defmodule Imp.Predict.Predict do
          {:ok, request_signature, request_config, reasoning_fields} <-
            prepare_native_reasoning(predict.signature, lm, predict.config),
          {:ok, messages} <-
-           format_with_adapter(adapter, request_signature, inputs, demos: predict.demos),
+           format_with_adapter(
+             adapter,
+             request_signature,
+             inputs,
+             Keyword.put(predict.adapter_opts, :demos, predict.demos)
+           ),
          {:ok, lm_opts} <- adapter_lm_opts(adapter, request_signature, request_config, lm),
          {:ok, lm_opts} <- multi_completion_opts(lm_opts),
          {:ok, raw} <-

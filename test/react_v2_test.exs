@@ -375,7 +375,9 @@ defmodule ReActV2Test do
     assert_received {:native_tool_request, forced_messages, forced_opts}
     assert forced_opts[:tool_choice] == %{type: "tool", name: "submit"}
 
-    assert Enum.map(forced_messages, & &1.role) == [:system, :user, :assistant, :tool, :user]
+    # The roster is native and the inputs are already in the history, so the
+    # forced request ends on the incomplete submit's result.
+    assert Enum.map(forced_messages, & &1.role) == [:system, :user, :assistant, :tool]
     assert [%ReqLLM.ToolCall{id: "toolu_incomplete"}] = Enum.at(forced_messages, 2).tool_calls
     assert Enum.at(forced_messages, 3).tool_call_id == "toolu_incomplete"
   end
