@@ -692,7 +692,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     output =
       System.get_env(
         "IMP_GRPO_OPAQUE_OUTPUT",
-        "/Users/deepfates/.cache/imp/trl/#{treatment_id()}"
+        Path.expand("~/.cache/imp/trl/#{treatment_id()}")
       )
 
     %{
@@ -701,10 +701,10 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
       python:
         System.get_env(
           "IMP_TRL_PYTHON",
-          "/Users/deepfates/.cache/imp/trl/feasibility-v1/.venv/bin/python"
+          Path.expand("~/.cache/imp/trl/feasibility-v1/.venv/bin/python")
         ),
       model:
-        System.get_env("IMP_TRL_MODEL", "/Users/deepfates/.cache/imp/trl/feasibility-v1/model"),
+        System.get_env("IMP_TRL_MODEL", Path.expand("~/.cache/imp/trl/feasibility-v1/model")),
       contract:
         System.get_env(
           "IMP_TRL_CONTRACT",
