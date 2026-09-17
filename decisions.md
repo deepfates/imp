@@ -4,8 +4,7 @@ One line per ruling. Each names its source, its status, and the condition under
 which it stops applying. A reason marked *unverified* is stated in the source
 but has no retained failure or measurement behind it; treat it as a claim, not
 a fact. Dates are when the ruling entered this repository (from `git log`),
-not necessarily when it was made. Workshop-wide rulings live in the workshop's
-`AGENTS.md` and are repeated here only where Imp is affected.
+not necessarily when it was made.
 
 | Date | Decision | Source and reason | Status | Retires when |
 | --- | --- | --- | --- | --- |
