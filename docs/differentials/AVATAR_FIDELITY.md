@@ -43,8 +43,7 @@ pre-rewrite actor score. Imp also returns an executable diagnostic baseline
 when either trajectory class is absent and takes bounded examples
 deterministically. A C1 artifact must preserve these deviations explicitly.
 
-Neither protocol can emit admissible evidence from a dirty checkout. The
-artifact binds the committed task, Python sidecar, shared authentication
-helper, fixture, authority ledger and manifest, and relevant Imp implementation
-source. Capture and registry admission therefore occur only after these files
-are committed cleanly.
+Neither protocol runs from a dirty checkout. The report binds the committed
+task, Python sidecar, shared authentication helper, fixture, pinned upstream
+source manifest, and the relevant Imp implementation source, so it can only be
+produced after those files are committed.

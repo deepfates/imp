@@ -62,6 +62,9 @@ ticket file in this repository.
 - Preserve upstream algorithmic semantics when using an upstream name.
 - Give deliberate Elixir-native alternatives a distinct contract and rationale.
 - Never turn fixtures, smoke tests, or symbol presence into broad parity claims.
+- Every published number needs a row in `benchmarks/RESULTS.md` carrying its
+  dataset, license, model, provider, date, commit, and the command that
+  produces it; `docs/BENCHMARKS.md` says what running that command needs.
 - Keep changes focused and update ExDoc or Livebooks with public API changes.
 
 ## Pull Requests

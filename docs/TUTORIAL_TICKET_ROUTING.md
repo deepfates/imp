@@ -4,18 +4,19 @@ Let's take the support-ticket router from the [README](../README.md) and do
 what you cannot do with a prompt string: score it on held-out data, improve it
 with an optimizer, and prove the improvement on tickets it has never seen.
 
-In the current committed benchmark runs the zero-shot router scored **30–50%**
-on twenty held-out tickets. The optimized router scored **95–100%** on the
-same twenty in all three repeats. Each full experiment — baseline,
-optimization, and held-out evaluation — cost about **$0.013** and ran in
-**7–9 seconds** with `gpt-5.4-mini`.
+The zero-shot router scored **30–50%** on twenty held-out tickets; the
+optimized router scored **95–100%** on the same twenty in all three repeats.
+Each full experiment — baseline, optimization, and held-out evaluation — cost
+about **$0.013** and ran in **8–9 seconds** with `gpt-5.4-mini`.
 
-Those numbers come from a committed, content-addressed run artifact in the
-source repository. The repository-only
-[experiment script](https://github.com/deepfates/imp/blob/main/scripts/tutorial_ticket_routing_experiment.exs)
-retains their research provenance; the packaged tutorial below uses the same
-public program, evaluation, and optimizer APIs without shipping that evidence
-runner.
+Those are rows R1 and R2 in
+[benchmarks/RESULTS.md](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md),
+which carries the dataset, model, provider, date and commit. You can measure
+them yourself: with an API key,
+`mix run scripts/tutorial_ticket_routing_experiment.exs` in a source checkout
+runs exactly this experiment three times, for about four cents in total. The
+packaged tutorial below uses the same public program, evaluation and optimizer
+APIs without that runner.
 The gain has a plain-English reason: our routing labels encode conventions
 the model cannot guess, and the optimizer put examples of those conventions
 into the program.
@@ -138,10 +139,13 @@ optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout:
 #=> {0.3, 0.95}
 ```
 
-The current three-repeat artifact measured 50% → 95%, 35% → 100%, and
-30% → 95%: gains of 45–65 points on held-out tickets. Each full run used
-about 14,800 tokens, cost about $0.013, and finished in 7–9 seconds. All 120
-evaluation calls completed without a row error.
+The three repeats measured 50% → 95%, 35% → 100%, and 30% → 95%: gains of
+45–65 points on held-out tickets. Each run used about 14,800 tokens, cost about
+$0.013, and finished in 8–9 seconds; all 120 evaluation calls completed without
+a row error and the cache was cleared before each repeat, so every call was
+live. Twenty rows move in 5-point steps, so trust the direction and the
+magnitude, not the endpoints. Rows R1 and R2 in
+[benchmarks/RESULTS.md](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md).
 
 It is not a magic button. The remaining misses are genuinely marginal tickets
 ("Scheduled reports did not run last night" — a platform failure that reads
@@ -204,7 +208,7 @@ router = Imp.load!("ticket_router.json")
 Credentials never enter the artifact; bind the live model at runtime with
 `Imp.with_lm/2` or a scoped `Imp.context/2`.
 
-The committed evidence runner also writes the optimized parameters as an
+The experiment script also writes the optimized parameters as an
 `Imp.Optimizer.Artifact`, starts a fresh OS process, reconstructs the trusted
 router, applies only those parameters, and serves four concurrent OTP tasks.
 All four fresh-process probes routed correctly; the artifact never contained
@@ -219,3 +223,5 @@ the provider credential or executable application code.
   same metric, bigger budget.
 - [Livebook 03](../livebooks/03_evaluate_and_optimize.livemd) runs this
   workflow interactively.
+- [Benchmarks](https://github.com/deepfates/imp/blob/main/docs/BENCHMARKS.md) lists every number this repository publishes,
+  what each costs to re-measure, and what cannot be re-measured at all.

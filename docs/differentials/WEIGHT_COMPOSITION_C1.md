@@ -25,8 +25,8 @@ Independent execution of the pinned runtime confirms that its default ratio ther
 an empty validation set for one through nine rows and falls into latest-prefix selection. Imp
 treats that truncation as incidental: with two or more rows and a positive ratio it keeps at
 least one validation row, while retaining a lone row for training when no split is possible.
-This BEAM-native correction has direct consumer coverage; it is outside the admitted shared C1
-observations and is not evidence of BetterTogether effectiveness.
+This BEAM-native correction has direct consumer coverage. It is a deliberate divergence from
+upstream, not a comparison result, and it is not evidence of BetterTogether effectiveness.
 
 Imp's aggregate launch/cancellation deadlines for BootstrapFinetune and bounded asynchronous
 training lifecycle for BetterTogether are recorded as BEAM-native extensions. They are not
@@ -45,6 +45,4 @@ mix imp.benchmark.better_together_differential
 ```
 
 The tasks refuse dirty-source capture and bind the committed Imp optimizer, task, sidecar, fixture,
-authority manifest, and authority ledger hashes. Registry admission remains a separate step: this
-tranche intentionally does not edit the shared claims, authorities, or reproductions
-registries while parallel work is active.
+and pinned upstream source manifest hashes.

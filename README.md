@@ -189,13 +189,21 @@ protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPER
 - [Production Operations](docs/PRODUCTION_OPERATIONS.md) — credentials,
   telemetry, concurrency, persistence, failure handling, and the protocol
   adapters.
+- [Ticket Routing Tutorial](docs/TUTORIAL_TICKET_ROUTING.md) — score a router
+  on held-out data, improve it with an optimizer, and prove the improvement on
+  tickets it has never seen. About a cent to run yourself.
 - [Runnable Livebooks](livebooks/01_real_lm_front_door.livemd) — inspect the
   same progression in IEx-ready notebooks.
+- [Benchmarks](https://github.com/deepfates/imp/blob/main/docs/BENCHMARKS.md) — every number this repository publishes,
+  the exact command that produces it, what that command costs you, and what
+  cannot be re-measured at all. The numbers themselves are one row each in
+  [benchmarks/RESULTS.md](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md).
+- [Case study: GEPA and MIPROv2 on TREC](https://github.com/deepfates/imp/blob/main/docs/CASE_STUDY_TREC.md) — a matched
+  optimizer comparison against pinned DSPy, recomputable from committed rows
+  but not reproducible, and labeled that way.
 - [Evidence](https://github.com/deepfates/imp/blob/main/docs/EVIDENCE.md) —
-  the research side: how far the DSPy parity aim has actually been
-  established, benchmark reproductions, execution traces and portable
-  trajectories, and what remains a target. It lives in the source repository,
-  not in the installed package.
+  what kind of evidence stands behind which kind of claim, and the record of
+  the runs that did not work.
 
 Run `mix docs` for the exhaustive module and function reference.
 

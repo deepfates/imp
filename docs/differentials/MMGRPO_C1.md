@@ -10,9 +10,8 @@ trace collection; the Elixir side executes Imp's public compiler with a local
 The comparison covers balanced dataset cycling, two-rollout group cardinality,
 two-predictor attribution, successful program-reward propagation, and the
 configured structured-format failure reward. Its source binding hashes the
-canonical `family.optimizer_mmgrpo` authority projection, the pinned authority
+canonical `family.optimizer_mmgrpo` projection, the pinned upstream source
 manifest, both harness implementations, the fixture, and Imp's GRPO source.
-Unrelated authority-ledger edits therefore do not invalidate this family.
 
 The protocol does **not** claim exact Python RNG or shuffle order, provider or
 transport behavior, model quality, training effectiveness, variable-invocation
