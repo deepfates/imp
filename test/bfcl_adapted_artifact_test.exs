@@ -4,7 +4,6 @@ defmodule BfclAdaptedArtifactTest do
   import ExUnit.CaptureIO
 
   alias Mix.Tasks.Imp.Benchmark.BfclAdapted
-  alias Imp.BenchmarkTruth.ReproductionArtifactValidator
 
   @fixture_path "test/fixtures/benchmarks/bfcl-adapted-v1.json"
   @score_keys ~w(valid_input tool_name_exact arguments_exact terminal_state_exact passing error_code)
@@ -174,12 +173,6 @@ defmodule BfclAdaptedArtifactTest do
     context = put_in(artifact["run_context"], ["payload_sha256"], digest(payload))
     context = Map.put(context, "envelope_sha256", digest(Map.delete(context, "envelope_sha256")))
     Map.put(artifact, "run_context", context)
-  end
-
-  defp mark_clean(artifact) do
-    artifact
-    |> put_in(["run_context", "workspace", "state"], "clean")
-    |> put_in(["run_context", "workspace", "reproducible"], true)
   end
 
   defp digest(value) do
