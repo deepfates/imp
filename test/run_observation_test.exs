@@ -82,6 +82,109 @@ defmodule Imp.RunObservationTest do
     assert terminal.kind == :run_cancelled
   end
 
+  test "oversized provider errors retain status without request or response content" do
+    {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()})
+    assert_receive :waiting
+
+    error =
+      ReqLLM.Error.API.Request.exception(
+        status: 429,
+        reason: "private error explanation",
+        request_body: String.duplicate("x", 215_000) <> "private request content",
+        response_body: %{"message" => "private response content"},
+        headers: %{"authorization" => "Bearer private-header-value"}
+      )
+      |> Map.put(:provider_code, "rate_limit_exceeded")
+      |> Map.put(:retryable, true)
+
+    Imp.Run.with_context(run.control, fn ->
+      Imp.Run.emit(:model_response, error: error, metadata: %{model_call_id: "fixture-call"})
+    end)
+
+    event = List.last(Imp.Run.events(run))
+
+    assert event.error == %{
+             truncated: true,
+             status: 429,
+             provider_code: "rate_limit_exceeded",
+             retryable: true
+           }
+
+    assert event.metadata.model_call_id == "fixture-call"
+    assert event.metadata.capture.truncated
+    assert event.metadata.capture.original_bytes > 215_000
+    assert :erlang.external_size(event) < 65_536
+
+    serialized = event |> Imp.Run.Event.to_map() |> Jason.encode!()
+    refute serialized =~ "private"
+    refute serialized =~ "request_body"
+    refute serialized =~ "response_body"
+    refute serialized =~ "authorization"
+    :ok = Imp.Run.cancel(run)
+  end
+
+  test "error summaries refuse arbitrary fields and unbounded provider codes" do
+    {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()}, max_event_bytes: 1000)
+    assert_receive :waiting
+
+    for error <- [
+          %{status: "429", provider_code: String.duplicate("x", 2000), retryable: "true"},
+          %{status: 999, provider_code: "sk-test-secret-1234567890", retryable: nil},
+          %{status: -1, provider_code: "private words", retryable: %{private: "value"}},
+          %{provider_code: "rate_limit\n"},
+          {:provider_error, String.duplicate("private", 2000)}
+        ] do
+      Imp.Run.with_context(run.control, fn ->
+        Imp.Run.emit(:model_response, error: error, input: String.duplicate("large", 1000))
+      end)
+
+      event = List.last(Imp.Run.events(run))
+      assert event.error == %{truncated: true}
+      assert :erlang.external_size(event) <= 1000
+    end
+
+    :ok = Imp.Run.cancel(run)
+  end
+
+  test "an error summary does not enlarge the existing capture envelope past a tight limit" do
+    for limit <- [300, 400, 500, 600] do
+      {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()}, max_event_bytes: limit)
+      assert_receive :waiting
+
+      Imp.Run.with_context(run.control, fn ->
+        Imp.Run.emit(:model_response,
+          error: %{status: 429, provider_code: String.duplicate("x", 64), retryable: true},
+          input: String.duplicate("large", 1000)
+        )
+      end)
+
+      event = List.last(Imp.Run.events(run))
+      assert event.input == nil
+      assert event.metadata.capture.truncated
+      envelope_bytes = :erlang.external_size(%{event | error: nil})
+      assert :erlang.external_size(event) <= max(limit, envelope_bytes)
+      :ok = Imp.Run.cancel(run)
+    end
+  end
+
+  test "ordinary errors and truncated successful responses keep their existing shape" do
+    {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()}, max_event_bytes: 1000)
+    assert_receive :waiting
+
+    Imp.Run.with_context(run.control, fn ->
+      Imp.Run.emit(:model_response, error: %{status: 429, reason: "short fixture"})
+      Imp.Run.emit(:model_response, output: String.duplicate("large", 1000))
+    end)
+
+    [_started, ordinary, large] = Imp.Run.events(run)
+    assert ordinary.error == %{status: 429, reason: "short fixture"}
+    refute Map.has_key?(ordinary.metadata, :capture)
+    assert large.error == nil
+    assert large.output == nil
+    assert large.metadata.capture.truncated
+    :ok = Imp.Run.cancel(run)
+  end
+
   test "task death is recorded once by control even when the task cannot emit" do
     {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()})
     assert_receive :waiting
