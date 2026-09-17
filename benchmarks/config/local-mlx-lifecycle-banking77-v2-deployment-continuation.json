@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "campaign_id": "local-mlx-sft-lifecycle-banking77-v2-deployment-continuation",
+  "status": "draft_for_principal_review_not_authorized",
+  "output_artifact": "benchmarks/results/local-mlx-lifecycle-banking77-v2-deployment-continuation.json",
+  "purpose": "Complete only the deployment, base-versus-fused evaluation, persistence, fresh-process reload, identity, and cleanup measurements that stopped V2 left unobserved. This draft does not authorize a server launch.",
+  "closed_predecessor": {
+    "campaign_id": "local-mlx-sft-lifecycle-banking77-v2",
+    "contract": "benchmarks/config/local-mlx-lifecycle-banking77-v2.json",
+    "contract_sha256": "832516a25c0c49df832ba355f470cedab1b21f9c9bace72ce0cb1e5310c7b73f",
+    "result": "benchmarks/results/local-mlx-lifecycle-banking77-v2.json",
+    "result_sha256": "4feb63c01e1ac7ba8322dfd86051c3bae1f5ad20adc5b3900d74cfda38f24005",
+    "result_payload_sha256": "a15f632f3d8668d09be8589442f0f88927e160f06ba75c9f0ab693f2bc9d63c9",
+    "record_commit": "7a3b4bc5156048a8298aa3617f207d90c10b3b15",
+    "disposition": "permanently_stopped_after_training_and_fusion_at_first_deployment_identity_failure",
+    "resume_or_reinterpret_allowed": false,
+    "base_evaluation_evidence_retained": false,
+    "training_or_effectiveness_outcome": "none"
+  },
+  "retained_artifacts": {
+    "job": {
+      "path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training-job.json",
+      "file_sha256": "8f25d1a86b6ec5423e83a66803e418b6e9fc2f0844332ea48f4f94a6abe7cab5",
+      "payload_sha256": "sha256:bed8a175c5f9e8a21ce7e0ffa288a0404f4441c9163c173c425e605c99a09b2f",
+      "verify_job_required": true
+    },
+    "manifest": {
+      "path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/manifest.json",
+      "file_sha256": "989b82a4e269a792afe078f3f1d04574103161212d19df55d57473f29888b172",
+      "payload_sha256": "b138c37d9e022a354d63926718e1d8dfeeaf54bcd0fcd707ff9e07b82f6cadb9",
+      "schema_version": 2,
+      "status": "succeeded"
+    },
+    "base_model": {
+      "repository": "mlx-community/Qwen2.5-0.5B-Instruct-4bit",
+      "revision": "a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "tree_sha256": "047d24a10e4acc788e046734351a0e4ec668ee36d2d9453daeb80a9364e87947",
+      "runtime_file_count": 9,
+      "runtime_bytes": 289598797
+    },
+    "fused_model": {
+      "path": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+      "tree_sha256": "d52aca6b049e9e015b0934bc56e4a120a6d669fb21bc5c7068c527e0f994dc44",
+      "adapter_sha256": "63dd02ea8f46e10428adfda14994242de39a84462ed97eed61f39655e7223ece",
+      "must_remain_distinct_from_base": true
+    },
+    "training_and_fusion_must_not_execute": true
+  },
+  "root_cause": {
+    "verdict": "The unexpected ID was ambient cache discovery. It was not a static alias and was not the model loaded at V2 startup or named by Imp requests; it is a genuine alternate model that MLX-LM could hot-load only if a request explicitly named it.",
+    "pinned_runtime": {
+      "mlx_lm_version": "0.31.3",
+      "huggingface_hub_version": "1.24.0",
+      "server_source_path": "/Users/deepfates/.cache/uv/archive-v0/ZcNz9qUZ0uj_wSdiNuuSq/mlx_lm/server.py",
+      "server_source_sha256": "cdfcb4ac848636f9927851a0ec7a951584526530cb7832ba58049e4a9144db8b"
+    },
+    "models_endpoint": {
+      "behavior": "handle_models_request scans huggingface_hub's active cache, advertises every model repository whose main ref has config.json, model.safetensors.index.json, and tokenizer_config.json, then appends the resolved CLI --model local path.",
+      "meaning": "available_or_discoverable_models_not_loaded_model_inventory",
+      "source_lines": "mlx_lm/server.py:1643-1698"
+    },
+    "ambient_model": {
+      "id": "jxm/gpt-oss-20b-base",
+      "revision": "4bdf551fbeba7b70712134144175108fa1c47715",
+      "cache_path": "/Users/deepfates/.cache/huggingface/hub/models--jxm--gpt-oss-20b-base",
+      "cache_size_observed": "39G",
+      "main_ref_mtime_utc": "2025-08-13T05:21:39Z",
+      "predates_v2": true,
+      "contains_all_models_endpoint_required_files": true,
+      "static_server_literal": false,
+      "genuinely_hot_loadable_if_explicitly_requested": true,
+      "loaded_or_requested_by_v2": false
+    },
+    "loaded_and_routed_identity": {
+      "startup": "ModelProvider maps default_model to the exact CLI --model path and ResponseGenerator loads it before handling generation work.",
+      "request": "MLXLMDeployment sets both ReqLLM model.id and model.model to the exact fused path; ReqLLM's OpenAI Chat API encodes request.options.model into the JSON model field.",
+      "server": "MLX-LM takes the JSON model field as requested_model and loads that exact key; the response model field echoes requested_model.",
+      "imp_response": "Imp retains ReqLLM response.model in __imp_lm_metadata__.req_llm.model.",
+      "conclusion": "The exact fused path is provably the sole startup-loaded artifact and sole routed artifact for an exact-path Imp request. The ambient cached model remains separately servable only under a different explicit request identity."
+    },
+    "v2_launch": {
+      "argv": [
+        "/Users/deepfates/.local/bin/uvx",
+        "--from",
+        "mlx-lm==0.31.3",
+        "mlx_lm.server",
+        "--model",
+        "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "18822",
+        "--max-tokens",
+        "64"
+      ],
+      "explicit_child_environment_delta": {
+        "IMP_BEAM_PORT_OWNER": "1"
+      },
+      "complete_parent_environment_retained": false,
+      "server_stdout_or_stderr_retained": false,
+      "known_limit": "ExternalCommand captured bounded server output in memory but discarded it during successful cleanup; the stopped result retains only the returned model IDs. The complete inherited launch environment and server log therefore remain unknown."
+    },
+    "source_bindings": [
+      {
+        "path": "lib/imp/clients/mlx_lm_deployment.ex",
+        "sha256": "1066f924dbf026d5ab13d5482fb16aa709db25790bb6157600b2589d7f1733a8"
+      },
+      {
+        "path": "lib/imp/clients/req_llm.ex",
+        "sha256": "72ed76f426d85946172ae7a771a0238ecd83fba7c6f3fe0abbd5e4c1e9c98f97"
+      },
+      {
+        "path": "deps/req_llm/lib/req_llm/providers/openai/chat_api.ex",
+        "sha256": "6e3d1a18bd481aef06dd601ef4852836331b604537ee78cd57f929ce3cb60fd7"
+      },
+      {
+        "path": "deps/req_llm/lib/req_llm/provider/defaults.ex",
+        "sha256": "6006dc5ca7455d58057c09b33cb78ff33234c0f25cbf24ab7ff5d42c16264b14"
+      },
+      {
+        "path": "lib/imp/external_command.ex",
+        "sha256": "c0994bdc30c47e87103ffd0cadcf7d585457a700f5d6a5c335135d190e456aa8"
+      }
+    ]
+  },
+  "deployment_isolation": {
+    "reason": "Keep MLX-LM's ambient cache-discovery endpoint truthful without changing Imp's exact-single-ID guard or deleting/moving another user's cached model.",
+    "root": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2-deployment-continuation",
+    "environment": {
+      "HF_HOME": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2-deployment-continuation/huggingface",
+      "HF_HUB_CACHE": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2-deployment-continuation/huggingface/hub",
+      "HUGGINGFACE_HUB_CACHE": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2-deployment-continuation/huggingface/hub",
+      "TRANSFORMERS_CACHE": "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2-deployment-continuation/transformers",
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "preconditions": [
+      "the isolation root does not exist before launch",
+      "the runner creates only empty cache directories before starting the base server",
+      "the complete non-secret environment variable names and the six values above are retained in the result",
+      "the same isolation environment is present in the parent and fresh BEAM processes and inherited by every MLX-LM server",
+      "no download, cache import, symlink, model copy, or request for an alternate model occurs"
+    ],
+    "guard": "The existing unmodified MLXLMDeployment ids == [artifact_path] check must pass. No implementation or test change may weaken it."
+  },
+  "frozen_data": {
+    "path": "benchmarks/data/provider-training-banking77-v1.json",
+    "file_sha256": "1703f59bf336df8dc35590275531b67bb6ee43a5d0c96eb44696c219af5cfc18",
+    "payload_sha256": "sha256:b84958ebf577bc5d57f2c6cf4a6033d7aafcb3a5cf91a79aa826b4345ebb1f3f",
+    "training_rows": 72,
+    "training_receipt": "849c8bee6757d7d32833fd92038c29b42c19d3431b7151c1ae2d72cc95050c6e",
+    "training_use": "none; the retained fused artifact is immutable",
+    "selection_ids_in_order": [
+      "banking77-train-5101",
+      "banking77-train-6729",
+      "banking77-train-5095",
+      "banking77-train-6738",
+      "banking77-train-3500",
+      "banking77-train-2530",
+      "banking77-train-2512",
+      "banking77-train-3501"
+    ],
+    "selection_receipt": "ff3223c6c72bffa7e07240eb2d41fefbbf0afa045ef6013736e9e120508c3983",
+    "untouched_test_ids_in_order": [
+      "banking77-test-800",
+      "banking77-test-801",
+      "banking77-test-802",
+      "banking77-test-803",
+      "banking77-test-804",
+      "banking77-test-805",
+      "banking77-test-806",
+      "banking77-test-807",
+      "banking77-test-808",
+      "banking77-test-809",
+      "banking77-test-1080",
+      "banking77-test-1081",
+      "banking77-test-1082",
+      "banking77-test-1083",
+      "banking77-test-1084",
+      "banking77-test-1085",
+      "banking77-test-1086",
+      "banking77-test-1087",
+      "banking77-test-1088",
+      "banking77-test-1089",
+      "banking77-test-1600",
+      "banking77-test-1601",
+      "banking77-test-1602",
+      "banking77-test-1603",
+      "banking77-test-1604",
+      "banking77-test-1605",
+      "banking77-test-1606",
+      "banking77-test-1607",
+      "banking77-test-1608",
+      "banking77-test-1609",
+      "banking77-test-2080",
+      "banking77-test-2081",
+      "banking77-test-2082",
+      "banking77-test-2083",
+      "banking77-test-2084",
+      "banking77-test-2085",
+      "banking77-test-2086",
+      "banking77-test-2087",
+      "banking77-test-2088",
+      "banking77-test-2089"
+    ],
+    "untouched_test_digest": "sha256:5d70b2ff26f9c30862175e63bc1cb4742f509f49c7571e205f1faf06d5d10fe1",
+    "test_visible_to_training_or_selection": false
+  },
+  "frozen_execution": {
+    "schedule": [
+      "verify the contract, stopped V2 result, retained job, manifest, base tree, fused tree, data, row identities, source bindings, free ports, and empty isolated cache",
+      "start the exact base path with pinned MLX-LM 0.31.3 under the isolated environment; require /v1/models to contain exactly the resolved base path; evaluate and durably record the frozen selection and untouched test rows",
+      "load the retained job and start the exact fused path through public MLXLMDeployment; rebind the ordinary program through TrainingJob.rebind with that deployment LM; require the unmodified exact-single-ID guard; evaluate and durably record the same rows",
+      "save the verified job and rebound program, stop every parent deployment, and require both ports free",
+      "start a fresh BEAM process under the same isolated environment, load the saved job and program, rebind through a newly supervised exact fused deployment, require exact identity again, and reproduce byte-identical fused predictions",
+      "stop every process, require both ports free, and write one immutable result"
+    ],
+    "base_argv": [
+      "/Users/deepfates/.local/bin/uvx",
+      "--from",
+      "mlx-lm==0.31.3",
+      "mlx_lm.server",
+      "--model",
+      "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-4ffe3de/model-cache/models--mlx-community--Qwen2.5-0.5B-Instruct-4bit/snapshots/a5339a4131f135d0fdc6a5c8b5bbed2753bbe0f3",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "18821",
+      "--max-tokens",
+      "64"
+    ],
+    "fused_argv": [
+      "/Users/deepfates/.local/bin/uvx",
+      "--from",
+      "mlx-lm==0.31.3",
+      "mlx_lm.server",
+      "--model",
+      "/Users/deepfates/.cache/imp/mlx_lm/probes/banking77-qwen25-a5339a4-c51a99e-v2/training/089e3e86-2c61b67d-07bf31be-7d4279ed-6fbb85f4-4e841fa2-45e1c599-5690a103/fused",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "18822",
+      "--max-tokens",
+      "64"
+    ],
+    "generation": {
+      "temperature": 0,
+      "cache": false,
+      "request_max_tokens": 32,
+      "server_max_tokens": 64
+    },
+    "metrics": [
+      "accuracy",
+      "macro_f1"
+    ],
+    "identity_receipts_per_request": [
+      "the deployment artifact path and SHA-256",
+      "the ReqLLM request telemetry model.id and model.model",
+      "a source-bound assertion that ReqLLM encodes that exact ID into the JSON model field",
+      "the Imp response __imp_lm_metadata__.req_llm.model echoed by MLX-LM",
+      "finish reason, token usage, raw output, parsed route, expected route, and correctness"
+    ],
+    "attribution_acceptance": [
+      "base and fused requests and responses each identify only their exact resolved artifact path",
+      "the content-verified fused artifact differs from the pinned base artifact",
+      "at least one untouched-test prediction changes between base and fused",
+      "the saved job and program reproduce byte-identical fused test predictions in a fresh BEAM process",
+      "every supervised process and reserved port is cleaned up"
+    ]
+  },
+  "change_control": {
+    "only_v2_to_continuation_changes": [
+      "reuse V2's already trained and fused verified artifact without any training or fusion",
+      "isolate MLX-LM's Hugging Face cache discovery so /v1/models describes only the exact local path passed to that server",
+      "persist base and fused evaluation rows immediately after each completed stage"
+    ],
+    "unchanged": [
+      "all Banking77 rows, identities, order, split boundaries, and digests",
+      "base and fused artifact bytes",
+      "model revision and MLX-LM version",
+      "generation settings",
+      "accuracy and macro-F1 metrics",
+      "lifecycle attribution and fresh-process byte-identity checks",
+      "interpretation and claim limits"
+    ],
+    "forbidden": [
+      "training, fusion, adapter update, artifact repair, or V2 resume",
+      "model, data, row, prompt, envelope, metric, or threshold change",
+      "weakening the exact-single-ID guard",
+      "requesting jxm/gpt-oss-20b-base or any alternate model",
+      "deleting, moving, importing, or modifying the ambient Hugging Face cache",
+      "retry, substitution, provider call, paid spend, or result-informed adjustment"
+    ]
+  },
+  "execution_limits": {
+    "attempt_limit": 1,
+    "no_retry": true,
+    "no_retraining": true,
+    "no_refusion": true,
+    "no_substitution": true,
+    "no_provider_calls": true,
+    "no_paid_spend": true,
+    "requires_fresh_principal_review_and_heavy_slot": true
+  },
+  "stop_rules": [
+    "any contract, source, artifact, dataset, row-order, environment, port, or clean-tree receipt mismatch",
+    "the isolated cache is not empty before the first server or gains an unexpected model during execution",
+    "any /v1/models ID list other than the one exact resolved artifact path for that server",
+    "any request or response model identity other than the exact artifact path for that arm",
+    "any training, fusion, download, alternate-model, retry, substitution, or result-informed action",
+    "first owning server, inference, persistence, reload, identity, byte-reproduction, or cleanup failure"
+  ],
+  "interpretation": {
+    "positive_or_negative_scores": "Report exactly as observed on the frozen one-model, one-task, one-split evaluation; selection remains report-only.",
+    "unchanged_predictions": "Lifecycle attribution remains incomplete, not proof that SFT is generally ineffective.",
+    "failure": "A stopped continuation is a deployment or measurement failure, not an optimizer loss.",
+    "claim_limits": [
+      "This draft does not authorize launch.",
+      "The continuation can complete only V2's deployment/lifecycle and task-specific changed-behavior measurement from the already verified fused tree.",
+      "It cannot establish general held-out effectiveness, DSPy or BetterTogether parity, GRPO, production reliability, or BEAM-native superiority.",
+      "V1 and V2 remain permanently stopped and must not be resumed, overwritten, or reinterpreted."
+    ]
+  }
+}

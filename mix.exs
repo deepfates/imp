@@ -77,6 +77,7 @@ defmodule Imp.MixProject do
         [
           "benchmark.failure_campaign.check": :test,
           "benchmark.truth.check": :test,
+          "benchmark.gepa_replication.check": :test,
           "benchmark.live.check": :test,
           "benchmark.optimizer_lift.check": :test,
           "benchmark.instruction_optimizer.contract.check": :test,
@@ -459,8 +460,14 @@ defmodule Imp.MixProject do
       "benchmark.gepa.contract.check": [
         "imp.benchmark.gepa_contract --out tmp/gepa-v014-contract"
       ],
+      "benchmark.gepa_replication.check": [
+        "imp.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
+      ],
       "benchmark.fast_slow.check": [
         "imp.benchmark.fast_slow --out tmp/fast-slow-protocol.json"
+      ],
+      "benchmark.optimize_anything.check": [
+        "imp.benchmark.optimize_anything --smoke --out tmp/optimize-anything"
       ],
       "benchmark.bfcl_scorer.check": [
         "imp.benchmark.bfcl_adapted --no-require-clean --out tmp/bfcl-shaped-scorer"

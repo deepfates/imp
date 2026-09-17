@@ -95,6 +95,110 @@ defmodule GepaCampaignTest do
     assert Enum.any?(after_selection, &test_prompt?/1)
   end
 
+  test "Imp GEPA campaign keeps local HoVer retrieval out of full replication evidence" do
+    dataset_root = tmp_dir("gepa-campaign-data")
+    upstream_dir = tmp_dir("gepa-campaign-upstream")
+    rows_dir = tmp_dir("gepa-campaign-rows")
+    final_dir = tmp_dir("gepa-campaign-final")
+
+    write_dataset_root!(dataset_root)
+    write_upstream_gepa_results!(upstream_dir, "gpt-41-mini")
+
+    result =
+      GepaCampaign.run(
+        dataset_root: dataset_root,
+        campaign_id: "gepa-campaign-test",
+        model: "openai:gpt-4.1-mini-2025-04-14",
+        reflection_model: "openai:gpt-5",
+        out_dir: rows_dir,
+        seeds: [0, 1],
+        generations: 1,
+        pricing_source: "test provider usage export",
+        token_cost:
+          explicit_costs(
+            Imp.BenchmarkTruth.GepaReplicationContract.required_families(),
+            [0, 1]
+          ),
+        source_commits: %{
+          "dspy" => "stanfordnlp/dspy@abcdef1",
+          "imp" => "deepfates/imp@abcdef2",
+          "gepa_artifact" => "gepa-ai/gepa-artifact@abcdef3"
+        },
+        lm: static_gold_lm(),
+        reflection_lm: static_reflection_lm()
+      )
+
+    assert File.exists?(result.out_path)
+
+    assert %{"git_sha" => "abcdef2", "rows" => rows} =
+             File.read!(result.out_path) |> Jason.decode!()
+
+    assert length(rows) == 6
+
+    assert Enum.all?(rows, fn row ->
+             is_map(get_in(row, ["results", "imp_gepa"])) and
+               get_in(row, ["results", "imp_gepa", "source"]) =~ "Imp GEPA campaign runner" and
+               get_in(row, ["results", "imp_gepa", "source"]) =~ "abcdef2" and
+               is_map(row["dataset"]) and
+               row["dataset"]["scope"] == "full" and
+               row["dataset"]["split_counts"] == %{"train" => 2, "dev" => 2, "test" => 2} and
+               is_map(row["token_cost"]) and
+               row["seed_variance"]["seeds"] == [0, 1]
+           end)
+
+    hover = Enum.find(rows, &(&1["family"] == "hoverBench"))
+    hotpot = Enum.find(rows, &(&1["family"] == "HotpotQABench"))
+    assert get_in(hotpot, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
+    assert get_in(hotpot, ["dataset", "retrieval", "verified"]) == true
+    assert get_in(hotpot, ["dataset", "retrieval", "implementation"]) == "imp_local_bm25"
+    assert get_in(hover, ["dataset", "retrieval", "kind"]) == "bm25s_wiki_abstracts_2017"
+    assert get_in(hover, ["dataset", "retrieval", "corpus_checksum"]) =~ "sha256:"
+    assert get_in(hover, ["dataset", "retrieval", "index_checksum"]) =~ "sha256:"
+    assert get_in(hover, ["dataset", "retrieval", "verified"]) == true
+    assert get_in(hover, ["dataset", "retrieval", "implementation"]) == "imp_local_bm25"
+    assert get_in(hover, ["results", "imp_gepa", "score"]) == 1.0
+
+    assert get_in(hotpot, ["metadata", "component_feedback", "components"]) == [
+             "create_query_hop2",
+             "final_answer",
+             "summarize1",
+             "summarize2"
+           ]
+
+    assert get_in(hover, ["metadata", "component_feedback", "components"]) == [
+             "create_query_hop2",
+             "create_query_hop3",
+             "summarize1",
+             "summarize2"
+           ]
+
+    ifbench = Enum.find(rows, &(&1["family"] == "IFBench"))
+
+    assert get_in(ifbench, ["metadata", "component_feedback", "components"]) == [
+             "ensure_correct_response_module",
+             "generate_response_module"
+           ]
+
+    Mix.Task.reenable("imp.benchmark.gepa_replication")
+
+    assert_raise Mix.Error, ~r/requires --upstream-evidence/, fn ->
+      Mix.Tasks.Imp.Benchmark.GepaReplication.run([
+        "--from-gepa-artifact",
+        upstream_dir,
+        "--imp-input",
+        result.out_path,
+        "--campaign-id",
+        "gepa-campaign-test",
+        "--artifact-model",
+        "gpt-41-mini",
+        "--out",
+        final_dir
+      ])
+    end
+
+    assert Path.wildcard(Path.join(final_dir, "gepa-replication-*.json")) == []
+  end
+
   test "Imp GEPA campaign rejects HoVer rows without source-exact retrieval provenance" do
     dataset_root = tmp_dir("gepa-campaign-hover-missing-retrieval")
     rows_dir = tmp_dir("gepa-campaign-hover-missing-rows")
@@ -864,6 +968,61 @@ defmodule GepaCampaignTest do
     assert get_in(row, ["results", "imp_gepa", "score"]) == 0.1
     assert get_in(row, ["seed_selection", "imp_gepa", "selection_split"]) == "dev"
     assert get_in(row, ["seed_selection", "imp_gepa", "test_scores_used"]) == false
+  end
+
+  test "Imp evidence satisfies the strict contract once converter comparators are supplied" do
+    dataset_root = tmp_dir("gepa-campaign-contract-data")
+    rows_dir = tmp_dir("gepa-campaign-contract-rows")
+    write_dataset_root!(dataset_root)
+    set_family_budget!(dataset_root, "AIMEBench", 4)
+
+    [imp_row] =
+      campaign_opts(dataset_root, rows_dir,
+        campaign_id: "gepa-campaign-contract",
+        seeds: [3, 5],
+        generations: :metric_budget,
+        token_cost: explicit_costs(["AIMEBench"], [3, 5])
+      )
+      |> GepaCampaign.run()
+      |> get_in([:report, "rows"])
+
+    selection = get_in(imp_row, ["seed_selection", "imp_gepa"])
+    assert imp_row["evidence_level"] == "research_campaign"
+    assert imp_row["metadata"]["budget_complete"]
+    observed_imp = get_in(imp_row, ["metric_call_evidence", "observed", "imp_gepa"])
+
+    rows =
+      Enum.map(GepaReplicationContract.required_families(), fn family ->
+        dataset =
+          if family in ["HotpotQABench", "hoverBench"] do
+            put_in(imp_row["dataset"], ["retrieval"], %{
+              "verified" => true,
+              "implementation" => "upstream_python_bm25s",
+              "corpus_checksum" => "sha256:" <> String.duplicate("a", 64),
+              "index_checksum" => "sha256:" <> String.duplicate("b", 64)
+            })
+          else
+            imp_row["dataset"]
+          end
+
+        imp_row
+        |> Map.put("family", family)
+        |> Map.put("dataset", dataset)
+        |> Map.put("results", contract_results(imp_row))
+        |> Map.put("seed_selection", Map.new(contract_optimizers(), &{&1, selection}))
+        |> Map.put("metric_call_evidence", %{
+          "basis" => "observed_and_enforced",
+          "source" => "optimizer runtime exports and enforced campaign limits",
+          "observed" =>
+            Map.merge(Map.new(contract_optimizers(), &{&1, 1}), %{
+              "imp_gepa" => observed_imp
+            }),
+          "enforced_limits" => Map.new(contract_optimizers(), &{&1, true})
+        })
+        |> maybe_put_contract_judge(family)
+      end)
+
+    assert GepaReplicationContract.validate_rows(rows).passing
   end
 
   defp static_gold_lm do
