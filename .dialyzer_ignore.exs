@@ -37,7 +37,7 @@
    {286, 30}},
   # defensive clause for non-covered differential rows
   {"bench/imp/benchmark_truth/optimize_anything/upstream_differential.ex", :pattern_match_cov,
-   {228, 10}},
+   {227, 10}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 21)
   {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 21}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 53)
