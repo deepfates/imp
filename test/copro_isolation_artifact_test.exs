@@ -25,7 +25,22 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
       )
 
     report = Jason.decode!(output)
-    artifact = COPROArtifact.build_artifact!(report)
+
+    out =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-copro-isolation-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
+      )
+
+    on_exit(fn -> File.rm_rf(out) end)
+
+    ExUnit.CaptureIO.capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.copro_isolation")
+      COPROArtifact.run_with_runner(["--out", out], fn -> report end)
+    end)
+
+    [path] = Path.wildcard(Path.join(out, "copro-isolation-*.json"))
+    artifact = path |> File.read!() |> Jason.decode!()
     %{artifact: artifact, report: report}
   end
 
