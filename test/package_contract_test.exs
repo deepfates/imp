@@ -25,6 +25,7 @@ defmodule PackageContractTest do
                    "priv/public_api.json",
                    "CHANGELOG.md",
                    "LICENSE",
+                   "NOTICE",
                    "RELEASE_NOTES.md",
                    "README.md",
                    "docs/IMP_FOR_DSPY_USERS.md",
@@ -41,6 +42,7 @@ defmodule PackageContractTest do
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "LICENSE",
+    "NOTICE",
     "SECURITY.md",
     ".github/dependabot.yml",
     ".github/pull_request_template.md",
@@ -315,7 +317,7 @@ defmodule PackageContractTest do
     assert unavailable == []
   end
 
-  test "README gives the usable private source install" do
+  test "README gives the usable source install" do
     readme = File.read!("README.md")
     version = Mix.Project.config()[:version]
 

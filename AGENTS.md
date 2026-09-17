@@ -1,7 +1,9 @@
 # Working on Imp
 
-Read this before changing anything here. The workshop's `AGENTS.md` has the
-idioms these repositories share; this file is what is specific to Imp.
+Orientation for anyone — person or agent — changing this repository.
+`CONTRIBUTING.md` has the gates and the development setup; `decisions.md` has
+the rulings that are in force and the condition under which each retires. This
+file is the design context those two assume.
 
 ## What Imp owns
 
@@ -12,10 +14,10 @@ application rather than owning one.
 
 ## What Imp does not own
 
-Product-specific characters, residents, accounts, inboxes, or chat threads.
-Imp now includes the optional `Imp.ACP` program adapter and the generic
-`Imp.MCP` tool integration. ExMCP owns both wire protocols. Imp owns typed
-program/tool conversion and execution; Dwell and hosts own product lifetimes.
+Product-specific characters, accounts, inboxes, or chat threads. Imp includes
+the optional `Imp.ACP` program adapter and the generic `Imp.MCP` tool
+integration; ExMCP owns both wire protocols. Imp owns typed program/tool
+conversion and execution, and the host application owns product lifetimes.
 Ordinary Imp startup opens no protocol listeners or remote connections.
 
 ## The centre of the model
@@ -26,13 +28,10 @@ around it, and persistence stores it as plain data. Thirty-three modules read it
 When something needs to know a program's shape, it should ask the signature
 rather than re-describe it.
 
-This is the strongest instance of "declare once, derive everything" in the
-constellation, and it is the pattern the other repositories are measured against.
-
 ## Where the boundaries are half-declared
 
-Imp has more `@callback` boundaries than any other repository here — and nearly
-all of them return `{:error, term()}`. Some paths return bare strings
+Imp has many `@callback` boundaries, and nearly all of them return
+`{:error, term()}`. Some paths return bare strings
 (`{:error, "expected an LM module exporting generate/2"}`), which a caller cannot
 act on except by matching text.
 
@@ -49,10 +48,9 @@ process-group lifecycle on raw ports: TERM, grace, KILL, and a check that the
 group is gone. The grace period is the requirement worth preserving — a trainer
 SIGKILLed mid-checkpoint loses work — and it is the reason Imp cannot simply
 adopt `ExMCP.Internal.OwnedProcess`, which stops the root process before
-signalling and so can never deliver a handleable TERM.
-
-If that consolidation happens, graceful shutdown is a precondition, not a
-follow-up. Until then this is a documented divergence rather than an accident.
+signalling and so can never deliver a handleable TERM. If that consolidation
+happens, graceful shutdown is a precondition, not a follow-up. Until then this is
+a documented divergence rather than an accident.
 
 ## Protocol integration
 
@@ -63,12 +61,13 @@ adds ACP presentation hints to that import; it is not another client.
 The shared ExMCP pin and its fork reasons live in `mix.exs`.
 
 `Imp.ACP` owns the default session/program adapter formerly shipped separately
-as imp_acp. Its namespace stays stable, but consumers depend on Imp directly.
-`docs/PRODUCTION_OPERATIONS.md` describes the MCP lifecycle/API migration.
+as the `imp_acp` package. Its namespace stays stable, but consumers depend on
+Imp directly. `docs/PRODUCTION_OPERATIONS.md` describes the MCP lifecycle and
+API migration.
 
 ## Checks
 
-`CONTRIBUTING.md` lists the gates. `mix check` is the default; provider-backed,
-research-scale and evidence-infrastructure runs are deliberately separate
-because they need credentials, datasets or spend. Keep that separation — a green
-default run is not evidence about a fidelity claim.
+`mix check` is the default merge signal and needs no credentials. Provider-backed
+and research-scale runs are deliberately separate because they need credentials,
+datasets or spend. Keep that separation — a green default run is not evidence
+about a fidelity claim.

@@ -10,7 +10,7 @@ rather than hand-editing prompts—to the BEAM.
 integrated protocol adapters — `Imp.ACP` and `Imp.MCP.connect/2`, absorbed from
 the retired `imp_acp` package — exist only on `main` until the next tag.
 Installing `v0.3.2` gives you the library described below without them; using
-the adapters today means a local checkout of `main`.
+the adapters today means depending on `main` (see [Install](#install)).
 
 Here, “typed” means required inputs are checked and model outputs are parsed
 and validated against the signature before application code receives them.
@@ -131,12 +131,23 @@ decision.
 
 ## Install
 
-Imp is not published to Hex. Install the private source release from its
-immutable tag (GitHub credentials with access to the repository are required):
+Imp is not published to Hex. It is installed from this public repository, at
+an immutable tag, with no credentials:
 
 ```elixir
 {:imp, github: "deepfates/imp", tag: "v0.3.2"}
 ```
+
+That tag does not contain `Imp.ACP` or `Imp.MCP.connect/2`; a tag that does
+will be cut. Until then, depend on `{:imp, github: "deepfates/imp", branch:
+"main"}` if you need the adapters.
+
+ExMCP is declared `runtime: false`, so an OTP release that uses `Imp.ACP` or
+`Imp.MCP` must list `applications: [ex_mcp: :load]` in its release definition;
+see [protocol runtime in releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
+
+Imp is MIT licensed (`LICENSE`); `NOTICE` records the upstream DSPy code two
+modules are ported from.
 
 Use `{:imp, path: "path/to/imp"}` only while developing against a local
 checkout. Imp requires Elixir `~> 1.19`. Commit your application's `mix.lock`;

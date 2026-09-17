@@ -1,0 +1,19 @@
+# NOTICE
+
+Imp is licensed under the MIT License; see `LICENSE`.
+
+Imp contains code ported from DSPy (https://github.com/stanfordnlp/dspy),
+which is licensed under the MIT License:
+
+    Copyright (c) 2023 Stanford Future Data Systems
+
+The following files are ports of DSPy source and carry that copyright
+alongside Imp's own:
+
+- `lib/imp/optimizer/utils.ex` — ported from `dspy/teleprompt/utils.py` and
+  `dspy/teleprompt/bootstrap_trace.py`.
+- `lib/imp/adapter/chat.ex` — its field-marker section parsing is ported line
+  for line from DSPy's chat adapter.
+
+Other modules name DSPy concepts or reproduce its semantics without copying
+its source; those are independent implementations.
