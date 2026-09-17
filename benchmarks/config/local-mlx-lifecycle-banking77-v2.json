@@ -3,6 +3,7 @@
   "campaign_id": "local-mlx-sft-lifecycle-banking77-v2",
   "status": "draft_for_principal_review_not_authorized",
   "output_artifact": "benchmarks/results/local-mlx-lifecycle-banking77-v2.json",
+  "note": "Paths under benchmarks/results/ are run write targets; that directory is not tracked, so any predecessor artifact named here is unpublished history recorded for provenance, not a file in this repository.",
   "purpose": "Run the already-approved one-model Banking77 base-versus-fused lifecycle probe with the JSONL that current public Imp actually renders. This is a draft only: it does not authorize training, inference, or a server.",
   "closed_predecessor": {
     "campaign_id": "local-mlx-sft-lifecycle-banking77-v1",

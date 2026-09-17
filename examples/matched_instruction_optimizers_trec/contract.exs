@@ -54,7 +54,7 @@ defmodule MatchedInstructionOptimizersTREC.Contract do
     require!(
       manifest["launch_status"] in [
         "blocked_pending_gepa_execution_and_fail_closed_preflight",
-        "blocked_workshop_spend_ceiling_after_gepa_legal_envelope",
+        "blocked_spend_ceiling_after_gepa_legal_envelope",
         "sealed"
       ],
       "launch_status drift"

@@ -2,7 +2,7 @@ defmodule Imp.ACP.Local do
   @moduledoc """
   Local ACP attachment to a long-running application over a private UNIX socket.
 
-  Each accepted connection gets its own ordinary `Imp.ACP` adapter. A resident
+  Each accepted connection gets its own ordinary `Imp.ACP` adapter. A host
   application supplies a program factory that attaches to its own runtime;
   closing the connection closes the adapter, not that independently owned runtime.
   `relay/2` exposes this socket as standard ACP stdio to an ordinary client.

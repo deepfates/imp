@@ -3,6 +3,7 @@
   "campaign_id": "local-mlx-sft-lifecycle-banking77-v2-deployment-continuation",
   "status": "draft_for_principal_review_not_authorized",
   "output_artifact": "benchmarks/results/local-mlx-lifecycle-banking77-v2-deployment-continuation.json",
+  "note": "Paths under benchmarks/results/ are run write targets; that directory is not tracked, so any predecessor artifact named here is unpublished history recorded for provenance, not a file in this repository.",
   "purpose": "Complete only the deployment, base-versus-fused evaluation, persistence, fresh-process reload, identity, and cleanup measurements that stopped V2 left unobserved. This draft does not authorize a server launch.",
   "closed_predecessor": {
     "campaign_id": "local-mlx-sft-lifecycle-banking77-v2",

@@ -25,9 +25,10 @@ It records six dispatches in this run, zero resumed rows, six durable rows, and
 All rows have distinct ReqLLM request IDs, OpenAI request IDs, and OpenAI
 Responses IDs. The claim gate has no rejections.
 
-`benchmarks/results/multimodal-quality-live-20260713T215119Z.json` is
-invalidated and removed. Its checkpoint schema and pre-dispatch shape evidence
-did not exclude forged minimal rows, so its result must not be used as proof.
+The 2026-07-13 multimodal quality live run is invalidated and removed, and its
+result JSON is unpublished history. Its checkpoint schema and pre-dispatch shape
+evidence did not exclude forged minimal rows, so its result must not be used as
+proof.
 
 ## Manifest Contract
 

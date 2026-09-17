@@ -710,7 +710,7 @@ defmodule Imp.MCPOAuthTest do
   defp fake_state, do: Agent.get(Imp.MCPOAuthTest.FakeState, & &1)
 
   # The host-owned redirect path: no loopback listener, the host hands the
-  # callback parameters to complete/2 itself. This is Haven's shape.
+  # callback parameters to complete/2 itself. This is a desktop client's shape.
   defp authorize_without_browser(store, resource_url) do
     assert {:ok, pending} =
              OAuth.begin(store, resource_url,

@@ -25,7 +25,7 @@ DSPY_ROOT = ROOT / "tmp" / "dspy-3.2.1"
 GEPA_ROOT = ROOT / "tmp" / "gepa-v0.1.4"
 UPSTREAM_PYTHON = ROOT / "tmp" / "dspy-parity-venv" / "bin" / "python"
 PRIOR_SPEND_BOUND = Decimal("3.08335175")
-WORKSHOP_CEILING = Decimal("100.00")
+SPEND_CEILING = Decimal("100.00")
 PREFLIGHT_PREFIX = "PAIRED_PREFLIGHT_JSON="
 
 
@@ -195,7 +195,7 @@ def preflight() -> dict[str, Any]:
 
     maximum = worst_case_usd(manifest)
     require(maximum == Decimal("59.10912000"), f"sealed maximum spend drift: {maximum}")
-    require(PRIOR_SPEND_BOUND + maximum <= WORKSHOP_CEILING, "workshop spend ceiling would be exceeded")
+    require(PRIOR_SPEND_BOUND + maximum <= SPEND_CEILING, "spend ceiling would be exceeded")
 
     imp = preflight_imp(manifest_sha)
     upstream = preflight_upstream(manifest)
@@ -223,7 +223,7 @@ def preflight() -> dict[str, Any]:
         "source_commit": git(ROOT, "rev-parse", "HEAD"),
         "manifest_sha256": manifest_sha,
         "prior_spend_bound": str(PRIOR_SPEND_BOUND),
-        "workshop_ceiling": str(WORKSHOP_CEILING),
+        "spend_ceiling": str(SPEND_CEILING),
         "treatment_maximum": str(maximum),
         "combined_maximum": str(PRIOR_SPEND_BOUND + maximum),
         "imp": imp,

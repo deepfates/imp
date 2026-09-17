@@ -2,8 +2,9 @@ defmodule Imp.MCP.OAuth do
   @moduledoc """
   Browser-authorized OAuth credentials for remote HTTP MCP servers.
 
-  A host that runs Imp programs — a Dwell resident, Haven, a script — can
-  declare an MCP server whose Authorization header it does not know yet. A
+  A host that runs Imp programs — a long-running application, a desktop
+  client, a script — can declare an MCP server whose Authorization header it
+  does not know yet. A
   person authorizes once in a browser on the machine that runs the host, the
   resulting grant is written to disk encrypted, and a short-lived
   `Authorization` header is materialized only when a connection is built.

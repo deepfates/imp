@@ -318,7 +318,7 @@ defmodule ReActV2Test do
   end
 
   test "a forced submit on an OpenRouter client with a configured effort still runs" do
-    # The live failure: a resident's client carried an effort, ReAct's forced
+    # The live failure: a host's client carried an effort, ReAct's forced
     # submit named `reasoning_effort: nil` for that one call, and the client
     # refused the two as a collision. One option, and nil means none.
     {:ok, state} = Agent.start_link(fn -> :initial end)

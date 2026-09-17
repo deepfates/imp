@@ -217,10 +217,9 @@ on 2026-07-13 retained 8/8, 4/8, and 6/8 records respectively with 4, 1, and 3
 calls.
 
 Live mode is gated by `COMBEE_PREFLIGHT_MODE=live` and
-`COMBEE_LIVE_PROVIDER=1`. The bounded run used pinned
-`openai:gpt-4.1-mini-2025-04-14` and is stored at
-`benchmarks/results/gepa-combee-preflight-live-20260713T231824Z.json`. All arms
-retained 8/8 correct answers. Naive large-batch took 2.62 seconds, 1 call, 755
+`COMBEE_LIVE_PROVIDER=1`. The bounded run on 2026-07-13 used pinned
+`openai:gpt-4.1-mini-2025-04-14`; its result JSON is unpublished history and is
+not retained in this repository. All arms retained 8/8 correct answers. Naive large-batch took 2.62 seconds, 1 call, 755
 tokens, and $0.000450; ComBee took 4.25 seconds, 3 calls, 1,909 tokens, and
 $0.001228; small-batch took 6.75 seconds, 4 calls, 1,266 tokens, and $0.000841.
 Usage and cost came from ReqLLM telemetry.
