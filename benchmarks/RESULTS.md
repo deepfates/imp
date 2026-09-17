@@ -18,19 +18,36 @@ for the claims that cannot be re-measured at all.
 
 | # | Number | Dataset (license) | Model | Provider | Date | Commit | Command |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R1 | Zero-shot held-out accuracy `0.30`–`0.50` over 3 repeats (20 held-out of 60 tickets) | `priv/tutorial/support_tickets.json`, 60 rows, sha256 `7ea5ae7a…` (written for this repository; see [SUPPORT_TICKETS_LICENSE.md](../priv/tutorial/SUPPORT_TICKETS_LICENSE.md)) | `gpt-5.4-mini` | OpenRouter route `openai/gpt-5.4-mini` | 2026-08-22 | `88d61a9c` | `OPENAI_API_KEY=… mix run scripts/tutorial_ticket_routing_experiment.exs` |
-| R2 | `LabeledFewShot(k: 8)` held-out accuracy `0.95`–`1.00` over the same 3 repeats; per-repeat lift `+0.45`, `+0.65`, `+0.65` | same as R1 | `gpt-5.4-mini` | OpenRouter route `openai/gpt-5.4-mini` | 2026-08-22 | `88d61a9c` | same as R1 |
+| R1 | Zero-shot held-out accuracy `0.30`–`0.40` over 3 repeats (20 held-out of 60 tickets) | `priv/tutorial/support_tickets.json`, 60 rows, sha256 `7ea5ae7a…` (written for this repository; see [SUPPORT_TICKETS_LICENSE.md](../priv/tutorial/SUPPORT_TICKETS_LICENSE.md)) | `gpt-5.4-mini` | OpenRouter route `openai/gpt-5.4-mini` | 2026-09-17 | `7985ed2f` | `OPENAI_API_KEY=… mix run scripts/tutorial_ticket_routing_experiment.exs` |
+| R2 | `LabeledFewShot(k: 8)` held-out accuracy `0.90`–`0.95` over the same 3 repeats; per-repeat lift `+0.55`, `+0.55`, `+0.65` | same as R1 | `gpt-5.4-mini` | OpenRouter route `openai/gpt-5.4-mini` | 2026-09-17 | `7985ed2f` | same as R1 |
 
 R1 and R2 come from one execution of one command; they are two numbers from the
 same three repeats, not independent measurements. That run used 120 requests,
-44,365 tokens and `$0.038819` in provider-priced usage for all three repeats —
-about `$0.013` and 8–9 seconds per repeat. No row errored and the in-BEAM cache
-was cleared before each repeat, so all 120 calls were live.
+44,293 tokens and `$0.038488` in provider-priced usage for all three repeats —
+about `$0.013` and 8–13 seconds per repeat. No row errored and the in-BEAM cache
+was cleared before each repeat, so all 120 calls were live. The run's artifact
+is committed at
+[`benchmarks/data/tutorial-ticket-routing-2026-09-17.receipt.json`](data/tutorial-ticket-routing-2026-09-17.receipt.json),
+sha256 `2dcc1228…`; the dollar figure in it is the script's own pricing table
+(`$0.75`/`$4.50` per million tokens) applied to reported token counts, not a
+provider-billed amount, so treat it as an estimate and the token counts as the
+measurement.
+
+The same command was run a month earlier, on 2026-08-22 at commit `88d61a9c`,
+against the same dataset, model and route: zero-shot `0.30`–`0.50`, optimized
+`0.95`–`1.00`, per-repeat lift `+0.45`, `+0.65`, `+0.65`, 120 requests and
+`$0.038819` in provider-priced usage. Two independent runs a month apart agree
+on the thing worth claiming — every repeat improved, by 45 to 65 points — and
+disagree on the endpoints, which is what a twenty-row evaluation should do.
 
 Three repeats of a twenty-row evaluation is a coarse instrument. The gap between
-the two rows (45–65 points) is far larger than the instrument's resolution
-(one row is 5 points), which is why the direction is trustworthy while the exact
-endpoints are not.
+the two rows (55–65 points on 2026-09-17, 45–65 points on 2026-08-22) is far
+larger than the instrument's resolution (one row is 5 points), which is why the
+direction is trustworthy while the exact endpoints are not. The 2026-09-17 run
+put one optimized repeat at `0.90`, below the `0.95`–`1.00` the tutorial claimed
+from the first run alone, and one repeat at 13.1 seconds, above the 8–9 seconds
+it claimed; both claims were widened to the measured union rather than restated
+from the luckier run.
 
 ## Recomputable only
 

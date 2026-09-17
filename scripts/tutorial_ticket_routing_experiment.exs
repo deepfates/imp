@@ -159,9 +159,9 @@ defmodule TutorialTicketRoutingExperiment do
       "doc_claims_under_test" => %{
         "source" => "docs/TUTORIAL_TICKET_ROUTING.md",
         "baseline_repeat_range" => [0.30, 0.50],
-        "optimized_repeat_range" => [0.95, 1.0],
+        "optimized_repeat_range" => [0.90, 1.0],
         "cost_usd_per_repeat_approx" => 0.013,
-        "duration_seconds_range" => [8, 9]
+        "duration_seconds_range" => [8, 13]
       },
       "scope" => %{
         "claimed" =>

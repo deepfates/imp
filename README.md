@@ -6,12 +6,6 @@ ordinary OTP application. It brings the central idea of
 [DSPy](https://dspy.ai)—programming behavior and improving it from examples
 rather than hand-editing prompts—to the BEAM.
 
-**Release state.** The released tag `v0.3.2` does not contain `Imp.ACP`. The
-integrated protocol adapters — `Imp.ACP` and `Imp.MCP.connect/2`, absorbed from
-the retired `imp_acp` package — exist only on `main` until the next tag.
-Installing `v0.3.2` gives you the library described below without them; using
-the adapters today means depending on `main` (see [Install](#install)).
-
 Here, “typed” means required inputs are checked and model outputs are parsed
 and validated against the signature before application code receives them.
 For DSPy compatibility, a supplied input whose value disagrees with its
@@ -135,12 +129,8 @@ Imp is not published to Hex. It is installed from this public repository, at
 an immutable tag, with no credentials:
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.3.2"}
+{:imp, github: "deepfates/imp", tag: "v0.4.0"}
 ```
-
-That tag does not contain `Imp.ACP` or `Imp.MCP.connect/2`; a tag that does
-will be cut. Until then, depend on `{:imp, github: "deepfates/imp", branch:
-"main"}` if you need the adapters.
 
 ExMCP is declared `runtime: false`, so an OTP release that uses `Imp.ACP` or
 `Imp.MCP` must list `applications: [ex_mcp: :load]` in its release definition;
@@ -152,9 +142,9 @@ modules are ported from.
 Use `{:imp, path: "path/to/imp"}` only while developing against a local
 checkout. Imp requires Elixir `~> 1.19`. Commit your application's `mix.lock`;
 the Git tag fixes Imp's source, while normal Mix constraints may otherwise
-resolve newer compatible transitive versions. Version `0.3.2` contains the
-breaking `0.3` changes from `0.2.1`; see the [release notes](RELEASE_NOTES.md)
-when upgrading.
+resolve newer compatible transitive versions. Version `0.4.0` contains
+breaking changes from `0.3.2`; see the [release notes](RELEASE_NOTES.md) when
+upgrading.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. The
@@ -163,9 +153,6 @@ runs a complete evaluation-and-optimization path without an API key; the
 provider-free parts of the learning path and deployment example do too.
 
 ## Connect tools or expose a program
-
-Everything in this section is on `main` only, not in `v0.3.2` (see the release
-state at the top).
 
 `Imp.MCP.connect/2` imports authorized MCP servers through ExMCP, returning
 ordinary tools plus explicit connection cleanup. Source server/tool identities,
@@ -209,8 +196,8 @@ Run `mix docs` for the exhaustive module and function reference.
 
 For an ordinary ACP workspace agent with bounded tools, see
 [examples/workspace_agent](examples/workspace_agent/README.md). It depends
-directly on this Imp checkout (`main` only, like the adapters it uses) and
-includes a provider-free mode for checking its launcher and workspace boundary.
+directly on this Imp checkout by path and includes a provider-free mode for
+checking its launcher and workspace boundary.
 
 ## Where this fits
 

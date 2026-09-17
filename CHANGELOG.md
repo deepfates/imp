@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.4.0 — 2026-09-17
+
+- `Imp.ACP` and `Imp.MCP.connect/2` are part of Imp. The separate `imp_acp`
+  package is retired: `Imp.ACP.start_link/1` and `Imp.ACP.run/1` expose an
+  ordinary Imp program to an ACP host, and `Imp.MCP.connect/2` imports
+  authorized MCP servers through ExMCP as ordinary tools with explicit
+  connection cleanup. There is no compatibility shim; a consumer that depended
+  on `imp_acp` depends on `imp` alone and changes the module prefix. ExMCP is
+  declared `runtime: false`, so an OTP release that uses either must list
+  `applications: [ex_mcp: :load]` in its release definition. Ordinary Imp
+  startup still starts no protocol endpoint.
 - A map or list value in a prompt, including a structured tool result, now
   renders the way DSPy renders a dict: `json.dumps(..., ensure_ascii=False)`
   with Python's default separators, complete. It was `inspect/1` at its
@@ -88,6 +99,24 @@ User-visible changes to Imp are recorded here.
   `{:mcp_tools_list_failed, server, {:invalid_mcp_tools_response, shape}}`
   rather than as a bare `{:invalid_mcp_tools_response, shape}` that named no
   server.
+- The repository is public. Installing at a tag needs no credentials, and the
+  README, docs, and livebooks no longer describe a private source release.
+- Removed the evidence-certification bookkeeping from the source checkout. It
+  never shipped in the package, so a consumer sees no change; the benchmark
+  harness it wrapped is unchanged.
+- Added [Benchmarks](https://github.com/deepfates/imp/blob/main/docs/BENCHMARKS.md)
+  and its [results table](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md).
+  Every number this repository publishes is one row in that table, carrying
+  the dataset and its license, the model, the provider, the date, the commit,
+  and the command that produced it; prose elsewhere cites a row rather than
+  restating a number. The benchmarks page says what each command needs from
+  you — key, Python environment, time, rough cost — and separates a row a
+  stranger can re-measure with an API key from one that only recomputes
+  statistics from committed rows, and from the claims that cannot be
+  re-measured at all. Neither page publishes an aggregate or a release score.
+  The tutorial's rows were re-measured live for this release, a month after the
+  first run, and both runs are recorded. They live in the repository, not in
+  the installed package.
 
 ## 0.3.2 — 2026-09-01
 

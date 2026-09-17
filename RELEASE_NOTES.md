@@ -1,101 +1,78 @@
-# Imp v0.3.2
+# Imp v0.4.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
 Declare a task as named inputs and outputs, call it like any other Elixir
 program, measure it on examples, compile it with an optimizer, and run the
 selected program under OTP.
 
+This release absorbs the protocol adapters that previously lived on `main`
+only, and changes three published shapes. It is `0.4.0` rather than a patch
+because a program written against `v0.3.2` can need edits.
+
 ## Install
 
-`v0.3.2` is a Git source release from a public repository; no credentials are
+`v0.4.0` is a Git source release from a public repository; no credentials are
 required.
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.3.2"}
+{:imp, github: "deepfates/imp", tag: "v0.4.0"}
 ```
 
 Imp is not published to Hex. Use a path dependency only while developing
 against a local checkout.
 
-This patch release makes the RLM controller's language guide match its
-restricted interpreter and preserves explicit zero-retry provider policy for
-all Req adapter forms, including MFA adapters with arguments.
+ExMCP is declared `runtime: false`, so an OTP release that uses `Imp.ACP` or
+`Imp.MCP` must list `applications: [ex_mcp: :load]` in its release
+definition; see [protocol runtime in
+releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
+Ordinary Imp startup starts no protocol endpoint.
 
-## What is included
+## Headline changes
 
-- Typed signatures with scalar, collection, enum, union, optional, default,
-  code, and constrained fields.
-- `Predict`, `ChainOfThought`, composed `Imp.Module` programs, retrieval,
-  ReActV2, CodeAct, RLM, tools, MCP, and provider streaming.
-- Examples, metrics, concurrent evaluation, disjoint train/selection/test
-  experiments, and optimizer reports.
-- Demonstration, instruction, prompt, ensemble, rule, playbook, and
-  weight-training optimizer families, including GEPA, MIPROv2, SIMBA, COPRO,
-  BootstrapFewShot, RandomSearch, KNNFewShot, BootstrapFinetune, BetterTogether,
-  Avatar, and Optimize Anything.
-- Checksummed whole-program and parameter artifacts that exclude credentials
-  and apply selected state to freshly constructed trusted code.
-- OTP-native operation with bounded tasks, cancellation, per-effect
-  authorization, redacted telemetry, caching, usage accounting, hot reload,
-  and failure propagation.
-- ReqLLM provider clients, explicit local/static test models, retriever and
-  trainer extension points, and local MLX/TRL integration boundaries.
+- `Imp.ACP` and `Imp.MCP.connect/2` are in the tag. The separate `imp_acp`
+  package is retired with no compatibility shim: a consumer that depended on
+  it now depends on `imp` alone. `Imp.MCP.connect/2` also gains OAuth
+  credentials for remote HTTP servers (`Imp.MCP.OAuth`), `bearer_env`
+  descriptor auth, `on_failure: :drop` with an `unavailable` list, and a
+  per-dial timeout.
+- `:reasoning_effort` is the one reasoning option on `Imp.Clients.ReqLLM`.
+  `:openrouter_reasoning` is gone; the wire encoding is the separate
+  `:openrouter_reasoning_wire`.
+- ReActV2 sends the tool roster natively and no longer declares a `tools`
+  input field or writes its instructions into `signature.instructions`. Loop
+  guidance travels to the adapter through `:adapter_opts`.
+- The `:model_response` event's `metadata.cost` is a plain USD float or `nil`,
+  with any provider breakdown under `metadata.billing`.
+- Structured values in a prompt render complete, the way DSPy renders a dict,
+  instead of a truncated `inspect/1`.
 
-The [Learning Path](docs/LEARNING_PATH.md) builds one program from its first
-provider call through evaluation, optimization, tools, persistence, and
-deployment. The [deployment example](examples/deployment/README.md) shows a
-supervised two-stage program with parameter reload, concurrent calls, restart,
-timeouts, and crash containment. Five Livebooks cover the same system
-interactively.
+## Breaking changes from v0.3.2
 
-## What the BEAM changes
-
-Imp preserves DSPy's program/evaluate/optimize workflow without copying
-Python's object model. Programs are immutable values. Configuration can be
-explicit or process-scoped. Evaluation and tool work run in supervised tasks.
-Telemetry uses standard `:telemetry` events. Saved state is rebound to live
-providers and callbacks at application startup instead of serializing runtime
-authority.
-
-Provider output and optimizer search are stochastic. A compiled program is a
-candidate until it improves the metric that matters on data excluded from
-training and selection. Imp supplies that lifecycle; applications still own
-their data, metric, budget, promotion rule, and operational policy.
-
-DSPy's Python integration ecosystem is larger. Imp exposes extension points
-for providers, retrievers, adapters, tools, and trainers, but Python-only
-integrations do not automatically work on the BEAM. DSPy's Flex code optimizer
-is not included in this release.
-
-The supported center is the `Imp` facade, signatures, adapters, evaluation,
-static and ReqLLM execution, tools, telemetry, saving, and the deployment
-pattern. Generated docs place optimizer implementations, parameter artifacts,
-agent loops, training integrations, and `Imp.Run` in **Experimental optimizers
-and advanced workflows**. These are implemented and tested APIs, not release
-promises of effectiveness or pre-1.0 shape stability. In particular, GRPO is
-an external-training boundary rather than an in-process gradient engine.
-
-## Breaking changes from v0.2.1
-
-- `Imp.optimize/3`, `/4`, and `/5` return `{:ok, program}` or
-  `{:error, reason}`. Use the corresponding `Imp.optimize!` function when a
-  failure should raise.
-- `Imp.Adapters.Types` and its nested structs moved to `Imp.Adapter.Types`.
-- `Imp.Agent` and `Imp.Agent.Runtime` were removed. Use ReActV2 or RLM as the
-  program and ordinary Elixir supervision as the runtime. Use
-  `Imp.start_run/3` only when a host needs ordered events, addressable
-  cancellation, or explicit effect authorization.
+- Replace `openrouter_reasoning: ...` with `reasoning_effort: ...`. Saved
+  programs allowlist `:reasoning_effort` and `:openrouter_reasoning_wire` in
+  its place, so rebuild artifacts that carried the old key.
+- A caller that passed or read ReActV2's `tools` input field no longer has
+  one; the roster is sent natively.
+- A host that read `metadata.cost` as a provider billing map reads a number
+  now, and finds the map under `metadata.billing` when the provider sent one.
 
 ## Upgrade path
 
-1. Replace `Imp.Adapters.Types` references with `Imp.Adapter.Types`.
-2. Choose the returning or raising optimizer API explicitly.
-3. Replace `Imp.Agent` usage with a ReActV2/RLM program owned by your
-   supervision tree.
-4. Rebuild saved artifacts with `0.3.2` before promotion.
+1. Rename the reasoning option and rebuild saved artifacts with `0.4.0`.
+2. Drop any `tools` handling around ReActV2.
+3. Sum spend from `metadata.cost` as a number.
+4. If you depended on `{:imp, github: "deepfates/imp", branch: "main"}` for the
+   adapters, move to the tag.
 5. Run your held-out evaluation and application smoke test against the tagged
    dependency.
 
-Generated module documentation is the complete API reference. Start with
-`Imp`, `Imp.Signature`, `Imp.Module`, `Imp.Evaluate`, `Imp.Optimizer`,
-`Imp.Optimizer.Artifact`, `Imp.Run`, and `Imp.Telemetry`.
+New in this release: [Benchmarks](https://github.com/deepfates/imp/blob/main/docs/BENCHMARKS.md)
+and its [results table](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md)
+carry every number this repository publishes with the command that produces it,
+and the ticket-routing rows were re-measured live for this release, a month
+after the first run, with both runs recorded.
+
+The [CHANGELOG](CHANGELOG.md) records every user-visible change in this
+release. Generated module documentation is the complete API reference. Start
+with `Imp`, `Imp.Signature`, `Imp.Module`, `Imp.Evaluate`, `Imp.Optimizer`,
+`Imp.ACP`, `Imp.MCP`, and `Imp.Telemetry`.

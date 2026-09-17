@@ -9699,7 +9699,7 @@
       "types": []
     }
   ],
-  "package_version": "0.3.2",
+  "package_version": "0.4.0",
   "schema_version": 3,
   "scope": "Curated Imp API compiled from package-shipped sources. Exports come from non-hidden documentation entries; callbacks, types, and struct fields are category- and policy-gated."
 }

@@ -44,7 +44,7 @@ Also accepts `OPENROUTER_API_KEY` with `openai/gpt-5.4-mini`. Set
 
 - **Needs:** an OpenAI or OpenRouter key. No Python, no dataset download; the
   sixty tickets ship in the package at `priv/tutorial/support_tickets.json`.
-- **Time:** 8–9 seconds per repeat, three repeats by default.
+- **Time:** 8–13 seconds per repeat, three repeats by default.
 - **Cost:** about `$0.013` per repeat at `gpt-5.4-mini` prices; the script
   enforces a hard budget of `$1.00` per repeat and refuses to exceed it.
 - **What it measures:** held-out accuracy of a four-way enum router before and
