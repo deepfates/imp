@@ -252,10 +252,9 @@ explicit campaign identity/version; no ambiguous intent was silently reused.
 
 The resolved `v7` plan selected the same single frozen row, direct,
 `simple_retrieval`, and RLM on both runtimes: exactly six jobs and zero provider
-calls during `--plan`. The completed artifact is
-`benchmarks/results/rlm-preflight/rlm-benchmark-parity-20260713T233641Z.json`;
-its manifest, checkpoint, and audit use the `v7` campaign identity in the same
-directory.
+calls during `--plan`. The campaign completed on 2026-07-13; its artifact,
+manifest, checkpoint, and audit all carried the `v7` campaign identity and are
+unpublished history, not retained in this repository.
 
 | Runtime | Approach | Score | Calls | Input | Output | USD | Latency ms | Cost authority |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -310,8 +309,8 @@ version-pinned Python dependencies, both setup-script hashes, a complete DSPy
 source-tree verifier, and a dated pricing authority. This remains one-row
 end-to-end and output-contract evidence only, not aggregate quality,
 reliability, semantic superiority, paper parity, or T3 evidence. The exact
-command and limitations are recorded in
-`benchmarks/results/rlm-anthropic-pilot/README.md`; the artifact SHA-256 is
+command and limitations were recorded beside the pilot artifact, which is
+unpublished history; the artifact SHA-256 is
 `b6b9757696c424568633cd80f84f626fb2093db51176b8d79e279b477ddfcaff`.
 
 ## Mechanical T3 Gate

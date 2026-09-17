@@ -122,7 +122,7 @@ defmodule Imp.MixProject do
     ]
   end
 
-  # Shared constellation reference. This fork carries byte-safe stdio,
+  # Shared fork reference. This fork carries byte-safe stdio,
   # caller-owned request/subprocess cleanup, ACP delivery barriers, and
   # per-connection HTTP trust propagation. See its FORK.md for each failure
   # and retirement condition; do not move this ref independently of consumers.

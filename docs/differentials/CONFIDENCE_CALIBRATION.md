@@ -100,8 +100,8 @@ evidence gates and remains negative.
 
 ## July 13 Evidence
 
-`benchmarks/results/confidence-calibration-live-20260713T225422Z.json` is the
-fresh authoritative run. All gates passed:
+The 2026-07-13 live run was the fresh authoritative run; its result JSON is
+unpublished history and is not retained in this repository. All gates passed:
 
 - calibration outcomes: 142 correct, 58 incorrect;
 - calibration occupancy: 7 occupied bins, 6 supported bins;
@@ -121,10 +121,9 @@ those source sets are disjoint rather than paired.
 
 The earlier July 13 support-routing fixture was all correct and used a one-bin
 mapping. Its zero post-calibration Brier score and ECE are not evidence of
-learned calibration. The retained
-`benchmarks/results/confidence-calibration-assessment-20260713.json` records the
-rejection and source-run digests; it is superseded as calibration evidence, not
-rewritten as a successful result.
+learned calibration. The 2026-07-13 assessment that recorded the rejection and
+the source-run digests is unpublished history; that observation is superseded as
+calibration evidence, not rewritten as a successful result.
 
 This remains a narrow operational probe. It does not establish calibration on
 other datasets, prompts, providers, model versions, or deployment populations.

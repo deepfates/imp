@@ -20,7 +20,7 @@ messages, models, splits, budgets, or parsing after results.
 ## Completed outcome
 
 The sealed treatment completed on 2026-07-27 under the owner's `$100` aggregate
-workshop provider ceiling. Imp GEPA improved its mean untouched accuracy over
+provider spend ceiling. Imp GEPA improved its mean untouched accuracy over
 its own baseline by `+0.4000` (source-ID-clustered 95% interval
 `[0.2958, 0.5042]`, Holm-adjusted `p = 0.00020`). Its mean difference from
 pinned DSPy GEPA was `-0.0083`, with 95% interval `[-0.0458, 0.0292]`, clearing
@@ -29,13 +29,12 @@ own baseline by `+0.1458`, with interval `[0.0458, 0.2458]` and Holm-adjusted
 `p = 0.00270`. The frozen headline therefore passed with GEPA as the declared
 winner.
 
-The committed compact result is
-`benchmarks/evidence/archive/matched_experiments/trec/matched-instruction-optimizers-trec-20260726.json`.
-It binds
-the full retained Imp, upstream, and aggregate artifacts by SHA-256; those raw
-artifacts remain local because they contain 181 MB of per-call evidence.
+The sealed campaign artifact, `matched-instruction-optimizers-trec-20260726.json`,
+is unpublished history: neither it nor the full retained Imp, upstream, and
+aggregate artifacts it binds by SHA-256 are in this repository, because those
+raw artifacts hold 181 MB of per-call evidence.
 The treatment used 6,491 calls and `$3.13862325` in provider-reported cost.
-Adding the conservative pre-treatment workshop bound yields at most
+Adding the conservative pre-treatment bound yields at most
 `$6.221975` against the `$100` ceiling.
 
 The compact scored-row inputs are committed separately from the private raw
@@ -47,9 +46,9 @@ noninferiority decision with one provider-free command:
 mix run --no-start \
   examples/matched_instruction_optimizers_trec/recompute_compact.exs -- \
   examples/matched_instruction_optimizers_trec/contract.json \
-  benchmarks/evidence/archive/matched_experiments/trec/imp-scored-rows.json \
-  benchmarks/evidence/archive/matched_experiments/trec/upstream-scored-rows.json \
-  benchmarks/evidence/archive/matched_experiments/trec/aggregate-recomputed.json
+  examples/matched_instruction_optimizers_trec/data/imp-scored-rows.json \
+  examples/matched_instruction_optimizers_trec/data/upstream-scored-rows.json \
+  examples/matched_instruction_optimizers_trec/data/aggregate-recomputed.json
 ```
 
 This verifies the statistics asserted by the compact rows. It does not
@@ -70,7 +69,7 @@ task and 48 optimizer transports after selection and untouched evaluation.
 
 Across both runtimes and three seeds, the revised outer safety envelope is
 7,140 task calls plus 342 optimizer calls. Its conservative reservation is
-$59.10912. With the current conservative workshop aggregate of $3.08335175,
+$59.10912. With the current conservative spend aggregate of $3.08335175,
 the combined worst case is $62.19247175 and fits the owner's `$100` ceiling.
 The semantic stopping rule is unchanged; the outer cap is operational only,
 and firing it makes the treatment inconclusive rather than scoring a truncated

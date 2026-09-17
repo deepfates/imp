@@ -87,10 +87,10 @@ without converting a failed lift into a success claim.
 
 ### Release Evidence
 
-The committed seed-61 campaign in
-`benchmarks/results/playbook-equation-balancer-live-v11.json` binds to commit
-`37f58dc6e3110606b5b08d01124b2cfb1ef52566` and records SHA-256 identities for
-all implementation sources. Its source/group-disjoint results were:
+The seed-61 campaign bound to commit
+`37f58dc6e3110606b5b08d01124b2cfb1ef52566` and recorded SHA-256 identities for
+all implementation sources. Its result JSON is unpublished history and is not
+retained in this repository. Its source/group-disjoint results were:
 
 | Split | Baseline | Candidate | Solver calls |
 |---|---:|---:|---:|
