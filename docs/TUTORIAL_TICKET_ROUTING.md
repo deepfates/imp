@@ -4,10 +4,11 @@ Let's take the support-ticket router from the [README](../README.md) and do
 what you cannot do with a prompt string: score it on held-out data, improve it
 with an optimizer, and prove the improvement on tickets it has never seen.
 
-The zero-shot router scored **30–50%** on twenty held-out tickets; the
-optimized router scored **95–100%** on the same twenty in all three repeats.
-Each full experiment — baseline, optimization, and held-out evaluation — cost
-about **$0.013** and ran in **8–9 seconds** with `gpt-5.4-mini`.
+Across two runs a month apart, the zero-shot router scored **30–50%** on twenty
+held-out tickets; the optimized router scored **90–100%** on the same twenty in
+every repeat of both. Each full experiment — baseline, optimization, and
+held-out evaluation — used about 14,800 tokens and ran in **8–13 seconds** with
+`gpt-5.4-mini`, for an estimated **$0.013** at list prices.
 
 Those are rows R1 and R2 in
 [benchmarks/RESULTS.md](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md),
@@ -105,7 +106,8 @@ the misses are not random — they are the model guessing what squad names mean:
 
 It reads the tickets fine. It cannot know that atlas is the money squad. On a
 task this small the exact score moves a little between runs — our current
-repeats landed between 0.30 and 0.50 — but every run tells the same story.
+repeats landed between 0.30 and 0.50 across both runs — but every run tells the
+same story.
 
 ## Improve With Measured Lift
 
@@ -139,12 +141,14 @@ optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout:
 #=> {0.3, 0.95}
 ```
 
-The three repeats measured 50% → 95%, 35% → 100%, and 30% → 95%: gains of
-45–65 points on held-out tickets. Each run used about 14,800 tokens, cost about
-$0.013, and finished in 8–9 seconds; all 120 evaluation calls completed without
-a row error and the cache was cleared before each repeat, so every call was
-live. Twenty rows move in 5-point steps, so trust the direction and the
-magnitude, not the endpoints. Rows R1 and R2 in
+The most recent three repeats measured 35% → 90%, 40% → 95%, and 30% → 95%:
+gains of 55–65 points on held-out tickets. Each run used about 14,800 tokens and
+finished in 8–13 seconds, an estimated $0.013 at list prices; all 120 evaluation
+calls completed without a row error and the cache was cleared before each
+repeat, so every call was live. An earlier run of the same command reached
+95–100% optimized with gains of 45–65 points, so treat 90% as the low end you
+should expect, not a regression. Twenty rows move in 5-point steps, so trust the
+direction and the magnitude, not the endpoints. Rows R1 and R2 in
 [benchmarks/RESULTS.md](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md).
 
 It is not a magic button. The remaining misses are genuinely marginal tickets

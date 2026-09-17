@@ -45,9 +45,9 @@ compares and what it deliberately does not, are in
 Two held-out results, both small, both in RESULTS.md.
 
 Rows R1 and R2 are the ticket-routing tutorial: a zero-shot enum router scored
-0.30–0.50 on twenty held-out tickets and 0.95–1.00 after `LabeledFewShot(k: 8)`,
-over three live repeats at about a cent each. A stranger with an API key can run
-that command and get their own numbers. It is the only end-to-end effectiveness
+0.30–0.50 on twenty held-out tickets and 0.90–1.00 after `LabeledFewShot(k: 8)`,
+over three live repeats at about a cent each, in each of two runs a month apart.
+A stranger with an API key can run that command and get their own numbers. It is the only end-to-end effectiveness
 claim here that is reproducible from scratch.
 
 Row R6 is `examples/deployment/agent_optimization.exs`, the first ordinary Imp
