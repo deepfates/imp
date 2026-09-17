@@ -40,12 +40,12 @@ one task never becomes general effectiveness.
 
 ## Where the receipts live
 
-- Broad or comparative statements may be indexed in `benchmarks/claims.json`
-  with their scope, sources, and requirements.
-- Admitted evidence artifacts live under `benchmarks/evidence/admitted/`,
-  named by their own SHA-256, and a validator suite replays each one.
-- The [conformance report](CONFORMANCE.md) is an audit aid generated from
-  pinned authority and implementation mappings; it is not a release score.
+- The benchmark harness lives under `lib/mix/tasks/imp.benchmark.*`, `bench/`,
+  and `scripts/`; each task writes its own report under `benchmarks/runs/`
+  when you run it.
+- Upstream pins the differential harness compares against are in
+  `benchmarks/authorities.json`; datasets and run configuration are in
+  `benchmarks/data/` and `benchmarks/config/`.
 - Execution traces, bounded native run observations, cancellation evidence,
   and portable ATIF trajectories are described in
   [Execution evidence and ATIF](TRAJECTORIES.md).
@@ -110,8 +110,7 @@ and selected for a reason established before its outcomes are read.
 what an *engineering rehearsal* established, and — as importantly — what an
 earlier draft of this section wrongly claimed.
 
-The 16k rehearsal (`examples/matched_ifbench_rehearsal16k`) is scoped by its
-own contract as `one_seed_engineering_rehearsal_source_faithful_config`:
+The 16k rehearsal is scoped by its own contract as `one_seed_engineering_rehearsal_source_faithful_config`:
 it exercises machinery and cost at the benchmark authors' settings before any
 larger spend, and by preregistration claims nothing about optimizer
 effectiveness. On its eleventh launch both runtimes completed baseline, GEPA,
@@ -119,8 +118,7 @@ and MIPROv2 and sealed all six optimization-and-selection cells at 16384-token
 settings for $16.42. The campaign itself did not complete: it stopped in the
 held-out phase on an input-token bound of our own (4096, exceeded by a
 4243-token prompt), so it produced no held-out optimizer verdict. Ten prior
-launches stopped on harness defects, each dated in `PREREGISTRATION.md` and
-archived under `evidence/matched/`.
+launches stopped on harness defects, each dated in its preregistration.
 
 **Withdrawn.** An earlier version of this section reported "GEPA optimization
 moves at source-faithful budget, and imp's magnitude matches upstream's,"

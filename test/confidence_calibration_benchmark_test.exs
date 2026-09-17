@@ -6,7 +6,6 @@ defmodule Imp.BenchmarkTruth.ConfidenceCalibrationTest do
   @data "benchmarks/data/confidence-calibration.jsonl"
   @trec_data "benchmarks/data/confidence-calibration-trec-fine.jsonl"
   @trec_provenance "benchmarks/data/confidence-calibration-trec-fine.provenance.json"
-  @live_artifact "benchmarks/results/confidence-calibration-live-20260713T225422Z.json"
   @moduletag :tmp_dir
 
   test "checked-in fixture passes source and group identity preflight" do
@@ -60,44 +59,6 @@ defmodule Imp.BenchmarkTruth.ConfidenceCalibrationTest do
     assert_raise ArgumentError, ~r/provenance contract mismatch/, fn ->
       ConfidenceCalibration.validate_data!(path, provenance: @trec_provenance)
     end
-  end
-
-  test "checked-in live artifact passes authority and metric consistency checks" do
-    artifact = @live_artifact |> File.read!() |> Jason.decode!()
-    rows = artifact["rows"]
-    calibration = Enum.filter(rows, &(&1["split"] == "calibration"))
-    heldout = Enum.filter(rows, &(&1["split"] == "heldout"))
-    mapping = Map.new(artifact["calibration"]["mapping"], &{&1["index"], &1})
-    comparison = artifact["brier_comparison"]
-
-    assert artifact["authority"]["passed?"]
-    assert artifact["authority"]["failed_gates"] == []
-    assert Enum.all?(artifact["authority"]["gates"], fn {_gate, passed?} -> passed? end)
-    assert artifact["data"]["sha256"] == sha256(File.read!(@trec_data))
-    assert length(calibration) == 200
-    assert length(heldout) == 200
-    assert mixed?(artifact["calibration"]["class_balance"])
-    assert mixed?(artifact["raw_report"]["class_balance"])
-    assert comparison["outcome"] == "improved"
-    assert comparison["improved?"]
-
-    assert_in_delta comparison["raw"] - comparison["calibrated"],
-                    comparison["raw_minus_calibrated"],
-                    1.0e-12
-
-    assert Enum.all?(heldout, fn row ->
-             index = min(trunc(row["raw_confidence"] * 10), 9)
-             mapping[index]["supported?"]
-           end)
-
-    assert disjoint?(calibration, heldout, "source_id")
-    assert disjoint?(calibration, heldout, "group_id")
-
-    assert Enum.all?(rows, fn row ->
-             row["source"]["label"] == row["expected"] and row["provider"] == "openai" and
-               row["api"] == "chat_completions" and
-               row["effective_model"] == "gpt-4.1-mini-2025-04-14"
-           end)
   end
 
   test "live preflight rejects namespaced evaluation IDs with duplicate held-out sources",

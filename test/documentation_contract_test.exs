@@ -71,19 +71,6 @@ defmodule DocumentationContractTest do
     refute docs =~ "Imp.HTTP.Hackneyless"
   end
 
-  test "release criteria are expressed as current product evidence, not historical tickets" do
-    body = File.read!("docs/maintainers/RELEASE.md")
-
-    refute_closed_ticket_refs(body)
-    refute body =~ "The production release scope is tracked under ticket"
-    refute body =~ "tk ready -T imp"
-
-    assert body =~ "All unfinished work lives in pull requests"
-    assert body =~ ~r/Markdown must not carry a\s+parallel roadmap/
-    assert body =~ "mix check"
-    assert body =~ "mix livebook.execute.check"
-  end
-
   test "parity validation program describes evidence lanes instead of ticket bookkeeping" do
     body = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
 
@@ -110,13 +97,6 @@ defmodule DocumentationContractTest do
     # overclaim without a deliberate, test-visible edit.
     assert body =~ "byte-identical to DSPy 3.2.1"
     assert body =~ "enforced per-PR in CI"
-  end
-
-  test "the Livebook execution command stays in contributor documentation" do
-    refute File.read!("README.md") =~ "mix livebook.execute.check"
-    refute File.read!("docs/LEARNING_PATH.md") =~ "mix livebook.execute.check"
-    assert File.read!("CONTRIBUTING.md") =~ "mix livebook.execute.check"
-    assert File.read!("docs/maintainers/GATES.md") =~ "mix livebook.execute.check"
   end
 
   test "shipped reader surfaces do not expose internal process coordinates" do

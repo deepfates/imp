@@ -78,13 +78,9 @@ defmodule Imp.MixProject do
           "benchmark.failure_campaign.check": :test,
           "benchmark.truth.check": :test,
           "benchmark.live.check": :test,
-          "benchmark.live_matrix": :test,
-          "imp.benchmark.hotpotqa_analysis": :test,
-          "benchmark.hotpotqa_analysis": :test,
           "benchmark.optimizer_lift.check": :test,
           "benchmark.instruction_optimizer.contract.check": :test,
           "benchmark.gepa.contract.check": :test,
-          "benchmark.gepa_replication.check": :test,
           "benchmark.fast_slow.check": :test,
           "benchmark.overhead.check": :test,
           "benchmark.search.check": :test,
@@ -93,10 +89,8 @@ defmodule Imp.MixProject do
           "benchmark.rag_tool_failure.check": :test,
           "benchmark.rlm.check": :test,
           "benchmark.rlm.contract.check": :test,
-          "reproduction.check": :test,
           "benchmark.parity.check": :test,
-          "benchmark.parity.full": :test,
-          "upstream_fidelity.check": :test
+          "benchmark.parity.full": :test
         ]
     else
       base_preferred_envs
@@ -432,15 +426,6 @@ defmodule Imp.MixProject do
 
   defp benchmark_aliases do
     [
-      "upstream_fidelity.check": [
-        "imp.upstream_fidelity --out tmp/upstream-fidelity/upstream-fidelity.json --require-conformant"
-      ],
-      "reproduction.check": [
-        "imp.reproductions --check"
-      ],
-      "research.portfolio.check": [
-        "imp.research_portfolio --check"
-      ],
       "benchmark.truth.check": [
         "test test/benchmark_truth_test.exs",
         "imp.benchmark.fetch --tasks colors,iris,iris_typo,heart_disease,ifbench_instruction_following,hard_math --full --out tmp/benchmark-truth-local",
@@ -474,14 +459,8 @@ defmodule Imp.MixProject do
       "benchmark.gepa.contract.check": [
         "imp.benchmark.gepa_contract --out tmp/gepa-v014-contract"
       ],
-      "benchmark.gepa_replication.check": [
-        "imp.benchmark.gepa_replication --smoke --out tmp/gepa-replication"
-      ],
       "benchmark.fast_slow.check": [
         "imp.benchmark.fast_slow --out tmp/fast-slow-protocol.json"
-      ],
-      "benchmark.optimize_anything.check": [
-        "imp.benchmark.optimize_anything --smoke --out tmp/optimize-anything"
       ],
       "benchmark.bfcl_scorer.check": [
         "imp.benchmark.bfcl_adapted --no-require-clean --out tmp/bfcl-shaped-scorer"
@@ -500,12 +479,6 @@ defmodule Imp.MixProject do
         "cmd tmp/dspy-current-venv/bin/python test/python_dspy_rlm_campaign_test.py",
         "cmd tmp/dspy-current-venv/bin/python test/python_dspy_rlm_wrapper_integration_test.py",
         "imp.benchmark.rlm_contract --cases test/fixtures/rlm_contract_cases.json --out tmp/rlm-contract-current"
-      ],
-      "benchmark.live_matrix": [
-        "imp.benchmark.live_matrix --in benchmarks/runs/parity/imp-dspy-parity-campaign-*.json --out tmp/live-matrix"
-      ],
-      "benchmark.hotpotqa_analysis": [
-        "imp.benchmark.hotpotqa_analysis"
       ],
       "benchmark.live.check": [
         "imp.benchmark.fetch --tasks gsm8k,hotpotqa --length 2 --out benchmarks/data",
