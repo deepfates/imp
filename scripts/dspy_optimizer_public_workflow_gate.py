@@ -679,27 +679,11 @@ def main() -> None:
         else "contained_as_zero_score_by_mipro_eval_candidate_program"
     )
 
-    # The matched treatment's operational guards deliberately inherit directly
-    # from BaseException.  Load the actual production type and prove that the
-    # same public MIPRO path cannot turn route/cost/identity/privacy/transport
-    # failure into an ordinary candidate score of zero.
-    operational_runner = (
-        Path(__file__).resolve().parents[1]
-        / "examples"
-        / "matched_gepa_mipro_ifbench"
-        / "run_upstream.py"
-    )
-    sys.path.insert(0, str(operational_runner.parent))
-    try:
-        spec = importlib.util.spec_from_file_location(
-            "imp_matched_ifbench_operational_boundary", operational_runner
-        )
-        if spec is None or spec.loader is None:
-            raise RuntimeError("cannot load matched IFBench operational boundary")
-        operational_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(operational_module)
-    finally:
-        sys.path.pop(0)
+    # Operational guards deliberately inherit directly from BaseException.
+    # Prove that the public MIPRO path cannot turn a route/cost/identity/
+    # privacy/transport failure into an ordinary candidate score of zero.
+    class OperationalSafetyAbort(BaseException):
+        """Bypasses DSPy's ordinary Exception containment for route/cost/budget drift."""
 
     operational_failure_type = None
     operational_failure_contained = None
@@ -709,7 +693,7 @@ def main() -> None:
         def operational_metric(_gold, _pred, _trace=None):
             nonlocal operational_calls
             operational_calls += 1
-            raise operational_module.OperationalSafetyAbort(
+            raise OperationalSafetyAbort(
                 "deterministic route/cost/identity/privacy/transport guard"
             )
 

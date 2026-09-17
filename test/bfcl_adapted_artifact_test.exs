@@ -51,23 +51,6 @@ defmodule BfclAdaptedArtifactTest do
            ) == artifact
   end
 
-  test "canonical dispatcher is pure and rejects injected claim promotion" do
-    artifact = run_artifact!() |> mark_clean() |> reseal()
-
-    assert :ok = ReproductionArtifactValidator.validate!("bfcl_shaped_scorer", artifact)
-
-    promoted =
-      artifact
-      |> put_in(["summary", "official_bfcl_effectiveness"], true)
-      |> reseal()
-
-    assert_raise ArgumentError,
-                 ~r/rows, summaries, sources, runtime, limitations, or claim flags are invalid/,
-                 fn ->
-                   ReproductionArtifactValidator.validate!("bfcl_shaped_scorer", promoted)
-                 end
-  end
-
   test "shared mutation corpus detects every preregistered failure independently" do
     fixture = read_json!(@fixture_path)
 

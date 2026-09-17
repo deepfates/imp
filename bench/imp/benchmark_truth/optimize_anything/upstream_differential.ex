@@ -17,7 +17,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
                  __DIR__
                )
 
-  @reproduction_registry Path.expand("../../../../benchmarks/reproductions.json", __DIR__)
   @authority_contract "optimize_anything_upstream_differential_protocol"
   @dataset_contract "optimize_anything_swe_bench_flask_5014_dataset"
   @domain_ids ["circle_packing_26", "blackbox_problem_46", "swe_bench_flask_5014"]
@@ -1490,7 +1489,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
       "imp_task_sha256" => source_files["elixir_task"]["sha256"],
       "authority_registry_sha256" => source_files["authority_registry"]["sha256"],
       "authority_registry_reader_sha256" => source_files["python_authority_registry"]["sha256"],
-      "reproduction_registry_sha256" => source_files["reproduction_registry"]["sha256"],
       "evaluator_description_sha256" => canonical_sha256(description)
     }
   end
@@ -1502,8 +1500,7 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
       "python_authority_registry" => source_identity(@authority_registry_reader),
       "elixir_harness" => source_identity(__ENV__.file),
       "elixir_task" => source_identity(@task_source),
-      "authority_registry" => source_identity(Imp.UpstreamAuthorityRegistry.path()),
-      "reproduction_registry" => source_identity(@reproduction_registry)
+      "authority_registry" => source_identity(Imp.UpstreamAuthorityRegistry.path())
     }
   end
 
