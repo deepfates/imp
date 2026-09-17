@@ -1,7 +1,7 @@
 defmodule TutorialParityTest do
   use ExUnit.Case, async: true
 
-  @parity_path "docs/internal/TUTORIAL_EXAMPLE_PARITY.md"
+  @parity_path "docs/differentials/TUTORIAL_EXAMPLE_PARITY.md"
 
   @families [
     "Email and entity extraction",
@@ -44,8 +44,8 @@ defmodule TutorialParityTest do
           "livebooks/04_tools_agents_mcp_rlm.livemd",
           "livebooks/05_operate_and_live_checks.livemd",
           "docs/LEARNING_PATH.md",
-          "docs/internal/MULTIMODAL_FIDELITY.md",
-          "docs/internal/BENCHMARK_CATALOG.md",
+          "docs/differentials/MULTIMODAL_FIDELITY.md",
+          "docs/BENCHMARKS.md",
           "examples/deployment/README.md"
         ] do
       assert File.regular?(path), "missing parity target #{path}"

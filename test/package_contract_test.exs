@@ -63,10 +63,10 @@ defmodule PackageContractTest do
 
   @excluded_files [
     "docs/EVIDENCE.md",
-    "docs/internal/BENCHMARK_CATALOG.md",
-    "docs/internal/BENCHMARK_TRUTH.md",
-    "docs/internal/COVERAGE_MATRIX.md",
-    "docs/internal/PARITY_VALIDATION_PROGRAM.md",
+    "docs/BENCHMARKS.md",
+    "docs/differentials/README.md",
+    "docs/differentials/ADAPTER_FIDELITY.md",
+    "docs/differentials/UPSTREAM_EXAM.md",
     "lib/imp/benchmarks.ex",
     "lib/mix/tasks/imp.public_api.ex",
     "lib/mix/tasks/imp.package.clean_room.ex",

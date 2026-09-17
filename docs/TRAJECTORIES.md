@@ -77,3 +77,39 @@ semantics. That warning must not be reported as full v1.8 viewer support; v1.8's
 audio additions are outside this export's current coverage. Validation and
 rendering demonstrate interchange for the exercised fixture, not completeness
 of an arbitrary application's evidence.
+
+## The optimizer trajectory envelope
+
+`Imp.Run` events above are the execution record of one program run.
+`Imp.Optimizer.Trajectory` is a different envelope: the one the optimizers
+share.
+
+`Imp.Optimizer.Trajectory` is the canonical execution envelope shared by
+GEPA, MIPROv2, SIMBA, RLM, ReAct, optimize-anything, and evaluation adapters.
+It preserves each runtime's native `trace`, feedback, metadata, and named
+parameter values while also projecting ordered provider-neutral events.
+
+The version 1 envelope includes:
+
+- text or typed multimodal examples and predictions;
+- reasoning, module calls, tool calls/results, partial errors, and evaluator feedback;
+- token/request/cost usage and microsecond timing;
+- cache key/hit identity, program and rollout identity, and named parameters;
+- optimizer-specific metadata that is intentionally not flattened.
+
+Use `Imp.Optimizer.Trajectory.project/3` at runtime boundaries. A trajectory
+batch can be checked with `validate_aligned!/1`; events must be contiguous and
+tool results must follow a unique matching call. `dump/1` emits the only
+supported cross-runtime JSON representation and redacts credentials in
+structured fields before they cross that boundary. Opaque image, audio, and
+file bytes remain byte-for-byte intact; callers must not place credentials in
+attachment payloads. `Imp.dump/1` and `Imp.load/1` use this same codec.
+`load/1` accepts only the exact versioned schema,
+known typed values, valid accounting, ordered events, and aligned tool calls.
+It returns `{:error, %Imp.Optimizer.Trajectory.DecodeError{}}` for malformed or
+future-version data rather than partially restoring it.
+
+The native `trace` remains available because reflection semantics differ by
+optimizer. Consumers should use `events` for cross-runtime inspection and the
+native fields when implementing optimizer-specific reflection or mutation.
+

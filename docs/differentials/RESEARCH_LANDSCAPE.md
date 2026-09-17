@@ -279,7 +279,7 @@ The review proposed this first group of work:
 It proposed this later group:
 
 1. Maintain the pinned Ax `23.0.0` executable differential and current
-   `24.0.4` product-semantic audit in `docs/internal/AX_DIFFERENTIAL.md` as
+   `24.0.4` product-semantic audit in `docs/differentials/AX_DIFFERENTIAL.md` as
    independent implementation checks without promoting Ax to scientific
    authority.
 2. Add operational failure campaigns for cancellation, timeout, retries,

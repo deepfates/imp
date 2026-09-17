@@ -5,13 +5,11 @@ quality. Typed value construction and pre-dispatch content shapes do not prove
 that ReqLLM serialized those values, that a provider received them, or that a
 model answered correctly.
 
-## Current Evidence
+## What has been observed
 
-The claim-authorizing artifact is
-`benchmarks/evidence/admitted/multimodal_live/02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e.json` (SHA-256
-`02d3c35797723e6ce4a7c544a3f602579771430276d6838beb14bcfe091e391e`). It was
-generated on 2026-07-13 from OpenAI manifest payload SHA-256
-`04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8`.
+One live run, on 2026-07-13, from OpenAI manifest payload SHA-256
+`04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8`. Its
+record is not published; what follows is the pinned configuration it used.
 
 The run used the pinned OpenAI Responses endpoint and model:
 
@@ -52,8 +50,8 @@ native file support.
 ## Serialized Audit
 
 The runner installs a Req request step after ReqLLM provider `encode_body` and
-before transport. This is the claim-authorizing request boundary. For every
-request, the persisted redacted audit contains:
+before transport — the last point at which what Imp actually sends can be
+observed. For every request, the redacted audit contains:
 
 - sanitized endpoint, API, HTTP method, serialized model, and body SHA-256;
 - ordered serialized part types;

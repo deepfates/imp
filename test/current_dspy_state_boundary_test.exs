@@ -12,7 +12,7 @@ defmodule Imp.CurrentDSPyStateBoundaryTest do
 
     unless File.exists?(python) and File.dir?(target) do
       flunk(
-        "install the source-verified DSPy 3.3.1 target and venv documented in docs/internal/BENCHMARK_TRUTH.md"
+        "install the source-verified DSPy 3.3.1 target and venv documented in docs/BENCHMARKS.md"
       )
     end
 

@@ -8,34 +8,48 @@ defmodule DocumentationContractTest do
                                  "Imp.UnlinkedTaskSupervisor"
                                ])
 
-  test "coverage matrix describes current evidence instead of closed planning tickets" do
-    body = File.read!("docs/internal/COVERAGE_MATRIX.md")
+  test "the benchmark docs name runnable commands instead of closed planning tickets" do
+    benchmarks = File.read!("docs/BENCHMARKS.md")
+    contributing = File.read!("CONTRIBUTING.md")
 
-    refute_closed_ticket_refs(body)
-    refute body =~ "integration gate should"
-    refute body =~ "integration gate required"
-    refute body =~ "integration gate needed"
-    refute body =~ "Imp.Embeddings.Hash"
-    refute body =~ "Imp.MCP.InProcess"
-    refute body =~ "Imp.MCP.HTTP`"
-    refute body =~ "Imp.MCP.Stdio`"
-    refute body =~ "Imp.MCP.StreamableHTTP`"
-    refute body =~ "before closing"
-    refute body =~ "waiting on live release evidence"
+    refute_closed_ticket_refs(benchmarks)
+    refute_closed_ticket_refs(contributing)
+    refute benchmarks =~ "before closing"
+    refute benchmarks =~ "waiting on live release evidence"
 
-    assert body =~ "mix integration.check"
-    assert body =~ "mix protocol.training.check"
-    assert body =~ "mix protocol.check"
-    assert body =~ "Imp.Embeddings.BagOfWords"
+    assert contributing =~ "mix integration.check"
+    assert contributing =~ "mix protocol.check"
+    assert contributing =~ "mix livebook.execute.check"
+    assert benchmarks =~ "mix differential.check"
+
     assert Code.ensure_loaded?(Imp.Embeddings.BagOfWords)
-    assert body =~ "Imp.MCP.Catalog"
-    assert body =~ "Imp.MCP.HTTPClient"
-    assert body =~ "Imp.MCP.StdioClient"
-    assert body =~ "Imp.MCP.StreamableHTTPClient"
     assert Code.ensure_loaded?(Imp.MCP.Catalog)
     assert Code.ensure_loaded?(Imp.MCP.HTTPClient)
     assert Code.ensure_loaded?(Imp.MCP.StdioClient)
     assert Code.ensure_loaded?(Imp.MCP.StreamableHTTPClient)
+  end
+
+  test "every mix command the benchmark docs publish is a task that exists" do
+    published =
+      "docs/BENCHMARKS.md"
+      |> File.read!()
+      |> then(&Regex.scan(~r/mix ([a-z][a-z_0-9.]*[a-z0-9])/, &1))
+      |> Enum.map(fn [_, task] -> task end)
+      |> Enum.uniq()
+      |> Enum.reject(&(&1 in ["deps.get", "run", "test", "help"]))
+
+    assert length(published) > 20
+
+    aliases =
+      Mix.Project.config()
+      |> Keyword.get(:aliases, [])
+      |> Keyword.keys()
+      |> MapSet.new(&Atom.to_string/1)
+
+    for task <- published do
+      assert Mix.Task.get(task) || MapSet.member?(aliases, task),
+             "docs/BENCHMARKS.md publishes `mix #{task}`, which is neither a task nor an alias"
+    end
   end
 
   test "documented Imp module references resolve to loadable modules" do
@@ -71,16 +85,24 @@ defmodule DocumentationContractTest do
     refute docs =~ "Imp.HTTP.Hackneyless"
   end
 
-  test "parity validation program describes evidence lanes instead of ticket bookkeeping" do
-    body = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
+  test "the benchmark docs separate what can be re-measured from what cannot" do
+    body = File.read!("docs/BENCHMARKS.md")
 
-    refute_closed_ticket_refs(body)
     refute body =~ "Ticket:"
     refute body =~ "regressions have tickets"
+
+    assert body =~ "## Cannot be re-measured"
+    assert body =~ "The split files are\nabsent"
+
+    results = File.read!("benchmarks/RESULTS.md")
+
+    assert results =~ "## Re-measurable"
+    assert results =~ "## Recomputable only"
+    assert results =~ "## Findings that are not results"
   end
 
   test "adapter fidelity audit names upstream semantics and Imp evidence" do
-    body = File.read!("docs/internal/ADAPTER_FIDELITY.md")
+    body = File.read!("docs/differentials/ADAPTER_FIDELITY.md")
     contributing = File.read!("CONTRIBUTING.md")
 
     assert contributing =~ "Public behavior belongs to code, tests, and user documentation"
@@ -112,7 +134,10 @@ defmodule DocumentationContractTest do
         "examples/provider_free_ticket_router/README.md"
       ] ++ Path.wildcard("livebooks/*.livemd")
 
-    banned = ~r/\bimp-[a-z]*\d[a-z0-9]*\b|docs\/(?:internal|maintainers)|benchmarks\/|evidence\//i
+    # benchmarks/RESULTS.md is a published surface: user docs are expected to
+    # cite it. Everything else under benchmarks/ is still internal.
+    banned =
+      ~r/\bimp-[a-z]*\d[a-z0-9]*\b|docs\/(?:internal|maintainers)|benchmarks\/(?!RESULTS\.md)|evidence\//i
 
     offenders =
       for path <- user_surfaces,
@@ -169,8 +194,27 @@ defmodule DocumentationContractTest do
              "docs/IMP_FOR_DSPY_USERS.md",
              "docs/LEARNING_PATH.md",
              "docs/PRODUCTION_OPERATIONS.md",
-             "docs/TRAJECTORIES.md"
+             "docs/TRAJECTORIES.md",
+             "docs/TUTORIAL_TICKET_ROUTING.md"
            ]
+
+    extras =
+      Mix.Project.config()
+      |> Keyword.fetch!(:docs)
+      |> Keyword.fetch!(:extras)
+
+    for doc <- ["docs/CASE_STUDY_TREC.md", "docs/EVIDENCE.md"] do
+      assert doc in extras, "#{doc} is not rendered into the docs"
+      refute doc in product_docs, "#{doc} names source-checkout commands and must not ship"
+    end
+
+    refute "docs/BENCHMARKS.md" in extras
+    refute "docs/BENCHMARKS.md" in product_docs
+
+    for doc <- ["README.md", "docs/EVIDENCE.md", "docs/TUTORIAL_TICKET_ROUTING.md"] do
+      assert File.read!(doc) =~ "blob/main/docs/BENCHMARKS.md",
+             "#{doc} does not link to the benchmark index"
+    end
 
     refute readme =~ "01_programming_not_prompting"
   end
@@ -244,12 +288,15 @@ defmodule DocumentationContractTest do
     assert Imp.get(agent_prediction, :answer) == "Paris"
   end
 
-  test "GEPA research records distinguish program and artifact evidence" do
-    coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
-    parity = File.read!("docs/internal/PARITY_VALIDATION_PROGRAM.md")
+  test "GEPA records distinguish the differential that runs from the campaign that cannot" do
+    benchmarks = File.read!("docs/BENCHMARKS.md")
 
-    assert coverage =~ "GEPA-style reflection"
-    assert parity =~ "GEPA-style optimizer rows"
+    assert benchmarks =~ "mix benchmark.gepa.contract.check"
+    assert benchmarks =~ "**The GEPA six-family campaign.**"
+
+    attribution = File.read!("benchmarks/data/GEPA_SPLITS_ATTRIBUTION.md")
+
+    assert attribution =~ "not in this repository"
   end
 
   test "cold learning path distinguishes portable programs from selected parameter artifacts" do
@@ -271,7 +318,7 @@ defmodule DocumentationContractTest do
   end
 
   test "instruction optimizer fidelity defines durable run-level resume boundaries" do
-    fidelity = File.read!("docs/internal/INSTRUCTION_OPTIMIZER_FIDELITY.md")
+    fidelity = File.read!("docs/differentials/INSTRUCTION_OPTIMIZER_FIDELITY.md")
 
     assert fidelity =~ "## Durable Run-Level Resume"
     assert fidelity =~ "A trial is the atomic boundary"
@@ -279,11 +326,12 @@ defmodule DocumentationContractTest do
     assert fidelity =~ "### Rebinding And Trust Boundary"
   end
 
-  test "embedding evidence names the deterministic baseline and provider shape contract" do
-    coverage = File.read!("docs/internal/COVERAGE_MATRIX.md")
+  test "the deterministic embedder says in its own docs that it is not a semantic model" do
+    {:docs_v1, _, _, _, %{"en" => doc}, _, _} = Code.fetch_docs(Imp.Embeddings.BagOfWords)
 
-    assert coverage =~ "deterministic local baseline"
-    assert coverage =~ "one numeric vector per input text"
+    assert doc =~ "local baseline"
+    assert doc =~ "not a semantic embedding model"
+    assert doc =~ "inject a real embedding provider"
   end
 
   test "streaming response structs are deliberate public vocabulary" do
