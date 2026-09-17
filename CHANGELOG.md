@@ -4,6 +4,12 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- ReActV2 preserves provider-native reasoning text and opaque reasoning details
+  across tool calls and saved-history reloads. ReqLLM receives the original
+  continuation data, including provider extension fields and signatures, instead
+  of losing it while rebuilding assistant messages. Operational history must be
+  stored privately; run events and explicit diagnostic redaction still redact
+  credential-shaped values.
 - A map or list value in a prompt, including a structured tool result, now
   renders the way DSPy renders a dict: `json.dumps(..., ensure_ascii=False)`
   with Python's default separators, complete. It was `inspect/1` at its

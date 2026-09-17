@@ -779,6 +779,7 @@ defmodule Imp.Clients.ReqLLM do
           content,
           Map.get(message, :tool_calls) || Map.get(message, "tool_calls")
         )
+        |> preserve_reasoning(message)
 
       # Messages that went through a JSON round trip (ReqLLMBatch checkpoints,
       # anything decoded from disk or the wire) arrive with string keys and
@@ -790,11 +791,88 @@ defmodule Imp.Clients.ReqLLM do
           content,
           Map.get(message, "tool_calls") || Map.get(message, :tool_calls)
         )
+        |> preserve_reasoning(message)
 
       other ->
         ReqLLM.Context.user(inspect(other))
     end)
   end
+
+  defp preserve_reasoning(%ReqLLM.Message{role: :assistant} = message, source) do
+    message =
+      case map_value(source, :reasoning_details) do
+        details when is_list(details) ->
+          %{message | reasoning_details: Enum.map(details, &restore_reasoning_detail/1)}
+
+        _ ->
+          message
+      end
+
+    text = map_value(source, :reasoning_content)
+
+    cond do
+      Enum.any?(message.reasoning_details || [], fn detail ->
+        match?(%ReqLLM.Message.ReasoningDetails{provider: :anthropic}, detail)
+      end) ->
+        # ReqLLM encodes Anthropic's signed/redacted blocks from the details.
+        # Adding their text as a thinking content part duplicates the block on
+        # tool turns and produces an unsigned continuation.
+        %{message | content: without_thinking(message.content)}
+
+      is_binary(text) and text != "" ->
+        %{
+          message
+          | content: [
+              ReqLLM.Message.ContentPart.thinking(text) | without_thinking(message.content)
+            ]
+        }
+
+      true ->
+        message
+    end
+  end
+
+  defp preserve_reasoning(message, _source), do: message
+
+  defp without_thinking(content), do: Enum.reject(content, &match?(%{type: :thinking}, &1))
+
+  defp restore_reasoning_detail(%ReqLLM.Message.ReasoningDetails{} = detail), do: detail
+  defp restore_reasoning_detail(%{"type" => _type} = raw_detail), do: raw_detail
+
+  # History's codec drops unknown struct types and may decode atoms as strings
+  # before their owning module is loaded. Restore only known struct fields and
+  # provider names; never atomize provider data or unrecognized wire maps.
+  defp restore_reasoning_detail(detail) when is_map(detail) do
+    provider = map_value(detail, :provider)
+
+    provider =
+      if is_binary(provider),
+        do:
+          Enum.find(
+            [:anthropic, :google, :openai, :openrouter],
+            &(Atom.to_string(&1) == provider)
+          ),
+        else: provider
+
+    if is_atom(provider) and not is_nil(provider) do
+      fields =
+        Enum.reduce(
+          [:text, :signature, :encrypted?, :format, :index, :provider_data],
+          %{provider: provider},
+          fn key, fields ->
+            if Map.has_key?(detail, key) or Map.has_key?(detail, Atom.to_string(key)),
+              do: Map.put(fields, key, map_value(detail, key)),
+              else: fields
+          end
+        )
+
+      struct(ReqLLM.Message.ReasoningDetails, fields)
+    else
+      detail
+    end
+  end
+
+  defp restore_reasoning_detail(detail), do: detail
 
   defp build_message(role, content, tool_calls) do
     case normalize_role(role) do
