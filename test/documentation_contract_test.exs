@@ -29,26 +29,62 @@ defmodule DocumentationContractTest do
     assert Code.ensure_loaded?(Imp.MCP.StreamableHTTPClient)
   end
 
-  test "every mix command the benchmark docs publish is a task that exists" do
-    published =
-      "docs/BENCHMARKS.md"
-      |> File.read!()
-      |> then(&Regex.scan(~r/mix ([a-z][a-z_0-9.]*[a-z0-9])/, &1))
-      |> Enum.map(fn [_, task] -> task end)
-      |> Enum.uniq()
-      |> Enum.reject(&(&1 in ["deps.get", "run", "test", "help"]))
+  # A benchmark command a reader cannot run is worse than no command. The file
+  # name of a Mix task module is not the task name: both
+  # lib/mix/tasks/imp.benchmark.classical_optimizer_differential.ex and
+  # lib/mix/tasks/imp.benchmark.weight_composition_differential.ex define a
+  # module with no run/1 plus several sibling task modules that do have one,
+  # so `mix imp.benchmark.classical_optimizer_differential` does not exist
+  # while `mix imp.benchmark.bootstrap_few_shot_differential` does. Resolving
+  # the module is therefore not enough; it has to be invocable.
+  test "every mix command the benchmark docs publish is invocable" do
+    published = published_mix_commands("docs/BENCHMARKS.md")
 
     assert length(published) > 20
 
+    for task <- published do
+      assert invocable_mix_command?(task),
+             "docs/BENCHMARKS.md publishes `mix #{task}`, which is neither an " <>
+               "alias in mix.exs nor a Mix task module exporting run/1"
+    end
+  end
+
+  test "the invocable-command check rejects a module that is not a runnable task" do
+    # Guard on the guard: these two resolve to real modules under
+    # lib/mix/tasks, and neither can be run.
+    refute invocable_mix_command?("imp.benchmark.classical_optimizer_differential")
+    refute invocable_mix_command?("imp.benchmark.weight_composition_differential")
+    refute invocable_mix_command?("imp.benchmark.no_such_task_at_all")
+
+    assert invocable_mix_command?("imp.benchmark.bootstrap_few_shot_differential")
+    assert invocable_mix_command?("differential.check")
+  end
+
+  defp published_mix_commands(path) do
+    path
+    |> File.read!()
+    |> then(&Regex.scan(~r/mix ([a-z][a-z_0-9.]*[a-z0-9])/, &1))
+    |> Enum.map(fn [_, task] -> task end)
+    |> Enum.uniq()
+    |> Enum.reject(&(&1 in ["deps.get", "run", "test", "help"]))
+  end
+
+  defp invocable_mix_command?(task) do
     aliases =
       Mix.Project.config()
       |> Keyword.get(:aliases, [])
       |> Keyword.keys()
       |> MapSet.new(&Atom.to_string/1)
 
-    for task <- published do
-      assert Mix.Task.get(task) || MapSet.member?(aliases, task),
-             "docs/BENCHMARKS.md publishes `mix #{task}`, which is neither a task nor an alias"
+    cond do
+      MapSet.member?(aliases, task) ->
+        true
+
+      module = Mix.Task.get(task) ->
+        Code.ensure_loaded?(module) and function_exported?(module, :run, 1)
+
+      true ->
+        false
     end
   end
 
