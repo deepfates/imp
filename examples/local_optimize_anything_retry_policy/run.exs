@@ -429,7 +429,7 @@ defmodule LocalOptimizeAnythingRetryPolicy.Runner do
       output:
         System.get_env(
           "IMP_OA_OUTPUT",
-          Path.expand("~/.cache/imp/optimize-anything/#{@treatment_id}")
+          "/Users/deepfates/.cache/imp/optimize-anything/#{@treatment_id}"
         )
         |> Path.expand()
     }
