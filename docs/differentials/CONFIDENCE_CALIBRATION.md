@@ -90,8 +90,8 @@ digest. Re-running the builder with the same arguments produces the same JSONL
 bytes.
 
 The task requires returned OpenAI Chat token logprobs and records the effective
-model, API, usage, raw metrics, fit diagnostics, complete mapping, authority
-gates, and Brier comparison. Authority requires verified source labels, unique
+model, API, usage, raw metrics, fit diagnostics, complete mapping, validity
+gates, and Brier comparison. A valid run requires verified source labels, unique
 evaluation and source IDs, source/group split disjointness, at least 100 records
 per split, mixed outcomes in both splits, at least two supported calibration
 bins, an authoritative fit, a complete held-out calibrated report, and a proper

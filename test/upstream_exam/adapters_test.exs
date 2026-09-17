@@ -4,7 +4,7 @@ defmodule UpstreamExam.AdaptersTest do
 
   Tranche 1 of the upstream exam: every test here cites the upstream file and
   test function it translates. The complete per-test disposition map (including
-  the tests that were NOT portable and why) is docs/internal/UPSTREAM_EXAM.md.
+  the tests that were NOT portable and why) is docs/differentials/UPSTREAM_EXAM.md.
 
   Rules of this file:
     * assertions check the SAME behavior as upstream, not a look-alike;

@@ -291,7 +291,7 @@ now accepts only complete canonical `(id_1, id_2)` lines or a standalone
 empty-set marker; any mixed prose is invalid. Failed rows are excluded from
 paired bootstrap comparisons instead of being treated as scored zeros.
 
-The admitted replacement was generated from commit `2b9cacd` on frozen query
+The replacement run was generated from commit `2b9cacd` on frozen query
 `1` at context size `1024` with `claude-sonnet-5`. Imp direct and DSPy direct
 both explained the correct empty-set conclusion in noncanonical prose and
 scored `0.0`. Imp RLM recorded `run`, `action_error`, and `submit` events,

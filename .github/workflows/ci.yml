@@ -202,7 +202,7 @@ jobs:
       # Its self-test imports gepa_artifact from the checkout root; the
       # maintainer environment had that on the ambient path, runners don't.
       - run: PYTHONPATH="$PWD/tmp/gepa-artifact" scripts/setup_corrected_gepa_comparator.sh tmp/gepa-artifact
-      # Source-exact IFBench scorer venv (docs/internal/BENCHMARK_TRUTH.md).
+      # Source-exact IFBench scorer venv (docs/BENCHMARKS.md).
       - run: |
           python3 -m venv tmp/ifbench-parity-venv
           tmp/ifbench-parity-venv/bin/python -m pip install -q -r benchmarks/requirements-ifbench-parity.txt
@@ -213,10 +213,11 @@ jobs:
       # spend their test timeout compiling.
       # Children run in both dev (banking77) and test (hotpotqa) envs.
       - run: cd examples/deployment && IMP_PATH=../.. mix deps.get && IMP_PATH=../.. mix deps.compile && IMP_PATH=../.. mix compile && IMP_PATH=../.. MIX_ENV=test mix deps.compile && IMP_PATH=../.. MIX_ENV=test mix compile
-      # Known-red residue at introduction (tracked on imp-sqkr): the sealed
-      # v1 contract detects mix.lock drift after the bandit CVE bump, and the
-      # MuSiQue receipts read a machine-local /tmp data dir. This job makes
-      # that visible on every run rather than hiding it in the fast lane.
+      # Re-measured 2026-09-17 on a clean tracked tree: neither residue this
+      # comment used to describe is still red. The mix.lock drift is gone and
+      # the MuSiQue receipts are excluded by their own tag. The only remaining
+      # failures came from Imp.UpstreamFidelityTest, which is removed with the
+      # rest of the conformance-ledger machinery.
       - run: mix differential.check
 
   docs:

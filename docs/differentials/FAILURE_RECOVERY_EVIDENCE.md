@@ -4,7 +4,7 @@ The canonical failure campaign exercises Imp runtime behavior through public
 Elixir APIs. It does not substitute benchmark-only recovery implementations for
 the production paths.
 
-## Deterministic authority
+## The deterministic campaign
 
 `mix benchmark.failure_campaign.check` runs ten iterations of cancellation,
 explicit task timeout, bounded concurrency, terminal partial-stream failure,
@@ -14,9 +14,9 @@ exact MIPROv2 and SIMBA checkpoint resume/tamper rejection.
 The artifact records process, port, supervised task, admission queue, and
 telemetry-handler deltas. It also records balanced telemetry span counts and a
 credential scan. Any failed iteration, nonzero added resource count, unbalanced
-span, retained handler, or credential hit keeps deterministic authority red.
+span, retained handler, or credential hit fails the campaign.
 
-## Selected local operational authority
+## The local operational campaign
 
 The operational campaign is intentionally local, bounded, and provider-free:
 
@@ -58,7 +58,6 @@ mix imp.benchmark.failure_campaign \
   --out benchmarks/runs/failure-recovery
 ```
 
-Then validate and retain the result. The artifact's payload
-hash, exact Git revision, clean workspace state, attempt counts, time bounds,
-exact tool history, canary digest, telemetry, and resource deltas are the
-authority inputs.
+The report records the payload hash, exact Git revision, clean workspace
+state, attempt counts, time bounds, exact tool history, canary digest,
+telemetry, and resource deltas. Read those, not a summary verdict.

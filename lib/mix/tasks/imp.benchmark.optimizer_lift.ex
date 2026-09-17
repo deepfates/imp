@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
   instruction/demo, Imp optimizers select and apply it identically to DSPy
   3.2.1 (lift_gap <= 0.001), without provider nondeterminism. It is NOT
   held-out lift evidence — optimizer effectiveness on data nothing selected
-  for remains a separately gated C3 target (see docs/internal/BENCHMARK_TRUTH.md).
+  for remains a separately gated C3 target (see docs/BENCHMARKS.md).
   """
 
   use Mix.Task

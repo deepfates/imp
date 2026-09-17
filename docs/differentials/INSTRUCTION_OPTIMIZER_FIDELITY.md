@@ -362,7 +362,7 @@ mix imp.benchmark.instruction_optimizer_experiment \
   --out benchmarks/runs/instruction-optimizer-experiment
 ```
 
-The admitted economical preflight binds Claude Haiku 4.5 to the
+The economical preflight binds Claude Haiku 4.5 to the
 provider-specific ReqLLM and
 LiteLLM identifiers, all three AIME split hashes, seed, arm order, optimizer
 options, DSPy `3.3.0b1`, Optuna `4.9.0`, and independent per-arm request,
@@ -372,9 +372,7 @@ The orchestrator derives one Imp
 campaign and one all-arm DSPy campaign and refuses to merge incomplete or
 identity-mismatched artifacts.
 
-The admitted one-seed artifact is
-`benchmarks/evidence/admitted/instruction_live/e2d79f12c6ef7120df8efacd8a43d03027be65963a41aaff5dd1f87a8bcd1c76.json`.
-Both runtimes completed every arm without failures. Baseline, MIPROv2, and
+One seed was run live. Both runtimes completed every arm without failures. Baseline, MIPROv2, and
 SIMBA each scored `2/3` on that runtime's frozen test split, so this establishes
 live sampled execution and accounting but not optimizer lift or T3 parity.
 

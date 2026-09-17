@@ -1077,8 +1077,8 @@ defmodule PublicSurfaceTest do
         # upstream test, including adapters we deliberately do not ship).
         &(&1 in [
             "README.md",
-            "docs/internal/RESEARCH_LANDSCAPE.md",
-            "docs/internal/UPSTREAM_EXAM.md"
+            "docs/differentials/RESEARCH_LANDSCAPE.md",
+            "docs/differentials/UPSTREAM_EXAM.md"
           ])
       )
       |> Enum.map_join("\n", &File.read!/1)
