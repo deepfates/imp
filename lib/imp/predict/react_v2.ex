@@ -3,8 +3,8 @@ defmodule Imp.Predict.ReActV2 do
   Native-tool-aware ReAct loop with structured history and typed completion.
 
   ReActV2 preserves parallel tool call IDs and results in `Imp.History`, keeps
-  unknown and failed tool calls as observations, and first forces a final
-  `submit` call when the normal loop ends without outputs. If a provider cannot
+  unknown and failed tool calls as observations, and forces a final `submit`
+  call when the loop ends without outputs. If a provider cannot
   honor that tool contract, a tools-disabled typed extractor derives the task
   outputs from the original inputs and accumulated history.
 

@@ -390,8 +390,8 @@ defmodule LocalServiceE2ETest do
       ]
     }
 
-    # Dynamic LM via context: a Static-pinned program can no longer be saved
-    # (dee-i3s4 / P03 made that loud), and this test saves the compiled RAG.
+    # The compiled RAG is saved, so the LM comes from context: saving refuses a
+    # Static-pinned program.
     base = Imp.predict("question, context -> answer")
     rag = Imp.rag(base, retriever, k: 1)
 

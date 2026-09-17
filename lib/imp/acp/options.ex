@@ -65,15 +65,12 @@ defmodule Imp.ACP.Options do
   @doc "ACP tool kinds accepted in `:tool_kinds`."
   def acp_tool_kinds, do: @acp_tool_kinds
 
-  # Imp tools carry no ACP kind, and the session falls back to a name-based
-  # guess that classifies everything unfamiliar as "other". Hosts such as Haven
+  # Imp tools carry no ACP kind, and the session otherwise falls back to a
+  # name-based guess that classifies anything unfamiliar as "other". Hosts
   # apply permission modes by kind (reads pass, mutations ask or are denied),
-  # so an agent declares the kind of each of its tools here.
-  #
-  # An MCP tool declares its own nature instead, and `Imp.ACP.ToolKind` derives
-  # the kind from that declaration; a program factory hands those derived kinds
-  # back with its program. This option remains the way to name a kind that
-  # annotations cannot express, and it outranks anything derived.
+  # so an agent declares the kind of each of its tools here. MCP tools are
+  # derived from their annotations by `Imp.ACP.ToolKind` instead; this option
+  # names a kind annotations cannot express and outranks anything derived.
   defp tool_kinds!(opts) do
     case validate_tool_kinds(Keyword.get(opts, :tool_kinds, %{})) do
       {:ok, kinds} ->
@@ -225,9 +222,8 @@ defmodule Imp.ACP.Options do
       :ok ->
         :ok
 
-      # A host application that already knows what its client should be told
-      # returns a JSON-RPC error triple. Tagging it as a lifecycle failure would
-      # bury the one thing about it that is useful, so it passes through.
+      # A JSON-RPC error triple is the host's own message to its client, so it
+      # passes through instead of being wrapped as a lifecycle failure.
       {:error, {code, message, _data} = acp_error}
       when is_integer(code) and is_binary(message) ->
         {:error, acp_error}

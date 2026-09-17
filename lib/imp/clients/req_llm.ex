@@ -37,24 +37,13 @@ defmodule Imp.Clients.ReqLLM do
 
   require Logger
 
-  # ── Provider-era-pinned constants ─────────────────────────────────────────
-  # Both values below encode provider behavior as of a specific date and WILL
-  # rot as providers ship new betas and model families. They are collected
-  # here so there is one place to update.
-  #
-  # To update:
-  # - @anthropic_structured_outputs_beta: check Anthropic's structured-outputs
-  #   beta header name (docs.anthropic.com, "structured outputs"); replace the
-  #   dated string when the beta graduates or is renamed.
-  # - @openai_reasoning_model_pattern: add new OpenAI reasoning-model family
-  #   prefixes as they ship. A model this regex misses is silently treated as
-  #   a NON-reasoning model (:max_tokens is not renamed to
-  #   :max_completion_tokens), which the provider then rejects or req_llm
-  #   papers over with a per-call warning.
-  #
-  # A registry-driven replacement (deriving both from ReqLLM's model registry
-  # instead of pinning) is the real fix and is out of scope here; see ticket
-  # de-4hmp.
+  # Both constants pin provider behavior that the model registry does not
+  # expose, so they go stale as providers ship new betas and model families.
+  # The beta header string changes when Anthropic renames or graduates its
+  # structured-outputs beta. A model the regex misses is treated as a
+  # non-reasoning model, so `:max_tokens` is not renamed to
+  # `:max_completion_tokens` and the provider rejects the request or req_llm
+  # renames it with a per-call warning.
   @anthropic_structured_outputs_beta "structured-outputs-2025-11-13"
   @openai_reasoning_model_pattern ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/
 
@@ -97,25 +86,19 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   @doc false
-  # Response-format capability for this LM (internal), read from the ReqLLM/LLMDB
-  # model registry (`Imp.LM.Capability`). This is Imp's analog of DSPy's
-  # `litellm.get_supported_openai_params` / `litellm.supports_response_schema`:
-  # DSPy delegates to litellm's registry, Imp delegates to ReqLLM's.
+  # Response-format capability for this LM, read from the ReqLLM/LLMDB model
+  # registry, the analog of DSPy's `litellm.get_supported_openai_params` /
+  # `litellm.supports_response_schema`. Mapping from LLMDB's
+  # `capabilities.json` descriptor:
   #
-  # The mapping from LLMDB's `capabilities.json` descriptor:
+  #   * `response_schema` := `json.schema` (Structured Outputs).
+  #   * `response_format` := `json.native or json.schema`; either mode implies
+  #     the model accepts the request param.
   #
-  #   * `response_schema` := `json.schema` (structured Structured-Outputs support).
-  #   * `response_format` := `json.native or json.schema` (the model accepts a
-  #     `response_format` request param at all — either json-object mode or
-  #     json-schema mode implies the param is accepted).
-  #
-  # When the registry has no `json` capability for a model (unknown / sparse
-  # entry), this normally returns `Imp.LM.Capability.none/0` — no
-  # `response_format` is sent. The exception is a native provider whose pinned
-  # public contract owns structured generation independently of model metadata:
-  # ReqLLM's Ollama provider unconditionally exposes JSON-schema
-  # `generate_object/4`. This keeps unknown providers loud-by-omission while
-  # avoiding a false downgrade for ordinary local Ollama model names.
+  # A model the registry resolves but does not advertise a `json` capability
+  # for returns `Imp.LM.Capability.none/0`, so no `response_format` is sent.
+  # The one exception is a provider that owns structured generation itself
+  # (currently native Ollama), handled below.
   @spec response_format_capability(t()) :: Imp.LM.Capability.t()
   def response_format_capability(%__MODULE__{model: model_spec}) do
     case resolve_model(model_spec) do
@@ -133,13 +116,10 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  # ReqLLM's native Ollama provider owns JSON-schema constrained generation at
-  # the provider layer, independently of LLMDB's per-model catalog. Its pinned
-  # public `generate_object/4` path unconditionally constructs a json_schema
-  # response format for Ollama's OpenAI-compatible endpoint. Local model names
-  # are commonly absent from LLMDB, so consulting only `model.capabilities`
-  # incorrectly downgraded this supported provider path to Capability.none and
-  # left small local models to follow a prompt-only JSON/value contract.
+  # ReqLLM's Ollama provider owns JSON-schema constrained generation at the
+  # provider layer: its `generate_object/4` path always builds a json_schema
+  # response format. Local model names are usually absent from LLMDB, so
+  # `model.capabilities` alone would downgrade a path the provider guarantees.
   defp response_format_capability(%{provider: provider}, _model_spec)
        when provider in [:ollama, "ollama"],
        do: Imp.LM.Capability.json_schema()
@@ -152,10 +132,8 @@ defmodule Imp.Clients.ReqLLM do
         %Imp.LM.Capability{response_format: native? or schema?, response_schema: schema?}
 
       _no_json_entry ->
-        # Documented loud-by-omission: the registry resolved the model but
-        # does not advertise a `json` capability, so no response_format is
-        # sent. Provider-owned guarantees (currently native Ollama) are handled
-        # above; all other unknown providers remain fail-closed.
+        # The registry resolved the model but advertises no `json` capability,
+        # so fail closed: send no response_format.
         Imp.LM.Capability.none()
     end
   end
@@ -1092,11 +1070,11 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  # ReqLLM 1.17.1 attaches its retry step after constructing the Req request and
-  # resets `max_retries` to 3. Re-apply an explicit caller no-retry policy in a
-  # final request step, at the adapter boundary, where it cannot be overwritten.
-  # The attempt event is emitted immediately before the actual Req adapter call,
-  # so it counts transports rather than Imp calls or ReqLLM lifecycle contexts.
+  # ReqLLM attaches its retry step after constructing the Req request and
+  # resets `max_retries` to 3, so an explicit caller no-retry policy is
+  # re-applied in a final request step at the adapter boundary, where nothing
+  # overwrites it. The attempt event fires immediately before the Req adapter
+  # call, so it counts transports rather than Imp calls.
   defp enforce_explicit_no_retry(opts) do
     http_opts = Keyword.get(opts, :req_http_options, [])
 
@@ -1245,21 +1223,19 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  # Reasoning models use `:max_completion_tokens`, not `:max_tokens`. If we hand
-  # `:max_tokens` (or no token limit at all) to req_llm, it injects/renames the
-  # option itself and logs a `[warning] Renamed :max_tokens ...` line on every
-  # request — twice, once per prepare pass. We pre-normalize here so req_llm never
-  # sees `:max_tokens` for these models and stays quiet.
+  # Reasoning models take `:max_completion_tokens`, not `:max_tokens`. Given
+  # `:max_tokens`, or no token limit, req_llm renames or injects the option
+  # itself and logs a `Renamed :max_tokens ...` warning on every request, twice
+  # per call. Normalizing first keeps req_llm from ever seeing `:max_tokens`
+  # for these models.
   #
-  # Wire-neutrality is load-bearing: we must send the SAME request req_llm would.
-  # On the text/stream path req_llm resolves its own default with
-  # `put_model_max_tokens_default(opts, model)` — NO fallback (see
-  # `ReqLLM.Provider.Options.maybe_extract_max_tokens/2`): it seeds the model's
-  # output limit when one exists and otherwise leaves the request uncapped. We call
-  # the exact same helper with the exact same (fallback-free) semantics, differing
-  # only in the target key — which is precisely what req_llm's rename step would
-  # have produced. A `fallback:` here would silently cap models that req_llm leaves
-  # uncapped, so it is deliberately omitted.
+  # The request on the wire must stay identical to req_llm's own. Its text and
+  # stream paths resolve the default with `put_model_max_tokens_default/2`,
+  # which seeds the model's output limit when the registry has one and
+  # otherwise leaves the request uncapped (`ReqLLM.Provider.Options`). This
+  # calls the same helper with the same fallback-free semantics and only a
+  # different target key. Passing a `fallback:` here would cap models req_llm
+  # leaves uncapped.
   defp rename_max_tokens_for_reasoning(opts, model) do
     {max_tokens, opts} = Keyword.pop(opts, :max_tokens)
 

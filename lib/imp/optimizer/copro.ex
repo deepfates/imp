@@ -678,7 +678,7 @@ defmodule Imp.Optimizer.COPRO do
     max_concurrency =
       eval_opts[:num_threads] || Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers)
 
-    # Imp.Evaluate now halts loudly at errors >= max_errors (DSPy
+    # Imp.Evaluate halts at errors >= max_errors (DSPy
     # parallelizer semantics); translate into COPRO's budget error so the
     # optimizer-facing contract stays the same.
     result =

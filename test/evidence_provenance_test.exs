@@ -46,11 +46,11 @@ defmodule EvidenceProvenanceTest do
       }
   }
 
-  # Reproduction commands recorded in immutable artifacts that no longer
-  # resolve to a mix task or alias (dee-1t1w). Content-addressed artifacts
-  # cannot be edited, so the annotation lives here: each entry names the live
-  # superseding recipe. The gate re-verifies the artifact still records the
-  # dead command, so a re-capture retires the entry.
+  # Reproduction commands recorded in immutable artifacts that do not resolve to
+  # a mix task or alias. Content-addressed artifacts cannot be edited, so the
+  # annotation lives here: each entry names the live superseding recipe. The
+  # gate re-verifies that the artifact still records the dead command, so a
+  # re-capture retires the entry.
   @dead_command_grandfathers %{
     {"benchmarks/evidence/admitted/optimize_anything/080f41578d725c8841d7484f6953cba419626b36f08043408c1027622ede4653.json",
      "dsex.benchmark.optimize_anything"} =>

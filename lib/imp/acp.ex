@@ -20,25 +20,19 @@ defmodule Imp.ACP do
   is installed into every session.
 
   The session map a factory receives is `:cwd`, `:mcp_servers`, `:session_id`,
-  `:host`, `:meta` and `:requested_meta`. `:meta` is ACP's `_meta` — the
-  extension point for per-session data the protocol does not model. Carrying it
-  is what lets one endpoint answer for more than one configuration without a
-  separate process per configuration; an adapter that drops it forces the choice
-  into the launch environment instead. Keys in `_meta` are namespaced by whoever
-  defines them, so read your own and ignore the rest.
+  `:host`, `:meta` and `:requested_meta`. `:meta` is ACP's `_meta`, the
+  extension point for per-session data the protocol does not model; one endpoint
+  can therefore answer for more than one configuration. Keys in `_meta` are
+  namespaced by whoever defines them, so read your own and ignore the rest.
 
-  On `session/new` both keys are the request's `_meta`. On `session/load` and
-  `session/resume` they differ: `:meta` is the `_meta` the session was created
-  with, stored beside the history and transcript it produced, and
-  `:requested_meta` is what this request asked for. The stored one wins, because
-  the history belongs to whatever produced it and a session that silently
-  becomes something else replays one configuration's transcript as another's.
-  `:requested_meta` exists so a factory can refuse that contradiction out loud:
-  only the factory knows which of its own keys are identity-bearing and which
-  may vary per connection, so this adapter carries both rather than guessing.
-
-  A session stored before `_meta` was carried has none, and resumes with `:meta`
-  empty — as it always did.
+  On `session/new` both keys hold the request's `_meta`. On `session/load` and
+  `session/resume` they may differ: `:meta` is the `_meta` the session was
+  created with, stored beside its history and transcript, and `:requested_meta`
+  is what this request asked for. The stored value is the one installed. Both
+  are passed so a factory can compare them and refuse a resume whose requested
+  configuration contradicts the stored one; only the factory knows which of its
+  own keys are identity-bearing. A session stored without `_meta` resumes with
+  `:meta` empty.
 
   Optional `:on_cancel` receives `(program, session_metadata)` only for an
   explicit active `session/cancel`, never on disconnect or close. It must return
@@ -52,8 +46,8 @@ defmodule Imp.ACP do
   deliberately trusted and the program's own `Imp.ToolPolicy` is sufficient.
   """
 
-  # :on_cancel is deliberately distinct from resource cleanup: an attachment
-  # closing must not imply cancellation of independently owned application work.
+  # :on_cancel is distinct from :cleanup: an attachment closing must not imply
+  # cancellation of independently owned application work.
   @adapter_keys [
     :program,
     :program_factory,
@@ -111,11 +105,10 @@ defmodule Imp.ACP do
     end
   end
 
-  # Stdio is the ACP wire. Configure it before starting any dependency so an
-  # application's boot logs cannot precede the first JSON-RPC frame. ExMCP
-  # repeats this when its stdio transport connects; doing it here closes the
-  # earlier application-start window for ordinary `mix run --no-start`
-  # launchers.
+  # Stdio is the ACP wire. Silence logging before starting any dependency so
+  # boot output cannot precede the first JSON-RPC frame. ExMCP does the same
+  # when its stdio transport connects; doing it here also covers the window
+  # during application start.
   defp prepare_stdio_runtime do
     Application.put_env(:ex_mcp, :stdio_mode, true)
     Application.put_env(:logger, :level, :emergency)

@@ -206,12 +206,10 @@ defmodule ReqLLMBatchTest do
     assert temperature == 0.0
   end
 
-  # Regression for the silent message-mangling failure: run/3 JSON-round-trips
-  # every payload for checkpoint durability, which turns atom keys (:role,
-  # :content) into strings. The client used to match only atom-keyed messages,
-  # so every round-tripped message fell through to the inspect/1 catch-all and
-  # reached the provider as `user: "%{\"content\" => ...}"` while the batch
-  # reported success.
+  # run/3 JSON-round-trips every payload for checkpoint durability, which turns
+  # atom message keys (:role, :content) into strings. The client must match both
+  # shapes: a message that falls through to the inspect/1 catch-all reaches the
+  # provider as an inspected map while the batch still reports success.
   test "run/3 delivers the documented payload shape to the transport as real messages" do
     checkpoint = checkpoint_path("api-guide-payload")
 

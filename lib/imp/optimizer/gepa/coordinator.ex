@@ -41,9 +41,9 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
     }
   end
 
-  # Deadline arithmetic lives in Imp.Deadline (a neutral core module) so
-  # Imp.Evaluate and the LM clients no longer depend on this optimizer
-  # internal. These delegates keep the Coordinator's historical surface.
+  # Deadline arithmetic lives in Imp.Deadline so that core modules such as
+  # Imp.Evaluate and the LM clients do not depend on this optimizer internal.
+  # These delegates keep the deadline helpers reachable from the Coordinator.
   defdelegate current_deadline, to: Imp.Deadline, as: :current
 
   @doc false

@@ -73,9 +73,9 @@ defmodule Imp.Predict.RLM.Interpreter do
     member?: 2,
     min: 1,
     max: 1,
-    # DSPy's sandbox is full Python, where sum() is a builtin; these are the
-    # function-free aggregations expressible in this fn-less interpreter
-    # (Enum.reduce needs a lambda, which generated code cannot write here).
+    # Aggregations that take no function argument. Generated code cannot write
+    # a lambda, so `Enum.reduce/3` is out of reach and these are listed
+    # explicitly.
     sum: 1,
     product: 1
   }

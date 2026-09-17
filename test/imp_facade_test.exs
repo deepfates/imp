@@ -280,8 +280,8 @@ defmodule ImpFacadeTest do
   end
 
   test "facade saves and loads portable programs" do
-    # A portable program is dynamic (or ReqLLM-pinned): a Static-pinned
-    # program can no longer be dumped (dee-i3s4 / P03 made that loud).
+    # A portable program is dynamic or ReqLLM-pinned: dumping refuses a
+    # Static-pinned program.
     lm = %{
       module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]

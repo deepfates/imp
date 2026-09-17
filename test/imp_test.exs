@@ -578,9 +578,9 @@ defmodule ImpTest do
   end
 
   test "evaluate and optimizers apply no per-row timeout by default" do
-    # Regression (discovered 2026-07-16): the old 5s default silently scored
-    # slow-but-correct live model calls as failure_score 0.0 inside optimizer
-    # candidate search, corrupting selection with no loud signal.
+    # A finite default would score slow-but-correct live model calls as
+    # failure_score 0.0 inside optimizer candidate search, corrupting selection
+    # with no loud signal.
     metric = Imp.Metrics.exact_match(:answer)
     devset = [Imp.example(question: "2+2?", answer: "4") |> Imp.Example.with_inputs(:question)]
 

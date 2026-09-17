@@ -641,9 +641,8 @@ defmodule Imp.ACP.Session do
     :exit, _reason -> {:error, :agent_unavailable}
   end
 
-  # A host that returned a JSON-RPC error triple already wrote the sentence its
-  # user needs to read, usually naming the thing to fix. Replacing it with a
-  # generic apology throws away the only actionable part of the failure.
+  # A JSON-RPC error triple from the host already carries the message its user
+  # needs, so it is surfaced rather than replaced with a generic one.
   defp failure_message({code, message, _data})
        when is_integer(code) and is_binary(message),
        do: message

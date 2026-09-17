@@ -109,9 +109,9 @@ defmodule SilentFailureRegressionsTest do
   end
 
   # ---------------------------------------------------------------------------
-  # P09 (dee-qc0q): a finite :timeout must be enforced at the DEFAULT
-  # max_concurrency: 1 (the sequential path used to skip the timeout machinery
-  # entirely: a 300ms program with timeout: 50 completed quietly with score 1.0).
+  # P09: a finite :timeout must be enforced at the DEFAULT max_concurrency: 1.
+  # If the sequential path skips the timeout machinery, a 300ms program with
+  # timeout: 50 completes quietly with score 1.0.
   # ---------------------------------------------------------------------------
 
   test "P09: Evaluate :timeout kills a slow row loudly at default max_concurrency" do
@@ -426,10 +426,10 @@ defmodule SilentFailureRegressionsTest do
   end
 
   # ---------------------------------------------------------------------------
-  # P05 (dee-ovd3): XML adapter parse must reject non-conforming output
-  # loudly. DSPy XMLAdapter.parse raises AdapterParseError unless every
-  # output field is present in tags; tag-free prose used to fall back to
-  # Chat.parse and return {:ok, ...} with the whole completion as the answer.
+  # P05: XML adapter parse must reject non-conforming output loudly. DSPy's
+  # XMLAdapter.parse raises AdapterParseError unless every output field is
+  # present in tags; falling back to Chat.parse would return {:ok, ...} with the
+  # whole completion as the answer.
   # ---------------------------------------------------------------------------
 
   test "P05: XML parse rejects tag-free prose loudly" do

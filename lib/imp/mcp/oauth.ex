@@ -62,9 +62,8 @@ defmodule Imp.MCP.OAuth do
   all, the lifetime is unknown, and an unknown lifetime is not treated as a
   long one: a fresh access token is minted on every call while a refresh token
   is available, so the same possibly-dead token is not handed out twice. With
-  no refresh token and no expiry, the stored token is returned as it is —
-  there is nothing better to hand back — and a rejection surfaces at the
-  server.
+  no refresh token and no expiry, the stored token is returned as it is and a
+  rejection surfaces at the server.
 
   A refresh the authorization server answers with `invalid_grant` — a revoked
   or already-rotated refresh token — is reported as
@@ -97,13 +96,11 @@ defmodule Imp.MCP.OAuth do
   descriptor, and hides its key material and the pending transaction from
   `inspect/1`.
 
-  It cannot make the same promise about the token once it has been handed over.
-  The header is passed to `ExMCP.Client`, which keeps it in its transport
-  state; if that client crashes, the standard OTP crash report prints its
-  state, and the header is printed with it. That is equally true of a static
-  `"headers"` entry — this module does not make it worse, and it cannot fix it
-  from here. Redacting a client's transport headers belongs in the ex_mcp fork,
-  which has no `format_status/1` and no custom `Inspect` for that state today.
+  It makes no such promise about the token once it has been handed over. The
+  header is passed to `ExMCP.Client`, which keeps it in its transport state; if
+  that client crashes, the standard OTP crash report prints that state and the
+  header with it. The same is true of a static `"headers"` entry. Redacting a
+  client's transport headers is ExMCP's to do, and it does not do it today.
 
   ## Concurrency
 
@@ -890,8 +887,8 @@ defmodule Imp.MCP.OAuth do
     end
   end
 
-  # Replace the file in one rename so a crash mid-write never leaves a
-  # half-written credential where a whole one used to be.
+  # Replace the file in one rename so a crash mid-write cannot leave a
+  # half-written credential in place of a complete one.
   defp write_atomically(store, credential, contents) do
     final = path(store, credential)
     temporary = final <> ".#{System.unique_integer([:positive])}.tmp"

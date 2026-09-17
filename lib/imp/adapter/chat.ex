@@ -1,5 +1,22 @@
 defmodule Imp.Adapter.Chat do
-  @moduledoc "Plain chat adapter: instructions plus field-labelled user content."
+  @moduledoc """
+  Plain chat adapter: instructions plus field-labelled user content.
+
+  `format/3` renders a signature and its inputs as a system message, one
+  user/assistant pair per demo, the conversation history, and a final user
+  message. Fields are labelled with `[[ ## name ## ]]` markers.
+
+  `parse/3` accepts an `Imp.Prediction`, a map of output fields, or completion
+  text. Text is split on those markers and the first section for each output
+  field wins. A completion that does not cover every output field is a parse
+  error rather than a partial prediction.
+
+  Options to `format/3`: `:demos`, `:response_instruction`, `:guidance`,
+  `:omit_empty_request`, and the renderer seams `:output_renderer`,
+  `:input_section_renderer` and `:system_renderer`, which let another adapter
+  reuse this message assembly with its own dialect. Options outside that list
+  are ignored; anything that is not a keyword list raises `ArgumentError`.
+  """
 
   @behaviour Imp.Adapter
 
@@ -9,34 +26,26 @@ defmodule Imp.Adapter.Chat do
       default: []
     ],
     response_instruction: [type: :boolean, default: true],
-    # Optional injectable renderer for demo/history ASSISTANT turns, letting a
-    # delegating adapter (JSON) substitute its own serialization while reusing
-    # Chat's message assembly. Arity 3: (signature, outputs, missing_message).
+    # Renderer for demo/history ASSISTANT turns: (signature, outputs,
+    # missing_message). A delegating adapter substitutes its own serialization
+    # while reusing Chat's message assembly.
     output_renderer: [type: {:fun, 3}],
-    # Optional injectable renderer for one INPUT-field section in user-facing
-    # turns (main request, demos, history). DSPy's XMLAdapter overrides
-    # `format_field_with_value`, which changes how EVERY input field renders
-    # (`<name>\nvalue\n</name>` instead of `[[ ## name ## ]]\nvalue`); this seam
-    # mirrors that polymorphism (dee-ovd3). Arity 2: (field, formatted_value)
-    # where formatted_value is Chat's field-aware formatted string (blob lists,
-    # scalars) — the renderer only wraps it in the adapter's dialect.
+    # Renderer for one INPUT-field section in user-facing turns (main request,
+    # demos, history): (field, formatted_value), where formatted_value is
+    # Chat's field-aware formatted string. The renderer only wraps it in the
+    # adapter's dialect.
     input_section_renderer: [type: {:fun, 2}],
-    # Optional renderer for the SYSTEM message. Arity 2: (signature, opts),
-    # where opts are these format options, so a renderer can read `:guidance`.
-    # Default: `render_system/2`, DSPy's field listing, marker template and
-    # objective. A host that wants the character first and the machinery last,
-    # in words, supplies this and leaves parsing alone.
+    # Renderer for the SYSTEM message: (signature, opts), where opts are these
+    # format options, so a renderer can read `:guidance`. Default:
+    # `render_system/2`. Replacing it leaves parsing unchanged.
     system_renderer: [type: {:fun, 2}],
     # Loop guidance a program passes as data rather than writing into
     # `signature.instructions`: `%{finish_tool:, input_names:, output_names:,
-    # tool_names:}`. The default system renderer says it the way ReAct's
-    # instructions used to; another renderer may say it in its own words.
+    # tool_names:}`.
     guidance: [type: {:or, [:map, nil]}],
-    # DSPy always ends a request with a user message, even an empty one, and
-    # the JSON and XML adapters append their output requirements to it. A
-    # native tool loop has nothing left to ask once every input is in the
-    # history; it sets this so the request ends on the newest tool result
-    # rather than on an empty message the provider would count as one.
+    # Drop the trailing user message when it is blank. A native tool loop has
+    # nothing left to ask once every input is in the history, and an empty
+    # message still counts as a turn to the provider.
     omit_empty_request: [type: :boolean, default: false]
   ]
 
@@ -45,12 +54,8 @@ defmodule Imp.Adapter.Chat do
     opts = validate_format_opts!(opts, "#{inspect(__MODULE__)}.format/3")
     demos = opts[:demos]
     response_instruction? = opts[:response_instruction]
-    # DSPy renders demo/history ASSISTANT turns through a polymorphic
-    # `format_assistant_message_content`. ChatAdapter emits `[[ ## field ## ]]`
-    # markers; JSONAdapter overrides it to emit a JSON object. Imp mirrors that
-    # polymorphism with an injectable output renderer (default: Chat's own), so
-    # the JSON adapter can override the assistant/output path instead of
-    # delegating Chat's marker rendering (dee-0bwu).
+    # Chat's own renderer emits `[[ ## field ## ]]` markers; the JSON adapter
+    # passes one that emits a JSON object instead.
     output_renderer = Keyword.get(opts, :output_renderer) || (&render_demo_outputs/3)
     input_renderer = Keyword.get(opts, :input_section_renderer) || (&chat_input_section/2)
     system_renderer = Keyword.get(opts, :system_renderer) || (&render_system/2)
@@ -87,16 +92,12 @@ defmodule Imp.Adapter.Chat do
   defp do_parse(_signature, %Imp.Prediction{} = prediction), do: {:ok, prediction}
   defp do_parse(signature, map) when is_map(map), do: build_prediction(signature, map)
 
-  # DSPy ChatAdapter parsing through 3.3.1: marker sections are parsed by first
-  # occurrence, then missing output defaults and nullable fallbacks are filled
-  # before a loud completeness check.
-  # the completion is split into `[[ ## field ## ]]`-headed sections; the FIRST
-  # section for each output field wins; a completion whose sections do not cover
-  # every output field is a LOUD parse error. There is deliberately no
-  # single-output leniency (stuffing an unstructured completion into the lone
-  # output field) and no in-parse JSON decode: a bad parse must FAIL so the
-  # ChatAdapter->JSONAdapter fallback in Imp.Predict (DSPy `__call__`'s
-  # fallback, a second LM call) can fire — nothing-silent (dee-coia).
+  # The completion is split into `[[ ## field ## ]]`-headed sections and the
+  # first section for each output field wins; then defaults and nullable
+  # fallbacks fill the rest. A completion that still misses an output field is
+  # a parse error: there is no single-output leniency and no in-parse JSON
+  # decode, so a bad parse fails loudly and `Imp.Predict`'s JSON-adapter
+  # fallback can fire.
   defp do_parse(signature, text) when is_binary(text) do
     build_prediction(signature, parse_marker_sections(signature, text))
   end
@@ -145,10 +146,9 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  # DSPy parse_value (dspy/adapters/utils.py) dispatch, in upstream order:
-  # a Literal (Imp: enum-constrained string) gets quote/prefix stripping; a str
-  # annotation gets Python `str(value)`; everything else keeps the typed
-  # coercion clauses below.
+  # Dispatch order matches DSPy's `parse_value`: an enum-constrained string
+  # (DSPy's Literal) gets quote and prefix stripping, a string field gets
+  # Python `str(value)`, everything else takes the typed clauses below.
   defp coerce_field(field, value) do
     cond do
       is_nil(value) and Imp.Adapter.OutputFields.optional?(field) ->
@@ -209,11 +209,11 @@ defmodule Imp.Adapter.Chat do
     ArgumentError -> value
   end
 
-  # parse_value's Literal branch: the raw value if allowed; otherwise (strings
-  # only) strip a wrapping `Literal[...]`/`str[...]` spelling, then one pair of
-  # wrapping quotes, and accept the stripped form when allowed. Anything else
-  # keeps the raw value so schema validation reports the honest enum error
-  # (dee-jbav).
+  # An allowed value passes through. Otherwise a string is stripped of a
+  # wrapping `Literal[...]`/`str[...]` spelling and one pair of quotes, and the
+  # stripped form is accepted if allowed. Anything else keeps the raw value so
+  # schema validation reports the enum error rather than this function hiding
+  # it.
   defp coerce_literal(value, allowed) do
     cond do
       value in allowed ->
@@ -233,8 +233,6 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Python: `if v.startswith(("Literal[", "str[")) and v.endswith("]"):
-  #            v = v[v.find("[") + 1 : -1]`
   defp strip_literal_wrapper(value) do
     if (String.starts_with?(value, "Literal[") or String.starts_with?(value, "str[")) and
          String.ends_with?(value, "]") do
@@ -245,7 +243,6 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Python: `if len(v) > 1 and v[0] == v[-1] and v[0] in "\"'": v = v[1:-1]`
   defp strip_wrapping_quotes(value) do
     with true <- String.length(value) > 1,
          first when first in ["\"", "'"] <- String.first(value),
@@ -265,9 +262,8 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # parse_value's `if annotation is str: return str(value)` — Python str() of
-  # the parsed value: "None"/"True"/"False" spellings, repr-style rendering for
-  # lists and dicts ("[1, 2, 3]"), floats in repr form (dee-jbav).
+  # A string field takes Python's `str(value)` spelling: "None"/"True"/"False",
+  # repr-style lists and dicts ("[1, 2, 3]"), floats in repr form.
   defp coerce_value(value, :string), do: py_str(value)
 
   defp coerce_value(value, :integer) when is_binary(value) do
@@ -301,21 +297,9 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Composite field types arrive from the chat wire as text (e.g. `["a","b"]`
-  # or `{'k': 1}`). DSPy's `parse_value` decodes non-str field values through
-  # the json_repair/ast.literal_eval ladder before handing them to validation
-  # (utils.py: `candidate = json_repair.loads(value)`, ast fallback, then
-  # `TypeAdapter(annotation).validate_python(candidate)`); on a decode miss it
-  # falls back to the raw value and lets validation raise. We mirror that here
-  # via Imp.Adapter.JSONRepair (strict JSON, then Python-dict spellings —
-  # dee-16qm): decode the binary, and on failure return it unchanged so schema
-  # validation produces the honest "expected array/object" error instead of
-  # swallowing it.
-  # Datetime fields parse from the ISO 8601 text the LM returns
-  # (test_datetime_inputs_and_outputs: "2024-11-27T14:00:00" -> datetime).
-  # An offset-carrying string yields a DateTime; a naive string yields a
-  # NaiveDateTime. An unparsable string stays raw so schema validation
-  # reports the honest "expected datetime" error.
+  # A datetime field arrives as ISO 8601 text: an offset-carrying string yields
+  # a DateTime, a naive string a NaiveDateTime. An unparsable string stays raw
+  # so schema validation reports the type error.
   defp coerce_value(value, :datetime) when is_binary(value) do
     trimmed = String.trim(value)
 
@@ -343,7 +327,7 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Python `str(...)` as parse_value applies it to a str-annotated field.
+  # Python `str(...)` as applied to a string field's value.
   defp py_str(value) when is_binary(value), do: value
   defp py_str(nil), do: "None"
   defp py_str(true), do: "True"
@@ -363,9 +347,9 @@ defmodule Imp.Adapter.Chat do
   defp py_str(value) when is_atom(value), do: to_string(value)
   defp py_str(value), do: inspect(value)
 
-  # Python `repr(...)` for elements nested in a str()-rendered list/dict:
-  # strings quote (single quotes unless the string itself contains one and no
-  # double quote); other scalars render as py_str.
+  # Python `repr(...)` for elements nested in a `str()`-rendered list or dict:
+  # a string is quoted (single quotes, unless it contains one and no double
+  # quote); other scalars render as `py_str`.
   defp py_repr(value) when is_binary(value) do
     if String.contains?(value, "'") and not String.contains?(value, "\"") do
       "\"" <> value <> "\""
@@ -394,10 +378,10 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Whether `name` is a PRESENT key (even with a nil value), across the atom,
-  # string, and existing-atom spellings fetch_field understands. DSPy's
-  # `k in demo` / `outputs.get(k, ...)` distinguish present-nil from absent;
-  # fetch_field alone collapses both to nil, so key-presence needs its own path.
+  # Whether `name` is a present key, even with a nil value, across the atom,
+  # string and existing-atom spellings `fetch_field/2` understands. Present-nil
+  # and absent must stay distinguishable, and `fetch_field/2` collapses both to
+  # nil.
   defp field_present?(fields, name) do
     string_name = to_string(name)
 
@@ -440,12 +424,9 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Native multimodal content keeps Chat's marker header regardless of the
-  # section renderer: DSPy's multimodal split (`split_message_content_for_custom
-  # _types`) operates on the provider content parts, not the field dialect, and
-  # no golden XML/native fixture exists to pin an alternative. Text values go
-  # through the injectable section renderer (Chat markers by default, XML tags
-  # for Imp.Adapter.XML).
+  # Native multimodal content keeps Chat's marker header whatever the section
+  # renderer is: the multimodal split happens on provider content parts, not in
+  # the field dialect. Text values go through the section renderer.
   defp render_input_section(field, value, section_renderer) do
     if code_field?(field) do
       code = Imp.Adapter.Types.Code.new(value, language: code_language(field))
@@ -463,22 +444,17 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Default (ChatAdapter) input-section dialect: `[[ ## name ## ]]\nvalue`.
+  # Default input-section dialect: `[[ ## name ## ]]\nvalue`.
   defp chat_input_section(field, formatted), do: "[[ ## #{field.name} ## ]]\n#{formatted}"
 
-  # DSPy format_field_value (utils.py:57-59) special-cases a list value on a
-  # `str`-annotated field, rendering it as a numbered guillemet blob list rather
-  # than a JSON dump. This is the RAG-passages pattern (a `context` str field
-  # carrying a list of retrieved passages). Every other value defers to
-  # format_value/1. A list on an array-TYPED field (annotation list[...], not
-  # str) keeps the json-dump path. (dee-tsce)
+  # A list on a string-typed field renders as a numbered guillemet blob list
+  # rather than a JSON dump: the RAG pattern, where a `context` string field
+  # carries a list of retrieved passages. A list on an array-typed field keeps
+  # the JSON dump.
   defp format_field_value(field, value) when is_list(value) do
-    # DSPy's `_format_blob` only accepts string elements (it raises TypeError on
-    # anything else), so DSPy's list-on-str blob path is reachable in practice
-    # only for a list of strings (or the empty list -> "N/A"). Restrict the blob
-    # branch to exactly those cases; any other list (e.g. provider-native ReAct's
-    # `tools` field carrying a list of tool-definition maps) keeps the prior
-    # json-style rendering rather than crashing. (dee-tsce)
+    # The blob branch takes only a list of strings (or the empty list, "N/A"),
+    # which is all upstream can render. Any other list, such as a `tools` field
+    # carrying tool-definition maps, falls back to JSON rather than crashing.
     if field_annotation(field) == "str" and Enum.all?(value, &is_binary/1) do
       format_input_list_field_value(value)
     else
@@ -488,7 +464,6 @@ defmodule Imp.Adapter.Chat do
 
   defp format_field_value(_field, value), do: format_value(value)
 
-  # utils._format_input_list_field_value / _format_blob.
   defp format_input_list_field_value([]), do: "N/A"
   defp format_input_list_field_value([single]), do: format_blob(single)
 
@@ -538,14 +513,12 @@ defmodule Imp.Adapter.Chat do
     |> Enum.reverse()
   end
 
-  # Default (ChatAdapter) assistant-content renderer for demo/history turns.
-  # Mirrors DSPy ChatAdapter.format_assistant_message_content:
-  #   - value resolution is KEY-PRESENCE (`outputs.get(k, missing)`), not `|| `,
-  #     so a legitimate `false`/`nil` output is kept, not replaced by the missing
-  #     sentinel;
-  #   - the joined field block is stripped ONCE (matching format_field_with_value)
-  #     rather than per field, so interior trailing whitespace survives;
-  #   - the trailing `\n\n[[ ## completed ## ]]\n` marker is ALWAYS appended.
+  # Default assistant-content renderer for demo/history turns. Three rules it
+  # must keep: values resolve by key presence, so a legitimate `false` or `nil`
+  # output is not replaced by the missing sentinel; the joined field block is
+  # stripped once rather than per field, so interior trailing whitespace
+  # survives; the trailing `\n\n[[ ## completed ## ]]\n` marker is always
+  # appended.
   defp render_demo_outputs(signature, outputs, missing_field_message) do
     body =
       signature
@@ -559,11 +532,10 @@ defmodule Imp.Adapter.Chat do
   end
 
   # Resolves a demo/history turn's output fields to ordered `{name, value}`
-  # pairs, using DSPy's key-presence rule (`outputs.get(k, missing_field_message)`):
-  # a present field (even nil/false) keeps its value; an absent field takes the
-  # missing-field message. Shared with the JSON adapter so both assistant paths
-  # resolve values identically and only differ in serialization (dee-u4st,
-  # dee-0bwu). Internal cross-adapter seam — not public API (`@doc false`).
+  # pairs by key presence: a present field, even nil or false, keeps its value;
+  # an absent field takes the missing-field message. Shared with the JSON
+  # adapter so the two assistant paths differ only in serialization. Internal
+  # cross-adapter seam, not public API.
   @doc false
   def resolve_demo_outputs(signature, outputs, missing_field_message) do
     Enum.map(signature.outputs, fn field ->
@@ -578,9 +550,9 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  # The default system message: DSPy's field listing, the marker template and
-  # the objective. Callable (`@doc false`) so a custom `:system_renderer` can
-  # fall back to it; an internal seam, not packaged API.
+  # The default system message: the field listing, the marker template and the
+  # objective. Public so a custom `:system_renderer` can fall back to it;
+  # an internal seam, not packaged API.
   @doc false
   def render_system(signature, opts \\ []) do
     objective =
@@ -601,9 +573,8 @@ defmodule Imp.Adapter.Chat do
     |> String.trim()
   end
 
-  # The sentences ReAct used to write into `signature.instructions`, rendered
-  # from the guidance it now passes as data, so a program's own instructions
-  # stay its own and the loop's mechanics have one owner.
+  # Renders loop guidance passed as data, appended after the program's own
+  # instructions so the two have separate owners.
   defp with_guidance(instructions, nil), do: instructions
 
   defp with_guidance(instructions, %{} = guidance) do
@@ -620,18 +591,16 @@ defmodule Imp.Adapter.Chat do
     |> String.trim()
   end
 
-  # Byte-faithful get_field_description_string, shared with the TwoStep
-  # adapter's persona prompt (DSPy TwoStepAdapter.format_task_description calls
-  # the same utils helper). Internal cross-adapter seam — not public API.
+  # The field listing, shared with the TwoStep adapter's persona prompt.
+  # Internal cross-adapter seam, not public API.
   @doc false
   def field_description_string(fields), do: render_field_list(fields)
 
   defp render_field_list(fields) do
-    # Byte-faithful to DSPy's get_field_description_string (dspy/adapters/
-    # utils.py): each field renders `N. \`name\` (type): {desc}` with the
-    # colon-space always present, then the whole group is stripped — so a
-    # field with no description keeps its trailing space only when it is not
-    # the last line in its group. (epic dee-8zev / dee-l9vm, dee-qtzk)
+    # Byte-faithful to DSPy: each field renders `N. \`name\` (type): {desc}`
+    # with the colon-space always present, then the whole group is stripped, so
+    # a field with no description keeps its trailing space only when it is not
+    # the last line in its group.
     fields
     |> Enum.with_index(1)
     |> Enum.map(fn {field, index} ->
@@ -643,8 +612,8 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp field_description(field) do
-    # DSPy renders a description equal to the "${name}" placeholder (the
-    # ChainOfThought reasoning sentinel) as empty; match that exactly.
+    # A description equal to the "${name}" placeholder (the chain-of-thought
+    # reasoning sentinel) renders as empty.
     desc = if field.desc == "${#{field.name}}", do: nil, else: field.desc
 
     base =
@@ -700,10 +669,9 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_interaction_template(signature) do
-    # DSPy 3.2.1 ChatAdapter.format_field_structure renders each field's value
-    # placeholder via translate_field_type: input fields (and str/Reasoning
-    # outputs) get no note; typed OUTPUT fields get an 8-space-indented
-    # "# note: the value you produce ..." suffix. Match it exactly (dee-3zun).
+    # Input fields, and string or reasoning outputs, get no type note. Every
+    # other output field gets an 8-space-indented "# note: the value you
+    # produce ..." suffix.
     input_lines = Enum.map(signature.inputs, &interaction_field_line(&1, ""))
 
     output_lines =
@@ -722,10 +690,9 @@ defmodule Imp.Adapter.Chat do
     |> String.trim()
   end
 
-  # Faithful to DSPy 3.2.1 dspy/adapters/utils.py translate_field_type: the note
-  # text keyed on the field's Python type. Emitted only for output fields.
-  # Composite types (enum->Literal, array->list, object->dict) are handled first
-  # via Imp.Adapter.CompositeType (dee-9ttv); scalars keep their existing clauses.
+  # The note text, keyed on the field's Python type and emitted only for output
+  # fields. Composite types (enum, array, object) resolve through
+  # `Imp.Adapter.CompositeType` first; scalars take the clauses below.
   defp structure_type_note(field) do
     case Imp.Adapter.CompositeType.note_desc(field) do
       nil -> scalar_structure_type_note(field)
@@ -784,10 +751,9 @@ defmodule Imp.Adapter.Chat do
   defp render_response_instruction(_signature, false), do: ""
 
   defp render_response_instruction(signature, true) do
-    # Byte-faithful to DSPy 3.2.1 ChatAdapter.user_message_output_requirements:
-    # always singular "the field ", then every output marker joined with
-    # ", then ", each carrying a Python-type note for non-str fields.
-    # (epic dee-8zev / dee-l9vm, dee-3zun)
+    # Byte-faithful to DSPy: always the singular "the field ", then every output
+    # marker joined with ", then ", each carrying a Python-type note unless the
+    # field is a string.
     markers =
       signature.outputs
       |> Enum.map(fn field -> "`[[ ## #{field.name} ## ]]`" <> output_type_info(field) end)
@@ -804,8 +770,8 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # DSPy annotation name for a field: composite types (Literal/list/dict) resolve
-  # through CompositeType; scalars fall back to the plain type-name mapping.
+  # The Python annotation name for a field: composite types resolve through
+  # `Imp.Adapter.CompositeType`, scalars through the plain type-name mapping.
   defp field_annotation(field) do
     if code_field?(field),
       do: code_annotation(field),
@@ -850,12 +816,10 @@ defmodule Imp.Adapter.Chat do
   defp error_prose(reason) when is_exception(reason), do: Exception.message(reason)
   defp error_prose(reason), do: inspect(reason, limit: 20)
 
-  # DSPy formats scalars via Python `str(...)` after `serialize_for_json`:
-  # `None -> "None"`, `True -> "True"`, `False -> "False"`. Elixir's
-  # `to_string/1` would give "" / "true" / "false", so these three are pinned.
-  # Public (`@doc false`) as an internal cross-adapter seam: the XML adapter's
-  # demo/history assistant renderer resolves values through the SAME scalar
-  # formatting so the adapters differ only in dialect (dee-ovd3).
+  # Scalars take Python's `str(...)` spelling: `None`, `True`, `False`, where
+  # Elixir's `to_string/1` would give "", "true" and "false". Public as an
+  # internal cross-adapter seam, so the other adapters format scalars
+  # identically and differ only in dialect.
   @doc false
   def format_value(value) when is_binary(value), do: value
   def format_value(nil), do: "None"
@@ -865,17 +829,14 @@ defmodule Imp.Adapter.Chat do
   def format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
     do: to_string(value)
 
-  # Datetimes render as ISO 8601 (upstream serializes datetimes to their JSON
-  # string form, e.g. "2024-11-25T10:00:00", before the prompt is built).
+  # Datetimes render as ISO 8601, their JSON string form.
   def format_value(%DateTime{} = value), do: DateTime.to_iso8601(value)
   def format_value(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   def format_value(%Imp.Adapter.Types.Code{} = value), do: Imp.Adapter.Types.Code.format(value)
 
-  # DSPy renders a dict or list value with `json.dumps(serialize_for_json(v),
-  # ensure_ascii=False)` (adapters/utils.py:61-63): complete, compact, Python's
-  # default separators. This was `inspect/1` at its default limit, which cut
-  # any structured tool result past fifty elements to an ellipsis the model
-  # could not count and no bound could measure.
+  # A list or map renders as complete, compact JSON with Python's default
+  # separators. It must never be truncated: a cut structured tool result is one
+  # the model cannot count and no bound can measure.
   def format_value(value) when is_list(value) or (is_map(value) and not is_struct(value)),
     do: py_json_dumps(value)
 
@@ -939,8 +900,8 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # json.dumps turns a non-string key into its str(): True -> "true" is
-  # Python's rule for bools, numbers stay numbers in quotes.
+  # A non-string key takes its Python `str()`, except that a bool becomes
+  # "true"/"false" as `json.dumps` spells it; numbers keep their digits.
   defp dumps_key(key) when is_binary(key), do: {:ok, Jason.encode!(key)}
   defp dumps_key(key) when is_atom(key), do: {:ok, Jason.encode!(Atom.to_string(key))}
   defp dumps_key(key) when is_integer(key), do: {:ok, Jason.encode!(Integer.to_string(key))}
@@ -1071,9 +1032,9 @@ defmodule Imp.Adapter.Chat do
   defp normalize_history_tool_calls(%Imp.Adapter.Types.ToolCalls{tool_calls: calls}),
     do: Enum.map(calls, &Imp.Adapter.Types.ToolCall.format/1)
 
-  # Redaction intentionally converts structs to credential-safe maps before an
-  # event is stored in history. Preserve the collection envelope so replay still
-  # emits the assistant tool-use message required before provider tool results.
+  # Redaction converts structs to credential-safe maps before an event is
+  # stored in history. The collection envelope must survive, or replay omits
+  # the assistant tool-use message a provider requires before tool results.
   defp normalize_history_tool_calls(%{tool_calls: calls}),
     do: normalize_history_tool_calls(calls)
 
@@ -1112,10 +1073,9 @@ defmodule Imp.Adapter.Chat do
     |> Enum.all?(fn field -> not is_nil(fetch_field(demo, field.name)) end)
   end
 
-  # DSPy base.format_demos keeps an incomplete demo when it has at least one
-  # input field and one output field PRESENT (`any(k in demo ...)`), regardless
-  # of whether their values are nil. Key-presence, not `not is_nil`, so a
-  # present-but-nil output field no longer drops the whole demo (dee-u4st).
+  # An incomplete demo is still usable when at least one input field and one
+  # output field are present. Key presence, not non-nil: a present-but-nil
+  # output field must not drop the whole demo.
   defp usable_incomplete_demo?(signature, demo) do
     Enum.any?(signature.inputs, fn field -> field_present?(demo, field.name) end) and
       Enum.any?(signature.outputs, fn field -> field_present?(demo, field.name) end)
@@ -1150,20 +1110,18 @@ defmodule Imp.Adapter.Chat do
     ]
   end
 
-  # DSPy's `field_header_pattern = re.compile(r"\[\[ ## (\w+) ## \]\]")`,
-  # matched (re.match) against each STRIPPED line.
+  # Matched against each line after stripping.
   @field_header_pattern ~r/^\[\[ ## (\w+) ## \]\]/u
 
-  # ChatAdapter.parse section scanning, ported line-for-line:
-  #   * `completion.splitlines()`;
+  # Section scanning, ported from DSPy line for line:
   #   * a line whose stripped form starts with the header pattern opens a new
-  #     section; the remainder of the line past the match becomes the first
+  #     section, and the rest of the line past the match becomes its first
   #     content line when non-empty (upstream slices the ORIGINAL line at the
-  #     stripped match end — that quirk is reproduced);
+  #     stripped match end; that quirk is reproduced);
   #   * every other line appends to the current section;
   #   * sections are joined with "\n" and stripped;
-  #   * only headers naming an output field count, FIRST occurrence wins,
-  #     name match is exact (no downcasing, no `name:` label lines).
+  #   * only headers naming an output field count, the first occurrence wins,
+  #     and the name must match exactly: no downcasing, no `name:` label lines.
   defp parse_marker_sections(signature, text) do
     allowed = Map.new(signature.outputs, fn field -> {to_string(field.name), field.name} end)
 

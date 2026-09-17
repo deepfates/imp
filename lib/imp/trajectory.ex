@@ -2,23 +2,25 @@ defmodule Imp.Trajectory do
   @moduledoc """
   ATIF-v1.8 projection of ordered native `Imp.Run.Event` observations.
 
-  Initial model context retains its actual message roles, marked as copied
-  context. Later requests remain available in `extra.model_requests`, rather
-  than duplicating history as newly authored conversation. Model responses are
-  the observed typed outputs, not an invented final-prediction transcript.
-  Lifecycle events and capture gaps are diagnostics in `extra`, not dialogue.
+  `to_atif/2` projects one run's ordered events into a JSON-encodable ATIF
+  document. The initial model context keeps its actual message roles and is
+  marked as copied context; every model request is also listed in
+  `extra.model_requests`. A model response step carries the observed typed
+  output. Lifecycle events and capture gaps become entries in
+  `extra.diagnostics` rather than dialogue steps.
 
-  Semantic tool dispatches have `llm_call_count: 0`; model responses leave the
-  count null (unknown), because a request may have hit a cache. No inference
-  count, metrics, reasoning, or tool result is invented from missing evidence.
-  Tool observations attach to their call step as ATIF requires, retaining native
-  sequence and time. Their IDs are scoped by run and event sequence. Reusing a
-  provider ID after a result is supported; overlapping reuse is rejected.
+  Semantic tool dispatches have `llm_call_count: 0`; a model response leaves the
+  count null, because a request may have been served from a cache. Inference
+  counts, metrics, reasoning and tool results are never synthesized from missing
+  evidence. A tool observation attaches to its call step as ATIF requires,
+  retaining the native sequence and time; step tool call IDs are scoped by run
+  and event sequence. A provider tool call ID may be reused once its result has
+  arrived, but an overlapping reuse raises `ArgumentError`.
 
-  This is a projection, not replay or a durable effect ledger. Streaming paths
-  bypassing `Imp.LM.request/2` cannot become complete model episodes here.
-  Redaction runs again on export, including caller metadata, but prompts and
-  results remain private application data. Capture gaps remain explicit.
+  The document is a projection, not a replay and not a durable effect ledger.
+  Streaming paths that bypass `Imp.LM.request/2` do not produce complete model
+  episodes. Redaction runs again on export, including caller metadata; prompts
+  and results are still private application data.
   """
 
   alias Imp.Run.Event

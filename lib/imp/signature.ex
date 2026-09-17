@@ -174,11 +174,9 @@ defmodule Imp.Signature do
           "Imp.Signature.load/1 expects a map with \"inputs\" and \"outputs\", got: #{inspect(state)}"
   end
 
-  # DSPy `make_signature` treats an empty-string `__doc__` (and a missing one) as
-  # absent and substitutes `_default_instructions`. Elixir treats only nil/false
-  # as falsy, so a bare "" survived. Match DSPy: nil OR exactly "" -> default.
-  # Whitespace-only instructions are NOT replaced (DSPy keeps them; they render
-  # empty after cleandoc), so only the empty string is special-cased (dee-wrx5).
+  # As in DSPy's `make_signature`, nil and the empty string both mean "no
+  # instructions" and fall back to the default. Whitespace-only instructions are
+  # kept as given, so only "" is special-cased.
   defp resolve_instructions(nil, inputs, outputs), do: default_instructions(inputs, outputs)
   defp resolve_instructions("", inputs, outputs), do: default_instructions(inputs, outputs)
   defp resolve_instructions(instructions, _inputs, _outputs), do: instructions

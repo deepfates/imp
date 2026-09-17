@@ -75,10 +75,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
-    # A capability-carrying fixture LM (not a bare closure) so the JSON adapter
-    # gates response_format on the SAME tier the DSPy FixtureLM declares
-    # (dee-ps19). `lm_capability` is optional; absent => DSPy BaseLM default
-    # (none), matching the historical fixtures.
+    # The fixture LM carries a capability so the JSON adapter gates
+    # response_format on the same tier the DSPy FixtureLM declares. A bare
+    # closure could not. `lm_capability` is optional; absent means the DSPy
+    # BaseLM default of no capability.
     lm =
       struct!(Imp.BenchmarkTruth.GoldenTraceFixtureLM,
         queue: queue,
@@ -93,8 +93,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       program = build_imp_program(case["module"], signature, case["adapter"], lm, case["demos"])
 
       # The two_step adapter mirrors dspy.TwoStepAdapter(extraction_model=...):
-      # the SAME fixture LM serves both the main call and the extraction call,
-      # so the recorded history covers both stages in order (dee-qt5r).
+      # one fixture LM serves both the main call and the extraction call, so
+      # the recorded history covers both stages in order.
       call_settings =
         if case["adapter"] == "two_step", do: [two_step_extraction_lm: lm], else: []
 
@@ -267,33 +267,29 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         "tool_trace_cases" => length(tool_trace_cases),
         "tool_trace_parity" => Enum.all?(tool_trace_cases, & &1["tool_trace_parity"]),
         "imp_semantic_checks" => semantic_summary(semantic_checks),
-        # Computed, not hardcoded: how many cases render byte-identical
-        # prompts to DSPy. This is the real faithful-port measurement (epic
-        # dee-8zev). It is intentionally NOT yet asserted for all cases —
-        # known divergences (CoT reasoning desc dee-l9vm, typed-field type
-        # hints dee-3zun, whitespace dee-qtzk, ReAct dee-kzop, JSON dee-ye3h)
-        # are being fixed; enforcement lands in dee-3e4v once resolved.
+        # How many cases render byte-identical prompts to DSPy. The count is
+        # computed, not hardcoded, and is reported rather than asserted:
+        # known divergences remain (chain-of-thought reasoning descriptions,
+        # typed-field type hints, whitespace, ReAct, JSON).
         #
-        # template_parity is boundary-aware (dee-idig): messages are compared
-        # PER CALL, so two different call-splittings with the same concatenated
-        # text no longer compare EQUAL.
+        # template_parity is boundary-aware: messages are compared per call,
+        # so two different call splittings with the same concatenated text do
+        # not compare equal.
         "template_parity_cases" => Enum.count(comparisons, & &1["template_parity"]),
         "message_template_parity" => Enum.all?(comparisons, & &1["template_parity"]),
         "template_parity_by_case" => Map.new(comparisons, &{&1["id"], &1["template_parity"]}),
-        # Request-envelope fidelity (dee-idig): are the PER-CALL request options
-        # Imp sends (response_format, tools, tool_choice, temperature, ...)
-        # identical to what DSPy sends for the same fixture? The old instrument
-        # compared only message role+content and so reported false parity while
-        # Imp shipped `response_format: json_object` on JSON cases and DSPy
-        # (capability-gated) shipped nothing. This dimension made that divergence
-        # VISIBLE, and dee-ps19 then FIXED it: Imp now gates response_format on
-        # the LM's capability exactly like DSPy's JSONAdapter, so the JSON cases
-        # match tier-for-tier (none / json_object / json_schema).
+        # Request-envelope fidelity: whether the per-call request options Imp
+        # sends (response_format, tools, tool_choice, temperature, ...) are
+        # identical to DSPy's for the same fixture. Comparing message role and
+        # content alone would report parity even when the two sides send
+        # different options. Imp gates response_format on the LM's capability
+        # as DSPy's JSONAdapter does, so JSON cases match tier for tier
+        # (none / json_object / json_schema).
         "envelope_parity_cases" => Enum.count(comparisons, & &1["envelope_parity"]),
         "message_envelope_parity" => Enum.all?(comparisons, & &1["envelope_parity"]),
         "envelope_parity_by_case" => Map.new(comparisons, &{&1["id"], &1["envelope_parity"]}),
-        # Fully parity = byte-identical messages AND identical request envelope,
-        # per call. The honest "faithful port for this case" number.
+        # Full parity is byte-identical messages and an identical request
+        # envelope, per call.
         "full_parity_cases" =>
           Enum.count(comparisons, &(&1["template_parity"] and &1["envelope_parity"])),
         "full_parity_by_case" =>
@@ -313,10 +309,10 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     imp_tool_trace = normalize(imp && imp["tool_trace"])
     dspy_tool_trace = normalize(dspy && dspy["tool_trace"])
 
-    # The comparable unit for prompt parity is the ordered list of LM CALLS,
-    # each carrying its rendered messages AND its request envelope. Building
-    # this once (instead of flat-mapping messages) preserves call boundaries so
-    # a differently-split trajectory can no longer masquerade as identical.
+    # The comparable unit for prompt parity is the ordered list of LM calls,
+    # each carrying its rendered messages and its request envelope. Keeping
+    # calls separate rather than flat-mapping messages preserves call
+    # boundaries, so a differently split trajectory cannot compare identical.
     imp_calls = rendered_calls(imp)
     dspy_calls = rendered_calls(dspy)
 
@@ -352,23 +348,19 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "tool_trace_parity" => if(tool_trace_required?, do: tool_trace_parity),
       "expected_tool_trace" => expected_tool_trace,
       "expected_prediction" => expected,
-      # Real prompt-fidelity measurement: are the rendered messages Imp sends
-      # byte-identical to what DSPy sends for the same fixture? The prompt IS
-      # the behavior; a divergence here means Imp instructs the model
-      # differently than DSPy and is not a faithful port for this case.
-      # (epic dee-8zev). Boundary-aware (dee-idig): messages are compared PER
-      # CALL, so a divergence in how work is split across calls is not masked.
+      # Whether the rendered messages Imp sends are byte-identical to DSPy's
+      # for the same fixture. A divergence means Imp instructs the model
+      # differently. Messages are compared per call, so a divergence in how
+      # work is split across calls is not masked.
       "template_parity" =>
         canonical(call_messages(imp_calls)) == canonical(call_messages(dspy_calls)),
-      # New dimension (dee-idig): the PER-CALL request envelope (LM opts on the
-      # Imp side, adapter kwargs on the DSPy side — response_format, tools,
-      # tool_choice, temperature, ...). This is the request divergence the
-      # message-only instrument was blind to. It is locked to its REAL measured
-      # value: false where Imp and DSPy actually send different options.
+      # The per-call request envelope: LM opts on the Imp side, adapter kwargs
+      # on the DSPy side (response_format, tools, tool_choice, temperature,
+      # ...). This is false wherever Imp and DSPy send different options.
       "envelope_parity" =>
         canonical(call_envelopes(imp_calls)) == canonical(call_envelopes(dspy_calls)),
-      # Surfaced so a divergence is legible in the report itself, not buried in
-      # raw history (nothing silent).
+      # Surfaced so a divergence is legible in the report rather than only in
+      # raw history.
       "imp_call_envelopes" => call_envelopes(imp_calls),
       "dspy_call_envelopes" => call_envelopes(dspy_calls),
       "imp" => imp,
@@ -377,13 +369,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     }
   end
 
-  # The ordered list of LM CALLS Imp/DSPy actually made, each as
-  # %{"messages" => [%{role, content}], "envelope" => <request-opts>} — the
-  # comparable unit for prompt AND envelope parity. Preserving call boundaries
-  # (instead of flat-mapping every message together) is what lets the
-  # comparison notice a differently-split trajectory (ReAct, retries) and a
-  # per-call request-option divergence (dee-idig). Nil side (missing run)
-  # yields [], which will not match a real run.
+  # The ordered list of LM calls one side made, each as
+  # %{"messages" => [%{role, content}], "envelope" => <request-opts>}: the
+  # comparable unit for both prompt and envelope parity. Preserving call
+  # boundaries is what lets the comparison notice a differently split
+  # trajectory (ReAct, retries) and a per-call request-option divergence. A
+  # missing run yields [], which never matches a real run.
   defp rendered_calls(nil), do: []
 
   defp rendered_calls(side) do
@@ -397,17 +388,17 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     end)
   end
 
-  # Per-call projections used by the two parity dimensions. Keeping them as a
-  # list-of-lists (outer = calls) means an unequal number of calls, or a
-  # per-call difference, can never compare EQUAL.
+  # Per-call projections used by the two parity dimensions. The outer list is
+  # calls, so an unequal number of calls, or a per-call difference, can never
+  # compare equal.
   defp call_messages(calls), do: Enum.map(calls, & &1["messages"])
   defp call_envelopes(calls), do: Enum.map(calls, & &1["envelope"])
 
-  # Canonical form for comparison. The Imp side is in-memory Elixir (a role can
-  # be an atom like `:system`, opts can be a keyword list) while the DSPy side
-  # is JSON-decoded (strings, maps); Elixir `==` distinguishes those but they
-  # are the same wire value. Round-tripping both through JSON compares exactly
-  # what gets sent to the model, matching the report's own serialized view.
+  # Canonical form for comparison. The Imp side is in-memory Elixir (a role may
+  # be an atom such as `:system`, opts may be a keyword list) while the DSPy
+  # side is JSON-decoded; Elixir `==` distinguishes those even though they are
+  # the same wire value. Round-tripping both through JSON compares exactly what
+  # gets sent to the model.
   defp canonical(value), do: value |> Jason.encode!() |> Jason.decode!()
 
   defp error_contains?(_error, nil), do: true

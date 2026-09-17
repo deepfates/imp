@@ -117,15 +117,9 @@ defmodule Imp.MCPConnectionTest do
     {%{"name" => name, "type" => "http", "url" => "http://127.0.0.1:#{port}/mcp"}, stop}
   end
 
-  # The defect this falsifies: the name a tool executed under was decided by
-  # frequency over the catalogs that answered, so a server that failed renamed
-  # the tools of the servers that did not. With `on_failure: :drop` that is not
-  # a tidiness problem: everything that addresses a tool by name -- an allowance,
-  # a stored record of what an agent may do, the demonstrations in its own
-  # prompt -- moved on the morning a neighbour went down.
-  #
-  # Two imports of the SAME descriptor list are what show it, so the list is
-  # built once and the second server is stopped between them.
+  # Falsifies name-by-catalog: a tool's name must not depend on which servers
+  # answered. Two imports of the SAME descriptor list are what show it, so the
+  # list is built once and the second server is stopped between them.
   test "a prefixed server's tools keep their names when the server beside it is silent" do
     {two, stop_two} = stoppable_server("two", Server)
     servers = [Map.put(server("one"), "tool_prefix", "one_"), two]
@@ -178,15 +172,9 @@ defmodule Imp.MCPConnectionTest do
     assert [%{server: "other", index: 1}] = down.unavailable
   end
 
-  # What used to be silently resolved by renaming. Two servers claiming one name
-  # is a defect in the declaration, and the refusal names the tool, both servers
-  # and -- in the log -- the option that fixes it. It is a refusal under
-  # `on_failure: :drop` as well: dropping is for what the network did.
-  #
-  # This is the trade the rule makes, and it is stated in the moduledoc: while
-  # one of the two is absent the collision goes unnoticed, and the morning they
-  # both answer it refuses. A refusal in one edit beats a rename of a name other
-  # things are addressing, which happens on exactly the same morning.
+  # Two servers claiming one tool name is a defect in the declaration, so it is
+  # a refusal under `on_failure: :drop` too: dropping covers network failures
+  # only. The refusal names the tool, both servers, and the fix in the log.
   test "two unprefixed servers offering one tool name refuse the import, naming both" do
     servers = [server("one"), server("two")]
 

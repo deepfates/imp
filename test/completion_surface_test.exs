@@ -658,8 +658,8 @@ defmodule CompletionSurfaceTest do
   end
 
   test "save/load, embeddings, and structured adapters work" do
-    # Dynamic LM via context: a Static-pinned program can no longer be saved
-    # (dee-i3s4 / P03 made that loud), and this test saves the program below.
+    # The program below is saved, so its LM comes from context: saving refuses
+    # a Static-pinned program.
     lm = %{
       module: Imp.LM.Static,
       opts: [handler: fn _messages, _opts -> ~s({"answer":"ok"}) end]

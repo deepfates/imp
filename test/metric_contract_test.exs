@@ -57,9 +57,8 @@ defmodule MetricContractTest do
     assert [%{feedback: {:trace_seen, true}}] = result.rows
   end
 
-  # Corrected toward loudness (dee-f1ct / P14): this test used to assert the
-  # old SILENT halt (max_errors: 0 quietly returned a 1-row partial Result).
-  # The contract now matches DSPy's parallelizer: reaching max_errors raises.
+  # The contract matches DSPy's parallelizer: reaching max_errors raises rather
+  # than returning a partial Result.
   test "Evaluate records failures with configurable failure score and cancels loudly at max errors" do
     program = %Program{handler: fn _inputs -> {:error, :boom} end}
     metric = fn _example, _prediction -> true end

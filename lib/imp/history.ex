@@ -2,15 +2,15 @@ defmodule Imp.History do
   @moduledoc """
   Immutable conversation history for signature-shaped Imp programs.
 
-  `Imp.History` mirrors the DSPy `History` primitive philosophically: history is
-  not a bag of raw chat messages, but a sequence of prior task turns keyed by the
-  same fields as the signature. For a signature like `"question, history ->
-  answer"`, a turn can be `%{question: "Capital of France?", answer: "Paris"}`.
+  A history is a sequence of prior task turns keyed by the same fields as the
+  signature, not raw chat messages. For a signature like
+  `"question, history -> answer"`, a turn can be
+  `%{question: "Capital of France?", answer: "Paris"}`. Turns are normalized
+  through `Imp.Example`, so a turn must be a field map or a list of field pairs.
 
   The Chat adapter renders each turn as prior user/assistant messages by
-  splitting fields according to the active signature. This keeps history
-  optimizer-friendly, serializable, and independent from any one provider's chat
-  message schema.
+  splitting the fields according to the active signature, which keeps a history
+  serializable and independent of any one provider's chat message schema.
 
       iex> history =
       ...>   Imp.History.new()
@@ -69,14 +69,13 @@ defmodule Imp.History do
   @doc """
   Loads a JSON-safe history map produced by `dump/1`.
 
-  Existing atoms and typed values are preserved. A symbolic atom whose owning
-  capability is no longer loaded becomes its exact name as a string; loading
-  history never creates atoms. This deliberately loses atom type for unknown
-  symbols so earlier observations remain usable after restart or capability
+  Existing atoms and typed values are preserved. Loading never creates atoms: a
+  symbolic atom whose owning capability is not loaded becomes its exact name as
+  a string, so earlier turns stay usable after a restart or a capability
   removal. Dumping the loaded history records that string representation.
 
   Malformed tags and map-key collisions introduced by this conversion are
-  rejected. Strict optimizer-artifact decoding is unchanged.
+  rejected, and a state without a list `"messages"` raises `ArgumentError`.
   """
   def load(%{"type" => "history", "messages" => messages}) when is_list(messages) do
     messages

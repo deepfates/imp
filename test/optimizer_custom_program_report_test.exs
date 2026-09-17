@@ -35,7 +35,7 @@ defmodule Imp.OptimizerCustomProgramReportTest do
     end
   end
 
-  test "GEPA no longer needs an out-of-band report to expose custom-program selection" do
+  test "GEPA exposes custom-program selection without an out-of-band report" do
     lm =
       Imp.LM.Static.new(
         handler: fn messages, _opts ->

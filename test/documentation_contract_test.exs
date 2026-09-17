@@ -471,7 +471,7 @@ defmodule DocumentationContractTest do
     retriever = Imp.Retrieve.Memory.new(docs, k: 1)
 
     # Mirrors the API guide: the RAG program stays dynamic (context-scoped LM)
-    # because a Static-pinned program can no longer be saved (dee-i3s4 / P03).
+    # because saving refuses a Static-pinned program.
     program =
       "question, context -> answer"
       |> Imp.predict()
