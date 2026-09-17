@@ -5,29 +5,6 @@ defmodule GEPAContractArtifactTest do
 
   alias Mix.Tasks.Imp.Benchmark.GepaContract
 
-  @gepa_sources %{
-    "src/gepa/core/engine.py" =>
-      "ba361b477de74c20eb813b277b0fb85b6898ca534e09c8e878604fb1c8980c53",
-    "src/gepa/core/result.py" =>
-      "5ee9ccfdf31e2d4d1262793c569e44ef7b39659a3e971e4f3dc7d656d69a1d85",
-    "src/gepa/core/state.py" =>
-      "9ad128c981c7344ba0e89d053c2fe33e98a2d74d830679d620cb7cd0d7b1820c",
-    "src/gepa/gepa_utils.py" =>
-      "60aca7024e31a3e273a01187a6329f381f297a77ec7b6add4b9c90b4d64e9b6c",
-    "src/gepa/proposer/base.py" =>
-      "75242e6c71758444d97949fb5c38ff84cd52f2f77f5464c894f6229c9beb210c",
-    "src/gepa/proposer/merge.py" =>
-      "cd0a3254927e399d0cae4a212076f7577161027b3c4ff19d03c3d2150408ee5a",
-    "src/gepa/strategies/acceptance.py" =>
-      "a6234c188fdeab0f7181dd1f01d767fc91779512773ed4ad952df68855c1d3a4",
-    "src/gepa/strategies/component_selector.py" =>
-      "248cc6eb125eeddaa98f90b7780db2754ec0444a6143aeb1f97ff5660cf39568",
-    "src/gepa/strategies/proposal_selection.py" =>
-      "8866ac697928ab0824653117876e08af7087d4cbfe24a4feaedb8ceef9b75b18",
-    "src/gepa/utils/stop_condition.py" =>
-      "d33475e411a38353f34272b12b0b2a7af24bbbeca2c2e4fe6c204fa476e87fdb"
-  }
-
   test "compare matches current GEPA v0.1.4 acceptance and proposal-selection semantics without effectiveness claims" do
     artifact = GepaContract.compare(upstream_fixture())
 
@@ -51,39 +28,6 @@ defmodule GEPAContractArtifactTest do
     assert rows["parallel_proposal_selection"]["actual"]["best_improvement"] == [3]
     assert rows["parallel_proposal_selection"]["actual"]["top_k_2"] == [3, 4]
     assert length(artifact["declared_native_deviations"]) == 3
-
-    admitted =
-      Map.merge(artifact, %{
-        "schema_version" => 1,
-        "evidence_tier" => "t1_gepa_v014_structural_differential_contract",
-        "claim_scope" =>
-          "provider-free GEPA v0.1.4 structural semantics, including parallel proposal selection",
-        "generated_at" => "2026-07-25T00:00:00Z",
-        "git_sha" => String.duplicate("a", 40),
-        "gepa" => %{
-          "version" => "0.1.4",
-          "tag" => "v0.1.4",
-          "commit" => "8b0ce6cd99a234f6b74daf37558a2ac0ce18f975",
-          "project_metadata_version" => "0.1.3",
-          "project_metadata_version_note" =>
-            "the v0.1.4 tag retains version=0.1.3 in pyproject.toml",
-          "source_materialization" => "exact pinned git checkout",
-          "sources" =>
-            Enum.map(@gepa_sources, fn {path, sha256} -> %{"path" => path, "sha256" => sha256} end)
-        }
-      })
-
-    assert :ok =
-             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-               "gepa_contract",
-               admitted
-             )
-
-    tampered = put_in(admitted, ["rows", Access.at(0), "passing"], false)
-
-    assert_raise ArgumentError, ~r/non-matching required row/, fn ->
-      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!("gepa_contract", tampered)
-    end
   end
 
   test "Mix task rejects a checkout that does not satisfy the current commit, tag, and source pins" do

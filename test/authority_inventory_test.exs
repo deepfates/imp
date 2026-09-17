@@ -2,10 +2,6 @@ defmodule AuthorityInventoryTest do
   use ExUnit.Case, async: true
 
   @authority_path "benchmarks/authorities.json"
-  @claims_path "benchmarks/claims.json"
-  @surface_map_path "docs/CONFORMANCE.md"
-  @coverage_matrix_path "docs/internal/COVERAGE_MATRIX.md"
-  @parity_program_path "docs/internal/PARITY_VALIDATION_PROGRAM.md"
 
   @dimensions [
     "upstream_repository",
@@ -190,16 +186,6 @@ defmodule AuthorityInventoryTest do
     assert deepseek["surface"] =~ "not the Imp implementation authority"
   end
 
-  test "every claim inventory surface token is explicitly owned by a family" do
-    ledger = read_json!(@authority_path)
-    claims = read_json!(@claims_path)["claims"]
-
-    claimed_tokens = claims |> Enum.flat_map(& &1["surface"]) |> MapSet.new()
-    mapped_tokens = ledger["families"] |> Enum.flat_map(& &1["surface_tokens"]) |> MapSet.new()
-
-    assert MapSet.difference(claimed_tokens, mapped_tokens) == MapSet.new()
-  end
-
   test "weight families have separate authorities and only Imp BootstrapFinetune owns local evidence" do
     families = Map.new(read_json!(@authority_path)["families"], &{&1["id"], &1})
 
@@ -239,64 +225,12 @@ defmodule AuthorityInventoryTest do
 
     bootstrap = families["family.optimizer_bootstrap_finetune"]
 
-    assert bootstrap["local_differential"]["artifacts"] == [
-             "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
-           ]
-
     refute inspect(bootstrap) =~
              "c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16"
 
     for {id, _} <- expected, id != "family.optimizer_bootstrap_finetune" do
       assert families[id]["local_differential"] == %{"status" => "gap", "artifacts" => []}
     end
-  end
-
-  test "every upstream map row, coverage concept, and parity lane is mapped" do
-    families = read_json!(@authority_path)["families"]
-
-    assert_all_mapped(
-      upstream_surface_ids(File.read!(@surface_map_path)),
-      Enum.flat_map(families, & &1["upstream_surface_ids"]),
-      "upstream surface"
-    )
-
-    assert_all_mapped(
-      coverage_concepts(File.read!(@coverage_matrix_path)),
-      Enum.flat_map(families, & &1["coverage_matrix_concepts"]),
-      "coverage concept"
-    )
-
-    assert_all_mapped(
-      parity_lanes(File.read!(@parity_program_path)),
-      Enum.flat_map(families, & &1["parity_lanes"]),
-      "parity lane"
-    )
-  end
-
-  defp upstream_surface_ids(body) do
-    Regex.scan(~r/^\| ([a-z][a-z0-9_.]+) \|/m, body, capture: :all_but_first)
-    |> List.flatten()
-    |> MapSet.new()
-  end
-
-  defp coverage_concepts(body) do
-    body
-    |> String.split("\n")
-    |> Enum.filter(&String.starts_with?(&1, "|"))
-    |> Enum.map(fn row -> row |> String.split("|") |> Enum.at(1) |> String.trim() end)
-    |> Enum.reject(&(&1 in ["", "---", "Concept", "Upstream concept"]))
-    |> MapSet.new()
-  end
-
-  defp parity_lanes(body) do
-    Regex.scan(~r/^## (Lane \d+: .+)$/m, body, capture: :all_but_first)
-    |> List.flatten()
-    |> MapSet.new()
-  end
-
-  defp assert_all_mapped(expected, mapped, label) do
-    missing = MapSet.difference(expected, MapSet.new(mapped))
-    assert missing == MapSet.new(), "unmapped #{label}s: #{inspect(MapSet.to_list(missing))}"
   end
 
   defp assert_keys(map, keys) do

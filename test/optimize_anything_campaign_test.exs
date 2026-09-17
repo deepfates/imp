@@ -78,12 +78,6 @@ defmodule OptimizeAnythingCampaignTest do
     assert Artifact.full_artifact?(artifact)
     assert Imp.BenchmarkTruth.RunContext.verify!(artifact) == artifact
 
-    assert :ok =
-             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-               "optimize_anything",
-               artifact
-             )
-
     assert File.regular?(path)
     assert Agent.get(queue, & &1) == []
     assert length(artifact["rows"]) == 3
@@ -131,121 +125,7 @@ defmodule OptimizeAnythingCampaignTest do
     assert budget_evidence["payload_sha256"] == digest(budget_evidence["payload"])
     assert artifact["budget_checkpoint"] == budget_evidence
 
-    cost_mutation =
-      update_in(artifact["rows"], fn [first | rest] ->
-        [Map.put(first, "cost_usd", 0.000_001) | rest]
-      end)
-      |> rebind_artifact()
-
-    assert_raise ArgumentError, ~r/invalid current optimize-anything artifact/, fn ->
-      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-        "optimize_anything",
-        cost_mutation
-      )
-    end
-
-    unsafe_url = "https://pricing.example/api%255fkey/CANARY_OA"
-
-    unsafe_pricing_budget =
-      artifact["rows"]
-      |> hd()
-      |> Map.fetch!("campaign_budget")
-      |> put_in(["pricing", "source_url"], unsafe_url)
-
-    unsafe_url_mutation =
-      artifact
-      |> put_in(["source", "budget", "pricing", "source_url"], unsafe_url)
-      |> update_in(["rows"], fn rows ->
-        Enum.map(rows, fn row ->
-          row
-          |> Map.put("campaign_budget", unsafe_pricing_budget)
-          |> put_in(["reproducibility", "budget"], unsafe_pricing_budget)
-        end)
-      end)
-      |> put_in(["budget_checkpoint", "payload", "budget"], unsafe_pricing_budget)
-      |> then(fn mutated ->
-        put_in(
-          mutated,
-          ["budget_checkpoint", "payload_sha256"],
-          digest(mutated["budget_checkpoint"]["payload"])
-        )
-      end)
-      |> rebind_artifact()
-
-    assert_raise ArgumentError, ~r/invalid current optimize-anything artifact/, fn ->
-      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-        "optimize_anything",
-        unsafe_url_mutation
-      )
-    end
-
-    unsafe_locator_mutation =
-      artifact
-      |> put_in(
-        ["rows", Access.at(0), "provenance", "budget_checkpoint"],
-        "https://example.test/checkpoint?api_key=CANARY_OA_ARTIFACT"
-      )
-      |> rebind_artifact()
-
-    assert_raise ArgumentError, ~r/invalid current optimize-anything artifact/, fn ->
-      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-        "optimize_anything",
-        unsafe_locator_mutation
-      )
-    end
-
-    fabricated_budget =
-      artifact["rows"]
-      |> hd()
-      |> Map.fetch!("campaign_budget")
-      |> Map.put("requests", 1)
-      |> Map.put("usage", %{"input_tokens" => 1, "output_tokens" => 1, "usd" => 0.000_001})
-
-    aggregate_mutation =
-      artifact
-      |> update_in(["rows"], fn rows ->
-        Enum.map(rows, fn row ->
-          row
-          |> Map.put("campaign_budget", fabricated_budget)
-          |> put_in(["reproducibility", "budget"], fabricated_budget)
-        end)
-      end)
-      |> put_in(["budget_checkpoint", "payload", "budget"], fabricated_budget)
-      |> then(fn mutated ->
-        put_in(
-          mutated,
-          ["budget_checkpoint", "payload_sha256"],
-          digest(mutated["budget_checkpoint"]["payload"])
-        )
-      end)
-      |> rebind_artifact()
-
-    assert_raise ArgumentError, ~r/invalid current optimize-anything artifact/, fn ->
-      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-        "optimize_anything",
-        aggregate_mutation
-      )
-    end
-
-    checkpoint_mutation =
-      artifact
-      |> put_in(["budget_checkpoint", "payload_sha256"], "sha256:" <> String.duplicate("0", 64))
-      |> rebind_artifact()
-
-    assert_raise ArgumentError, ~r/invalid current optimize-anything artifact/, fn ->
-      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-        "optimize_anything",
-        checkpoint_mutation
-      )
-    end
-
     File.rm!(Path.join(checkpoint_dir, "oa-campaign-contract-test/campaign-budget.json"))
-
-    assert :ok =
-             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-               "optimize_anything",
-               artifact
-             )
 
     assert_raise ArgumentError, ~r/already has checkpoint state/, fn ->
       Campaign.run(
@@ -685,23 +565,6 @@ defmodule OptimizeAnythingCampaignTest do
   defp digest(value) do
     encoded = :erlang.term_to_binary(value, [:deterministic])
     "sha256:" <> (:crypto.hash(:sha256, encoded) |> Base.encode16(case: :lower))
-  end
-
-  defp rebind_artifact(artifact) do
-    previous = artifact["run_context"]
-
-    context =
-      Imp.BenchmarkTruth.RunContext.new!(
-        source_commits: previous["source_commits"],
-        code_source: "imp",
-        workspace_state: "synthetic",
-        environment: previous["environment"],
-        inputs: artifact["source"]
-      )
-
-    artifact
-    |> Map.drop(["generated_at", "git_sha", "run_context"])
-    |> then(&Imp.BenchmarkTruth.RunContext.finish(context, &1))
   end
 
   defp tmp_dir(name) do

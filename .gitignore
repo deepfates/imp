@@ -12,16 +12,13 @@
 
 # Replaceable build and test material.
 /tmp/
-/benchmarks/data/
-!/benchmarks/data/
-/benchmarks/data/*
-!/benchmarks/data/musique-ans-mipro-current-v1.receipt.json
+# `mix imp.benchmark.fetch` writes split-sized dataset files here. Everything
+# else under benchmarks/data -- fixtures, manifests, provenance, build
+# scripts -- is tracked, so nothing a checkout needs is ignored.
+/benchmarks/data/*-[0-9]*.jsonl
 !/benchmarks/data/hotpotqa-validation-0-10.jsonl
-!/benchmarks/data/hotpotqa-validation-0-10.manifest.json
-!/benchmarks/data/HOTPOTQA_ATTRIBUTION.md
 
-# Disposable executions and resumable campaign state. Immutable accepted
-# evidence lives outside these roots under benchmarks/evidence/admitted.
+# Benchmark output. Every task writes its report under one of these roots.
 /benchmarks/runs/
 /benchmarks/checkpoints/
 /benchmarks/results/

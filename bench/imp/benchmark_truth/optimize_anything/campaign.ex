@@ -300,7 +300,8 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
 
   defp current_gepa_commit! do
     "benchmarks/authorities.json"
-    |> Imp.EvidenceAuthorities.load!()
+    |> File.read!()
+    |> Jason.decode!()
     |> get_in(["pinned_sources", "gepa_standalone", "commit"])
     |> case do
       commit when is_binary(commit) and byte_size(commit) == 40 -> commit

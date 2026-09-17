@@ -52,8 +52,6 @@ defmodule PackageContractTest do
   @excluded_prefixes [
     "benchmarks/config/",
     "benchmarks/",
-    "benchmarks/evidence/",
-    "benchmarks/results/",
     "examples/local_",
     "examples/matched_",
     "lib/imp/benchmark_env.ex",
@@ -66,22 +64,15 @@ defmodule PackageContractTest do
   ]
 
   @excluded_files [
-    "docs/CONFORMANCE.md",
     "docs/EVIDENCE.md",
     "docs/internal/BENCHMARK_CATALOG.md",
     "docs/internal/BENCHMARK_TRUTH.md",
     "docs/internal/COVERAGE_MATRIX.md",
     "docs/internal/PARITY_VALIDATION_PROGRAM.md",
-    "docs/maintainers/RELEASE.md",
-    "docs/maintainers/EVIDENCE.md",
     "lib/imp/benchmarks.ex",
-    "lib/mix/tasks/imp.evidence.admit.ex",
     "lib/mix/tasks/imp.public_api.ex",
     "lib/mix/tasks/imp.package.clean_room.ex",
-    "bench/imp/evidence_authorities.ex",
-    "bench/imp/research_portfolio.ex",
     "bench/imp/upstream_authority_registry.ex",
-    "bench/imp/upstream_fidelity.ex",
     "priv/public_api_policy.json"
   ]
 

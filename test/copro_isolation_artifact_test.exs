@@ -9,7 +9,6 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
   @python "tmp/dspy-parity-venv/bin/python"
   @script "scripts/dspy_copro_isolation_differential.py"
   @config "benchmarks/config/copro-isolation-differential-v1.json"
-  @admission "benchmarks/evidence/admitted/copro_isolation/4f2d959d76bde9fb87da8091223232255074a431be2c05e2e757638c0c43870d.json"
 
   setup_all do
     unless File.exists?(@python) and File.dir?("tmp/dspy-3.2.1/.git") do
@@ -26,7 +25,22 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
       )
 
     report = Jason.decode!(output)
-    artifact = @admission |> File.read!() |> Jason.decode!()
+
+    out =
+      Path.join(
+        System.tmp_dir!(),
+        "imp-copro-isolation-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
+      )
+
+    on_exit(fn -> File.rm_rf(out) end)
+
+    ExUnit.CaptureIO.capture_io(fn ->
+      Mix.Task.reenable("imp.benchmark.copro_isolation")
+      COPROArtifact.run_with_runner(["--out", out], fn -> report end)
+    end)
+
+    [path] = Path.wildcard(Path.join(out, "copro-isolation-*.json"))
+    artifact = path |> File.read!() |> Jason.decode!()
     %{artifact: artifact, report: report}
   end
 
@@ -153,28 +167,6 @@ defmodule Imp.BenchmarkTruth.COPROIsolationArtifactTest do
     assert_raise Mix.Error, ~r/cannot be captured without --require-clean/, fn ->
       COPROArtifact.run_with_runner(["--no-require-clean"], fn -> %{} end)
     end
-  end
-
-  test "admitted receipt binds its historical ledger while semantic sources remain current" do
-    artifact = @admission |> File.read!() |> Jason.decode!()
-    historical = artifact["source_bindings"]
-    current = COPROArtifact.source_bindings()
-
-    {ledger, 0} =
-      System.cmd("git", [
-        "show",
-        "#{artifact["git_sha"]}:benchmarks/authorities.json"
-      ])
-
-    historical_ledger_sha256 =
-      "sha256:" <> (:crypto.hash(:sha256, ledger) |> Base.encode16(case: :lower))
-
-    assert historical["authority_ledger_sha256"] == historical_ledger_sha256
-
-    assert Map.drop(historical, ["authority_ledger_sha256", "task_sha256"]) ==
-             Map.drop(current, ["authority_ledger_sha256", "task_sha256"])
-
-    assert COPROArtifact.validate_artifact!(artifact) == artifact
   end
 
   defp payload(artifact), do: Map.drop(artifact, ["generated_at", "git_sha", "run_context"])

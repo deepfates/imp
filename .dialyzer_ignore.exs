@@ -37,7 +37,7 @@
    {286, 30}},
   # defensive clause for non-covered differential rows
   {"bench/imp/benchmark_truth/optimize_anything/upstream_differential.ex", :pattern_match_cov,
-   {228, 10}},
+   {227, 10}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 21)
   {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 21}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 53)
@@ -108,8 +108,6 @@
   {"lib/imp/tracking/mlflow.ex", :call_without_opaque, {361, 8}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"lib/mix/tasks/imp.benchmark.fast_slow.ex", :pattern_match, 1},
-  # MapSet opacity on the hop-id set from analysis JSON
-  {"lib/mix/tasks/imp.benchmark.hotpotqa_analysis.ex", :call_without_opaque, {159, 24}},
   # MapSet opacity on the run-index set from parity JSON
   {"lib/mix/tasks/imp.benchmark.parity.aggregate.ex", :call_without_opaque, {328, 24}},
   # raise-only helper: invalid_python!/1 exists to Mix.raise

@@ -6,17 +6,14 @@ defmodule Imp.BenchmarkTruth.PathsTest do
   test "separates disposable runs from resumable checkpoints" do
     assert Paths.runs_root() == "benchmarks/runs"
     assert Paths.checkpoints_root() == "benchmarks/checkpoints"
-    assert Paths.admitted_root() == "benchmarks/evidence/admitted"
     assert Paths.runs("gepa-paper") == "benchmarks/runs/gepa-paper"
     assert Paths.checkpoints("gepa-paper") == "benchmarks/checkpoints/gepa-paper"
-    assert Paths.admitted("gepa_paper") == "benchmarks/evidence/admitted/gepa_paper"
   end
 
   test "lane names cannot escape their canonical root" do
     for lane <- ["../evidence", "/tmp", "nested/path", "", :gepa] do
       assert_raise ArgumentError, fn -> Paths.runs(lane) end
       assert_raise ArgumentError, fn -> Paths.checkpoints(lane) end
-      assert_raise ArgumentError, fn -> Paths.admitted(lane) end
     end
   end
 

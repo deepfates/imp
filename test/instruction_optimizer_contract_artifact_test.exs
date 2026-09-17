@@ -22,12 +22,6 @@ defmodule InstructionOptimizerContractArtifactTest do
     [path] = Path.wildcard(Path.join(out, "instruction-optimizer-contract-*.json"))
     artifact = path |> File.read!() |> Jason.decode!()
 
-    assert :ok =
-             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-               "instruction_contract",
-               artifact
-             )
-
     assert artifact["evidence_tier"] == "t1_instruction_optimizer_differential_contract"
     assert artifact["dspy"]["version"] == "3.3.0b1"
     assert artifact["dspy"]["commit"] == "b2829b7ae3b6e276ac6a8bef66a7ec519dbc923f"
@@ -37,16 +31,6 @@ defmodule InstructionOptimizerContractArtifactTest do
     refute artifact["summary"]["paper_protocol_complete"]
     refute artifact["summary"]["full_optimizer_parity"]
     assert Enum.all?(artifact["rows"], & &1["passing"])
-
-    tampered =
-      put_in(artifact, ["dspy", "sources", Access.at(0), "sha256"], String.duplicate("0", 64))
-
-    assert_raise ArgumentError, ~r/wrong instruction authority materialization/, fn ->
-      Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-        "instruction_contract",
-        tampered
-      )
-    end
 
     deviations = Map.new(artifact["declared_native_deviations"], &{&1["id"], &1})
 

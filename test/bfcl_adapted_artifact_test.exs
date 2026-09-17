@@ -4,7 +4,6 @@ defmodule BfclAdaptedArtifactTest do
   import ExUnit.CaptureIO
 
   alias Mix.Tasks.Imp.Benchmark.BfclAdapted
-  alias Imp.BenchmarkTruth.ReproductionArtifactValidator
 
   @fixture_path "test/fixtures/benchmarks/bfcl-adapted-v1.json"
   @score_keys ~w(valid_input tool_name_exact arguments_exact terminal_state_exact passing error_code)
@@ -49,23 +48,6 @@ defmodule BfclAdaptedArtifactTest do
              require_clean: false,
              replay_reference: true
            ) == artifact
-  end
-
-  test "canonical dispatcher is pure and rejects injected claim promotion" do
-    artifact = run_artifact!() |> mark_clean() |> reseal()
-
-    assert :ok = ReproductionArtifactValidator.validate!("bfcl_shaped_scorer", artifact)
-
-    promoted =
-      artifact
-      |> put_in(["summary", "official_bfcl_effectiveness"], true)
-      |> reseal()
-
-    assert_raise ArgumentError,
-                 ~r/rows, summaries, sources, runtime, limitations, or claim flags are invalid/,
-                 fn ->
-                   ReproductionArtifactValidator.validate!("bfcl_shaped_scorer", promoted)
-                 end
   end
 
   test "shared mutation corpus detects every preregistered failure independently" do
@@ -191,12 +173,6 @@ defmodule BfclAdaptedArtifactTest do
     context = put_in(artifact["run_context"], ["payload_sha256"], digest(payload))
     context = Map.put(context, "envelope_sha256", digest(Map.delete(context, "envelope_sha256")))
     Map.put(artifact, "run_context", context)
-  end
-
-  defp mark_clean(artifact) do
-    artifact
-    |> put_in(["run_context", "workspace", "state"], "clean")
-    |> put_in(["run_context", "workspace", "reproducible"], true)
   end
 
   defp digest(value) do

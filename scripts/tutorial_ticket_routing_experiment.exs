@@ -1,6 +1,6 @@
 # Reproduces docs/TUTORIAL_TICKET_ROUTING.md end to end against the live
 # provider and writes a provenance-stamped, content-addressed run artifact to
-# benchmarks/evidence/admitted/tutorial_ticket_routing/<sha256>.json.
+# benchmarks/runs/tutorial-ticket-routing/<sha256>.json.
 #
 #     OPENAI_API_KEY=... mix run scripts/tutorial_ticket_routing_experiment.exs
 #     OPENROUTER_API_KEY=... OPENROUTER_MODEL=openai/gpt-5.4-mini \
@@ -14,14 +14,10 @@
 # in-BEAM response cache is cleared before every repeat and per-repeat cache
 # stats are recorded, so each repeat is genuinely live: zero cache hits is
 # asserted by the artifact test, not assumed.
-#
-# The committed artifact is the evidence behind
-# claim.docs.tutorial_ticket_routing.optimizer_lift in benchmarks/claims.json
-# and is checked by test/tutorial_ticket_routing_artifact_test.exs.
 
 defmodule TutorialTicketRoutingExperiment do
   @dataset_relative "priv/tutorial/support_tickets.json"
-  @out_dir "benchmarks/evidence/admitted/tutorial_ticket_routing"
+  @out_dir "benchmarks/runs/tutorial-ticket-routing"
   @schema_version 2
   @input_per_million 0.75
   @output_per_million 4.50

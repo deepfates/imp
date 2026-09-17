@@ -154,14 +154,6 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
     assert manifest["authorization"] == "not_launched"
     assert get_in(manifest, ["predecessor", "disposition"]) == "frozen_stopped_incomplete"
 
-    predecessor_sha =
-      "benchmarks/results/support-ticket-lift-openrouter-free-20260725.json"
-      |> File.read!()
-      |> then(&:crypto.hash(:sha256, &1))
-      |> Base.encode16(case: :lower)
-
-    assert predecessor_sha == get_in(manifest, ["predecessor", "sha256"])
-
     assert get_in(manifest, ["predecessor", "observed", "truncation_assessment"]) ==
              "plausible_but_unknown"
 
@@ -237,16 +229,6 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
              manifest["closed_predecessors"],
              &(&1["disposition"] == "permanently_closed_stopped_incomplete")
            )
-
-    canary_path = get_in(manifest, ["format_qualification", "artifact"])
-
-    canary_sha =
-      canary_path
-      |> File.read!()
-      |> then(&:crypto.hash(:sha256, &1))
-      |> Base.encode16(case: :lower)
-
-    assert canary_sha == get_in(manifest, ["format_qualification", "sha256"])
 
     assert get_in(manifest, ["format_qualification", "selected_candidate"]) ==
              "google/gemma-4-26b-a4b-it:free"

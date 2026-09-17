@@ -3,17 +3,14 @@ defmodule Imp.BenchmarkTruth.Paths do
 
   @runs_root "benchmarks/runs"
   @checkpoints_root "benchmarks/checkpoints"
-  @admitted_root "benchmarks/evidence/admitted"
   @safe_lane ~r/\A[a-z0-9][a-z0-9_-]*\z/
   @max_symlink_depth 64
 
   def runs_root, do: @runs_root
   def checkpoints_root, do: @checkpoints_root
-  def admitted_root, do: @admitted_root
 
   def runs(lane), do: join!(@runs_root, lane)
   def checkpoints(lane), do: join!(@checkpoints_root, lane)
-  def admitted(protocol), do: join!(@admitted_root, protocol)
 
   @doc false
   def canonical_path!(path, base \\ File.cwd!())

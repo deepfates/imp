@@ -14,24 +14,6 @@ defmodule OptimizeAnythingArtifactTest do
     assert Artifact.full_artifact?(Artifact.build(full_rows(), mode: :full))
   end
 
-  test "the immutable pre-v2 campaign remains T2 evidence but cannot authorize effectiveness" do
-    path =
-      "benchmarks/evidence/archive/optimize_anything/58ff84ac7a0d95bec2238a367ea998347a036565f8284fd71be39a6bd7d4f631.json"
-
-    artifact = path |> File.read!() |> Jason.decode!()
-
-    refute Artifact.full_artifact?(artifact)
-    assert Artifact.validate_legacy_rows(artifact["rows"], mode: :full).passing
-
-    refute Artifact.validate_legacy_rows(artifact["rows"], mode: :full).authorizes_effectiveness
-
-    assert :ok =
-             Imp.BenchmarkTruth.ReproductionArtifactValidator.validate!(
-               "optimize_anything",
-               artifact
-             )
-  end
-
   test "missing classes and required fields are rejected" do
     [row | _] = full_rows()
     validation = Artifact.validate_rows([Map.delete(row, "provider")])

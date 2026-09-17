@@ -56,40 +56,6 @@ defmodule OperationsStressTest do
     assert artifact["summary"]["passing"] == artifact["summary"]["total"]
   end
 
-  test "operations stress stays outside evidence admission and public claims" do
-    protocol =
-      "benchmarks/reproductions.json"
-      |> File.read!()
-      |> Jason.decode!()
-      |> get_in(["protocols", "operations"])
-
-    assert protocol["evidence_classification"] == "test_only_diagnostic"
-    assert protocol["artifact_validator"] == nil
-
-    operations_preflight =
-      "benchmarks/research_portfolio.json"
-      |> File.read!()
-      |> Jason.decode!()
-      |> Map.fetch!("lanes")
-      |> Enum.find(&(&1["id"] == "beam_operations"))
-      |> Map.fetch!("preflight")
-
-    assert operations_preflight["evidence_classification"] == "test_only_diagnostic"
-    refute operations_preflight["claim_eligible"]
-
-    catalog_commands =
-      Imp.BenchmarkCatalog.families()
-      |> Enum.flat_map(& &1.commands)
-
-    refute "mix benchmark.operations_stress.check" in catalog_commands
-    refute File.read!("benchmarks/claims.json") =~ "operations_stress"
-
-    benchmark_truth = File.read!("docs/internal/BENCHMARK_TRUTH.md")
-
-    assert benchmark_truth =~ "deliberately outside the evidence"
-    assert benchmark_truth =~ "must not be admitted or cited at any C0-C5 level"
-  end
-
   defp tmp_dir(name) do
     path = Path.join(System.tmp_dir!(), "imp-#{name}-#{System.unique_integer([:positive])}")
     File.rm_rf!(path)

@@ -26,19 +26,17 @@ run under `mix test test/learning_path_contract_test.exs`, and
 both green when changing public examples or notebooks.
 
 Provider-backed and research-scale tests are separate because they require
-credentials, external services, canonical datasets, or significant spend. See
-`docs/maintainers/RELEASE.md` and `docs/maintainers/EVIDENCE.md` before changing
-a provider, optimizer, benchmark, or fidelity claim. `.env.example` documents
+credentials, external services, canonical datasets, or significant spend.
+`.env.example` documents
 the supported live-test variables; keep real credentials in an ignored `.env`.
 
 ## Maintainer checks
 
-The benchmark-evidence and reproduction-registry tests are excluded from the
-default `mix test` run (tag `:evidence_infrastructure`). They validate the
-committed benchmark artifacts against full git history, the pinned DSPy Python
-environments (`scripts/setup_dspy_parity_env.sh` and friends), and in some
-lanes a `.env` with provider credentials — none of which a fresh clone has.
-To run them:
+Some benchmark and upstream-differential tests are excluded from the default
+`mix test` run (tag `:evidence_infrastructure`). They need the pinned DSPy
+Python environments (`scripts/setup_dspy_parity_env.sh` and friends), and in
+some lanes a `.env` with provider credentials — neither of which a fresh clone
+has. To run them:
 
 ```sh
 scripts/setup_dspy_parity_env.sh
@@ -47,20 +45,14 @@ scripts/setup_reference_test_env.sh
 EVIDENCE_INFRASTRUCTURE=1 mix test        # or: mix test --include evidence_infrastructure
 ```
 
-They also need a full (non-shallow) clone, because the source-binding
-validators resolve ancestor commit SHAs.
-
 ## Maintainer Authority
 
 Public behavior belongs to code, tests, and user documentation. Pinned upstream
-semantics belong to `benchmarks/authorities.json`; reproducible research
-protocols and retained results belong to `benchmarks/reproductions.json` and
-`benchmarks/evidence/`. Unfinished work is a pull request on a topic branch; there is no ticket file in this repository.
-
-`benchmarks/claims.json` is a scoped index for auditing unusually broad or
-comparative statements. It is not a release score. Read
-`docs/maintainers/AUTHORITIES.md`, `docs/maintainers/REPRODUCTIONS.md`, and
-`docs/maintainers/RESEARCH_PROTOCOLS.md` when changing those surfaces.
+semantics belong to `benchmarks/authorities.json`: the differential harness
+reads it before comparing Imp against upstream, and it fails closed when a pin
+drifts. Benchmark results belong to whoever ran the harness, in the report the
+task writes. Unfinished work is a pull request on a topic branch; there is no
+ticket file in this repository.
 
 ## Design Standard
 
