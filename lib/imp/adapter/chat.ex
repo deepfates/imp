@@ -1044,11 +1044,21 @@ defmodule Imp.Adapter.Chat do
       content: render_inputs(signature, turn, skip: history_input_fields(signature))
     }
 
-    assistant = %{
-      role: :assistant,
-      content: fetch_field(turn, :next_thought) |> blank_to_empty(),
-      tool_calls: calls
-    }
+    assistant =
+      Enum.reduce(
+        [:reasoning_content, :reasoning_details],
+        %{
+          role: :assistant,
+          content: fetch_field(turn, :next_thought) |> blank_to_empty(),
+          tool_calls: calls
+        },
+        fn field, message ->
+          case fetch_field(turn, field) do
+            nil -> message
+            value -> Map.put(message, field, value)
+          end
+        end
+      )
 
     tool_messages =
       Enum.map(results, fn result ->
