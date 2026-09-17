@@ -24,8 +24,8 @@ IMP_PATH=../.. mix deps.get
 IMP_PATH=../.. mix run --no-start run_workflow.exs
 ```
 
-A copied application with access to the private repository can omit `IMP_PATH`
-and resolve the immutable `v0.3.2` Git dependency declared in `mix.exs`.
+A copied application can omit `IMP_PATH` and resolve the immutable `v0.3.2`
+Git dependency declared in `mix.exs`.
 
 The workflow:
 
@@ -149,6 +149,5 @@ Use a whole-program artifact for a supported portable Imp shape. Use
 `Imp.Optimizer.Artifact` when the application owns a custom program and only
 its selected predictor parameters should cross the persistence boundary.
 
-During source development set `IMP_PATH` to the Imp checkout. Applications
-with access to the private repository use the tagged Git dependency in
-`mix.exs`.
+During source development set `IMP_PATH` to the Imp checkout. Other
+applications use the tagged Git dependency in `mix.exs`.

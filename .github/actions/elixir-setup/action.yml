@@ -78,14 +78,14 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: erlef/setup-beam@v1
+    - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
       id: beam
       with:
         otp-version: "28"
         elixir-version: "1.19"
     - name: Cache Elixir deps and build (single writer)
       if: inputs.save-cache == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           deps
@@ -94,7 +94,7 @@ runs:
         key: mix-v4-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
     - name: Restore Elixir deps and build (read-only)
       if: inputs.save-cache != 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           deps

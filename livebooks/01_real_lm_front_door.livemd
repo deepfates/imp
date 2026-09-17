@@ -29,7 +29,7 @@ if repo do
 
   Mix.install([{:imp, path: repo}], install_opts)
 else
-  # Standalone notebook: install the private source release.
+  # Standalone notebook: install the tagged Git source release.
   Mix.install([{:imp, github: "deepfates/imp", tag: "v0.3.2"}])
 end
 

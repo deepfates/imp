@@ -22,7 +22,7 @@ jobs:
     name: evidence.venv-free
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
@@ -49,13 +49,13 @@ jobs:
     if: inputs.full
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - uses: ./.github/actions/elixir-setup
         with:
           save-cache: "false"
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: "pip"
@@ -63,7 +63,7 @@ jobs:
             scripts/setup_dspy_parity_env.sh
             scripts/setup_dspy_current_target.sh
             scripts/setup_reference_test_env.sh
-      - uses: denoland/setup-deno@v2
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.8.3
       - name: Check out the pinned DSPy 3.2.1 source tree

@@ -212,6 +212,7 @@ defmodule Imp.MixProject do
          ".formatter.exs",
          "CHANGELOG.md",
          "LICENSE",
+         "NOTICE",
          "RELEASE_NOTES.md",
          "assets/imp-with-cards.jpg",
          "priv/public_api.json",

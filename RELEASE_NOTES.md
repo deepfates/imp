@@ -7,8 +7,8 @@ selected program under OTP.
 
 ## Install
 
-`v0.3.2` is a private Git source release. GitHub credentials with access to the
-repository are required.
+`v0.3.2` is a Git source release from a public repository; no credentials are
+required.
 
 ```elixir
 {:imp, github: "deepfates/imp", tag: "v0.3.2"}
