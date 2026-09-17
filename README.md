@@ -192,3 +192,18 @@ For an ordinary ACP workspace agent with bounded tools, see
 [examples/workspace_agent](examples/workspace_agent/README.md). It depends
 directly on this Imp checkout (`main` only, like the adapters it uses) and
 includes a provider-free mode for checking its launcher and workspace boundary.
+
+## Where this fits
+
+Imp is one of four repositories that together run persistent agents with
+AT Protocol accounts. Imp is the library: typed language-model programs, an
+MCP client (`Imp.MCP`), and the ACP server side (`Imp.ACP`). Dwell hosts
+residents on Imp and owns their capabilities and grants. Kite exposes one
+AT Protocol account as MCP tools and delivers its notifications to Dwell.
+Haven is the person's app: an ACP client to residents and to any other agent.
+`ex_mcp` (our fork) is the one MCP and ACP implementation all four use.
+
+Dependency direction: Haven → ex_mcp; Kite → ex_mcp; Dwell → Imp → ex_mcp.
+Imp is never a service and never depends on the other three. Haven does not
+compile against Imp; it launches an Imp program as an external ACP process.
+Dwell inherits Imp's ex_mcp revision, so a bump here is a bump for Dwell.
