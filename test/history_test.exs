@@ -91,8 +91,8 @@ defmodule Imp.HistoryTest do
   end
 
   test "program saving stores program shape, not runtime history input" do
-    # No pinned LM: the program is never called here, and a Static-pinned
-    # program can no longer be dumped (dee-i3s4 / P03 made that loud).
+    # No pinned LM: the program is never called here, and dumping refuses a
+    # Static-pinned program.
     program = Imp.predict("question, history -> answer")
 
     dumped = Imp.Saving.dump(program)

@@ -124,12 +124,10 @@ defmodule Imp.Predict.RLM do
     persistent: [type: :boolean, default: false]
   ]
 
-  # Names already bound inside the constrained interpreter: registered
-  # callbacks (llm_query, llm_query_batched, rlm_query, rlm_query_batched,
-  # recurse, load) and interpreter intrinsics (print, submit, show_vars —
-  # SHOW_VARS is rewritten to show_vars before evaluation). A user tool with
-  # one of these names would be shadowed by the builtin, so it is rejected at
-  # construction (DSPy rlm.py `_RESERVED_TOOL_NAMES`).
+  # Names already bound inside the constrained interpreter: the registered
+  # callbacks and the interpreter intrinsics (`SHOW_VARS` is rewritten to
+  # `show_vars` before evaluation). A user tool taking one of these names would
+  # be shadowed by the builtin, so it is rejected at construction.
   @reserved_tool_names ~w(llm_query llm_query_batched rlm_query rlm_query_batched recurse load print submit show_vars SHOW_VARS)
 
   def new(signature, opts \\ []) do
@@ -1577,8 +1575,8 @@ defmodule Imp.Predict.RLM do
       normalize_history_messages(new_prompt_messages) ++
         [%{"role" => "assistant", "content" => assistant_content}]
 
-    # The environment's compaction history mirrors upstream format_iteration/1:
-    # assistant action followed by one REPL-result user message.
+    # One compacted iteration is an assistant action followed by a single
+    # REPL-result user message.
     pending_history_segment = [%{"role" => "assistant", "content" => assistant_content}]
 
     %{

@@ -23,7 +23,7 @@ defmodule Imp.Optimizer.Utils do
   replaced per call (upstream passes `devset=` to its evaluate callable).
 
   Faithful to upstream's failure contract: an exception during evaluation is
-  logged LOUDLY and returns a zero-score result (upstream returns
+  logged and returns a zero-score result (upstream returns
   `Prediction(score=0.0, results=[])`; Imp returns an
   `%Imp.Evaluate.Result{score: 0.0}` with the error recorded in `:errors` —
   never discarded silently).
@@ -95,7 +95,7 @@ defmodule Imp.Optimizer.Utils do
   wrapper over `Imp.Optimizer.DemoCandidates.build/4`, which implements the
   same seed schedule (zero-shot, labels-only, unshuffled bootstrap, shuffled
   bootstraps) and applies `:metric_threshold` uniformly to every round —
-  including the unshuffled arm, so upstream's #9308 regression cannot occur.
+  including the unshuffled arm, which upstream skips.
 
   Returns a map of predictor name to a list of `num_candidate_sets` demo
   lists (upstream returns the same shape keyed by predictor index).
@@ -135,7 +135,7 @@ defmodule Imp.Optimizer.Utils do
   accepting the invalid prediction).
 
   With `raise_on_error: true` (upstream's default) the first failure raises
-  a loud `RuntimeError` instead.
+  a `RuntimeError` instead.
 
   Other options are passed to `Imp.Optimizer.TrajectoryRunner.run/4`
   (`:max_concurrency`, `:timeout`, ...).

@@ -8,13 +8,11 @@ defmodule Imp.LM do
   non-negative float, or `nil` when the provider reported nothing Imp can read
   as a number. A host summing spend reads that number and nothing else.
 
-  Providers report the total in several shapes — a bare number, a string, a
-  `Decimal`, or a cost breakdown map — and Imp reads the number out of all of
-  them, so no host has to learn a provider library's internal shape. When the
-  provider reported a breakdown, the whole breakdown map is also on the event
-  as `:billing`, untouched; when it reported none, there is no `:billing` key.
-  A breakdown's shape belongs to the provider, so it is evidence to inspect,
-  not a contract to depend on.
+  Providers report the total as a bare number, a string, a `Decimal` or a cost
+  breakdown map, and Imp reads the number out of all four. When the provider
+  reported a breakdown, that map is also on the event as `:billing`, unchanged;
+  when it reported none, there is no `:billing` key. A breakdown's shape is the
+  provider's, so treat it as evidence to inspect, not as a contract.
   """
 
   @callback generate(messages :: list(map()), opts :: keyword()) ::
@@ -25,22 +23,16 @@ defmodule Imp.LM do
   @optional_callbacks request: 2, stream: 3
 
   @doc false
-  # The LM's response-format capability (internal), the Imp analog of DSPy's
-  # `lm.supported_params` / `lm.supports_response_schema` (see
-  # `Imp.LM.Capability`). The JSON adapter gates `response_format` on this
-  # exactly as DSPy's `JSONAdapter` gates on those two properties.
+  # The LM's response-format capability, the analog of DSPy's
+  # `lm.supported_params` / `lm.supports_response_schema`. The JSON adapter
+  # gates `response_format` on it, as DSPy's `JSONAdapter` gates on those two
+  # properties. Resolution:
   #
-  # Resolution mirrors DSPy: a client that carries a real model registry
-  # introspects it; anything that cannot be introspected (a bare arity-2
-  # callback, a plain module, a configured `%{module:, opts:}` map) resolves to
-  # the DSPy `BaseLM` default — no declared capability — so no `response_format`
-  # is sent. This is deliberate and NOT silent: it is the same contract DSPy
-  # gives an LM that does not declare `supported_params`.
-  #
-  #   * `%Imp.Clients.ReqLLM{}` -> introspect the ReqLLM/LLMDB model registry.
-  #   * a struct whose module exports `response_format_capability/1` -> ask it
-  #     (lets fixtures and custom clients declare their tier).
-  #   * anything else -> `Imp.LM.Capability.none/0`.
+  #   * a struct whose module exports `response_format_capability/1` -> ask it,
+  #     so fixtures and custom clients can declare their own tier.
+  #   * anything else (a bare arity-2 callback, a plain module, a configured
+  #     `%{module:, opts:}` map) -> `Imp.LM.Capability.none/0`, the DSPy
+  #     `BaseLM` default, so no `response_format` is sent.
   @spec response_format_capability(term()) :: Imp.LM.Capability.t()
   def response_format_capability(%module{} = lm) do
     cond do
@@ -55,9 +47,9 @@ defmodule Imp.LM do
   def response_format_capability(_lm), do: Imp.LM.Capability.none()
 
   @doc false
-  # Native-reasoning support is deliberately a separate capability from JSON
-  # response formatting. Registry-backed clients can declare it, and custom
-  # clients/fixtures can do the same without teaching Predict model names.
+  # Native-reasoning support is a capability separate from JSON response
+  # formatting, so a client declares it rather than the predictor matching on
+  # model names.
   def reasoning_capability(%module{} = lm) do
     Code.ensure_loaded?(module) and function_exported?(module, :reasoning_capability, 1) and
       module.reasoning_capability(lm) == true
@@ -66,7 +58,7 @@ defmodule Imp.LM do
   def reasoning_capability(_lm), do: false
 
   @doc false
-  # A configured client option participates below a per-call/program override,
+  # A configured client option ranks below a per-call or program override,
   # matching DSPy's `lm_kwargs` > `lm.kwargs` precedence.
   def configured_option(%module{} = lm, key) do
     if Code.ensure_loaded?(module) and function_exported?(module, :configured_option, 2),
@@ -200,8 +192,8 @@ defmodule Imp.LM do
   }
 
   @doc false
-  # Loud, once-per-VM deprecation warning for LM shapes kept only for
-  # compatibility. `reset_deprecation_warnings/0` re-arms it (tests).
+  # Warns once per VM for an LM shape kept only for compatibility.
+  # `reset_deprecation_warnings/0` re-arms it, for tests.
   def warn_deprecated_shape(shape) do
     key = {__MODULE__, :deprecated_shape_warned, shape}
 

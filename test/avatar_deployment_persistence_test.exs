@@ -40,8 +40,8 @@ defmodule AvatarDeploymentPersistenceTest do
   test "compiled Avatar optimizer output preserves its deployment report" do
     metric = fn _example, prediction -> Imp.get(prediction, :answer) == "Paris" end
 
-    # Dynamic LM via context: a Static-pinned program can no longer be saved
-    # (dee-i3s4 / P03 made that loud), and this test saves the compiled output.
+    # The compiled output is saved, so the LM comes from context: saving
+    # refuses a Static-pinned program.
     student =
       Imp.avatar("question -> answer", [], metadata: %{deployment: "candidate"})
 

@@ -8,9 +8,9 @@ defmodule Imp.MCP do
 
   Tool schemas follow the MCP specification dialect: the input contract is the
   camelCase `"inputSchema"` key (MCP spec, Tool definition) and `"description"`
-  is optional. For in-process Elixir catalogs the snake_case `:input_schema`
-  key is accepted as a documented back-compat fallback; wire transports always
-  see spec-compliant servers use `inputSchema`.
+  is optional. In-process Elixir catalogs may spell it `:input_schema`; that
+  fallback applies to them only, since a spec-compliant server sends
+  `inputSchema`.
 
   Transport clients default to `result_mode: :text`, matching DSPy's MCP tool
   boundary: one text block becomes a string, multiple text blocks become a
@@ -73,9 +73,9 @@ defmodule Imp.MCP do
         convert_tool_result(result, mode, text)
       end
     else
-      # Older in-process adapters sometimes return a bare application value
-      # instead of the MCP CallToolResult envelope. Keep that documented
-      # compatibility path while normalizing spec-compliant wire results.
+      # An in-process adapter may return a bare application value instead of
+      # an MCP CallToolResult envelope. Pass it through unchanged; only
+      # envelopes are normalized.
       result
     end
   end

@@ -2,31 +2,32 @@ defmodule Imp.Run do
   @moduledoc """
   An addressable execution of an Imp program with ordered semantic events.
 
-  `Imp.call/2` remains the minimal program boundary. `Imp.Run` is the optional
+  `Imp.call/2` is the minimal program boundary. `Imp.Run` is the optional
   runtime boundary for hosts that need to observe a composed program while it
   is running, cancel its in-flight effects, or explicitly authorize validated
-  ReActV2/RLM tool effects. Observation and cancellation use the owned run
-  context; security decisions are carried explicitly in `Imp.Execution`.
-  Events describe Imp execution; they do not contain ACP, MCP, UI, or transport
+  ReActV2 and RLM tool effects. Observation and cancellation use the owned run
+  context; authorization decisions are carried explicitly in `Imp.Execution`.
+  Events describe Imp execution only: they contain no ACP, MCP, UI or transport
   concepts. One run-owned delivery process invokes the event sink serially, so
   a slow observer preserves event order without delaying cancellation or owner
-  cleanup. Sinks should still hand work off promptly: a permanently blocked
-  sink prevents its own later events and barriers from being delivered.
+  cleanup. A sink should still hand work off promptly, because a blocked sink
+  holds up its own later events and barriers.
 
   `events/1` reads the retained native sequence independently of sink progress.
-  `cancel_with_events/3` snapshots it before cleanup, including one owner-recorded
-  cancellation outcome. This is in-memory evidence, not a durable effects log:
-  node/owner death can lose it, and cancellation says nothing about whether an
-  unfinished remote write landed. Persist authorization before dispatch when
-  that guarantee is needed. `Imp.Run.Event.to_map/1` serializes redacted events.
-  Model request/response observations cover `Imp.LM.request/2`; ReActV2 and RLM
-  provide their semantic tool call/result events.
+  `cancel_with_events/3` snapshots that sequence before cleanup, including one
+  owner-recorded cancellation outcome. The snapshot is in-memory evidence, not a
+  durable effects log: node or owner death loses it, and cancellation says
+  nothing about whether an unfinished remote write landed. Persist authorization
+  before dispatch when that guarantee is needed. `Imp.Run.Event.to_map/1`
+  serializes a redacted event. Model request and response observations cover
+  `Imp.LM.request/2`; ReActV2 and RLM emit the semantic tool call and result
+  events.
 
-  Capture defaults to 64 KiB per event and a 512-event / 4 MiB snapshot. Configure
-  `:max_event_bytes`, `:max_events`, and `:max_snapshot_bytes` at start. Oversized
-  event payloads become explicit digest/size markers before sink delivery;
-  snapshot eviction adds a `:capture_gap` marker. Neither represents full evidence.
-  A sink receives all bounded events; the snapshot is a bounded recent window.
+  Capture defaults to 64 KiB per event and a 512-event, 4 MiB snapshot;
+  `:max_event_bytes`, `:max_events` and `:max_snapshot_bytes` override them at
+  start. An oversized event payload becomes a digest and size marker before sink
+  delivery, and snapshot eviction adds a `:capture_gap` marker. A sink receives
+  every bounded event; the snapshot is a bounded recent window.
   """
 
   alias Imp.Run.Control

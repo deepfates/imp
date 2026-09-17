@@ -8,13 +8,11 @@ defmodule Imp.MatchedGepaMiproIFBenchTest do
 
   @root Path.expand("../examples/matched_gepa_mipro_ifbench", __DIR__)
 
-  # This is the v1 campaign's LAUNCH preflight: contract.exs pins the working
-  # tree's root mix.lock sha, so it can only pass while the tree matches the
-  # seal. v1 is permanently stopped (recorded, with this contract's own sha,
-  # in the gepa014 successor's immutable_predecessors - amending it would
-  # break that seal), and the 2026-08-08 bandit CVE bump changed mix.lock.
-  # The seal's historical validity is still checkable by running this test at
-  # the sealed commit; at HEAD it is definitionally unrunnable.
+  # The v1 campaign's launch preflight: contract.exs pins the root mix.lock sha
+  # of the sealed tree, so it passes only at the sealed commit. The seal cannot
+  # be amended - the gepa014 successor records this contract's own sha in its
+  # immutable_predecessors - and any dependency bump since moved mix.lock, so
+  # at HEAD the test is unrunnable by construction.
   @tag skip:
          "v1 launch preflight pins the sealed mix.lock; permanently stopped campaign, " <>
            "unrunnable at HEAD after any dependency change (see imp-sqkr)"

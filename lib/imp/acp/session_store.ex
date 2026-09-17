@@ -39,9 +39,9 @@ defmodule Imp.ACP.SessionStore do
         |> Map.put("cwd", metadata.cwd)
         |> Map.put("updatedAt", timestamp())
         |> Map.put("title", title(transcript))
-        # The session's own `_meta`, stored beside the history it produced. A
-        # restored session must be the same thing it was, not whatever the
-        # resuming request happens to say — see `Imp.ACP.Handler`.
+        # The session's own `_meta`, stored beside the history it produced, so
+        # a restore installs the configuration that produced that history
+        # rather than the resuming request's. See `Imp.ACP.Handler`.
         |> Map.put("meta", Map.get(metadata, :meta) || %{})
         |> Map.put("history", dumped_history)
         |> Map.put("transcript", transcript)
@@ -197,9 +197,8 @@ defmodule Imp.ACP.SessionStore do
 
   defp validate_cwd(_record, _cwd), do: {:error, :workspace_mismatch}
 
-  # Records written before sessions carried `_meta` have no "meta" key. They
-  # resume as they always did — with whatever the endpoint's own default is —
-  # rather than being refused for a field they could not have stored.
+  # A record with no "meta" key is valid: it resumes with an empty `_meta` and
+  # the endpoint's own default, rather than being refused.
   defp stored_meta(%{"meta" => meta}) when is_map(meta), do: meta
   defp stored_meta(_record), do: %{}
 

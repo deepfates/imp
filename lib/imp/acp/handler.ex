@@ -174,11 +174,10 @@ defmodule Imp.ACP.Handler do
                    Map.get(context, :client_capabilities)
                  ),
                mcp_servers: params["mcpServers"] || [],
-               # A restored session keeps the `_meta` it was created with. The
-               # history and transcript below were produced under it, so the
-               # request does not get to redefine what this session is; it is
-               # handed over as :requested_meta for a factory that wants to
-               # refuse the contradiction rather than answer as someone else.
+               # A restored session keeps the `_meta` it was created with,
+               # because the history and transcript below were produced under
+               # it. The request's own `_meta` is passed separately as
+               # :requested_meta so a factory can refuse a contradiction.
                meta: restored.meta,
                requested_meta: params["_meta"] || %{},
                session_id: session_id

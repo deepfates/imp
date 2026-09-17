@@ -4,10 +4,9 @@ defmodule Imp.Tool do
 
   A tool is a named, schema-described Elixir function. ReAct programs expose
   tools to the language model, while ordinary Elixir code can call the same
-  tool values directly. The useful Imp habit is to keep the
-  boundary explicit: the tool name is the action, the description is for the
-  model or human reader, the schema is the input contract, and the function is
-  ordinary Elixir.
+  tool values directly. The name is the action, the description is written for
+  the model or a human reader, the schema is the input contract, and the
+  function is ordinary Elixir.
 
   Tool calls validate JSON-schema-shaped input contracts before invoking the
   runner, are wrapped in Imp telemetry, and runtime traces redact sensitive
@@ -153,9 +152,9 @@ defmodule Imp.Tool do
   @doc false
   def validate_input(%__MODULE__{} = tool, input), do: do_validate_input(tool, input)
 
-  # Empty schemas preserve the historical untyped-tool behavior. The error
-  # tuples intentionally match the former MCP-only wrapper so every runtime
-  # observes one contract without exposing a second public validation API.
+  # An empty schema declares no input contract, so every input passes. The
+  # error tuples are the shape every Imp runtime already matches on, so there
+  # is one validation contract and no second public validation API.
   defp do_validate_input(%__MODULE__{schema: schema}, _input) when map_size(schema) == 0,
     do: :ok
 

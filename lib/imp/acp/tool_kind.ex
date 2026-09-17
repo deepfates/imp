@@ -2,23 +2,19 @@ defmodule Imp.ACP.ToolKind do
   @moduledoc """
   Derives an ACP tool kind from the MCP tool annotations a server declares.
 
-  An MCP server already states what each of its tools does to the world.
-  `ToolAnnotations` carries `readOnlyHint`, `destructiveHint`, `idempotentHint`
-  and `openWorldHint`, and those hints travel on the wire in `tools/list`. A
-  host that instead keeps a hand-written table from tool *name* to ACP kind has
-  re-derived that declaration, and the table goes stale the moment the server
-  publishes a tool the table does not name - which is the case where a
-  permission mode that would have asked does not ask.
-
-  So the kind is computed from the declaration, once, here.
+  An MCP server declares what each tool does to the world: `ToolAnnotations`
+  carries `readOnlyHint`, `destructiveHint`, `idempotentHint` and
+  `openWorldHint`, and those hints travel on the wire in `tools/list`. The kind
+  is computed from that declaration, so a tool a host has never heard of is
+  still classified.
 
   ## The rule
 
   The MCP specification's own defaults apply when a hint is absent:
   `readOnlyHint` defaults to `false`, `destructiveHint` to `true`, and
-  `openWorldHint` to `true`. Those defaults are only consulted when the tool
-  declared *some* hint; a tool that declares none is undeclared, and this
-  module answers `nil` rather than guessing.
+  `openWorldHint` to `true`. Those defaults are consulted only when the tool
+  declared some hint; a tool that declares none is undeclared, and this module
+  answers `nil` rather than guessing.
 
       readOnlyHint: true,  openWorldHint: true    -> "read"
       readOnlyHint: true,  openWorldHint: false   -> "think"
@@ -27,16 +23,15 @@ defmodule Imp.ACP.ToolKind do
       write, not destructive, openWorldHint: false-> "edit"
       no annotations, or no hints in them         -> nil
 
-  The safety-relevant distinction is the one the hints actually make: does this
-  tool change anything, and can the change be destructive. The finer ACP kinds
-  (`search` versus `read`, `edit` versus `execute`) are presentational, so a
-  host that wants a nicer card keeps declaring those by name in `:tool_kinds`,
-  which takes precedence over anything derived here. Nothing safety-relevant
-  depends on that override existing.
+  The hints answer the safety-relevant questions: does the tool change
+  anything, and can the change be destructive. The finer ACP kinds (`search`
+  versus `read`, `edit` versus `execute`) are presentational; a host that wants
+  a different card declares the kind by name in `:tool_kinds`, which takes
+  precedence over anything derived here. Nothing safety-relevant depends on
+  that override.
 
-  `"think"` for a read that declares `openWorldHint: false` is the reading of a
-  tool that touches nothing outside the process - Kite's `silence` is the
-  example, and it is the kind Dwell's hand table already assigned it.
+  `"think"` is the kind for a read that declares `openWorldHint: false`, a tool
+  that touches nothing outside the process.
   """
 
   @hint_keys ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"]

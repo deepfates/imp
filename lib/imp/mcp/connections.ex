@@ -34,15 +34,16 @@ end
 defmodule Imp.MCP.Connections do
   @moduledoc """
   Opens explicitly authorized MCP servers through ExMCP and imports their tools.
+
   Connections belong to `:owner` (the caller by default), independently of any
   ACP session. Exact descriptors must be approved through `:authorize` or
   `:trusted_servers`; connection cleanup never depends on a model-visible name.
 
   ## Authenticating an HTTP server
 
-  A descriptor carries static `"headers"` as before. It can instead name an
-  auth kind, which is resolved to a header when the connection is built and
-  never written back into the descriptor:
+  A descriptor may carry static `"headers"`. It may instead name an auth kind,
+  which is resolved to a header when the connection is built and never written
+  back into the descriptor:
 
       %{"type" => "oauth", "credential" => "readwise"}
 
@@ -54,11 +55,10 @@ defmodule Imp.MCP.Connections do
       %{"type" => "bearer_env", "variable" => "EXA_API_KEY"}
 
   reads the variable from the host's environment. When it is unset the server
-  is connected with no `Authorization` header and one warning naming the
-  server and the variable is logged — a server that works anonymously, with
-  rate limits, still works before the person has found a key. Add
-  `"required" => true` to refuse the connection instead, with a message naming
-  the variable.
+  is connected with no `Authorization` header and one warning naming the server
+  and the variable is logged, so a server that also answers anonymously still
+  works. Add `"required" => true` to refuse the connection instead, with a
+  message naming the variable.
 
   Both forms may be combined with static `"headers"`; the resolved header is
   appended. Tokens never appear in the descriptor, so authorization callbacks,
@@ -66,24 +66,20 @@ defmodule Imp.MCP.Connections do
 
   ## A server that cannot be reached
 
-  By default (`on_failure: :refuse`) one unreachable server fails the whole
-  import: every client is disconnected and an error is returned. That is right
-  for a caller that needs all of its tools or none.
+  Under the default `on_failure: :refuse`, one unreachable server fails the
+  whole import: every client is disconnected and an error is returned.
 
-  `on_failure: :drop` is for a caller whose servers are independent — a
-  long-lived agent holding several third-party catalogs, where one of them
-  answering 503 this morning should cost that catalog and nothing else. A
-  server whose transport or `initialize` fails, which never answers at all, or
-  which cannot answer `tools/list`, is left out: its client is closed, the
-  servers beside it keep their tools, and the returned `Imp.MCP.Import` names
-  it in `unavailable` with the reason the refusal would have carried,
-  summarized to one short line, and with the `index` of the descriptor in the
-  list that was passed in — the name is not an identity.
+  Under `on_failure: :drop`, a server whose transport or `initialize` fails,
+  which never answers at all, or which cannot answer `tools/list`, is left out:
+  its client is closed, the servers beside it keep their tools, and the
+  returned `Imp.MCP.Import` names it in `unavailable` with the reason the
+  refusal would have carried, summarized to one short line, and with the
+  `index` of the descriptor in the list that was passed in. Use it for a caller
+  whose servers are independent, such as a long-lived agent holding several
+  third-party catalogs.
 
   Each dial is bounded by `:timeout` on its own, so a host that accepts the
   connection and then answers nothing costs that server its timeout and no more.
-  A list of such servers used to spend one shared budget and refuse the whole
-  import whatever `:on_failure` said.
 
   ## What a tool is named
 
@@ -94,34 +90,20 @@ defmodule Imp.MCP.Connections do
 
   Every tool that server offers is then named `exa_` <> its own name, always,
   whether or not anything else is connected. A descriptor without a prefix
-  contributes its tools under the names the server gave them.
+  contributes its tools under the names the server gave them. A name therefore
+  never depends on which servers answered.
 
-  Nothing is ever renamed to resolve anything. If two connected servers without
+  Nothing is renamed to resolve anything. If two connected servers without
   prefixes offer the same tool name, the import refuses with
   `{:mcp_tool_name_collision, tool, servers}` naming the tool and both servers,
   and logs the fix — give one of them a `"tool_prefix"`. A tool whose name is
-  one the program has already taken (`:reserved_tool_names`) is refused the same
-  way.
+  one the program has already taken (`:reserved_tool_names`) is refused the
+  same way. Both refusals stand under `on_failure: :drop`, which drops what the
+  network did and never what the caller declared.
 
-  The refusal stands under `on_failure: :drop`. Dropping is for what the network
-  did; two servers claiming one name is what the caller wrote, and continuing
-  without one of them would discard a capability the caller asked for.
-
-  This used to be decided by collision: a name two connected servers both
-  offered was qualified `mcp_<server>_<tool>`, and any other name was left
-  alone. That made the name a fact about which servers answered. Under
-  `on_failure: :drop` a second server going down took the qualification off
-  every tool of the server that did answer — a caller holding `mcp_kite_post`
-  yesterday held `post` today — and whatever addresses a tool by name moved with
-  it: an allowance, a stored record of what an agent may do, the demonstrations
-  in its own prompt.
-
-  The consequence to know about: a collision between two unprefixed servers can
-  go unnoticed for as long as one of them is absent, and then refuse a start on
-  the morning they both answer. That is the trade this makes. A refusal naming
-  the two servers, the tool and the fix is recoverable in one edit; a silent
-  rename of a name other things are addressing is not, and it happens on exactly
-  the same morning.
+  A consequence to plan for: a collision between two unprefixed servers goes
+  unnoticed for as long as one of them is absent, and then refuses the import
+  the first time both answer.
 
   `Imp.Tool` provenance (`tool.metadata.mcp`) carries the server and the name
   the server published, whatever the tool ended up called.
@@ -129,12 +111,9 @@ defmodule Imp.MCP.Connections do
   Dropping covers failures of the connection and of `tools/list`, not of the
   declaration. A descriptor that `:authorize` refused, one whose `auth` cannot
   produce a header (a `bearer_env` variable declared `required` and unset, for
-  example), one whose `"tool_prefix"` is not a string, and one that is malformed
-  all still refuse the import under either setting: they are decisions the
-  caller made before anything was dialed, and silently continuing without them
-  would discard the caller's own answer. So does a tool name two servers both
-  claim, which is the same kind of defect found a moment later. So does anything
-  raised by the caller's own `:tool_filter`.
+  example), one whose `"tool_prefix"` is not a string, one that is malformed, a
+  tool name two servers both claim, and anything raised by the caller's own
+  `:tool_filter` all refuse the import under either setting.
   """
 
   require Logger
@@ -224,26 +203,24 @@ defmodule Imp.MCP.Connections do
     end
   end
 
-  # ExMCP may exit the connector on a bad handshake. Isolate connect so the ACP
-  # session (or other :owner) survives, then adopt clients onto the session-owned
-  # bridge. Do not rely on "remember to unlink from a spawn_monitor helper."
+  # ExMCP may exit the connector on a bad handshake, so connecting happens in a
+  # helper process and the surviving clients are adopted onto the owner-owned
+  # bridge afterwards. The :owner outlives a failed handshake either way.
   defp connect_isolated(servers, opts) do
     parent = self()
     ref = make_ref()
-    # Every dial is bounded on its own inside `dial/2`; this budget is the
-    # backstop for the helper wedging around them, so it has to cover the whole
-    # list dialed in turn. One budget for the list refused an import of several
-    # slow servers as a timeout no matter what `:on_failure` said.
+    # Every dial is bounded on its own inside `dial/2`. This budget is only the
+    # backstop for the helper itself wedging around them, so it has to cover the
+    # whole list dialed in turn.
     timeout = timeout(opts) * max(length(servers), 1) + 5_000
 
     {pid, mon} =
       spawn_monitor(fn ->
-        # Two deaths reach this process as exit signals. A client whose
-        # transport refuses the connection answers `ExMCP.Client.start_link/1`
-        # with an error and then exits; and a dial abandoned at its deadline is
+        # Two deaths reach this process as exit signals: a client whose
+        # transport refuses the connection exits after answering
+        # `ExMCP.Client.start_link/1`, and a dial abandoned at its deadline is
         # killed while linked here. Without this flag either one kills the
-        # helper, so no reason survives to be reported and no server after the
-        # failing one is ever dialed.
+        # helper, losing the reason and every server after the failing one.
         Process.flag(:trap_exit, true)
 
         result =
@@ -285,16 +262,15 @@ defmodule Imp.MCP.Connections do
     end
   end
 
-  # Killing a process that opened MCP clients does not close them. An
+  # Killing a process that opened MCP clients does not close them: an
   # `ExMCP.Client` traps exits and its catch-all `handle_info/2` swallows the
-  # `EXIT` from the process that started it, so every client an abandoned dial
-  # had opened would stay alive, holding its socket, for the life of the node.
-  # A client whose `start_link/1` has not returned has no pid anybody holds;
-  # the link is the only handle on it, so read the links before the kill.
-  # The chain is at most helper -> dial -> client -> transport, and every link
-  # in it was opened by this import, so following it is not a licence to kill
-  # somebody else's process: nothing is adopted onto the caller-owned bridge
-  # until the whole connect has answered.
+  # `EXIT` from the process that started it, so an abandoned dial's clients
+  # would stay alive holding their sockets. A client whose `start_link/1` has
+  # not returned has no pid anybody holds, so the links are the only handle on
+  # it and must be read before the kill. The chain is at most
+  # helper -> dial -> client -> transport and every link in it was opened by
+  # this import: nothing is adopted onto the caller-owned bridge until the
+  # whole connect has answered.
   defp abandon(pid), do: abandon(pid, 3)
 
   defp abandon(pid, depth) do
@@ -356,8 +332,8 @@ defmodule Imp.MCP.Connections do
   # the handshake has finished, and a host that accepts the connection and then
   # answers nothing — a firewall dropping packets, a wedged proxy — returns
   # within neither `:handshake_timeout` nor `:era_probe_timeout` on this path.
-  # Bounding each dial here is what makes "a server that is down costs that
-  # server" true of silence and not only of a refused connection.
+  # The bound here is what keeps silence costing one server rather than the
+  # whole import.
   #
   # A failed dial leaves nothing behind: `start_link/1` answers with an error
   # only after the client process has exited. A dial abandoned at the deadline
@@ -459,17 +435,13 @@ defmodule Imp.MCP.Connections do
     kind, reason -> {:error, {:mcp_tool_import_failed, {kind, reason}}}
   end
 
-  # Everything the server itself got wrong about its catalog is reported under
-  # one tag naming it, and that tag is the only error this returns. `:drop`
-  # therefore covers all of it and nothing else: what a caller is told about a
-  # dropped server is always the server's own catalog failure, never a fault of
-  # the caller's that happened to surface here. Including a `tools/list` body
-  # that is not a catalog: that
-  # is the server answering badly, and a reason no caller can map back to a
-  # server is a reason no caller can act on. Everything after the catalog —
-  # the caller's own `:tool_filter` raising, for one — is left to the caller's
-  # error paths rather than being caught here and reported as this server's
-  # fault.
+  # `{:mcp_tools_list_failed, server, reason}` is the only error this returns,
+  # and it covers everything the server got wrong about its own catalog,
+  # including a `tools/list` body that is not a catalog. That keeps `:drop`
+  # exactly aligned with server-side catalog failures: a dropped server's
+  # reason always names the server and is never a fault of the caller's that
+  # happened to surface here. Failures after the catalog — the caller's own
+  # `:tool_filter` raising, for one — are left to the caller's error paths.
   defp server_tools(server, client, opts) do
     case list_tools(client, opts) do
       {:ok, response} ->
@@ -586,13 +558,8 @@ defmodule Imp.MCP.Connections do
   # flat catalog. What a tool is called here is the caller's declaration and
   # nothing else: a descriptor's `"tool_prefix"` is prepended to every tool that
   # server offers, and a descriptor without one contributes its tools under the
-  # names the server gave them.
-  #
-  # Nothing is renamed to resolve anything. This used to qualify a name two
-  # connected servers both offered, which made the name a fact about which
-  # servers answered: under `on_failure: :drop` a second server going down took
-  # the qualification off every tool of the server that did answer, and whatever
-  # addresses a tool by name moved with it.
+  # names the server gave them. Nothing is renamed to resolve a collision, so a
+  # name never depends on which servers answered.
   defp name_tools(sourced_schemas, opts) do
     reserved = opts |> Keyword.get(:reserved_tool_names, []) |> MapSet.new(&to_string/1)
 
@@ -627,10 +594,9 @@ defmodule Imp.MCP.Connections do
   end
 
   # Two servers offering one name is a defect in the declaration, so it refuses
-  # the import rather than being papered over -- and it refuses under
-  # `on_failure: :drop` too, which drops what the network did and never what the
-  # caller wrote. The error names the tool and every server that offered it; the
-  # log names the fix, because a term cannot carry a sentence.
+  # the import, under `on_failure: :drop` too. The error names the tool and
+  # every server that offered it; the log names the fix, because a term cannot
+  # carry a sentence.
   defp refuse_duplicate_names(named) do
     named
     |> Enum.group_by(fn {_server, _original, schema} -> schema["name"] end)
@@ -697,7 +663,7 @@ defmodule Imp.MCP.Connections do
 
   # The tool declares its own nature in `annotations`; MCP carries that in
   # `tools/list` alongside the schema. Key it by the name the program will see,
-  # which is the qualified name whenever disambiguation renamed the tool.
+  # which is the prefixed name whenever the descriptor declares a prefix.
   defp declared_annotations(schemas) do
     schemas
     |> Enum.flat_map(fn schema ->
@@ -908,8 +874,9 @@ defmodule Imp.MCP.Connections do
     end
   end
 
-  # ACP v1's original stdio descriptor was untagged. Newer schemas include
-  # `type: "stdio"`; accept both without treating arbitrary maps as stdio.
+  # A stdio descriptor is either tagged `type: "stdio"` or untagged and
+  # identified by its `"command"`. Both are accepted; an arbitrary map is not
+  # treated as stdio.
   defp server_type(%{"type" => type}) when is_binary(type), do: type
   defp server_type(%{"command" => command}) when is_binary(command), do: "stdio"
   defp server_type(_server), do: nil

@@ -34,8 +34,8 @@ defmodule Imp.Predict.ChainOfThought do
     signature =
       signature
       |> Imp.Signature.ensure()
-      # DSPy 3.3.1 keeps the legacy default as `str`; callers opt into its
-      # native-capable Reasoning type through `rationale_field_type`.
+      # The reasoning field defaults to a plain string; `:rationale_field_type`
+      # opts into the native-capable reasoning type.
       |> Imp.Signature.prepend_output(rationale_field)
 
     %__MODULE__{predict: Imp.Predict.Predict.new(signature, opts)}

@@ -52,8 +52,8 @@ defmodule Imp.Optimizer.RandomSearch do
     stop_at_score: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
     metric_threshold: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
     metric_identity: [type: :any, default: nil],
-    # Historical Imp spellings. They are normalized immediately and do not
-    # change DSPy's fixed seed schedule.
+    # Imp-side aliases. They are normalized immediately and do not change
+    # DSPy's fixed seed schedule.
     candidates: [type: {:custom, __MODULE__, :validate_optional_non_negative, []}, default: nil],
     demos_per_candidate: [
       type: {:custom, __MODULE__, :validate_optional_non_negative, []},
@@ -576,7 +576,7 @@ defmodule Imp.Optimizer.RandomSearch do
     max_concurrency =
       optimizer.num_threads || Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers)
 
-    # Imp.Evaluate now halts loudly at errors >= max_errors (DSPy
+    # Imp.Evaluate halts at errors >= max_errors (DSPy
     # parallelizer semantics); translate into RandomSearch's budget error so
     # the optimizer-facing contract stays the same.
     result =

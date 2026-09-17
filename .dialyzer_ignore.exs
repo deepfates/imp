@@ -57,9 +57,9 @@
   # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
   # struct, but its schema defaults the field to nil and Response.usage/1 is
   # `map() | nil`, so the nil clause is reachable at runtime.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1381},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1409, 8}},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {169, 7}},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1357},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1385, 8}},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {147, 7}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -224,7 +224,7 @@
   # Defensive fallbacks and MapSet opacity retained at the 0.3 cut. These are
   # individually pinned so a changed success type makes the gate ask again.
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {341, 16}},
-  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {763, 8}},
+  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {730, 8}},
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {675, 8}},
   {"lib/imp/mcp.ex", :pattern_match_cov, {372, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},

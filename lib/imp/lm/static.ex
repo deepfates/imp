@@ -2,9 +2,18 @@ defmodule Imp.LM.Static do
   @moduledoc """
   Deterministic local LM for examples, tests, and offline workflows.
 
-  `Imp.LM.Static` implements the `Imp.LM` behaviour by calling a supplied
-  handler function. It is useful when you want to teach, test, or debug Imp
-  program structure without reaching a provider.
+  Implements the `Imp.LM` behaviour by calling a supplied handler instead of a
+  provider, so program structure can be exercised offline.
+
+  Options, given to `new/1` or per call, and merged with the per-call options
+  winning:
+
+    * `:handler` — a two-argument function `(messages, opts)` returning the LM
+      output. Defaults to a handler that keys off the prompt text. A handler
+      that is not a two-argument function raises `ArgumentError`.
+    * `:n` — number of completions. `1`, the default, returns one output; an
+      integer above 1 calls the handler that many times and returns a list.
+      Any other value raises `ArgumentError`.
   """
 
   @behaviour Imp.LM
@@ -36,9 +45,9 @@ defmodule Imp.LM.Static do
             "#{inspect(__MODULE__)}.generate/2 expects :handler to be a two-argument function, got: #{inspect(handler)}"
     end
 
-    # Multi-completion (DSPy `n=`): like upstream's DummyLM, the handler is
-    # invoked once per requested completion so stateful handlers can script
-    # distinct answers. `n: 1` (the default) keeps the single-output shape.
+    # Multi-completion (DSPy `n=`): the handler is invoked once per requested
+    # completion, so a stateful handler can script distinct answers. `n: 1`,
+    # the default, keeps the single-output shape.
     case Keyword.get(opts, :n, 1) do
       1 ->
         {:ok, handler.(messages, opts)}

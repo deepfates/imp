@@ -1,29 +1,26 @@
 defmodule Imp.LM.Capability do
   @moduledoc false
 
-  # Per-LM response-format capability signal (internal), the Imp analog of the
-  # two DSPy `BaseLM` properties the JSON adapter gates on:
+  # Per-LM response-format capability, the analog of the two DSPy `BaseLM`
+  # properties the JSON adapter gates on:
   #
   #   * `response_format` — does the model accept a `response_format` request
   #     param at all? DSPy checks `"response_format" in lm.supported_params`
   #     (`dspy/clients/lm.py`: `litellm.get_supported_openai_params(...)`).
-  #   * `response_schema` — does the model support *structured* JSON-schema
+  #   * `response_schema` — does the model support structured JSON-schema
   #     output (OpenAI Structured Outputs)? DSPy checks
   #     `lm.supports_response_schema` (`litellm.supports_response_schema(...)`).
   #
-  # DSPy reads these from litellm's model registry; Imp reads them from the
+  # DSPy reads both from litellm's model registry; Imp reads them from the
   # ReqLLM/LLMDB registry (`Imp.Clients.ReqLLM.response_format_capability/1`),
-  # except where a native ReqLLM provider itself owns a stronger documented
-  # transport guarantee (currently Ollama JSON-schema generation).
-  # The *decision logic* over the two booleans is reproduced byte-faithfully in
-  # `Imp.Adapter.JSON`; the *source* is each ecosystem's own registry, exactly
-  # as DSPy delegates to litellm rather than hardcoding a model list.
+  # except where a native ReqLLM provider owns a stronger documented transport
+  # guarantee (currently Ollama JSON-schema generation). The decision logic over
+  # the two booleans lives in `Imp.Adapter.JSON`; the source of the booleans is
+  # the registry, not a hardcoded model list.
   #
-  # The default is DSPy's `BaseLM` default — both false — which means "no
-  # response_format is sent". Any LM that cannot be introspected for capability
-  # (a bare callback, an unknown module) resolves to this default. That is
-  # intentional and matches DSPy: an LM that does not declare `supported_params`
-  # gets no `response_format`.
+  # The default is both false: send no `response_format`. An LM that cannot be
+  # introspected (a bare callback, an unknown module) resolves to it, matching
+  # DSPy's treatment of an LM that does not declare `supported_params`.
 
   @type t :: %__MODULE__{
           response_format: boolean(),
@@ -46,9 +43,13 @@ defmodule Imp.LM.Capability do
   def json_schema, do: %__MODULE__{response_format: true, response_schema: true}
 
   @doc """
-  Build a capability from an explicit tier name. Used by the provider-free
-  golden-trace fixtures (and any caller that already knows the tier) so both
-  sides of the differential declare the *same* capability tier.
+  Builds a capability from an explicit tier name.
+
+  Tiers are `:none`, `:response_format` (also `"json_object"`) and
+  `:json_schema` (also `"response_schema"`), as atoms or strings; `nil` is
+  `:none`. Any other value raises `ArgumentError`. Callers that already know
+  the tier, such as the provider-free golden-trace fixtures, use this so both
+  sides of a differential declare the same tier.
   """
   @spec from_tier(atom() | String.t() | nil) :: t()
   def from_tier(tier) when tier in [:none, "none", nil], do: none()

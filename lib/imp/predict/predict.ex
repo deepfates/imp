@@ -54,9 +54,9 @@ defmodule Imp.Predict.Predict do
     adapter: [type: {:custom, Imp.Adapter, :validate_adapter, []}],
     demos: [type: {:list, :any}, default: []],
     config: [type: :keyword_list, default: []],
-    # Options handed to the adapter's format/3 on every call, beside `:demos`.
-    # This is how a program passes rendering data (ReAct's guidance) and how a
-    # host injects renderers without a second adapter module.
+    # Options handed to the adapter's `format/3` on every call, beside
+    # `:demos`: how a program passes rendering data, and how a host injects
+    # renderers without writing a second adapter module.
     adapter_opts: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}]
   ]
@@ -87,8 +87,8 @@ defmodule Imp.Predict.Predict do
   @impl true
   def call(%__MODULE__{} = predict, inputs) when is_list(inputs) or is_map(inputs) do
     if Map.get(Imp.Settings.get(), :track_usage, false) do
-      # DSPy `track_usage=True`: the call runs inside a usage tracker and the
-      # aggregate lands on the prediction (`Imp.Prediction.get_lm_usage/1`).
+      # The call runs inside a usage tracker and the aggregate lands on the
+      # prediction, readable with `Imp.Prediction.get_lm_usage/1`.
       {result, usage} = Imp.Usage.track(fn -> do_call(predict, inputs) end)
 
       case result do
@@ -109,9 +109,9 @@ defmodule Imp.Predict.Predict do
   Calls the program with a per-call config override.
 
   `config` is a keyword list merged over the program's stored config for this
-  invocation only — the program itself is not mutated. This is the Imp analog
-  of DSPy's call-time `config={...}` override (and of its predicted-outputs
-  `prediction=` pass-through): every merged entry flows to the LM request.
+  invocation only; the program itself is not mutated. Every merged entry flows
+  to the LM request, including a predicted-outputs `:prediction` map. Raises
+  `ArgumentError` if `config` is not a keyword list.
 
       Imp.Predict.Predict.call(program, %{question: "..."},
         temperature: 0.2,
@@ -286,12 +286,10 @@ defmodule Imp.Predict.Predict do
     }
   end
 
-  # Imp.Saving's portable-LM doctrine (already enforced by RLM): a program
-  # pinned to a non-portable LM must fail LOUDLY at dump time instead of
-  # silently persisting `dynamic_lm: false` with a nil LM — an artifact that
-  # would load as a dynamic program answering with the global LM. The escape
-  # hatch is explicit: pin a portable ReqLLM client, or opt in to dynamic LM
-  # resolution (build the program without `:lm`).
+  # A program pinned to a non-portable LM fails loudly here rather than
+  # persisting `dynamic_lm: false` with a nil LM, which would load as a dynamic
+  # program answering with the global LM. Callers pin a portable ReqLLM client,
+  # or build the program without `:lm` to resolve the LM at call time.
   defp dump_lm(lm, dynamic_lm?),
     do: Imp.Saving.dump_portable_lm(lm, dynamic_lm?, "Predict LM")
 
@@ -332,12 +330,9 @@ defmodule Imp.Predict.Predict do
   end
 
   @doc false
-  # DSPy 3.2.1 Predict.forward warns (logger.warning, "not in signature") on
-  # every call that carries input keys outside the signature, then proceeds —
-  # the extras are ignored, not fatal (dspy/predict/predict.py,
-  # test_extra_fields_warning). Imp matches: loud per-call warning, call
-  # continues. Public (doc-false) so entry points that filter inputs before
-  # reaching Predict (ReActV2) can emit the same warning at their boundary.
+  # Input keys outside the signature warn once per call and are then ignored;
+  # they are never fatal. Public so entry points that filter inputs before they
+  # reach `Predict`, such as ReActV2, can warn at their own boundary.
   def warn_extra_inputs(signature, inputs, except \\ []) do
     expected = Enum.map(signature.inputs, & &1.name)
     allowed = MapSet.new(Enum.map(expected, &to_string/1) ++ Enum.map(except, &to_string/1))
@@ -360,11 +355,9 @@ defmodule Imp.Predict.Predict do
     :ok
   end
 
-  # DSPy 3.2.1 Predict._forward_preprocess: "Populate default values for
-  # missing input fields" — an input field declared with a default fills in
-  # when the caller omits it, BEFORE the extra/type/missing checks
-  # (test_input_field_default_value). Fields without a default are untouched,
-  # so a genuinely missing required field still fails loudly.
+  # An input field declared with a default fills in when the caller omits it,
+  # before the extra-key, type and missing-field checks. A field without a
+  # default is untouched, so a missing required field still fails.
   defp apply_input_defaults(signature, inputs) do
     Enum.reduce(signature.inputs, inputs, fn field, acc ->
       case Map.fetch(field.metadata, :default) do
@@ -385,18 +378,13 @@ defmodule Imp.Predict.Predict do
     end)
   end
 
-  # DSPy 3.2.1 Predict._forward_preprocess soft-validates provided inputs
-  # against the signature's declared types when `settings.warn_on_type_mismatch`
-  # is on (the default): a mismatch logs a warning and the call proceeds —
-  # never an error (test_type_mismatch_warning and family). Imp matches, with
-  # two documented seams:
-  #   * nil values are skipped (upstream skips None);
-  #   * plain `:string` fields without an enum constraint are skipped: Imp
-  #     defaults every untyped field to :string, so an implicit string is
-  #     indistinguishable from a declared one — this mirrors upstream's
-  #     IS_TYPE_UNDEFINED skip for unannotated fields (upstream also
-  #     special-cases a list of strings as str-compatible, so no upstream
-  #     test asserts a plain-str mismatch warning).
+  # Inputs are soft-validated against the signature's declared types when the
+  # `:warn_on_type_mismatch` setting is on (the default): a mismatch logs a
+  # warning and the call proceeds, never an error. Two values are skipped:
+  #   * nil;
+  #   * a plain `:string` field with no enum constraint, because every untyped
+  #     field defaults to `:string` and an implicit string cannot be told from
+  #     a declared one.
   defp warn_type_mismatches(signature, inputs) do
     if Map.get(Imp.Settings.get(), :warn_on_type_mismatch, true) do
       Enum.each(signature.inputs, fn field ->
@@ -418,17 +406,15 @@ defmodule Imp.Predict.Predict do
     :ok
   end
 
-  # The implicit-string seam (see the note above): a plain `:string` field
-  # without an enum constraint is skipped at the FIELD level only — a string
-  # element type nested inside `array[...]` was declared explicitly and is
-  # checked strictly.
+  # The implicit-string skip applies at field level only: a string element type
+  # nested inside `array[...]` was declared explicitly and is checked strictly.
   defp skip_field?(field) do
     field.type == :string and not is_list(fetch_meta(field_descriptor(field), :enum))
   end
 
   # A flat type descriptor for a field: its type plus its inline constraint
-  # keys (`enum`, `items`), the same shape Imp.Signature.Parser stores for
-  # array elements — so the compatibility walk recurses uniformly.
+  # keys (`enum`, `items`). This is the shape `Imp.Signature.Parser` stores for
+  # array elements, so the compatibility walk recurses uniformly.
   defp field_descriptor(field) do
     constraints =
       case fetch_meta(field.metadata, :constraints) do
@@ -505,9 +491,8 @@ defmodule Imp.Predict.Predict do
   defp scalar?(value),
     do: is_binary(value) or is_atom(value) or is_number(value)
 
-  # Human label for the warning, in Imp's own type spellings: `integer`,
-  # `array[integer]`, `enum[pending, approved]` (upstream prints Python's:
-  # `int`, `list[int]`, `Literal['pending', 'approved']`).
+  # Human label for the warning, in Imp's type spellings: `integer`,
+  # `array[integer]`, `enum[pending, approved]`.
   defp descriptor_label(descriptor) do
     case fetch_meta(descriptor, :enum) do
       allowed when is_list(allowed) ->
@@ -626,8 +611,8 @@ defmodule Imp.Predict.Predict do
     end
   end
 
-  # Prefer the capability-gated arity-3 form (DSPy-faithful response_format
-  # selection); fall back to arity-2 for adapters that predate it.
+  # The arity-3 form lets the adapter choose a response format from the LM's
+  # capability. An adapter that exports only `lm_opts/2` takes that instead.
   defp call_adapter_lm_opts(adapter, signature, config, lm) do
     opts =
       if function_exported?(adapter, :lm_opts, 3) do
@@ -658,9 +643,9 @@ defmodule Imp.Predict.Predict do
 
   defp ensure_adapter_loaded(adapter), do: {:error, {:invalid_adapter, adapter}}
 
-  # DSPy `n=` multi-completion (Predict._forward_preprocess): with n > 1 and an
-  # unset or near-zero temperature, the samples would collapse; upstream bumps
-  # temperature to 0.7 and Imp matches. `:n` itself flows to the LM request.
+  # With `n > 1` and an unset or near-zero temperature the samples would
+  # collapse to the same completion, so the temperature is raised to 0.7. `:n`
+  # itself flows to the LM request.
   defp multi_completion_opts(opts) do
     case Keyword.get(opts, :n, 1) do
       1 ->
@@ -680,9 +665,9 @@ defmodule Imp.Predict.Predict do
     end
   end
 
-  # An LM asked for n > 1 completions must return a list of outputs. An LM
-  # that ignores :n and returns a single output would silently produce one
-  # completion for an n=K request — that is an error, never a quiet fallback.
+  # An LM asked for `n > 1` completions must return a list of outputs. An LM
+  # that ignores `:n` and returns one output is an error, not a quiet fallback
+  # to a single completion.
   defp validate_completion_shape(opts, raw) do
     n = Keyword.get(opts, :n, 1)
 
@@ -696,12 +681,10 @@ defmodule Imp.Predict.Predict do
     end
   end
 
-  # Multi-completion parse: the K completions parse independently; the first is
-  # the primary prediction and `completions` holds all K in order (DSPy
-  # `Prediction.from_completions` / `result.completions.field[i]`). A parse
-  # failure on ANY completion fails the whole call loudly with the failing
-  # index — matching upstream, where one bad completion raises for the call
-  # (after the chat->JSON fallback, which Imp also applies to the whole call).
+  # The K completions parse independently: the first is the primary prediction
+  # and `completions` holds all K in order. A parse failure on any one of them
+  # fails the whole call, reporting the failing index, after the chat-to-JSON
+  # fallback has been tried for the call.
   defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos)
        when is_list(raw) do
     case parse_completions(adapter, signature, raw) do
@@ -763,11 +746,9 @@ defmodule Imp.Predict.Predict do
     end
   end
 
-  # DSPy 3.2.1 ChatAdapter.__call__ retries any failure through JSONAdapter
-  # unless the adapter IS a JSONAdapter or use_json_adapter_fallback is false
-  # (dspy/adapters/chat_adapter.py). XMLAdapter subclasses ChatAdapter without
-  # overriding __call__, so it inherits the same JSON fallback — byte-verified
-  # by the xml_missing_output_error golden-trace case (dee-ovd3).
+  # The chat and XML adapters retry any parse failure through the JSON adapter
+  # unless the caller sets `json_fallback: false`. No other adapter does: the
+  # JSON adapter has nothing to fall back to.
   defp chat_json_fallback?(adapter, opts) when adapter in [Imp.Adapter.Chat, Imp.Adapter.XML],
     do: Keyword.get(opts, :json_fallback, true)
 
@@ -800,10 +781,9 @@ defmodule Imp.Predict.Predict do
     end
   end
 
-  # Multi-completion twin of retry_with_json_adapter/8: the whole call is
-  # retried through the JSON adapter (as upstream's ChatAdapter fallback
-  # retries the whole call), and the retry must again return one output per
-  # completion.
+  # Multi-completion twin of the single-completion JSON retry: the whole call
+  # is retried through the JSON adapter, and the retry must again return one
+  # output per completion.
   defp retry_completions_with_json_adapter(
          error,
          signature,
@@ -932,11 +912,10 @@ defmodule Imp.Predict.Predict do
      }}
   end
 
-  # DSPy's bootstrap trace retains the output fields that were decoded before
-  # a typed adapter failure. GRPO uses that structural progress to distinguish
-  # a wholly malformed completion from one that partially followed a
-  # multi-output signature. Keep only field names here: values remain in the
-  # already-redacted raw trace and typed parsing still fails loudly.
+  # Records which output fields were decoded before a typed adapter failure,
+  # so an optimizer can tell a wholly malformed completion from one that
+  # partly followed a multi-output signature. Field names only: values stay in
+  # the redacted raw trace, and typed parsing still fails.
   defp format_progress(error, signature) do
     expected = Enum.map(signature.outputs, & &1.name)
     present = present_output_fields(error, expected)

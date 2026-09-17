@@ -326,12 +326,10 @@ defmodule Imp.Optimize.Anything.AdapterTest do
     end
   end
 
-  # Regression for de-pacg: the store used to be an unlinked Agent with a janitor
-  # process that killed it when its CREATOR exited, even though the adapter
-  # struct is a value that can be handed to any process — a creator exiting
-  # mid-evaluation crashed in-flight workers on Agent.get_and_update. The store
-  # is now supervised (Imp.Optimize.Anything.StateStoreSupervisor) and has a
-  # single cleanup path: explicit close/1 (or application shutdown).
+  # The adapter struct is a value that can be handed to any process, so the
+  # store must not die with its creator. It is supervised by
+  # Imp.Optimize.Anything.StateStoreSupervisor and has a single cleanup path:
+  # explicit close/1, or application shutdown.
   test "store survives its creator; adapter stays usable elsewhere until close/1" do
     parent = self()
 

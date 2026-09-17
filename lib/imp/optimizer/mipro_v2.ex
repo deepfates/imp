@@ -761,7 +761,7 @@ defmodule Imp.Optimizer.MIPROv2 do
         max_errors: optimizer.max_errors
       )
 
-    # Imp.Evaluate now halts loudly at errors >= max_errors (DSPy
+    # Imp.Evaluate halts at errors >= max_errors (DSPy
     # parallelizer semantics); translate into MIPROv2's budget error so the
     # optimizer-facing contract stays the same.
     result =

@@ -43,7 +43,7 @@ defmodule Imp.Optimizer.GEPA do
   alternate stopping rules. A finite
   `:max_metric_calls` is the pinned profile's authoritative semantic budget and
   supersedes the BEAM-native `:generations` knob. When the metric budget is
-  `:infinity`, `:generations` retains its legacy budget-derivation behavior.
+  `:infinity`, `:generations` derives the budget instead.
   The first profile is the released no-merge ablation. The second enables the
   same source-authenticated common-ancestor merge path used by DSPy's ordinary
   GEPA treatment.

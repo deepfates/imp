@@ -812,9 +812,9 @@ defmodule Imp.Saving do
   defp dump_optional_callback(nil, _context), do: nil
   defp dump_optional_callback(callback, context), do: dump_callback!(callback, context)
 
-  # KNNFewShot's per-call BootstrapFewShot arguments. Teacher settings can
-  # carry live LM handles, so a non-empty teacher_settings refuses to persist
-  # LOUDLY instead of silently dropping optimizer behavior.
+  # KNNFewShot's per-call BootstrapFewShot arguments. Teacher settings can carry
+  # a live LM handle, so a non-empty `teacher_settings` raises rather than
+  # dumping an artifact whose optimizer behavior has quietly changed.
   defp dump_knn_bootstrap!(%Imp.Optimizer.BootstrapFewShot{} = bootstrap) do
     unless bootstrap.teacher_settings == [] do
       raise ArgumentError,
@@ -839,8 +839,8 @@ defmodule Imp.Saving do
   defp decode_infinity("infinity"), do: :infinity
   defp decode_infinity(value), do: value
 
-  # The KNN vectorizer is either an Imp.Embeddings provider MODULE (portable
-  # by name, revalidated at load) or a function (portable only through the
+  # The KNN vectorizer is either an Imp.Embeddings provider module (portable by
+  # name, revalidated at load) or a function (portable only through the
   # named-callback registry, like every other persisted callback).
   defp dump_vectorizer!(module) when is_atom(module),
     do: %{"kind" => "module", "name" => Atom.to_string(module)}
@@ -1149,9 +1149,9 @@ defmodule Imp.Saving do
   end
 
   @doc false
-  # Shared portable-LM doctrine for every dumping program (RLM, Predict, ...):
-  # a pinned (`dynamic?: false`) LM that cannot be serialized must raise here,
-  # never dump as nil — a `{"dynamic_lm" => false, "lm" => nil}` artifact loads
+  # Shared by every dumping program (Predict, RLM, ...): a pinned
+  # (`dynamic?: false`) LM that cannot be serialized raises here and never dumps
+  # as nil, because a `{"dynamic_lm" => false, "lm" => nil}` artifact would load
   # as a dynamic program that silently answers with the global LM.
   def dump_portable_lm(nil, true, _context), do: nil
 
@@ -1695,8 +1695,8 @@ defmodule Imp.Saving do
   # Optimizer artifacts are an untrusted persistence boundary. Predictor names
   # are compared with the trusted live program during Artifact.apply/4, so the
   # wire representation stays a string and never interns an atom from bytes.
-  # The tagged-atom clause preserves schema-2/schema-3 artifacts written by
-  # earlier Imp versions without depending on incidental VM atom preloading.
+  # The tagged-atom clause accepts the schema-2 and schema-3 encodings without
+  # depending on which atoms the loading VM happens to have interned.
   defp encode_parameter_name!(name) when is_atom(name), do: Atom.to_string(name)
   defp encode_parameter_name!(name) when is_binary(name), do: name
 
