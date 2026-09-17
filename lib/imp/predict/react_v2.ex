@@ -69,6 +69,11 @@ defmodule Imp.Predict.ReActV2 do
   `:context_projected` events. If the current call and instructions alone exceed
   the window, an incomplete prediction retains history and context diagnostics.
   This is lossy prompt selection, not summarization or deletion of memory.
+
+  Tool history retains provider-native reasoning text and opaque reasoning
+  details for continuation, including after `Imp.History.dump/1` and `Imp.History.load/1`.
+  These are operational protocol data and must remain unmodified. Store history
+  privately; use redacted events or `Imp.History.redact/1` for diagnostic copies.
   """
 
   @behaviour Imp.Module
@@ -962,6 +967,10 @@ defmodule Imp.Predict.ReActV2 do
     |> Map.put(:tool_call_results, results)
     |> then(fn event -> if final, do: Map.merge(event, final), else: event end)
     |> Imp.Redaction.redact()
+    # Opaque signatures and reasoning blocks may resemble credentials. Preserve
+    # the provider's continuation state exactly; Run events redact their copies.
+    |> maybe_put(:reasoning_content, Map.get(prediction.metadata, :native_reasoning))
+    |> maybe_put(:reasoning_details, Map.get(prediction.metadata, :reasoning_details))
   end
 
   defp final_prediction(final, history, reason) do

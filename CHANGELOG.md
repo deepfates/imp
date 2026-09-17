@@ -4,6 +4,12 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- ReActV2 preserves provider-native reasoning text and opaque reasoning details
+  across tool calls and saved-history reloads. ReqLLM receives the original
+  continuation data, including provider extension fields and signatures, instead
+  of losing it while rebuilding assistant messages. Operational history must be
+  stored privately; run events and explicit diagnostic redaction still redact
+  credential-shaped values.
 - A `ReActV2` turn now ends when the model stops calling tools. A step that
   comes back as prose with no tool call, for a task signature with exactly one
   output of type `:string`, finishes the run with that prose as the output and
