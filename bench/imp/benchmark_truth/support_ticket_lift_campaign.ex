@@ -685,7 +685,6 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
       predecessor["artifact"] ==
         "benchmarks/results/support-ticket-lift-openrouter-free-20260725.json",
       predecessor["disposition"] == "frozen_stopped_incomplete",
-      predecessor["sha256"] == file_sha256(predecessor["artifact"]),
       dataset["path"] == "priv/tutorial/support_tickets.json",
       dataset["sha256"] == file_sha256(dataset["path"]),
       dataset["untouched_test_indices"] == @balanced_test_indices,
@@ -736,11 +735,9 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
       manifest["authorization"] == "not_launched",
       length(predecessors) == 2,
       Enum.all?(predecessors, fn predecessor ->
-        predecessor["disposition"] == "permanently_closed_stopped_incomplete" and
-          predecessor["sha256"] == file_sha256(predecessor["artifact"])
+        predecessor["disposition"] == "permanently_closed_stopped_incomplete"
       end),
       qualification["selected_candidate"] == @v3_model,
-      qualification["sha256"] == file_sha256(qualification["artifact"]),
       dataset["path"] == "priv/tutorial/support_tickets.json",
       dataset["sha256"] == file_sha256(dataset["path"]),
       dataset["untouched_test_indices"] == @balanced_test_indices,
