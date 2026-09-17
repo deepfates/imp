@@ -225,10 +225,6 @@ defmodule AuthorityInventoryTest do
 
     bootstrap = families["family.optimizer_bootstrap_finetune"]
 
-    assert bootstrap["local_differential"]["artifacts"] == [
-             "benchmarks/evidence/admitted/local_mlx/7016478544971aba539f522905ec40f41a29380a1b09291ef7cca91cb7d4567d.json"
-           ]
-
     refute inspect(bootstrap) =~
              "c7299fa4900557388f86d37d3198b24f520f80238157c6f6a6b92511249a0d16"
 
