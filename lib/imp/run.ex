@@ -38,7 +38,10 @@ defmodule Imp.Run do
   and the snapshot whole however large it is, and with `:max_events` and
   `:max_snapshot_bytes` set to `:infinity` nothing is ever evicted. A host that
   must keep a complete record of a run sets all three. An oversized event
-  payload becomes a digest and size marker before sink delivery, and snapshot
+  payload becomes a digest and size marker before sink delivery. A failed
+  event keeps a small error marker in its place, with the validated HTTP
+  status, provider code and retryability when present and when the marker fits,
+  never the error message or the request and response bodies. Snapshot
   eviction adds a `:capture_gap` marker. A sink receives every bounded event;
   the snapshot is a bounded recent window.
   """
@@ -508,14 +511,56 @@ defmodule Imp.Run.Control do
         | input: nil,
           output: nil,
           reasoning: nil,
-          error: nil,
+          error: bounded_error(event.error),
           metadata:
             event.metadata
             |> Map.take([:model_call_id])
             |> Map.put(:capture, %{truncated: true, original_bytes: bytes, sha256: digest})
       }
+      |> fit_error_summary(max_bytes)
     end
   end
+
+  defp fit_error_summary(%{error: nil} = event, _max_bytes), do: event
+
+  defp fit_error_summary(event, max_bytes) do
+    marker = %{event | error: %{truncated: true}}
+
+    cond do
+      :erlang.external_size(event) <= max_bytes -> event
+      :erlang.external_size(marker) <= max_bytes -> marker
+      # The existing capture envelope may itself exceed a very small limit.
+      # Do not enlarge that envelope when even the failure marker cannot fit.
+      true -> %{event | error: nil}
+    end
+  end
+
+  defp bounded_error(nil), do: nil
+
+  # Errors can carry an entire provider request. Keep failure distinguishable
+  # from successful output without retaining messages, bodies, headers or cause.
+  # Redaction has already run; even these named fields must have bounded shapes.
+  defp bounded_error(error) when is_map(error) do
+    error
+    |> Map.take([:status, :provider_code, :retryable])
+    |> Enum.reduce(%{truncated: true}, fn
+      {:status, status}, summary when is_integer(status) and status in 100..599 ->
+        Map.put(summary, :status, status)
+
+      {:retryable, retryable}, summary when is_boolean(retryable) ->
+        Map.put(summary, :retryable, retryable)
+
+      {:provider_code, code}, summary when is_binary(code) and byte_size(code) <= 64 ->
+        if Regex.match?(~r/\A[A-Za-z0-9_.:-]+\z/, code),
+          do: Map.put(summary, :provider_code, code),
+          else: summary
+
+      _, summary ->
+        summary
+    end)
+  end
+
+  defp bounded_error(_error), do: %{truncated: true}
 
   defp bound_snapshot(state) do
     if over?(length(state.events), state.limits.max_events) or
