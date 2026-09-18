@@ -352,7 +352,17 @@ defmodule Imp.Adapter.Types do
   defmodule Citation, do: defstruct([:text, :source, metadata: %{}])
 
   defmodule ToolCall do
-    @moduledoc "Provider-native tool call value with stable id, name, and arguments."
+    @moduledoc """
+    Provider-native tool call value with stable id, name, and arguments.
+
+    `from_map/1` accepts the OpenAI wire shape (`%{"function" => %{"name",
+    "arguments"}}`) and a flat map. In a flat map the name may be spelled
+    `name`, `recipient_name` or `tool`, and the arguments `arguments`, `args`
+    or `parameters`, with atom or string keys. The spellings are here rather
+    than at each call site: `tool`/`arguments` is what a model emits when it
+    writes a tool call as JSON prose instead of calling natively, which is what
+    `Imp.Predict.ReActV2` then has to execute.
+    """
     defstruct [:name, arguments: %{}, id: nil]
 
     def new(name, arguments \\ %{}, opts \\ []) do
@@ -386,29 +396,9 @@ defmodule Imp.Adapter.Types do
     end
 
     def from_map(%{} = call) do
-      name =
-        call
-        |> Map.get(:name, Map.get(call, "name"))
-        |> case do
-          nil -> Map.get(call, :recipient_name, Map.get(call, "recipient_name"))
-          value -> value
-        end
-        |> normalize_name()
+      name = call |> first_key([:name, :recipient_name, :tool]) |> normalize_name()
 
-      arguments =
-        Map.get(
-          call,
-          :arguments,
-          Map.get(
-            call,
-            "arguments",
-            Map.get(
-              call,
-              :args,
-              Map.get(call, "args", Map.get(call, :parameters, Map.get(call, "parameters", %{})))
-            )
-          )
-        )
+      arguments = first_key(call, [:arguments, :args, :parameters]) || %{}
 
       id = Map.get(call, :id, Map.get(call, "id"))
 
@@ -438,6 +428,15 @@ defmodule Imp.Adapter.Types do
     defp from_function(function, _id) do
       raise ArgumentError,
             "OpenAI-style tool call function must be a map; got: #{inspect(function)}"
+    end
+
+    defp first_key(call, keys) do
+      Enum.find_value(keys, fn key ->
+        case Map.fetch(call, key) do
+          {:ok, value} -> value
+          :error -> Map.get(call, to_string(key))
+        end
+      end)
     end
 
     defp normalize_arguments(arguments) when is_binary(arguments) do

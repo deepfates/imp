@@ -4,6 +4,30 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- A signature field's description now reaches the provider in the JSON schema
+  Imp builds for it (`Imp.Schema.json_schema/1`), so `ReActV2`'s `submit` tool
+  declares each output field's own words about itself in its parameter schema.
+  A field without a description still emits no `description` key. This is the
+  only place a field description reaches a host that replaces the chat
+  adapter's rendered system section.
+- A `ReActV2` step answered in plain prose with no tool call is now a thought
+  that called nothing, not a parse failure. It used to fail the chat parse and
+  re-ask the whole prompt through `Imp.Adapter.JSON`, which doubled the cost of
+  the step and broke the provider's prefix cache; the prose is now
+  `next_thought`, `tool_calls` is empty, and the loop ends the step at the
+  forced `submit` as it already did for an empty tool-call list. The prose is
+  recorded as that turn's thought in the history and shown back to the model as
+  a plain assistant turn in the next request. `Imp.Adapter.Chat` reads a
+  marker-free completion this way only for a signature that declares
+  `metadata[:prose_step]`; every other signature parses exactly as before, JSON
+  fallback included.
+- `Imp.Adapter.Types.ToolCall.from_map/1` accepts `tool` as a spelling of the
+  tool name, beside `name` and `recipient_name` (the arguments already accepted
+  `arguments`, `args` and `parameters`). `%{"tool" => ..., "arguments" => ...}`
+  is what a model emits when it writes a tool call as JSON instead of calling
+  natively, and `Imp.Predict.ReActV2` now executes such a call instead of
+  recording a malformed-call observation and spending another iteration on it.
+
 ## 0.4.0 — 2026-09-17
 
 - `Imp.ACP` and `Imp.MCP.connect/2` are part of Imp. The separate `imp_acp`

@@ -534,7 +534,9 @@ defmodule ReActV2Test do
     assert Imp.get(prediction, :answer) == nil
     assert Imp.get(prediction, :termination_reason) == :max_iters
 
-    for _ <- 1..5 do
+    # Four requests, not five: the prose the required-only fallback returns is
+    # read as a thought that called nothing, so no JSON-adapter re-ask fires.
+    for _ <- 1..4 do
       assert_received {:required_only_tool_request, _messages, _opts}
     end
 
@@ -752,6 +754,169 @@ defmodule ReActV2Test do
     assert program.react.demos == [demo]
     assert {:ok, prediction} = Imp.call(program, %{question: "q"})
     assert Imp.get(prediction, :answer) == "ok"
+  end
+
+  # A step answered in prose with no tool call is a thought that called
+  # nothing: it costs one LM call, is recorded as that turn's thought, and ends
+  # the step at the forced submit.
+  test "a prose step is a thought, then the forced submit finishes the run" do
+    lm =
+      action_lm([
+        "I already know this one, no lookup needed.",
+        %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+      ])
+
+    lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [lookup], lm: lm)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :forced_submit
+
+    messages = prediction |> Imp.get(:history) |> Imp.History.messages()
+
+    assert Enum.any?(
+             messages,
+             &(Map.get(&1, :next_thought) == "I already know this one, no lookup needed.")
+           )
+  end
+
+  # What a model writes when it spells a tool call out as JSON rather than
+  # calling natively. `Imp.Adapter.Types.ToolCall.from_map/1` reads it as one
+  # call instead of an unexecutable malformed observation.
+  test "a tool call written with the tool/args keys is executed" do
+    parent = self()
+    reply = Imp.tool(:reply, "reply", fn arguments -> send(parent, {:replied, arguments}) end)
+
+    for call <- [
+          %{"tool" => "reply", "arguments" => %{"text" => "hello"}},
+          %{"tool" => "reply", "args" => %{"text" => "hello"}},
+          %{tool: :reply, arguments: %{text: "hello"}}
+        ] do
+      lm =
+        action_lm([
+          %{tool_calls: [call]},
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "done"}}]}
+        ])
+
+      assert {:ok, prediction} =
+               Imp.react_v2("question -> answer", [reply], lm: lm)
+               |> Imp.call(%{question: "say hello"})
+
+      assert Imp.get(prediction, :answer) == "done"
+      assert_received {:replied, %{text: "hello"}}
+    end
+  end
+
+  # A field's description is part of the contract. The submit tool's parameter
+  # schema is where it reaches a provider that is sent tools natively, and the
+  # only place it reaches a host that replaces the adapter's system section.
+  test "the submit tool schema carries each output field's description" do
+    signature =
+      Imp.Signature.new(%{
+        inputs: [:question],
+        outputs: [
+          %{name: :answer, desc: "One sentence, no citation."},
+          %{name: :confidence, type: :float}
+        ]
+      })
+
+    lm =
+      action_lm([%{tool_calls: [%{name: "submit", arguments: %{answer: "a", confidence: 1.0}}]}])
+
+    program = Imp.react_v2(signature, [], lm: lm)
+    submit = Enum.find(program.react.config[:tools], &(&1.function.name == "submit"))
+    properties = submit.function.parameters["properties"]
+
+    assert properties["answer"]["description"] == "One sentence, no citation."
+    refute Map.has_key?(properties["confidence"], "description")
+  end
+
+  # Recording the thought is only half of it: the forced request has to show it
+  # back, or the model is asked to submit without seeing what it just said.
+  test "a prose-only step is an assistant turn in the forced request" do
+    owner = self()
+    prose = "I already know this one, no lookup needed."
+    {:ok, state} = Agent.start_link(fn -> :first end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:request, messages})
+
+          Agent.get_and_update(state, fn
+            :first -> {prose, :second}
+            :second -> {%{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}, :done}
+          end)
+        end
+      )
+
+    lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [lookup],
+               lm: lm,
+               forced_submit_notice: "Submit now."
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+
+    assert_received {:request, _first}
+    assert_received {:request, forced}
+
+    roles_and_contents = Enum.map(forced, &{&1[:role], to_string(&1[:content])})
+
+    assert {:assistant, prose} in roles_and_contents
+
+    thought_at = Enum.find_index(roles_and_contents, &(&1 == {:assistant, prose}))
+
+    inputs_at =
+      Enum.find_index(roles_and_contents, fn {role, c} ->
+        role == :user and c =~ "Capital of France?"
+      end)
+
+    notice_at =
+      Enum.find_index(roles_and_contents, fn {role, c} -> role == :user and c =~ "Submit now." end)
+
+    assert inputs_at < thought_at
+    assert thought_at < notice_at
+  end
+
+  test "a prose-only turn in prior history renders as an assistant message" do
+    history =
+      Imp.History.new([
+        %{
+          question: "Earlier?",
+          next_thought: "Thinking out loud.",
+          tool_calls: [],
+          tool_call_results: []
+        }
+      ])
+
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:request, messages})
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "ok"}}]}
+        end
+      )
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [], lm: lm)
+             |> Imp.call(%{question: "Now?", history: history})
+
+    assert Imp.get(prediction, :answer) == "ok"
+    assert_received {:request, messages}
+
+    assert Enum.any?(
+             messages,
+             &(&1[:role] == :assistant and to_string(&1[:content]) == "Thinking out loud.")
+           )
   end
 
   defp action_lm(actions, notify \\ nil) do
