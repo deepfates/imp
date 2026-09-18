@@ -107,7 +107,7 @@ defmodule Imp.RunObservationTest do
 
     assert [_started, retained] = Imp.Run.events(run)
     assert retained.output == payload
-    Imp.Run.stop(run)
+    Imp.Run.cancel(run)
   end
 
   test "an infinite event bound still truncates when a byte bound is set" do
@@ -123,7 +123,7 @@ defmodule Imp.RunObservationTest do
     assert [_started, large] = Imp.Run.events(run)
     assert large.output == nil
     assert large.metadata.capture.truncated
-    Imp.Run.stop(run)
+    Imp.Run.cancel(run)
   end
 
   test "capture limits still reject anything that is neither a positive integer nor infinity" do
