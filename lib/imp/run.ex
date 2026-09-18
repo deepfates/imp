@@ -25,9 +25,14 @@ defmodule Imp.Run do
 
   Capture defaults to 64 KiB per event and a 512-event, 4 MiB snapshot;
   `:max_event_bytes`, `:max_events` and `:max_snapshot_bytes` override them at
-  start. An oversized event payload becomes a digest and size marker before sink
-  delivery, and snapshot eviction adds a `:capture_gap` marker. A sink receives
-  every bounded event; the snapshot is a bounded recent window.
+  start. Each takes a positive integer or `:infinity`, which removes that bound
+  entirely: with `:max_event_bytes` set to `:infinity` an event reaches the sink
+  and the snapshot whole however large it is, and with `:max_events` and
+  `:max_snapshot_bytes` set to `:infinity` nothing is ever evicted. A host that
+  must keep a complete record of a run sets all three. An oversized event
+  payload becomes a digest and size marker before sink delivery, and snapshot
+  eviction adds a `:capture_gap` marker. A sink receives every bounded event;
+  the snapshot is a bounded recent window.
   """
 
   alias Imp.Run.Control
@@ -299,8 +304,8 @@ defmodule Imp.Run.Control do
       max_snapshot_bytes: Keyword.get(capture, :max_snapshot_bytes, 4_194_304)
     }
 
-    unless Enum.all?(limits, fn {_, n} -> is_integer(n) and n > 0 end),
-      do: raise(ArgumentError, "run capture limits must be positive integers")
+    unless Enum.all?(limits, fn {_, n} -> bound?(n) end),
+      do: raise(ArgumentError, "run capture limits must be positive integers or :infinity")
 
     {:ok, delivery} = EventDelivery.start_link(Keyword.fetch!(opts, :event_sink))
 
@@ -453,6 +458,13 @@ defmodule Imp.Run.Control do
     |> bound_snapshot()
   end
 
+  defp bound?(:infinity), do: true
+  defp bound?(n), do: is_integer(n) and n > 0
+
+  # `:infinity` is the absence of a bound, not a very large one: the event is
+  # never measured, so a host that wants the whole record pays no digest cost.
+  defp bound_event(event, :infinity), do: event
+
   defp bound_event(event, max_bytes) do
     bytes = :erlang.external_size(event)
 
@@ -476,8 +488,8 @@ defmodule Imp.Run.Control do
   end
 
   defp bound_snapshot(state) do
-    if length(state.events) > state.limits.max_events or
-         state.snapshot_bytes > state.limits.max_snapshot_bytes do
+    if over?(length(state.events), state.limits.max_events) or
+         over?(state.snapshot_bytes, state.limits.max_snapshot_bytes) do
       {last, events} = List.pop_at(state.events, -1)
 
       bound_snapshot(%{
@@ -490,6 +502,9 @@ defmodule Imp.Run.Control do
       state
     end
   end
+
+  defp over?(_measured, :infinity), do: false
+  defp over?(measured, limit), do: measured > limit
 
   defp safe_cancel(fun, reason) do
     _ = fun.(reason)

@@ -36,8 +36,10 @@ Capture is bounded separately from execution. `Imp.Run.start/3` accepts
 markers before sink delivery. Snapshot eviction adds a `capture_gap` marker;
 the sink can retain all bounded events independently of snapshot eviction.
 Applications can choose a larger event bound when persisting long prompts, but
-must account for memory and sink throughput. A digest is not a recoverable
-artifact. Truncated observations are never exported as complete model output.
+must account for memory and sink throughput. Each of the three also accepts
+`:infinity`, which removes that bound: a host that needs a complete record of a
+run sets all three and accepts that the run holds every event in memory. A
+digest is not a recoverable artifact. Truncated observations are never exported as complete model output.
 
 The projection uses ATIF-v1.8. It preserves actual initial context roles, marks
 that context as copied, and keeps later model request messages in metadata.
