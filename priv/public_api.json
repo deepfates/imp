@@ -7370,6 +7370,7 @@
       },
       "source": "lib/imp/predict/react_v2.ex",
       "struct_fields": [
+        "forced_submit_notice",
         "max_iters",
         "react",
         "signature",
