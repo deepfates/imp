@@ -754,6 +754,33 @@ defmodule ReActV2Test do
     assert Imp.get(prediction, :answer) == "ok"
   end
 
+  # What a model writes when it spells a tool call out as JSON rather than
+  # calling natively. `Imp.Adapter.Types.ToolCall.from_map/1` reads it as one
+  # call instead of an unexecutable malformed observation.
+  test "a tool call written with the tool/args keys is executed" do
+    parent = self()
+    reply = Imp.tool(:reply, "reply", fn arguments -> send(parent, {:replied, arguments}) end)
+
+    for call <- [
+          %{"tool" => "reply", "arguments" => %{"text" => "hello"}},
+          %{"tool" => "reply", "args" => %{"text" => "hello"}},
+          %{tool: :reply, arguments: %{text: "hello"}}
+        ] do
+      lm =
+        action_lm([
+          %{tool_calls: [call]},
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "done"}}]}
+        ])
+
+      assert {:ok, prediction} =
+               Imp.react_v2("question -> answer", [reply], lm: lm)
+               |> Imp.call(%{question: "say hello"})
+
+      assert Imp.get(prediction, :answer) == "done"
+      assert_received {:replied, %{text: "hello"}}
+    end
+  end
+
   defp action_lm(actions, notify \\ nil) do
     {:ok, state} = Agent.start_link(fn -> actions end)
 

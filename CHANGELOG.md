@@ -4,6 +4,13 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- `Imp.Adapter.Types.ToolCall.from_map/1` accepts `tool` as a spelling of the
+  tool name, beside `name` and `recipient_name` (the arguments already accepted
+  `arguments`, `args` and `parameters`). `%{"tool" => ..., "arguments" => ...}`
+  is what a model emits when it writes a tool call as JSON instead of calling
+  natively, and `Imp.Predict.ReActV2` now executes such a call instead of
+  recording a malformed-call observation and spending another iteration on it.
+
 ## 0.4.0 — 2026-09-17
 
 - `Imp.ACP` and `Imp.MCP.connect/2` are part of Imp. The separate `imp_acp`
