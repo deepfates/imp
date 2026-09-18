@@ -16,7 +16,8 @@ User-visible changes to Imp are recorded here.
   the step and broke the provider's prefix cache; the prose is now
   `next_thought`, `tool_calls` is empty, and the loop ends the step at the
   forced `submit` as it already did for an empty tool-call list. The prose is
-  recorded as that turn's thought in the history. `Imp.Adapter.Chat` reads a
+  recorded as that turn's thought in the history and shown back to the model as
+  a plain assistant turn in the next request. `Imp.Adapter.Chat` reads a
   marker-free completion this way only for a signature that declares
   `metadata[:prose_step]`; every other signature parses exactly as before, JSON
   fallback included.

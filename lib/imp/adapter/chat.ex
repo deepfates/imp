@@ -1069,11 +1069,16 @@ defmodule Imp.Adapter.Chat do
       content: render_inputs(signature, turn, skip: history_input_fields(signature))
     }
 
-    assistant = %{
-      role: :assistant,
-      content: fetch_field(turn, :next_thought) |> blank_to_empty(),
-      tool_calls: calls
-    }
+    thought = turn |> fetch_field(:next_thought) |> blank_to_empty()
+
+    # A step that said something and called nothing is a plain assistant turn:
+    # no `tool_calls` key for a provider to reconcile, and the thought is shown
+    # back to the model, which is the point of recording it. A turn with
+    # neither content nor calls is dropped below.
+    assistant =
+      if calls == [],
+        do: %{role: :assistant, content: thought},
+        else: %{role: :assistant, content: thought, tool_calls: calls}
 
     tool_messages =
       Enum.map(results, fn result ->
