@@ -52,21 +52,8 @@ defmodule Imp.Predict.ReActV2 do
     # What to tell the model when the loop makes it submit. A 1-arity function
     # of the termination reason, or a plain string; nil says nothing, which is
     # what the loop did before this option existed.
-    forced_submit_notice: [
-      type: {:custom, __MODULE__, :validate_forced_submit_notice, []},
-      default: nil
-    ]
+    forced_submit_notice: [type: {:or, [{:fun, 1}, :string, nil]}, default: nil]
   ]
-
-  @doc false
-  def validate_forced_submit_notice(nil), do: {:ok, nil}
-  def validate_forced_submit_notice(text) when is_binary(text), do: {:ok, text}
-  def validate_forced_submit_notice(fun) when is_function(fun, 1), do: {:ok, fun}
-
-  def validate_forced_submit_notice(other),
-    do:
-      {:error,
-       "expected :forced_submit_notice to be a string or a 1-arity function, got: #{inspect(other)}"}
 
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)

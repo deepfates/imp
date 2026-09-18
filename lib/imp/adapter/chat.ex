@@ -13,8 +13,10 @@ defmodule Imp.Adapter.Chat do
 
   Options to `format/3`: `:demos`, `:response_instruction`, `:guidance`,
   `:omit_empty_request`, and the renderer seams `:output_renderer`,
-  `:input_section_renderer` and `:system_renderer`, which let another adapter
-  reuse this message assembly with its own dialect. Options outside that list
+  `:input_section_renderer`, `:system_renderer` and `:tool_result_renderer`,
+  which let another adapter reuse this message assembly with its own dialect
+  and let a host bound what a tool result costs in the prompt without changing
+  what the loop records. Options outside that list
   are ignored; anything that is not a keyword list raises `ArgumentError`.
   """
 
@@ -39,6 +41,13 @@ defmodule Imp.Adapter.Chat do
     # format options, so a renderer can read `:guidance`. Default:
     # `render_system/2`. Replacing it leaves parsing unchanged.
     system_renderer: [type: {:fun, 2}],
+    # Renderer for one TOOL result message: (result, call), where call is
+    # `%{id:, name:}` for the call that produced it. Default:
+    # `format_tool_result/1`. This is where a host bounds what the model reads
+    # of a large result: the loop still records the whole result in history and
+    # in run events, and only the prompt carries the bounded view. Errors reach
+    # it too, so a host decides how a failure reads.
+    tool_result_renderer: [type: {:fun, 2}],
     # Loop guidance a program passes as data rather than writing into
     # `signature.instructions`: `%{finish_tool:, input_names:, output_names:,
     # tool_names:}`.
@@ -60,8 +69,11 @@ defmodule Imp.Adapter.Chat do
     input_renderer = Keyword.get(opts, :input_section_renderer) || (&chat_input_section/2)
     system_renderer = Keyword.get(opts, :system_renderer) || (&render_system/2)
 
+    tool_result_renderer =
+      Keyword.get(opts, :tool_result_renderer) || (&default_tool_result_renderer/2)
+
     {history_messages, history_fields} =
-      extract_history(signature, inputs, output_renderer, input_renderer)
+      extract_history(signature, inputs, output_renderer, input_renderer, tool_result_renderer)
 
     request = %{
       role: :user,
@@ -983,7 +995,9 @@ defmodule Imp.Adapter.Chat do
     )
   end
 
-  defp extract_history(signature, inputs, renderer, input_renderer) do
+  defp default_tool_result_renderer(result, _call), do: format_tool_result(result)
+
+  defp extract_history(signature, inputs, renderer, input_renderer, tool_result_renderer) do
     signature.inputs
     |> Enum.reduce({[], MapSet.new()}, fn field, {messages, fields} ->
       case fetch_field(inputs, field.name) do
@@ -993,7 +1007,8 @@ defmodule Imp.Adapter.Chat do
                signature,
                Imp.History.messages(history),
                renderer,
-               input_renderer
+               input_renderer,
+               tool_result_renderer
              ), MapSet.put(fields, field.name)}
 
         _other ->
@@ -1002,13 +1017,13 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  defp render_history_turns(signature, turns, renderer, input_renderer) do
+  defp render_history_turns(signature, turns, renderer, input_renderer, tool_result_renderer) do
     turns
     |> Enum.flat_map(fn turn ->
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
 
       if native_tool_history_turn?(turn) do
-        render_native_tool_history_turn(signature, turn)
+        render_native_tool_history_turn(signature, turn, tool_result_renderer)
       else
         [
           %{
@@ -1032,7 +1047,7 @@ defmodule Imp.Adapter.Chat do
 
   defp native_tool_history_turn?(turn), do: not is_nil(fetch_field(turn, :tool_calls))
 
-  defp render_native_tool_history_turn(signature, turn) do
+  defp render_native_tool_history_turn(signature, turn, tool_result_renderer) do
     calls = normalize_history_tool_calls(fetch_field(turn, :tool_calls))
     results = List.wrap(fetch_field(turn, :tool_call_results))
 
@@ -1050,10 +1065,11 @@ defmodule Imp.Adapter.Chat do
     tool_messages =
       Enum.map(results, fn result ->
         id = fetch_field(result, :id)
+        call = %{id: id, name: result |> fetch_field(:name) |> blank_to_empty()}
 
         %{
           role: :tool,
-          content: result |> fetch_field(:result) |> format_tool_result(),
+          content: tool_result_renderer.(fetch_field(result, :result), call),
           tool_calls: [%{id: id}]
         }
       end)
