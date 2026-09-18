@@ -4,7 +4,10 @@ defmodule Imp.Predict.ReActV2 do
 
   ReActV2 preserves parallel tool call IDs and results in `Imp.History`, keeps
   unknown and failed tool calls as observations, and forces a final `submit`
-  call when the loop ends without outputs. If a provider cannot
+  call when the loop ends without outputs. That forced request says nothing
+  about why by default; `:forced_submit_notice`, a string or a 1-arity function
+  of the termination reason, adds one user-visible turn saying so, which is kept
+  in the returned history like any other turn. If a provider cannot
   honor that tool contract, a tools-disabled typed extractor derives the task
   outputs from the original inputs and accumulated history.
 
@@ -24,7 +27,14 @@ defmodule Imp.Predict.ReActV2 do
 
   @malformed_tool_call "__imp_malformed_tool_call__"
 
-  defstruct [:signature, :react, tools: %{}, max_iters: 20, tool_policy: :allow]
+  defstruct [
+    :signature,
+    :react,
+    :forced_submit_notice,
+    tools: %{},
+    max_iters: 20,
+    tool_policy: :allow
+  ]
 
   @type t :: %__MODULE__{}
 
@@ -38,8 +48,25 @@ defmodule Imp.Predict.ReActV2 do
     adapter_opts: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     max_iters: [type: :non_neg_integer, default: 20],
-    tool_policy: [type: {:custom, Imp.ToolPolicy, :validate, []}, default: :allow]
+    tool_policy: [type: {:custom, Imp.ToolPolicy, :validate, []}, default: :allow],
+    # What to tell the model when the loop makes it submit. A 1-arity function
+    # of the termination reason, or a plain string; nil says nothing, which is
+    # what the loop did before this option existed.
+    forced_submit_notice: [
+      type: {:custom, __MODULE__, :validate_forced_submit_notice, []},
+      default: nil
+    ]
   ]
+
+  @doc false
+  def validate_forced_submit_notice(nil), do: {:ok, nil}
+  def validate_forced_submit_notice(text) when is_binary(text), do: {:ok, text}
+  def validate_forced_submit_notice(fun) when is_function(fun, 1), do: {:ok, fun}
+
+  def validate_forced_submit_notice(other),
+    do:
+      {:error,
+       "expected :forced_submit_notice to be a string or a 1-arity function, got: #{inspect(other)}"}
 
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
@@ -88,7 +115,8 @@ defmodule Imp.Predict.ReActV2 do
         ),
       tools: tools,
       max_iters: opts[:max_iters],
-      tool_policy: opts[:tool_policy]
+      tool_policy: opts[:tool_policy],
+      forced_submit_notice: opts[:forced_submit_notice]
     }
   end
 
@@ -222,6 +250,8 @@ defmodule Imp.Predict.ReActV2 do
          initial_error,
          execution
        ) do
+    history = append_forced_submit_notice(react, history, reason)
+
     case forced_submit_prediction(react, history, pending) do
       {:ok, prediction, history} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
@@ -255,6 +285,26 @@ defmodule Imp.Predict.ReActV2 do
         })
     end
   end
+
+  # The notice is what the model is told, so it goes into the durable history
+  # rather than into one request: the record of the run carries it, and the
+  # prompt renders it as the last user message before the forced request.
+  defp append_forced_submit_notice(react, history, reason) do
+    case notice_text(react.forced_submit_notice, reason) do
+      text when is_binary(text) and text != "" ->
+        case Imp.Signature.input_names(react.signature) do
+          [first | _rest] -> append_history(history, %{first => text})
+          [] -> history
+        end
+
+      _none ->
+        history
+    end
+  end
+
+  defp notice_text(nil, _reason), do: nil
+  defp notice_text(text, _reason) when is_binary(text), do: text
+  defp notice_text(fun, reason) when is_function(fun, 1), do: fun.(reason)
 
   defp forced_submit_prediction(react, history, pending) do
     forced = forced_submit_program(react, %{type: "tool", name: "submit"})

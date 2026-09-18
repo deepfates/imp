@@ -72,8 +72,7 @@ defmodule Imp.Adapter.ChatFormatValueTest do
     assert Chat.format_tool_result({:error, {:tool_error, :read, "no such file"}}) ==
              "Error: read failed: no such file"
 
-    assert Chat.format_tool_result(
-             {:error, {:tool_authorization_denied, :post, :client_denied}}
-           ) == "Error: post was not allowed; the person declined it."
+    assert Chat.format_tool_result({:error, {:tool_authorization_denied, :post, :client_denied}}) ==
+             "Error: post was not allowed; the person declined it."
   end
 end
