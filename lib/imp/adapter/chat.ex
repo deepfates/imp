@@ -790,9 +790,11 @@ defmodule Imp.Adapter.Chat do
 
   Successful results format like any other value. A failed result renders as
   one sentence instead of an Elixir term: a denied call says who declined it,
-  a crashed tool names itself and its message, and an atom reason is spelled
-  out. Hosts that relay Imp tool results over a protocol boundary should use
-  this so the same words reach the person that reached the model.
+  a crashed tool names itself and its message, an atom reason is spelled out, a
+  rejected `submit` says which outputs it needs, and a structured `:reason` map
+  reads as its reason and limit. Hosts that relay Imp tool results over a
+  protocol boundary should use this so the same words reach the person that
+  reached the model.
 
       iex> Imp.Adapter.Chat.format_tool_result({:error, {:tool_authorization_denied, :post, :client_denied}})
       "Error: post was not allowed; the person declined it."
@@ -808,13 +810,47 @@ defmodule Imp.Adapter.Chat do
     do: "#{name} was not allowed: #{error_prose(reason)}"
 
   defp error_prose({:tool_error, name, message}), do: "#{name} failed: #{error_prose(message)}"
+
+  # A failed submit is the one tool error the model is expected to act on, so it
+  # says what is wrong with the call rather than naming an internal term.
+  defp error_prose({:missing_output_fields, names}) when is_list(names),
+    do: "submit is missing: " <> Enum.map_join(names, ", ", &to_string/1)
+
+  defp error_prose({:invalid_submit_outputs, reason}),
+    do: "submit outputs were not accepted: #{error_prose(reason)}"
+
+  defp error_prose({:invalid_submit_arguments, _arguments}), do: "submit needs a map of outputs"
+
   defp error_prose(reason) when is_binary(reason), do: reason
 
   defp error_prose(reason) when is_atom(reason),
     do: reason |> Atom.to_string() |> String.replace("_", " ")
 
   defp error_prose(reason) when is_exception(reason), do: Exception.message(reason)
+
+  # Adapters and tools carry structured failures as a map keyed on :reason. The
+  # reason is the sentence; a :limit is the number the reader needs with it.
+  defp error_prose(reason) when is_map(reason) and not is_struct(reason) do
+    case fetch_either(reason, :reason) do
+      {:ok, value} ->
+        case fetch_either(reason, :limit) do
+          {:ok, limit} -> "#{error_prose(value)} (limit #{format_value(limit)})"
+          :error -> error_prose(value)
+        end
+
+      :error ->
+        inspect(reason, limit: 20)
+    end
+  end
+
   defp error_prose(reason), do: inspect(reason, limit: 20)
+
+  defp fetch_either(map, key) do
+    case Map.fetch(map, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(map, Atom.to_string(key))
+    end
+  end
 
   # Scalars take Python's `str(...)` spelling: `None`, `True`, `False`, where
   # Elixir's `to_string/1` would give "", "true" and "false". Public as an
