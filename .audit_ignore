@@ -16,22 +16,10 @@
 # Shared facts. mix.lock pins cowlib 2.20.0, the newest release on Hex, and
 # cowboy 2.19.0. Both arrive only through ex_mcp, which imp declares
 # `runtime: false`; imp's own Plug.Cowboy call sites are tests, bench and the
-# source-checkout-only demo task, none of which ship in the Hex package. All
-# three ERLEF records carry an open-ended Hex range (introduced 2.9.0, no fixed
-# version), so hex.audit flags every cowlib release that exists, including the
-# ones that carry the fix. That is why the advisory gate moved to mix_audit.
-
-# EEF-CVE-2026-43971 / CVE-2026-43971 (MEDIUM) - Link header directive smuggling
-# via unescaped target/rel/attribute keys in cow_link:link/1.
-# VERIFIED FIXED in the version we ship. The ERLEF record names fix commit
-# 89da27ee4c241f5d649ba7d9b7f2188918af6cea ("Link: escape and validate values
-# when building", 2026-08-18); in ninenines/cowlib,
-# `git merge-base --is-ancestor 89da27ee 2.20.0` returns true, and the record's
-# own GIT range ends at that commit and lists every affected version up to
-# 2.19.0 but not 2.20.0. Only the open-ended Hex range still matches.
-# GHSA-gg23-fwhr-prjh carries no affected package ranges at all.
-# RETIRE when the ERLEF Hex range gains `fixed: 2.20.0`.
-EEF-CVE-2026-43971
+# source-checkout-only demo task, none of which ship in the Hex package. Both
+# remaining ERLEF records carry an open-ended Hex range (introduced 2.9.0, no
+# fixed version), so hex.audit flags every cowlib release that exists. That is
+# why the advisory gate moved to mix_audit.
 
 # EEF-CVE-2026-43966 / CVE-2026-43966 / GHSA-w4f7-4cxr-rv3c (MEDIUM) - HTTP
 # response splitting via non-VCHAR bytes in cow_http_struct_hd:escape_string/2.
