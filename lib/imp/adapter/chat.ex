@@ -11,6 +11,19 @@ defmodule Imp.Adapter.Chat do
   field wins. A completion that does not cover every output field is a parse
   error rather than a partial prediction.
 
+  One signature-declared exception: `signature.metadata[:prose_step]` names an
+  output field that takes a completion carrying no marker at all. A native tool
+  loop asks for a thought and tool calls, and a model that answers a step in
+  plain prose with no tool call has said something and called nothing — the
+  plain reading of that completion, not a format failure worth a second LM call
+  through `Imp.Adapter.JSON`. Remaining outputs take their declared defaults, so
+  the signature says what an unanswered field means. The exception is narrow on
+  purpose: the completion must carry no `[[ ## field ## ]]` line anywhere and
+  must not be blank, a completion that carried native tool calls is a map rather
+  than text and never reaches it, and a signature without that metadata parses
+  exactly as before. `Imp.Predict.ReActV2` sets it on its internal step
+  signature; see that module.
+
   Options to `format/3`: `:demos`, `:response_instruction`, `:guidance`,
   `:omit_empty_request`, and the renderer seams `:output_renderer`,
   `:input_section_renderer`, `:system_renderer` and `:tool_result_renderer`,
@@ -111,7 +124,7 @@ defmodule Imp.Adapter.Chat do
   # decode, so a bad parse fails loudly and `Imp.Predict`'s JSON-adapter
   # fallback can fire.
   defp do_parse(signature, text) when is_binary(text) do
-    build_prediction(signature, parse_marker_sections(signature, text))
+    build_prediction(signature, parse_fields(signature, text))
   end
 
   defp do_parse(_signature, raw), do: {:error, {:unsupported_lm_output, raw}}
@@ -1174,6 +1187,44 @@ defmodule Imp.Adapter.Chat do
   #   * sections are joined with "\n" and stripped;
   #   * only headers naming an output field count, the first occurrence wins,
   #     and the name must match exactly: no downcasing, no `name:` label lines.
+  # A completion carrying no marker at all is the whole answer for a signature
+  # that declared a prose field, and marker parsing otherwise.
+  defp parse_fields(signature, text) do
+    case prose_step_field(signature, text) do
+      {:ok, name} -> %{name => String.trim(text)}
+      :error -> parse_marker_sections(signature, text)
+    end
+  end
+
+  # `signature.metadata[:prose_step]` names the output field that takes a
+  # marker-free completion. Only a completion with no `[[ ## field ## ]]` line
+  # anywhere qualifies: a partially marked completion is still a parse failure,
+  # so a model that half-followed the format is not silently reinterpreted.
+  # Native tool calls never reach here — a completion that carried them is a
+  # map, not text.
+  defp prose_step_field(signature, text) do
+    with name when not is_nil(name) <-
+           Map.get(signature.metadata, :prose_step, Map.get(signature.metadata, "prose_step")),
+         field when not is_nil(field) <- output_field(signature, name),
+         true <- String.trim(text) != "",
+         true <- marker_free?(text) do
+      {:ok, field.name}
+    else
+      _no_prose_step -> :error
+    end
+  end
+
+  defp output_field(signature, name) do
+    name = to_string(name)
+    Enum.find(signature.outputs, &(to_string(&1.name) == name))
+  end
+
+  defp marker_free?(text) do
+    text
+    |> String.split(~r/\r\n|\r|\n/)
+    |> Enum.all?(&is_nil(Regex.run(@field_header_pattern, String.trim(&1))))
+  end
+
   defp parse_marker_sections(signature, text) do
     allowed = Map.new(signature.outputs, fn field -> {to_string(field.name), field.name} end)
 

@@ -4,7 +4,21 @@ defmodule Imp.Predict.ReActV2 do
 
   ReActV2 preserves parallel tool call IDs and results in `Imp.History`, keeps
   unknown and failed tool calls as observations, and forces a final `submit`
-  call when the loop ends without outputs. That forced request says nothing
+  call when the loop ends without outputs.
+
+  A step's outputs are `next_thought` and `tool_calls`. The provider holds the
+  tool roster natively, so a step normally comes back as native tool calls. A
+  step that comes back as plain prose with no tool call is read as that prose
+  being `next_thought` and no tool calls, by the `:prose_step` metadata on the
+  internal step signature that `Imp.Adapter.Chat` honors: it is a thought that
+  called nothing, not a parse failure, so it costs one LM call rather than two
+  and keeps the provider's prefix cache. That thought is appended to the
+  history as its own turn, and an empty tool-call list then ends the step at
+  the forced `submit` with `:empty_tool_calls`. A tool call the model writes as
+  JSON rather than calling natively is accepted with `tool` for `name` and
+  `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
+  that names no tool at all is kept as a malformed-call observation. That
+  forced request says nothing
   about why by default; `:forced_submit_notice`, a string or a 1-arity function
   of the termination reason, adds one user-visible turn saying so, which is kept
   in the returned history like any other turn. If a provider cannot
@@ -74,9 +88,17 @@ defmodule Imp.Predict.ReActV2 do
             [Imp.Signature.Field.new(%{name: :history, type: :history}, :input)],
         outputs: [
           Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output),
-          Imp.Signature.Field.new(%{name: :tool_calls, type: :array}, :output)
+          Imp.Signature.Field.new(
+            %{name: :tool_calls, type: :array, metadata: %{default: []}},
+            :output
+          )
         ],
-        instructions: signature.instructions
+        instructions: signature.instructions,
+        # A step answered in plain prose, with no native tool call, is a
+        # thought that called nothing. `Imp.Adapter.Chat` reads a marker-free
+        # completion as `next_thought`, and `tool_calls` takes its declared
+        # default of none, which ends the step at `forced_submit`.
+        metadata: %{prose_step: :next_thought}
       }
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, signature))
@@ -184,6 +206,11 @@ defmodule Imp.Predict.ReActV2 do
         emit_reasoning(prediction, turn)
 
         if calls.tool_calls == [] do
+          # The step said something and called nothing. What it said is part of
+          # the run, so it is appended as this turn's history event before the
+          # forced request; the pending inputs it carries are then spent.
+          {history, pending} = append_thought_only_step(history, pending, prediction, calls)
+
           forced_submit(
             react,
             history,
@@ -355,6 +382,16 @@ defmodule Imp.Predict.ReActV2 do
             do: final_prediction(final, history, :forced_submit),
             else: incomplete_prediction(history, reason, initial_error)
       end
+    end
+  end
+
+  defp append_thought_only_step(history, pending, prediction, calls) do
+    case Imp.get(prediction, :next_thought) do
+      thought when thought in [nil, ""] ->
+        {history, pending}
+
+      _thought ->
+        {append_history(history, history_event(pending, prediction, calls, [], nil)), %{}}
     end
   end
 

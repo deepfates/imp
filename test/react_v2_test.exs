@@ -534,7 +534,9 @@ defmodule ReActV2Test do
     assert Imp.get(prediction, :answer) == nil
     assert Imp.get(prediction, :termination_reason) == :max_iters
 
-    for _ <- 1..5 do
+    # Four requests, not five: the prose the required-only fallback returns is
+    # read as a thought that called nothing, so no JSON-adapter re-ask fires.
+    for _ <- 1..4 do
       assert_received {:required_only_tool_request, _messages, _opts}
     end
 
@@ -752,6 +754,33 @@ defmodule ReActV2Test do
     assert program.react.demos == [demo]
     assert {:ok, prediction} = Imp.call(program, %{question: "q"})
     assert Imp.get(prediction, :answer) == "ok"
+  end
+
+  # A step answered in prose with no tool call is a thought that called
+  # nothing: it costs one LM call, is recorded as that turn's thought, and ends
+  # the step at the forced submit.
+  test "a prose step is a thought, then the forced submit finishes the run" do
+    lm =
+      action_lm([
+        "I already know this one, no lookup needed.",
+        %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+      ])
+
+    lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [lookup], lm: lm)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :forced_submit
+
+    messages = prediction |> Imp.get(:history) |> Imp.History.messages()
+
+    assert Enum.any?(
+             messages,
+             &(Map.get(&1, :next_thought) == "I already know this one, no lookup needed.")
+           )
   end
 
   # What a model writes when it spells a tool call out as JSON rather than

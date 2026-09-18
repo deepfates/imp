@@ -4,6 +4,16 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- A `ReActV2` step answered in plain prose with no tool call is now a thought
+  that called nothing, not a parse failure. It used to fail the chat parse and
+  re-ask the whole prompt through `Imp.Adapter.JSON`, which doubled the cost of
+  the step and broke the provider's prefix cache; the prose is now
+  `next_thought`, `tool_calls` is empty, and the loop ends the step at the
+  forced `submit` as it already did for an empty tool-call list. The prose is
+  recorded as that turn's thought in the history. `Imp.Adapter.Chat` reads a
+  marker-free completion this way only for a signature that declares
+  `metadata[:prose_step]`; every other signature parses exactly as before, JSON
+  fallback included.
 - `Imp.Adapter.Types.ToolCall.from_map/1` accepts `tool` as a spelling of the
   tool name, beside `name` and `recipient_name` (the arguments already accepted
   `arguments`, `args` and `parameters`). `%{"tool" => ..., "arguments" => ...}`
