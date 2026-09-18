@@ -222,7 +222,7 @@
   # Defensive fallbacks and MapSet opacity retained at the 0.3 cut. These are
   # individually pinned so a changed success type makes the gate ask again.
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {341, 16}},
-  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {730, 8}},
+  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {742, 8}},
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {675, 8}},
   {"lib/imp/mcp.ex", :pattern_match_cov, {372, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},

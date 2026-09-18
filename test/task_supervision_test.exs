@@ -3,6 +3,16 @@ defmodule TaskSupervisionTest do
 
   @moduletag :capture_log
 
+  defmodule NeverReturns do
+    @behaviour Imp.Module
+    defstruct [:signature]
+
+    def call(_program, %{owner: owner}) do
+      send(owner, :waiting)
+      Process.sleep(:infinity)
+    end
+  end
+
   setup do
     Application.ensure_all_started(:imp)
     Imp.Settings.reset()
@@ -332,6 +342,23 @@ defmodule TaskSupervisionTest do
 
     assert [{:ok, first}, {:ok, second}] = results
     assert Imp.get(first, :answer) != Imp.get(second, :answer)
+  end
+
+  # Imp.Run.start/3 admits its task. cancel/3 ends the run and releases that
+  # lease; stop/1 is documented only for a run that has already completed and
+  # releases the control process alone, so stopping a still-running task leaves
+  # its lease held for the life of the node.
+  test "cancelling a run releases the admission lease it took" do
+    assert wait_for_status(%{active: 0, queued: 0})
+
+    {:ok, run} = Imp.Run.start(%NeverReturns{}, %{owner: self()})
+    assert_receive :waiting
+    assert wait_for_active(1)
+
+    :ok = Imp.Run.cancel(run)
+
+    assert wait_for_status(%{active: 0, queued: 0})
+    refute Process.alive?(run.task.pid)
   end
 
   defp wait_for_active(expected, attempts \\ 100)

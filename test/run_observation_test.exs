@@ -82,6 +82,61 @@ defmodule Imp.RunObservationTest do
     assert terminal.kind == :run_cancelled
   end
 
+  test "infinity capture keeps a megabyte tool result whole, in the sink and the snapshot" do
+    owner = self()
+
+    {:ok, run} =
+      Imp.Run.start(%Wait{}, %{owner: owner},
+        event_sink: fn event -> send(owner, {:sunk, event}) end,
+        max_events: :infinity,
+        max_event_bytes: :infinity,
+        max_snapshot_bytes: :infinity
+      )
+
+    assert_receive :waiting
+    payload = String.duplicate("lorem ipsum ", 90_000)
+    assert byte_size(payload) > 1_000_000
+
+    Imp.Run.with_context(run.control, fn ->
+      Imp.Run.emit(:tool_result, output: payload)
+    end)
+
+    assert_receive {:sunk, %{kind: :tool_result} = sunk}, 5_000
+    assert sunk.output == payload
+    refute Map.has_key?(sunk.metadata, :capture)
+
+    assert [_started, retained] = Imp.Run.events(run)
+    assert retained.output == payload
+    Imp.Run.cancel(run)
+  end
+
+  test "an infinite event bound still truncates when a byte bound is set" do
+    {:ok, run} =
+      Imp.Run.start(%Wait{}, %{owner: self()}, max_events: :infinity, max_event_bytes: 1000)
+
+    assert_receive :waiting
+
+    Imp.Run.with_context(run.control, fn ->
+      Imp.Run.emit(:tool_result, output: String.duplicate("large", 1000))
+    end)
+
+    assert [_started, large] = Imp.Run.events(run)
+    assert large.output == nil
+    assert large.metadata.capture.truncated
+    Imp.Run.cancel(run)
+  end
+
+  test "capture limits still reject anything that is neither a positive integer nor infinity" do
+    ExUnit.CaptureLog.capture_log(fn ->
+      for bad <- [[max_events: 0], [max_event_bytes: :unbounded], [max_snapshot_bytes: -1]] do
+        assert {:error, {%ArgumentError{} = error, _stacktrace}} =
+                 Imp.Run.start(%Wait{}, %{owner: self()}, bad)
+
+        assert Exception.message(error) =~ "positive integers"
+      end
+    end)
+  end
+
   test "task death is recorded once by control even when the task cannot emit" do
     {:ok, run} = Imp.Run.start(%Wait{}, %{owner: self()})
     assert_receive :waiting
