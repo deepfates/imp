@@ -311,6 +311,22 @@ defmodule Imp.Schema do
     |> maybe_put("items", json_nested(fetch_meta(constraints, :items)))
     |> put_object_contract(fetch_meta(constraints, :properties))
     |> maybe_nullable(field)
+    |> maybe_put_description(field)
+  end
+
+  # The field's own words about itself, at the top level of the property schema
+  # so they survive the nullable `anyOf` wrapping. A provider reads this schema
+  # as a tool's parameters (ReActV2's `submit`), and a host that replaces the
+  # adapter's rendered system section has no other place where a field
+  # description reaches the model.
+  defp maybe_put_description(schema, field) do
+    case field.desc do
+      desc when is_binary(desc) ->
+        if String.trim(desc) == "", do: schema, else: Map.put(schema, "description", desc)
+
+      _no_desc ->
+        schema
+    end
   end
 
   defp maybe_nullable(schema, field) do

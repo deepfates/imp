@@ -4,6 +4,12 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- A signature field's description now reaches the provider in the JSON schema
+  Imp builds for it (`Imp.Schema.json_schema/1`), so `ReActV2`'s `submit` tool
+  declares each output field's own words about itself in its parameter schema.
+  A field without a description still emits no `description` key. This is the
+  only place a field description reaches a host that replaces the chat
+  adapter's rendered system section.
 - A `ReActV2` step answered in plain prose with no tool call is now a thought
   that called nothing, not a parse failure. It used to fail the chat parse and
   re-ask the whole prompt through `Imp.Adapter.JSON`, which doubled the cost of

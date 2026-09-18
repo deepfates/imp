@@ -810,6 +810,30 @@ defmodule ReActV2Test do
     end
   end
 
+  # A field's description is part of the contract. The submit tool's parameter
+  # schema is where it reaches a provider that is sent tools natively, and the
+  # only place it reaches a host that replaces the adapter's system section.
+  test "the submit tool schema carries each output field's description" do
+    signature =
+      Imp.Signature.new(%{
+        inputs: [:question],
+        outputs: [
+          %{name: :answer, desc: "One sentence, no citation."},
+          %{name: :confidence, type: :float}
+        ]
+      })
+
+    lm =
+      action_lm([%{tool_calls: [%{name: "submit", arguments: %{answer: "a", confidence: 1.0}}]}])
+
+    program = Imp.react_v2(signature, [], lm: lm)
+    submit = Enum.find(program.react.config[:tools], &(&1.function.name == "submit"))
+    properties = submit.function.parameters["properties"]
+
+    assert properties["answer"]["description"] == "One sentence, no citation."
+    refute Map.has_key?(properties["confidence"], "description")
+  end
+
   defp action_lm(actions, notify \\ nil) do
     {:ok, state} = Agent.start_link(fn -> actions end)
 
