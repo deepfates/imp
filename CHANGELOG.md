@@ -36,7 +36,7 @@ User-visible changes to Imp are recorded here.
   can now be reproduced call for call, without repeating an unchanging roster
   on every one. Both payloads are redacted like every other event.
 
-- `Imp.Adapter.Chat.format/3` gains the `:history_note_renderer` seam,
+- The chat adapter's format options gain the `:history_note_renderer` seam,
   `fn signature, turn -> nil | String.t()`. It is consulted for every stored
   history turn, native tool turns included, after that turn's own messages, and
   its text becomes one user message immediately behind them. Before it, a host
