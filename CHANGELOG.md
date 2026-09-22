@@ -17,6 +17,20 @@ User-visible changes to Imp are recorded here.
   those fields, and so does a step that says nothing at all. The new option
   `prose: :forced_submit` keeps the old behaviour for a single-output
   signature.
+- `ReActV2` gains `on_max_iters`, what the step limit does. The default,
+  `:forced_submit`, is what it did before: one more request with `tool_choice`
+  naming `submit`. `:last_prose` makes one more request with no tools in it at
+  all, so the only thing the model can do is speak, and that prose is the
+  single text output, with `termination_reason: :last_prose`. This is the
+  ending that fits a host whose model already finishes turns by writing prose:
+  it is never asked to call a tool it did not choose. A completion that says
+  nothing finishes with an empty answer rather than an error. `:last_prose`
+  needs a signature with exactly one output of type `:string`, and is refused
+  at construction otherwise. The companion option `last_prose_note`, a string,
+  puts one line of host text in front of that request as a user message and
+  keeps it in the returned history; Imp writes no sentence of its own. Both
+  options persist through `dump`/`load`, and a dump written before them loads
+  as `:forced_submit`.
 - `ReActV2` gains `finish_on`, a map from tool name to
   `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. A tool
   named there ends the turn with the outputs the function returns, which are
