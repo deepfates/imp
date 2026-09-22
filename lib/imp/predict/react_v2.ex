@@ -28,8 +28,19 @@ defmodule Imp.Predict.ReActV2 do
       execute and are recorded, and a `submit` in the same step still wins.
       Outputs that fail validation are recorded as that call's result, the same
       error a bad `submit` records, and the loop continues.
-    * `max_iters`, or a prediction error. The loop forces one more request with
-      `tool_choice` naming `submit` (`termination_reason: :forced_submit`).
+    * `max_iters`. What the step limit does is `on_max_iters`. The default,
+      `:forced_submit`, makes one more request with `tool_choice` naming
+      `submit` (`termination_reason: :forced_submit`). `:last_prose` makes one
+      more request with no tools in it at all, so the only thing the model can
+      do is speak; that prose is the single text output and
+      `termination_reason: :last_prose`, and a completion that says nothing is
+      an empty answer rather than an error. `:last_prose` needs a signature
+      with exactly one output of type `:string`, and is refused at
+      construction otherwise. `:last_prose_note` puts one line of host text in
+      front of that request as a user message; Imp writes no sentence of its
+      own.
+    * A prediction error. The loop forces one more request with `tool_choice`
+      naming `submit` (`termination_reason: :forced_submit`).
 
   A step's outputs are `next_thought` and `tool_calls`. The provider holds the
   tool roster natively, so a step normally comes back as native tool calls. A
@@ -45,7 +56,8 @@ defmodule Imp.Predict.ReActV2 do
   forced request says nothing
   about why by default; `:forced_submit_notice`, a string or a 1-arity function
   of the termination reason, adds one user-visible turn saying so, which is kept
-  in the returned history like any other turn. If a provider cannot
+  in the returned history like any other turn, and `:last_prose_note` does the
+  same for the `:last_prose` request. If a provider cannot
   honor that tool contract, a tools-disabled typed extractor derives the task
   outputs from the original inputs and accumulated history.
 
@@ -69,10 +81,12 @@ defmodule Imp.Predict.ReActV2 do
     :signature,
     :react,
     :forced_submit_notice,
+    :last_prose_note,
     tools: %{},
     max_iters: 20,
     tool_policy: :allow,
     prose: :answer,
+    on_max_iters: :forced_submit,
     finish_on: %{}
   ]
 
@@ -98,6 +112,15 @@ defmodule Imp.Predict.ReActV2 do
     # mainstream tool loop does. `:forced_submit` keeps the older behaviour of
     # one more request with `tool_choice` naming submit.
     prose: [type: {:in, [:answer, :forced_submit]}, default: :answer],
+    # What the step limit does. `:forced_submit` makes one more request with
+    # `tool_choice` naming submit. `:last_prose` makes one more request with no
+    # tools in it, so the only thing the model can do is speak, and what it
+    # says is the answer; it needs a signature with one text output for that
+    # prose to be.
+    on_max_iters: [type: {:in, [:forced_submit, :last_prose]}, default: :forced_submit],
+    # One line of text put in front of the `:last_prose` request as a user
+    # message. nil says nothing, and Imp never writes a sentence of its own.
+    last_prose_note: [type: {:or, [:string, nil]}, default: nil],
     # Tools that end the turn with the outputs they carry, the shape Pydantic
     # AI calls an output tool. Name to
     # `fn arguments, result, inputs -> {:finish, outputs} | :continue end`.
@@ -111,6 +134,13 @@ defmodule Imp.Predict.ReActV2 do
 
     if Imp.Tool.resolve_name(tools, :submit) do
       raise ArgumentError, "submit is reserved by Imp.Predict.ReActV2"
+    end
+
+    if opts[:on_max_iters] == :last_prose and not single_text_output?(signature) do
+      raise ArgumentError,
+            "Imp.Predict.ReActV2.new/3: on_max_iters: :last_prose needs a signature with " <>
+              "exactly one output of type :string, got: " <>
+              inspect(Imp.Signature.output_names(signature))
     end
 
     submit = Imp.Tool.new(:submit, "Submit the final outputs for the task.", & &1)
@@ -161,7 +191,9 @@ defmodule Imp.Predict.ReActV2 do
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
       forced_submit_notice: opts[:forced_submit_notice],
+      last_prose_note: opts[:last_prose_note],
       prose: opts[:prose],
+      on_max_iters: opts[:on_max_iters],
       finish_on: resolve_finish_on!(opts[:finish_on], tools)
     }
   end
@@ -268,8 +300,15 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  defp run(react, history, inputs, pending, turn, max_iters, execution) when turn >= max_iters,
-    do: forced_submit(react, history, inputs, pending, :max_iters, turn, nil, execution)
+  defp run(react, history, inputs, pending, turn, max_iters, execution) when turn >= max_iters do
+    case react.on_max_iters do
+      :forced_submit ->
+        forced_submit(react, history, inputs, pending, :max_iters, turn, nil, execution)
+
+      :last_prose ->
+        last_prose(react, history, pending, turn)
+    end
+  end
 
   defp run(react, history, inputs, pending, turn, max_iters, execution) do
     case predict(react.react, react, history, pending) do
@@ -393,21 +432,60 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
+  # The step limit under `on_max_iters: :last_prose`. The last request carries
+  # no tools, so the only thing the model can do is speak, and what it says is
+  # the single text output. A completion that says nothing is an empty answer:
+  # the run is over either way, and there is nothing to force.
+  defp last_prose(react, history, pending, turn) do
+    history = append_note(history, react.signature, react.last_prose_note)
+
+    case predict(last_prose_program(react), react, history, pending) do
+      {:ok, prediction, history} ->
+        calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
+        emit_reasoning(prediction, turn)
+        history = append_last_step(history, pending, prediction, calls)
+        final_prediction(last_prose_outputs(react.signature, prediction), history, :last_prose)
+
+      {:error, reason, history} ->
+        termination =
+          if context_window_exceeded?(reason), do: :context_window_exceeded, else: :max_iters
+
+        incomplete_prediction(history, termination, reason)
+    end
+  end
+
+  # A request with no tools. Both provider keys go: the chat completions body
+  # carries `tools` and `tool_choice` together or not at all, and a request
+  # that names a tool choice without a roster is invalid.
+  defp last_prose_program(react) do
+    %{react.react | config: Keyword.drop(react.react.config, [:tools, :tool_choice])}
+  end
+
+  defp last_prose_outputs(signature, prediction) do
+    case parse_prose(signature, prediction) do
+      {:ok, outputs} ->
+        outputs
+
+      :none ->
+        [%Imp.Signature.Field{name: name}] = signature.outputs
+        %{name => nil}
+    end
+  end
+
   # The notice is what the model is told, so it goes into the durable history
   # rather than into one request: the record of the run carries it, and the
   # prompt renders it as the last user message before the forced request.
-  defp append_forced_submit_notice(react, history, reason) do
-    case notice_text(react.forced_submit_notice, reason) do
-      text when is_binary(text) and text != "" ->
-        case Imp.Signature.input_names(react.signature) do
-          [first | _rest] -> append_history(history, %{first => text})
-          [] -> history
-        end
+  defp append_forced_submit_notice(react, history, reason),
+    do: append_note(history, react.signature, notice_text(react.forced_submit_notice, reason))
 
-      _none ->
-        history
+  defp append_note(history, signature, text) when is_binary(text) and text != "" do
+    case Imp.Signature.input_names(signature) do
+      [first | _rest] -> append_history(history, %{first => text})
+      [] -> history
     end
   end
+
+  defp append_note(history, _signature, _none), do: history
 
   defp notice_text(nil, _reason), do: nil
   defp notice_text(text, _reason) when is_binary(text), do: text
@@ -460,7 +538,7 @@ defmodule Imp.Predict.ReActV2 do
     submit_calls = %ToolCalls{tool_calls: Enum.filter(calls.tool_calls, &submit?/1)}
 
     if submit_calls.tool_calls == [] do
-      history = maybe_append_forced_observation(history, pending, prediction, calls)
+      history = append_last_step(history, pending, prediction, calls)
       extract_final(react, inputs, history, reason, initial_error)
     else
       case execute_calls(react, submit_calls, execution, inputs) do
@@ -488,7 +566,10 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  defp maybe_append_forced_observation(history, pending, prediction, calls) do
+  # The completion of the run's last request, thought and any calls, as this
+  # turn's history event. A completion that said nothing and called nothing
+  # adds no turn.
+  defp append_last_step(history, pending, prediction, calls) do
     thought = Imp.get(prediction, :next_thought)
 
     if thought in [nil, ""] and calls.tool_calls == [] do
@@ -763,17 +844,23 @@ defmodule Imp.Predict.ReActV2 do
   # validated through the same parse a `submit`'s arguments go through, so a
   # constrained output is not quietly filled with something it excludes.
   defp prose_answer(%__MODULE__{prose: :forced_submit}, _prediction), do: :none
+  defp prose_answer(react, prediction), do: parse_prose(react.signature, prediction)
 
-  defp prose_answer(react, prediction) do
-    with [%Imp.Signature.Field{type: type, name: name}] <- react.signature.outputs,
-         true <- type in [:string, "string"],
+  defp parse_prose(signature, prediction) do
+    with true <- single_text_output?(signature),
+         [%Imp.Signature.Field{name: name}] <- signature.outputs,
          prose when is_binary(prose) and prose != "" <- Imp.get(prediction, :next_thought),
-         {:ok, parsed} <- Imp.Adapter.Chat.parse(react.signature, %{name => prose}, []) do
+         {:ok, parsed} <- Imp.Adapter.Chat.parse(signature, %{name => prose}, []) do
       {:ok, Imp.Prediction.to_map(parsed)}
     else
       _not_an_answer -> :none
     end
   end
+
+  defp single_text_output?(%Imp.Signature{outputs: [%Imp.Signature.Field{type: type}]}),
+    do: type in [:string, "string"]
+
+  defp single_text_output?(_signature), do: false
 
   defp execute_call(
          _react,

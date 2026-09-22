@@ -240,6 +240,8 @@ defmodule Imp.Saving do
       "tools" => dump_tools(Map.delete(react.tools, :submit), "ReActV2"),
       "max_iters" => react.max_iters,
       "prose" => Atom.to_string(react.prose),
+      "on_max_iters" => Atom.to_string(react.on_max_iters),
+      "last_prose_note" => react.last_prose_note,
       "finish_on" => dump_finish_on(react.finish_on),
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
@@ -574,6 +576,8 @@ defmodule Imp.Saving do
       tools: Map.put(tools, :submit, submit),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
       prose: load_react_v2_prose!(state["prose"]),
+      on_max_iters: load_react_v2_on_max_iters!(state["on_max_iters"]),
+      last_prose_note: load_react_v2_last_prose_note!(state["last_prose_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
@@ -1162,6 +1166,21 @@ defmodule Imp.Saving do
 
   defp load_react_v2_prose!(other),
     do: raise(ArgumentError, "invalid saved ReActV2 prose: #{inspect(other)}")
+
+  # A dump written before ReActV2 had the option carries no "on_max_iters" key,
+  # and the step limit forced a submit then.
+  defp load_react_v2_on_max_iters!(nil), do: :forced_submit
+  defp load_react_v2_on_max_iters!("forced_submit"), do: :forced_submit
+  defp load_react_v2_on_max_iters!("last_prose"), do: :last_prose
+
+  defp load_react_v2_on_max_iters!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 on_max_iters: #{inspect(other)}")
+
+  defp load_react_v2_last_prose_note!(nil), do: nil
+  defp load_react_v2_last_prose_note!(note) when is_binary(note), do: note
+
+  defp load_react_v2_last_prose_note!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 last_prose_note: #{inspect(other)}")
 
   defp dump_react_mode!(:provider_native), do: "provider_native"
   defp dump_react_mode!(:dspy_3_2_1), do: "dspy_3_2_1"
