@@ -53,10 +53,11 @@ defmodule Imp.RunTest do
     :ok = Imp.Run.stop(run)
 
     events = receive_events([])
-    assert Enum.map(events, & &1.sequence) == Enum.to_list(0..9)
+    assert Enum.map(events, & &1.sequence) == Enum.to_list(0..10)
 
     assert [
              %{kind: :run_started},
+             %{kind: :tools_offered},
              %{kind: :model_request},
              %{kind: :model_response},
              %{kind: :reasoning, reasoning: "look it up"},

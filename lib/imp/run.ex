@@ -23,6 +23,14 @@ defmodule Imp.Run do
   `Imp.LM.request/2`; ReActV2 and RLM emit the semantic tool call and result
   events.
 
+  A `:model_request` carries the messages as its input and the rest of the
+  request as metadata: `:options`, the request options with the tool
+  definitions removed, and `:tools_hash`, a SHA-256 of those definitions (or
+  `nil` when the request offered none). The definitions themselves are emitted
+  once per distinct hash per run, as a `:tools_offered` event whose input is the
+  tool list as sent, so a run's record holds every request whole without
+  repeating a roster that does not change.
+
   Capture defaults to 64 KiB per event and a 512-event, 4 MiB snapshot;
   `:max_event_bytes`, `:max_events` and `:max_snapshot_bytes` override them at
   start. Each takes a positive integer or `:infinity`, which removes that bound
@@ -152,6 +160,18 @@ defmodule Imp.Run do
   end
 
   @doc false
+  # Per-run "have I already recorded this?" state, so an observation that only
+  # has to be made once per run is made once. Returns true the first time the
+  # run sees `key` and false afterwards; outside a run there is nothing to
+  # record against, so it is always false.
+  def first_seen?(key) do
+    case context() do
+      control when is_pid(control) -> Control.first_seen?(control, key)
+      nil -> false
+    end
+  end
+
+  @doc false
   def register_cancellable(fun) when is_function(fun, 1) do
     case context() do
       control when is_pid(control) -> Control.register(control, fun)
@@ -262,6 +282,7 @@ defmodule Imp.Run.Control do
   def start(opts), do: GenServer.start(__MODULE__, opts)
   def events(pid), do: GenServer.call(pid, :events)
   def emit(pid, kind, attrs), do: GenServer.call(pid, {:emit, kind, attrs})
+  def first_seen?(pid, key), do: GenServer.call(pid, {:first_seen, key})
   def register(pid, fun), do: GenServer.call(pid, {:register, fun})
   def unregister(pid, ref), do: GenServer.call(pid, {:unregister, ref})
   def cancel(pid, reason), do: GenServer.call(pid, {:cancel, reason}, 30_000)
@@ -324,7 +345,8 @@ defmodule Imp.Run.Control do
        owner: owner,
        owner_monitor: Process.monitor(owner),
        task_pid: nil,
-       cancelled: nil
+       cancelled: nil,
+       seen: MapSet.new()
      }}
   end
 
@@ -361,6 +383,14 @@ defmodule Imp.Run.Control do
   end
 
   def handle_call(:delivery, _from, state), do: {:reply, state.delivery, state}
+
+  def handle_call({:first_seen, key}, _from, state) do
+    if MapSet.member?(state.seen, key) do
+      {:reply, false, state}
+    else
+      {:reply, true, %{state | seen: MapSet.put(state.seen, key)}}
+    end
+  end
 
   def handle_call({:register, fun}, _from, %{cancelled: nil} = state) do
     ref = make_ref()
