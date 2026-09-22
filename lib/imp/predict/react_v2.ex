@@ -2,9 +2,34 @@ defmodule Imp.Predict.ReActV2 do
   @moduledoc """
   Native-tool-aware ReAct loop with structured history and typed completion.
 
-  ReActV2 preserves parallel tool call IDs and results in `Imp.History`, keeps
-  unknown and failed tool calls as observations, and forces a final `submit`
-  call when the loop ends without outputs.
+  ReActV2 preserves parallel tool call IDs and results in `Imp.History` and
+  keeps unknown and failed tool calls as observations.
+
+  ## How a turn ends
+
+    * `submit`. The model calls the reserved `submit` tool with the signature's
+      outputs. `termination_reason: :submit`.
+    * Prose. The step comes back as text with no tool call, and the task
+      signature has exactly one output of type `:string`. That prose is the
+      output, and the run finishes in that one request, with
+      `termination_reason: :answered`. This is what every other mainstream tool
+      loop does, so it is the default; `prose: :forced_submit` restores the
+      older behaviour for a single-output signature. A signature with several
+      outputs, or one non-text output, always takes the forced submit, because
+      prose cannot fill those fields. A step that says nothing at all also takes
+      the forced submit: there is no answer in an empty completion.
+    * A terminal tool. `finish_on` maps a tool name to
+      `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. It
+      runs after that tool's call executes; `{:finish, outputs}` validates
+      `outputs` against the signature exactly as a `submit` would and finishes
+      with `termination_reason: :finished_by_tool` and `finished_by_tool` naming
+      the tool. `:continue` leaves the loop running. When one step calls several
+      terminal tools, the first in call order finishes the run; the rest still
+      execute and are recorded, and a `submit` in the same step still wins.
+      Outputs that fail validation are recorded as that call's result, the same
+      error a bad `submit` records, and the loop continues.
+    * `max_iters`, or a prediction error. The loop forces one more request with
+      `tool_choice` naming `submit` (`termination_reason: :forced_submit`).
 
   A step's outputs are `next_thought` and `tool_calls`. The provider holds the
   tool roster natively, so a step normally comes back as native tool calls. A
@@ -13,11 +38,10 @@ defmodule Imp.Predict.ReActV2 do
   internal step signature that `Imp.Adapter.Chat` honors: it is a thought that
   called nothing, not a parse failure, so it costs one LM call rather than two
   and keeps the provider's prefix cache. That thought is appended to the
-  history as its own turn, and an empty tool-call list then ends the step at
-  the forced `submit` with `:empty_tool_calls`. A tool call the model writes as
+  history as its own turn. A tool call the model writes as
   JSON rather than calling natively is accepted with `tool` for `name` and
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
-  that names no tool at all is kept as a malformed-call observation. That
+  that names no tool at all is kept as a malformed-call observation. The
   forced request says nothing
   about why by default; `:forced_submit_notice`, a string or a 1-arity function
   of the termination reason, adds one user-visible turn saying so, which is kept
@@ -47,7 +71,9 @@ defmodule Imp.Predict.ReActV2 do
     :forced_submit_notice,
     tools: %{},
     max_iters: 20,
-    tool_policy: :allow
+    tool_policy: :allow,
+    prose: :answer,
+    finish_on: %{}
   ]
 
   @type t :: %__MODULE__{}
@@ -66,7 +92,16 @@ defmodule Imp.Predict.ReActV2 do
     # What to tell the model when the loop makes it submit. A 1-arity function
     # of the termination reason, or a plain string; nil says nothing, which is
     # what the loop did before this option existed.
-    forced_submit_notice: [type: {:or, [{:fun, 1}, :string, nil]}, default: nil]
+    forced_submit_notice: [type: {:or, [{:fun, 1}, :string, nil]}, default: nil],
+    # What a step of plain prose with no tool call means. `:answer` ends the
+    # turn with that prose as the single text output, which is what every other
+    # mainstream tool loop does. `:forced_submit` keeps the older behaviour of
+    # one more request with `tool_choice` naming submit.
+    prose: [type: {:in, [:answer, :forced_submit]}, default: :answer],
+    # Tools that end the turn with the outputs they carry, the shape Pydantic
+    # AI calls an output tool. Name to
+    # `fn arguments, result, inputs -> {:finish, outputs} | :continue end`.
+    finish_on: [type: {:custom, __MODULE__, :validate_finish_on, []}, default: %{}]
   ]
 
   def new(signature, tools, opts \\ []) do
@@ -125,8 +160,45 @@ defmodule Imp.Predict.ReActV2 do
       tools: tools,
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
-      forced_submit_notice: opts[:forced_submit_notice]
+      forced_submit_notice: opts[:forced_submit_notice],
+      prose: opts[:prose],
+      finish_on: resolve_finish_on!(opts[:finish_on], tools)
     }
+  end
+
+  @doc false
+  def validate_finish_on(finish_on) when is_map(finish_on) do
+    invalid =
+      Enum.find(finish_on, fn {name, fun} ->
+        not ((is_atom(name) or is_binary(name)) and is_function(fun, 3))
+      end)
+
+    case invalid do
+      nil -> {:ok, finish_on}
+      {name, _fun} -> {:error, "expected #{inspect(name)} to name a 3-arity function"}
+    end
+  end
+
+  def validate_finish_on(other),
+    do: {:error, "expected a map of tool name to 3-arity function, got: #{inspect(other)}"}
+
+  # A `finish_on` key is normalized to the tool's own name the same way a model's
+  # spelling of a call is, so the loop looks it up by one key. An unknown name is
+  # a typo the caller should hear about at construction, not a tool that silently
+  # never finishes.
+  defp resolve_finish_on!(finish_on, tools) do
+    Map.new(finish_on, fn {name, fun} ->
+      case Imp.Tool.resolve_name(tools, name) do
+        nil ->
+          raise ArgumentError, "Imp.Predict.ReActV2.new/3: :finish_on names no tool: #{name}"
+
+        :submit ->
+          raise ArgumentError, "Imp.Predict.ReActV2.new/3: submit already ends the turn"
+
+        resolved ->
+          {to_string(resolved), fun}
+      end
+    end)
   end
 
   @doc false
@@ -207,32 +279,53 @@ defmodule Imp.Predict.ReActV2 do
 
         if calls.tool_calls == [] do
           # The step said something and called nothing. What it said is part of
-          # the run, so it is appended as this turn's history event before the
-          # forced request; the pending inputs it carries are then spent.
+          # the run, so it is appended as this turn's history event; the pending
+          # inputs it carries are then spent.
           {history, pending} = append_thought_only_step(history, pending, prediction, calls)
 
-          forced_submit(
-            react,
-            history,
-            inputs,
-            pending,
-            :empty_tool_calls,
-            turn,
-            nil,
-            execution
-          )
+          case prose_answer(react, prediction) do
+            {:ok, outputs} ->
+              # The model stopped calling tools and said its answer. That is the
+              # end of the turn, and it costs no further request.
+              final_prediction(outputs, history, :answered)
+
+            :none ->
+              forced_submit(
+                react,
+                history,
+                inputs,
+                pending,
+                :empty_tool_calls,
+                turn,
+                nil,
+                execution
+              )
+          end
         else
-          case execute_calls(react, calls, execution) do
+          case execute_calls(react, calls, execution, inputs) do
             {:cancel, reason} ->
               {:error, {:execution_cancelled, reason}}
 
-            {results, final} ->
+            {results, final, finished_by} ->
               event = history_event(pending, prediction, calls, results, final)
               history = append_history(history, event)
 
-              if final,
-                do: final_prediction(final, history, :submit),
-                else: run(react, history, inputs, %{}, turn + 1, max_iters, execution)
+              cond do
+                final ->
+                  final_prediction(final, history, :submit)
+
+                finished_by ->
+                  {tool_name, outputs} = finished_by
+
+                  final_prediction(
+                    Map.put(outputs, :finished_by_tool, tool_name),
+                    history,
+                    :finished_by_tool
+                  )
+
+                true ->
+                  run(react, history, inputs, %{}, turn + 1, max_iters, execution)
+              end
           end
         end
 
@@ -370,11 +463,11 @@ defmodule Imp.Predict.ReActV2 do
       history = maybe_append_forced_observation(history, pending, prediction, calls)
       extract_final(react, inputs, history, reason, initial_error)
     else
-      case execute_calls(react, submit_calls, execution) do
+      case execute_calls(react, submit_calls, execution, inputs) do
         {:cancel, cancel_reason} ->
           {:error, {:execution_cancelled, cancel_reason}}
 
-        {results, final} ->
+        {results, final, _finished_by} ->
           event = history_event(pending, prediction, submit_calls, results, final)
           history = append_history(history, event)
 
@@ -584,8 +677,8 @@ defmodule Imp.Predict.ReActV2 do
     %ToolCalls{tool_calls: calls}
   end
 
-  defp execute_calls(react, %ToolCalls{tool_calls: calls}, execution) do
-    Enum.reduce_while(calls, {[], nil}, fn call, {results, final} ->
+  defp execute_calls(react, %ToolCalls{tool_calls: calls}, execution, inputs) do
+    Enum.reduce_while(calls, {[], nil, nil}, fn call, {results, final, finished_by} ->
       unless malformed_call?(call) do
         :ok =
           Imp.Run.emit(:tool_call,
@@ -601,6 +694,10 @@ defmodule Imp.Predict.ReActV2 do
           {:halt, {:cancel, reason}}
 
         {result, error?} ->
+          # A terminal tool has already run; the hook only reads what it did.
+          {result, error?, finished_by} =
+            finish_on_result(react, call, result, error?, inputs, finished_by)
+
           unless malformed_call?(call) do
             :ok =
               Imp.Run.emit(:tool_result,
@@ -619,9 +716,63 @@ defmodule Imp.Predict.ReActV2 do
               do: result.result,
               else: final
 
-          {:cont, {results ++ [Map.put(Map.from_struct(result), :error, error?)], final}}
+          {:cont,
+           {results ++ [Map.put(Map.from_struct(result), :error, error?)], final, finished_by}}
       end
     end)
+  end
+
+  # `finish_on` is consulted for every successful call to a terminal tool, but
+  # only the first one that finishes ends the run: the rest of the step's calls
+  # still execute and are recorded, as they would be in any other step. Outputs
+  # that do not satisfy the signature are that call's recorded result, which is
+  # the error an invalid `submit` records, and the loop keeps going.
+  defp finish_on_result(react, call, result, error?, inputs, finished_by) do
+    with false <- error?,
+         false <- malformed_call?(call),
+         {:ok, fun} <- fetch_finish_on(react, call),
+         {:finish, outputs} <- fun.(Imp.Tool.normalize_arguments(call.arguments), result, inputs) do
+      case validate_submit(react.signature, outputs) do
+        {validated, false} when finished_by == nil ->
+          {result, false, {to_string(Imp.Tool.resolve_name(react.tools, call.name)), validated}}
+
+        {_validated, false} ->
+          {result, false, finished_by}
+
+        {error, true} ->
+          {error, true, finished_by}
+      end
+    else
+      _continue -> {result, error?, finished_by}
+    end
+  end
+
+  defp fetch_finish_on(%{finish_on: finish_on}, _call) when map_size(finish_on) == 0, do: :error
+
+  defp fetch_finish_on(react, call) do
+    case Imp.Tool.resolve_name(react.tools, call.name) do
+      nil -> :error
+      name -> Map.fetch(react.finish_on, to_string(name))
+    end
+  end
+
+  # A step that stops calling tools and says something has answered, when the
+  # task declares exactly one text output for that prose to be. Several outputs,
+  # or one that is not text, cannot be filled from prose, and an empty
+  # completion says nothing, so both still take the forced submit. The prose is
+  # validated through the same parse a `submit`'s arguments go through, so a
+  # constrained output is not quietly filled with something it excludes.
+  defp prose_answer(%__MODULE__{prose: :forced_submit}, _prediction), do: :none
+
+  defp prose_answer(react, prediction) do
+    with [%Imp.Signature.Field{type: type, name: name}] <- react.signature.outputs,
+         true <- type in [:string, "string"],
+         prose when is_binary(prose) and prose != "" <- Imp.get(prediction, :next_thought),
+         {:ok, parsed} <- Imp.Adapter.Chat.parse(react.signature, %{name => prose}, []) do
+      {:ok, Imp.Prediction.to_map(parsed)}
+    else
+      _not_an_answer -> :none
+    end
   end
 
   defp execute_call(

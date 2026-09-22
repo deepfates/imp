@@ -305,7 +305,7 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [], lm: lm)
+             Imp.react_v2("question -> answer", [], lm: lm, prose: :forced_submit)
              |> Imp.call(%{question: "answer"})
 
     assert Imp.get(prediction, :answer) == "forced"
@@ -756,20 +756,79 @@ defmodule ReActV2Test do
     assert Imp.get(prediction, :answer) == "ok"
   end
 
-  # A step answered in prose with no tool call is a thought that called
-  # nothing: it costs one LM call, is recorded as that turn's thought, and ends
-  # the step at the forced submit.
-  test "a prose step is a thought, then the forced submit finishes the run" do
-    lm =
-      action_lm([
-        "I already know this one, no lookup needed.",
-        %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
-      ])
-
+  # The model stopped calling tools and said its answer. The task declares one
+  # text output for that prose to be, so the turn is over: one request, the
+  # prose as the answer, and the prose recorded as that step's thought.
+  test "a prose step with one text output ends the turn as the answer" do
+    parent = self()
+    prose = "I already know this one: Paris."
+    lm = action_lm([prose], parent)
     lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
 
     assert {:ok, prediction} =
              Imp.react_v2("question -> answer", [lookup], lm: lm)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == prose
+    assert Imp.get(prediction, :termination_reason) == :answered
+
+    messages = prediction |> Imp.get(:history) |> Imp.History.messages()
+    assert Enum.any?(messages, &(Map.get(&1, :next_thought) == prose))
+
+    assert_received {:lm_call, _only_call}
+    refute_received {:lm_call, _forced}
+  end
+
+  # A signature with more than one output cannot be filled from prose, so a
+  # prose step still buys the forced submit there.
+  test "a prose step with several outputs still forces submit" do
+    parent = self()
+
+    lm =
+      action_lm(
+        [
+          "I already know this one.",
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris", confidence: 0.9}}]}
+        ],
+        parent
+      )
+
+    signature =
+      Imp.Signature.new(%{
+        inputs: [:question],
+        outputs: [%{name: :answer}, %{name: :confidence, type: :float}]
+      })
+
+    assert {:ok, prediction} =
+             Imp.Predict.ReActV2.new(signature, [], lm: lm)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :confidence) == 0.9
+    assert Imp.get(prediction, :termination_reason) == :forced_submit
+
+    assert_received {:lm_call, _normal}
+    assert_received {:lm_call, _forced}
+  end
+
+  # The opt-out for a single-output signature: `prose: :forced_submit` is the
+  # behaviour before a prose step ended the turn, and it costs two requests.
+  test "prose: :forced_submit keeps the second request for a single-output signature" do
+    parent = self()
+
+    lm =
+      action_lm(
+        [
+          "I already know this one, no lookup needed.",
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+        ],
+        parent
+      )
+
+    lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [lookup], lm: lm, prose: :forced_submit)
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
@@ -781,6 +840,139 @@ defmodule ReActV2Test do
              messages,
              &(Map.get(&1, :next_thought) == "I already know this one, no lookup needed.")
            )
+
+    assert_received {:lm_call, _normal}
+    assert_received {:lm_call, _forced}
+    refute_received {:lm_call, _third}
+  end
+
+  # A terminal tool ends the turn with the outputs it carries, the shape
+  # Pydantic AI calls an output tool: the call is executed and recorded, and
+  # what the host makes of it is the run's answer.
+  test "finish_on ends the run on a tool call and records the call" do
+    parent = self()
+    reply = Imp.tool(:reply, "reply", fn %{text: text} -> "sent: #{text}" end)
+
+    lm =
+      action_lm(
+        [
+          %{
+            next_thought: "answering",
+            tool_calls: [%{id: "r1", name: "reply", arguments: %{"text" => "Paris"}}]
+          }
+        ],
+        parent
+      )
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [reply],
+               lm: lm,
+               finish_on: %{
+                 reply: fn arguments, _result, _inputs ->
+                   {:finish, %{answer: arguments.text}}
+                 end
+               }
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :finished_by_tool
+    assert Imp.get(prediction, :finished_by_tool) == "reply"
+
+    assert %Imp.History{messages: [event]} = Imp.get(prediction, :history)
+
+    assert [%{id: "r1", name: "reply", result: "sent: Paris", error: false}] =
+             event.tool_call_results
+
+    assert_received {:lm_call, _only_call}
+    refute_received {:lm_call, _second}
+  end
+
+  test "finish_on returning :continue leaves the loop running" do
+    parent = self()
+    reply = Imp.tool(:reply, "reply", fn _arguments -> "sent" end)
+
+    lm =
+      action_lm(
+        [
+          %{tool_calls: [%{id: "r1", name: "reply", arguments: %{"text" => "wait"}}]},
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+        ],
+        parent
+      )
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [reply],
+               lm: lm,
+               finish_on: %{"reply" => fn _arguments, _result, _inputs -> :continue end}
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :submit
+    assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
+    assert [%{name: "reply", error: false}] = first.tool_call_results
+  end
+
+  # Outputs a terminal tool cannot satisfy are the error an invalid submit is,
+  # recorded as that call's result, and the loop goes on.
+  test "finish_on outputs that miss a field are an error like an invalid submit" do
+    reply = Imp.tool(:reply, "reply", fn _arguments -> "sent" end)
+
+    lm =
+      action_lm([
+        %{tool_calls: [%{id: "r1", name: "reply", arguments: %{}}]},
+        %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+      ])
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [reply],
+               lm: lm,
+               finish_on: %{reply: fn _arguments, _result, _inputs -> {:finish, %{}} end}
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert Imp.get(prediction, :termination_reason) == :submit
+
+    assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
+
+    assert [%{error: true, result: {:error, {:missing_output_fields, [:answer]}}}] =
+             first.tool_call_results
+  end
+
+  test "finish_on sees the task inputs and rejects a name that is not a tool" do
+    parent = self()
+    reply = Imp.tool(:reply, "reply", fn _arguments -> "sent" end)
+
+    lm = action_lm([%{tool_calls: [%{id: "r1", name: "reply", arguments: %{}}]}])
+
+    assert {:ok, prediction} =
+             Imp.react_v2("question -> answer", [reply],
+               lm: lm,
+               finish_on: %{
+                 reply: fn _arguments, _result, inputs ->
+                   send(parent, {:finish_inputs, inputs})
+                   {:finish, %{answer: "saw inputs"}}
+                 end
+               }
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "saw inputs"
+    assert_received {:finish_inputs, %{question: "Capital of France?"}}
+
+    assert_raise ArgumentError, ~r/:finish_on names no tool/, fn ->
+      Imp.react_v2("question -> answer", [reply],
+        finish_on: %{nope: fn _a, _r, _i -> :continue end}
+      )
+    end
+
+    assert_raise ArgumentError, ~r/submit already ends the turn/, fn ->
+      Imp.react_v2("question -> answer", [reply],
+        finish_on: %{submit: fn _a, _r, _i -> :continue end}
+      )
+    end
   end
 
   # What a model writes when it spells a tool call out as JSON rather than
@@ -858,6 +1050,7 @@ defmodule ReActV2Test do
     assert {:ok, prediction} =
              Imp.react_v2("question -> answer", [lookup],
                lm: lm,
+               prose: :forced_submit,
                forced_submit_notice: "Submit now."
              )
              |> Imp.call(%{question: "Capital of France?"})
