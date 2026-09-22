@@ -4,6 +4,48 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- A `ReActV2` turn now ends when the model stops calling tools. A step that
+  comes back as prose with no tool call, for a task signature with exactly one
+  output of type `:string`, finishes the run with that prose as the output and
+  `termination_reason: :answered`, in that one request. It used to cost one more
+  request with `tool_choice` naming `submit`, which both spent a call and, when
+  the model had already acted with a tool, came back with a summary of what it
+  did rather than what it said. Every other mainstream loop — Anthropic's tool
+  runner, the OpenAI Agents SDK, LangGraph's ReAct, Pydantic AI — ends the turn
+  this way, so it is the default. A signature with several outputs, or one
+  non-text output, still takes the forced submit, because prose cannot fill
+  those fields, and so does a step that says nothing at all. The new option
+  `prose: :forced_submit` keeps the old behaviour for a single-output
+  signature.
+- `ReActV2` gains `finish_on`, a map from tool name to
+  `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. A tool
+  named there ends the turn with the outputs the function returns, which are
+  validated against the signature exactly as a `submit`'s are, with
+  `termination_reason: :finished_by_tool` and `finished_by_tool` naming the
+  tool. This is the shape Pydantic AI calls an output tool: one call both does
+  the work and carries the answer. `:continue` leaves the loop running. When a
+  step calls several terminal tools, the first in call order finishes the run
+  and the rest still execute and are recorded; a `submit` in the same step
+  still wins. The functions persist by registry name, like a tool runner.
+- A `:model_request` event now records the whole request, not only its
+  messages. Its metadata carries `:options`, the request options with the tool
+  definitions removed, and `:tools_hash`, a SHA-256 of the canonical JSON of
+  those definitions or `nil` when the request offered none. The definitions
+  themselves are emitted once per run per distinct hash, as a new
+  `:tools_offered` event whose input is the tool list as sent. A recorded run
+  can now be reproduced call for call, without repeating an unchanging roster
+  on every one. Both payloads are redacted like every other event.
+
+- `Imp.Adapter.Chat.format/3` gains the `:history_note_renderer` seam,
+  `fn signature, turn -> nil | String.t()`. It is consulted for every stored
+  history turn, native tool turns included, after that turn's own messages, and
+  its text becomes one user message immediately behind them. Before it, a host
+  had no way to say anything *about* a turn that carried tool calls: those
+  turns route through the native replay path, which consults neither
+  `:output_renderer` nor `:input_section_renderer`. A note is data about the
+  turn — the answer was never delivered, the account's allowance ran out — so
+  the model reads it as the next thing after the turn, and the record the loop
+  keeps is untouched.
 - A signature field's description now reaches the provider in the JSON schema
   Imp builds for it (`Imp.Schema.json_schema/1`), so `ReActV2`'s `submit` tool
   declares each output field's own words about itself in its parameter schema.
@@ -14,10 +56,10 @@ User-visible changes to Imp are recorded here.
   that called nothing, not a parse failure. It used to fail the chat parse and
   re-ask the whole prompt through `Imp.Adapter.JSON`, which doubled the cost of
   the step and broke the provider's prefix cache; the prose is now
-  `next_thought`, `tool_calls` is empty, and the loop ends the step at the
-  forced `submit` as it already did for an empty tool-call list. The prose is
+  `next_thought` and `tool_calls` is empty, which is what the turn-ending rule
+  above then reads. The prose is
   recorded as that turn's thought in the history and shown back to the model as
-  a plain assistant turn in the next request. `Imp.Adapter.Chat` reads a
+  a plain assistant turn in any next request. `Imp.Adapter.Chat` reads a
   marker-free completion this way only for a signature that declares
   `metadata[:prose_step]`; every other signature parses exactly as before, JSON
   fallback included.
