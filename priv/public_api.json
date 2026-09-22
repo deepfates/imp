@@ -7370,8 +7370,10 @@
       },
       "source": "lib/imp/predict/react_v2.ex",
       "struct_fields": [
+        "finish_on",
         "forced_submit_notice",
         "max_iters",
+        "prose",
         "react",
         "signature",
         "tool_policy",

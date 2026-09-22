@@ -26,10 +26,17 @@ defmodule Imp.Adapter.Chat do
 
   Options to `format/3`: `:demos`, `:response_instruction`, `:guidance`,
   `:omit_empty_request`, and the renderer seams `:output_renderer`,
-  `:input_section_renderer`, `:system_renderer` and `:tool_result_renderer`,
+  `:input_section_renderer`, `:system_renderer`, `:tool_result_renderer` and
+  `:history_note_renderer`,
   which let another adapter reuse this message assembly with its own dialect
   and let a host bound what a tool result costs in the prompt without changing
-  what the loop records. Options outside that list
+  what the loop records. `:history_note_renderer` is the one seam for saying
+  something *about* a stored turn rather than re-rendering it: it is consulted
+  for every history turn, native tool turns included, after that turn's own
+  messages, and its text becomes one user message right after them — the next
+  thing the model reads. A note is data about the turn (the answer was not
+  delivered, the account's allowance ran out), not a rewrite of what happened,
+  so the record the loop keeps is unchanged. Options outside that list
   are ignored; anything that is not a keyword list raises `ArgumentError`.
   """
 
@@ -61,6 +68,12 @@ defmodule Imp.Adapter.Chat do
     # in run events, and only the prompt carries the bounded view. Errors reach
     # it too, so a host decides how a failure reads.
     tool_result_renderer: [type: {:fun, 2}],
+    # Renderer for a NOTE about one stored history turn: (signature, turn),
+    # returning nil or text. Text becomes one user message immediately after
+    # that turn's own messages, for both native tool turns and plain ones. This
+    # is how a host tells the model something that became true after the turn
+    # ended without editing the turn.
+    history_note_renderer: [type: {:fun, 2}],
     # Loop guidance a program passes as data rather than writing into
     # `signature.instructions`: `%{finish_tool:, input_names:, output_names:,
     # tool_names:}`.
@@ -85,8 +98,14 @@ defmodule Imp.Adapter.Chat do
     tool_result_renderer =
       Keyword.get(opts, :tool_result_renderer) || (&default_tool_result_renderer/2)
 
-    {history_messages, history_fields} =
-      extract_history(signature, inputs, output_renderer, input_renderer, tool_result_renderer)
+    renderers = %{
+      output: output_renderer,
+      input_section: input_renderer,
+      tool_result: tool_result_renderer,
+      history_note: Keyword.get(opts, :history_note_renderer) || (&no_history_note/2)
+    }
+
+    {history_messages, history_fields} = extract_history(signature, inputs, renderers)
 
     request = %{
       role: :user,
@@ -1010,19 +1029,16 @@ defmodule Imp.Adapter.Chat do
 
   defp default_tool_result_renderer(result, _call), do: format_tool_result(result)
 
-  defp extract_history(signature, inputs, renderer, input_renderer, tool_result_renderer) do
+  defp no_history_note(_signature, _turn), do: nil
+
+  defp extract_history(signature, inputs, renderers) do
     signature.inputs
     |> Enum.reduce({[], MapSet.new()}, fn field, {messages, fields} ->
       case fetch_field(inputs, field.name) do
         %Imp.History{} = history ->
           {messages ++
-             render_history_turns(
-               signature,
-               Imp.History.messages(history),
-               renderer,
-               input_renderer,
-               tool_result_renderer
-             ), MapSet.put(fields, field.name)}
+             render_history_turns(signature, Imp.History.messages(history), renderers),
+           MapSet.put(fields, field.name)}
 
         _other ->
           {messages, fields}
@@ -1030,32 +1046,49 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  defp render_history_turns(signature, turns, renderer, input_renderer, tool_result_renderer) do
+  defp render_history_turns(signature, turns, renderers) do
     turns
     |> Enum.flat_map(fn turn ->
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
 
-      if native_tool_history_turn?(turn) do
-        render_native_tool_history_turn(signature, turn, tool_result_renderer)
-      else
-        [
-          %{
-            role: :user,
-            content:
-              render_inputs(signature, turn,
-                skip: history_input_fields(signature),
-                section_renderer: input_renderer
-              )
-          },
-          %{
-            role: :assistant,
-            content:
-              renderer.(signature, turn, "Not supplied for this conversation history message. ")
-          }
-        ]
-        |> Enum.reject(&blank_message?/1)
-      end
+      messages =
+        if native_tool_history_turn?(turn) do
+          render_native_tool_history_turn(signature, turn, renderers.tool_result)
+        else
+          [
+            %{
+              role: :user,
+              content:
+                render_inputs(signature, turn,
+                  skip: history_input_fields(signature),
+                  section_renderer: renderers.input_section
+                )
+            },
+            %{
+              role: :assistant,
+              content:
+                renderers.output.(
+                  signature,
+                  turn,
+                  "Not supplied for this conversation history message. "
+                )
+            }
+          ]
+          |> Enum.reject(&blank_message?/1)
+        end
+
+      messages ++ history_note_messages(signature, turn, renderers.history_note)
     end)
+  end
+
+  # The note is what the model reads next after the turn it is about, so it is
+  # a user message directly behind that turn's own messages. A renderer that
+  # returns nothing adds nothing.
+  defp history_note_messages(signature, turn, note_renderer) do
+    case note_renderer.(signature, turn) do
+      note when is_binary(note) and note != "" -> [%{role: :user, content: note}]
+      _no_note -> []
+    end
   end
 
   defp native_tool_history_turn?(turn), do: not is_nil(fetch_field(turn, :tool_calls))

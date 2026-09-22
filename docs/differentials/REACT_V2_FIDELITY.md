@@ -42,7 +42,8 @@ existing fail-fast `Imp.Predict.ReAct`.
 | Parallel tool calls preserve IDs and execute all calls | Every missing ID receives `call_<turn>_<index>`; results retain the corresponding ID | parallel call test |
 | Unknown tools and execution failures become observations | ReActV2 records error results and continues; existing ReAct remains fail-fast | recovery test |
 | `submit` is reserved and validates final outputs | Constructor rejects user `submit`; the generated submit tool uses the task JSON schema | reserved-submit and missing-output tests |
-| Empty calls, parse failure, context exhaustion, or budget exhaustion force one submit call | The final predictor call pins provider `tool_choice` to `submit` and clears `reasoning_effort`, matching the pinned call configuration | forced-submit test |
+| Empty calls, parse failure, context exhaustion, or budget exhaustion force one submit call | Parse failure, context exhaustion and budget exhaustion still do: the final predictor call pins provider `tool_choice` to `submit` and clears `reasoning_effort`, matching the pinned call configuration. A step of prose with no tool call does not, when the task declares exactly one text output: that prose is the output and the turn is over, as it is in Anthropic's tool runner, the OpenAI Agents SDK, LangGraph's ReAct and Pydantic AI. `prose: :forced_submit` restores the upstream shape | forced-submit test, prose-answer test |
+| No upstream equivalent | `finish_on` names tools that end the turn with the outputs they carry, the shape Pydantic AI calls an output tool | `finish_on` tests |
 | Prior calls replay as native assistant/tool messages | Chat adapter emits assistant `tool_calls` and matching tool-result messages by call ID | native history adapter test and ReqLLM tests |
 
 Imp additionally applies its existing explicit tool policy to every call and

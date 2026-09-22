@@ -239,6 +239,8 @@ defmodule Imp.Saving do
       "react" => dump(react.react),
       "tools" => dump_tools(Map.delete(react.tools, :submit), "ReActV2"),
       "max_iters" => react.max_iters,
+      "prose" => Atom.to_string(react.prose),
+      "finish_on" => dump_finish_on(react.finish_on),
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
   end
@@ -571,6 +573,8 @@ defmodule Imp.Saving do
       react: require_predict!(load(state["react"]), "ReActV2"),
       tools: Map.put(tools, :submit, submit),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
+      prose: load_react_v2_prose!(state["prose"]),
+      finish_on: load_finish_on!(state["finish_on"]),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
   end
@@ -1133,6 +1137,31 @@ defmodule Imp.Saving do
       {:error, message} -> raise ArgumentError, "invalid saved #{context}: #{message}"
     end
   end
+
+  # A terminal tool's decision function is host code, so it persists the way a
+  # tool runner and a tool policy do: by registry name, not by value.
+  defp dump_finish_on(finish_on),
+    do: Map.new(finish_on, fn {name, fun} -> {name, dump_callback!(fun, "ReActV2 finish_on")} end)
+
+  defp load_finish_on!(nil), do: %{}
+
+  defp load_finish_on!(finish_on) when is_map(finish_on),
+    do:
+      Map.new(finish_on, fn {name, key} ->
+        {name, load_callback!(key, 3, "ReActV2 finish_on")}
+      end)
+
+  defp load_finish_on!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 finish_on: #{inspect(other)}")
+
+  # A dump written before ReActV2 had the option carries no "prose" key, and
+  # the older behaviour it was written under is the forced submit.
+  defp load_react_v2_prose!(nil), do: :forced_submit
+  defp load_react_v2_prose!("answer"), do: :answer
+  defp load_react_v2_prose!("forced_submit"), do: :forced_submit
+
+  defp load_react_v2_prose!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 prose: #{inspect(other)}")
 
   defp dump_react_mode!(:provider_native), do: "provider_native"
   defp dump_react_mode!(:dspy_3_2_1), do: "dspy_3_2_1"

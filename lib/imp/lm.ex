@@ -3,7 +3,16 @@ defmodule Imp.LM do
   Behaviour for language model clients.
 
   Inside an `Imp.Run` context, `request/2` emits one `:model_request` and one
-  `:model_response` event per call. The response event's metadata carries the
+  `:model_response` event per call. The request event carries the messages as
+  its input and the rest of the request in its metadata: `:options`, the
+  request options with the tool definitions removed, and `:tools_hash`, the
+  SHA-256 of the canonical JSON of those definitions, or `nil` when the request
+  offered no tools. The definitions themselves are emitted once per run per
+  distinct hash, as a `:tools_offered` event whose input is the tool list as
+  sent. Between the two, a recorded request can be reproduced without repeating
+  a roster on every call. Both are redacted like every other event.
+
+  The response event's metadata carries the
   money for that call in `:cost`: the provider's reported total in USD as a
   non-negative float, or `nil` when the provider reported nothing Imp can read
   as a number. A host summing spend reads that number and nothing else.
@@ -87,11 +96,30 @@ defmodule Imp.LM do
   def request(lm, %Imp.Core.LMRequest{} = request) do
     if Imp.Run.context() do
       call_id = Imp.Run.new_event_id("model")
+      {messages, options} = Imp.Core.request_parts(request)
+      tools = List.wrap(Keyword.get(options, :tools, []))
+      hash = tools_hash(tools)
+
+      # The definitions are the largest and least variable part of a request, so
+      # they are recorded once per roster rather than once per call, and every
+      # request names the roster it was sent by its hash.
+      if hash && Imp.Run.first_seen?({:tools_offered, hash}) do
+        Imp.Run.emit(:tools_offered,
+          component: lm_name(lm),
+          input: tools,
+          metadata: %{tools_hash: hash}
+        )
+      end
 
       Imp.Run.emit(:model_request,
         component: lm_name(lm),
-        input: elem(Imp.Core.request_parts(request), 0),
-        metadata: %{model_call_id: call_id, model: request.config.model}
+        input: messages,
+        metadata: %{
+          model_call_id: call_id,
+          model: request.config.model,
+          options: Keyword.delete(options, :tools),
+          tools_hash: hash
+        }
       )
 
       result = perform_request(lm, request)
@@ -126,6 +154,33 @@ defmodule Imp.LM do
   def request(_lm, request) do
     {:error, {:invalid_lm_request, request}}
   end
+
+  # A stable name for one tool roster: the SHA-256 of its canonical JSON, with
+  # object keys sorted, so two requests offering the same definitions hash the
+  # same however the terms were built. A request offering no tools has no hash.
+  defp tools_hash([]), do: nil
+
+  defp tools_hash(tools) do
+    :sha256
+    |> :crypto.hash(canonical_json(Imp.Observability.Inspection.json_safe(tools)))
+    |> Base.encode16(case: :lower)
+  end
+
+  defp canonical_json(value) when is_map(value) do
+    entries =
+      value
+      |> Enum.sort_by(fn {key, _value} -> key end)
+      |> Enum.map_join(",", fn {key, nested} ->
+        Jason.encode!(to_string(key)) <> ":" <> canonical_json(nested)
+      end)
+
+    "{" <> entries <> "}"
+  end
+
+  defp canonical_json(value) when is_list(value),
+    do: "[" <> Enum.map_join(value, ",", &canonical_json/1) <> "]"
+
+  defp canonical_json(value), do: Jason.encode!(value)
 
   defp maybe_put_billing(metadata, nil), do: metadata
   defp maybe_put_billing(metadata, billing), do: Map.put(metadata, :billing, billing)
