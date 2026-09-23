@@ -116,9 +116,6 @@
   {"lib/mix/tasks/imp.benchmark.parity.ex", :pattern_match, {715, 11}},
   # raise-only helper: invalid_snapshot!/2 exists to Mix.raise
   {"lib/mix/tasks/imp.public_api.ex", :no_return, {838, 8}},
-  # dependency code: this file ships inside the req_llm package, not this
-  # repo; LLMDB.Model.t/0 is a Zoi-generated spec dialyzer cannot see
-  {"lib/req_llm.ex", :unknown_type, {109, 24}},
 
   # --- Surfaced 2026-08-08 during ignore-file regeneration (imp-fkwy): 583
   # commits landed without CI, and these warnings accumulated unpinned.
@@ -221,7 +218,7 @@
 
   # Defensive fallbacks and MapSet opacity retained at the 0.3 cut. These are
   # individually pinned so a changed success type makes the gate ask again.
-  {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {341, 16}},
+  {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {340, 16}},
   {"lib/imp/adapter/chat.ex", :pattern_match_cov, {774, 8}},
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {675, 8}},
   {"lib/imp/mcp.ex", :pattern_match_cov, {372, 8}},

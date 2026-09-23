@@ -1070,11 +1070,11 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  # ReqLLM attaches its retry step after constructing the Req request and
-  # resets `max_retries` to 3, so an explicit caller no-retry policy is
-  # re-applied in a final request step at the adapter boundary, where nothing
-  # overwrites it. The attempt event fires immediately before the Req adapter
-  # call, so it counts transports rather than Imp calls.
+  # An explicit caller no-retry policy is applied again in a final request step
+  # at the adapter boundary, after every ReqLLM and Req step has run, so no
+  # later option merge can restore retries. The same step emits the attempt
+  # event immediately before the Req adapter call, so it counts transports
+  # rather than Imp calls; campaign budgets read that count.
   defp enforce_explicit_no_retry(opts) do
     http_opts = Keyword.get(opts, :req_http_options, [])
 
