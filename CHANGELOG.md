@@ -14,12 +14,14 @@ User-visible changes to Imp are recorded here.
   outputs, or one non-text output, keeps DSPy's `submit` unchanged.
 - An interrupted turn of a one-text-output signature (the step limit, a
   failed request, a step that calls nothing and says nothing) makes one more
-  request that offers no tools, so the only thing the model can do is write
-  text, and that text is the answer, with `termination_reason: :last_prose`
+  request with the same tools as every step and `tool_choice: "none"`, so the
+  model can only write text, and that text is the answer, with `termination_reason: :last_prose`
   and `termination_cause` naming the interruption (`:max_iters`,
   `:prediction_error`, `:parse_error`, `:empty_completion`,
   `:invalid_answer`). A completion that says nothing is an empty answer rather
-  than an error. `last_prose_note`, a string, puts one line of host text in
+  than an error. A tool call the model makes on that request anyway is not
+  run; the text is the answer and the calls are listed in
+  `unexecuted_tool_calls`. `last_prose_note`, a string, puts one line of host text in
   front of that request as a user message and keeps it in the returned
   history; Imp writes no sentence of its own. If the process's `Imp.Deadline`
   has already passed, no request is made and the run ends with

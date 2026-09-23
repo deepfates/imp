@@ -419,8 +419,8 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # The one place an interrupted turn goes: the last request with no tools for
-  # a signature with one text output, the forced submit for every other.
+  # The one place an interrupted turn goes: the last request with
+  # `tool_choice: "none"` for a signature with one text output, the forced submit for every other.
   defp interrupted(react, history, inputs, pending, cause, turn, error, execution) do
     if single_text_output?(react.signature),
       do: last_prose(react, history, pending, cause, turn, error),
