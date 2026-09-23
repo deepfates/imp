@@ -52,7 +52,7 @@ defmodule ToolSchemaRuntimeTest do
     refute_received {:schema_tool_called, _input}
   end
 
-  test "ReActV2 records validation errors and permits a later submit" do
+  test "ReActV2 records validation errors and permits a later answer" do
     parent = self()
     {:ok, turns} = Agent.start_link(fn -> 0 end)
 
@@ -60,7 +60,7 @@ defmodule ToolSchemaRuntimeTest do
       static_lm(fn _messages ->
         Agent.get_and_update(turns, fn
           0 -> {%{tool_calls: [%{name: "lookup", arguments: %{}}]}, 1}
-          _ -> {%{tool_calls: [%{name: "submit", arguments: %{answer: "recovered"}}]}, 2}
+          _ -> {"recovered", 2}
         end)
       end)
 

@@ -21,7 +21,7 @@ defmodule ReActV2RequestShapeTest do
             next_thought: "look #{n}",
             tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]
           },
-          else: %{tool_calls: [%{id: "s", name: "submit", arguments: %{answer: "ok"}}]}
+          else: "ok"
       end
     )
   end
@@ -51,7 +51,7 @@ defmodule ReActV2RequestShapeTest do
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
 
     for {messages, opts} <- requests(2) do
-      assert Enum.sort(Enum.map(opts[:tools], & &1.function.name)) == ["look", "submit"]
+      assert Enum.map(opts[:tools], & &1.function.name) == ["look"]
       refute Enum.any?(messages, &(&1[:content] =~ "[[ ## tools ## ]]"))
 
       refute Enum.any?(
@@ -67,10 +67,38 @@ defmodule ReActV2RequestShapeTest do
     [{[system | _], _}] = requests(1)
 
     assert system.role == :system
-    assert system.content =~ "call `submit` with `answer`"
-    assert system.content =~ "The available tools are: `look`, `submit`."
+
+    assert system.content =~
+             "When the final answer is ready, write it as plain text without calling a tool."
+
+    assert system.content =~ "The available tools are: `look`."
+    refute system.content =~ "submit"
     # And the program's own instructions carry none of it.
     refute program.signature.instructions =~ "You are an Agent"
+  end
+
+  # With `submit`, the guidance is DSPy ReActV2's text.
+  test "a signature with submit is told to call it, in DSPy's words" do
+    submit_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(self(), {:system, hd(messages)})
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "ok", confidence: 1.0}}]}
+        end
+      )
+
+    program = Imp.react_v2("intent -> answer, confidence: float", [look()], lm: submit_lm)
+    assert {:ok, _} = Imp.call(program, %{intent: "hello"})
+    assert_received {:system, system}
+
+    for line <- [
+          "You are an Agent. Use the supplied tools to produce `answer`, `confidence` from `intent`.",
+          "Call tools when more information is needed.",
+          "When the final answer is ready, call `submit` with `answer`, `confidence`.",
+          "The available tools are: `look`, `submit`."
+        ] do
+      assert system.content =~ line
+    end
   end
 
   test "a host can replace the system message and keep parsing" do
@@ -94,9 +122,9 @@ defmodule ReActV2RequestShapeTest do
 
     assert_received {:rendered,
                      %{
-                       finish_tool: :submit,
+                       finish_tool: nil,
                        output_names: [:answer],
-                       tool_names: [:look, :submit]
+                       tool_names: [:look]
                      }}
 
     [{[system | _], _} | _] = requests(2)

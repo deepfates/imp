@@ -24,28 +24,10 @@ defmodule Mix.Tasks.ImpAcp.Demo do
         handler: fn messages, _opts ->
           case Imp.ACP.DemoMessages.current_tool_result(messages) do
             {:error, _reason} ->
-              %{
-                next_thought: "Respect the failed workspace inspection.",
-                tool_calls: [
-                  %{
-                    id: "submit-workspace-denied",
-                    name: "submit",
-                    arguments: %{answer: "Workspace inspection was not authorized."}
-                  }
-                ]
-              }
+              "Workspace inspection was not authorized."
 
             {:ok, _content} ->
-              %{
-                next_thought: "The workspace tool supplied the answer.",
-                tool_calls: [
-                  %{
-                    id: "submit-workspace",
-                    name: "submit",
-                    arguments: %{answer: "Imp ReActV2 is running in #{workspace}."}
-                  }
-                ]
-              }
+              "Imp ReActV2 is running in #{workspace}."
 
             :none ->
               %{

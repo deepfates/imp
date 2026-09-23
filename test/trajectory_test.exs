@@ -12,14 +12,14 @@ defmodule Imp.TrajectoryTest do
             next_thought: "look it up",
             tool_calls: [
               %{id: "lookup-1", name: "lookup", arguments: %{query: "beam"}},
-              %{id: "submit-1", name: "submit", arguments: %{answer: "BEAM"}}
+              %{id: "submit-1", name: "submit", arguments: %{answer: "BEAM", confidence: 1.0}}
             ]
           }
         end
       )
 
     {:ok, run} =
-      Imp.Run.start(Imp.react_v2("question -> answer", [lookup], lm: lm), %{
+      Imp.Run.start(Imp.react_v2("question -> answer, confidence: float", [lookup], lm: lm), %{
         question: "runtime?",
         api_key: secret
       })

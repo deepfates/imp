@@ -4,33 +4,32 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
-- A `ReActV2` turn now ends when the model stops calling tools. A step that
-  comes back as prose with no tool call, for a task signature with exactly one
-  output of type `:string`, finishes the run with that prose as the output and
-  `termination_reason: :answered`, in that one request. It used to cost one more
-  request with `tool_choice` naming `submit`, which both spent a call and, when
-  the model had already acted with a tool, came back with a summary of what it
-  did rather than what it said. Every other mainstream loop — Anthropic's tool
-  runner, the OpenAI Agents SDK, LangGraph's ReAct, Pydantic AI — ends the turn
-  this way, so it is the default. A signature with several outputs, or one
-  non-text output, still takes the forced submit, because prose cannot fill
-  those fields, and so does a step that says nothing at all. The new option
-  `prose: :forced_submit` keeps the old behaviour for a single-output
-  signature.
-- `ReActV2` gains `on_max_iters`, what the step limit does. The default,
-  `:forced_submit`, is what it did before: one more request with `tool_choice`
-  naming `submit`. `:last_prose` makes one more request with no tools in it at
-  all, so the only thing the model can do is speak, and that prose is the
-  single text output, with `termination_reason: :last_prose`. This is the
-  ending that fits a host whose model already finishes turns by writing prose:
-  it is never asked to call a tool it did not choose. A completion that says
-  nothing finishes with an empty answer rather than an error. `:last_prose`
-  needs a signature with exactly one output of type `:string`, and is refused
-  at construction otherwise. The companion option `last_prose_note`, a string,
-  puts one line of host text in front of that request as a user message and
-  keeps it in the returned history; Imp writes no sentence of its own. Both
-  options persist through `dump`/`load`, and a dump written before them loads
-  as `:forced_submit`.
+- `ReActV2` offers `submit` only to a signature that needs it. A task
+  signature with exactly one output of type `:string` gets no `submit` tool:
+  a step that comes back as prose with no tool call is the answer, in that
+  one request, with `termination_reason: :answered`, which is how Anthropic's
+  tool runner, the OpenAI Agents SDK, LangGraph's ReAct and Pydantic AI end a
+  turn. Its history event carries the output, as a `submit`'s does, and the
+  answer is not also emitted as a `:reasoning` event. A signature with several
+  outputs, or one non-text output, keeps DSPy's `submit` unchanged.
+- An interrupted turn of a one-text-output signature (the step limit, a
+  failed request, a step that calls nothing and says nothing) makes one more
+  request that offers no tools, so the only thing the model can do is write
+  text, and that text is the answer, with `termination_reason: :last_prose`
+  and `termination_cause` naming the interruption (`:max_iters`,
+  `:prediction_error`, `:parse_error`, `:empty_completion`,
+  `:invalid_answer`). A completion that says nothing is an empty answer rather
+  than an error. `last_prose_note`, a string, puts one line of host text in
+  front of that request as a user message and keeps it in the returned
+  history; Imp writes no sentence of its own. If the process's `Imp.Deadline`
+  has already passed, no request is made and the run ends with
+  `termination_reason: :deadline_exceeded`. `forced_submit_notice` is for
+  signatures with `submit` and `last_prose_note` for those without; each is
+  refused at construction for the other. There is no `prose` or
+  `on_max_iters` option, and a dump no longer carries them.
+- `Imp.Observability` reports a prediction that ended `:answered`,
+  `:last_prose` or `:finished_by_tool` as complete; it reported them as
+  incomplete.
 - `ReActV2` gains `finish_on`, a map from tool name to
   `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. A tool
   named there ends the turn with the outputs the function returns, which are

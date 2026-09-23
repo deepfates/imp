@@ -29,21 +29,8 @@ defmodule Imp.ReActV2ContextTest do
              "choices" => [
                %{
                  "index" => 0,
-                 "message" => %{
-                   "role" => "assistant",
-                   "content" => nil,
-                   "tool_calls" => [
-                     %{
-                       "id" => "done",
-                       "type" => "function",
-                       "function" => %{
-                         "name" => "submit",
-                         "arguments" => Jason.encode!(%{answer: "done"})
-                       }
-                     }
-                   ]
-                 },
-                 "finish_reason" => "tool_calls"
+                 "message" => %{"role" => "assistant", "content" => "done"},
+                 "finish_reason" => "stop"
                }
              ]
            }}
@@ -163,8 +150,7 @@ defmodule Imp.ReActV2ContextTest do
 
       if n < 2,
         do: {:error, %Imp.ContextWindowExceededError{message: "limit"}},
-        else:
-          {:ok, %{tool_calls: [%{id: "done", name: "submit", arguments: %{answer: "continued"}}]}}
+        else: {:ok, "continued"}
     end
 
     prior =
@@ -217,7 +203,7 @@ defmodule Imp.ReActV2ContextTest do
                  end)
 
           refute inspect(messages) =~ "prior-answer"
-          {:ok, %{tool_calls: [%{id: "done", name: "submit", arguments: %{answer: "done"}}]}}
+          {:ok, "done"}
       end
     end
 

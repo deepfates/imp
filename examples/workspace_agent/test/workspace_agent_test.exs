@@ -14,7 +14,7 @@ defmodule WorkspaceAgentTest do
     %{root: root}
   end
 
-  test "provider-free ReAct factory reads and submits workspace evidence", %{root: root} do
+  test "provider-free ReAct factory reads and answers with workspace evidence", %{root: root} do
     assert {:ok, program, %{cleanup: cleanup}} =
              WorkspaceAgent.program(%{cwd: root}, provider: :static, program: :react)
 

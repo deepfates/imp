@@ -1,10 +1,12 @@
 defmodule ReActV2LastProseTest do
   use ExUnit.Case, async: true
 
-  # `on_max_iters: :last_prose` ends a turn that reaches the step limit with one
-  # request that carries no tools, so the only thing the model can do is speak.
-  # What it says is the single text output; what it does not say is an empty
-  # answer, not an error.
+  # A signature with one text output ends every interrupted turn (the step
+  # limit, a failed request, a step that calls nothing and says nothing) with
+  # one request that carries no tools, so the only thing the model can do is
+  # write text. What it writes is the single text output; what it does not say
+  # is an empty answer, not an error. A deadline that has already passed
+  # leaves no time for that request.
 
   defp look, do: Imp.tool(:look, "Look at a thing", fn _arguments -> %{"seen" => true} end)
 
@@ -41,13 +43,13 @@ defmodule ReActV2LastProseTest do
     program =
       Imp.react_v2("intent -> answer", [look()],
         lm: recording_lm(owner, prose),
-        max_iters: 2,
-        on_max_iters: :last_prose
+        max_iters: 2
       )
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == prose
     assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_cause) == :max_iters
 
     [{_first, first_opts}, {_second, _}, {last, last_opts}] = requests(3)
     refute_received {:request, 4, _messages, _opts}
@@ -73,7 +75,6 @@ defmodule ReActV2LastProseTest do
       Imp.react_v2("intent -> answer", [look()],
         lm: recording_lm(owner, "The thing is there."),
         max_iters: 1,
-        on_max_iters: :last_prose,
         last_prose_note: note
       )
 
@@ -93,8 +94,7 @@ defmodule ReActV2LastProseTest do
     program =
       Imp.react_v2("intent -> answer", [look()],
         lm: recording_lm(owner, "The thing is there."),
-        max_iters: 1,
-        on_max_iters: :last_prose
+        max_iters: 1
       )
 
     assert {:ok, _prediction} = Imp.call(program, %{intent: "hello"})
@@ -111,8 +111,7 @@ defmodule ReActV2LastProseTest do
     program =
       Imp.react_v2("intent -> answer", [look()],
         lm: recording_lm(owner, ""),
-        max_iters: 1,
-        on_max_iters: :last_prose
+        max_iters: 1
       )
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
@@ -128,8 +127,7 @@ defmodule ReActV2LastProseTest do
     program =
       Imp.react_v2("intent -> answer", [look()],
         lm: recording_lm(owner, prose),
-        max_iters: 1,
-        on_max_iters: :last_prose
+        max_iters: 1
       )
 
     assert {:ok, run} =
@@ -155,46 +153,133 @@ defmodule ReActV2LastProseTest do
     end
   end
 
-  test "a signature that is not one text output refuses the option" do
-    assert_raise ArgumentError, ~r/exactly one output of type :string/, fn ->
-      Imp.react_v2("intent -> answer, confidence: float", [look()], on_max_iters: :last_prose)
+  test "a failed step takes the same last request, and the cause is recorded" do
+    owner = self()
+    counter = :counters.new(1, [])
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          n = :counters.get(counter, 1) + 1
+          :counters.put(counter, 1, n)
+          send(owner, {:request, n, messages, opts})
+
+          if n == 1,
+            do: raise(RuntimeError, "provider unavailable"),
+            else: "I could not look, so from memory: it is there."
+        end
+      )
+
+    program = Imp.react_v2("intent -> answer", [look()], lm: lm, last_prose_note: "Last one.")
+
+    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+    assert Imp.get(prediction, :answer) == "I could not look, so from memory: it is there."
+    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_cause) == :prediction_error
+
+    [_failed, {last, last_opts}] = requests(2)
+    refute Keyword.has_key?(last_opts, :tools)
+
+    # The inputs no step spent come first, and the note is the last thing said.
+    [inputs, note] = Enum.take(user_contents(last), -2)
+    assert inputs =~ "hello"
+    assert note =~ "Last one."
+  end
+
+  test "a step that calls nothing and says nothing takes the same last request" do
+    owner = self()
+    counter = :counters.new(1, [])
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          n = :counters.get(counter, 1) + 1
+          :counters.put(counter, 1, n)
+          send(owner, {:request, n, messages, opts})
+          if n == 1, do: %{tool_calls: []}, else: "Said at last."
+        end
+      )
+
+    program = Imp.react_v2("intent -> answer", [look()], lm: lm)
+
+    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+    assert Imp.get(prediction, :answer) == "Said at last."
+    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_cause) == :empty_completion
+
+    [{_first, first_opts}, {_last, last_opts}] = requests(2)
+    assert first_opts[:tool_choice] == "auto"
+    refute Keyword.has_key?(last_opts, :tools)
+    refute Keyword.has_key?(last_opts, :tool_choice)
+  end
+
+  test "a deadline that has already passed makes no last request" do
+    owner = self()
+
+    # The deadline passes during the first step's tool call.
+    slow_look =
+      Imp.tool(:look, "Look at a thing", fn _arguments ->
+        Process.sleep(20)
+        %{"seen" => true}
+      end)
+
+    program =
+      Imp.react_v2("intent -> answer", [slow_look],
+        lm: recording_lm(owner, "never asked"),
+        max_iters: 1,
+        last_prose_note: "Last one."
+      )
+
+    assert {:ok, prediction} =
+             Imp.Deadline.with_deadline(10, fn -> Imp.call(program, %{intent: "hello"}) end)
+
+    assert Imp.get(prediction, :termination_reason) == :deadline_exceeded
+    assert Imp.get(prediction, :termination_cause) == :max_iters
+    assert Imp.get(prediction, :answer) == nil
+
+    [_first] = requests(1)
+    refute_received {:request, 2, _messages, _opts}
+
+    # The note is what the model would have been told; no request, no note.
+    history = Imp.get(prediction, :history)
+    refute Enum.any?(Imp.History.messages(history), &(Map.get(&1, :intent) == "Last one."))
+  end
+
+  test "each note is refused for the signature it does not belong to" do
+    assert_raise ArgumentError,
+                 ~r/:last_prose_note needs a signature with exactly one output/,
+                 fn ->
+                   Imp.react_v2("intent -> answer, confidence: float", [look()],
+                     last_prose_note: "Now."
+                   )
+                 end
+
+    assert_raise ArgumentError, ~r/:forced_submit_notice needs a signature with submit/, fn ->
+      Imp.react_v2("intent -> answer", [look()], forced_submit_notice: "Now.")
     end
   end
 
-  test "the default still forces a submit at the step limit" do
-    owner = self()
-
-    program =
-      Imp.react_v2("intent -> answer", [look()], lm: recording_lm(owner, ""), max_iters: 1)
-
-    assert {:ok, _prediction} = Imp.call(program, %{intent: "hello"})
-    [_first, {_forced, forced_opts}] = requests(2)
-    assert forced_opts[:tool_choice] == %{type: "tool", name: "submit"}
-  end
-
-  test "dump and load round-trip the options, and an older dump forces a submit" do
+  test "dump and load round-trip the note, and a loaded program has no submit" do
     runner = fn _arguments -> %{"seen" => true} end
     registry = Imp.Saving.Registry.new(look_runner: runner)
     tool = Imp.tool(:look, "Look at a thing", runner)
 
     dumped =
-      Imp.react_v2("intent -> answer", [tool],
-        on_max_iters: :last_prose,
-        last_prose_note: "Answer now."
-      )
+      Imp.react_v2("intent -> answer", [tool], last_prose_note: "Answer now.")
       |> Imp.dump(registry: registry)
 
-    assert dumped["on_max_iters"] == "last_prose"
     assert dumped["last_prose_note"] == "Answer now."
+    refute Map.has_key?(dumped, "on_max_iters")
 
     loaded = Imp.load(dumped, registry: registry)
-    assert loaded.on_max_iters == :last_prose
     assert loaded.last_prose_note == "Answer now."
+    refute Map.has_key?(loaded.tools, :submit)
 
-    older =
-      Imp.load(Map.drop(dumped, ["on_max_iters", "last_prose_note"]), registry: registry)
+    with_submit =
+      Imp.react_v2("intent -> answer, confidence: float", [tool])
+      |> Imp.dump(registry: registry)
+      |> Imp.load(registry: registry)
 
-    assert older.on_max_iters == :forced_submit
-    assert older.last_prose_note == nil
+    assert Map.has_key?(with_submit.tools, :submit)
   end
 end

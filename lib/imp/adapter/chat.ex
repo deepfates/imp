@@ -618,18 +618,30 @@ defmodule Imp.Adapter.Chat do
   end
 
   # Renders loop guidance passed as data, appended after the program's own
-  # instructions so the two have separate owners.
+  # instructions so the two have separate owners. With a finish tool the text
+  # is DSPy ReActV2's, byte for byte. A `finish_tool` of nil means the loop has
+  # no finish tool and the answer is the text the model writes when it stops
+  # calling tools, so that one line says so instead; this is Imp's divergence
+  # for a signature with one text output (`Imp.Predict.ReActV2`).
   defp with_guidance(instructions, nil), do: instructions
 
   defp with_guidance(instructions, %{} = guidance) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
-    finish = Map.get(guidance, :finish_tool, :submit)
+
+    finish =
+      case Map.get(guidance, :finish_tool, :submit) do
+        nil ->
+          "When the final answer is ready, write it as plain text without calling a tool."
+
+        tool ->
+          "When the final answer is ready, call `#{tool}` with #{names.(:output_names)}."
+      end
 
     """
     #{instructions}
     You are an Agent. Use the supplied tools to produce #{names.(:output_names)} from #{names.(:input_names)}.
     Call tools when more information is needed.
-    When the final answer is ready, call `#{finish}` with #{names.(:output_names)}.
+    #{finish}
     The available tools are: #{names.(:tool_names)}.
     """
     |> String.trim()

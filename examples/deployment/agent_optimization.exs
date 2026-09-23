@@ -255,7 +255,7 @@ defmodule ImpDeployment.AgentOptimization.Runner do
 
     actions =
       events
-      |> Enum.filter(&(&1.kind == :tool_call and to_string(&1.tool_name) != "submit"))
+      |> Enum.filter(&(&1.kind == :tool_call))
       |> Enum.map(&to_string(&1.tool_name))
 
     errors = Enum.filter(events, &(&1.kind == :run_failed or not is_nil(&1.error)))
@@ -285,7 +285,7 @@ defmodule ImpDeployment.AgentOptimization.Runner do
 
     grounded? = expected_result? and String.contains?(answer, row.account_id)
     clean? = errors == []
-    valid_final? = completed and answer != "" and termination_reason == :submit
+    valid_final? = completed and answer != "" and termination_reason == :answered
 
     score =
       if expected? do
@@ -307,7 +307,7 @@ defmodule ImpDeployment.AgentOptimization.Runner do
         if(expected_result?, do: nil, else: "expected action did not return its sandbox result"),
         if(valid_final? and clean? and grounded?,
           do: nil,
-          else: "run did not submit a clean answer grounded in account #{row.account_id}"
+          else: "run did not answer cleanly, grounded in account #{row.account_id}"
         )
       ]
       |> Enum.reject(&is_nil/1)
