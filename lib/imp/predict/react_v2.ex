@@ -40,9 +40,14 @@ defmodule Imp.Predict.ReActV2 do
   `:empty_tool_calls` for a signature with `submit`).
 
   With one text output, every interruption takes the same path: one more
-  request that offers no tools, so the only thing the model can do is write
-  text, and that text is the answer, with `termination_reason: :last_prose`.
-  A completion that says nothing is an empty answer rather than an error.
+  request with `tool_choice: "none"`, so the model can only write text, and
+  that text is the answer, with `termination_reason: :last_prose`. The
+  request offers the same tools as every other step: a provider may refuse a
+  history of tool calls when no tools are declared (Anthropic does), and a
+  changed roster changes the prompt prefix a provider caches. If the model
+  calls a tool anyway, the call is not run; the completion's text, if any, is
+  the answer, and the calls are kept in `unexecuted_tool_calls`. A completion
+  that says nothing is an empty answer rather than an error.
   `:last_prose_note` puts one line of host text in front of that request as a
   user message; Imp writes no sentence of its own. If the process's
   `Imp.Deadline` has already passed, no request is made and the prediction
@@ -469,8 +474,10 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   # An interrupted turn of a signature with one text output. The last request
-  # carries no tools, so the only thing the model can do is write text, and
-  # that text is the single text output. A completion that says nothing is an
+  # says `tool_choice: "none"`, so the model can only write text, and that
+  # text is the single text output. A tool call it makes anyway is not run,
+  # and is kept out of the history, where it would replay as a call with no
+  # result; the prediction names it in `unexecuted_tool_calls` instead. A completion that says nothing is an
   # empty answer: the run is over either way, and there is nothing to force.
   # A deadline that has already passed leaves no time for that request, so
   # none is made.
@@ -484,10 +491,12 @@ defmodule Imp.Predict.ReActV2 do
         {:ok, prediction, history} ->
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
           outputs = last_prose_outputs(react.signature, prediction)
-          history = append_last_step(history, pending, prediction, calls, outputs)
+          no_calls = %ToolCalls{tool_calls: []}
+          history = append_last_step(history, pending, prediction, no_calls, outputs)
 
           outputs
           |> Map.put(:termination_cause, cause)
+          |> put_unexecuted(calls)
           |> final_prediction(history, :last_prose)
 
         {:error, reason, history} ->
@@ -522,11 +531,22 @@ defmodule Imp.Predict.ReActV2 do
 
   defp deadline_passed?, do: Imp.Deadline.expired?(Imp.Deadline.current())
 
-  # A request with no tools. Both provider keys go: the chat completions body
-  # carries `tools` and `tool_choice` together or not at all, and a request
-  # that names a tool choice without a roster is invalid.
+  # The same roster as every step, with `tool_choice: "none"`. ReqLLM encodes
+  # it as `"none"` for OpenAI and OpenRouter and `{"type": "none"}` for
+  # Anthropic (`test/react_v2_last_request_wire_test.exs`).
   defp last_prose_program(react) do
-    %{react.react | config: Keyword.drop(react.react.config, [:tools, :tool_choice])}
+    %{react.react | config: Keyword.put(react.react.config, :tool_choice, "none")}
+  end
+
+  defp put_unexecuted(outputs, %ToolCalls{tool_calls: []}), do: outputs
+
+  defp put_unexecuted(outputs, %ToolCalls{tool_calls: calls}) do
+    unexecuted =
+      Enum.map(calls, fn call ->
+        %{id: call.id, name: call.name, arguments: Imp.Tool.normalize_arguments(call.arguments)}
+      end)
+
+    Map.put(outputs, :unexecuted_tool_calls, Imp.Redaction.redact(unexecuted))
   end
 
   defp last_prose_outputs(signature, prediction) do

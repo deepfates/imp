@@ -3,8 +3,8 @@ defmodule ReActV2LastProseTest do
 
   # A signature with one text output ends every interrupted turn (the step
   # limit, a failed request, a step that calls nothing and says nothing) with
-  # one request that carries no tools, so the only thing the model can do is
-  # write text. What it writes is the single text output; what it does not say
+  # one request with `tool_choice: "none"` and the same tools as every step, so
+  # the model can only write text. What it writes is the single text output; what it does not say
   # is an empty answer, not an error. A deadline that has already passed
   # leaves no time for that request.
 
@@ -19,7 +19,7 @@ defmodule ReActV2LastProseTest do
         :counters.put(counter, 1, n)
         send(owner, {:request, n, messages, opts})
 
-        if Keyword.has_key?(opts, :tools) do
+        if opts[:tool_choice] != "none" do
           %{
             next_thought: "look first",
             tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]
@@ -36,7 +36,7 @@ defmodule ReActV2LastProseTest do
   defp user_contents(messages),
     do: messages |> Enum.filter(&(&1[:role] == :user)) |> Enum.map(& &1[:content])
 
-  test "the step limit spends one request with no tools and takes its prose as the answer" do
+  test "the step limit spends one request that allows no tool call and takes its prose as the answer" do
     owner = self()
     prose = "Two looks were enough: the thing is there."
 
@@ -55,8 +55,9 @@ defmodule ReActV2LastProseTest do
     refute_received {:request, 4, _messages, _opts}
 
     assert Keyword.fetch!(first_opts, :tool_choice) == "auto"
-    refute Keyword.has_key?(last_opts, :tools)
-    refute Keyword.has_key?(last_opts, :tool_choice)
+    assert last_opts[:tool_choice] == "none"
+    # The roster is the one every step sent, so the prompt prefix is unchanged.
+    assert last_opts[:tools] == first_opts[:tools]
 
     # Nothing was said on the model's behalf: the last request is the second
     # request plus that step's exchange.
@@ -178,7 +179,7 @@ defmodule ReActV2LastProseTest do
     assert Imp.get(prediction, :termination_cause) == :prediction_error
 
     [_failed, {last, last_opts}] = requests(2)
-    refute Keyword.has_key?(last_opts, :tools)
+    assert last_opts[:tool_choice] == "none"
 
     # The inputs no step spent come first, and the note is the last thing said.
     [inputs, note] = Enum.take(user_contents(last), -2)
@@ -209,8 +210,8 @@ defmodule ReActV2LastProseTest do
 
     [{_first, first_opts}, {_last, last_opts}] = requests(2)
     assert first_opts[:tool_choice] == "auto"
-    refute Keyword.has_key?(last_opts, :tools)
-    refute Keyword.has_key?(last_opts, :tool_choice)
+    assert last_opts[:tool_choice] == "none"
+    assert last_opts[:tools] == first_opts[:tools]
   end
 
   test "a deadline that has already passed makes no last request" do
@@ -243,6 +244,51 @@ defmodule ReActV2LastProseTest do
     # The note is what the model would have been told; no request, no note.
     history = Imp.get(prediction, :history)
     refute Enum.any?(Imp.History.messages(history), &(Map.get(&1, :intent) == "Last one."))
+  end
+
+  # `tool_choice: "none"` is a request, not a guarantee. A call the model makes
+  # anyway is not run and is not replayed as a call with no result; its text
+  # is the answer and the call is named in `unexecuted_tool_calls`.
+  test "a tool call on the last request is not run, and its text is the answer" do
+    owner = self()
+    counter = :counters.new(1, [])
+
+    look =
+      Imp.tool(:look, "Look at a thing", fn _arguments ->
+        send(owner, :looked)
+        %{"seen" => true}
+      end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          n = :counters.get(counter, 1) + 1
+          :counters.put(counter, 1, n)
+
+          if opts[:tool_choice] == "none",
+            do: %{
+              next_thought: "One more look, then: it is there.",
+              tool_calls: [%{id: "late", name: "look", arguments: %{"where" => "shelf"}}]
+            },
+            else: %{tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]}
+        end
+      )
+
+    program = Imp.react_v2("intent -> answer", [look], lm: lm, max_iters: 1)
+    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+
+    assert_received :looked
+    refute_received :looked
+
+    assert Imp.get(prediction, :answer) == "One more look, then: it is there."
+    assert Imp.get(prediction, :termination_reason) == :last_prose
+
+    assert [%{id: "late", name: "look", arguments: %{where: "shelf"}}] =
+             Imp.get(prediction, :unexecuted_tool_calls)
+
+    [_first, last] = Imp.History.messages(Imp.get(prediction, :history))
+    assert last.answer == "One more look, then: it is there."
+    assert last.tool_calls.tool_calls == []
   end
 
   test "each note is refused for the signature it does not belong to" do
