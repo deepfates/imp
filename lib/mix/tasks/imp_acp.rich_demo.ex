@@ -22,28 +22,10 @@ defmodule Mix.Tasks.ImpAcp.RichDemo do
         handler: fn messages, _opts ->
           case Imp.ACP.DemoMessages.current_tool_result(messages) do
             {:error, _reason} ->
-              %{
-                next_thought: "Respect the failed workspace inspection.",
-                tool_calls: [
-                  %{
-                    id: "submit-workspace-denied-1",
-                    name: "submit",
-                    arguments: %{answer: "Workspace inspection was not authorized."}
-                  }
-                ]
-              }
+              "Workspace inspection was not authorized."
 
             {:ok, content} ->
-              %{
-                next_thought: "Return the grounded observation.",
-                tool_calls: [
-                  %{
-                    id: "submit-workspace-1",
-                    name: "submit",
-                    arguments: %{answer: "Imp observed workspace #{content}."}
-                  }
-                ]
-              }
+              "Imp observed workspace #{content}."
 
             :none ->
               %{

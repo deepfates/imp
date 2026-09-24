@@ -46,9 +46,7 @@ defmodule Mix.Tasks.ImpAcp.HostEffectsDemo do
                   :none -> "host effect produced no result"
                 end
 
-              tool_turn("Return the host-observed result.", "submit", "host-submit", %{
-                answer: result
-              })
+              result
           end
         end
       )

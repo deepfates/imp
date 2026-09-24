@@ -18,6 +18,9 @@ defmodule Imp.Clients.ReqLLM do
   `error.code = "context_length_exceeded"` become
   `Imp.ContextWindowExceededError`. Other provider errors retain their original
   shape; prose and generic HTTP 400 responses do not trigger context recovery.
+  A successful HTTP response whose body carries a provider error, which is how
+  OpenRouter relays an upstream refusal, is returned as that error
+  (`ReqLLM.Error.API.Request`), never as an empty completion.
 
   `:reasoning_effort` is the one reasoning option, on the client or on a call.
   It takes `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `default`, as
@@ -317,7 +320,10 @@ defmodule Imp.Clients.ReqLLM do
 
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
-        {:ok, from_response(response, lm.model)}
+        case relayed_error(response) do
+          nil -> {:ok, from_response(response, lm.model)}
+          error -> {:error, normalize_context_refusal(error)}
+        end
 
       {:error, reason} ->
         {:error, normalize_context_refusal(reason)}
@@ -330,6 +336,34 @@ defmodule Imp.Clients.ReqLLM do
   catch
     kind, reason -> {:error, {:req_llm_generate_failed, error_message({kind, reason})}}
   end
+
+  # OpenRouter relays an upstream provider's refusal as a successful HTTP
+  # response whose body is an error object with no choices, and ReqLLM decodes
+  # that into a response with an empty message and the error in
+  # `provider_meta`. Read as a completion it says nothing, and a model that
+  # says nothing has declined to answer (`Imp.Predict.ReActV2`), so a refused
+  # request would be recorded as a choice. It is the failed request it reports,
+  # in the shape ReqLLM gives an HTTP error.
+  defp relayed_error(%ReqLLM.Response{provider_meta: %{} = meta}) do
+    case Map.get(meta, "error") || Map.get(meta, :error) do
+      %{} = error ->
+        code = Map.get(error, "code") || Map.get(error, :code)
+
+        %ReqLLM.Error.API.Request{
+          reason: Map.get(error, "message") || Map.get(error, :message) || inspect(error),
+          status: if(is_integer(code), do: code),
+          response_body: %{"error" => error}
+        }
+
+      message when is_binary(message) and message != "" ->
+        %ReqLLM.Error.API.Request{reason: message, response_body: %{"error" => message}}
+
+      _none ->
+        nil
+    end
+  end
+
+  defp relayed_error(_response), do: nil
 
   # OpenAI-compatible providers name this refusal in the structured error code.
   # General HTTP 400s and prose mentioning context are not safe retry signals.

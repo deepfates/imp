@@ -7374,8 +7374,6 @@
         "forced_submit_notice",
         "last_prose_note",
         "max_iters",
-        "on_max_iters",
-        "prose",
         "react",
         "signature",
         "tool_policy",

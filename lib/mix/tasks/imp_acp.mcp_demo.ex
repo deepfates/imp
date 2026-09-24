@@ -40,28 +40,10 @@ defmodule Mix.Tasks.ImpAcp.McpDemo do
       handler: fn messages, _opts ->
         case Imp.ACP.DemoMessages.current_tool_result(messages) do
           {:error, _reason} ->
-            %{
-              next_thought: "Respect the failed MCP request.",
-              tool_calls: [
-                %{
-                  id: "submit-mcp-denied",
-                  name: "submit",
-                  arguments: %{answer: "The MCP tool request was not authorized."}
-                }
-              ]
-            }
+            "The MCP tool request was not authorized."
 
           {:ok, content} ->
-            %{
-              next_thought: "Return the MCP observation.",
-              tool_calls: [
-                %{
-                  id: "submit-mcp-workspace",
-                  name: "submit",
-                  arguments: %{answer: "MCP returned workspace #{content}."}
-                }
-              ]
-            }
+            "MCP returned workspace #{content}."
 
           :none ->
             %{

@@ -26,12 +26,10 @@ defmodule Mix.Tasks.ImpAcp.HostTerminalCancelDemo do
               })
 
             {:ok, result} ->
-              tool_turn("Return the terminal result.", "submit", "host-submit", %{answer: result})
+              result
 
             {:error, reason} ->
-              tool_turn("Report the terminal failure.", "submit", "host-failed", %{
-                answer: "host terminal failed: #{inspect(reason)}"
-              })
+              "host terminal failed: #{inspect(reason)}"
           end
         end
       )

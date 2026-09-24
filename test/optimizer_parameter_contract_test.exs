@@ -182,9 +182,10 @@ defmodule Imp.Optimizer.ParameterContractTest do
         schema: %{"type" => "object", "properties" => %{"query" => %{"type" => "string"}}}
       )
 
+    # ReActV2 has `submit` only for a signature that is not one text output.
     programs = [
       ReAct.new("question -> answer", [tool]),
-      ReActV2.new("question -> answer", [tool])
+      ReActV2.new("question -> answer, confidence: float", [tool])
     ]
 
     for program <- programs do

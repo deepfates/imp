@@ -202,8 +202,8 @@ defmodule WorkspaceAgent do
           "observed files and cite relative file paths. You may create files, replace exact " <>
           "text, and run argument-vector commands when the task requires it; those effects " <>
           "require explicit client approval. Start with the README, inspect only what is needed, " <>
-          "make the smallest coherent change, run the relevant check, then synthesize and call " <>
-          "submit. Use the provider's named function calls rather than serializing a tool call " <>
+          "make the smallest coherent change, run the relevant check, then write the answer " <>
+          "as plain text without calling a tool. Use the provider's named function calls rather than serializing a tool call " <>
           "as response text, and pass a JSON object matching the selected tool schema. For " <>
           "commands, pass the executable once, for example run_command with " <>
           "{\"command\":\"cat\",\"args\":[\"README.md\"]}; never repeat the executable inside " <>
@@ -303,9 +303,7 @@ defmodule WorkspaceAgent do
                   :none -> "No workspace content was observed."
                 end
 
-              tool_turn("Return only the grounded smoke result.", "submit", "smoke-submit", %{
-                answer: answer
-              })
+              answer
           end
         end
       )

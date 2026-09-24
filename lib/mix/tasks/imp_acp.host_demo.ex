@@ -22,14 +22,10 @@ defmodule Mix.Tasks.ImpAcp.HostDemo do
             {:ok, content} ->
               answer = content |> String.split("\n") |> List.first()
 
-              tool_turn("Return the host-supplied evidence.", "submit", "host-submit", %{
-                answer: "ACP host supplied: #{answer}"
-              })
+              "ACP host supplied: #{answer}"
 
             {:error, reason} ->
-              tool_turn("Report the failed host read.", "submit", "host-failed", %{
-                answer: "ACP host read failed: #{inspect(reason)}"
-              })
+              "ACP host read failed: #{inspect(reason)}"
 
             :none ->
               tool_turn("Ask the ACP host for the mounted README.", "read_file", "host-read", %{
