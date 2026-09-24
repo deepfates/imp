@@ -66,9 +66,13 @@ defmodule Imp.MCP.OwnedStdio do
 
   @impl ExMCP.Transport
   def send_message(message, %__MODULE__{} = state) when is_binary(message) do
+    # A request that is not written is reported in the words ExMCP's client
+    # and `Imp.MCP.CallFailure` already read as never sent: `:request_too_large`
+    # (ExMCP's HTTP size check) and `:not_connected` for a server that has
+    # exited or a connection that is closed.
     cond do
       byte_size(message) > state.max_frame_bytes ->
-        {:error, :frame_too_large}
+        {:error, :request_too_large}
 
       String.contains?(message, "\n") ->
         {:error, {:validation_error, {:embedded_newline, "a stdio frame is one line"}}}
@@ -76,6 +80,7 @@ defmodule Imp.MCP.OwnedStdio do
       true ->
         case call(state, {:send, message <> "\n"}) do
           :ok -> {:ok, state}
+          {:error, :closed} -> {:error, :not_connected}
           {:error, reason} -> {:error, {:transport_error, {:send_failed, reason}}}
         end
     end

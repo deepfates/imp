@@ -171,6 +171,34 @@ defmodule Imp.MCPStdioLifecycleTest do
            "stdio server child #{child_pid} outlived the server that started it"
   end
 
+  # A request that cannot be written is reported in the words ExMCP's client
+  # and `Imp.MCP.CallFailure` already read as "never sent".
+  test "a request to a server that has exited, or one too large to send, was not sent" do
+    python = System.find_executable("python3")
+
+    {:ok, stdio} =
+      Imp.MCP.OwnedStdio.connect(command: [python, "-c", "pass"], max_frame_bytes: 64)
+
+    on_exit(fn -> Imp.MCP.OwnedStdio.close(stdio) end)
+
+    assert {:error, {:connection_error, {:process_exited, 0}}} =
+             Imp.MCP.OwnedStdio.receive_message(stdio, 5_000)
+
+    request = ~s({"jsonrpc":"2.0","id":1,"method":"tools/list"})
+    assert {:error, :not_connected} = Imp.MCP.OwnedStdio.send_message(request, stdio)
+
+    assert {:error, :request_too_large} =
+             Imp.MCP.OwnedStdio.send_message(String.duplicate("x", 65), stdio)
+
+    for reason <- [
+          :not_connected,
+          %{type: :transport_error, message: "Failed to send request: :request_too_large"}
+        ] do
+      assert %Imp.MCP.CallFailure{outcome: :not_sent} =
+               Imp.MCP.CallFailure.returned("s", "t", reason)
+    end
+  end
+
   # A JSON-RPC server that answers initialize/tools/list/tools/call, then
   # deliberately refuses to exit on stdin EOF (and optionally ignores SIGTERM).
   defp fake_server(tmp_dir, label, opts) do
