@@ -34,10 +34,16 @@ Ordinary Imp startup starts no protocol endpoint.
   servers need; and the browser OAuth flow.
 - `ReActV2` offers `submit` only to a signature that needs one. A task with
   exactly one text output ends its turn on a step that answers in prose, and an
-  interrupted turn makes one last text-only request instead of failing.
+  interrupted turn makes one last request whose text is the answer instead of
+  failing.
 - `ReActV2` gains `finish_on` for tools whose call is the answer.
 - `:model_request` events record the whole request, and tool definitions are
   emitted once per run as `:tools_offered`.
+- An MCP tool call that got no answer says whether it was refused, never sent,
+  or may have run (`Imp.MCP.CallFailure`, `Imp.Tool.outcome/1`), and a failed
+  tool call reaches the model as plain text.
+- A host names its own run pool and limit (`Imp.Run.start/3`'s `:admission`),
+  and a failing run event sink is reported to the run's owner.
 
 ## Breaking changes from v0.4.0
 
@@ -52,6 +58,13 @@ Ordinary Imp startup starts no protocol endpoint.
 - An `Imp.Tool` named with a string keeps the string, and tools imported from
   an MCP server are named by the server's string. Code that compared an
   imported tool's `name` to an atom compares it to the string.
+- An MCP tool call that got no answer returns
+  `{:error, %Imp.MCP.CallFailure{}}` instead of
+  `{:mcp_tool_call_failed, server, reason}` or
+  `{:mcp_connection_unavailable, server, reason}`.
+- A run's owner can receive
+  `{:imp_run_event_sink_failed, run_id, details}`; an owner with a strict
+  `handle_info/2` needs a clause for it.
 - For a signature with one `:string` output, `ReActV2` offers no `submit`
   tool, and a step answered in prose with no tool call ends the turn. Code that
   matches on `termination_reason` meets three new values: `:answered`,
@@ -62,7 +75,10 @@ Ordinary Imp startup starts no protocol endpoint.
 1. Change the dependency line, run `mix deps.get`, and commit `mix.lock`.
 2. Add `erlexec: :load` to any release that lists `ex_mcp: :load`.
 3. Replace `OAuth.begin/3`'s `:flow` with `:client_registration` if you used it.
-4. Run your held-out evaluation and application smoke test against the new
+4. Match MCP call failures on `%Imp.MCP.CallFailure{outcome: ...}`, compare
+   imported tool names as strings, and give run owners a clause for
+   `:imp_run_event_sink_failed`.
+5. Run your held-out evaluation and application smoke test against the new
    release; a one-text-output ReActV2 program now ends turns differently.
 
 The [CHANGELOG](CHANGELOG.md) records every user-visible change in this
