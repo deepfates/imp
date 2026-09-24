@@ -4,6 +4,11 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- `Imp.LM.generate/3` takes `purpose:`, a name for what kind of call this is.
+  It is recorded on the `:model_request` event's metadata as `:purpose` and is
+  never sent to the provider, so a caller that makes more than one kind of model
+  call can tell them apart on the record.
+
 - An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
   The run's owner is sent
   `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
