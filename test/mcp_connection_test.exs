@@ -202,7 +202,7 @@ defmodule Imp.MCPConnectionTest do
 
     # Unreserved, the same declaration imports under the server's own name.
     assert {:ok, plain} = Imp.MCP.connect([only], trusted_servers: [only])
-    assert Enum.map(plain.tools, & &1.name) == [:look]
+    assert Enum.map(plain.tools, & &1.name) == ["look"]
     assert :ok = plain.cleanup.()
 
     # And a prefix moves it off the reserved name, because the check is on the
@@ -424,7 +424,7 @@ defmodule Imp.MCPConnectionTest do
     # The server after the failing one was still dialed, and its tool is here,
     # under the name its own server gave it: nothing else claims that name, and
     # nothing renames it for the one that did not answer.
-    assert Enum.map(imported.tools, & &1.name) == [:look]
+    assert Enum.map(imported.tools, & &1.name) == ["look"]
     assert Imp.Tool.call(hd(imported.tools), %{}) == "observed"
 
     assert [%{server: "down", reason: {:mcp_connection_failed, detail}}] = imported.unavailable
@@ -446,7 +446,7 @@ defmodule Imp.MCPConnectionTest do
 
     on_exit(imported.cleanup)
 
-    assert Enum.map(imported.tools, & &1.name) == [:look]
+    assert Enum.map(imported.tools, & &1.name) == ["look"]
 
     assert [%{server: "mute", index: 0, reason: {:mcp_tools_list_failed, "mute", detail}}] =
              imported.unavailable
@@ -529,7 +529,7 @@ defmodule Imp.MCPConnectionTest do
     # and the working server behind them is still dialed. Under one budget for
     # the whole list this was {:error, :mcp_import_timeout}, whatever
     # :on_failure said.
-    assert Enum.map(imported.tools, & &1.name) == [:look]
+    assert Enum.map(imported.tools, & &1.name) == ["look"]
 
     assert [
              %{server: "silent-a", index: 0, reason: {:mcp_connection_failed, :timeout}},
@@ -556,7 +556,7 @@ defmodule Imp.MCPConnectionTest do
     # cannot tell which of its own two descriptors that is, and matching by name
     # discards the one that connected.
     assert [%{server: "same", index: 0}] = imported.unavailable
-    assert Enum.map(imported.tools, & &1.name) == [:look]
+    assert Enum.map(imported.tools, & &1.name) == ["look"]
     assert Imp.Tool.call(hd(imported.tools), %{}) == "observed"
   end
 

@@ -449,12 +449,12 @@ defmodule DeploymentReferenceTest do
     refute Process.alive?(supervisor)
   end
 
-  test "reference project declares immutable private-release and source-checkout dependency modes" do
+  test "reference project declares the released package and source-checkout dependency modes" do
     mix_file = File.read!(Path.join(@example_root, "mix.exs"))
     readme = File.read!(Path.join(@example_root, "README.md"))
 
     assert mix_file =~ ~s(elixir: "~> 1.19")
-    assert mix_file =~ ~s({:imp, github: "deepfates/imp", tag: "v0.4.0"})
+    assert mix_file =~ ~s({:imp, "~> 0.5"})
     assert mix_file =~ "IMP_PATH"
     assert readme =~ "bounded supervised task"
     assert readme =~ "IMP_MODEL"

@@ -1,8 +1,0 @@
-#!/bin/sh
-set -eu
-
-imp_acp_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-cd "$imp_acp_root"
-
-mix compile 1>&2
-exec mix imp_acp.demo_mcp_server

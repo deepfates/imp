@@ -106,19 +106,25 @@ defmodule PackageContractTest do
     assert_release_files(files)
   end
 
-  test "the 0.4.0 release surfaces agree" do
+  test "the release surfaces agree" do
     version = Mix.Project.config()[:version]
-    source_dependency = ~s({:imp, github: "deepfates/imp", tag: "v#{version}"})
+    dependency = hex_dependency(version)
 
-    assert version == "0.4.0"
+    assert version == "0.5.0"
     assert File.read!("RELEASE_NOTES.md") =~ "# Imp v#{version}"
     assert File.read!("CHANGELOG.md") =~ "## #{version}"
-    assert File.read!("examples/deployment/mix.exs") =~ source_dependency
+    assert File.read!("examples/deployment/mix.exs") =~ dependency
 
     for path <- Path.wildcard("livebooks/*.livemd") do
-      assert File.read!(path) =~ source_dependency,
-             "#{path} does not install the released source tag"
+      assert File.read!(path) =~ dependency,
+             "#{path} does not install the released Hex package"
     end
+  end
+
+  # The requirement a consumer writes for this release: `~> major.minor`.
+  defp hex_dependency(version) do
+    [major, minor | _patch] = String.split(version, ".")
+    ~s({:imp, "~> #{major}.#{minor}"})
   end
 
   test "clean-room package gate is discoverable from the root Mix project" do
@@ -230,7 +236,7 @@ defmodule PackageContractTest do
   end
 
   @tag timeout: 180_000
-  test "staged source artifact preserves the release boundary" do
+  test "the built Hex package preserves the release boundary" do
     output_dir = package_tmp_dir()
 
     on_exit(fn -> File.rm_rf(output_dir) end)
@@ -308,13 +314,13 @@ defmodule PackageContractTest do
     assert unavailable == []
   end
 
-  test "README gives the usable source install" do
+  test "README gives the Hex install" do
     readme = File.read!("README.md")
     version = Mix.Project.config()[:version]
 
-    assert readme =~ "not published to Hex"
-    assert readme =~ ~s({:imp, github: "deepfates/imp", tag: "v#{version}"})
-    refute readme =~ "Documentation lives at [hexdocs.pm/imp]"
+    assert readme =~ hex_dependency(version)
+    refute readme =~ "not published to Hex"
+    refute readme =~ ~s(github: "deepfates/imp")
   end
 
   defp assert_release_files(files) do

@@ -32,7 +32,9 @@ defmodule Imp.Run do
   returns, after any report the sink's own failures produced, in sequence
   order, and each event is reported at most once. The same reports are sent
   when the sink's process dies outright, for example because it was linked
-  to a process that crashed; the run's control then ends too.
+  to a process that crashed; the run's control then ends too, and so does the
+  run: an effect in flight has its cancellation called with
+  `{:run_control_ended, reason}` and the task is killed.
 
   `events/1` reads the retained native sequence independently of sink progress.
   `cancel_with_events/3` snapshots that sequence before cleanup, including one
@@ -198,7 +200,12 @@ defmodule Imp.Run do
     {:ok, events}
   end
 
-  @doc "Releases the event/cancellation control process after a run completes."
+  @doc """
+  Releases the event/cancellation control process after a run completes.
+
+  A run still going when its control is released is ended with it, as when
+  its control ends for any other reason.
+  """
   @spec stop(t()) :: :ok
   def stop(%__MODULE__{control: control}) do
     Control.stop(control)
@@ -508,7 +515,7 @@ defmodule Imp.Run.Control do
     if is_pid(state.task_pid) and Process.alive?(state.task_pid),
       do: Process.exit(state.task_pid, :kill)
 
-    {:stop, :normal, state}
+    {:stop, :normal, %{state | cancellables: %{}}}
   end
 
   def handle_info({EventDelivery, :failed, failure}, state),
@@ -523,12 +530,26 @@ defmodule Imp.Run.Control do
   def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
 
   @impl true
-  def terminate(_reason, state) do
+  def terminate(reason, state) do
     Process.unlink(state.delivery)
     monitor = Process.monitor(state.delivery)
     Process.exit(state.delivery, :kill)
     receive(do: ({:DOWN, ^monitor, :process, _pid, _reason} -> :ok))
     state |> report_pending_failures() |> report_undelivered()
+
+    # The run does not outlive its control: whatever ended the control (its
+    # sink's process dying, a stop), the task is ended and work still in flight
+    # is cancelled, rather than left running until it next emits. This comes
+    # after the reports, so an owner hears why before it sees the task end. The
+    # task is ended first, so a cancellation that does not return cannot keep
+    # it going.
+    if is_pid(state.task_pid) and Process.alive?(state.task_pid),
+      do: Process.exit(state.task_pid, :kill)
+
+    Enum.each(state.cancellables, fn {_ref, fun} ->
+      safe_cancel(fun, {:run_control_ended, reason})
+    end)
+
     :ok
   end
 

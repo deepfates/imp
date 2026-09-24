@@ -180,7 +180,7 @@ defmodule LocalServiceE2ETest do
 
     [tool] = base_url |> Imp.MCP.HTTPClient.new() |> Imp.MCP.import_tools()
 
-    assert tool.name == :lookup
+    assert tool.name == "lookup"
     assert Imp.Tool.call(tool, %{"key" => "capital"}) == "Paris"
   end
 
@@ -223,7 +223,7 @@ defmodule LocalServiceE2ETest do
       )
       |> Imp.MCP.import_tools()
 
-    assert tool.name == :echo
+    assert tool.name == "echo"
     assert Imp.Tool.call(tool, %{"text" => "hello"}) == "hello"
   end
 

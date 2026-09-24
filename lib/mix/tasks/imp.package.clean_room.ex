@@ -2,7 +2,8 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
   @moduledoc """
   Prove source package deployment and persistence from isolated consumer VMs.
 
-  By default the task stages the declared private source package, creates a clean consumer,
+  By default the task builds the Hex package with `mix hex.build --unpack`,
+  creates a clean consumer that depends on the unpacked package by path,
   runs the packaged provider-free tutorial from that consumer boundary, writes a
   callback-bearing artifact in one VM, and loads it in a second VM with a
   separately constructed callback registry. The loader explicitly supplies a
@@ -15,8 +16,8 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
       mix imp.package.clean_room --lock mix.lock
       mix imp.package.clean_room --skip-release --output tmp/persistence-proof
 
-  Hex dependency resolution uses `HEX_OFFLINE=1`; the declared Git fork may
-  still be fetched. Resolution uses the
+  Hex dependency resolution uses `HEX_OFFLINE=1`, so the consumer needs no
+  network, checkout, token or Git dependency. Resolution uses the
   source checkout's `mix.lock` by default. Run `mix deps.get` in that checkout
   first so every locked Hex dependency is present in the local cache. Use
   `--lock` to supply a different lockfile. `--package` must name an unpacked
@@ -81,19 +82,19 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
   @doc false
   def stage_package!(destination, root) do
     destination = Path.expand(destination)
-    # Preserve the real git dependency declaration. Hex refuses it, so this is
-    # a private source-consumption proof, not evidence of Hex publishability.
+
     if File.exists?(destination),
       do: Mix.raise("package destination already exists: #{destination}")
 
-    files = Mix.Project.config() |> Keyword.fetch!(:package) |> Keyword.fetch!(:files)
-    File.mkdir_p!(destination)
+    # The staged package is the one Hex would publish, file for file, including
+    # the dependency declarations Hex accepts.
+    {output, status} =
+      System.cmd("mix", ["hex.build", "--unpack", "--output", destination],
+        cd: root,
+        stderr_to_stdout: true
+      )
 
-    for relative <- files, File.regular?(Path.join(root, relative)) do
-      target = Path.join(destination, relative)
-      File.mkdir_p!(Path.dirname(target))
-      File.cp!(Path.join(root, relative), target)
-    end
+    if status != 0, do: Mix.raise("mix hex.build failed (#{status}):\n#{output}")
 
     destination
   end
