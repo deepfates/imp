@@ -96,6 +96,30 @@ defmodule Imp.RunTest do
     refute Process.alive?(run.control)
   end
 
+  # The model call an RLM run has in flight is its budget's to end, and the
+  # budget ends with the run's task. So the cancellations are called before
+  # the task is ended, or the call is left running with nobody to end it.
+  test "a run whose control ends cancels its RLM's in-flight model call" do
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          send(owner, {:effect_started, self()})
+          Process.sleep(:infinity)
+        end
+      )
+
+    program = Imp.rlm("question -> answer", lm: lm)
+    assert {:ok, run} = Imp.Run.start(program, %{question: "wait"})
+    assert_receive {:effect_started, effect_pid}, 1_000
+    on_exit(fn -> Process.exit(effect_pid, :kill) end)
+    monitor = Process.monitor(effect_pid)
+
+    Process.exit(run.control, :shutdown)
+    assert_receive {:DOWN, ^monitor, :process, ^effect_pid, :killed}, 2_000
+  end
+
   test "a blocked event sink cannot delay cancellation or leak its delivery process" do
     owner = self()
     program = %BlockingProgram{signature: Imp.signature("question -> answer")}
