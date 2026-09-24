@@ -1126,7 +1126,11 @@ defmodule Imp.Adapter.Chat do
 
     user = %{
       role: :user,
-      content: render_inputs(signature, turn, skip: history_input_fields(signature))
+      content:
+        render_inputs(signature, turn,
+          skip: history_input_fields(signature),
+          section_renderer: renderers.input_section
+        )
     }
 
     thought = turn |> fetch_field(:next_thought) |> blank_to_empty()

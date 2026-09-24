@@ -834,6 +834,44 @@ defmodule ReActV2Test do
     assert kept.function.name == "submit"
   end
 
+  # A host that renders input sections its own way gets the same rendering for
+  # past turns as for the current one, whether or not the past turn called a
+  # tool; otherwise the model reads its history in one format and its present
+  # in another.
+  test "a history turn with tool calls uses the host's input section renderer" do
+    signature = Imp.react_v2("question -> answer", []).react.signature
+    plain = fn _field, value -> value end
+
+    history =
+      Imp.History.new([
+        %{
+          question: "prior",
+          next_thought: "",
+          tool_calls:
+            Imp.Adapter.Types.ToolCalls.new([
+              %{id: "l-1", name: "lookup", arguments: %{query: "beam"}}
+            ])
+            |> Imp.Redaction.redact(),
+          tool_call_results: [%{id: "l-1", name: "lookup", result: "BEAM", error: false}]
+        }
+      ])
+
+    assert [
+             %{role: :system},
+             %{role: :user, content: past},
+             %{role: :assistant},
+             %{role: :tool},
+             _
+           ] =
+             Imp.Adapter.Chat.format(
+               signature,
+               %{history: history, tools: []},
+               input_section_renderer: plain
+             )
+
+    assert past == "prior"
+  end
+
   test "participates in LM demo and registry-backed persistence lifecycle" do
     runner = fn %{query: query} -> query end
     registry = Imp.Saving.Registry.new(lookup_runner: runner)
