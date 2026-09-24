@@ -137,8 +137,9 @@ defmodule Imp.MCP.Connections do
 
   A connection whose call timed out, or whose caller died during the call, may
   still be waiting on that request inside ExMCP, and lent again it would hold
-  the next call behind it. It is closed instead, and a replacement is dialed
-  in the background; calls wait for it. A replacement that cannot be dialed
+  the next call behind it. It is taken out of the pool instead and closed once
+  that request is done, so the server finishes what it was doing, and a
+  replacement is dialed in the background; calls wait for it. A replacement that cannot be dialed
   leaves the server a connection fewer, and a server left with none answers
   its calls `:not_sent` with `reason: :not_connected`.
 

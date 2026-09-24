@@ -21,7 +21,7 @@ defmodule Imp.MCPConnectionPoolTest do
 
     def handle_list_tools(_cursor, state) do
       tools =
-        for name <- ~w(slow fast),
+        for name <- ~w(slow fast write),
             do: %{"name" => name, "description" => name, "inputSchema" => %{"type" => "object"}}
 
       {:ok, tools, nil, state}
@@ -30,6 +30,14 @@ defmodule Imp.MCPConnectionPoolTest do
     def handle_call_tool("slow", _arguments, state) do
       Process.sleep(1_500)
       {:ok, %{"content" => [%{"type" => "text", "text" => "slow done"}]}, state}
+    end
+
+    # A write that takes a while and says when it is done.
+    def handle_call_tool("write", %{"tag" => tag}, state) do
+      :ets.insert(:pool_test_writes, {tag, :started})
+      Process.sleep(800)
+      :ets.insert(:pool_test_writes, {tag, :finished})
+      {:ok, %{"content" => [%{"type" => "text", "text" => "written"}]}, state}
     end
 
     def handle_call_tool("fast", _arguments, state),
@@ -268,6 +276,45 @@ defmodule Imp.MCPConnectionPoolTest do
     {elapsed, result} = ms(fn -> Imp.Tool.call(tools["fast"], %{}) end)
     assert result == "fast done"
     assert elapsed < 500, "the next call waited #{elapsed} ms"
+  end
+
+  # Retiring a connection takes it out of the pool; it does not cut off the
+  # request still out on it. Closing its socket mid-request ends the server's
+  # handler with it, and a write that would have finished is left half done.
+  describe "a retired connection's request" do
+    setup do
+      :ets.new(:pool_test_writes, [:named_table, :public])
+      :ok
+    end
+
+    test "still finishes on the server after its call timed out" do
+      {_imported, tools} = tools(server(), pool_size: 1, timeout: 300)
+
+      assert {:error, %CallFailure{outcome: :unknown}} =
+               Imp.Tool.call(tools["write"], %{"tag" => "timed out"})
+
+      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+
+      assert eventually(fn ->
+               :ets.lookup(:pool_test_writes, "timed out") == [{"timed out", :finished}]
+             end)
+    end
+
+    test "still finishes on the server after its borrower died" do
+      {_imported, tools} = tools(server(), pool_size: 1, timeout: 5_000)
+
+      {:ok, borrower} =
+        Task.start(fn -> Imp.Tool.call(tools["write"], %{"tag" => "orphaned"}) end)
+
+      assert eventually(fn -> :ets.lookup(:pool_test_writes, "orphaned") != [] end)
+      Process.exit(borrower, :kill)
+
+      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+
+      assert eventually(fn ->
+               :ets.lookup(:pool_test_writes, "orphaned") == [{"orphaned", :finished}]
+             end)
+    end
   end
 
   # A replacement that cannot be dialed leaves the server with one connection

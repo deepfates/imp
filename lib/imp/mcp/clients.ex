@@ -18,9 +18,9 @@ defmodule Imp.MCP.Clients do
   # A client whose call timed out, or whose borrower died during the call, may
   # still be waiting on that request: ExMCP's client makes the request inside
   # its own process. Lent again, it would hold the next call behind that one.
-  # Such a client is retired instead (`retire/2`): closed, and a replacement
-  # dialed in the background by the function the import gave for its server.
-  # Calls wait for the replacement. One that cannot be dialed leaves the server
+  # Such a client is retired instead (`retire/2`): closed once that request is
+  # done, and a replacement dialed in the background by the function the
+  # import gave for its server. Calls wait for the replacement. One that cannot be dialed leaves the server
   # a connection fewer, and a server left with none answers its calls
   # `:not_connected`.
 
@@ -273,8 +273,10 @@ defmodule Imp.MCP.Clients do
     end
   end
 
-  # The retired client is closed by killing it: it may be inside a request, and
-  # a disconnect would wait behind that. Its replacement is dialed by a linked
+  # The retired client may be inside a request. It is closed once that request
+  # is done (`close_after_request/1`), not killed: closing its socket mid-request
+  # ends an ExMCP (Cowboy) server's handler with it, so a write that would have
+  # finished is left half done. Its replacement is dialed by a linked
   # process of the bridge's, which traps exits so that a dial abandoned at its
   # deadline does not take it down.
   defp replace(state, client) do
@@ -285,11 +287,11 @@ defmodule Imp.MCP.Clients do
 
     case {server, Map.fetch(state.replacements, server)} do
       {nil, _} ->
-        Process.exit(client, :kill)
+        close_after_request(client)
         state
 
       {_server, :error} ->
-        Process.exit(client, :kill)
+        close_after_request(client)
         answer_if_gone(state, server)
 
       {server, {:ok, redial}} ->
@@ -307,17 +309,24 @@ defmodule Imp.MCP.Clients do
 
   defp dial_replacement(bridge, server, retired, redial) do
     # The replacement function takes the server's origin into the trusted
-    # origins for this process before it calls back to kill the retired client,
-    # which held it until then.
+    # origins for this process before it calls back to close the retired
+    # client, which held it until then.
+    close = fn ->
+      unless Process.get(:retired_closed) do
+        Process.put(:retired_closed, true)
+        close_after_request(retired)
+      end
+    end
+
     outcome =
       try do
-        redial.(fn -> Process.exit(retired, :kill) end)
+        redial.(close)
       catch
         kind, reason -> {:error, {kind, reason}}
       end
 
-    # Ensure the retired client is gone whatever the dial did.
-    Process.exit(retired, :kill)
+    # Close the retired client whatever the dial did.
+    close.()
     send(bridge, {:replacement, self(), server, outcome})
 
     with {:ok, client} <- outcome do
@@ -377,6 +386,26 @@ defmodule Imp.MCP.Clients do
   defp disconnect_all(clients) do
     Enum.each(clients, fn {_server, client} ->
       if is_pid(client) and Process.alive?(client), do: safe_disconnect(client)
+    end)
+
+    :ok
+  end
+
+  # How long a retired client is given to finish the request it is inside
+  # before it is killed. Imp does not set ExMCP's HTTP `request_timeout`, so a
+  # request ends within ExMCP's default of 30 s; the rest is margin.
+  @retired_grace 35_000
+
+  # Stops the client once the request it is inside, if any, is done: a stop is
+  # handled after the client's current callback returns. A client still busy
+  # after `@retired_grace` is killed.
+  defp close_after_request(client) do
+    spawn(fn ->
+      try do
+        GenServer.stop(client, :normal, @retired_grace)
+      catch
+        :exit, _reason -> Process.exit(client, :kill)
+      end
     end)
 
     :ok
