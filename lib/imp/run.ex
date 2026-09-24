@@ -487,8 +487,11 @@ defmodule Imp.Run.Control do
     {:reply, ref, %{state | cancellables: Map.put(state.cancellables, ref, fun)}}
   end
 
+  # Work registered after a cancel is cancelled at once, by a process linked
+  # to this one that bounds it, so this control goes on answering meanwhile.
   def handle_call({:register, fun}, _from, state) do
-    call_cancellations([fun], state.cancelled, @cancellation_bound)
+    reason = state.cancelled
+    spawn_link(fn -> call_cancellations([fun], reason, @cancellation_bound) end)
     {:reply, nil, state}
   end
 
@@ -734,24 +737,46 @@ defmodule Imp.Run.Control do
   defp over?(_measured, :infinity), do: false
   defp over?(measured, limit), do: measured > limit
 
-  # The cancellations run in a process of their own, so one that does not
-  # return holds neither this control nor what the caller does next. Past
-  # `bound` the process is killed: whether its effect was cancelled is as
-  # unknown as it was, and the process does not outlive the wait.
+  # Each cancellation runs in a process of its own, all at once, so one that
+  # does not return holds neither the others, nor this control, nor what the
+  # caller does next. Past `bound` those still running are killed: whether
+  # their effects were cancelled is as unknown as it was. They are linked to
+  # the caller, so they end with it however it ends; `safe_cancel/2` ends them
+  # normally whatever the cancellation does, so the link reports nothing else.
   defp call_cancellations([], _reason, _bound), do: :ok
 
   defp call_cancellations(funs, reason, bound) do
-    {pid, monitor} = spawn_monitor(fn -> Enum.each(funs, &safe_cancel(&1, reason)) end)
+    deadline = if bound == :infinity, do: :infinity, else: now_ms() + bound
 
+    running =
+      Map.new(funs, fn fun ->
+        pid = spawn_link(fn -> safe_cancel(fun, reason) end)
+        {Process.monitor(pid), pid}
+      end)
+
+    await_cancellations(running, deadline)
+  end
+
+  defp await_cancellations(running, _deadline) when map_size(running) == 0, do: :ok
+
+  defp await_cancellations(running, deadline) do
     receive do
-      {:DOWN, ^monitor, :process, ^pid, _reason} -> :ok
+      {:DOWN, monitor, :process, _pid, _reason} when is_map_key(running, monitor) ->
+        await_cancellations(Map.delete(running, monitor), deadline)
     after
-      bound ->
-        Process.demonitor(monitor, [:flush])
-        Process.exit(pid, :kill)
-        :ok
+      remaining(deadline) ->
+        Enum.each(running, fn {monitor, pid} ->
+          Process.demonitor(monitor, [:flush])
+          Process.unlink(pid)
+          Process.exit(pid, :kill)
+        end)
     end
   end
+
+  defp remaining(:infinity), do: :infinity
+  defp remaining(deadline), do: max(deadline - now_ms(), 0)
+
+  defp now_ms, do: System.monotonic_time(:millisecond)
 
   defp safe_cancel(fun, reason) do
     _ = fun.(reason)

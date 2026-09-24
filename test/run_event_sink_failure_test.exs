@@ -31,6 +31,56 @@ defmodule Imp.RunEventSinkFailureTest do
     end
   end
 
+  # Registers one cancellation per entry of `effects`, in order, and waits.
+  # `:hang` never returns and reports its own process; `:returns` reports that
+  # it was called.
+  defmodule Effects do
+    @behaviour Imp.Module
+    defstruct [:signature, :effects]
+
+    def call(%{effects: effects}, %{owner: owner}) do
+      effects
+      |> Enum.with_index()
+      |> Enum.each(fn {effect, index} ->
+        Imp.Run.register_cancellable(fn reason ->
+          send(owner, {:cancelling, index, self(), reason})
+          if effect == :hang, do: Process.sleep(:infinity)
+        end)
+      end)
+
+      send(owner, :waiting)
+      Process.sleep(:infinity)
+    end
+  end
+
+  # When its first effect is cancelled, a process still working for the run
+  # registers another, which never returns.
+  defmodule LateEffect do
+    @behaviour Imp.Module
+    defstruct [:signature]
+
+    def call(_, %{owner: owner}) do
+      control = Imp.Run.context()
+
+      worker =
+        spawn(fn ->
+          receive do
+            :register ->
+              Imp.Run.with_context(control, fn ->
+                Imp.Run.register_cancellable(fn reason ->
+                  send(owner, {:late_cancelled, reason})
+                  Process.sleep(:infinity)
+                end)
+              end)
+          end
+        end)
+
+      Imp.Run.register_cancellable(fn _reason -> send(worker, :register) end)
+      send(owner, :waiting)
+      Process.sleep(:infinity)
+    end
+  end
+
   # Starts a waiting run whose sink hands each event to `deliver` and reports
   # what it was given to the test. The run stops with the test process.
   defp start(deliver) do
@@ -293,5 +343,47 @@ defmodule Imp.RunEventSinkFailureTest do
     assert_receive {:DOWN, ^task, :process, _pid, _reason}, 1_000
     assert {:ok, {:ok, events}} = Task.yield(cancel, 2_000)
     assert List.last(events).kind == :run_cancelled
+  end
+
+  # The cancellations are called at once, so one that never returns keeps no
+  # other from being called: an RLM's model call is ended by its own.
+  test "every cancellation is called when another never returns" do
+    {:ok, run} = Imp.Run.start(%Effects{effects: [:hang, :returns, :hang]}, %{owner: self()})
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+
+    assert {:ok, _events} = Imp.Run.cancel_with_events(run, :host_cancelled, 200)
+    assert_received {:cancelling, 1, _pid, :host_cancelled}
+  end
+
+  # A cancellation process lives no longer than the control that waits for it,
+  # however the control ends.
+  test "a cancellation that never returns does not outlive a control that is killed" do
+    {:ok, run} = Imp.Run.start(%Effects{effects: [:hang]}, %{owner: self()})
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+
+    Process.exit(run.control, :shutdown)
+    assert_receive {:cancelling, 0, cancelling, {:run_control_ended, :shutdown}}, 1_000
+    Process.exit(run.control, :kill)
+
+    monitor = Process.monitor(cancelling)
+    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 1_000
+  end
+
+  # A cancellation registered after the cancel is called once, and a cancel
+  # still returns within about twice its timeout when it never returns.
+  test "a cancellation registered after the cancel neither holds the cancel nor is lost" do
+    {:ok, run} = Imp.Run.start(%LateEffect{}, %{owner: self()})
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+
+    started = System.monotonic_time(:millisecond)
+    assert {:ok, _events} = Imp.Run.cancel_with_events(run, :host_cancelled, 200)
+    elapsed = System.monotonic_time(:millisecond) - started
+
+    assert_receive {:late_cancelled, :host_cancelled}, 1_000
+    refute_receive {:late_cancelled, _reason}, 200
+    assert elapsed < 1_000, "the cancel took #{elapsed} ms"
   end
 end

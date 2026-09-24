@@ -57,7 +57,9 @@ User-visible changes to Imp are recorded here.
   returned held the run's control, left the task running, and made the cancel
   exit after 30 s. When the control ends, the cancellations are again called
   before the task is killed, so an RLM's model call in flight is ended by its
-  budget instead of being left running.
+  budget instead of being left running. The cancellations are called at once,
+  each in its own process, so one that never returns keeps no other from
+  being called, and those processes end with the control however it ends.
 
 - `Imp.LM.generate/3` takes `purpose:`, a name for what kind of call this is.
   It is recorded on the `:model_request` event's metadata as `:purpose` and is
