@@ -1,8 +1,6 @@
 defmodule Imp.Optimizer.SIMBA.StatePrimitivesTest do
   use ExUnit.Case, async: true
 
-  import ExUnit.CaptureLog
-
   alias Imp.Optimizer.SIMBA.{Buckets, Population}
 
   test "finalist selection follows Python half-even rounding" do
@@ -116,7 +114,7 @@ defmodule Imp.Optimizer.SIMBA.StatePrimitivesTest do
     payload = reflection_payload()
 
     log =
-      capture_log(fn ->
+      Imp.Test.OwnLog.capture(fn ->
         assert {:ok, %{first: "Be precise.", second: "Check the final answer."},
                 "Both modules receive named advice."} =
                  Imp.Optimizer.SIMBA.Reflection.run(prompt_lm, payload)
