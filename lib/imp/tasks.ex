@@ -1,43 +1,53 @@
 defmodule Imp.Tasks.Admission do
   @moduledoc false
 
+  # Leases on places in named pools. Each pool counts its own leases against
+  # the limit its caller passes. `reserve!/2` waits in one FIFO queue for a
+  # place; `try_reserve/2` answers `{:error, :busy}` when the pool is full.
+  # A lease is tied to a process by a monitor, so a holder that dies gives its
+  # place back.
+
   use GenServer
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
 
-  def reserve!(max_workers) do
-    {:ok, token} = GenServer.call(__MODULE__, {:reserve, max_workers}, :infinity)
+  def reserve!(pool, limit) do
+    {:ok, token} = GenServer.call(__MODULE__, {:reserve, pool, limit, :wait}, :infinity)
     token
   end
 
+  def try_reserve(pool, limit), do: GenServer.call(__MODULE__, {:reserve, pool, limit, :busy})
   def transfer(token, pid), do: GenServer.call(__MODULE__, {:transfer, token, pid})
   def release(token), do: GenServer.call(__MODULE__, {:release, token})
   def owned_by?(token, pid), do: GenServer.call(__MODULE__, {:owned_by?, token, pid})
-  def status, do: GenServer.call(__MODULE__, :status)
+  def status(pool), do: GenServer.call(__MODULE__, {:status, pool})
 
   @impl true
   def init(_opts),
-    do: {:ok, %{leases: %{}, monitors: %{}, waiters: %{}, queue: :queue.new()}}
+    do: {:ok, %{leases: %{}, counts: %{}, monitors: %{}, waiters: %{}, queue: :queue.new()}}
 
   @impl true
-  def handle_call({:reserve, max_workers}, {owner, _tag} = from, state) do
-    active = map_size(state.leases)
+  def handle_call({:reserve, pool, limit, mode}, {owner, _tag} = from, state) do
+    cond do
+      active(state, pool) < limit ->
+        {token, state} = grant_lease(state, pool, owner)
+        {:reply, {:ok, token}, state}
 
-    if active < max_workers do
-      {token, state} = grant_lease(state, owner)
-      {:reply, {:ok, token}, state}
-    else
-      waiter = make_ref()
-      monitor = Process.monitor(owner)
-      entry = %{from: from, owner: owner, monitor: monitor, max_workers: max_workers}
+      mode == :busy ->
+        {:reply, {:error, :busy}, state}
 
-      {:noreply,
-       %{
-         state
-         | waiters: Map.put(state.waiters, waiter, entry),
-           queue: :queue.in(waiter, state.queue),
-           monitors: Map.put(state.monitors, monitor, {:waiter, waiter})
-       }}
+      true ->
+        waiter = make_ref()
+        monitor = Process.monitor(owner)
+        entry = %{from: from, owner: owner, monitor: monitor, pool: pool, limit: limit}
+
+        {:noreply,
+         %{
+           state
+           | waiters: Map.put(state.waiters, waiter, entry),
+             queue: :queue.in(waiter, state.queue),
+             monitors: Map.put(state.monitors, monitor, {:waiter, waiter})
+         }}
     end
   end
 
@@ -52,7 +62,8 @@ defmodule Imp.Tasks.Admission do
 
         state = %{
           state
-          | leases: Map.put(state.leases, token, %{pid: pid, monitor: monitor, phase: :active}),
+          | leases:
+              Map.put(state.leases, token, %{lease | pid: pid, monitor: monitor, phase: :active}),
             monitors:
               state.monitors |> Map.delete(lease.monitor) |> Map.put(monitor, {:lease, token})
         }
@@ -72,8 +83,9 @@ defmodule Imp.Tasks.Admission do
     {:reply, match?(%{pid: ^pid, phase: :active}, Map.get(state.leases, token)), state}
   end
 
-  def handle_call(:status, _from, state) do
-    {:reply, %{active: map_size(state.leases), queued: map_size(state.waiters)}, state}
+  def handle_call({:status, pool}, _from, state) do
+    queued = Enum.count(state.waiters, fn {_waiter, entry} -> entry.pool == pool end)
+    {:reply, %{active: active(state, pool), queued: queued}, state}
   end
 
   @impl true
@@ -85,6 +97,8 @@ defmodule Imp.Tasks.Admission do
     end
   end
 
+  defp active(state, pool), do: Map.get(state.counts, pool, 0)
+
   defp drop_lease(state, token, demonitor? \\ true) do
     case Map.pop(state.leases, token) do
       {nil, _leases} ->
@@ -92,7 +106,19 @@ defmodule Imp.Tasks.Admission do
 
       {lease, leases} ->
         if demonitor?, do: Process.demonitor(lease.monitor, [:flush])
-        %{state | leases: leases, monitors: Map.delete(state.monitors, lease.monitor)}
+
+        counts =
+          case active(state, lease.pool) do
+            1 -> Map.delete(state.counts, lease.pool)
+            n -> Map.put(state.counts, lease.pool, n - 1)
+          end
+
+        %{
+          state
+          | leases: leases,
+            counts: counts,
+            monitors: Map.delete(state.monitors, lease.monitor)
+        }
     end
   end
 
@@ -107,15 +133,16 @@ defmodule Imp.Tasks.Admission do
     end
   end
 
-  defp grant_lease(state, owner, monitor \\ nil) do
+  defp grant_lease(state, pool, owner, monitor \\ nil) do
     token = make_ref()
     monitor = monitor || Process.monitor(owner)
-    lease = %{pid: owner, monitor: monitor, phase: :reserved}
+    lease = %{pid: owner, monitor: monitor, phase: :reserved, pool: pool}
 
     {token,
      %{
        state
        | leases: Map.put(state.leases, token, lease),
+         counts: Map.update(state.counts, pool, 1, &(&1 + 1)),
          monitors: Map.put(state.monitors, monitor, {:lease, token})
      }}
   end
@@ -132,14 +159,15 @@ defmodule Imp.Tasks.Admission do
           :error ->
             grant_waiters(state)
 
-          {:ok, entry} when map_size(state.leases) < entry.max_workers ->
-            state = %{state | waiters: Map.delete(state.waiters, waiter)}
-            {token, state} = grant_lease(state, entry.owner, entry.monitor)
-            GenServer.reply(entry.from, {:ok, token})
-            grant_waiters(state)
-
-          {:ok, _entry} ->
-            %{state | queue: :queue.in_r(waiter, state.queue)}
+          {:ok, entry} ->
+            if active(state, entry.pool) < entry.limit do
+              state = %{state | waiters: Map.delete(state.waiters, waiter)}
+              {token, state} = grant_lease(state, entry.pool, entry.owner, entry.monitor)
+              GenServer.reply(entry.from, {:ok, token})
+              grant_waiters(state)
+            else
+              %{state | queue: :queue.in_r(waiter, state.queue)}
+            end
         end
     end
   end
@@ -150,13 +178,18 @@ defmodule Imp.Tasks do
   Supervised, bounded task boundary for Imp runtime fan-out.
 
   Imp applies monitored FIFO backpressure when the effective
-  `:async_max_workers` capacity is exhausted.
+  `:async_max_workers` capacity is exhausted. That bound is one machine-wide
+  pool shared by every Imp task. A host that sets its own limit on the runs it
+  starts passes `admission: {pool, limit}` to `Imp.Run.start/3`; those runs
+  hold places in the host's pool rather than this one.
   """
 
   @supervisor Imp.TaskSupervisor
   @unlinked_supervisor Imp.UnlinkedTaskSupervisor
   @admission Imp.Tasks.Admission
   @admission_token_key {__MODULE__, :admission_token}
+  # The pool every task joins unless its caller names another.
+  @machine_pool {__MODULE__, :machine}
 
   @async_stream_option_schema [
     max_concurrency: [type: :pos_integer],
@@ -175,7 +208,7 @@ defmodule Imp.Tasks do
   @doc false
   def admission_status do
     ensure_runtime!()
-    @admission.status()
+    @admission.status(@machine_pool)
   end
 
   @doc "Returns whether the Imp admission boundary and both task supervisors are running."
@@ -209,6 +242,23 @@ defmodule Imp.Tasks do
   def async_nolink(fun) do
     raise ArgumentError,
           "Imp.Tasks.async_nolink/1 expects a zero-arity function, got: #{inspect(fun)}"
+  end
+
+  @doc false
+  # An unlinked task admitted to the caller's own pool instead of the machine
+  # pool: at most `limit` tasks hold a place in `pool` at once, and a full pool
+  # answers `{:error, :busy}` without waiting. Work the task starts in turn
+  # joins the machine pool as usual.
+  @spec async_nolink_in_pool((-> term()), term(), pos_integer()) ::
+          {:ok, Task.t()} | {:error, :busy}
+  def async_nolink_in_pool(fun, pool, limit)
+      when is_function(fun, 0) and is_integer(limit) and limit > 0 do
+    snapshot = Imp.Settings.snapshot()
+    ensure_runtime!()
+
+    with {:ok, token} <- @admission.try_reserve({:pool, pool}, limit) do
+      {:ok, start_admitted_task(@unlinked_supervisor, :nolink, fun, snapshot, token)}
+    end
   end
 
   @doc false
@@ -329,12 +379,15 @@ defmodule Imp.Tasks do
 
   defp start_task(supervisor, link, fun) do
     snapshot = Imp.Settings.snapshot()
+    ensure_runtime!()
+    token = @admission.reserve!(@machine_pool, Map.fetch!(snapshot, :async_max_workers))
+    start_admitted_task(supervisor, link, fun, snapshot, token)
+  end
+
+  defp start_admitted_task(supervisor, link, fun, snapshot, token) do
     telemetry_context = Imp.Telemetry.context()
     run_context = Imp.Run.context()
     streaming_context = Imp.Streaming.Execution.context()
-    max_workers = Map.fetch!(snapshot, :async_max_workers)
-    ensure_runtime!()
-    token = @admission.reserve!(max_workers)
     owner = self()
 
     wrapped = fn ->
@@ -410,7 +463,7 @@ defmodule Imp.Tasks do
   end
 
   defp run_admitted(snapshot, telemetry_context, run_context, streaming_context, max_workers, fun) do
-    token = @admission.reserve!(max_workers)
+    token = @admission.reserve!(@machine_pool, max_workers)
     :ok = @admission.transfer(token, self())
 
     try do
