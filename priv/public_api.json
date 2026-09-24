@@ -3994,6 +3994,37 @@
     {
       "callbacks": [],
       "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.MCP.CallFailure",
+      "signatures": {
+        "types": {
+          "outcome/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/mcp/call_failure.ex",
+      "struct_fields": [
+        "outcome",
+        "reason",
+        "server",
+        "tool"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "outcome/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
       "functions": [
         "list_tools/1",
         "new/1"
@@ -8374,6 +8405,7 @@
         "index_tools!/2",
         "new/4",
         "normalize_arguments/1",
+        "outcome/1",
         "resolve_name/2",
         "validate_tools/1"
       ],
@@ -8394,6 +8426,9 @@
           "normalize_arguments/1": [
             "normalize_arguments(arguments)"
           ],
+          "outcome/1": [
+            "outcome(arg1)"
+          ],
           "resolve_name/2": [
             "resolve_name(tools, name)"
           ],
@@ -8402,6 +8437,7 @@
           ]
         },
         "types": {
+          "outcome/0": [],
           "t/0": []
         }
       },
@@ -8414,6 +8450,10 @@
         "schema"
       ],
       "types": [
+        {
+          "kind": "type",
+          "name": "outcome/0"
+        },
         {
           "kind": "type",
           "name": "t/0"

@@ -46,6 +46,32 @@ User-visible changes to Imp are recorded here.
   header. A server with neither protected-resource nor authorization-server
   metadata is refused rather than given guessed `/authorize` and `/token`
   endpoints.
+- An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
+  The run's owner is sent
+  `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
+  and delivery goes on with the next event. Stopping or cancelling a run
+  reports the same way every event the sink had not finished with
+  (`:in_sink_when_stopped`, `:never_handed_to_sink`). Run owners receive this
+  message where they received nothing before; an owner with a strict
+  `handle_info/2` needs a clause for it.
+
+- `Imp.Run.start/3` takes `admission: {pool, limit}`: the run holds a place in
+  the host's named pool instead of the machine-wide `:async_max_workers` pool,
+  at most `limit` runs hold places in that pool at once, and a full pool
+  returns `{:error, :busy}` without waiting. Runs started without it wait for
+  the machine-wide pool as before.
+
+- An MCP tool call that got no answer from its tool returns
+  `{:error, %Imp.MCP.CallFailure{}}` instead of
+  `{:mcp_tool_call_failed, server, reason}` or
+  `{:mcp_connection_unavailable, server, reason}`. Its `outcome` says whether
+  the call was refused before anything ran, never sent, or sent with no
+  trustworthy answer (`:refused`, `:not_sent`, `:unknown`); `reason` keeps
+  ExMCP's error unchanged, and an exit is kept as `{:exit, reason}`.
+  `Imp.Tool.outcome/1` gives the outcome of any tool call (`:result` when the
+  tool answered, MCP error results included), and ReActV2 and RLM record it on
+  each `:tool_result` event as `metadata.outcome`.
+
 - A failed tool call reaches the model as plain text instead of an Elixir
   term. An MCP error result is the text of its content, the tool's own words,
   after `Error: ` unless the text already begins with "error"; a JSON-RPC
@@ -87,8 +113,8 @@ User-visible changes to Imp are recorded here.
   declines to answer.
 - An interrupted turn of a one-text-output signature (the step limit, a
   failed request, prose the output does not accept) makes one more
-  request with the same tools as every step and `tool_choice: "none"`, so the
-  model can only write text, and that text is the answer, with `termination_reason: :last_prose`
+  request with the same tools as every step and `tool_choice: "auto"`, and its
+  text is the answer, with `termination_reason: :last_prose`
   and `termination_cause` naming the interruption (`:max_iters`,
   `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
@@ -99,8 +125,9 @@ User-visible changes to Imp are recorded here.
   has already passed, no request is made and the run ends with
   `termination_reason: :deadline_exceeded`. `forced_submit_notice` is for
   signatures with `submit` and `last_prose_note` for those without; each is
-  refused at construction for the other. There is no `prose` or
-  `on_max_iters` option, and a dump no longer carries them.
+  refused at construction for the other. The request does not say
+  `tool_choice: "none"`: told that while it wanted a tool, a model wrote the
+  call as text in its own tool markup, and that text became the answer.
 - `Imp.Observability` reports a prediction that ended `:answered`,
   `:last_prose` or `:finished_by_tool` as complete; it reported them as
   incomplete.

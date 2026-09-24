@@ -44,14 +44,17 @@ defmodule Imp.Predict.ReActV2 do
   to answer, and asking it again would make declining cost a second request.
 
   With one text output, every interruption takes the same path: one more
-  request with `tool_choice: "none"`, so the model can only write text, and
-  that text is the answer, with `termination_reason: :last_prose`. The
-  request offers the same tools as every other step: a provider may refuse a
-  history of tool calls when no tools are declared (Anthropic does), and a
-  changed roster changes the prompt prefix a provider caches. If the model
-  calls a tool anyway, the call is not run; the completion's text, if any, is
-  the answer, and the calls are kept in `unexecuted_tool_calls`. A completion
-  that says nothing is an empty answer rather than an error.
+  request, and its text is the answer, with `termination_reason: :last_prose`.
+  The request is a step like any other: the same tools and the same
+  `tool_choice: "auto"`. A provider may refuse a history of tool calls when no
+  tools are declared (Anthropic does), and a changed roster changes the prompt
+  prefix a provider caches. It does not say `tool_choice: "none"`: a model told
+  that while it wants a tool can write the call as text in its own tool markup
+  (seen from inkling through OpenRouter, and through DeepInfra),
+  and that text would become the answer. If the model calls a tool, the call
+  is not run; the completion's text, if any, is the answer, and the calls are
+  kept in `unexecuted_tool_calls`. A completion that says nothing is an empty
+  answer rather than an error.
   `:last_prose_note` puts one line of host text in front of that request as a
   user message; Imp writes no sentence of its own. If the process's
   `Imp.Deadline` has already passed, no request is made and the prediction
@@ -490,8 +493,8 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # The one place an interrupted turn goes: the last request with
-  # `tool_choice: "none"` for a signature with one text output, the forced submit for every other.
+  # The one place an interrupted turn goes: the last request for a signature
+  # with one text output, the forced submit for every other.
   defp interrupted(react, history, inputs, pending, cause, turn, error, execution) do
     if single_text_output?(react.signature),
       do: last_prose(react, history, pending, cause, turn, error),
@@ -545,11 +548,11 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   # An interrupted turn of a signature with one text output. The last request
-  # says `tool_choice: "none"`, so the model can only write text, and that
-  # text is the single text output. A tool call it makes anyway is not run,
-  # and is kept out of the history, where it would replay as a call with no
-  # result; the prediction names it in `unexecuted_tool_calls` instead. A completion that says nothing is an
-  # empty answer: the run is over either way, and there is nothing to force.
+  # is an ordinary step, and its text is the single text output. A tool call
+  # in it is not run, and is kept out of the history, where it would replay as
+  # a call with no result; the prediction names it in `unexecuted_tool_calls`
+  # instead. A completion that says nothing is an empty answer: the run is
+  # over either way, and there is nothing to force.
   # A deadline that has already passed leaves no time for that request, so
   # none is made.
   defp last_prose(react, history, pending, cause, turn, initial_error) do
@@ -558,7 +561,7 @@ defmodule Imp.Predict.ReActV2 do
     else
       {history, pending} = note_after_inputs(history, pending, react)
 
-      case predict(last_prose_program(react), react, history, pending) do
+      case predict(react.react, react, history, pending) do
         {:ok, prediction, history} ->
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
           outputs = last_prose_outputs(react.signature, prediction)
@@ -601,13 +604,6 @@ defmodule Imp.Predict.ReActV2 do
     do: {append_note(history, react.signature, react.last_prose_note), pending}
 
   defp deadline_passed?, do: Imp.Deadline.expired?(Imp.Deadline.current())
-
-  # The same roster as every step, with `tool_choice: "none"`. ReqLLM encodes
-  # it as `"none"` for OpenAI and OpenRouter and `{"type": "none"}` for
-  # Anthropic (`test/react_v2_last_request_wire_test.exs`).
-  defp last_prose_program(react) do
-    %{react.react | config: Keyword.put(react.react.config, :tool_choice, "none")}
-  end
 
   defp put_unexecuted(outputs, %ToolCalls{tool_calls: []}), do: outputs
 
@@ -935,6 +931,10 @@ defmodule Imp.Predict.ReActV2 do
 
         {result, error?} ->
           # A terminal tool has already run; the hook only reads what it did.
+          # So the outcome is taken before it: outputs the hook cannot fit make
+          # the result an error, not the call a refusal.
+          outcome = if error?, do: Imp.Tool.outcome(result), else: :result
+
           {result, error?, finished_by} =
             finish_on_result(react, call, result, error?, inputs, finished_by)
 
@@ -945,7 +945,8 @@ defmodule Imp.Predict.ReActV2 do
                 tool_call_id: call.id,
                 tool_name: call.name,
                 output: if(error?, do: nil, else: result),
-                error: if(error?, do: result, else: nil)
+                error: if(error?, do: result, else: nil),
+                metadata: %{outcome: outcome}
               )
           end
 

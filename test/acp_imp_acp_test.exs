@@ -1443,7 +1443,7 @@ defmodule Imp.ACPTest do
     # Bridge monitors the owner; session death must drop the live MCP clients.
     assert Enum.any?(1..50, fn _ ->
              case Imp.Tool.call(tool, %{}) do
-               {:error, {:mcp_connection_unavailable, _, _}} ->
+               {:error, %Imp.MCP.CallFailure{outcome: :not_sent, reason: {:exit, _}}} ->
                  true
 
                _ ->
@@ -1453,7 +1453,9 @@ defmodule Imp.ACPTest do
            end),
            "expected MCP clients to disconnect after owner death"
 
-    assert {:error, {:mcp_connection_unavailable, _, _}} = Imp.Tool.call(tool, %{})
+    assert {:error, %Imp.MCP.CallFailure{outcome: :not_sent, reason: {:exit, _}}} =
+             Imp.Tool.call(tool, %{})
+
     assert :ok = cleanup.()
   end
 
@@ -1489,7 +1491,9 @@ defmodule Imp.ACPTest do
     assert Imp.Tool.call(tool, %{}) == workspace_name
     assert :ok = cleanup.()
     assert Process.alive?(self())
-    assert {:error, {:mcp_connection_unavailable, _, _}} = Imp.Tool.call(tool, %{})
+
+    assert {:error, %Imp.MCP.CallFailure{outcome: :not_sent, reason: {:exit, _}}} =
+             Imp.Tool.call(tool, %{})
   end
 
   test "bad MCP connect stays isolated from the caller" do

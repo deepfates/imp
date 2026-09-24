@@ -1200,7 +1200,8 @@ defmodule Imp.Predict.RLM do
             component: __MODULE__,
             tool_call_id: tool_call_id,
             tool_name: name,
-            error: error
+            error: error,
+            metadata: %{outcome: Imp.Tool.outcome({:error, error})}
           )
 
         {:error, error, runtime}
@@ -1211,7 +1212,8 @@ defmodule Imp.Predict.RLM do
             component: __MODULE__,
             tool_call_id: tool_call_id,
             tool_name: name,
-            output: value
+            output: value,
+            metadata: %{outcome: :result}
           )
 
         {:ok, value, runtime}

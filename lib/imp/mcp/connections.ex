@@ -152,7 +152,7 @@ defmodule Imp.MCP.Connections do
 
   require Logger
 
-  alias Imp.MCP.Import
+  alias Imp.MCP.{CallFailure, Import}
 
   @type server :: map()
   @type context :: %{cwd: String.t(), server: server()}
@@ -604,11 +604,14 @@ defmodule Imp.MCP.Connections do
                    timeout: timeout(opts),
                    meta: call_meta(server, opts)
                  ) do
-              {:ok, result} -> Imp.MCP.tool_result(result, result_mode(opts))
-              {:error, reason} -> {:error, {:mcp_tool_call_failed, server_name(server), reason}}
+              {:ok, result} ->
+                Imp.MCP.tool_result(result, result_mode(opts))
+
+              {:error, reason} ->
+                {:error, CallFailure.returned(server_name(server), name, reason)}
             end
           catch
-            :exit, reason -> {:error, {:mcp_connection_unavailable, server_name(server), reason}}
+            :exit, reason -> {:error, CallFailure.exited(server_name(server), name, reason)}
           end
         end)
       end)

@@ -339,8 +339,10 @@ defmodule Imp.MCPConnectionTest do
     [tool] = Imp.MCP.import_tools(client)
 
     assert {:error,
-            {:mcp_tool_call_failed, _, %ExMCP.Error.TransportError{reason: :outcome_unknown}}} =
-             error = Imp.Tool.call(tool, %{})
+            %Imp.MCP.CallFailure{
+              outcome: :unknown,
+              reason: %ExMCP.Error.TransportError{reason: :outcome_unknown}
+            }} = error = Imp.Tool.call(tool, %{})
 
     assert Imp.Adapter.Chat.format_tool_result(error) ==
              "Error: no answer came back; the connection broke after the request was sent, " <>

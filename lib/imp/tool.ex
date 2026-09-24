@@ -151,6 +151,80 @@ defmodule Imp.Tool do
     end)
   end
 
+  @typedoc """
+  What a tool call came to, from the caller's side.
+
+    * `:result` — the tool answered. Its answer may itself be an error the tool
+      reported, such as an MCP error result; the tool said what happened.
+    * `:refused` — declined before anything ran: Imp's own checks (an unknown
+      tool, a malformed call, arguments that fail the schema, a tool policy, a
+      host's authorization, submit outputs that do not fit) or, for an MCP
+      tool, the server or its HTTP layer.
+    * `:not_sent` — an MCP request that never left.
+    * `:unknown` — the tool may have acted and there is no answer to say
+      whether it did: a tool function that raised, threw or exited, an RLM
+      budget that stopped or refused the call, or an MCP call with no
+      trustworthy answer. Check before repeating it.
+
+  A tool policy that denies with its own error term, or an
+  `Imp.OperationalSafetyError`, reads as `:result`, because that term cannot be
+  told apart from the same term returned by a tool that ran. A policy that
+  denies with `false` reads as `:refused`.
+  """
+  @type outcome :: :result | :refused | :not_sent | :unknown
+
+  @doc """
+  The outcome of a tool call, read from the value the call returned.
+
+  Pass what `call/2` returned, or the `{:error, reason}` a ReActV2 or RLM loop
+  recorded for the call. `Imp.MCP.CallFailure` carries the outcome of an MCP
+  call that got no answer; see it for the MCP cases.
+
+      iex> Imp.Tool.outcome("Paris")
+      :result
+      iex> Imp.Tool.outcome({:error, {:unknown_tool, "frobnicate"}})
+      :refused
+      iex> Imp.Tool.outcome({:error, {:tool_error, :lookup, {:exit, :killed}}})
+      :unknown
+  """
+  @spec outcome(term()) :: outcome()
+  def outcome({:error, reason}), do: error_outcome(reason)
+  def outcome(_value), do: :result
+
+  @refusals [
+    :unknown_tool,
+    :malformed_tool_call,
+    :missing_required,
+    :schema_validation,
+    :tool_denied,
+    :tool_policy_error,
+    :tool_authorization_denied,
+    :missing_output_fields,
+    :invalid_submit_outputs,
+    :invalid_submit_arguments
+  ]
+
+  # RLM runs each tool inside its budget. A budget error can come before the
+  # tool starts or after RLM stopped a tool that was still running, and the
+  # term does not say which, so it reads as unknown.
+  @rlm_budget_errors [:rlm_time_budget_exceeded, :rlm_cancelled, :rlm_max_llm_calls]
+
+  defp error_outcome(%Imp.MCP.CallFailure{outcome: outcome}), do: outcome
+  defp error_outcome({:rlm_tool_error, reason}), do: error_outcome(reason)
+  defp error_outcome({:rlm_effect_exit, _reason}), do: :unknown
+  defp error_outcome(reason) when reason in @rlm_budget_errors, do: :unknown
+
+  defp error_outcome(reason) when is_tuple(reason) and elem(reason, 0) in @rlm_budget_errors,
+    do: :unknown
+
+  defp error_outcome({:tool_error, _name, _reason}), do: :unknown
+
+  defp error_outcome(reason)
+       when is_tuple(reason) and tuple_size(reason) > 0 and elem(reason, 0) in @refusals,
+       do: :refused
+
+  defp error_outcome(_reason), do: :result
+
   @doc false
   def validate_input(%__MODULE__{} = tool, input), do: do_validate_input(tool, input)
 

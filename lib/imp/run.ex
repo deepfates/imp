@@ -13,6 +13,27 @@ defmodule Imp.Run do
   cleanup. A sink should still hand work off promptly, because a blocked sink
   holds up its own later events and barriers.
 
+  The sink's return value is ignored. When a sink raises, throws or exits, the
+  run's owner is sent
+  `{:imp_run_event_sink_failed, run_id, %{sequence: sequence, kind: kind, reason: {class, reason}}}`,
+  where `class` is `:error`, `:throw` or `:exit`, and delivery goes on with the
+  next event. Imp does not know whether the sink stored the event before it
+  failed (a store call that timed out may have landed), so it does not mark a
+  hole itself; the host, which knows its store, decides what to record. The
+  event is still in the snapshot.
+
+  Stopping or cancelling a run ends delivery. `stop/1` first waits up to five
+  seconds for the sink to finish what it has; `cancel_with_events/3` does not
+  wait. Every event the sink had not finished with is then reported the same
+  way, with `reason` `:in_sink_when_stopped` for the event the sink was
+  holding (it may have been stored) and `:never_handed_to_sink` for each event
+  after it. `kind` is `nil` for an event the snapshot no longer holds. These
+  reports are in the owner's mailbox when `stop/1` or `cancel_with_events/3`
+  returns, after any report the sink's own failures produced, in sequence
+  order, and each event is reported at most once. The same reports are sent
+  when the sink's process dies outright, for example because it was linked
+  to a process that crashed; the run's control then ends too.
+
   `events/1` reads the retained native sequence independently of sink progress.
   `cancel_with_events/3` snapshots that sequence before cleanup, including one
   owner-recorded cancellation outcome. The snapshot is in-memory evidence, not a
@@ -21,7 +42,8 @@ defmodule Imp.Run do
   before dispatch when that guarantee is needed. `Imp.Run.Event.to_map/1`
   serializes a redacted event. Model request and response observations cover
   `Imp.LM.request/2`; ReActV2 and RLM emit the semantic tool call and result
-  events.
+  events, and each `:tool_result` carries `metadata.outcome`, the call's
+  `Imp.Tool.outcome/1`.
 
   A `:model_request` carries the messages as its input and the rest of the
   request as metadata: `:options`, the request options with the tool
@@ -55,15 +77,41 @@ defmodule Imp.Run do
 
   @type t :: %__MODULE__{task: Task.t(), control: pid(), id: String.t()}
 
-  @doc "Starts an unlinked supervised program run owned by the calling process."
+  @doc """
+  Starts an unlinked supervised program run owned by the calling process.
+
+  By default a run takes a place in the machine-wide pool that all Imp tasks
+  share, bounded by the `:async_max_workers` setting, and `start/3` waits for a
+  place when the pool is full.
+
+  Pass `admission: {pool, limit}` to count the run in a pool the host names
+  instead, such as one per agent: at most `limit` runs hold a place in `pool` at
+  once, and when it is full `start/3` returns `{:error, :busy}` straight away,
+  having stopped the control process it started for the run and started no
+  task. The host keeps its own queue and starts the next run when
+  one of its runs ends. The limit is read on each start, so a host that changes
+  its setting passes the new one. A run in a named pool does not count against
+  the machine-wide pool. Tasks it starts inside itself take places in the
+  machine-wide pool as usual, except a stream the run enumerates itself
+  (`Imp.Tasks.async_stream/3`), which runs one item at a time on the run's own
+  place, as it does for any run.
+  """
   @spec start(struct(), map() | keyword(), keyword()) :: {:ok, t()} | {:error, term()}
   def start(program, inputs, opts \\ []) when is_list(opts) do
     event_sink = Keyword.get(opts, :event_sink, fn _event -> :ok end)
     authorize = Keyword.get(opts, :authorize)
     authorization_timeout = Keyword.get(opts, :authorization_timeout, 30_000)
+    admission = Keyword.get(opts, :admission)
 
     unless is_function(event_sink, 1) do
       raise ArgumentError, ":event_sink must be an arity-1 function"
+    end
+
+    unless is_nil(admission) or
+             match?({_pool, limit} when is_integer(limit) and limit > 0, admission) do
+      raise ArgumentError,
+            ":admission must be {pool, limit} with a positive integer limit, got: " <>
+              inspect(admission)
     end
 
     id = Keyword.get_lazy(opts, :id, &new_id/0)
@@ -84,28 +132,36 @@ defmodule Imp.Run do
              event_sink: event_sink,
              capture: Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes])
            ) do
-      task =
-        Imp.Tasks.async_nolink(fn ->
-          with_context(control, fn ->
-            emit(:run_started, component: program.__struct__, input: inputs)
-            result = Imp.Module.execute(program, inputs, execution)
+      body = fn ->
+        with_context(control, fn ->
+          emit(:run_started, component: program.__struct__, input: inputs)
+          result = Imp.Module.execute(program, inputs, execution)
 
-            case result do
-              {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
-              {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
-              {:error, reason} -> emit(:run_failed, error: reason)
-              other -> emit(:run_failed, error: {:invalid_result, other})
-            end
+          case result do
+            {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
+            {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
+            {:error, reason} -> emit(:run_failed, error: reason)
+            other -> emit(:run_failed, error: {:invalid_result, other})
+          end
 
-            result
-          end)
+          result
         end)
+      end
 
-      :ok = Control.attach_task(control, task.pid)
+      case start_task(body, admission) do
+        {:ok, task} ->
+          :ok = Control.attach_task(control, task.pid)
+          {:ok, %__MODULE__{task: task, control: control, id: id}}
 
-      {:ok, %__MODULE__{task: task, control: control, id: id}}
+        {:error, :busy} ->
+          Control.force_stop(control)
+          {:error, :busy}
+      end
     end
   end
+
+  defp start_task(body, nil), do: {:ok, Imp.Tasks.async_nolink(body)}
+  defp start_task(body, {pool, limit}), do: Imp.Tasks.async_nolink_in_pool(body, pool, limit)
 
   @doc "Cancels registered effects before terminating the outer supervised task."
   @spec cancel(t(), term(), timeout()) :: :ok
@@ -331,12 +387,18 @@ defmodule Imp.Run.Control do
     unless Enum.all?(limits, fn {_, n} -> bound?(n) end),
       do: raise(ArgumentError, "run capture limits must be positive integers or :infinity")
 
-    {:ok, delivery} = EventDelivery.start_link(Keyword.fetch!(opts, :event_sink))
+    # Delivery is linked, and its death must reach `terminate/2` so that what
+    # it had not delivered is reported.
+    Process.flag(:trap_exit, true)
+    progress = EventDelivery.new_progress()
+    {:ok, delivery} = EventDelivery.start_link(Keyword.fetch!(opts, :event_sink), progress)
 
     {:ok,
      %{
        id: Keyword.fetch!(opts, :id),
        delivery: delivery,
+       progress: progress,
+       reported: 0,
        sequence: 0,
        events: [],
        dropped_events: 0,
@@ -449,14 +511,62 @@ defmodule Imp.Run.Control do
     {:stop, :normal, state}
   end
 
+  def handle_info({EventDelivery, :failed, failure}, state),
+    do: {:noreply, report(state, failure)}
+
+  def handle_info({:EXIT, delivery, reason}, %{delivery: delivery} = state),
+    do: {:stop, {:event_delivery_exited, reason}, state}
+
+  # Trapping exits is only for delivery's sake; any other exit signal ends
+  # the run's control as it would have without trapping.
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
+
   @impl true
   def terminate(_reason, state) do
-    if Process.alive?(state.delivery) do
-      Process.unlink(state.delivery)
-      Process.exit(state.delivery, :kill)
-    end
-
+    Process.unlink(state.delivery)
+    monitor = Process.monitor(state.delivery)
+    Process.exit(state.delivery, :kill)
+    receive(do: ({:DOWN, ^monitor, :process, _pid, _reason} -> :ok))
+    state |> report_pending_failures() |> report_undelivered()
     :ok
+  end
+
+  # Every report reaches the owner from this process, so the owner's reports
+  # are in sequence order and each event is reported once.
+  defp report(state, failure) do
+    send(state.owner, {:imp_run_event_sink_failed, state.id, failure})
+    %{state | reported: failure.sequence + 1}
+  end
+
+  # Delivery sends a failure here before it records the event as finished,
+  # and it is dead, so every failure it sent is already in this mailbox.
+  defp report_pending_failures(state) do
+    receive do
+      {EventDelivery, :failed, failure} -> state |> report(failure) |> report_pending_failures()
+    after
+      0 -> state
+    end
+  end
+
+  # Delivery is dead, so its progress no longer moves. Every event it had not
+  # finished and that was not reported as failed is reported now: the one the
+  # sink was holding may have been stored, and the ones after it were never
+  # handed over.
+  defp report_undelivered(state) do
+    {handed, finished} = EventDelivery.progress(state.progress)
+    first = max(finished, state.reported)
+
+    kinds =
+      for event <- state.events,
+          event.sequence >= first,
+          into: %{},
+          do: {event.sequence, event.kind}
+
+    Enum.reduce(first..(state.sequence - 1)//1, state, fn sequence, state ->
+      reason = if sequence < handed, do: :in_sink_when_stopped, else: :never_handed_to_sink
+      report(state, %{sequence: sequence, kind: Map.get(kinds, sequence), reason: reason})
+    end)
   end
 
   defp record(%{terminal: terminal} = state, _kind, _attrs) when not is_nil(terminal), do: state
@@ -514,7 +624,7 @@ defmodule Imp.Run.Control do
           error: bounded_error(event.error),
           metadata:
             event.metadata
-            |> Map.take([:model_call_id])
+            |> Map.take([:model_call_id, :outcome])
             |> Map.put(:capture, %{truncated: true, original_bytes: bytes, sha256: digest})
       }
       |> fit_error_summary(max_bytes)
@@ -599,34 +709,59 @@ defmodule Imp.Run.EventDelivery do
 
   use GenServer
 
-  def start_link(sink), do: GenServer.start_link(__MODULE__, sink)
+  # Two counters shared with the run's control: how many events have been
+  # handed to the sink, and how many the sink has finished with (returned,
+  # raised, thrown or exited). The control reads them after this process is
+  # dead to report what was not delivered. A sink failure is sent to the
+  # control, which reports it to the owner, before the event counts as
+  # finished; so once this process is dead the control holds every failure it
+  # sent and can tell which events are already reported.
+  @handed 1
+  @finished 2
+
+  def new_progress, do: :counters.new(2, [:atomics])
+
+  def progress(progress),
+    do: {:counters.get(progress, @handed), :counters.get(progress, @finished)}
+
+  def start_link(sink, progress),
+    do: GenServer.start_link(__MODULE__, {sink, self(), progress})
+
   def deliver(pid, event), do: GenServer.cast(pid, {:deliver, event})
   def barrier(pid, receiver, tag), do: GenServer.cast(pid, {:barrier, receiver, tag})
   def drain(pid, timeout), do: GenServer.call(pid, :drain, timeout)
 
   @impl true
-  def init(sink), do: {:ok, sink}
+  def init({sink, control, progress}),
+    do: {:ok, %{sink: sink, control: control, progress: progress}}
 
   @impl true
-  def handle_cast({:deliver, event}, sink) do
-    safe_sink(sink, event)
-    {:noreply, sink}
+  def handle_cast({:deliver, event}, state) do
+    :counters.put(state.progress, @handed, event.sequence + 1)
+
+    with {:error, reason} <- sink(state, event) do
+      failure = %{sequence: event.sequence, kind: event.kind, reason: reason}
+      send(state.control, {__MODULE__, :failed, failure})
+    end
+
+    :counters.put(state.progress, @finished, event.sequence + 1)
+    {:noreply, state}
   end
 
-  def handle_cast({:barrier, receiver, tag}, sink) do
+  def handle_cast({:barrier, receiver, tag}, state) do
     send(receiver, {:imp_run_barrier, tag})
-    {:noreply, sink}
+    {:noreply, state}
   end
 
   @impl true
-  def handle_call(:drain, _from, sink), do: {:reply, :ok, sink}
+  def handle_call(:drain, _from, state), do: {:reply, :ok, state}
 
-  defp safe_sink(sink, event) do
-    _ = sink.(event)
+  defp sink(state, event) do
+    _ = state.sink.(event)
     :ok
   rescue
-    _error -> :ok
+    error -> {:error, {:error, error}}
   catch
-    _kind, _reason -> :ok
+    kind, reason -> {:error, {kind, reason}}
   end
 end
