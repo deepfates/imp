@@ -115,6 +115,20 @@ defmodule Imp.MCP.Connections do
   Each dial is bounded by `:timeout` on its own, so a host that accepts the
   connection and then answers nothing costs that server its timeout and no more.
 
+  ## Calls to one server at once
+
+  One ExMCP client sends one request at a time: over HTTP it makes the POST
+  from inside its own process, so a quick call made while a slow one is out
+  waits for the slow one to answer. `pool_size:` (1 by default) opens that many
+  connections to each server, and each tool call borrows an idle one for the
+  length of the call, so up to `pool_size` calls to one server run at once. A
+  host sets it from how many of its own calls can be out together. A call that
+  finds every connection busy waits for one, and if none comes free within
+  `:timeout` it fails as `:not_sent` (`Imp.MCP.CallFailure`): nothing was sent.
+  The first connection to a server decides whether the server is reachable and
+  lists its tools; one of the others that cannot be opened leaves the server
+  with fewer connections and is logged.
+
   ## What a tool is named
 
   The declaration decides, and nothing else. A descriptor may carry a
@@ -168,7 +182,8 @@ defmodule Imp.MCP.Connections do
     :call_meta,
     :tool_filter,
     :credentials,
-    :on_failure
+    :on_failure,
+    :pool_size
   ]
 
   @doc """
@@ -193,6 +208,9 @@ defmodule Imp.MCP.Connections do
 
     with :ok <- ensure_runtime(servers),
          {:ok, bridge} <- Imp.MCP.Clients.start(owner: owner) do
+      # Internal: the tools borrow their connections from the bridge.
+      opts = Keyword.put(opts, :bridge, bridge)
+
       case connect_isolated(servers, opts) do
         {:ok, connected, unavailable} ->
           :ok = Imp.MCP.Clients.adopt(bridge, client_entries(connected))
@@ -266,15 +284,15 @@ defmodule Imp.MCP.Connections do
 
         case result do
           {:ok, clients, unavailable} ->
-            Enum.each(clients, fn {_index, _server, client} ->
-              if Process.alive?(client), do: Process.unlink(client)
+            Enum.each(clients, fn {_index, _server, pooled} ->
+              Enum.each(pooled, &if(Process.alive?(&1), do: Process.unlink(&1)))
             end)
 
             send(parent, {ref, {:ok, clients, unavailable}})
 
           {:error, reason, clients} ->
-            Enum.each(clients, fn {_index, _server, client} ->
-              if Process.alive?(client), do: Process.unlink(client)
+            Enum.each(clients, fn {_index, _server, pooled} ->
+              Enum.each(pooled, &if(Process.alive?(&1), do: Process.unlink(&1)))
             end)
 
             send(parent, {ref, {:error, reason, clients}})
@@ -339,9 +357,10 @@ defmodule Imp.MCP.Connections do
          {:ok, headers} <- connection_headers(server, opts),
          options = client_options(server, opts, headers),
          :ok <- trust(options, self()),
-         {:ok, client} <- dial_http_fallback(options, timeout(opts)),
+         {:ok, client, options} <- dial_http_fallback(options, timeout(opts)),
          :ok <- trust(options, client) do
-      connect_all(rest, opts, index + 1, [{index, server, client} | clients], unavailable)
+      pooled = [client | dial_more(options, server, extra_connections(server, opts), opts)]
+      connect_all(rest, opts, index + 1, [{index, server, pooled} | clients], unavailable)
     else
       {:unreachable, reason} ->
         if drop?(opts) do
@@ -450,29 +469,68 @@ defmodule Imp.MCP.Connections do
   # only. A 401 is reported as `:unauthorized`, not as an HTTP error, and is not
   # retried: it is about credentials, not the protocol. ExMCP reports this
   # failure as a string, so the status is read from its text. This retires if
-  # ExMCP falls back on any 4xx to the probe.
+  # ExMCP falls back on any 4xx to the probe. The options that connected are
+  # returned with the client, so further connections to the server are dialed
+  # the way that worked.
   defp dial_http_fallback(options, deadline) do
     case dial(options, deadline) do
-      {:unreachable, {:mcp_connection_failed, reason}} = failed ->
-        if Keyword.get(options, :transport) == :http and probe_refused?(reason),
-          do: dial(Keyword.put(options, :protocol_mode, :legacy_only), deadline),
-          else: failed
+      {:ok, client} ->
+        {:ok, client, options}
 
-      outcome ->
-        outcome
+      {:unreachable, {:mcp_connection_failed, reason}} = failed ->
+        if Keyword.get(options, :transport) == :http and probe_refused?(reason) do
+          legacy = Keyword.put(options, :protocol_mode, :legacy_only)
+
+          with {:ok, client} <- dial(legacy, deadline), do: {:ok, client, legacy}
+        else
+          failed
+        end
+
+      failed ->
+        failed
     end
   end
 
   defp probe_refused?(reason),
     do: inspect(reason, limit: :infinity) =~ ~r/era_probe_failed.*\{:http_error, 4\d\d\b/
 
+  # The connections past the first. The first already showed the server is
+  # there, so one of these that cannot be opened costs the server a connection
+  # rather than its place in the import.
+  # Each is dialed with the options the first connected with, and holds its
+  # server's origin in `Imp.MCP.Trust` for as long as it lives.
+  defp dial_more(_options, _server, count, _opts) when count <= 0, do: []
+
+  defp dial_more(options, server, count, opts) do
+    Enum.flat_map(1..count, fn _ ->
+      case dial(options, timeout(opts)) do
+        {:ok, client} ->
+          :ok = trust(options, client)
+          [client]
+
+        {:unreachable, reason} ->
+          Logger.warning(
+            "MCP server #{inspect(server_name(server))} took one connection fewer than " <>
+              "pool_size asked for: #{inspect(shorten(reason))}"
+          )
+
+          []
+      end
+    end)
+  end
+
+  # Each connection is lent by the bridge under its server's place in the list.
   defp client_entries(connected),
-    do: Enum.map(connected, fn {_index, server, client} -> {server, client} end)
+    do:
+      Enum.flat_map(connected, fn {index, _server, pooled} ->
+        Enum.map(pooled, &{index, &1})
+      end)
 
   defp tools_from_clients(clients, opts) do
     clients
-    |> Enum.reduce_while({:ok, [], []}, fn {index, server, client}, {:ok, acc, unavailable} ->
-      case server_tools(server, client, opts) do
+    |> Enum.reduce_while({:ok, [], []}, fn {index, server, [client | _] = pooled},
+                                           {:ok, acc, unavailable} ->
+      case server_tools(index, server, client, opts) do
         {:ok, sourced} ->
           {:cont, {:ok, acc ++ sourced, unavailable}}
 
@@ -481,7 +539,7 @@ defmodule Imp.MCP.Connections do
             # This one answered the handshake and then could not say what it
             # offers, so it contributes nothing. Close it here: an open client
             # nothing imported from would otherwise live as long as the import.
-            safe_disconnect(client)
+            Enum.each(pooled, &safe_disconnect/1)
             {:cont, {:ok, acc, [absence(server, index, reason) | unavailable]}}
           else
             {:halt, {:error, reason}}
@@ -511,11 +569,11 @@ defmodule Imp.MCP.Connections do
   # reason always names the server and is never a fault of the caller's that
   # happened to surface here. Failures after the catalog — the caller's own
   # `:tool_filter` raising, for one — are left to the caller's error paths.
-  defp server_tools(server, client, opts) do
+  defp server_tools(index, server, client, opts) do
     case list_tools(client, opts) do
       {:ok, response} ->
         case tool_schemas(response) do
-          {:ok, schemas} -> attach_client_runs(schemas, client, server, opts)
+          {:ok, schemas} -> attach_client_runs(schemas, index, server, opts)
           {:error, reason} -> {:error, {:mcp_tools_list_failed, server_name(server), reason}}
         end
 
@@ -569,7 +627,9 @@ defmodule Imp.MCP.Connections do
     if String.length(text) > 120, do: String.slice(text, 0, 119) <> "…", else: text
   end
 
-  defp attach_client_runs(schemas, client, server, opts) do
+  defp attach_client_runs(schemas, index, server, opts) do
+    bridge = Keyword.fetch!(opts, :bridge)
+
     schemas =
       schemas
       |> Enum.filter(fn schema ->
@@ -593,30 +653,42 @@ defmodule Imp.MCP.Connections do
           })
 
         Map.put(schema, "run", fn arguments ->
-          try do
-            # A lost response does not establish that a write did not happen.
-            # ExMCP defaults modern stream retries to at-least-once; this tool
-            # boundary has no server idempotency contract, so never opt into it.
-            case ExMCP.Client.call_tool(client, name, arguments,
-                   format: :map,
-                   retry_policy: false,
-                   http_stream_retry: :safe_only,
-                   timeout: timeout(opts),
-                   meta: call_meta(server, opts)
-                 ) do
-              {:ok, result} ->
-                Imp.MCP.tool_result(result, result_mode(opts))
+          case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
+            {:ok, client} ->
+              try do
+                call_tool(client, name, arguments, server, opts)
+              after
+                Imp.MCP.Clients.checkin(bridge, client)
+              end
 
-              {:error, reason} ->
-                {:error, CallFailure.returned(server_name(server), name, reason)}
-            end
-          catch
-            :exit, reason -> {:error, CallFailure.exited(server_name(server), name, reason)}
+            {:error, reason} ->
+              {:error, CallFailure.returned(server_name(server), name, reason)}
           end
         end)
       end)
 
     {:ok, Enum.map(schemas, &{server, &1})}
+  end
+
+  defp call_tool(client, name, arguments, server, opts) do
+    # A lost response does not establish that a write did not happen.
+    # ExMCP defaults modern stream retries to at-least-once; this tool
+    # boundary has no server idempotency contract, so never opt into it.
+    case ExMCP.Client.call_tool(client, name, arguments,
+           format: :map,
+           retry_policy: false,
+           http_stream_retry: :safe_only,
+           timeout: timeout(opts),
+           meta: call_meta(server, opts)
+         ) do
+      {:ok, result} ->
+        Imp.MCP.tool_result(result, result_mode(opts))
+
+      {:error, reason} ->
+        {:error, CallFailure.returned(server_name(server), name, reason)}
+    end
+  catch
+    :exit, reason -> {:error, CallFailure.exited(server_name(server), name, reason)}
   end
 
   defp call_meta(server, opts) do
@@ -1022,8 +1094,8 @@ defmodule Imp.MCP.Connections do
     do: raise(ArgumentError, "MCP server #{field} must be a list")
 
   defp disconnect_all(clients) do
-    Enum.each(clients, fn {_index, _server, client} ->
-      if Process.alive?(client), do: safe_disconnect(client)
+    Enum.each(clients, fn {_index, _server, pooled} ->
+      Enum.each(pooled, &if(Process.alive?(&1), do: safe_disconnect(&1)))
     end)
 
     :ok
@@ -1090,7 +1162,15 @@ defmodule Imp.MCP.Connections do
     unless is_integer(timeout(opts)) and timeout(opts) > 0 do
       raise ArgumentError, ":timeout must be a positive integer"
     end
+
+    unless is_integer(pool_size(opts)) and pool_size(opts) > 0 do
+      raise ArgumentError, ":pool_size must be a positive integer"
+    end
   end
+
+  defp pool_size(opts), do: Keyword.get(opts, :pool_size, 1)
+
+  defp extra_connections(_server, opts), do: pool_size(opts) - 1
 
   defp timeout(opts), do: Keyword.get(opts, :timeout, 30_000)
   defp result_mode(opts), do: Keyword.get(opts, :result_mode, :text)

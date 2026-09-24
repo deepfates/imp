@@ -197,7 +197,7 @@ defmodule Imp.MCPCallOutcomeTest do
       {imported, tools} = http_tools(http_server())
       imported.cleanup.()
 
-      assert {:error, %CallFailure{outcome: :not_sent, reason: {:exit, {:noproc, _}}}} =
+      assert {:error, %CallFailure{outcome: :not_sent, reason: :not_connected}} =
                call(tools, "answer")
     end
 
