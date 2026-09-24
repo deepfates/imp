@@ -109,4 +109,38 @@ defmodule Imp.RunRequestRecordTest do
     refute inspect(request.metadata.options) =~ "sk-test-secret-1234567890"
     assert inspect(request.metadata.options) =~ "REDACTED"
   end
+
+  defmodule PurposeProgram do
+    @behaviour Imp.Module
+    defstruct [:lm]
+
+    @impl true
+    def call(program, _inputs) do
+      {:ok, _} = Imp.LM.generate(program.lm, [%{role: :user, content: "hi"}], purpose: :voice)
+      {:ok, _} = Imp.LM.generate(program.lm, [%{role: :user, content: "hi"}], temperature: 0.0)
+      {:ok, Imp.Prediction.new(%{answer: "done"})}
+    end
+  end
+
+  # A caller that makes more than one kind of model call names which one this
+  # is, so a reader of the record can tell them apart without guessing from the
+  # options. The name is the record's, never the provider's.
+  test "a request's purpose is on its record and is never sent to the provider" do
+    parent = self()
+    lm = Imp.LM.Static.new(handler: fn _messages, opts -> send(parent, {:sent, opts}) && "ok" end)
+
+    {:ok, run} = Imp.Run.start(%PurposeProgram{lm: lm}, %{question: "q"})
+    assert {:ok, _prediction} = Task.await(run.task)
+    events = Imp.Run.events(run)
+    Imp.Run.stop(run)
+
+    assert [voiced, plain] = Enum.filter(events, &(&1.kind == :model_request))
+    assert voiced.metadata.purpose == :voice
+    refute Keyword.has_key?(voiced.metadata.options, :purpose)
+    refute Map.has_key?(plain.metadata, :purpose)
+
+    assert_received {:sent, first}
+    assert_received {:sent, _second}
+    refute Keyword.has_key?(first, :purpose)
+  end
 end

@@ -10,7 +10,9 @@ defmodule Imp.LM do
   offered no tools. The definitions themselves are emitted once per run per
   distinct hash, as a `:tools_offered` event whose input is the tool list as
   sent. Between the two, a recorded request can be reproduced without repeating
-  a roster on every call. Both are redacted like every other event.
+  a roster on every call. Both are redacted like every other event. A request
+  made with `generate/3`'s `:purpose` carries it in the request event's
+  metadata as `:purpose`; it is never part of what is sent.
 
   The response event's metadata carries the
   money for that call in `:cost`: the provider's reported total in USD as a
@@ -77,11 +79,27 @@ defmodule Imp.LM do
 
   def configured_option(_lm, _key), do: :error
 
+  @doc """
+  Sends one request to `lm` and returns its output.
+
+  `:purpose` names what kind of call this is, for a caller that makes more than
+  one kind -- a program's own loop and a second model that writes its replies,
+  say. It is recorded on the `:model_request` event's metadata as `:purpose`
+  and is never sent to the provider: it is the record's, so a reader can tell
+  the calls apart without guessing from their options. A request without it
+  has no `:purpose` key.
+  """
   def generate(lm, messages, opts \\ [])
 
   def generate(lm, messages, opts) do
     opts = validate_opts!(opts, "Imp.LM.generate/3")
+    {purpose, opts} = Keyword.pop(opts, :purpose)
     request = Imp.Core.request(messages, opts, lm)
+
+    request =
+      if is_nil(purpose),
+        do: request,
+        else: %{request | metadata: Map.put(request.metadata, :purpose, purpose)}
 
     case request(lm, request) do
       {:ok, %Imp.Core.LMResponse{} = response} ->
@@ -114,12 +132,16 @@ defmodule Imp.LM do
       Imp.Run.emit(:model_request,
         component: lm_name(lm),
         input: messages,
-        metadata: %{
-          model_call_id: call_id,
-          model: request.config.model,
-          options: Keyword.delete(options, :tools),
-          tools_hash: hash
-        }
+        metadata:
+          maybe_put_purpose(
+            %{
+              model_call_id: call_id,
+              model: request.config.model,
+              options: Keyword.delete(options, :tools),
+              tools_hash: hash
+            },
+            request.metadata
+          )
       )
 
       result = perform_request(lm, request)
@@ -181,6 +203,9 @@ defmodule Imp.LM do
     do: "[" <> Enum.map_join(value, ",", &canonical_json/1) <> "]"
 
   defp canonical_json(value), do: Jason.encode!(value)
+
+  defp maybe_put_purpose(metadata, %{purpose: purpose}), do: Map.put(metadata, :purpose, purpose)
+  defp maybe_put_purpose(metadata, _request_metadata), do: metadata
 
   defp maybe_put_billing(metadata, nil), do: metadata
   defp maybe_put_billing(metadata, billing), do: Map.put(metadata, :billing, billing)
