@@ -2,25 +2,16 @@ defmodule Imp.BenchmarkTruth.MultimodalManifest do
   @moduledoc false
 
   @payload_keys ~w(assets campaign_id claim_policy created_at limitations provider samples schema_version scoring signature)
-  @provider_keys ~w(api capabilities credential_env endpoint generation identity_evidence model name pricing profile req_llm_dependency req_llm_model)
+  @provider_keys ~w(api capabilities credential_env endpoint generation identity_evidence model name pricing profile req_llm_model)
   @required_generation_keys ~w(max_tokens timeout_ms)
   @optional_generation_keys ~w(seed temperature top_p)
   @pricing_keys ~w(as_of cached_input_nano_usd_per_token cached_input_usd_per_1m currency input_nano_usd_per_token input_usd_per_1m output_nano_usd_per_token output_usd_per_1m pricing_basis source)
-  @req_llm_dependency_keys ~w(package package_sha256 repository source source_revision version)
   @signature_keys ~w(input output output_schema prompt_contract)
   @scoring_keys ~w(family_thresholds normalization scorer)
   @claim_keys ~w(document_family image_family required_families)
   @asset_keys ~w(bytes mime_type path sha256)
   @sample_keys ~w(asset_ids delivery expected_capability family gold id prompt)
   @deliveries ~w(typed_image_data_uri typed_native_file)
-  @req_llm_dependency %{
-    "package" => "req_llm",
-    "package_sha256" => "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
-    "repository" => "https://github.com/agentjido/req_llm",
-    "source" => "hexpm",
-    "source_revision" => "33840077c2f1332eb6dff2d268dff02393014da4",
-    "version" => "1.17.1"
-  }
   @provider_profiles %{
     "google-gemini-2.5-flash-generate-content" => %{
       "api" => "generateContent",
@@ -43,7 +34,6 @@ defmodule Imp.BenchmarkTruth.MultimodalManifest do
         "pricing_basis" => "standard_text_image_video",
         "source" => "https://ai.google.dev/gemini-api/docs/pricing"
       },
-      "req_llm_dependency" => @req_llm_dependency,
       "req_llm_model" => "google:gemini-2.5-flash"
     },
     "openai-gpt-4.1-mini-2025-04-14-responses" => %{
@@ -66,7 +56,6 @@ defmodule Imp.BenchmarkTruth.MultimodalManifest do
         "pricing_basis" => "standard",
         "source" => "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
       },
-      "req_llm_dependency" => @req_llm_dependency,
       "req_llm_model" => "openai:gpt-4.1-mini-2025-04-14"
     }
   }
@@ -93,7 +82,7 @@ defmodule Imp.BenchmarkTruth.MultimodalManifest do
     root = Keyword.get(opts, :root, File.cwd!()) |> Path.expand()
     exact_keys!(payload, @payload_keys, "manifest payload")
 
-    require_equal!(payload["schema_version"], 2, "schema_version")
+    require_equal!(payload["schema_version"], 3, "schema_version")
     require_string!(payload["campaign_id"], "campaign_id")
     require_string!(payload["created_at"], "created_at")
 
@@ -144,17 +133,44 @@ defmodule Imp.BenchmarkTruth.MultimodalManifest do
     end)
   end
 
-  def runtime_dependency!(payload) when is_map(payload) do
-    dependency = payload["provider"]["req_llm_dependency"]
+  @doc """
+  Binds the loaded ReqLLM package into the manifest's provider, so the
+  checkpoint identity, request audits and artifact record the dependency that
+  actually serializes and sends each request. A checkpoint written under one
+  ReqLLM package cannot resume under another.
+  """
+  def bind_runtime_dependency!(%{payload: payload} = manifest) do
+    %{
+      manifest
+      | payload: put_in(payload, ["provider", "req_llm_dependency"], runtime_dependency!())
+    }
+  end
 
-    runtime_version =
+  @doc """
+  The loaded ReqLLM package: its version and the Hex package checksum from the
+  project's lock. Raises when nothing is loaded or when the loaded version is
+  not the locked one.
+  """
+  def runtime_dependency! do
+    loaded =
       case Application.spec(:req_llm, :vsn) do
         nil -> raise ArgumentError, "ReqLLM runtime dependency is not loaded"
         version -> to_string(version)
       end
 
-    require_equal!(runtime_version, dependency["version"], "ReqLLM runtime version")
-    dependency
+    case Mix.Dep.Lock.read()[:req_llm] do
+      {:hex, :req_llm, ^loaded, package_sha256, _managers, _deps, "hexpm", _outer} ->
+        %{
+          "package" => "req_llm",
+          "package_sha256" => package_sha256,
+          "source" => "hexpm",
+          "version" => loaded
+        }
+
+      locked ->
+        raise ArgumentError,
+              "loaded ReqLLM #{loaded} is not the Hex package locked in mix.lock: #{inspect(locked)}"
+    end
   end
 
   def profiles, do: Map.keys(@provider_profiles) |> Enum.sort()
@@ -217,9 +233,6 @@ defmodule Imp.BenchmarkTruth.MultimodalManifest do
         require_string!(pricing[key], "pricing.#{key}")
       end
     )
-
-    exact_keys!(provider["req_llm_dependency"], @req_llm_dependency_keys, "req_llm_dependency")
-    require_equal!(provider["req_llm_dependency"], @req_llm_dependency, "req_llm_dependency")
   end
 
   defp validate_signature!(signature) do

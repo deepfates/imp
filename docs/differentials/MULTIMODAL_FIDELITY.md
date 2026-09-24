@@ -39,8 +39,12 @@ The provider manifests are:
 
 Their strict, checksummed schema pins every sample ID, prompt, expected output,
 family, delivery mode, asset byte count, MIME type, asset SHA-256, provider,
-endpoint, API, exact model, generation options, ReqLLM dependency, and pricing.
-Runtime ReqLLM version drift fails before dispatch.
+endpoint, API, exact model, generation options, and pricing. The ReqLLM
+dependency is not part of the manifest: the runner reads the loaded ReqLLM
+version and its Hex package checksum from `mix.lock`, refuses to run when the
+two disagree, and binds that dependency into the checkpoint identity, the
+request audits and the artifact. A checkpoint cannot resume under a different
+ReqLLM package.
 
 All assets are synthetic and repository-owned. Images cover shape counting,
 spatial relation, and OCR. The native-document family sends the original
@@ -57,7 +61,7 @@ observed. For every request, the redacted audit contains:
 - sanitized endpoint, API, HTTP method, serialized model, and body SHA-256;
 - ordered serialized part types;
 - each part's MIME type, decoded byte count, and content SHA-256;
-- ReqLLM package source, version, package hash, repository, and source revision;
+- ReqLLM package source, version, and package hash;
 - ReqLLM request ID and detected transport.
 
 The audit never persists data URIs, base64 payloads, file bytes, prompt text, or

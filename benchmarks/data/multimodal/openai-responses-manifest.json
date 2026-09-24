@@ -79,14 +79,6 @@
         "source": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
       },
       "profile": "openai-gpt-4.1-mini-2025-04-14-responses",
-      "req_llm_dependency": {
-        "package": "req_llm",
-        "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
-        "repository": "https://github.com/agentjido/req_llm",
-        "source": "hexpm",
-        "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
-        "version": "1.17.1"
-      },
       "req_llm_model": "openai:gpt-4.1-mini-2025-04-14"
     },
     "samples": [
@@ -157,7 +149,7 @@
         "prompt": "Use both pages of the attached synthetic PDF. Among projects with review code R7 on page 2, which owner on page 1 has the highest Units value? Return exactly one JSON object with one field and no markdown: {\"answer\": \"owner\"}"
       }
     ],
-    "schema_version": 2,
+    "schema_version": 3,
     "scoring": {
       "family_thresholds": {
         "image": 0.75,
@@ -178,5 +170,5 @@
       "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
     }
   },
-  "payload_sha256": "04daa155d3f97edfff62e329dfdca1248855f22b2271f7e954228432f1ae39d8"
+  "payload_sha256": "7e0f46b93d76a0f1703e6edce0276436ac686fc5dd2ad57a0e7a9826776e3a09"
 }

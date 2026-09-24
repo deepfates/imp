@@ -165,7 +165,18 @@ defmodule AuthorityInventoryTest do
     assert pins["ax_typescript"]["source_manifest"]["file_count"] == 11
     assert length(pins["ax_typescript"]["source_paths"]) == 11
     assert pins["req_llm"]["role"] == "beam_runtime_dependency"
-    assert pins["req_llm"]["commit"] == "33840077c2f1332eb6dff2d268dff02393014da4"
+    assert pins["req_llm"]["commit"] == "fd9e079fddf253e9b719b2d2c6920f4306592809"
+
+    {:hex, :req_llm, locked_version, hex_package, _, _, "hexpm", hex_registry} =
+      Mix.Dep.Lock.read()[:req_llm]
+
+    assert pins["req_llm"]["version"] == locked_version
+    assert pins["req_llm"]["git_ref"] == "refs/tags/v" <> locked_version
+
+    assert pins["req_llm"]["source_hashes"] == %{
+             "hex_package" => hex_package,
+             "hex_registry" => hex_registry
+           }
   end
 
   test "mmGRPO implementation authority is DSPy source and DeepSeekMath is background only" do
