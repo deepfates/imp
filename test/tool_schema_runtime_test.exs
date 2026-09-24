@@ -182,4 +182,31 @@ defmodule ToolSchemaRuntimeTest do
   end
 
   defp finish_action, do: %{action: %{tool_name: "Finish", tool_input_query: %{}}}
+
+  # A tool's name is the value it was given. A string that happens to name an
+  # atom already loaded in the VM (`"ok"` always does) stays a string, so the
+  # type of a name never depends on what else is running.
+  test "a tool keeps the type of the name it was given" do
+    assert Imp.Tool.new("ok", "d", fn _ -> :ok end).name == "ok"
+    assert Imp.Tool.new(:ok, "d", fn _ -> :ok end).name == :ok
+  end
+
+  test "an imported MCP tool is named by the string the server published" do
+    catalog = [
+      %{
+        name: "ok",
+        description: "d",
+        input_schema: %{"type" => "object"},
+        run: fn _ -> :ok end
+      },
+      %{
+        name: "never_an_atom_#{System.unique_integer([:positive])}",
+        description: "d",
+        input_schema: %{"type" => "object"},
+        run: fn _ -> :ok end
+      }
+    ]
+
+    assert Enum.all?(Imp.MCP.import_tools(catalog), &is_binary(&1.name))
+  end
 end

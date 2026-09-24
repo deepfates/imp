@@ -24,8 +24,8 @@ IMP_PATH=../.. mix deps.get
 IMP_PATH=../.. mix run --no-start run_workflow.exs
 ```
 
-A copied application can omit `IMP_PATH` and resolve the immutable `v0.4.0`
-Git dependency declared in `mix.exs`.
+A copied application can omit `IMP_PATH` and resolve the released Imp package
+declared in `mix.exs`.
 
 The workflow:
 

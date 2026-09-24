@@ -116,7 +116,7 @@ defmodule ProtocolMCPProviderTest do
       |> then(&Imp.MCP.HTTPClient.new(&1 <> "/mcp-http"))
       |> Imp.MCP.import_tools()
 
-    assert http_tool.name == :lookup_http
+    assert http_tool.name == "lookup_http"
     assert Imp.Tool.call(http_tool, %{"key" => "capital"}) == "Paris"
 
     # The client starts without a session id: the server assigns one on the
@@ -126,7 +126,7 @@ defmodule ProtocolMCPProviderTest do
       |> then(&Imp.MCP.StreamableHTTPClient.new(&1 <> "/mcp-stream"))
       |> Imp.MCP.import_tools()
 
-    assert stream_tool.name == :lookup_stream
+    assert stream_tool.name == "lookup_stream"
     assert Imp.Tool.call(stream_tool, %{"key" => "runtime"}) == "BEAM"
 
     assert_received {:initialized, "/mcp-http"}
@@ -176,7 +176,7 @@ defmodule ProtocolMCPProviderTest do
       )
       |> Imp.MCP.import_tools()
 
-    assert tool.name == :echo_stdio
+    assert tool.name == "echo_stdio"
     assert Imp.Tool.call(tool, %{"text" => "trusted"}) == "trusted"
   end
 

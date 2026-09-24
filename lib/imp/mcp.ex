@@ -26,7 +26,16 @@ defmodule Imp.MCP do
   refused, never sent, or sent with no trustworthy answer.
   """
 
-  @doc "Connects authorized MCP servers; returns tools with source metadata and cleanup."
+  @doc """
+  Connects authorized MCP servers; returns tools with source metadata and cleanup.
+
+  `servers` is a list of descriptor maps, local (`"command"`) or remote
+  (`"url"`); see `Imp.MCP.Connections` for their shape and every option.
+
+      server = %{"name" => "files", "command" => "my-mcp-server", "args" => ["--stdio"]}
+      {:ok, import} = Imp.MCP.connect([server], trusted_servers: [server])
+      agent = Imp.react_v2("question -> answer", import.tools, lm: lm)
+  """
   def connect(servers, opts \\ []), do: Imp.MCP.Connections.import_tools(servers, opts)
 
   @client_info %{"name" => "imp", "version" => "0.1.0"}

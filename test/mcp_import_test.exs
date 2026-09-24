@@ -32,7 +32,7 @@ defmodule MCPImportTest do
       ])
 
     [tool] = MCP.import_tools(catalog)
-    assert tool.name == :lookup
+    assert tool.name == "lookup"
     assert tool.schema == %{"required" => ["key"]}
 
     assert %{value: "value:abc"} = Imp.Tool.call(tool, %{key: "abc"})

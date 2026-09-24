@@ -46,11 +46,13 @@ spend decision hangs on the answer.
 `Imp.ExternalCommand` runs MLX and TRL training workers, and implements its own
 process-group lifecycle on raw ports: TERM, grace, KILL, and a check that the
 group is gone. The grace period is the requirement worth preserving — a trainer
-SIGKILLed mid-checkpoint loses work — and it is the reason Imp cannot simply
-adopt `ExMCP.Internal.OwnedProcess`, which stops the root process before
-signalling and so can never deliver a handleable TERM. If that consolidation
-happens, graceful shutdown is a precondition, not a follow-up. Until then this is
-a documented divergence rather than an accident.
+SIGKILLed mid-checkpoint loses work.
+
+`Imp.MCP.OwnedStdio` runs local MCP servers through erlexec instead: each server
+leads its own process group, and stopping it sends the group TERM, waits the
+`kill_timeout`, then sends KILL. That is the same shape with the grace period
+kept, so `ExternalCommand` could move onto erlexec; until it does, the two are a
+documented divergence (`decisions.md`) rather than an accident.
 
 ## Protocol integration
 
@@ -58,7 +60,10 @@ a documented divergence rather than an accident.
 ExMCP. Its clients follow an explicit owner PID; tools retain original source
 identity in `metadata.mcp`, independently of model-facing names. `Imp.ACP.MCP`
 adds ACP presentation hints to that import; it is not another client.
-The shared ExMCP pin and its fork reasons live in `mix.exs`.
+ExMCP is the Hex package, unpatched. Where Imp needs something ExMCP does not
+do — owned stdio process groups, trust for authorized remote origins, the HTTP
+options public servers need, the browser OAuth flow — Imp does it in its own
+module, with the reason and the condition that retires it written there.
 
 `Imp.ACP` owns the default session/program adapter formerly shipped separately
 as the `imp_acp` package. Its namespace stays stable, but consumers depend on

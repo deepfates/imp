@@ -29,8 +29,8 @@ if repo do
 
   Mix.install([{:imp, path: repo}], install_opts)
 else
-  # Standalone notebook: install the tagged Git source release.
-  Mix.install([{:imp, github: "deepfates/imp", tag: "v0.4.0"}])
+  # Standalone notebook: install the released package from Hex.
+  Mix.install([{:imp, "~> 0.5"}])
 end
 live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 ```

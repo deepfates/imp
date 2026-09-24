@@ -87,7 +87,7 @@ Single-call programs use `Imp.predict/2` or `Imp.chain_of_thought/2`. Larger
 programs are normal structs implementing `Imp.Module`; named predictor
 callbacks let the same optimizers improve one stage at a time.
 
-The [deployment example](examples/deployment/README.md) is a complete
+The [deployment example](https://github.com/deepfates/imp/blob/main/examples/deployment/README.md) is a complete
 two-stage support pipeline. It selects a program from disjoint data, writes a
 linked result and parameter artifact, loads the artifact in a fresh OS
 process, serves concurrent calls from a supervised process, hot-reloads new
@@ -125,30 +125,60 @@ decision.
 
 ## Install
 
-Imp is not published to Hex. It is installed from this public repository, at
-an immutable tag, with no credentials:
+Add Imp to your dependencies in `mix.exs`:
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.4.0"}
+{:imp, "~> 0.5"}
 ```
 
-ExMCP is declared `runtime: false`, so an OTP release that uses `Imp.ACP` or
-`Imp.MCP` must list `applications: [ex_mcp: :load]` in its release definition;
-see [protocol runtime in releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
+Imp requires Elixir `~> 1.19` on macOS or Linux. Every dependency comes from
+Hex. One of them, erlexec, builds a small C++ program, so the machine that
+compiles Imp needs a C++ compiler (the Xcode command line tools, or `g++`).
+Version `0.5.0` changes how Imp is installed and one `Imp.MCP.OAuth` option;
+see the
+[release notes](RELEASE_NOTES.md) when upgrading from `0.4.0`.
+
+ExMCP and erlexec are declared `runtime: false`: ordinary Imp startup does not
+start them. An OTP release that uses `Imp.ACP` or `Imp.MCP` lists them in
+`:load` mode, so they are bundled and started only when a protocol entry point
+needs them:
+
+```elixir
+def project do
+  [
+    app: :my_app,
+    version: "0.1.0",
+    elixir: "~> 1.19",
+    deps: [{:imp, "~> 0.5"}],
+    releases: [
+      my_app: [
+        applications: [ex_mcp: :load, erlexec: :load]
+      ]
+    ]
+  ]
+end
+```
+
+Without `erlexec: :load`, the first stdio MCP connection in the release fails
+with `{:spawn_failed, {:erlexec, ...}}`. See
+[protocol runtime in releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
+
+`mix hex.audit` in a project that depends on Imp reports two advisories against
+cowlib, which arrives through ExMCP's HTTP server. Neither has a fixed cowlib
+release. EEF-CVE-2026-43966 (response splitting) is fixed one layer up, in
+cowboy 2.16.0 and later (a fresh `mix deps.get` resolves 2.19.0), which
+refuses header values containing CR or LF.
+EEF-CVE-2026-43969 is in cowlib's client-side Cookie encoder, which nothing in
+Imp's dependency tree calls. Imp's own gate ignores both, with what was
+checked, in
+[`.audit_ignore`](https://github.com/deepfates/imp/blob/main/.audit_ignore).
 
 Imp is MIT licensed (`LICENSE`); `NOTICE` records the upstream DSPy code two
 modules are ported from.
 
-Use `{:imp, path: "path/to/imp"}` only while developing against a local
-checkout. Imp requires Elixir `~> 1.19`. Commit your application's `mix.lock`;
-the Git tag fixes Imp's source, while normal Mix constraints may otherwise
-resolve newer compatible transitive versions. Version `0.4.0` contains
-breaking changes from `0.3.2`; see the [release notes](RELEASE_NOTES.md) when
-upgrading.
-
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. The
-[provider-free ticket router](examples/provider_free_ticket_router/README.md)
+[provider-free ticket router](https://github.com/deepfates/imp/blob/main/examples/provider_free_ticket_router/README.md)
 runs a complete evaluation-and-optimization path without an API key; the
 provider-free parts of the learning path and deployment example do too.
 
@@ -195,15 +225,15 @@ protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPER
 Run `mix docs` for the exhaustive module and function reference.
 
 For an ordinary ACP workspace agent with bounded tools, see
-[examples/workspace_agent](examples/workspace_agent/README.md). It depends
+[examples/workspace_agent](https://github.com/deepfates/imp/blob/main/examples/workspace_agent/README.md). It depends
 directly on this Imp checkout by path and includes a provider-free mode for
 checking its launcher and workspace boundary.
 
 ## Where this fits
 
 Imp is a library: typed language-model programs, an MCP client (`Imp.MCP`), and
-the ACP server side (`Imp.ACP`). It depends on `deepfates/ex_mcp`, a fork of
-`ex_mcp`, which is the one MCP and ACP implementation Imp uses. Ordinary Imp
-startup opens no protocol endpoint, and Imp is never a service. A host
+the ACP server side (`Imp.ACP`). [ExMCP](https://hex.pm/packages/ex_mcp) is the
+one MCP and ACP implementation Imp uses. Ordinary Imp startup opens no protocol
+endpoint, and Imp is never a service. A host
 application owns product lifetimes and decides when to launch an Imp program as
 an external ACP process.
