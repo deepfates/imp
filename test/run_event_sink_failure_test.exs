@@ -13,6 +13,24 @@ defmodule Imp.RunEventSinkFailureTest do
     end
   end
 
+  # A program with an effect in flight: it registers how to cancel it, the way
+  # a tool call does, and waits. With `cancel: :hang` the cancellation never
+  # returns, as one waiting on an unresponsive client would not.
+  defmodule InFlight do
+    @behaviour Imp.Module
+    defstruct [:signature, cancel: :returns]
+
+    def call(%{cancel: cancel}, %{owner: owner}) do
+      Imp.Run.register_cancellable(fn reason ->
+        send(owner, {:effect_cancelled, reason})
+        if cancel == :hang, do: Process.sleep(:infinity)
+      end)
+
+      send(owner, :waiting)
+      Process.sleep(:infinity)
+    end
+  end
+
   # Starts a waiting run whose sink hands each event to `deliver` and reports
   # what it was given to the test. The run stops with the test process.
   defp start(deliver) do
@@ -24,8 +42,8 @@ defmodule Imp.RunEventSinkFailureTest do
     end
 
     {:ok, run} = Imp.Run.start(%Wait{}, %{owner: owner}, event_sink: sink)
-    # A run whose control stopped first leaves its task running, holding a
-    # place in Imp's task pool; end it whatever the test did.
+    # End the task whatever the test did, so a failing test does not leave
+    # it holding a place in Imp's task pool.
     on_exit(fn -> Process.exit(run.task.pid, :kill) end)
     assert_receive :waiting
     run
@@ -208,12 +226,55 @@ defmodule Imp.RunEventSinkFailureTest do
                      %{sequence: 2, kind: :tool_call, reason: :never_handed_to_sink}}
   end
 
-  # `stop/1` releases the run's control and leaves its task to finish; the
-  # waiting program here never does, and would hold its place in Imp's task
-  # pool after the test.
+  # Waits for the task to be gone, so it holds no place in Imp's task pool
+  # after the test.
   defp end_task(run) do
     monitor = Process.monitor(run.task.pid)
     Process.exit(run.task.pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 5_000
+  end
+
+  # The control owns the run. When its sink's process dies the control ends,
+  # and the run must not go on without it: the effect in flight is cancelled
+  # and the task ends, instead of running on until it next emits an event.
+  test "a run whose control ends because its sink died does not outlive it" do
+    owner = self()
+
+    sink = fn
+      %{kind: :run_started} ->
+        send(owner, {:sink, self()})
+        receive(do: (:die -> spawn_link(fn -> exit(:store_crashed) end)))
+        receive(do: (:never -> :ok))
+
+      _event ->
+        :ok
+    end
+
+    {:ok, run} = Imp.Run.start(%InFlight{}, %{owner: owner}, event_sink: sink)
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+    assert_receive {:sink, delivery}
+
+    task = Process.monitor(run.task.pid)
+    control = Process.monitor(run.control)
+    send(delivery, :die)
+
+    assert_receive {:DOWN, ^control, :process, _pid, _reason}, 5_000
+    assert_receive {:effect_cancelled, {:run_control_ended, _reason}}, 5_000
+    assert_receive {:DOWN, ^task, :process, _pid, _reason}, 5_000
+  end
+
+  # Ending the task does not wait on the cancellations: one that never returns
+  # must not leave the run going on without its control.
+  test "a run whose control ends is ended even when a cancellation never returns" do
+    {:ok, run} = Imp.Run.start(%InFlight{cancel: :hang}, %{owner: self()})
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+
+    task = Process.monitor(run.task.pid)
+    Process.exit(run.control, :shutdown)
+
+    assert_receive {:effect_cancelled, {:run_control_ended, :shutdown}}, 5_000
+    assert_receive {:DOWN, ^task, :process, _pid, :killed}, 5_000
   end
 end

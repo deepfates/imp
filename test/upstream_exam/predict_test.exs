@@ -796,7 +796,7 @@ defmodule UpstreamExam.PredictTest do
       program = Imp.predict("question -> answer", lm: lm)
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} =
                    Imp.call(program, %{
                      question: "test",
@@ -828,7 +828,7 @@ defmodule UpstreamExam.PredictTest do
       program = Imp.predict(signature, lm: lm)
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{count: "not an int", name: "test"})
         end)
 
@@ -850,7 +850,7 @@ defmodule UpstreamExam.PredictTest do
       program = Imp.predict(signature, lm: lm)
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{count: 42, name: "test"})
         end)
 
@@ -866,7 +866,7 @@ defmodule UpstreamExam.PredictTest do
       program = Imp.predict("items: array[str] -> result", lm: lm)
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{items: "not a list"})
         end)
 
@@ -874,7 +874,7 @@ defmodule UpstreamExam.PredictTest do
       assert log =~ "expected array[string]"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{items: ["a", "b", "c"]})
         end)
 
@@ -889,7 +889,7 @@ defmodule UpstreamExam.PredictTest do
       program = Imp.predict("numbers: array[int], names: array[str] -> result", lm: lm)
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} =
                    Imp.call(program, %{numbers: [1, 2, 3], names: ["alice", "bob"]})
         end)
@@ -897,7 +897,7 @@ defmodule UpstreamExam.PredictTest do
       refute log =~ "type mismatch"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} =
                    Imp.call(program, %{numbers: ["1", "2", "3"], names: ["alice", "bob"]})
         end)
@@ -906,7 +906,7 @@ defmodule UpstreamExam.PredictTest do
       assert log =~ "expected array[integer]"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{numbers: [1, 2, 3], names: [1, 2, 3]})
         end)
 
@@ -914,7 +914,7 @@ defmodule UpstreamExam.PredictTest do
       assert log =~ "expected array[string]"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{numbers: [], names: []})
         end)
 
@@ -935,14 +935,14 @@ defmodule UpstreamExam.PredictTest do
         )
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{status: "approved", priority: 2})
         end)
 
       refute log =~ "type mismatch"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{status: "invalid", priority: 2})
         end)
 
@@ -950,7 +950,7 @@ defmodule UpstreamExam.PredictTest do
       assert log =~ "expected enum[pending, approved, rejected]"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{status: "approved", priority: 5})
         end)
 
@@ -976,21 +976,21 @@ defmodule UpstreamExam.PredictTest do
       program = Imp.predict(signature, lm: lm)
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{mode: "auto"})
         end)
 
       refute log =~ "type mismatch"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{mode: nil})
         end)
 
       refute log =~ "type mismatch"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{mode: "invalid"})
         end)
 
@@ -1006,7 +1006,7 @@ defmodule UpstreamExam.PredictTest do
 
       log =
         Imp.Settings.context([warn_on_type_mismatch: false], fn ->
-          ExUnit.CaptureLog.capture_log(fn ->
+          Imp.Test.OwnLog.capture(fn ->
             assert {:ok, _prediction} = Imp.call(program, %{count: "not an int", name: "test"})
           end)
         end)
@@ -1014,7 +1014,7 @@ defmodule UpstreamExam.PredictTest do
       refute log =~ "type mismatch"
 
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} = Imp.call(program, %{count: "not an int", name: "test"})
         end)
 
@@ -1085,7 +1085,7 @@ defmodule UpstreamExam.PredictTest do
       # A datetime-typed input given a non-datetime value warns (type-mismatch
       # family) but still proceeds.
       log =
-        ExUnit.CaptureLog.capture_log(fn ->
+        Imp.Test.OwnLog.capture(fn ->
           assert {:ok, _prediction} =
                    Imp.call(program, %{event_name: "Event 2", event_time: "tomorrow"})
         end)

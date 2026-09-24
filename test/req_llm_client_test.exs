@@ -1557,6 +1557,18 @@ defmodule ReqLLMClientTest do
     refute Keyword.has_key?(second_opts, :cache)
   end
 
+  # `purpose:` names a call for the record and is never sent. A streamed call
+  # reaches the provider without going through `Imp.LM.generate/3`, so it must
+  # not carry the name there either.
+  test "a purpose in a streamed predictor's config is not sent to the provider" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub, cache: false)
+    program = Imp.predict("question -> answer", lm: lm, config: [purpose: :voice])
+
+    assert Imp.Streaming.collect(program, %{question: "pong"}, provider_stream: true) == "pong"
+    assert_received {:req_llm_stream, "openai:gpt-test", _messages, opts}
+    refute Keyword.has_key?(opts, :purpose)
+  end
+
   test "composed provider streaming records terminal usage exactly once" do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: StreamingUsageStub)
     program = Imp.predict("question -> answer", lm: lm)
