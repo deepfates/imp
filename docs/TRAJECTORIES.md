@@ -59,8 +59,9 @@ credential patterns; prompts and results still contain private application data.
 
 ## Independent validation
 
-Generate a provider-free export from an actual ReActV2 execution, then run the
-upstream Harbor validator rather than a hand-maintained schema copy:
+In a source checkout, generate a provider-free export from an actual ReActV2
+execution, then run the upstream Harbor validator rather than a hand-maintained
+schema copy:
 
 ```sh
 IMP_ATIF_FIXTURE_OUT=/tmp/imp-trajectory.json mix test test/trajectory_test.exs

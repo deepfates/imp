@@ -299,8 +299,10 @@ defmodule Imp.MCPCallOutcomeTest do
     test "a stdio write the client stopped waiting for is unknown, and it arrives", %{
       tmp_dir: dir
     } do
+      # Only this import's transport: another test's may still be closing.
+      before = owned_stdio_processes()
       {_imported, tools} = stdio_tools(dir)
-      [transport] = owned_stdio_processes()
+      [transport] = owned_stdio_processes() -- before
       :sys.suspend(transport)
 
       failure =

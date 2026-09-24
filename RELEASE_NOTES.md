@@ -51,6 +51,14 @@ Ordinary Imp startup starts no protocol endpoint.
   `{:imp, "~> 0.5"}`. `EX_MCP_PATH` is no longer read.
 - A release that uses `Imp.MCP` or `Imp.ACP` adds `erlexec: :load` beside
   `ex_mcp: :load`.
+- Trust for an authorized remote MCP server is VM-wide. While a connection to
+  it is open, its exact origin (`scheme://host:port`) is in ExMCP's
+  `trusted_origins`, so any ExMCP client in the same VM may send credential
+  headers to that origin without consent. In 0.4.0 the trust belonged to the
+  one connection. No other origin is trusted, the origin is removed when the
+  last connection to it closes, and origins the host configured are left
+  alone. A host that runs other ExMCP clients it does not trust with those
+  origins should know this.
 - `Imp.MCP.OAuth.begin/3` no longer takes `:flow`; a pre-registered client is
   `client_registration: {:pre_registered, client_id, client_secret}` with
   `client_issuer:` naming the authorization server it belongs to. A server

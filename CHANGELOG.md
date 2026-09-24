@@ -7,27 +7,26 @@ User-visible changes to Imp are recorded here.
 - Imp is a Hex package: `{:imp, "~> 0.5"}`. Every dependency comes from Hex,
   including ExMCP (`~> 1.5`, unpatched); the `deepfates/ex_mcp` Git fork, the
   bundled `vendor/ex_mcp` path and the `EX_MCP_PATH` override are gone.
-- A local (stdio) MCP server runs as the leader of its own process group,
-  started through erlexec, a new dependency. Closing the connection, or the
-  death of the process that owns it, sends the group SIGTERM and then SIGKILL a
-  second later, so the server and any children it started end with it. An OTP
-  release that uses `Imp.MCP` or `Imp.ACP` now lists
-  `applications: [ex_mcp: :load, erlexec: :load]`. erlexec compiles a C++
-  port program, and Imp sets `SHELL=/bin/sh` in a VM started without `SHELL`,
-  which erlexec's port program refuses to start without.
-- Inside an OTP release, a stdio server's `PATH` no longer carries the
-  release's own directories, so a server that is an Elixir or Erlang program
-  finds the host's runtime instead of the release's.
-- While a connection to an authorized remote MCP server is open, its exact
-  origin is in ExMCP's VM-wide `trusted_origins`, and it is removed when the
-  last connection to it closes. Origins the host configured are left alone.
-- Remote MCP connections send no `Origin` header, post to `/` when the URL is
-  written with a `/` path, and retry once with the standard `initialize`
-  handshake when ExMCP's `server/discover` probe gets a 4xx other than 401.
-  Servers such as Scry answer only these ways.
-- When a stdio MCP server exits on its own, the rest of its process group gets
-  SIGKILL half a second later, so a child that ignores SIGTERM does not outlive
-  it.
+- What 0.4.0 got from the fork now lives in Imp: stdio MCP servers in their
+  own process group, a `PATH` without the release's own directories, and the
+  HTTP options public servers need (no `Origin` header, a written `/` path
+  kept, one retry with the standard `initialize` after a non-401 4xx on the
+  era probe). What an upgrader meets:
+  - erlexec is a direct dependency. It builds a C++ port program, and an OTP
+    release that uses `Imp.MCP` or `Imp.ACP` lists
+    `applications: [ex_mcp: :load, erlexec: :load]`.
+  - Imp sets `SHELL=/bin/sh` in a VM started without `SHELL`, because
+    erlexec's port program does not start without it.
+  - Closing a stdio connection, or the death of the process that owns it,
+    sends the server's group SIGTERM and SIGKILL one second later; 0.4.0 stopped
+    the group without a SIGTERM a server could handle.
+  - When a stdio server exits on its own, what is left of its group gets
+    SIGKILL half a second later.
+  - Trust for an authorized remote server is VM-wide: while a connection to it
+    is open, its exact origin is in ExMCP's `trusted_origins`, so any ExMCP
+    client in the VM may send credentials to that origin. In 0.4.0 the trust
+    belonged to the one connection. The origin is removed when the last
+    connection to it closes, and origins the host configured are left alone.
 - A tool's name keeps the type it was given. `Imp.Tool.new/4` no longer turns a
   string into an atom that happens to exist, and tools imported from an MCP
   server are always named by the server's string. Lookups (`resolve_name/2`,
@@ -38,14 +37,9 @@ User-visible changes to Imp are recorded here.
   functions. Its `:flow` option is replaced by `:client_registration`
   (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`);
   a pre-registered client also names its `:client_issuer`, and the flow
-  refuses to begin when the server names a different authorization server.
-  Authorization-server discovery takes the document that names the issuer it
-  asked for, which finds a tenant issuer such as Readwise's; a
-  protected-resource document that names another resource is refused; a
-  `client_secret_basic` token endpoint gets the secret in the Authorization
-  header. A server with neither protected-resource nor authorization-server
-  metadata is refused rather than given guessed `/authorize` and `/token`
-  endpoints.
+  refuses to begin when the server names a different authorization server. A
+  server with neither protected-resource nor authorization-server metadata is
+  refused rather than given guessed `/authorize` and `/token` endpoints.
 - An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
   The run's owner is sent
   `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
@@ -125,9 +119,7 @@ User-visible changes to Imp are recorded here.
   has already passed, no request is made and the run ends with
   `termination_reason: :deadline_exceeded`. `forced_submit_notice` is for
   signatures with `submit` and `last_prose_note` for those without; each is
-  refused at construction for the other. The request does not say
-  `tool_choice: "none"`: told that while it wanted a tool, a model wrote the
-  call as text in its own tool markup, and that text became the answer.
+  refused at construction for the other.
 - `Imp.Observability` reports a prediction that ended `:answered`,
   `:last_prose` or `:finished_by_tool` as complete; it reported them as
   incomplete.
