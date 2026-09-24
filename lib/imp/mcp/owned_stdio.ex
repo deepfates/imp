@@ -49,7 +49,8 @@ defmodule Imp.MCP.OwnedStdio do
 
   @impl ExMCP.Transport
   def connect(opts) do
-    with {:ok, _started} <- Application.ensure_all_started(:erlexec),
+    with :ok <- ensure_shell(),
+         {:ok, _started} <- Application.ensure_all_started(:erlexec),
          {:ok, server} <- GenServer.start_link(__MODULE__, opts) do
       {:ok,
        %__MODULE__{
@@ -120,6 +121,17 @@ defmodule Imp.MCP.OwnedStdio do
 
   @impl ExMCP.Transport
   def capabilities(%__MODULE__{}), do: [:push]
+
+  # erlexec's port program exits with status 4 when `SHELL` is unset or empty,
+  # which is how containers and service managers often start the VM, and it
+  # reads the variable again whenever its supervisor restarts it. It is set in
+  # the VM's environment for that reason; `/bin/sh` is the POSIX shell. A
+  # server's own environment is still `child_environment/1`. This retires if
+  # erlexec starts without `SHELL`.
+  defp ensure_shell do
+    if System.get_env("SHELL", "") == "", do: System.put_env("SHELL", "/bin/sh")
+    :ok
+  end
 
   defp call(state, request, timeout \\ 5_000) do
     GenServer.call(state.server, request, timeout)

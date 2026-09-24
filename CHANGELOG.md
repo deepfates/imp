@@ -12,7 +12,9 @@ User-visible changes to Imp are recorded here.
   death of the process that owns it, sends the group SIGTERM and then SIGKILL a
   second later, so the server and any children it started end with it. An OTP
   release that uses `Imp.MCP` or `Imp.ACP` now lists
-  `applications: [ex_mcp: :load, erlexec: :load]`.
+  `applications: [ex_mcp: :load, erlexec: :load]`. erlexec compiles a C++
+  port program, and Imp sets `SHELL=/bin/sh` in a VM started without `SHELL`,
+  which erlexec's port program refuses to start without.
 - Inside an OTP release, a stdio server's `PATH` no longer carries the
   release's own directories, so a server that is an Elixir or Erlang program
   finds the host's runtime instead of the release's.

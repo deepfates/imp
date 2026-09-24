@@ -9,10 +9,11 @@ defmodule Imp.MCPStdioEnvironmentTest do
   @moduletag :tmp_dir
 
   setup do
-    saved = Map.take(System.get_env(), ["PATH", "RELEASE_ROOT", "IMP_TEST_HOST_SECRET"])
+    names = ["PATH", "RELEASE_ROOT", "IMP_TEST_HOST_SECRET", "SHELL"]
+    saved = Map.take(System.get_env(), names)
 
     on_exit(fn ->
-      for name <- ["PATH", "RELEASE_ROOT", "IMP_TEST_HOST_SECRET"] do
+      for name <- names do
         case Map.fetch(saved, name) do
           {:ok, value} -> System.put_env(name, value)
           :error -> System.delete_env(name)
@@ -66,6 +67,22 @@ defmodule Imp.MCPStdioEnvironmentTest do
     assert environment["IMP_TEST_DECLARED"] == "declared"
     refute Map.has_key?(environment, "IMP_TEST_HOST_SECRET")
     refute Map.has_key?(environment, "RELEASE_ROOT")
+  end
+
+  # Containers and service managers often start the VM without SHELL, and
+  # erlexec's port program refuses to start without it.
+  test "a server starts when the VM was started without SHELL", %{tmp_dir: tmp_dir} do
+    _ = Application.stop(:erlexec)
+    System.delete_env("SHELL")
+    on_exit(fn -> Application.stop(:erlexec) end)
+
+    script = Path.join(tmp_dir, "server.py")
+    File.write!(script, server_script(Path.join(tmp_dir, "environment.json")))
+    client = MCP.StdioClient.new("python3", args: [script], timeout: 15_000)
+
+    assert [%{name: name}] = MCP.StdioClient.list_tools(client)
+    assert to_string(name) == "noop"
+    MCP.StdioClient.close(client)
   end
 
   defp server_script(report) do
