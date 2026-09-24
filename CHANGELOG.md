@@ -97,8 +97,12 @@ User-visible changes to Imp are recorded here.
   HTTP with a standing GET stream, so a server that speaks only the old
   transport answered its first request with 405. It works with servers that
   name the session `sessionId` (the TypeScript SDK's, ExMCP's), not with the
-  Python SDK's SSE servers (`session_id`), which ExMCP 1.5 refuses. A server
-  that speaks Streamable HTTP is reached as `"http"`.
+  Python SDK's SSE servers (`session_id`): their dial fails with
+  `:sse_endpoint_without_session_id` and a message saying to use `"http"`. A
+  server that speaks Streamable HTTP is reached as `"http"`. An `sse`
+  descriptor with `"headers"` or `"auth"` is refused
+  (`:mcp_sse_credentials_refused`): the server names where requests go, and
+  its credentials would go there whatever origin it named.
 
 - An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
   ended every HTTP request at its own 30 s default whatever `:timeout` said,

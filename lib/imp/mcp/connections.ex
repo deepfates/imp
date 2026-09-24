@@ -69,9 +69,16 @@ defmodule Imp.MCP.Connections do
   stream, and the server's first event names the URL requests are posted to,
   headers and all. It works with servers whose posting URL carries the session
   as `sessionId`, as the TypeScript SDK's and ExMCP's do. It does not work with
-  the Python SDK's SSE servers, which name it `session_id`: ExMCP 1.5 refuses
-  the connection (`missing_session_id`). A server that speaks Streamable HTTP
-  as well is better reached as `"http"`.
+  the Python SDK's SSE servers, which name it `session_id`: the dial fails
+  with `{:sse_endpoint_without_session_id, why, exmcp_reason}`, where `why`
+  says to use their Streamable HTTP endpoint. A server that speaks Streamable
+  HTTP as well is better reached as `"http"`.
+
+  An `"sse"` descriptor may not carry `"headers"` or `"auth"`: the server
+  names where requests are posted, and ExMCP sends a connection's headers
+  there, whatever origin it names, before Imp can see it. Such a descriptor is
+  refused before anything is dialed (`:mcp_sse_credentials_refused`), and
+  refuses the whole import even under `on_failure: :drop`.
 
   Only descriptors the caller authorized are dialed. `trusted_servers:` lists
   them exactly; `authorize:` is a function of the descriptor (and optionally
@@ -412,6 +419,7 @@ defmodule Imp.MCP.Connections do
     # gave, and `client_options/3` raises on a descriptor nobody can address.
     with :ok <- validate_tool_prefix(server),
          :ok <- authorize(server, opts),
+         :ok <- sse_without_credentials(server),
          {:ok, headers} <- connection_headers(server, opts),
          options = client_options(server, opts, headers),
          :ok <- trust(options, self()),
@@ -560,17 +568,35 @@ defmodule Imp.MCP.Connections do
         {:ok, client, options}
 
       {:unreachable, {:mcp_connection_failed, reason}} = failed ->
-        if Keyword.get(options, :transport) == :http and probe_refused?(reason) do
-          legacy = Keyword.put(options, :protocol_mode, :legacy_only)
+        cond do
+          Keyword.get(options, :transport) == :http and probe_refused?(reason) ->
+            legacy = Keyword.put(options, :protocol_mode, :legacy_only)
+            with {:ok, client} <- dial(legacy, deadline), do: {:ok, client, legacy}
 
-          with {:ok, client} <- dial(legacy, deadline), do: {:ok, client, legacy}
-        else
-          failed
+          Keyword.get(options, :transport) == :sse and
+              reason == {:transport_connect_failed, "missing_session_id"} ->
+            {:unreachable, {:mcp_connection_failed, without_session_id(reason)}}
+
+          true ->
+            failed
         end
 
       failed ->
         failed
     end
+  end
+
+  # ExMCP's deprecated-SSE client connects only to a server whose stream names
+  # the posting URL's session as `sessionId`; the Python SDK's servers name it
+  # `session_id`, and ExMCP answers `missing_session_id`, as text. Those servers
+  # serve Streamable HTTP too, so the refusal says how to reach them. ExMCP's
+  # own reason is kept. This retires if ExMCP reads the session under either
+  # name.
+  defp without_session_id(reason) do
+    {:sse_endpoint_without_session_id,
+     ~s[this server's SSE endpoint does not name its session sessionId (the Python ] <>
+       ~s[SDK's names it session_id), which ExMCP cannot follow; connect to its ] <>
+       ~s[Streamable HTTP endpoint with type: "http"], reason}
   end
 
   defp probe_refused?(reason),
@@ -1046,6 +1072,30 @@ defmodule Imp.MCP.Connections do
         {:error, auth_unavailable(server, "auth applies to http and sse servers only")}
     end
   end
+
+  # A deprecated-SSE server names in its stream's first event the URL requests
+  # are posted to, and ExMCP posts there, with every header the connection
+  # carries, from inside the dial (`ExMCP.Transport.HTTP.LegacySSE.connect/1`):
+  # nothing outside it sees that URL before the first request, and ExMCP does
+  # not check it against the stream's origin. Headers given to an `sse`
+  # descriptor could therefore reach any origin its server names, so a
+  # descriptor that declares headers or auth is refused as `sse`. This retires
+  # if ExMCP holds the posting URL to the stream's origin.
+  defp sse_without_credentials(%{"type" => "sse"} = server) do
+    declared? = Map.get(server, "headers", []) not in [nil, []] or Map.has_key?(server, "auth")
+
+    if declared? do
+      {:error,
+       {:mcp_sse_credentials_refused, server_name(server),
+        ~s(an sse server names where requests are posted, and its headers and auth ) <>
+          ~s(would go there whatever origin it names; connect to its Streamable HTTP ) <>
+          ~s(endpoint with type: "http")}}
+    else
+      :ok
+    end
+  end
+
+  defp sse_without_credentials(_server), do: :ok
 
   defp static_headers(server),
     do: name_value_list!(Map.get(server, "headers", []), "headers")

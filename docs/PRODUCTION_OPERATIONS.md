@@ -363,8 +363,13 @@ answers anonymously with lower rate limits still works before the person has
 found a key. Add `"required" => true` when the server is useless without the
 key; the connection is then refused with a message naming the variable.
 
-Both forms apply to `"http"` and `"sse"` descriptors and may be combined with
-static `"headers"`. Static headers alone keep working exactly as before.
+Both forms apply to `"http"` descriptors and may be combined with static
+`"headers"`. Static headers alone keep working exactly as before. An `"sse"`
+descriptor (MCP's deprecated HTTP+SSE transport) takes neither: its server
+names the URL requests are posted to, and ExMCP would send the credentials
+there whatever origin it named, so such a descriptor is refused
+(`:mcp_sse_credentials_refused`). Reach the server's Streamable HTTP endpoint
+with `"type" => "http"` instead.
 
 ### Local ACP attachment
 

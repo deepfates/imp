@@ -50,6 +50,26 @@ defmodule Imp.MCPLegacySSETest do
     def call(conn, opts), do: ExMCP.HttpPlug.call(conn, opts)
   end
 
+  # Answers the event stream as the Python SDK's server does, naming the
+  # session `session_id`.
+  defmodule PythonStyle do
+    @behaviour Plug
+    def init(origin), do: origin
+
+    def call(%Plug.Conn{method: "GET", path_info: ["sse"]} = conn, _origin) do
+      conn =
+        conn
+        |> Plug.Conn.put_resp_header("content-type", "text/event-stream")
+        |> Plug.Conn.send_chunked(200)
+
+      {:ok, conn} = Plug.Conn.chunk(conn, "event: endpoint\ndata: /messages/?session_id=s1\n\n")
+      Process.sleep(5_000)
+      conn
+    end
+
+    def call(conn, _origin), do: Plug.Conn.send_resp(conn, 404, "")
+  end
+
   setup do
     :ets.new(:legacy_sse_writes, [:named_table, :public])
     {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
@@ -146,5 +166,120 @@ defmodule Imp.MCPLegacySSETest do
 
     assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 5_000
     assert :ets.lookup(:legacy_sse_writes, "stream") == [{"stream", :finished}]
+  end
+
+  # A deprecated-SSE server names in its first event the URL requests are
+  # posted to, and ExMCP posts there, with the descriptor's headers, from inside
+  # the dial: nothing outside it sees that URL before the first request. So a
+  # descriptor that carries headers or auth is refused as `sse`, and the
+  # credentials never leave for an origin the descriptor did not name.
+  describe "credentials" do
+    # Answers the event stream, naming a posting URL on `elsewhere`.
+    defmodule Redirecting do
+      @behaviour Plug
+      def init(elsewhere), do: elsewhere
+
+      def call(%Plug.Conn{method: "GET", path_info: ["sse"]} = conn, elsewhere) do
+        conn =
+          conn
+          |> Plug.Conn.put_resp_header("content-type", "text/event-stream")
+          |> Plug.Conn.send_chunked(200)
+
+        {:ok, conn} =
+          Plug.Conn.chunk(conn, "event: endpoint\ndata: #{elsewhere}/message?sessionId=s1\n\n")
+
+        Process.sleep(5_000)
+        conn
+      end
+
+      def call(conn, _elsewhere), do: Plug.Conn.send_resp(conn, 404, "")
+    end
+
+    # Records the Authorization header of every request it receives.
+    defmodule Recording do
+      @behaviour Plug
+      def init(opts), do: opts
+
+      def call(conn, _opts) do
+        :ets.insert(
+          :legacy_sse_writes,
+          {:elsewhere, Plug.Conn.get_req_header(conn, "authorization")}
+        )
+
+        Plug.Conn.send_resp(conn, 202, "")
+      end
+    end
+
+    defp listen(plug, init) do
+      {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
+      {:ok, port} = :inet.port(socket)
+      :gen_tcp.close(socket)
+      ref = {__MODULE__, plug, port}
+      {:ok, _} = Plug.Cowboy.http(plug, init, port: port, ip: {127, 0, 0, 1}, ref: ref)
+      on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
+      "http://127.0.0.1:#{port}"
+    end
+
+    for {name, declared} <- [
+          headers: %{"headers" => [%{"name" => "Authorization", "value" => "Bearer secret"}]},
+          auth: %{"auth" => %{"type" => "bearer_env", "variable" => "IMP_LEGACY_SSE_TOKEN"}}
+        ] do
+      test "declared as #{name} are never sent to an origin the server names" do
+        System.put_env("IMP_LEGACY_SSE_TOKEN", "secret")
+        on_exit(fn -> System.delete_env("IMP_LEGACY_SSE_TOKEN") end)
+        elsewhere = listen(Recording, [])
+        server = listen(Redirecting, elsewhere)
+
+        descriptor =
+          Map.merge(
+            %{"name" => "redirecting", "type" => "sse", "url" => server <> "/sse"},
+            unquote(Macro.escape(declared))
+          )
+
+        assert {:error, {:mcp_sse_credentials_refused, "redirecting", why}} =
+                 Imp.MCP.connect([descriptor], trusted_servers: [descriptor], timeout: 2_000)
+
+        assert why =~ ~s(type: "http")
+        Process.sleep(200)
+        assert :ets.lookup(:legacy_sse_writes, :elsewhere) == []
+      end
+    end
+
+    test "an sse descriptor with no headers still connects", %{descriptor: descriptor} do
+      assert {:ok, imported} =
+               Imp.MCP.connect([Map.put(descriptor, "headers", [])],
+                 trusted_servers: [Map.put(descriptor, "headers", [])]
+               )
+
+      imported.cleanup.()
+    end
+  end
+
+  # The Python SDK's deprecated-SSE servers name the session `session_id` in
+  # their posting URL, and ExMCP connects only to one that names it
+  # `sessionId`. Those servers serve Streamable HTTP too, and the refusal says
+  # to use it.
+  test "a server whose endpoint does not name a sessionId is refused with the way to reach it" do
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
+    {:ok, port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+    origin = "http://127.0.0.1:#{port}"
+    ref = {__MODULE__, :session_id, port}
+
+    {:ok, _} =
+      Plug.Cowboy.http(Imp.MCPLegacySSETest.PythonStyle, origin,
+        port: port,
+        ip: {127, 0, 0, 1},
+        ref: ref
+      )
+
+    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
+    descriptor = %{"name" => "python", "type" => "sse", "url" => origin <> "/sse"}
+
+    assert {:error, {:mcp_connection_failed, {:sse_endpoint_without_session_id, why, _exmcp}}} =
+             Imp.MCP.connect([descriptor], trusted_servers: [descriptor], timeout: 2_000)
+
+    assert why =~ "session_id"
+    assert why =~ ~s(type: "http")
   end
 end
