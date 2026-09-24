@@ -13,6 +13,16 @@ defmodule Imp.Run do
   cleanup. A sink should still hand work off promptly, because a blocked sink
   holds up its own later events and barriers.
 
+  The sink's return value is ignored. When a sink raises, throws or exits, the
+  run's owner is sent
+  `{:imp_run_event_sink_failed, run_id, %{sequence: sequence, kind: kind, reason: {class, reason}}}`,
+  where `class` is `:error`, `:throw` or `:exit`, and delivery goes on with the
+  next event. Imp does not know whether the sink stored the event before it
+  failed (a store call that timed out may have landed), so it does not mark a
+  hole itself; the host, which knows its store, decides what to record. The
+  event is still in the snapshot. Events still queued when the owner stops or
+  cancels the run are not delivered; `cancel_with_events/3` returns them.
+
   `events/1` reads the retained native sequence independently of sink progress.
   `cancel_with_events/3` snapshots that sequence before cleanup, including one
   owner-recorded cancellation outcome. The snapshot is in-memory evidence, not a
@@ -366,7 +376,12 @@ defmodule Imp.Run.Control do
     unless Enum.all?(limits, fn {_, n} -> bound?(n) end),
       do: raise(ArgumentError, "run capture limits must be positive integers or :infinity")
 
-    {:ok, delivery} = EventDelivery.start_link(Keyword.fetch!(opts, :event_sink))
+    {:ok, delivery} =
+      EventDelivery.start_link(
+        Keyword.fetch!(opts, :event_sink),
+        owner,
+        Keyword.fetch!(opts, :id)
+      )
 
     {:ok,
      %{
@@ -634,34 +649,38 @@ defmodule Imp.Run.EventDelivery do
 
   use GenServer
 
-  def start_link(sink), do: GenServer.start_link(__MODULE__, sink)
+  def start_link(sink, owner, run_id), do: GenServer.start_link(__MODULE__, {sink, owner, run_id})
   def deliver(pid, event), do: GenServer.cast(pid, {:deliver, event})
   def barrier(pid, receiver, tag), do: GenServer.cast(pid, {:barrier, receiver, tag})
   def drain(pid, timeout), do: GenServer.call(pid, :drain, timeout)
 
   @impl true
-  def init(sink), do: {:ok, sink}
+  def init({sink, owner, run_id}), do: {:ok, %{sink: sink, owner: owner, run_id: run_id}}
 
   @impl true
-  def handle_cast({:deliver, event}, sink) do
-    safe_sink(sink, event)
-    {:noreply, sink}
+  def handle_cast({:deliver, event}, state) do
+    with {:error, reason} <- sink(state, event) do
+      failure = %{sequence: event.sequence, kind: event.kind, reason: reason}
+      send(state.owner, {:imp_run_event_sink_failed, state.run_id, failure})
+    end
+
+    {:noreply, state}
   end
 
-  def handle_cast({:barrier, receiver, tag}, sink) do
+  def handle_cast({:barrier, receiver, tag}, state) do
     send(receiver, {:imp_run_barrier, tag})
-    {:noreply, sink}
+    {:noreply, state}
   end
 
   @impl true
-  def handle_call(:drain, _from, sink), do: {:reply, :ok, sink}
+  def handle_call(:drain, _from, state), do: {:reply, :ok, state}
 
-  defp safe_sink(sink, event) do
-    _ = sink.(event)
+  defp sink(state, event) do
+    _ = state.sink.(event)
     :ok
   rescue
-    _error -> :ok
+    error -> {:error, {:error, error}}
   catch
-    _kind, _reason -> :ok
+    kind, reason -> {:error, {kind, reason}}
   end
 end
