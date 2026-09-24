@@ -53,6 +53,111 @@ defmodule Imp.MCP do
     def list_tools(%__MODULE__{tools: tools}), do: tools
   end
 
+  @doc """
+  The words a model reads for a failed MCP tool call.
+
+  An error result (`{:mcp_tool_error, envelope}`) is the text its tool wrote:
+  MCP spec, CallToolResult, puts what went wrong in the content, for the model
+  to read. Its text items are joined; its structured content stands in as plain
+  data when there is no text. A JSON-RPC error is the server's message. A call
+  that got no answer is one sentence saying so and why. A stream that broke
+  after the request was delivered is not reported as a failure: the server may
+  have done the work, and the sentence says it may have been carried out.
+
+  This is only what is read. The error term itself, which the loop records,
+  keeps the whole envelope or reason.
+
+      iex> Imp.MCP.failure_text({:mcp_tool_call_failed, "kite", :timeout})
+      "no answer came back; it timed out."
+  """
+  @spec failure_text(term()) :: String.t()
+  def failure_text(reason)
+
+  def failure_text({:mcp_tool_error, envelope}), do: error_result_text(envelope)
+
+  def failure_text({:mcp_tool_call_failed, _server, reason}) do
+    case json_rpc_message(reason) do
+      {:ok, message} -> message
+      :error -> "no answer came back; " <> no_answer_reason(reason)
+    end
+  end
+
+  def failure_text({:mcp_connection_unavailable, _server, exit_reason}),
+    do: "no answer came back; " <> exit_prose(exit_reason)
+
+  def failure_text({:json_rpc_error, error}) do
+    case json_rpc_message(error) do
+      {:ok, message} -> message
+      :error -> "the server refused the call."
+    end
+  end
+
+  defp error_result_text(envelope) when is_map(envelope) do
+    texts =
+      envelope
+      |> fetch_field(:content, [])
+      |> List.wrap()
+      |> Enum.filter(&(is_map(&1) and text_content?(&1)))
+      |> Enum.map(&fetch_field(&1, :text, nil))
+      |> Enum.filter(&(is_binary(&1) and &1 != ""))
+
+    cond do
+      texts != [] ->
+        Enum.join(texts, "\n")
+
+      structured = fetch_field(envelope, :structuredContent, nil) ->
+        Imp.Adapter.Chat.format_value(structured)
+
+      true ->
+        "The tool reported an error without saying what it was."
+    end
+  end
+
+  defp error_result_text(_envelope), do: "The tool reported an error without saying what it was."
+
+  # `ExMCP.Client.call_tool(format: :map)` returns a server's JSON-RPC error as
+  # its decoded map; the `:struct` format wraps it in an `ExMCP.Error` or
+  # `ExMCP.Error.ProtocolError` whose `:code` is an integer. ExMCP's server
+  # failure classes (`data.type`) add a clause where they say something the
+  # message does not; the others are identifiers, not words, and are left out.
+  defp json_rpc_message(%{"message" => message} = error)
+       when is_binary(message) and message != "",
+       do: {:ok, message <> json_rpc_type_prose(Map.get(error, "data"))}
+
+  defp json_rpc_message(%{message: message, code: code})
+       when is_binary(message) and message != "" and is_integer(code),
+       do: {:ok, message}
+
+  defp json_rpc_message(_reason), do: :error
+
+  defp json_rpc_type_prose(%{"type" => "handler_crash"}), do: "; the tool crashed."
+  defp json_rpc_type_prose(%{"type" => "handler_timeout"}), do: "; the tool took too long."
+
+  defp json_rpc_type_prose(%{"type" => "handler_start_failed"}),
+    do: "; the server could not start the tool."
+
+  defp json_rpc_type_prose(_data), do: ""
+
+  # The ways ExMCP reports a tool call that got no answer.
+  defp no_answer_reason(:timeout), do: "it timed out."
+  defp no_answer_reason(:not_connected), do: "the connection is not open."
+  defp no_answer_reason(:closed), do: "the connection closed."
+  defp no_answer_reason(:cancelled), do: "the request was cancelled."
+
+  defp no_answer_reason(%ExMCP.Error.TransportError{reason: :outcome_unknown}),
+    do: "the connection broke after the request was sent, so it may have been carried out."
+
+  defp no_answer_reason(%ExMCP.Error.TransportError{reason: :timeout}), do: "it timed out."
+  defp no_answer_reason(%ExMCP.Error{code: :connection_error}), do: "the connection closed."
+  defp no_answer_reason(_reason), do: "the connection failed."
+
+  # The exit of a call to the client process names its pid and arguments; none
+  # of that is for the reader.
+  defp exit_prose({reason, {GenServer, :call, _args}}), do: exit_prose(reason)
+  defp exit_prose(:timeout), do: "it timed out."
+  defp exit_prose(:noproc), do: "the connection is not open."
+  defp exit_prose(_reason), do: "the connection closed."
+
   @doc false
   def json_rpc_result(%{"error" => error}), do: {:error, {:json_rpc_error, error}}
   def json_rpc_result(%{"result" => result}), do: {:ok, result}

@@ -761,7 +761,38 @@ defmodule ReActContractTest do
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
 
     assert [
-             %{tool: :lookup, result: "Execution error in lookup: :not_found"},
+             %{tool: :lookup, result: "Execution error in lookup: not found"},
+             %{tool: :finish, result: "Completed."}
+           ] = Imp.Prediction.get(prediction, :history)
+  end
+
+  # DSPy's MCP boundary raises on an error result and ReAct shows the exception;
+  # Imp keeps the envelope as a term, and the model reads the tool's own words.
+  test "dspy_3_2_1: an MCP error result is observed as the tool's own words" do
+    Process.put(:react_actions, [
+      %{next_thought: "try lookup", next_tool_name: "lookup", next_tool_args: %{}},
+      %{next_thought: "done", next_tool_name: "finish", next_tool_args: %{}},
+      %{reasoning: "Recovered from the explicit error", answer: "done"}
+    ])
+
+    envelope = %{
+      "isError" => true,
+      "content" => [%{"type" => "text", "text" => "no record at that uri"}]
+    }
+
+    lookup =
+      Imp.Tool.new(:lookup, "lookup", fn _args -> {:error, {:mcp_tool_error, envelope}} end)
+
+    agent =
+      Imp.Predict.ReAct.new("question -> answer", [lookup],
+        lm: sequence_lm(:react_actions),
+        mode: :dspy_3_2_1
+      )
+
+    assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
+
+    assert [
+             %{tool: :lookup, result: "Execution error in lookup: no record at that uri"},
              %{tool: :finish, result: "Completed."}
            ] = Imp.Prediction.get(prediction, :history)
   end

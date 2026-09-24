@@ -625,8 +625,9 @@ defmodule Imp.Predict.ReAct do
   defp display_tool_name(nil), do: "unknown"
   defp display_tool_name(name), do: to_string(name)
 
-  defp format_tool_error(reason) when is_binary(reason), do: reason
-  defp format_tool_error(reason), do: inspect(reason)
+  # DSPy formats the raised exception; Imp's failures are terms, so the model
+  # reads the words `Imp.Adapter.Chat` renders for them rather than the term.
+  defp format_tool_error(reason), do: Imp.Adapter.Chat.tool_error_text(reason)
 
   defp action_parse_failure?(%{reason: {:error, %Imp.AdapterParseError{}}}), do: true
   defp action_parse_failure?(%{reason: {:error, {:missing_output_fields, _fields}}}), do: true

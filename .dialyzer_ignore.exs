@@ -221,7 +221,7 @@
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {340, 16}},
   {"lib/imp/adapter/chat.ex", :pattern_match_cov, {787, 8}},
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {675, 8}},
-  {"lib/imp/mcp.ex", :pattern_match_cov, {372, 8}},
+  {"lib/imp/mcp.ex", :pattern_match_cov, {477, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
