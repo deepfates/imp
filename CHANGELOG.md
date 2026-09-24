@@ -7,7 +7,11 @@ User-visible changes to Imp are recorded here.
 - An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
   The run's owner is sent
   `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
-  and delivery goes on with the next event.
+  and delivery goes on with the next event. Stopping or cancelling a run
+  reports the same way every event the sink had not finished with
+  (`:in_sink_when_stopped`, `:never_handed_to_sink`). Run owners receive this
+  message where they received nothing before; an owner with a strict
+  `handle_info/2` needs a clause for it.
 
 - `Imp.Run.start/3` takes `admission: {pool, limit}`: the run holds a place in
   the host's named pool instead of the machine-wide `:async_max_workers` pool,

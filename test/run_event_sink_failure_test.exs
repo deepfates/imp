@@ -99,4 +99,85 @@ defmodule Imp.RunEventSinkFailureTest do
     assert_receive {:stored, %Imp.Run.Event{kind: :model_response}}
     refute_receive {:imp_run_event_sink_failed, _run_id, _failure}, 100
   end
+
+  # A sink that is still holding an event when the run is stopped: that event
+  # may or may not be stored, and the ones queued behind it were never handed
+  # over. Both are reported, before `stop/1` returns.
+  @tag timeout: 20_000
+  test "stopping a run reports the event in the sink and every event never handed to it" do
+    owner = self()
+
+    run =
+      start(fn
+        %{kind: :model_response} ->
+          send(owner, :holding)
+          receive(do: (:never -> :ok))
+
+        _event ->
+          :ok
+      end)
+
+    emit(run, :model_response, output: "a")
+    emit(run, :tool_call, tool_name: :lookup)
+    emit(run, :tool_result, output: "b")
+    assert_receive :holding
+
+    :ok = Imp.Run.stop(run)
+    end_task(run)
+
+    assert_received {:imp_run_event_sink_failed, _run_id,
+                     %{sequence: 1, kind: :model_response, reason: :in_sink_when_stopped}}
+
+    assert_received {:imp_run_event_sink_failed, _run_id,
+                     %{sequence: 2, kind: :tool_call, reason: :never_handed_to_sink}}
+
+    assert_received {:imp_run_event_sink_failed, _run_id,
+                     %{sequence: 3, kind: :tool_result, reason: :never_handed_to_sink}}
+
+    refute_received {:imp_run_event_sink_failed, _run_id, %{sequence: 0}}
+  end
+
+  test "cancelling a run reports the events it cut off" do
+    owner = self()
+
+    run =
+      start(fn
+        %{kind: :model_response} ->
+          send(owner, :holding)
+          receive(do: (:never -> :ok))
+
+        _event ->
+          :ok
+      end)
+
+    emit(run, :model_response, output: "a")
+    assert_receive :holding
+
+    {:ok, _events} = Imp.Run.cancel_with_events(run, :host_cancelled, 100)
+
+    assert_received {:imp_run_event_sink_failed, _run_id,
+                     %{sequence: 1, reason: :in_sink_when_stopped}}
+
+    # The run_cancelled event recorded at cancel was never handed over.
+    assert_received {:imp_run_event_sink_failed, _run_id,
+                     %{sequence: 2, kind: :run_cancelled, reason: :never_handed_to_sink}}
+  end
+
+  test "a run whose sink kept up reports nothing when stopped" do
+    run = start(fn _event -> :ok end)
+    emit(run, :model_response, output: "a")
+    assert_receive {:stored, %Imp.Run.Event{kind: :model_response}}
+    :ok = Imp.Run.stop(run)
+    end_task(run)
+    refute_received {:imp_run_event_sink_failed, _run_id, _failure}
+  end
+
+  # `stop/1` releases the run's control and leaves its task to finish; the
+  # waiting program here never does, and would hold its place in Imp's task
+  # pool after the test.
+  defp end_task(run) do
+    monitor = Process.monitor(run.task.pid)
+    Process.exit(run.task.pid, :kill)
+    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}
+  end
 end
