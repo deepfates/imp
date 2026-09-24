@@ -624,7 +624,7 @@ defmodule DocumentationContractTest do
 
     [tool] = Imp.MCP.import_tools(catalog)
 
-    assert tool.name == :lookup
+    assert tool.name == "lookup"
     assert {:ok, [^tool]} = Imp.Tool.validate_tools([tool])
     assert {:error, message} = Imp.Tool.validate_tools([:not_a_tool])
     assert message =~ "expected a list of Imp.Tool structs"

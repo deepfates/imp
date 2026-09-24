@@ -40,10 +40,12 @@ defmodule Imp.Tool do
   @doc """
   Builds a tool from a name, description, unary function, and optional schema.
 
-  Atom names stay atoms. String names are converted to an existing atom when one
-  is already loaded, otherwise they remain strings. This avoids creating atoms
-  from untrusted model output while still allowing tools to round-trip provider
-  payloads that use string names.
+  The name keeps the type it was given: an atom stays an atom and a string stays
+  a string. Tools imported from an MCP server are named by the string the server
+  published. A string is never turned into an atom, so a name's type does not
+  depend on which atoms happen to be loaded in the VM, and no atom is created
+  from a remote server's or a model's text. Lookups by name
+  (`resolve_name/2`) compare atoms and strings by their text.
 
   The schema is a JSON-schema-shaped map used by ReAct/provider adapters and by
   humans reading the program boundary.
@@ -166,18 +168,11 @@ defmodule Imp.Tool do
     end
   end
 
-  defp normalize_name(name) when is_atom(name), do: name
-  defp normalize_name(name) when is_binary(name), do: existing_atom_or_string(name)
+  defp normalize_name(name) when is_atom(name) or is_binary(name), do: name
 
   defp normalize_name(name) do
     raise ArgumentError,
           "Imp.Tool names must be atoms or strings; got: #{inspect(name)}"
-  end
-
-  defp existing_atom_or_string(name) do
-    String.to_existing_atom(name)
-  rescue
-    ArgumentError -> name
   end
 
   defp safe_existing_atom(key) when is_atom(key), do: key
