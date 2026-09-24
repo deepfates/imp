@@ -1139,10 +1139,18 @@ defmodule Imp.Adapter.Chat do
     # no `tool_calls` key for a provider to reconcile, and the thought is shown
     # back to the model, which is the point of recording it. A turn with
     # neither content nor calls is dropped below.
-    assistant =
+    base =
       if calls == [],
         do: %{role: :assistant, content: thought},
         else: %{role: :assistant, content: thought, tool_calls: calls}
+
+    assistant =
+      Enum.reduce([:reasoning_content, :reasoning_details], base, fn field, message ->
+        case fetch_field(turn, field) do
+          nil -> message
+          value -> Map.put(message, field, value)
+        end
+      end)
 
     tool_messages =
       Enum.map(results, fn result ->

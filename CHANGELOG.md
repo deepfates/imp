@@ -4,6 +4,12 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- ReActV2 preserves provider-native reasoning text and opaque reasoning details
+  across tool calls and saved-history reloads. ReqLLM receives the original
+  continuation data, including provider extension fields and signatures, instead
+  of losing it while rebuilding assistant messages. Operational history must be
+  stored privately; run events and explicit diagnostic redaction still redact
+  credential-shaped values.
 - `Imp.Clients.ReqLLM` returns a response whose body carries a provider error
   as `{:error, %ReqLLM.Error.API.Request{}}`. OpenRouter relays an upstream
   provider's refusal as a successful HTTP response with an error object and no
