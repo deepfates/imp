@@ -222,8 +222,6 @@ defmodule Imp.MCP.Connections do
 
       case connect_isolated(servers, opts) do
         {:ok, connected, unavailable} ->
-          :ok = Imp.MCP.Clients.adopt(bridge, client_entries(connected))
-
           case tools_from_clients(connected, opts) do
             {:ok, tools, annotations, unlisted} ->
               {:ok,
@@ -240,11 +238,6 @@ defmodule Imp.MCP.Connections do
               _ = Imp.MCP.Clients.stop(bridge)
               {:error, reason}
           end
-
-        {:error, reason, clients} ->
-          disconnect_all(clients)
-          _ = Imp.MCP.Clients.stop(bridge)
-          {:error, reason}
 
         {:error, reason} ->
           _ = Imp.MCP.Clients.stop(bridge)
@@ -292,20 +285,27 @@ defmodule Imp.MCP.Connections do
             kind, reason -> {:error, {:mcp_connection_failed, {kind, reason}}, []}
           end
 
+        # The helper hands its clients to the bridge itself, and lets go of
+        # them only once the bridge holds them, so at no moment does nothing
+        # hold them. The caller may die, or give up at the time limit below,
+        # after the helper has answered; the bridge then closes them with its
+        # owner or with the import, and a bridge already gone means they are
+        # closed here.
         case result do
           {:ok, clients, unavailable} ->
-            Enum.each(clients, fn {_index, _server, pooled} ->
-              Enum.each(pooled, &if(Process.alive?(&1), do: Process.unlink(&1)))
-            end)
-
-            send(parent, {ref, {:ok, clients, unavailable}})
+            try do
+              :ok = Imp.MCP.Clients.adopt(Keyword.fetch!(opts, :bridge), client_entries(clients))
+              unlink_all(clients)
+              send(parent, {ref, {:ok, clients, unavailable}})
+            catch
+              :exit, reason ->
+                disconnect_all(clients)
+                send(parent, {ref, {:error, {:mcp_import_exit, reason}}})
+            end
 
           {:error, reason, clients} ->
-            Enum.each(clients, fn {_index, _server, pooled} ->
-              Enum.each(pooled, &if(Process.alive?(&1), do: Process.unlink(&1)))
-            end)
-
-            send(parent, {ref, {:error, reason, clients}})
+            disconnect_all(clients)
+            send(parent, {ref, {:error, reason}})
         end
       end)
 
@@ -320,8 +320,23 @@ defmodule Imp.MCP.Connections do
       timeout ->
         abandon(pid)
         Process.demonitor(mon, [:flush])
+
+        # An answer that arrived with the time limit names clients the bridge
+        # already holds; the caller stops the bridge, which closes them.
+        receive do
+          {^ref, _result} -> :ok
+        after
+          0 -> :ok
+        end
+
         {:error, :mcp_import_timeout}
     end
+  end
+
+  defp unlink_all(clients) do
+    Enum.each(clients, fn {_index, _server, pooled} ->
+      Enum.each(pooled, &if(Process.alive?(&1), do: Process.unlink(&1)))
+    end)
   end
 
   # Killing a process that opened MCP clients does not close them: an
@@ -331,8 +346,9 @@ defmodule Imp.MCP.Connections do
   # not returned has no pid anybody holds, so the links are the only handle on
   # it and must be read before the kill. The chain is at most
   # helper -> dial -> client -> transport and every link in it was opened by
-  # this import: nothing is adopted onto the caller-owned bridge until the
-  # whole connect has answered.
+  # this import. A helper abandoned while handing its clients to the bridge
+  # reaches the bridge through them; that bridge is this import's own, and the
+  # caller stops it on the time limit anyway.
   defp abandon(pid), do: abandon(pid, 3)
 
   defp abandon(pid, depth) do

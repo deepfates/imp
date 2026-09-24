@@ -320,6 +320,42 @@ defmodule Imp.MCPConnectionPoolTest do
     end
   end
 
+  # The caller can die while its import is still connecting: a turn cancelled,
+  # a task killed at its own deadline. The connections already made must close
+  # with it, and with them their hold on the server's origin.
+  describe "a caller that dies while its import connects" do
+    test "leaves no connection open when the rest connect", do: caller_dies(:ok)
+    test "leaves no connection open when the rest are refused", do: caller_dies(false)
+  end
+
+  defp caller_dies(second_answer) do
+    first = server()
+    second = %{server() | "name" => "second"}
+
+    caller =
+      spawn(fn ->
+        caller = self()
+
+        authorize = fn
+          %{"name" => "second"} ->
+            Process.exit(caller, :kill)
+            second_answer
+
+          _descriptor ->
+            :ok
+        end
+
+        Imp.MCP.connect([first, second], authorize: authorize, pool_size: 2)
+      end)
+
+    monitor = Process.monitor(caller)
+    assert_receive {:DOWN, ^monitor, :process, _pid, :killed}, 5_000
+    origin = String.replace(first["url"], "/mcp", "")
+
+    assert eventually(fn -> origin not in trusted_origins() end),
+           "a connection to #{origin} outlived the caller that was importing it"
+  end
+
   test "pool_size must be a positive integer" do
     assert_raise ArgumentError, ~r/pool_size/, fn ->
       Imp.MCP.connect([server()], trusted_servers: [server()], pool_size: 0)

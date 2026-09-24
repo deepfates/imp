@@ -74,6 +74,11 @@ User-visible changes to Imp are recorded here.
   sends it several calls at once, and another connection would be another
   server process.
 
+- A caller of `Imp.MCP.connect/2` that dies while its import is connecting no
+  longer leaves the connections already made open, each holding its server's
+  origin in the trusted origins. They close with the import's `:owner`, which
+  is the caller unless another process was named.
+
 - `Imp.Run.start/3` takes `admission: {pool, limit}`: the run holds a place in
   the host's named pool instead of the machine-wide `:async_max_workers` pool,
   at most `limit` runs hold places in that pool at once, and a full pool
