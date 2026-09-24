@@ -741,8 +741,9 @@ defmodule Imp.Run.Control do
   # does not return holds neither the others, nor this control, nor what the
   # caller does next. Past `bound` those still running are killed: whether
   # their effects were cancelled is as unknown as it was. They are linked to
-  # the caller, so they end with it however it ends; `safe_cancel/2` ends them
-  # normally whatever the cancellation does, so the link reports nothing else.
+  # the caller, so they end with it however it ends, and each ends normally
+  # whatever its cancellation does (`guarded_cancel/2`), so the link reports
+  # nothing else.
   defp call_cancellations([], _reason, _bound), do: :ok
 
   defp call_cancellations(funs, reason, bound) do
@@ -750,7 +751,7 @@ defmodule Imp.Run.Control do
 
     running =
       Map.new(funs, fn fun ->
-        pid = spawn_link(fn -> safe_cancel(fun, reason) end)
+        pid = spawn_link(fn -> guarded_cancel(fun, reason) end)
         {Process.monitor(pid), pid}
       end)
 
@@ -777,6 +778,25 @@ defmodule Imp.Run.Control do
   defp remaining(deadline), do: max(deadline - now_ms(), 0)
 
   defp now_ms, do: System.monotonic_time(:millisecond)
+
+  # `safe_cancel/2` catches what a cancellation raises, throws or exits with,
+  # but not an exit signal that ends its process, as a process it linked to
+  # crashing would. So the cancellation runs in a process of its own and this
+  # one, which traps exits, ends normally however that one ends, and ends it
+  # when the caller it is linked to ends.
+  defp guarded_cancel(fun, reason) do
+    Process.flag(:trap_exit, true)
+    worker = spawn_link(fn -> safe_cancel(fun, reason) end)
+
+    receive do
+      {:EXIT, ^worker, _reason} ->
+        :ok
+
+      {:EXIT, _caller, _reason} ->
+        Process.exit(worker, :kill)
+        :ok
+    end
+  end
 
   defp safe_cancel(fun, reason) do
     _ = fun.(reason)
