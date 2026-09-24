@@ -65,8 +65,9 @@ defmodule Imp.Run do
 
   Pass `admission: {pool, limit}` to count the run in a pool the host names
   instead, such as one per agent: at most `limit` runs hold a place in `pool` at
-  once, and when it is full `start/3` returns `{:error, :busy}` straight away
-  and starts nothing. The host keeps its own queue and starts the next run when
+  once, and when it is full `start/3` returns `{:error, :busy}` straight away,
+  having stopped the control process it started for the run and started no
+  task. The host keeps its own queue and starts the next run when
   one of its runs ends. The limit is read on each start, so a host that changes
   its setting passes the new one. A run in a named pool does not count against
   the machine-wide pool. Tasks it starts inside itself take places in the
