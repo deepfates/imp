@@ -165,7 +165,14 @@ defmodule Imp.Run do
   defp start_task(body, nil), do: {:ok, Imp.Tasks.async_nolink(body)}
   defp start_task(body, {pool, limit}), do: Imp.Tasks.async_nolink_in_pool(body, pool, limit)
 
-  @doc "Cancels registered effects before terminating the outer supervised task."
+  @doc """
+  Cancels registered effects before terminating the outer supervised task.
+
+  The cancellations are given `timeout` between them, and the task another
+  `timeout` to end before it is killed. A cancellation still running after its
+  `timeout` is abandoned, so one that never returns delays the cancel by
+  `timeout` rather than holding it.
+  """
   @spec cancel(t(), term(), timeout()) :: :ok
   def cancel(run, reason \\ :cancelled, timeout \\ 5_000)
 
@@ -193,7 +200,7 @@ defmodule Imp.Run do
 
   def cancel_with_events(%__MODULE__{} = run, reason, timeout)
       when timeout == :infinity or (is_integer(timeout) and timeout > 0) do
-    :ok = Control.cancel(run.control, reason)
+    :ok = Control.cancel(run.control, reason, timeout)
     terminate_task(run.task.pid, timeout)
     events = Control.events(run.control)
     Control.force_stop(run.control)
@@ -345,13 +352,24 @@ defmodule Imp.Run.Control do
 
   alias Imp.Run.{Event, EventDelivery}
 
+  # How long cancellations called without a caller's timeout (the control
+  # ending, its owner going down, work registered after a cancel) may take
+  # before they are abandoned.
+  @cancellation_bound 5_000
+
   def start(opts), do: GenServer.start(__MODULE__, opts)
   def events(pid), do: GenServer.call(pid, :events)
   def emit(pid, kind, attrs), do: GenServer.call(pid, {:emit, kind, attrs})
   def first_seen?(pid, key), do: GenServer.call(pid, {:first_seen, key})
   def register(pid, fun), do: GenServer.call(pid, {:register, fun})
   def unregister(pid, ref), do: GenServer.call(pid, {:unregister, ref})
-  def cancel(pid, reason), do: GenServer.call(pid, {:cancel, reason}, 30_000)
+  # The control waits up to `timeout` for the cancellations; the call allows
+  # for that and for the rest of its work.
+  def cancel(pid, reason, timeout) do
+    call_timeout = if timeout == :infinity, do: :infinity, else: timeout + 5_000
+    GenServer.call(pid, {:cancel, reason, timeout}, call_timeout)
+  end
+
   def barrier(pid, receiver, tag), do: GenServer.call(pid, {:barrier, receiver, tag})
   def attach_task(pid, task_pid), do: GenServer.call(pid, {:attach_task, task_pid})
 
@@ -470,7 +488,7 @@ defmodule Imp.Run.Control do
   end
 
   def handle_call({:register, fun}, _from, state) do
-    safe_cancel(fun, state.cancelled)
+    call_cancellations([fun], state.cancelled, @cancellation_bound)
     {:reply, nil, state}
   end
 
@@ -482,8 +500,8 @@ defmodule Imp.Run.Control do
     {:reply, :ok, %{state | task_pid: task_pid, task_monitor: Process.monitor(task_pid)}}
   end
 
-  def handle_call({:cancel, reason}, _from, %{cancelled: nil} = state) do
-    Enum.each(state.cancellables, fn {_ref, fun} -> safe_cancel(fun, reason) end)
+  def handle_call({:cancel, reason, timeout}, _from, %{cancelled: nil} = state) do
+    call_cancellations(Map.values(state.cancellables), reason, timeout)
 
     state =
       record(state, :run_cancelled, %{error: reason, metadata: %{unfinished_effects: :unknown}})
@@ -491,7 +509,7 @@ defmodule Imp.Run.Control do
     {:reply, :ok, %{state | cancelled: reason, cancellables: %{}}}
   end
 
-  def handle_call({:cancel, _reason}, _from, state), do: {:reply, :ok, state}
+  def handle_call({:cancel, _reason, _timeout}, _from, state), do: {:reply, :ok, state}
 
   def handle_call({:barrier, receiver, tag}, _from, state) do
     EventDelivery.barrier(state.delivery, receiver, tag)
@@ -510,7 +528,7 @@ defmodule Imp.Run.Control do
 
   def handle_info({:DOWN, monitor, :process, owner, reason}, state)
       when monitor == state.owner_monitor and owner == state.owner do
-    Enum.each(state.cancellables, fn {_ref, fun} -> safe_cancel(fun, {:owner_down, reason}) end)
+    call_cancellations(Map.values(state.cancellables), {:owner_down, reason}, @cancellation_bound)
 
     if is_pid(state.task_pid) and Process.alive?(state.task_pid),
       do: Process.exit(state.task_pid, :kill)
@@ -538,17 +556,21 @@ defmodule Imp.Run.Control do
     state |> report_pending_failures() |> report_undelivered()
 
     # The run does not outlive its control: whatever ended the control (its
-    # sink's process dying, a stop), the task is ended and work still in flight
-    # is cancelled, rather than left running until it next emits. This comes
-    # after the reports, so an owner hears why before it sees the task end. The
-    # task is ended first, so a cancellation that does not return cannot keep
-    # it going.
+    # sink's process dying, a stop), work still in flight is cancelled and the
+    # task is ended, rather than left running until it next emits. This comes
+    # after the reports, so an owner hears why before it sees the task end.
+    # The cancellations come before the kill because some of what they end is
+    # held by processes that end with the task (an RLM's model call is its
+    # budget's to end); they are bounded, so one that does not return cannot
+    # keep the task going.
+    call_cancellations(
+      Map.values(state.cancellables),
+      {:run_control_ended, reason},
+      @cancellation_bound
+    )
+
     if is_pid(state.task_pid) and Process.alive?(state.task_pid),
       do: Process.exit(state.task_pid, :kill)
-
-    Enum.each(state.cancellables, fn {_ref, fun} ->
-      safe_cancel(fun, {:run_control_ended, reason})
-    end)
 
     :ok
   end
@@ -711,6 +733,25 @@ defmodule Imp.Run.Control do
 
   defp over?(_measured, :infinity), do: false
   defp over?(measured, limit), do: measured > limit
+
+  # The cancellations run in a process of their own, so one that does not
+  # return holds neither this control nor what the caller does next. Past
+  # `bound` the process is killed: whether its effect was cancelled is as
+  # unknown as it was, and the process does not outlive the wait.
+  defp call_cancellations([], _reason, _bound), do: :ok
+
+  defp call_cancellations(funs, reason, bound) do
+    {pid, monitor} = spawn_monitor(fn -> Enum.each(funs, &safe_cancel(&1, reason)) end)
+
+    receive do
+      {:DOWN, ^monitor, :process, ^pid, _reason} -> :ok
+    after
+      bound ->
+        Process.demonitor(monitor, [:flush])
+        Process.exit(pid, :kill)
+        :ok
+    end
+  end
 
   defp safe_cancel(fun, reason) do
     _ = fun.(reason)

@@ -264,8 +264,8 @@ defmodule Imp.RunEventSinkFailureTest do
     assert_receive {:DOWN, ^task, :process, _pid, _reason}, 5_000
   end
 
-  # Ending the task does not wait on the cancellations: one that never returns
-  # must not leave the run going on without its control.
+  # Ending the task waits on the cancellations only so long: one that never
+  # returns must not leave the run going on without its control.
   test "a run whose control ends is ended even when a cancellation never returns" do
     {:ok, run} = Imp.Run.start(%InFlight{cancel: :hang}, %{owner: self()})
     on_exit(fn -> Process.exit(run.task.pid, :kill) end)
@@ -275,6 +275,23 @@ defmodule Imp.RunEventSinkFailureTest do
     Process.exit(run.control, :shutdown)
 
     assert_receive {:effect_cancelled, {:run_control_ended, :shutdown}}, 5_000
-    assert_receive {:DOWN, ^task, :process, _pid, :killed}, 5_000
+    assert_receive {:DOWN, ^task, :process, _pid, :killed}, 8_000
+  end
+
+  # A cancel waits for the cancellations no longer than its timeout: one that
+  # never returns neither keeps the task going nor keeps `cancel/3` from
+  # returning.
+  test "a cancel ends the task and returns in time when a cancellation never returns" do
+    {:ok, run} = Imp.Run.start(%InFlight{cancel: :hang}, %{owner: self()})
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+
+    task = Process.monitor(run.task.pid)
+    cancel = Task.async(fn -> Imp.Run.cancel_with_events(run, :host_cancelled, 200) end)
+
+    assert_receive {:effect_cancelled, :host_cancelled}, 1_000
+    assert_receive {:DOWN, ^task, :process, _pid, _reason}, 1_000
+    assert {:ok, {:ok, events}} = Task.yield(cancel, 2_000)
+    assert List.last(events).kind == :run_cancelled
   end
 end

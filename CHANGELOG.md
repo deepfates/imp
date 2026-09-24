@@ -49,6 +49,16 @@ User-visible changes to Imp are recorded here.
   monitor then reports `:killed`. `Imp.Run.cancel/2` on a run whose control
   has already ended still exits (`:noproc`), but there is no longer a task
   left to stop.
+- A cancellation that never returns no longer holds a run. `Imp.Run.cancel/3`
+  and `cancel_with_events/3` give the registered cancellations the cancel's
+  `timeout` (5 s by default) and then end the task as before; the control
+  ending, its owner going down, and work registered after a cancel give them
+  5 s. A cancellation still running then is abandoned. Before, one that never
+  returned held the run's control, left the task running, and made the cancel
+  exit after 30 s. When the control ends, the cancellations are again called
+  before the task is killed, so an RLM's model call in flight is ended by its
+  budget instead of being left running.
+
 - `Imp.LM.generate/3` takes `purpose:`, a name for what kind of call this is.
   It is recorded on the `:model_request` event's metadata as `:purpose` and is
   never sent to the provider, so a caller that makes more than one kind of model
