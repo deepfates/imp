@@ -134,6 +134,24 @@ defmodule Imp.MCPLegacySSETest do
     assert Task.await(slow, 5_000) == "written"
   end
 
+  # A connection's event stream ends when nothing arrives on it for ExMCP's
+  # idle timeout (60 s unless set), and ExMCP does not reopen it: the client
+  # stays up, a request it posts is answered on no stream (and times out as
+  # unknown, though the server ran it) or is refused `:not_connected`. The
+  # connection is replaced when its stream ends, so the next call reaches the
+  # server. The heartbeat check is sent here rather than waited for.
+  test "a connection whose stream ended is replaced", %{descriptor: descriptor} do
+    {imported, tools} = tools(descriptor, pool_size: 1, timeout: 2_000)
+    {:env, env} = Function.info(imported.cleanup, :env)
+    [client] = Imp.MCP.Clients.client_pids(Enum.find(env, &is_pid/1))
+    stream = :sys.get_state(client).transport_state.sse_pid
+    monitor = Process.monitor(stream)
+    send(stream, :check_heartbeat)
+    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 2_000
+
+    assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+  end
+
   # A retired connection is closed after its request, so the server finishes
   # the write the call timed out on.
   test "a retired connection's request still finishes on the server", %{descriptor: descriptor} do

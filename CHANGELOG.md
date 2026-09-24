@@ -103,7 +103,9 @@ User-visible changes to Imp are recorded here.
   descriptor with `"headers"` or `"auth"` is refused
   (`:mcp_sse_credentials_refused`): the server names where requests go, and
   its credentials would go there whatever origin it named. Under
-  `on_failure: :drop` only that server is left out, with a warning.
+  `on_failure: :drop` only that server is left out, with a warning. An `sse`
+  connection whose event stream ends (ExMCP ends it after 60 s with nothing
+  on it, and does not reopen it) is replaced, rather than kept and lent.
 
 - An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
   ended every HTTP request at its own 30 s default whatever `:timeout` said,

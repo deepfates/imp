@@ -112,7 +112,9 @@ defmodule Imp.MCP.Clients do
        lent: %{},
        waiting: %{},
        replacements: %{},
-       replacing: %{}
+       replacing: %{},
+       streams: %{},
+       dead: MapSet.new()
      }}
   end
 
@@ -127,13 +129,15 @@ defmodule Imp.MCP.Clients do
         Map.update(idle, server, [client], &(&1 ++ [client]))
       end)
 
+    state = %{
+      state
+      | clients: state.clients ++ clients,
+        idle: idle,
+        replacements: Map.merge(state.replacements, replacements)
+    }
+
     {:reply, :ok,
-     %{
-       state
-       | clients: state.clients ++ clients,
-         idle: idle,
-         replacements: Map.merge(state.replacements, replacements)
-     }}
+     Enum.reduce(clients, state, fn {_server, client}, acc -> watch(acc, client) end)}
   end
 
   def handle_call({:checkout, server, ref}, {pid, _tag} = from, state) do
@@ -193,6 +197,28 @@ defmodule Imp.MCP.Clients do
     {:stop, :normal, %{state | clients: []}}
   end
 
+  # A client's event stream ended. ExMCP does not reopen it, and a request the
+  # client posts then is answered on no stream, or not sent. An idle client is
+  # replaced now; a lent one when it is given back.
+  def handle_info({:DOWN, monitor, :process, _pid, _reason}, state)
+      when is_map_key(state.streams, monitor) do
+    {client, streams} = Map.pop(state.streams, monitor)
+    state = %{state | streams: streams}
+    server = Enum.find_value(state.idle, fn {key, idle} -> if client in idle, do: key end)
+
+    cond do
+      server != nil ->
+        idle = Map.update!(state.idle, server, &List.delete(&1, client))
+        {:noreply, replace(%{state | idle: idle}, client)}
+
+      Map.has_key?(state.lent, client) ->
+        {:noreply, %{state | dead: MapSet.put(state.dead, client)}}
+
+      true ->
+        {:noreply, state}
+    end
+  end
+
   # A borrower that died may have left its call out on the client it held.
   def handle_info({:DOWN, monitor, :process, _pid, _reason}, state) do
     case Enum.find(state.lent, fn {_client, lease} -> lease.monitor == monitor end) do
@@ -214,7 +240,7 @@ defmodule Imp.MCP.Clients do
         {:ok, client} ->
           Process.link(client)
           send(dialer, {:replacement_taken, client})
-          state = %{state | clients: state.clients ++ [{server, client}]}
+          state = watch(%{state | clients: state.clients ++ [{server, client}]}, client)
           next_in_line(state, server, client)
 
         {:error, _reason} ->
@@ -238,7 +264,8 @@ defmodule Imp.MCP.Clients do
     state = %{
       state
       | clients: clients,
-        idle: Map.new(state.idle, fn {server, idle} -> {server, List.delete(idle, pid)} end)
+        idle: Map.new(state.idle, fn {server, idle} -> {server, List.delete(idle, pid)} end),
+        dead: MapSet.delete(state.dead, pid)
     }
 
     state =
@@ -286,6 +313,7 @@ defmodule Imp.MCP.Clients do
   # deadline does not take it down.
   defp replace(state, client) do
     server = Enum.find_value(state.clients, fn {key, pid} -> if pid == client, do: key end)
+    state = %{state | dead: MapSet.delete(state.dead, client)}
     Process.unlink(client)
     clients = Enum.reject(state.clients, fn {_key, pid} -> pid == client end)
     state = %{state | clients: clients}
@@ -360,9 +388,39 @@ defmodule Imp.MCP.Clients do
       {lease, lent} ->
         Process.demonitor(lease.monitor, [:flush])
         state = %{state | lent: lent}
-        server = Enum.find_value(state.clients, fn {key, pid} -> if pid == client, do: key end)
-        next_in_line(state, server, client)
+
+        if MapSet.member?(state.dead, client) do
+          replace(state, client)
+        else
+          server = Enum.find_value(state.clients, fn {key, pid} -> if pid == client, do: key end)
+          next_in_line(state, server, client)
+        end
     end
+  end
+
+  # An HTTP+SSE client's event stream is a process of its own, and when it
+  # ends (nothing arrived for ExMCP's idle timeout, or the server closed it)
+  # the client stays up without it. ExMCP exposes no call for the stream, so
+  # its pid is read from the client's state, as `requests_out/1` reads the
+  # requests. This retires when ExMCP reopens an ended stream or ends the
+  # client with it.
+  defp watch(state, client) do
+    case stream_of(client) do
+      stream when is_pid(stream) ->
+        %{state | streams: Map.put(state.streams, Process.monitor(stream), client)}
+
+      nil ->
+        state
+    end
+  end
+
+  defp stream_of(client) do
+    case :sys.get_state(client, 1_000) do
+      %{transport_state: %{sse_pid: stream}} when is_pid(stream) -> stream
+      _state -> nil
+    end
+  catch
+    :exit, _reason -> nil
   end
 
   defp next_in_line(state, nil, _client), do: state
