@@ -757,13 +757,9 @@ defmodule Imp.MCP.OAuth do
     result
   end
 
-  defp callback_matches?(params, expected_state) when is_binary(expected_state),
+  # ExMCP generates the state for every flow, so every redirect is matched on it.
+  defp callback_matches?(params, expected_state),
     do: Map.get(params, "state") == expected_state
-
-  # Without a state to match on there is nothing to distinguish the redirect
-  # from any other request, so take the first one that looks like a callback.
-  defp callback_matches?(params, _expected_state),
-    do: Map.has_key?(params, "code") or Map.has_key?(params, "error")
 
   defp read_callback(connection) do
     case :gen_tcp.recv(connection, 0, @callback_header_timeout) do
