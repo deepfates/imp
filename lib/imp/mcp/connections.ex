@@ -39,6 +39,40 @@ defmodule Imp.MCP.Connections do
   ACP session. Exact descriptors must be approved through `:authorize` or
   `:trusted_servers`; connection cleanup never depends on a model-visible name.
 
+  ## Descriptors
+
+  A server is a map with string keys. A local server runs as a child process
+  that speaks MCP on stdin and stdout:
+
+      %{
+        "name" => "files",
+        "type" => "stdio",
+        "command" => "npx",
+        "args" => ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        "env" => [%{"name" => "LOG_LEVEL", "value" => "warn"}]
+      }
+
+  `"type"` may be left out when `"command"` is present. The command is found on
+  `PATH` and runs in `:cwd` (the current directory by default). It sees the
+  host's ordinary variables (`HOME`, `PATH`, `LANG` and the like) and its own
+  `"env"`, not the rest of the host's environment. Closing the import, or the
+  end of its `:owner`, stops the server and every process it started.
+
+  A remote server is `"type" => "http"` (Streamable HTTP) or `"sse"`, with a
+  `"url"`:
+
+      %{"name" => "docs", "type" => "http", "url" => "https://mcp.example.com/mcp"}
+
+  Only descriptors the caller authorized are dialed. `trusted_servers:` lists
+  them exactly; `authorize:` is a function of the descriptor (and optionally
+  a `%{cwd: cwd, server: descriptor}` context) that returns `:ok` or `true` to
+  allow it; anything else refuses it:
+
+      {:ok, import} = Imp.MCP.connect([server], trusted_servers: [server])
+      tool = Enum.find(import.tools, &(to_string(&1.name) == "read_text_file"))
+      Imp.Tool.call(tool, %{"path" => "/tmp/notes.txt"})
+      import.cleanup.()
+
   ## Authenticating an HTTP server
 
   A descriptor may carry static `"headers"`. It may instead name an auth kind,
