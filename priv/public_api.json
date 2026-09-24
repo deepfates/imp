@@ -7411,7 +7411,7 @@
       "struct_fields": [
         "finish_on",
         "forced_submit_notice",
-        "last_prose_note",
+        "last_text_note",
         "max_iters",
         "react",
         "signature",

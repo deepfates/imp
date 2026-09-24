@@ -1,4 +1,4 @@
-defmodule ReActV2LastProseTest do
+defmodule ReActV2LastTextTest do
   use ExUnit.Case, async: true
 
   # A signature with one text output ends every interrupted turn (the step
@@ -49,7 +49,7 @@ defmodule ReActV2LastProseTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == prose
-    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_reason) == :last_text
     assert Imp.get(prediction, :termination_cause) == :max_iters
 
     [{_first, first_opts}, {_second, _}, {last, last_opts}] = requests(3)
@@ -77,7 +77,7 @@ defmodule ReActV2LastProseTest do
       Imp.react_v2("intent -> answer", [look()],
         lm: recording_lm(owner, "The thing is there."),
         max_iters: 1,
-        last_prose_note: note
+        last_text_note: note
       )
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
@@ -118,7 +118,7 @@ defmodule ReActV2LastProseTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_reason) == :last_text
     refute Imp.get(prediction, :termination_error)
   end
 
@@ -172,11 +172,11 @@ defmodule ReActV2LastProseTest do
         end
       )
 
-    program = Imp.react_v2("intent -> answer", [look()], lm: lm, last_prose_note: "Last one.")
+    program = Imp.react_v2("intent -> answer", [look()], lm: lm, last_text_note: "Last one.")
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "I could not look, so from memory: it is there."
-    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_reason) == :last_text
     assert Imp.get(prediction, :termination_cause) == :prediction_error
 
     [_failed, {last, last_opts}] = requests(2)
@@ -247,7 +247,7 @@ defmodule ReActV2LastProseTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "Answered after all."
-    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_reason) == :last_text
     assert Imp.get(prediction, :termination_cause) == :prediction_error
     assert_received {:tool_choice, "auto"}
     assert_received {:tool_choice, "auto"}
@@ -267,7 +267,7 @@ defmodule ReActV2LastProseTest do
       Imp.react_v2("intent -> answer", [slow_look],
         lm: recording_lm(owner, "never asked"),
         max_iters: 1,
-        last_prose_note: "Last one."
+        last_text_note: "Last one."
       )
 
     assert {:ok, prediction} =
@@ -311,7 +311,7 @@ defmodule ReActV2LastProseTest do
     refute_received :looked
 
     assert Imp.get(prediction, :answer) == "One more look, then: it is there."
-    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_reason) == :last_text
 
     assert [%{id: "late", name: "look", arguments: %{where: "shelf"}}] =
              Imp.get(prediction, :unexecuted_tool_calls)
@@ -356,7 +356,7 @@ defmodule ReActV2LastProseTest do
     assert_received {:tool_choice, 2, "auto"}
     refute_received :identity_status_ran
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_reason) == :last_text
     assert Imp.get(prediction, :termination_cause) == :prediction_error
 
     assert [%{id: "wanted", name: "identity_status"}] =
@@ -398,10 +398,10 @@ defmodule ReActV2LastProseTest do
 
   test "each note is refused for the signature it does not belong to" do
     assert_raise ArgumentError,
-                 ~r/:last_prose_note needs a signature with exactly one output/,
+                 ~r/:last_text_note needs a signature with exactly one output/,
                  fn ->
                    Imp.react_v2("intent -> answer, confidence: float", [look()],
-                     last_prose_note: "Now."
+                     last_text_note: "Now."
                    )
                  end
 
@@ -416,14 +416,14 @@ defmodule ReActV2LastProseTest do
     tool = Imp.tool(:look, "Look at a thing", runner)
 
     dumped =
-      Imp.react_v2("intent -> answer", [tool], last_prose_note: "Answer now.")
+      Imp.react_v2("intent -> answer", [tool], last_text_note: "Answer now.")
       |> Imp.dump(registry: registry)
 
-    assert dumped["last_prose_note"] == "Answer now."
+    assert dumped["last_text_note"] == "Answer now."
     refute Map.has_key?(dumped, "on_max_iters")
 
     loaded = Imp.load(dumped, registry: registry)
-    assert loaded.last_prose_note == "Answer now."
+    assert loaded.last_text_note == "Answer now."
     refute Map.has_key?(loaded.tools, :submit)
 
     with_submit =

@@ -61,7 +61,7 @@ defmodule Imp.RunTest do
 
     assert [
              %{kind: :run_started},
-             %{kind: :tools_offered},
+             %{kind: :tools_sent},
              %{kind: :model_request},
              %{kind: :model_response},
              %{kind: :reasoning, reasoning: "look it up"},

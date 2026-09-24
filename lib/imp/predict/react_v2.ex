@@ -35,7 +35,7 @@ defmodule Imp.Predict.ReActV2 do
 
   A turn is interrupted when it reaches `max_iters`, when a step's request
   fails (`:prediction_error`, `:parse_error`), or when a step calls no tool and
-  gives no answer (`:invalid_answer` for prose the text output does not
+  gives no answer (`:invalid_answer` for text the output does not
   accept, and `:empty_tool_calls` for a signature with `submit`).
 
   With one text output, a step that calls no tool and says nothing is not an
@@ -44,7 +44,7 @@ defmodule Imp.Predict.ReActV2 do
   to answer, and asking it again would make declining cost a second request.
 
   With one text output, every interruption takes the same path: one more
-  request, and its text is the answer, with `termination_reason: :last_prose`.
+  request, and its text is the answer, with `termination_reason: :last_text`.
   The request is a step like any other: the same tools and the same
   `tool_choice: "auto"`. A provider may refuse a history of tool calls when no
   tools are declared (Anthropic does), and a changed roster changes the prompt
@@ -55,7 +55,7 @@ defmodule Imp.Predict.ReActV2 do
   is not run; the completion's text, if any, is the answer, and the calls are
   kept in `unexecuted_tool_calls`. A completion that says nothing is an empty
   answer rather than an error.
-  `:last_prose_note` puts one line of host text in front of that request as a
+  `:last_text_note` puts one line of host text in front of that request as a
   user message; Imp writes no sentence of its own. If the process's
   `Imp.Deadline` has already passed, no request is made and the prediction
   ends with `termination_reason: :deadline_exceeded` and no answer. Either
@@ -79,8 +79,8 @@ defmodule Imp.Predict.ReActV2 do
 
   A step's outputs are `next_thought` and `tool_calls`. The provider holds the
   tool roster natively, so a step normally comes back as native tool calls. A
-  step that comes back as plain prose with no tool call is read as that prose
-  being `next_thought` and no tool calls, by the `:prose_step` metadata on the
+  step that comes back as plain text with no tool call is read as that text
+  being `next_thought` and no tool calls, by the `:text_step` metadata on the
   internal step signature that `Imp.Adapter.Chat` honors: it is a thought that
   called nothing, not a parse failure, so it costs one LM call rather than two
   and keeps the provider's prefix cache. That thought is appended to the
@@ -114,7 +114,7 @@ defmodule Imp.Predict.ReActV2 do
     :signature,
     :react,
     :forced_submit_notice,
-    :last_prose_note,
+    :last_text_note,
     tools: %{},
     max_iters: 20,
     tool_policy: :allow,
@@ -179,7 +179,7 @@ defmodule Imp.Predict.ReActV2 do
           "makes it submit. A string, or a function of the termination reason that " <>
           "returns one. `nil` says nothing. Refused for a signature with one text output."
     ],
-    last_prose_note: [
+    last_text_note: [
       type: {:or, [:string, nil]},
       default: nil,
       doc:
@@ -235,12 +235,12 @@ defmodule Imp.Predict.ReActV2 do
           )
         ],
         instructions: signature.instructions,
-        # A step answered in plain prose, with no native tool call, is a
+        # A step answered in plain text, with no native tool call, is a
         # thought that called nothing. `Imp.Adapter.Chat` reads a marker-free
         # completion as `next_thought`, and `tool_calls` takes its declared
         # default of none, which ends the turn: as the answer when the
         # signature has one text output, and at the forced submit otherwise.
-        metadata: %{prose_step: :next_thought}
+        metadata: %{text_step: :next_thought}
       }
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, signature))
@@ -268,7 +268,7 @@ defmodule Imp.Predict.ReActV2 do
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
       forced_submit_notice: opts[:forced_submit_notice],
-      last_prose_note: opts[:last_prose_note],
+      last_text_note: opts[:last_text_note],
       finish_on: resolve_finish_on!(opts[:finish_on], tools)
     }
   end
@@ -280,11 +280,11 @@ defmodule Imp.Predict.ReActV2 do
       single_text_output?(signature) and opts[:forced_submit_notice] != nil ->
         raise ArgumentError,
               "Imp.Predict.ReActV2.new/3: :forced_submit_notice needs a signature with submit; " <>
-                "a signature with one text output has none, so use :last_prose_note"
+                "a signature with one text output has none, so use :last_text_note"
 
-      not single_text_output?(signature) and opts[:last_prose_note] != nil ->
+      not single_text_output?(signature) and opts[:last_text_note] != nil ->
         raise ArgumentError,
-              "Imp.Predict.ReActV2.new/3: :last_prose_note needs a signature with " <>
+              "Imp.Predict.ReActV2.new/3: :last_text_note needs a signature with " <>
                 "exactly one output of type :string, got: " <>
                 inspect(Imp.Signature.output_names(signature))
 
@@ -431,7 +431,7 @@ defmodule Imp.Predict.ReActV2 do
           # appended as this turn's history event, with the outputs when it is
           # the answer, as a `submit`'s event carries them; the pending inputs
           # it carries are then spent.
-          case parse_prose(react.signature, prediction) do
+          case parse_text(react.signature, prediction) do
             {:ok, outputs} ->
               # The model stopped calling tools and said its answer. That is the
               # end of the turn, and it costs no further request.
@@ -497,7 +497,7 @@ defmodule Imp.Predict.ReActV2 do
   # with one text output, the forced submit for every other.
   defp interrupted(react, history, inputs, pending, cause, turn, error, execution) do
     if single_text_output?(react.signature),
-      do: last_prose(react, history, pending, cause, turn, error),
+      do: last_text(react, history, pending, cause, turn, error),
       else: forced_submit(react, history, inputs, pending, cause, turn, error, execution)
   end
 
@@ -555,7 +555,7 @@ defmodule Imp.Predict.ReActV2 do
   # over either way, and there is nothing to force.
   # A deadline that has already passed leaves no time for that request, so
   # none is made.
-  defp last_prose(react, history, pending, cause, turn, initial_error) do
+  defp last_text(react, history, pending, cause, turn, initial_error) do
     if deadline_passed?() do
       incomplete_prediction(history, :deadline_exceeded, initial_error, cause)
     else
@@ -564,14 +564,14 @@ defmodule Imp.Predict.ReActV2 do
       case predict(react.react, react, history, pending) do
         {:ok, prediction, history} ->
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
-          outputs = last_prose_outputs(react.signature, prediction)
+          outputs = last_text_outputs(react.signature, prediction)
           no_calls = %ToolCalls{tool_calls: []}
           history = append_last_step(history, pending, prediction, no_calls, outputs)
 
           outputs
           |> Map.put(:termination_cause, cause)
           |> put_unexecuted(calls)
-          |> final_prediction(history, :last_prose)
+          |> final_prediction(history, :last_text)
 
         {:error, reason, history} ->
           termination =
@@ -594,14 +594,14 @@ defmodule Imp.Predict.ReActV2 do
   # The note is the last thing the model reads. Inputs no step has spent yet
   # (the first step failed) would otherwise render after it, so they go into
   # the history first, as the user turn they are.
-  defp note_after_inputs(history, pending, %{last_prose_note: note} = react)
+  defp note_after_inputs(history, pending, %{last_text_note: note} = react)
        when is_binary(note) and note != "" and map_size(pending) > 0 do
     history = history |> append_history(pending) |> append_note(react.signature, note)
     {history, %{}}
   end
 
   defp note_after_inputs(history, pending, react),
-    do: {append_note(history, react.signature, react.last_prose_note), pending}
+    do: {append_note(history, react.signature, react.last_text_note), pending}
 
   defp deadline_passed?, do: Imp.Deadline.expired?(Imp.Deadline.current())
 
@@ -616,8 +616,8 @@ defmodule Imp.Predict.ReActV2 do
     Map.put(outputs, :unexecuted_tool_calls, Imp.Redaction.redact(unexecuted))
   end
 
-  defp last_prose_outputs(signature, prediction) do
-    case parse_prose(signature, prediction) do
+  defp last_text_outputs(signature, prediction) do
+    case parse_text(signature, prediction) do
       {:ok, outputs} ->
         outputs
 
@@ -998,21 +998,21 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   # A step that stops calling tools and says something has answered, when the
-  # task declares exactly one text output for that prose to be. Several outputs,
-  # or one that is not text, cannot be filled from prose and take the forced
-  # submit. The prose is validated through the same parse a `submit`'s
+  # task declares exactly one text output for that text to be. Several outputs,
+  # or one that is not text, cannot be filled from text alone and take the
+  # forced submit. The text is validated through the same parse a `submit`'s
   # arguments go through, so a constrained output is not quietly filled with
   # something it excludes. What is not an answer carries the interruption it
   # is.
-  defp parse_prose(signature, prediction) do
+  defp parse_text(signature, prediction) do
     with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
-         {:prose, prose} when is_binary(prose) and prose != "" <-
-           {:prose, Imp.get(prediction, :next_thought)},
-         {:ok, parsed} <- Imp.Adapter.Chat.parse(signature, %{name => prose}, []) do
+         {:written, text} when is_binary(text) and text != "" <-
+           {:written, Imp.get(prediction, :next_thought)},
+         {:ok, parsed} <- Imp.Adapter.Chat.parse(signature, %{name => text}, []) do
       {:ok, Imp.Prediction.to_map(parsed)}
     else
       :submit -> {:none, :empty_tool_calls}
-      {:prose, _nothing} -> {:ok, %{hd(signature.outputs).name => nil}}
+      {:written, _nothing} -> {:ok, %{hd(signature.outputs).name => nil}}
       {:error, _reason} -> {:none, :invalid_answer}
     end
   end

@@ -48,7 +48,7 @@ defmodule Imp.ObservabilityInspectionTest do
   # Each of these is a ReActV2 turn that ended with its answer; only the way it
   # ended differs. A turn that ran out of steps, time or context has none.
   test "a prediction that ended with its answer is complete however the turn ended" do
-    for reason <- [:submit, :forced_submit, :answered, :last_prose, :finished_by_tool] do
+    for reason <- [:submit, :forced_submit, :answered, :last_text, :finished_by_tool] do
       prediction = Imp.Prediction.new(%{answer: "Paris", termination_reason: reason})
 
       assert %Inspection{status: :ok} = Imp.Observability.inspect_artifact(prediction),

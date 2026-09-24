@@ -51,7 +51,7 @@ defmodule Imp.Run do
   request as metadata: `:options`, the request options with the tool
   definitions removed, and `:tools_hash`, a SHA-256 of those definitions (or
   `nil` when the request offered none). The definitions themselves are emitted
-  once per distinct hash per run, as a `:tools_offered` event whose input is the
+  once per distinct hash per run, as a `:tools_sent` event whose input is the
   tool list as sent, so a run's record holds every request whole without
   repeating a roster that does not change.
 

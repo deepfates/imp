@@ -48,7 +48,7 @@ defmodule Imp.RunRequestRecordTest do
     events = run_events([[tool("look")], [tool("look")]])
 
     requests = Enum.filter(events, &(&1.kind == :model_request))
-    offered = Enum.filter(events, &(&1.kind == :tools_offered))
+    offered = Enum.filter(events, &(&1.kind == :tools_sent))
 
     assert length(requests) == 2
     # The roster did not change, so it is recorded once for the whole run.
@@ -71,14 +71,14 @@ defmodule Imp.RunRequestRecordTest do
     # The definitions precede the request that was sent by them.
     kinds = Enum.map(events, & &1.kind)
 
-    assert Enum.find_index(kinds, &(&1 == :tools_offered)) <
+    assert Enum.find_index(kinds, &(&1 == :tools_sent)) <
              Enum.find_index(kinds, &(&1 == :model_request))
   end
 
   test "a run whose roster changes records the new definitions once more" do
     events = run_events([[tool("look")], [tool("look"), tool("write")], [tool("look")]])
 
-    offered = Enum.filter(events, &(&1.kind == :tools_offered))
+    offered = Enum.filter(events, &(&1.kind == :tools_sent))
     requests = Enum.filter(events, &(&1.kind == :model_request))
 
     # Three requests, two distinct rosters, and the third request repeats the
@@ -99,7 +99,7 @@ defmodule Imp.RunRequestRecordTest do
 
     assert [request] = Enum.filter(events, &(&1.kind == :model_request))
     assert request.metadata.tools_hash == nil
-    assert Enum.filter(events, &(&1.kind == :tools_offered)) == []
+    assert Enum.filter(events, &(&1.kind == :tools_sent)) == []
   end
 
   test "the recorded options are redacted like every other event payload" do
