@@ -14,13 +14,18 @@ defmodule Imp.RunEventSinkFailureTest do
   end
 
   # A program with an effect in flight: it registers how to cancel it, the way
-  # a tool call does, and waits.
+  # a tool call does, and waits. With `cancel: :hang` the cancellation never
+  # returns, as one waiting on an unresponsive client would not.
   defmodule InFlight do
     @behaviour Imp.Module
-    defstruct [:signature]
+    defstruct [:signature, cancel: :returns]
 
-    def call(_, %{owner: owner}) do
-      Imp.Run.register_cancellable(fn reason -> send(owner, {:effect_cancelled, reason}) end)
+    def call(%{cancel: cancel}, %{owner: owner}) do
+      Imp.Run.register_cancellable(fn reason ->
+        send(owner, {:effect_cancelled, reason})
+        if cancel == :hang, do: Process.sleep(:infinity)
+      end)
+
       send(owner, :waiting)
       Process.sleep(:infinity)
     end
@@ -257,5 +262,19 @@ defmodule Imp.RunEventSinkFailureTest do
     assert_receive {:DOWN, ^control, :process, _pid, _reason}, 5_000
     assert_receive {:effect_cancelled, {:run_control_ended, _reason}}, 5_000
     assert_receive {:DOWN, ^task, :process, _pid, _reason}, 5_000
+  end
+
+  # Ending the task does not wait on the cancellations: one that never returns
+  # must not leave the run going on without its control.
+  test "a run whose control ends is ended even when a cancellation never returns" do
+    {:ok, run} = Imp.Run.start(%InFlight{cancel: :hang}, %{owner: self()})
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+
+    task = Process.monitor(run.task.pid)
+    Process.exit(run.control, :shutdown)
+
+    assert_receive {:effect_cancelled, {:run_control_ended, :shutdown}}, 5_000
+    assert_receive {:DOWN, ^task, :process, _pid, :killed}, 5_000
   end
 end

@@ -538,15 +538,17 @@ defmodule Imp.Run.Control do
     state |> report_pending_failures() |> report_undelivered()
 
     # The run does not outlive its control: whatever ended the control (its
-    # sink's process dying, a stop), work still in flight is cancelled and the
-    # task is ended, rather than left running until it next emits. This comes
-    # after the reports, so an owner hears why before it sees the task end.
+    # sink's process dying, a stop), the task is ended and work still in flight
+    # is cancelled, rather than left running until it next emits. This comes
+    # after the reports, so an owner hears why before it sees the task end. The
+    # task is ended first, so a cancellation that does not return cannot keep
+    # it going.
+    if is_pid(state.task_pid) and Process.alive?(state.task_pid),
+      do: Process.exit(state.task_pid, :kill)
+
     Enum.each(state.cancellables, fn {_ref, fun} ->
       safe_cancel(fun, {:run_control_ended, reason})
     end)
-
-    if is_pid(state.task_pid) and Process.alive?(state.task_pid),
-      do: Process.exit(state.task_pid, :kill)
 
     :ok
   end
