@@ -245,6 +245,50 @@ defmodule Imp.MCPLegacySSETest do
       end
     end
 
+    # Under `on_failure: :drop` the credentialed server is left out, as one
+    # that cannot be dialed is, and the others are imported: an ACP client
+    # that offers one such server does not lose the rest of its servers.
+    # Under the default the whole import is still refused.
+    test "under on_failure: :drop leave out only that server", %{descriptor: descriptor} do
+      elsewhere = listen(Recording, [])
+      server = listen(Redirecting, elsewhere)
+
+      credentialed = %{
+        "name" => "redirecting",
+        "type" => "sse",
+        "url" => server <> "/sse",
+        "headers" => [%{"name" => "authorization", "value" => "Bearer secret"}]
+      }
+
+      servers = [credentialed, descriptor]
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, imported} =
+                   Imp.MCP.connect(servers,
+                     trusted_servers: servers,
+                     on_failure: :drop,
+                     timeout: 2_000
+                   )
+
+          send(self(), {:imported, imported})
+        end)
+
+      assert_received {:imported, imported}
+      on_exit(fn -> imported.cleanup.() end)
+
+      assert [%{server: "redirecting", index: 0, reason: {:mcp_sse_credentials_refused, _, _}}] =
+               imported.unavailable
+
+      assert "fast" in Enum.map(imported.tools, &to_string(&1.name))
+      assert log =~ "redirecting"
+      Process.sleep(200)
+      assert :ets.lookup(:legacy_sse_writes, :elsewhere) == []
+
+      assert {:error, {:mcp_sse_credentials_refused, "redirecting", _why}} =
+               Imp.MCP.connect(servers, trusted_servers: servers, timeout: 2_000)
+    end
+
     test "an sse descriptor with no headers still connects", %{descriptor: descriptor} do
       assert {:ok, imported} =
                Imp.MCP.connect([Map.put(descriptor, "headers", [])],

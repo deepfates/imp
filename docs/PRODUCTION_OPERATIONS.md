@@ -204,7 +204,9 @@ may carry the same name, and one without a name is reported as `"unnamed"`.
 Dropping covers the connection and `tools/list` only — a descriptor
 `:authorize` refused, one whose declared `auth` cannot produce a header (a
 `bearer_env` variable declared `required` and unset, say), a malformed one, and
-anything the caller's own `:tool_filter` raises still refuse the import.
+anything the caller's own `:tool_filter` raises still refuse the import. The
+one exception is an `"sse"` descriptor that carries credentials (below): it is
+left out as an unreachable server is.
 
 Each dial is bounded by `:timeout` on its own, so a host that accepts the
 connection and then answers nothing — a firewall dropping packets, a wedged
@@ -368,8 +370,10 @@ Both forms apply to `"http"` descriptors and may be combined with static
 descriptor (MCP's deprecated HTTP+SSE transport) takes neither: its server
 names the URL requests are posted to, and ExMCP would send the credentials
 there whatever origin it named, so such a descriptor is refused
-(`:mcp_sse_credentials_refused`). Reach the server's Streamable HTTP endpoint
-with `"type" => "http"` instead.
+(`:mcp_sse_credentials_refused`). Under `on_failure: :drop` only that server is
+left out, named in `imported.unavailable` and logged; otherwise the import is
+refused. Reach the server's Streamable HTTP endpoint with `"type" => "http"`
+instead.
 
 ### Local ACP attachment
 

@@ -77,8 +77,10 @@ defmodule Imp.MCP.Connections do
   An `"sse"` descriptor may not carry `"headers"` or `"auth"`: the server
   names where requests are posted, and ExMCP sends a connection's headers
   there, whatever origin it names, before Imp can see it. Such a descriptor is
-  refused before anything is dialed (`:mcp_sse_credentials_refused`), and
-  refuses the whole import even under `on_failure: :drop`.
+  refused before anything is dialed (`:mcp_sse_credentials_refused`): it
+  refuses the whole import under the default `on_failure: :refuse`, and under
+  `on_failure: :drop` it is left out, named in `unavailable` and logged, as a
+  server that cannot be dialed is.
 
   Only descriptors the caller authorized are dialed. `trusted_servers:` lists
   them exactly; `authorize:` is a function of the descriptor (and optionally
@@ -127,7 +129,8 @@ defmodule Imp.MCP.Connections do
   refusal would have carried, summarized to one short line, and with the
   `index` of the descriptor in the list that was passed in. Use it for a caller
   whose servers are independent, such as a long-lived agent holding several
-  third-party catalogs.
+  third-party catalogs. An `"sse"` descriptor that carries credentials (see
+  above) is left out the same way.
 
   Each dial is bounded by `:timeout` on its own, so a host that accepts the
   connection and then answers nothing costs that server its timeout and no more.
@@ -431,6 +434,20 @@ defmodule Imp.MCP.Connections do
     else
       {:unreachable, reason} ->
         if drop?(opts) do
+          connect_all(rest, opts, index + 1, clients, [
+            absence(server, index, reason) | unavailable
+          ])
+        else
+          {:error, reason, clients}
+        end
+
+      # A credentialed `sse` descriptor is left out under `:drop` as an
+      # unreachable one is, with a warning: an ACP client that offers one must
+      # not lose every other server of its session.
+      {:error, {:mcp_sse_credentials_refused, _name, why} = reason} ->
+        if drop?(opts) do
+          Logger.warning("MCP server #{inspect(server_name(server))} left out: #{why}")
+
           connect_all(rest, opts, index + 1, clients, [
             absence(server, index, reason) | unavailable
           ])
