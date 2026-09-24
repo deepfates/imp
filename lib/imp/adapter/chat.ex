@@ -1179,20 +1179,69 @@ defmodule Imp.Adapter.Chat do
   # the turn's answer, so it is shown as the answer: assistant text, with its
   # result dropped. Shown as a call to a tool the request does not offer, some
   # providers' models imitate it and write the raw tool-call markup as text.
+  # A submit the loop rejected was not the answer, so it is dropped with its
+  # error; the loop took the last accepted one, and so does this. A call
+  # recorded without an id is matched to its result by name.
   defp submit_as_text(calls, results) do
-    {submits, calls} = Enum.split_with(calls, &(get_in(&1, [:function, :name]) == "submit"))
+    {submits, calls} = Enum.split_with(calls, &submit_call?/1)
 
     case submits do
       [] ->
         {calls, results, nil}
 
       submits ->
-        ids = MapSet.new(submits, &Map.get(&1, :id))
-        results = Enum.reject(results, &MapSet.member?(ids, fetch_field(&1, :id)))
-        answer = submits |> List.last() |> get_in([:function, :arguments]) |> submitted_text()
+        {submit_results, results} = Enum.split_with(results, &submit_result?(&1, submits))
+
+        answer =
+          submits
+          |> Enum.zip(submit_results_in_order(submits, submit_results))
+          |> Enum.reject(fn {_submit, result} -> rejected?(result) end)
+          |> List.last()
+          |> case do
+            nil -> nil
+            {submit, _result} -> submit |> get_in([:function, :arguments]) |> submitted_text()
+          end
+
         {calls, results, answer}
     end
   end
+
+  defp submit_call?(call), do: get_in(call, [:function, :name]) == "submit"
+
+  defp submit_result?(result, submits) do
+    case fetch_field(result, :id) do
+      nil -> to_string(fetch_field(result, :name)) == "submit"
+      id -> Enum.any?(submits, &(Map.get(&1, :id) == id))
+    end
+  end
+
+  # Each submit's result, or nil when none was recorded: by id when the call
+  # has one, otherwise the next id-less result, since the loop records results
+  # in call order.
+  defp submit_results_in_order(submits, submit_results) do
+    idless = Enum.filter(submit_results, &is_nil(fetch_field(&1, :id)))
+
+    {paired, _idless} =
+      Enum.map_reduce(submits, idless, fn submit, idless ->
+        case Map.get(submit, :id) do
+          nil ->
+            case idless do
+              [result | rest] -> {result, rest}
+              [] -> {nil, []}
+            end
+
+          id ->
+            {Enum.find(submit_results, &(fetch_field(&1, :id) == id)), idless}
+        end
+      end)
+
+    paired
+  end
+
+  defp rejected?(nil), do: false
+
+  defp rejected?(result),
+    do: fetch_field(result, :error) == true or match?({:error, _}, fetch_field(result, :result))
 
   defp submitted_text(%{} = arguments) do
     case Map.values(arguments) do

@@ -834,6 +834,81 @@ defmodule ReActV2Test do
     assert kept.function.name == "submit"
   end
 
+  # A submit the loop rejected was not the answer: the loop told the model so
+  # and kept going. Replayed as text it would read as an answer the model gave
+  # and then gave again. A call recorded without an id is matched to its result
+  # by name, so the results of the step's other calls are kept.
+  test "a rejected or id-less recorded submit is replayed only as what the loop accepted" do
+    no_submit = [guidance: %{finish_tool: nil, input_names: [], output_names: [], tool_names: []}]
+    signature = Imp.react_v2("question -> answer", []).react.signature
+
+    step = fn fields, calls, results ->
+      Map.merge(fields, %{
+        tool_calls: Imp.Adapter.Types.ToolCalls.new(calls) |> Imp.Redaction.redact(),
+        tool_call_results: results
+      })
+    end
+
+    history =
+      Imp.History.new([
+        step.(
+          %{question: "prior", next_thought: "trying"},
+          [%{id: "s-1", name: "submit", arguments: %{reply: "wrong key"}}],
+          [
+            %{
+              id: "s-1",
+              name: "submit",
+              result: {:error, {:missing_output_fields, [:answer]}},
+              error: true
+            }
+          ]
+        ),
+        step.(
+          %{next_thought: "again", answer: "Right key."},
+          [%{id: "s-2", name: "submit", arguments: %{answer: "Right key."}}],
+          [%{id: "s-2", name: "submit", result: %{answer: "Right key."}, error: false}]
+        )
+      ])
+      |> Imp.History.dump()
+      |> Imp.History.load()
+
+    messages = Imp.Adapter.Chat.format(signature, %{history: history, tools: []}, no_submit)
+
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{role: :assistant, content: "trying"},
+             %{role: :assistant, content: "again\n\nRight key."},
+             %{role: :user}
+           ] = messages
+
+    refute Enum.any?(messages, &String.contains?(inspect(&1), "wrong key"))
+
+    idless =
+      Imp.History.new([
+        step.(
+          %{question: "prior", next_thought: ""},
+          [
+            %{name: "lookup", arguments: %{query: "beam"}},
+            %{name: "submit", arguments: %{answer: "BEAM."}}
+          ],
+          [
+            %{name: "lookup", result: "BEAM", error: false},
+            %{name: "submit", result: %{answer: "BEAM."}, error: false}
+          ]
+        )
+      ])
+
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{role: :assistant, tool_calls: [%{function: %{name: "lookup"}}]},
+             %{role: :tool, content: "BEAM"},
+             %{role: :assistant, content: "BEAM."},
+             %{role: :user}
+           ] = Imp.Adapter.Chat.format(signature, %{history: idless, tools: []}, no_submit)
+  end
+
   # A host that renders input sections its own way gets the same rendering for
   # past turns as for the current one, whether or not the past turn called a
   # tool; otherwise the model reads its history in one format and its present
