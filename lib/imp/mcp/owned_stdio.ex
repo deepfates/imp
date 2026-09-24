@@ -16,7 +16,9 @@ defmodule Imp.MCP.OwnedStdio do
   # `@kill_timeout_seconds`. The process below is started by the client, so OTP
   # ends it with the client; erlexec's link to it then stops the group, so a
   # client that dies without closing takes the server with it. A descendant
-  # that leaves the group on purpose (`setsid`) is not reached. This retires if
+  # that leaves the group on purpose (`setsid`) is not reached, and when the
+  # server exits on its own erlexec sends the rest of its group SIGTERM only,
+  # so a child that ignores SIGTERM outlives it. This retires if
   # ExMCP's stdio transport owns the process group itself.
   #
   # The server's environment is built here as well, because the process is

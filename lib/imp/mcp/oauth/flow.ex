@@ -80,6 +80,7 @@ defmodule Imp.MCP.OAuth.Flow do
           required(:redirect_uri) => String.t(),
           optional(:scopes) => [String.t()],
           optional(:client_registration) => RegistrationPolicy.configured_strategy(),
+          optional(:client_issuer) => String.t() | nil,
           optional(:metadata_fetch) => keyword()
         }
 
@@ -331,12 +332,17 @@ defmodule Imp.MCP.OAuth.Flow do
   defp client(metadata, config) do
     # The policy asks for the redirect port because a dynamically registered
     # client is bound to its exact redirect URI; that URI is already fixed here.
-    policy_config = %{
-      client_registration: Map.get(config, :client_registration, :auto),
-      application_type: :native,
-      protocol_version: ExMCP.protocol_version(),
-      redirect_port: URI.parse(config.redirect_uri).port
-    }
+    # A pre-registered client names the issuer it was registered with, and the
+    # policy refuses one whose discovered issuer differs: a server could
+    # otherwise name its own authorization server and receive the secret.
+    policy_config =
+      %{
+        client_registration: Map.get(config, :client_registration, :auto),
+        application_type: :native,
+        protocol_version: ExMCP.protocol_version(),
+        redirect_port: URI.parse(config.redirect_uri).port
+      }
+      |> put_present(:credential_issuer, Map.get(config, :client_issuer))
 
     case RegistrationPolicy.select(metadata, policy_config) do
       {:ok, {:dynamic, selection}} -> register(selection, metadata, config)
@@ -437,6 +443,9 @@ defmodule Imp.MCP.OAuth.Flow do
 
     "#{uri.scheme}://#{host}#{port}"
   end
+
+  defp put_present(map, _key, nil), do: map
+  defp put_present(map, key, value), do: Map.put(map, key, value)
 
   defp field(map, key), do: Map.get(map, key) || Map.get(map, Atom.to_string(key))
 end

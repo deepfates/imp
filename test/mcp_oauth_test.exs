@@ -741,6 +741,39 @@ defmodule Imp.MCPOAuthTest do
              fake_state().token_requests
   end
 
+  # A client registered ahead of time is used as given: no registration
+  # request, and its own secret at the token endpoint.
+  @tag :tmp_dir
+  test "a pre-registered client authorizes with its own id and secret", %{tmp_dir: tmp_dir} do
+    %{origin: origin, resource_url: resource_url} = fake_auth_server(expires_in: 3600)
+    store = OAuth.store(directory: tmp_dir, secret: :crypto.strong_rand_bytes(32))
+    client = {:pre_registered, "pre-registered-client", "pre-secret"}
+
+    begin = fn issuer ->
+      OAuth.begin(store, resource_url,
+        credential: "workspace",
+        redirect_uri: "http://127.0.0.1:65535/host/callback",
+        client_registration: client,
+        client_issuer: issuer
+      )
+    end
+
+    # The secret belongs to one authorization server; a server naming another
+    # one does not get it.
+    assert {:error, {:mcp_oauth_begin_failed, {:pre_registered_credential_issuer_mismatch, _}}} =
+             begin.("https://elsewhere.example")
+
+    assert {:ok, pending} = begin.(origin)
+
+    assert pending.authorization_url =~ "client_id=pre-registered-client"
+
+    assert {:ok, "workspace"} =
+             OAuth.complete(pending, %{"code" => "accepted-code", "state" => pending.state})
+
+    assert [%{grant_type: "authorization_code", client_secret: "pre-secret"}] =
+             fake_state().token_requests
+  end
+
   # -- fixtures --------------------------------------------------------------
 
   defp oauth_server(opts \\ []) do

@@ -46,7 +46,8 @@ Ordinary Imp startup starts no protocol endpoint.
 - A release that uses `Imp.MCP` or `Imp.ACP` adds `erlexec: :load` beside
   `ex_mcp: :load`.
 - `Imp.MCP.OAuth.begin/3` no longer takes `:flow`; a pre-registered client is
-  `client_registration: {:pre_registered, client_id, client_secret}`. A server
+  `client_registration: {:pre_registered, client_id, client_secret}` with
+  `client_issuer:` naming the authorization server it belongs to. A server
   with no OAuth metadata at all is refused instead of given guessed endpoints.
 - For a signature with one `:string` output, `ReActV2` offers no `submit`
   tool, and a step answered in prose with no tool call ends the turn. Code that

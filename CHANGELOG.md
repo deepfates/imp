@@ -25,7 +25,9 @@ User-visible changes to Imp are recorded here.
   Servers such as Scry answer only these ways.
 - `Imp.MCP.OAuth.begin/3` runs its own browser flow on ExMCP's public OAuth
   functions. Its `:flow` option is replaced by `:client_registration`
-  (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`).
+  (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`);
+  a pre-registered client also names its `:client_issuer`, and the flow
+  refuses to begin when the server names a different authorization server.
   Authorization-server discovery takes the document that names the issuer it
   asked for, which finds a tenant issuer such as Readwise's; a
   protected-resource document that names another resource is refused; a

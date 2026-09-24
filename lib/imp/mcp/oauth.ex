@@ -255,8 +255,12 @@ defmodule Imp.MCP.OAuth do
       authorization server. Defaults to `:auto`: dynamic registration when the
       server offers it. `{:pre_registered, client_id, client_secret}` uses a
       client registered ahead of time (`client_secret` may be `nil` for a public
-      client); `{:cimd, url}` names a Client ID Metadata Document. See
-      `ExMCP.Authorization.RegistrationPolicy`.
+      client) and needs `:client_issuer`; `{:cimd, url}` names a Client ID
+      Metadata Document. See `ExMCP.Authorization.RegistrationPolicy`.
+    * `:client_issuer` — the issuer of the authorization server a
+      pre-registered client was registered with. The flow refuses to begin
+      when the server names a different one, so the client's secret only goes
+      where it was issued.
 
   """
   @spec begin(Store.t(), String.t(), keyword()) :: {:ok, Pending.t()} | {:error, term()}
@@ -457,6 +461,7 @@ defmodule Imp.MCP.OAuth do
       redirect_uri: redirect_uri,
       scopes: Keyword.get(opts, :scopes, []),
       client_registration: Keyword.get(opts, :client_registration, :auto),
+      client_issuer: Keyword.get(opts, :client_issuer),
       metadata_fetch: [allow_insecure_loopback: loopback?(server_url)]
     }
   end
