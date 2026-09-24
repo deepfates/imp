@@ -396,17 +396,24 @@ defmodule Imp.MCP.Clients do
     :ok
   end
 
-  # Closes the client once the request it is inside, if any, is done: the
-  # client handles the disconnect after its current callback returns. A
+  # Closes the client once the request it is inside, if any, is done. A
   # disconnect rather than a bare stop, because it closes the transport, and an
   # HTTP+SSE client's GET stream is a process of its own that a stop leaves
-  # running. A request an HTTP+SSE client posts from a process of its own is
-  # not waited for, and is not ended by the close either; it ends within the
-  # same bounds. A client still busy after `grace`, which the import sets
-  # longer than its request can take, is killed.
+  # running. But the disconnect also ends the HTTP session with a DELETE, and a
+  # server may end the requests in flight on that session with it (the Python
+  # SDK's does). A plain HTTP client makes its request inside its own callback,
+  # so a disconnect waits for it. An HTTP+SSE client posts from a process of its
+  # own and is free meanwhile, so the close first waits for those posts to end:
+  # ExMCP keeps them in the client's `async_post_tasks` and exposes no call to
+  # ask, so the state is read. That reading retires when ExMCP's disconnect
+  # waits for its posts itself. Each step is given `grace`, which the import
+  # sets longer than one request can take, and a client still busy after it is
+  # killed.
   defp close_after_request(client, grace) do
     spawn(fn ->
       try do
+        await_posts(client, System.monotonic_time(:millisecond) + grace)
+        # The disconnect's own DELETE is a request too, and gets its own grace.
         GenServer.call(client, :disconnect, grace)
         GenServer.stop(client, :normal, grace)
       catch
@@ -416,6 +423,20 @@ defmodule Imp.MCP.Clients do
 
     :ok
   end
+
+  defp await_posts(client, deadline) do
+    case :sys.get_state(client, remaining(deadline)) do
+      %{async_post_tasks: posts} when is_map(posts) and map_size(posts) > 0 ->
+        if remaining(deadline) == 0, do: exit(:timeout)
+        Process.sleep(50)
+        await_posts(client, deadline)
+
+      _state ->
+        :ok
+    end
+  end
+
+  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
 
   defp safe_disconnect(client) do
     try do

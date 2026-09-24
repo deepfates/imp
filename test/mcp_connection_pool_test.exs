@@ -96,6 +96,12 @@ defmodule Imp.MCPConnectionPoolTest do
     def call(conn, opts) do
       {:ok, body, conn} = Plug.Conn.read_body(conn)
 
+      # What the writes were when the client ended its session. A server may
+      # end the requests in flight on a session with it, as the Python SDK's
+      # does.
+      if conn.method == "DELETE" and :ets.whereis(:pool_test_writes) != :undefined,
+        do: :ets.insert(:pool_test_writes, {:at_session_end, :ets.tab2list(:pool_test_writes)})
+
       if body =~ "server/discover",
         do: Plug.Conn.send_resp(conn, 404, "unknown method"),
         else: ExMCP.HttpPlug.call(Plug.Conn.assign(conn, :raw_body, body), opts)
@@ -353,6 +359,33 @@ defmodule Imp.MCPConnectionPoolTest do
 
       assert eventually(fn -> not Process.alive?(client) end)
       assert eventually(fn -> not Process.alive?(stream) end), "the retired stream outlived it"
+    end
+  end
+
+  # ExMCP's disconnect ends an HTTP session with a DELETE, and a server may end
+  # the requests in flight on that session with it. On an HTTP+SSE connection
+  # a request is posted from a process of the client's own, so the client is
+  # free while it is out: the close waits for it before the disconnect.
+  describe "a retired HTTP+SSE connection's session" do
+    setup do
+      :ets.new(:pool_test_writes, [:named_table, :public])
+      :ok
+    end
+
+    test "is ended only after its request is done" do
+      descriptor = %{server(LegacySSE) | "type" => "sse"}
+      {imported, tools} = tools(descriptor, pool_size: 1, timeout: 300)
+      [client] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+      assert is_binary(:sys.get_state(client).transport_state.session_id)
+
+      assert {:error, %CallFailure{outcome: :unknown}} =
+               Imp.Tool.call(tools["write"], %{"tag" => "session"})
+
+      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+      assert eventually(fn -> :ets.lookup(:pool_test_writes, :at_session_end) != [] end)
+
+      [{:at_session_end, writes}] = :ets.lookup(:pool_test_writes, :at_session_end)
+      assert {"session", :finished} in writes, "the session ended with the write in flight"
     end
   end
 
