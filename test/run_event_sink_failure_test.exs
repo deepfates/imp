@@ -24,6 +24,9 @@ defmodule Imp.RunEventSinkFailureTest do
     end
 
     {:ok, run} = Imp.Run.start(%Wait{}, %{owner: owner}, event_sink: sink)
+    # A run whose control stopped first leaves its task running, holding a
+    # place in Imp's task pool; end it whatever the test did.
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
     assert_receive :waiting
     run
   end
@@ -195,7 +198,7 @@ defmodule Imp.RunEventSinkFailureTest do
 
     monitor = Process.monitor(run.control)
     send(:sys.get_state(run.control).delivery, :go)
-    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}
+    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 5_000
     end_task(run)
 
     assert_received {:imp_run_event_sink_failed, _run_id,
@@ -211,6 +214,6 @@ defmodule Imp.RunEventSinkFailureTest do
   defp end_task(run) do
     monitor = Process.monitor(run.task.pid)
     Process.exit(run.task.pid, :kill)
-    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}
+    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 5_000
   end
 end
