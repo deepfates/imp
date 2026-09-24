@@ -9,7 +9,7 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
   alias Imp.Adapter.Chat
 
   describe "an MCP error result" do
-    test "is the text of its content, and nothing else" do
+    test "is the text of its content, which says it is an error" do
       envelope = %{
         "content" => [
           %{"type" => "text", "text" => "error: write outcome unknown; reconcile before retry"}
@@ -34,7 +34,7 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
       }
 
       assert Chat.format_tool_result({:error, {:mcp_tool_error, envelope}}) ==
-               "not posted\nthe thread is locked"
+               "Error: not posted\nthe thread is locked"
     end
 
     test "with no text, is its structured content as data" do
@@ -45,13 +45,24 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
       }
 
       assert Chat.format_tool_result({:error, {:mcp_tool_error, envelope}}) ==
-               ~s({"code": "refused"})
+               ~s(Error: {"code": "refused"})
     end
 
     test "with nothing at all, says so" do
       assert Chat.format_tool_result({:error, {:mcp_tool_error, %{"isError" => true}}}) ==
-               "The tool reported an error without saying what it was."
+               "Error: The tool reported an error without saying what it was."
     end
+  end
+
+  # The model is given no flag beside the text, so text that does not already
+  # say it is an error gets the same `Error: ` as every other failure.
+  test "an MCP error result whose text does not say it is an error is marked as one" do
+    envelope = %{"content" => [%{"type" => "text", "text" => "no record at that uri"}]}
+
+    assert Chat.format_tool_result({:error, {:mcp_tool_error, envelope}}) ==
+             "Error: no record at that uri"
+
+    assert Chat.tool_error_text({:mcp_tool_error, envelope}) == "no record at that uri"
   end
 
   describe "a JSON-RPC error from the server" do
@@ -69,7 +80,7 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
                "Error: Invalid params: uri is required"
     end
 
-    test "adds the error's type in words when the server named one ExMCP defines" do
+    test "a tool that crashed or outlived the server's wait may have been carried out" do
       crash = %{
         "code" => -32603,
         "message" => "Tool call failed",
@@ -77,7 +88,7 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
       }
 
       assert Chat.format_tool_result({:error, {:mcp_tool_call_failed, "kite", crash}}) ==
-               "Error: Tool call failed; the tool crashed."
+               "Error: the tool crashed while running, so it may have been carried out."
 
       slow = %{
         "code" => -32603,
@@ -86,31 +97,33 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
       }
 
       assert Chat.format_tool_result({:error, {:mcp_tool_call_failed, "kite", slow}}) ==
-               "Error: Tool call failed; the tool took too long."
+               "Error: the server stopped waiting for the tool, so it may have been carried out."
     end
   end
 
+  # A request that was sent and got no answer may have been acted on, and the
+  # words say so: "no answer came back" alone reads as nothing having happened.
   describe "a call that got no answer" do
-    test "a timeout says it timed out" do
+    test "a timeout says it timed out and may have been carried out" do
       assert Chat.format_tool_result({:error, {:mcp_tool_call_failed, "kite", :timeout}}) ==
-               "Error: no answer came back; it timed out."
+               "Error: no answer came back; it timed out, so it may have been carried out."
 
       exit = {:timeout, {GenServer, :call, [self(), {:request, "tools/call", %{}, %{}}, 300]}}
 
       assert Chat.format_tool_result({:error, {:mcp_connection_unavailable, "kite", exit}}) ==
-               "Error: no answer came back; it timed out."
+               "Error: no answer came back; it timed out, so it may have been carried out."
     end
 
-    test "a closed connection says the connection closed" do
+    test "a connection that closed under the call says it may have been carried out" do
       closed = ExMCP.Error.connection_error("Transport closed: :normal")
 
       assert Chat.format_tool_result({:error, {:mcp_tool_call_failed, "kite", closed}}) ==
-               "Error: no answer came back; the connection closed."
+               "Error: no answer came back; the connection closed, so it may have been carried out."
 
       exit = {:normal, {GenServer, :call, [self(), :request, 300]}}
 
       assert Chat.format_tool_result({:error, {:mcp_connection_unavailable, "kite", exit}}) ==
-               "Error: no answer came back; the connection closed."
+               "Error: no answer came back; the connection closed, so it may have been carried out."
     end
 
     test "a connection that is not open says so" do
@@ -123,14 +136,14 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
                "Error: no answer came back; the connection is not open."
     end
 
-    test "a transport failure says the connection failed" do
+    test "a transport failure says the connection failed and it may have been carried out" do
       refused = %{
         type: :transport_error,
         message: "Failed to send request: %Mint.TransportError{reason: :econnrefused}"
       }
 
       assert Chat.format_tool_result({:error, {:mcp_tool_call_failed, "kite", refused}}) ==
-               "Error: no answer came back; the connection failed."
+               "Error: no answer came back; the connection failed, so it may have been carried out."
     end
 
     test "a broken stream after delivery says the call may have been carried out" do
@@ -146,13 +159,13 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
                  "so it may have been carried out."
     end
 
-    test "a tool that exits says it stopped before answering" do
+    test "a tool that exits says it stopped before answering and may have been carried out" do
       assert Chat.format_tool_result({:error, {:tool_error, :lookup, {:exit, :killed}}}) ==
-               "Error: lookup failed: it stopped before answering."
+               "Error: lookup stopped before answering, so it may have been carried out."
 
       assert Chat.format_tool_result(
                {:error, {:tool_error, :lookup, {:exit, {:timeout, {GenServer, :call, []}}}}}
-             ) == "Error: lookup failed: it timed out."
+             ) == "Error: lookup timed out, so it may have been carried out."
     end
   end
 

@@ -5,12 +5,15 @@ User-visible changes to Imp are recorded here.
 ## Unreleased
 
 - A failed tool call reaches the model as plain text instead of an Elixir
-  term. An MCP error result is the text of its content, the tool's own words;
-  a JSON-RPC error is the server's message; a call that got no answer says
-  why in one sentence (it timed out, the connection closed or failed, or it
-  broke after the request was sent and so may have been carried out). An
+  term. An MCP error result is the text of its content, the tool's own words,
+  after `Error: ` unless the text already begins with "error"; a JSON-RPC
+  error is the server's message; a call that got no answer says why in one
+  sentence, and unless the request was never sent, that it may have been
+  carried out (a timeout, a closed or failed connection, a broken stream, a
+  server that stopped waiting for its tool or a tool that crashed). An
   unknown tool, missing or invalid arguments, a denied tool and a tool that
-  exits or throws are sentences too. `Imp.Adapter.Chat.format_tool_result/1`
+  exits or throws are sentences too; a tool that exits may have been carried
+  out. `Imp.Adapter.Chat.format_tool_result/1`
   renders these, `Imp.Adapter.Chat.tool_error_text/1` gives the words without
   `Error: `, and `Imp.MCP.failure_text/1` gives the MCP ones. The recorded
   error term is unchanged. `Imp.Predict.ReAct`'s `:dspy_3_2_1` observations

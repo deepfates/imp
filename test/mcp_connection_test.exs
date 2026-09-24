@@ -295,7 +295,8 @@ defmodule Imp.MCPConnectionTest do
     assert {:error, {:mcp_tool_error, failure}} = error = Imp.Tool.call(tool, %{})
 
     # The record keeps the envelope; the model reads the tool's own words.
-    assert Imp.Adapter.Chat.format_tool_result(error) == "Outcome unknown; reconcile before retry"
+    assert Imp.Adapter.Chat.format_tool_result(error) ==
+             "Error: Outcome unknown; reconcile before retry"
 
     assert failure["structuredContent"] == %{
              "code" => "indeterminate",

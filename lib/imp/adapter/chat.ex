@@ -847,12 +847,13 @@ defmodule Imp.Adapter.Chat do
 
   Successful results format like any other value. A failed result renders as
   plain text instead of an Elixir term. An MCP error result is the text its
-  tool wrote and nothing else, since those are the tool's own words. Every
-  other failure is one sentence after `Error: `: a JSON-RPC error is the
-  server's message; a call that got no answer says why in words (it timed
-  out, the connection closed or failed, or it broke after the request was sent
-  and so may have been carried out); a denied call says who declined it; a
-  crashed tool names itself and its message; an unknown tool, a rejected
+  tool wrote, after `Error: ` unless that text already begins with "error",
+  since the model is given no other sign that the call failed. Every other
+  failure is one sentence after `Error: `: a JSON-RPC error is the server's
+  message; a call that got no answer says why in words, and unless it was
+  never sent, that it may have been carried out; a denied call says who
+  declined it; a crashed tool names itself and its message, and one that
+  exited says it may have been carried out; an unknown tool, a rejected
   argument or a rejected `submit` says what is wrong with the call; an atom
   reason is spelled out; and a structured `:reason` map reads as its reason
   and limit. Only the rendering is plain: the result the loop records keeps
@@ -864,8 +865,10 @@ defmodule Imp.Adapter.Chat do
       "Error: post was not allowed; the person declined it."
   """
   @spec format_tool_result(term()) :: String.t()
-  def format_tool_result({:error, {:mcp_tool_error, _envelope} = reason}),
-    do: Imp.MCP.failure_text(reason)
+  def format_tool_result({:error, {:mcp_tool_error, _envelope} = reason}) do
+    text = Imp.MCP.failure_text(reason)
+    if text =~ ~r/\A\s*error\b/i, do: text, else: "Error: " <> text
+  end
 
   def format_tool_result({:error, reason}), do: "Error: " <> tool_error_text(reason)
   def format_tool_result(value), do: format_value(value)
@@ -910,8 +913,9 @@ defmodule Imp.Adapter.Chat do
   defp error_prose({:tool_authorization_denied, name, reason}),
     do: "#{name} was not allowed: #{error_prose(reason)}"
 
+  # An exit stops the tool wherever it was, which may be after its effect.
   defp error_prose({:tool_error, name, {:exit, reason}}),
-    do: "#{name} failed: #{tool_exit_prose(reason)}"
+    do: "#{name} #{tool_exit_prose(reason)}, so it may have been carried out."
 
   defp error_prose({:tool_error, name, {:throw, _value}}),
     do: "#{name} failed: it threw instead of returning."
@@ -953,8 +957,8 @@ defmodule Imp.Adapter.Chat do
   defp error_prose(reason), do: inspect(reason, limit: 20)
 
   defp tool_exit_prose({reason, {GenServer, :call, _args}}), do: tool_exit_prose(reason)
-  defp tool_exit_prose(:timeout), do: "it timed out."
-  defp tool_exit_prose(_reason), do: "it stopped before answering."
+  defp tool_exit_prose(:timeout), do: "timed out"
+  defp tool_exit_prose(_reason), do: "stopped before answering"
 
   defp fetch_either(map, key) do
     case Map.fetch(map, key) do
