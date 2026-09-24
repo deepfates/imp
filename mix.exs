@@ -123,8 +123,9 @@ defmodule Imp.MixProject do
   end
 
   # Shared fork reference. This fork carries byte-safe stdio,
-  # caller-owned request/subprocess cleanup, ACP delivery barriers, and
-  # per-connection HTTP trust propagation. See its FORK.md for each failure
+  # caller-owned request/subprocess cleanup, ACP delivery barriers,
+  # per-connection HTTP trust propagation, and tool results that survive a
+  # missed output-validation deadline. See its FORK.md for each failure
   # and retirement condition; do not move this ref independently of consumers.
   # Protocol adapters start ExMCP explicitly; ordinary prediction and optimizer
   # processes must neither start protocol services nor acquire their boot output.
@@ -143,7 +144,7 @@ defmodule Imp.MixProject do
       true ->
         {:ex_mcp,
          github: "deepfates/ex_mcp",
-         ref: "7285330b490476cc153dd60fb9adac9cd39d4a94",
+         ref: "6b46670f254846c9d19269def7f6fe3ffa2bea40",
          runtime: false}
     end
   end
