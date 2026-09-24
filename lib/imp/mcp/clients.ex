@@ -26,6 +26,8 @@ defmodule Imp.MCP.Clients do
 
   use GenServer
 
+  require Logger
+
   @type client_entry :: {map(), pid()}
 
   @spec start(keyword()) :: {:ok, pid()} | {:error, term()}
@@ -110,7 +112,9 @@ defmodule Imp.MCP.Clients do
        lent: %{},
        waiting: %{},
        replacements: %{},
-       replacing: %{}
+       replacing: %{},
+       streams: %{},
+       dead: MapSet.new()
      }}
   end
 
@@ -125,13 +129,15 @@ defmodule Imp.MCP.Clients do
         Map.update(idle, server, [client], &(&1 ++ [client]))
       end)
 
+    state = %{
+      state
+      | clients: state.clients ++ clients,
+        idle: idle,
+        replacements: Map.merge(state.replacements, replacements)
+    }
+
     {:reply, :ok,
-     %{
-       state
-       | clients: state.clients ++ clients,
-         idle: idle,
-         replacements: Map.merge(state.replacements, replacements)
-     }}
+     Enum.reduce(clients, state, fn {_server, client}, acc -> watch(acc, client) end)}
   end
 
   def handle_call({:checkout, server, ref}, {pid, _tag} = from, state) do
@@ -191,6 +197,28 @@ defmodule Imp.MCP.Clients do
     {:stop, :normal, %{state | clients: []}}
   end
 
+  # A client's event stream ended. ExMCP does not reopen it, and a request the
+  # client posts then is answered on no stream, or not sent. An idle client is
+  # replaced now; a lent one when it is given back.
+  def handle_info({:DOWN, monitor, :process, _pid, _reason}, state)
+      when is_map_key(state.streams, monitor) do
+    {client, streams} = Map.pop(state.streams, monitor)
+    state = %{state | streams: streams}
+    server = Enum.find_value(state.idle, fn {key, idle} -> if client in idle, do: key end)
+
+    cond do
+      server != nil ->
+        idle = Map.update!(state.idle, server, &List.delete(&1, client))
+        {:noreply, replace(%{state | idle: idle}, client)}
+
+      Map.has_key?(state.lent, client) ->
+        {:noreply, %{state | dead: MapSet.put(state.dead, client)}}
+
+      true ->
+        {:noreply, state}
+    end
+  end
+
   # A borrower that died may have left its call out on the client it held.
   def handle_info({:DOWN, monitor, :process, _pid, _reason}, state) do
     case Enum.find(state.lent, fn {_client, lease} -> lease.monitor == monitor end) do
@@ -212,7 +240,7 @@ defmodule Imp.MCP.Clients do
         {:ok, client} ->
           Process.link(client)
           send(dialer, {:replacement_taken, client})
-          state = %{state | clients: state.clients ++ [{server, client}]}
+          state = watch(%{state | clients: state.clients ++ [{server, client}]}, client)
           next_in_line(state, server, client)
 
         {:error, _reason} ->
@@ -236,7 +264,8 @@ defmodule Imp.MCP.Clients do
     state = %{
       state
       | clients: clients,
-        idle: Map.new(state.idle, fn {server, idle} -> {server, List.delete(idle, pid)} end)
+        idle: Map.new(state.idle, fn {server, idle} -> {server, List.delete(idle, pid)} end),
+        dead: MapSet.delete(state.dead, pid)
     }
 
     state =
@@ -284,6 +313,7 @@ defmodule Imp.MCP.Clients do
   # deadline does not take it down.
   defp replace(state, client) do
     server = Enum.find_value(state.clients, fn {key, pid} -> if pid == client, do: key end)
+    state = %{state | dead: MapSet.delete(state.dead, client)}
     Process.unlink(client)
     clients = Enum.reject(state.clients, fn {_key, pid} -> pid == client end)
     state = %{state | clients: clients}
@@ -358,9 +388,39 @@ defmodule Imp.MCP.Clients do
       {lease, lent} ->
         Process.demonitor(lease.monitor, [:flush])
         state = %{state | lent: lent}
-        server = Enum.find_value(state.clients, fn {key, pid} -> if pid == client, do: key end)
-        next_in_line(state, server, client)
+
+        if MapSet.member?(state.dead, client) do
+          replace(state, client)
+        else
+          server = Enum.find_value(state.clients, fn {key, pid} -> if pid == client, do: key end)
+          next_in_line(state, server, client)
+        end
     end
+  end
+
+  # An HTTP+SSE client's event stream is a process of its own, and when it
+  # ends (nothing arrived for ExMCP's idle timeout, or the server closed it)
+  # the client stays up without it. ExMCP exposes no call for the stream, so
+  # its pid is read from the client's state, as `requests_out/1` reads the
+  # requests. This retires when ExMCP reopens an ended stream or ends the
+  # client with it.
+  defp watch(state, client) do
+    case stream_of(client) do
+      stream when is_pid(stream) ->
+        %{state | streams: Map.put(state.streams, Process.monitor(stream), client)}
+
+      nil ->
+        state
+    end
+  end
+
+  defp stream_of(client) do
+    case :sys.get_state(client, 1_000) do
+      %{transport_state: %{sse_pid: stream}} when is_pid(stream) -> stream
+      _state -> nil
+    end
+  catch
+    :exit, _reason -> nil
   end
 
   defp next_in_line(state, nil, _client), do: state
@@ -396,23 +456,33 @@ defmodule Imp.MCP.Clients do
     :ok
   end
 
-  # Closes the client once the request it is inside, if any, is done. A
-  # disconnect rather than a bare stop, because it closes the transport, and an
-  # HTTP+SSE client's GET stream is a process of its own that a stop leaves
-  # running. But the disconnect also ends the HTTP session with a DELETE, and a
-  # server may end the requests in flight on that session with it (the Python
-  # SDK's does). A plain HTTP client makes its request inside its own callback,
-  # so a disconnect waits for it. An HTTP+SSE client posts from a process of its
-  # own and is free meanwhile, so the close first waits for those posts to end:
-  # ExMCP keeps them in the client's `async_post_tasks` and exposes no call to
-  # ask, so the state is read. That reading retires when ExMCP's disconnect
-  # waits for its posts itself. Each step is given `grace`, which the import
-  # sets longer than one request can take, and a client still busy after it is
+  # Closes the client once the requests it has out are done. A disconnect
+  # rather than a bare stop, because it closes the transport, and a client's
+  # GET stream is a process of its own that a stop leaves running. But the
+  # disconnect also ends the HTTP session (a DELETE, or the close of an
+  # HTTP+SSE event stream) and cancels the client's request streams, and a
+  # server may end the requests in flight on them (the Python SDK's does on
+  # the DELETE; ExMCP's ends a streamed request whose stream closes). A plain
+  # request is made inside the client's own callback, so a disconnect waits for
+  # it. A request posted from a process of the client's own is not: one that
+  # asked for progress and has a stream of its own, and any post of a
+  # Streamable HTTP client that keeps a standing GET stream (Imp opens none,
+  # but ExMCP keeps those in the state read below). The client is free while
+  # such a request is out, so the close first waits until it has none out.
+  #
+  # ExMCP exposes no call to ask, so the client's state is read: a request is
+  # out from the moment the client takes the call (`pending_requests`, written
+  # in the same callback that starts the post) until its post has ended
+  # (`async_post_tasks`, and the transport's `modern_streams`). A state without
+  # those fields is not read as idle: the close then waits the whole grace
+  # before the disconnect. This reading retires when ExMCP's disconnect waits
+  # for its own requests. Each step is given `grace`, which the import sets
+  # longer than one request can take, and a client still busy after it is
   # killed.
   defp close_after_request(client, grace) do
     spawn(fn ->
       try do
-        await_posts(client, System.monotonic_time(:millisecond) + grace)
+        await_requests(client, System.monotonic_time(:millisecond) + grace)
         # The disconnect's own DELETE is a request too, and gets its own grace.
         GenServer.call(client, :disconnect, grace)
         GenServer.stop(client, :normal, grace)
@@ -424,17 +494,41 @@ defmodule Imp.MCP.Clients do
     :ok
   end
 
-  defp await_posts(client, deadline) do
-    case :sys.get_state(client, remaining(deadline)) do
-      %{async_post_tasks: posts} when is_map(posts) and map_size(posts) > 0 ->
+  defp await_requests(client, deadline) do
+    case client |> :sys.get_state(remaining(deadline)) |> requests_out() do
+      0 ->
+        :ok
+
+      count when is_integer(count) ->
         if remaining(deadline) == 0, do: exit(:timeout)
         Process.sleep(50)
-        await_posts(client, deadline)
+        await_requests(client, deadline)
 
-      _state ->
-        :ok
+      :unknown ->
+        Logger.warning(
+          "an MCP client's state does not say which requests it has out; " <>
+            "it is closed after its whole grace"
+        )
+
+        Process.sleep(remaining(deadline))
     end
   end
+
+  @doc false
+  # The requests an `ExMCP.Client` state has out, or `:unknown` for a state
+  # this does not know how to read.
+  def requests_out(%{pending_requests: pending, async_post_tasks: posts} = state)
+      when is_map(pending) and is_map(posts) do
+    streams =
+      case Map.get(state, :transport_state) do
+        %{modern_streams: streams} when is_map(streams) -> map_size(streams)
+        _other -> 0
+      end
+
+    map_size(pending) + map_size(posts) + streams
+  end
+
+  def requests_out(_state), do: :unknown
 
   defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
 

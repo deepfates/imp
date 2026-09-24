@@ -63,6 +63,27 @@ defmodule Imp.MCP.Connections do
 
       %{"name" => "docs", "type" => "http", "url" => "https://mcp.example.com/mcp"}
 
+  `"sse"` is MCP's deprecated HTTP+SSE transport (protocol 2024-11-05), and its
+  `"url"` is the event stream's, usually ending in `/sse` (a URL without a path
+  means `/sse`). The client GETs that
+  stream, and the server's first event names the URL requests are posted to,
+  headers and all. It works with servers whose posting URL carries the session
+  as `sessionId`, as the TypeScript SDK's and ExMCP's do. It does not work with
+  the Python SDK's SSE servers, which name it `session_id`: the dial fails
+  with `{:sse_endpoint_without_session_id, why, exmcp_reason}`, where `why`
+  says to use their Streamable HTTP endpoint. A server that speaks Streamable
+  HTTP as well is better reached as `"http"`.
+
+  An `"sse"` descriptor may not carry `"headers"` or `"auth"`: the server
+  names where requests are posted, and ExMCP sends a connection's headers
+  there, whatever origin it names, before Imp can see it. Such a descriptor is
+  refused before anything is dialed (`:mcp_sse_credentials_refused`): it
+  refuses the whole import under the default `on_failure: :refuse`, and under
+  `on_failure: :drop` it is left out, named in `unavailable` and logged, as a
+  server that cannot be dialed is. An `"sse"` URL with a query string is
+  refused the same way (`:mcp_sse_url_refused`): ExMCP would dial the stream
+  without it.
+
   Only descriptors the caller authorized are dialed. `trusted_servers:` lists
   them exactly; `authorize:` is a function of the descriptor (and optionally
   a `%{cwd: cwd, server: descriptor}` context) that returns `:ok` or `true` to
@@ -110,7 +131,8 @@ defmodule Imp.MCP.Connections do
   refusal would have carried, summarized to one short line, and with the
   `index` of the descriptor in the list that was passed in. Use it for a caller
   whose servers are independent, such as a long-lived agent holding several
-  third-party catalogs.
+  third-party catalogs. An `"sse"` descriptor that carries credentials (see
+  above) is left out the same way.
 
   Each dial is bounded by `:timeout` on its own, so a host that accepts the
   connection and then answers nothing costs that server its timeout and no more.
@@ -142,6 +164,13 @@ defmodule Imp.MCP.Connections do
   replacement is dialed in the background; calls wait for it. A replacement that cannot be dialed
   leaves the server a connection fewer, and a server left with none answers
   its calls `:not_sent` with `reason: :not_connected`.
+
+  A call is answered at its `:timeout`, as `:unknown` with `reason: :timeout`,
+  while its request runs on to the connection's own request limit (the
+  `:timeout`, at least 30 s). That holds for a request that asks for progress
+  too: ExMCP ends such a request's stream a second after the timeout a call is
+  made with, and the server ends the tool with it, so Imp makes the call with
+  the whole request limit and keeps the caller's timeout itself.
 
   A `stdio` server has one connection whatever `pool_size` says. ExMCP writes
   each request to its pipe and matches answers by id, so calls to it already
@@ -210,6 +239,7 @@ defmodule Imp.MCP.Connections do
   @http_dns_timeout 1_000
   @http_connect_timeout 5_000
   @http_request_timeout 30_000
+  @http_stream_idle_timeout 60_000
 
   @doc """
   Connects authorized servers and imports all discovered tools.
@@ -402,6 +432,8 @@ defmodule Imp.MCP.Connections do
     # gave, and `client_options/3` raises on a descriptor nobody can address.
     with :ok <- validate_tool_prefix(server),
          :ok <- authorize(server, opts),
+         :ok <- sse_without_credentials(server),
+         :ok <- sse_url_without_query(server),
          {:ok, headers} <- connection_headers(server, opts),
          options = client_options(server, opts, headers),
          :ok <- trust(options, self()),
@@ -413,6 +445,21 @@ defmodule Imp.MCP.Connections do
     else
       {:unreachable, reason} ->
         if drop?(opts) do
+          connect_all(rest, opts, index + 1, clients, [
+            absence(server, index, reason) | unavailable
+          ])
+        else
+          {:error, reason, clients}
+        end
+
+      # An `sse` descriptor refused for its credentials or its URL is left out
+      # under `:drop` as an unreachable one is, with a warning: an ACP client
+      # that offers one must not lose every other server of its session.
+      {:error, {refusal, _name, why} = reason}
+      when refusal in [:mcp_sse_credentials_refused, :mcp_sse_url_refused] ->
+        if drop?(opts) do
+          Logger.warning("MCP server #{inspect(server_name(server))} left out: #{why}")
+
           connect_all(rest, opts, index + 1, clients, [
             absence(server, index, reason) | unavailable
           ])
@@ -550,17 +597,35 @@ defmodule Imp.MCP.Connections do
         {:ok, client, options}
 
       {:unreachable, {:mcp_connection_failed, reason}} = failed ->
-        if Keyword.get(options, :transport) == :http and probe_refused?(reason) do
-          legacy = Keyword.put(options, :protocol_mode, :legacy_only)
+        cond do
+          Keyword.get(options, :transport) == :http and probe_refused?(reason) ->
+            legacy = Keyword.put(options, :protocol_mode, :legacy_only)
+            with {:ok, client} <- dial(legacy, deadline), do: {:ok, client, legacy}
 
-          with {:ok, client} <- dial(legacy, deadline), do: {:ok, client, legacy}
-        else
-          failed
+          Keyword.get(options, :transport) == :sse and
+              reason == {:transport_connect_failed, "missing_session_id"} ->
+            {:unreachable, {:mcp_connection_failed, without_session_id(reason)}}
+
+          true ->
+            failed
         end
 
       failed ->
         failed
     end
+  end
+
+  # ExMCP's deprecated-SSE client connects only to a server whose stream names
+  # the posting URL's session as `sessionId`; the Python SDK's servers name it
+  # `session_id`, and ExMCP answers `missing_session_id`, as text. Those servers
+  # serve Streamable HTTP too, so the refusal says how to reach them. ExMCP's
+  # own reason is kept. This retires if ExMCP reads the session under either
+  # name.
+  defp without_session_id(reason) do
+    {:sse_endpoint_without_session_id,
+     ~s[this server's SSE endpoint does not name its session sessionId (the Python ] <>
+       ~s[SDK's names it session_id), which ExMCP cannot follow; connect to its ] <>
+       ~s[Streamable HTTP endpoint with type: "http"], reason}
   end
 
   defp probe_refused?(reason),
@@ -785,15 +850,23 @@ defmodule Imp.MCP.Connections do
   end
 
   defp borrowed_call(bridge, index, name, arguments, server, opts) do
+    # The meta is made here, in the process making the call, which is what a
+    # `:call_meta` function of the server alone can know the call from; the
+    # request itself is made from a process of its own (`await_call/5`). Made
+    # before the checkout, a callback that raises holds no connection.
+    meta = call_meta(server, opts)
+    opts = Keyword.put(opts, :call_meta, fn _server -> meta end)
+
     case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
       {:ok, client} ->
         result =
-          try do
-            call_tool(client, name, arguments, server, opts)
-          catch
-            kind, reason ->
+          case await_call(client, name, arguments, server, opts) do
+            {:raised, kind, reason, stacktrace} ->
               Imp.MCP.Clients.retire(bridge, client)
-              :erlang.raise(kind, reason, __STACKTRACE__)
+              :erlang.raise(kind, reason, stacktrace)
+
+            result ->
+              result
           end
 
         # A call its caller stopped waiting for is still out inside ExMCP's
@@ -809,6 +882,49 @@ defmodule Imp.MCP.Connections do
         {:error, CallFailure.returned(server_name(server), name, reason)}
     end
   end
+
+  # ExMCP ends a request that has a stream of its own (one that asked for
+  # progress) a second after the timeout the call was made with, and its
+  # server ends the tool with the stream (`ExMCP.Client`'s `:request_timeout`).
+  # The caller's `:timeout` is Imp's to keep, the way a plain request its
+  # caller stopped waiting for runs on: the call is made from a process of its
+  # own with the whole request limit, and the caller is answered at its own
+  # timeout, `:unknown` (`reason: :timeout`), while the request runs on. The
+  # answer the caller no longer waits for goes to an alias that is gone by
+  # then. This retires if ExMCP leaves a timed-out request's stream open.
+  defp await_call(client, name, arguments, server, opts) do
+    reply_to = :erlang.alias([:reply])
+    whole = Keyword.put(opts, :timeout, request_limit(opts))
+
+    spawn(fn ->
+      answer =
+        try do
+          call_tool(client, name, arguments, server, whole)
+        catch
+          kind, reason -> {:raised, kind, reason, __STACKTRACE__}
+        end
+
+      send(reply_to, {reply_to, answer})
+    end)
+
+    receive do
+      {^reply_to, answer} -> answer
+    after
+      timeout(opts) ->
+        :erlang.unalias(reply_to)
+
+        receive do
+          {^reply_to, answer} -> answer
+        after
+          0 -> {:error, CallFailure.returned(server_name(server), name, :timeout)}
+        end
+    end
+  end
+
+  # How long an HTTP request can take as its connection bounds it (see
+  # `http_bounds/1`).
+  defp request_limit(opts),
+    do: @http_dns_timeout + @http_connect_timeout + max(timeout(opts), @http_request_timeout)
 
   defp still_out?({:error, %CallFailure{reason: :timeout}}), do: true
   defp still_out?({:error, %CallFailure{reason: {:exit, {:timeout, _call}}}}), do: true
@@ -1037,6 +1153,47 @@ defmodule Imp.MCP.Connections do
     end
   end
 
+  # A deprecated-SSE server names in its stream's first event the URL requests
+  # are posted to, and ExMCP posts there, with every header the connection
+  # carries, from inside the dial (`ExMCP.Transport.HTTP.LegacySSE.connect/1`):
+  # nothing outside it sees that URL before the first request, and ExMCP does
+  # not check it against the stream's origin. Headers given to an `sse`
+  # descriptor could therefore reach any origin its server names, so a
+  # descriptor that declares headers or auth is refused as `sse`. This retires
+  # if ExMCP holds the posting URL to the stream's origin.
+  defp sse_without_credentials(%{"type" => "sse"} = server) do
+    declared? = Map.get(server, "headers", []) not in [nil, []] or Map.has_key?(server, "auth")
+
+    if declared? do
+      {:error,
+       {:mcp_sse_credentials_refused, server_name(server),
+        ~s(an sse server names where requests are posted, and its headers and auth ) <>
+          ~s(would go there whatever origin it names; connect to its Streamable HTTP ) <>
+          ~s(endpoint with type: "http")}}
+    else
+      :ok
+    end
+  end
+
+  defp sse_without_credentials(_server), do: :ok
+
+  # ExMCP rebuilds an event stream's URL from its origin and path and drops a
+  # query string (`ExMCP.Transport.HTTP.LegacySSE`), so a URL that carries one
+  # would be dialed as another URL.
+  defp sse_url_without_query(%{"type" => "sse", "url" => url} = server) when is_binary(url) do
+    case URI.new(url) do
+      {:ok, %URI{query: query}} when is_binary(query) ->
+        {:error,
+         {:mcp_sse_url_refused, server_name(server),
+          "an sse server's url cannot carry a query string: ExMCP would dial it without one"}}
+
+      _other ->
+        :ok
+    end
+  end
+
+  defp sse_url_without_query(_server), do: :ok
+
   defp static_headers(server),
     do: name_value_list!(Map.get(server, "headers", []), "headers")
 
@@ -1140,7 +1297,7 @@ defmodule Imp.MCP.Connections do
           reconnect: false
         ]
 
-      type when type in ["http", "sse"] ->
+      "http" ->
         url = required_string!(server, "url")
 
         [
@@ -1152,26 +1309,74 @@ defmodule Imp.MCP.Connections do
           # assert, and a server that allow-lists browser origins refuses it
           # (Scry answers 403). No `Origin` header is sent.
           security: %{origin: nil},
-          use_sse: type == "sse",
-          # ExMCP bounds each HTTP request by these, apart from how long the
-          # caller waits: resolving the name, connecting (ExMCP reads the
-          # connect bound from `:timeout`, which is also the client's wait for
-          # a request made without one; Imp passes one on every request), and
-          # the request itself. The request bound is the host's `:timeout`, so
-          # a call it allows is not cut off by ExMCP's own 30 s default, and
-          # never less than that default: a request its caller stopped waiting
-          # for is left to finish on the server (see `Imp.MCP.Clients`).
-          dns_timeout_ms: @http_dns_timeout,
-          timeout: @http_connect_timeout,
-          request_timeout: max(timeout(opts), @http_request_timeout),
-          era_probe_timeout: timeout(opts),
-          handshake_timeout: timeout(opts),
-          health_check_interval: nil,
-          reconnect: false
-        ] ++ root_endpoint(url)
+          use_sse: false
+        ] ++ http_bounds(opts) ++ root_endpoint(url)
+
+      # MCP's deprecated HTTP+SSE transport (2024-11-05): a GET event stream at
+      # the descriptor's URL, whose `endpoint` event names where requests are
+      # posted. ExMCP's `ExMCP.Transport.HTTP.LegacySSE` takes the server's
+      # origin and the stream's path apart.
+      "sse" ->
+        url = required_string!(server, "url")
+        {origin, path} = sse_url!(url)
+
+        [
+          transport: :sse,
+          url: origin,
+          sse_path: path,
+          headers: headers,
+          stream_handshake_timeout: timeout(opts),
+          # ExMCP ends a stream after this long with nothing on it, and a
+          # request still out then has no stream to answer on: the stream waits
+          # longer than a request can take, and never less than ExMCP's 60 s.
+          stream_idle_timeout: max(@http_stream_idle_timeout, request_limit(opts) + 1_000)
+        ] ++ http_bounds(opts)
 
       type ->
         raise ArgumentError, "unsupported ACP MCP server type: #{inspect(type)}"
+    end
+  end
+
+  # ExMCP bounds each HTTP request by these, apart from how long the caller
+  # waits: resolving the name, connecting (ExMCP reads the connect bound from
+  # `:timeout`, which is also the client's wait for a request made without one;
+  # Imp passes one on every request), and the request itself. The request
+  # bound is the host's `:timeout`, so a call it allows is not cut off by
+  # ExMCP's own 30 s default, and never less than that default: a request its
+  # caller stopped waiting for is left to finish on the server (see
+  # `Imp.MCP.Clients`).
+  defp http_bounds(opts) do
+    [
+      dns_timeout_ms: @http_dns_timeout,
+      timeout: @http_connect_timeout,
+      request_timeout: max(timeout(opts), @http_request_timeout),
+      era_probe_timeout: timeout(opts),
+      handshake_timeout: timeout(opts),
+      health_check_interval: nil,
+      reconnect: false
+    ]
+  end
+
+  # The event stream's URL, as the origin ExMCP posts under and the path it
+  # GETs. A URL without a path is the conventional `/sse`. A URL with a query
+  # string was refused before this (`sse_url_without_query/1`).
+  defp sse_url!(url) do
+    case URI.new(url) do
+      {:ok, %URI{scheme: scheme, host: host, query: nil} = uri}
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        port = if uri.port in [nil, URI.default_port(scheme)], do: "", else: ":#{uri.port}"
+        host = if String.contains?(host, ":"), do: "[#{host}]", else: host
+
+        path =
+          case uri.path do
+            path when path in [nil, "", "/"] -> "/sse"
+            path -> path
+          end
+
+        {"#{scheme}://#{host}#{port}", path}
+
+      _other ->
+        raise ArgumentError, "MCP server url must be an absolute HTTP(S) URL"
     end
   end
 

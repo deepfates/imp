@@ -91,6 +91,34 @@ User-visible changes to Imp are recorded here.
   closed once that request is done, so the server finishes what it was doing;
   a replacement that cannot be dialed leaves the server a connection fewer.
 
+- `"type" => "sse"` now means MCP's deprecated HTTP+SSE transport (2024-11-05):
+  the descriptor's `"url"` is the event stream's (`https://host/sse`), and
+  requests go to the URL the server names on it. Before, `sse` was Streamable
+  HTTP with a standing GET stream, so a server that speaks only the old
+  transport answered its first request with 405. It works with servers that
+  name the session `sessionId` (the TypeScript SDK's, ExMCP's), not with the
+  Python SDK's SSE servers (`session_id`): their dial fails with
+  `:sse_endpoint_without_session_id` and a message saying to use `"http"`. A
+  server that speaks Streamable HTTP is reached as `"http"`. An `sse`
+  descriptor with `"headers"` or `"auth"` is refused
+  (`:mcp_sse_credentials_refused`): the server names where requests go, and
+  its credentials would go there whatever origin it named. Under
+  `on_failure: :drop` only that server is left out, with a warning, and so is
+  an `sse` URL with a query string (`:mcp_sse_url_refused`), which ExMCP would
+  dial without it. An `sse` connection whose event stream ends (ExMCP ends it
+  after a stretch with nothing on it, and does not reopen it) is replaced,
+  rather than kept and lent; the stretch is at least 60 s and longer than a
+  request can take.
+
+- A call to an HTTP MCP server that asks for progress (`call_meta` with a
+  `progressToken`) no longer loses its server-side work when the caller's
+  `:timeout` passes. ExMCP ended such a request's stream a second after the
+  call's timeout, and its server ended the tool with it: a 3 s write under a
+  300 ms timeout never finished. The caller is still answered at its
+  `:timeout`, `:unknown` with `reason: :timeout` (formerly a process exit
+  for a plain request), and the request runs on to the connection's limit.
+  `:call_meta` is still called in the process that makes the call.
+
 - An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
   ended every HTTP request at its own 30 s default whatever `:timeout` said,
   so a call to a tool that takes 33 s failed at about 30 s under
