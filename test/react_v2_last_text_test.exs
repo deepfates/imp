@@ -188,6 +188,20 @@ defmodule ReActV2LastTextTest do
     assert note =~ "Last one."
   end
 
+  test "a failed last request records both failures under :initial and :last_text" do
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> raise(RuntimeError, "provider unavailable") end
+      )
+
+    program = Imp.react_v2("intent -> answer", [look()], lm: lm)
+
+    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+    assert Imp.get(prediction, :termination_cause) == :prediction_error
+    assert %{initial: _first, last_text: _last} = error = Imp.get(prediction, :termination_error)
+    assert Map.keys(error) |> Enum.sort() == [:initial, :last_text]
+  end
+
   test "a step that calls nothing and says nothing is an empty answer, with no further request" do
     owner = self()
     counter = :counters.new(1, [])
