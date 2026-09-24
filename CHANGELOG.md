@@ -154,9 +154,16 @@ User-visible changes to Imp are recorded here.
 
 ### ReActV2, adapters and models
 
+- The names follow the glossary: a step answered in text ends as `:answered`,
+  the last request of an interrupted turn as `:last_text` with
+  `last_text_note`, the step signature declares `metadata[:text_step]`, and
+  the tool list sent to a provider is the `:tools_sent` event. Builds of
+  `main` between 0.4.0 and 0.5.0 called them `:last_prose`,
+  `last_prose_note`, `:prose_step` and `:tools_offered`; a store that kept
+  events under the old kind reads them back as `:other`.
 - `ReActV2` offers `submit` only to a signature that needs it. A task
   signature with exactly one output of type `:string` gets no `submit` tool:
-  a step that comes back as prose with no tool call is the answer, in that
+  a step that comes back as text with no tool call is the answer, in that
   one request, with `termination_reason: :answered`, which is how Anthropic's
   tool runner, the OpenAI Agents SDK, LangGraph's ReAct and Pydantic AI end a
   turn. Its history event carries the output, as a `submit`'s does, and the
@@ -167,19 +174,19 @@ User-visible changes to Imp are recorded here.
   :answered` and no further request, because saying nothing is how a model
   declines to answer.
 - An interrupted turn of a one-text-output signature (the step limit, a
-  failed request, prose the output does not accept) makes one more
+  failed request, text the output does not accept) makes one more
   request with the same tools as every step and `tool_choice: "auto"`, and its
-  text is the answer, with `termination_reason: :last_prose`
+  text is the answer, with `termination_reason: :last_text`
   and `termination_cause` naming the interruption (`:max_iters`,
   `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
   run; the text is the answer and the calls are listed in
-  `unexecuted_tool_calls`. `last_prose_note`, a string, puts one line of host text in
+  `unexecuted_tool_calls`. `last_text_note`, a string, puts one line of host text in
   front of that request as a user message and keeps it in the returned
   history; Imp writes no sentence of its own. If the process's `Imp.Deadline`
   has already passed, no request is made and the run ends with
   `termination_reason: :deadline_exceeded`. `forced_submit_notice` is for
-  signatures with `submit` and `last_prose_note` for those without; each is
+  signatures with `submit` and `last_text_note` for those without; each is
   refused at construction for the other.
 - `ReActV2` gains `finish_on`, a map from tool name to
   `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. A tool
@@ -191,19 +198,19 @@ User-visible changes to Imp are recorded here.
   step calls several terminal tools, the first in call order finishes the run
   and the rest still execute and are recorded; a `submit` in the same step
   still wins. The functions persist by registry name, like a tool runner.
-- A `ReActV2` step answered in plain prose with no tool call is now a thought
+- A `ReActV2` step answered in plain text with no tool call is now a thought
   that called nothing, not a parse failure. It used to fail the chat parse and
   re-ask the whole prompt through `Imp.Adapter.JSON`, which doubled the cost of
-  the step and broke the provider's prefix cache; the prose is now
+  the step and broke the provider's prefix cache; the text is now
   `next_thought` and `tool_calls` is empty, which is what the turn-ending rule
-  above then reads. The prose is
+  above then reads. The text is
   recorded as that turn's thought in the history and shown back to the model as
   a plain assistant turn in any next request. `Imp.Adapter.Chat` reads a
   marker-free completion this way only for a signature that declares
-  `metadata[:prose_step]`; every other signature parses exactly as before, JSON
+  `metadata[:text_step]`; every other signature parses exactly as before, JSON
   fallback included.
 - `Imp.Observability` reports a prediction that ended `:answered`,
-  `:last_prose` or `:finished_by_tool` as complete; it reported them as
+  `:last_text` or `:finished_by_tool` as complete; it reported them as
   incomplete.
 - ReActV2 preserves provider-native reasoning text and opaque reasoning details
   across tool calls and saved-history reloads. ReqLLM receives the original
@@ -216,7 +223,7 @@ User-visible changes to Imp are recorded here.
   definitions removed, and `:tools_hash`, a SHA-256 of the canonical JSON of
   those definitions or `nil` when the request offered none. The definitions
   themselves are emitted once per run per distinct hash, as a new
-  `:tools_offered` event whose input is the tool list as sent. A recorded run
+  `:tools_sent` event whose input is the tool list as sent. A recorded run
   can now be reproduced call for call, without repeating an unchanging roster
   on every one. Both payloads are redacted like every other event.
 - `Imp.LM.generate/3` takes `purpose:`, a name for what kind of call this is.

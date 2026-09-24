@@ -38,7 +38,7 @@ Ordinary Imp startup starts no protocol endpoint.
   failing.
 - `ReActV2` gains `finish_on` for tools whose call is the answer.
 - `:model_request` events record the whole request, and tool definitions are
-  emitted once per run as `:tools_offered`.
+  emitted once per run as `:tools_sent`.
 - An MCP tool call that got no answer says whether it was refused, never sent,
   or may have run (`Imp.MCP.CallFailure`, `Imp.Tool.outcome/1`), and a failed
   tool call reaches the model as plain text.
@@ -94,7 +94,7 @@ Ordinary Imp startup starts no protocol endpoint.
 - For a signature with one `:string` output, `ReActV2` offers no `submit`
   tool, and a step answered in prose with no tool call ends the turn. Code that
   matches on `termination_reason` meets three new values: `:answered`,
-  `:last_prose` and `:finished_by_tool`.
+  `:last_text` and `:finished_by_tool`.
 
 ## Upgrade path
 
