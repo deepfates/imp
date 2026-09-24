@@ -2,8 +2,44 @@
 
 User-visible changes to Imp are recorded here.
 
-## Unreleased
+## 0.5.0 — not yet released
 
+- Imp is a Hex package: `{:imp, "~> 0.5"}`. Every dependency comes from Hex,
+  including ExMCP (`~> 1.5`, unpatched); the `deepfates/ex_mcp` Git fork, the
+  bundled `vendor/ex_mcp` path and the `EX_MCP_PATH` override are gone.
+- What 0.4.0 got from the fork now lives in Imp: stdio MCP servers in their
+  own process group, a `PATH` without the release's own directories, and the
+  HTTP options public servers need (no `Origin` header, a written `/` path
+  kept, one retry with the standard `initialize` after a non-401 4xx on the
+  era probe). What an upgrader meets:
+  - erlexec is a direct dependency. It builds a C++ port program, and an OTP
+    release that uses `Imp.MCP` or `Imp.ACP` lists
+    `applications: [ex_mcp: :load, erlexec: :load]`.
+  - Imp sets `SHELL=/bin/sh` in a VM started without `SHELL`, because
+    erlexec's port program does not start without it.
+  - Closing a stdio connection, or the death of the process that owns it,
+    sends the server's group SIGTERM and SIGKILL one second later; 0.4.0 stopped
+    the group without a SIGTERM a server could handle.
+  - When a stdio server exits on its own, what is left of its group gets
+    SIGKILL half a second later.
+  - Trust for an authorized remote server is VM-wide: while a connection to it
+    is open, its exact origin is in ExMCP's `trusted_origins`, so any ExMCP
+    client in the VM may send credentials to that origin. In 0.4.0 the trust
+    belonged to the one connection. The origin is removed when the last
+    connection to it closes, and origins the host configured are left alone.
+- A tool's name keeps the type it was given. `Imp.Tool.new/4` no longer turns a
+  string into an atom that happens to exist, and tools imported from an MCP
+  server are always named by the server's string. Lookups (`resolve_name/2`,
+  tool policies) already compare names by text; code that matched an imported
+  tool's name against an atom matches the string now.
+- `Imp.Predict.ReActV2.new/3` documents its options.
+- `Imp.MCP.OAuth.begin/3` runs its own browser flow on ExMCP's public OAuth
+  functions. Its `:flow` option is replaced by `:client_registration`
+  (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`);
+  a pre-registered client also names its `:client_issuer`, and the flow
+  refuses to begin when the server names a different authorization server. A
+  server with neither protected-resource nor authorization-server metadata is
+  refused rather than given guessed `/authorize` and `/token` endpoints.
 - A run no longer outlives its control process. When the control ends,
   whether its event sink's process died or `Imp.Run.stop/1` was called while
   the run was still going, the task is killed and every cancellation registered by
@@ -13,7 +49,6 @@ User-visible changes to Imp are recorded here.
   monitor then reports `:killed`. `Imp.Run.cancel/2` on a run whose control
   has already ended still exits (`:noproc`), but there is no longer a task
   left to stop.
-
 - An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
   The run's owner is sent
   `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
@@ -39,14 +74,6 @@ User-visible changes to Imp are recorded here.
   `Imp.Tool.outcome/1` gives the outcome of any tool call (`:result` when the
   tool answered, MCP error results included), and ReActV2 and RLM record it on
   each `:tool_result` event as `metadata.outcome`.
-
-- The last request of an interrupted one-text-output turn no longer says
-  `tool_choice: "none"`. It is a step like any other, with the same tools and
-  `tool_choice: "auto"`. Told "none" while it wanted a tool, a model wrote the
-  call as text in its own tool markup, and that text became the answer. A tool
-  call on that request is still not run and is listed in
-  `unexecuted_tool_calls`; the answer is the completion's text, which may be
-  empty.
 
 - A failed tool call reaches the model as plain text instead of an Elixir
   term. An MCP error result is the text of its content, the tool's own words,
@@ -89,7 +116,8 @@ User-visible changes to Imp are recorded here.
   declines to answer.
 - An interrupted turn of a one-text-output signature (the step limit, a
   failed request, prose the output does not accept) makes one more
-  request with the same tools as every step, and its text is the answer, with `termination_reason: :last_prose`
+  request with the same tools as every step and `tool_choice: "auto"`, and its
+  text is the answer, with `termination_reason: :last_prose`
   and `termination_cause` naming the interruption (`:max_iters`,
   `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
@@ -100,8 +128,7 @@ User-visible changes to Imp are recorded here.
   has already passed, no request is made and the run ends with
   `termination_reason: :deadline_exceeded`. `forced_submit_notice` is for
   signatures with `submit` and `last_prose_note` for those without; each is
-  refused at construction for the other. There is no `prose` or
-  `on_max_iters` option, and a dump no longer carries them.
+  refused at construction for the other.
 - `Imp.Observability` reports a prediction that ended `:answered`,
   `:last_prose` or `:finished_by_tool` as complete; it reported them as
   incomplete.

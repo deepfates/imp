@@ -255,6 +255,36 @@ defmodule DocumentationContractTest do
     refute readme =~ "01_programming_not_prompting"
   end
 
+  # ExDoc resolves a relative link to a Markdown file by its base name alone,
+  # so `examples/deployment/README.md` opens whichever rendered extra is called
+  # README.md. Every relative link in a rendered page must name the page it
+  # opens there.
+  test "relative links in the rendered docs open the page they name" do
+    extras =
+      Mix.Project.config()
+      |> Keyword.fetch!(:docs)
+      |> Keyword.fetch!(:extras)
+      |> Enum.map(fn
+        {path, _opts} -> to_string(path)
+        path -> path
+      end)
+
+    by_name = Map.new(extras, &{Path.basename(&1), &1})
+
+    wrong =
+      for page <- extras,
+          [_, target] <-
+            Regex.scan(~r/\]\(([^)#\s]+\.(?:md|livemd))(?:#[^)]*)?\)/, File.read!(page)),
+          not String.contains?(target, "://"),
+          named =
+            page |> Path.dirname() |> Path.join(target) |> Path.expand() |> Path.relative_to_cwd(),
+          opened = Map.get(by_name, Path.basename(target)),
+          opened != nil and opened != named,
+          do: {page, target, opened}
+
+    assert wrong == [], "relative links that open another page: #{inspect(wrong)}"
+  end
+
   test "README common workflow snippets compose as one coherent path" do
     typed_lm = %{
       module: Imp.LM.Static,
@@ -594,7 +624,7 @@ defmodule DocumentationContractTest do
 
     [tool] = Imp.MCP.import_tools(catalog)
 
-    assert tool.name == :lookup
+    assert tool.name == "lookup"
     assert {:ok, [^tool]} = Imp.Tool.validate_tools([tool])
     assert {:error, message} = Imp.Tool.validate_tools([:not_a_tool])
     assert message =~ "expected a list of Imp.Tool structs"

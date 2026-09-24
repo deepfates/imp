@@ -124,30 +124,92 @@ defmodule Imp.Predict.ReActV2 do
   @type t :: %__MODULE__{}
 
   @option_schema [
-    lm: [type: {:custom, Imp.LM, :validate_lm, []}],
-    adapter: [type: {:custom, Imp.Adapter, :validate_adapter, []}],
-    demos: [type: {:list, :any}, default: []],
-    config: [type: :keyword_list, default: []],
-    # Handed to the adapter beside the loop's own guidance; a host injects its
-    # renderers here (`Imp.Adapter.Chat` `:system_renderer`).
-    adapter_opts: [type: :keyword_list, default: []],
-    metadata: [type: {:map, :any, :any}, default: %{}],
-    max_iters: [type: :non_neg_integer, default: 20],
-    tool_policy: [type: {:custom, Imp.ToolPolicy, :validate, []}, default: :allow],
-    # What to tell the model when the loop makes it submit, for a signature
-    # that has `submit`. A 1-arity function of the termination reason, or a
-    # plain string; nil says nothing.
-    forced_submit_notice: [type: {:or, [{:fun, 1}, :string, nil]}, default: nil],
-    # One line of text put in front of the last request of an interrupted turn,
-    # for a signature with one text output. nil says nothing, and Imp never
-    # writes a sentence of its own.
-    last_prose_note: [type: {:or, [:string, nil]}, default: nil],
-    # Tools that end the turn with the outputs they carry, the shape Pydantic
-    # AI calls an output tool. Name to
-    # `fn arguments, result, inputs -> {:finish, outputs} | :continue end`.
-    finish_on: [type: {:custom, __MODULE__, :validate_finish_on, []}, default: %{}]
+    lm: [
+      type: {:custom, Imp.LM, :validate_lm, []},
+      doc: "The model each step calls. When absent, each call uses `Imp.Settings`' `:lm`."
+    ],
+    adapter: [
+      type: {:custom, Imp.Adapter, :validate_adapter, []},
+      doc:
+        "The adapter that renders each step's request and parses its reply. When " <>
+          "absent, each call uses `Imp.Settings`' `:adapter`."
+    ],
+    demos: [
+      type: {:list, :any},
+      default: [],
+      doc: "Worked examples for the step predictor, as for `Imp.Predict.Predict`."
+    ],
+    config: [
+      type: :keyword_list,
+      default: [],
+      doc:
+        "Request options for every step (temperature, max tokens, ...). The tool " <>
+          "roster is added here, so do not pass `:tools`."
+    ],
+    adapter_opts: [
+      type: :keyword_list,
+      default: [],
+      doc:
+        "Options handed to the adapter beside the loop's own guidance; a host " <>
+          "injects its renderers here, such as `Imp.Adapter.Chat`'s `:system_renderer`."
+    ],
+    metadata: [
+      type: {:map, :any, :any},
+      default: %{},
+      doc: "Free-form metadata kept on the step predictor."
+    ],
+    max_iters: [
+      type: :non_neg_integer,
+      default: 20,
+      doc:
+        "Steps before the turn is interrupted. An interrupted turn ends with the " <>
+          "forced `submit`, or, for a signature with one text output, one last " <>
+          "text-only request."
+    ],
+    tool_policy: [
+      type: {:custom, Imp.ToolPolicy, :validate, []},
+      default: :allow,
+      doc: "Which tool calls may run; see `Imp.ToolPolicy`."
+    ],
+    forced_submit_notice: [
+      type: {:or, [{:fun, 1}, :string, nil]},
+      default: nil,
+      doc:
+        "For a signature that has `submit`: what the model is told when the loop " <>
+          "makes it submit. A string, or a function of the termination reason that " <>
+          "returns one. `nil` says nothing. Refused for a signature with one text output."
+    ],
+    last_prose_note: [
+      type: {:or, [:string, nil]},
+      default: nil,
+      doc:
+        "For a signature with exactly one `:string` output: one line of host text " <>
+          "put in front of the last request of an interrupted turn and kept in the " <>
+          "history. `nil` says nothing; Imp writes no sentence of its own. Refused " <>
+          "for any other signature."
+    ],
+    finish_on: [
+      type: {:custom, __MODULE__, :validate_finish_on, []},
+      default: %{},
+      doc:
+        "Tools whose call ends the turn: a map from tool name to " <>
+          "`fn arguments, result, inputs -> {:finish, outputs} | :continue end`. " <>
+          "See \"How a turn ends\" above."
+    ]
   ]
 
+  @doc """
+  Builds a ReAct loop over `tools` for `signature`.
+
+  `tools` is a list of `Imp.Tool` values; the name `submit` is reserved. The
+  signature decides whether the loop has a `submit` tool (see the module
+  documentation).
+
+  ## Options
+
+  #{NimbleOptions.docs(@option_schema)}
+  """
+  @spec new(Imp.Signature.t() | String.t(), [Imp.Tool.t()], keyword()) :: t()
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")

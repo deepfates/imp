@@ -12,6 +12,7 @@ defmodule Imp.Application do
       Imp.Settings,
       Imp.Cache,
       Imp.Tasks.Admission,
+      Imp.MCP.Trust,
       {Task.Supervisor, name: Imp.TaskSupervisor},
       {Task.Supervisor, name: Imp.UnlinkedTaskSupervisor},
       {Registry, keys: :unique, name: Imp.Clients.MLXLMDeployment.Registry},

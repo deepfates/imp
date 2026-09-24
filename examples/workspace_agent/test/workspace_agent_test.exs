@@ -110,26 +110,26 @@ defmodule WorkspaceAgentTest do
   end
 
   test "host-authorized MCP descriptors become ordinary external tools", %{root: root} do
-    adapter_name = "../../.." |> Path.expand(__DIR__) |> Path.basename()
+    # The server is Imp's demo MCP server, started in this VM over HTTP, so the
+    # test runs wherever the example does: a source checkout or the Hex package.
+    {:ok, _started} = Application.ensure_all_started(:ex_mcp)
+    port = free_port()
+    ref = {__MODULE__, port}
 
-    env =
-      [%{"name" => "MIX_ENV", "value" => "test"}] ++
-        Enum.flat_map(["EX_MCP_PATH", "IMP_PATH"], fn name ->
-          case System.get_env(name) do
-            path when is_binary(path) and path != "" ->
-              [%{"name" => name, "value" => path}]
+    {:ok, _server} =
+      Imp.ACP.DemoMCPServer.start_link(
+        transport: :http,
+        port: port,
+        use_sse: false,
+        ranch_ref: ref
+      )
 
-            _unset ->
-              []
-          end
-        end)
+    on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
 
     server = %{
       "name" => "imp-acp-demo",
-      "type" => "stdio",
-      "command" => Path.expand("../../../scripts/imp-acp-demo-mcp-server", __DIR__),
-      "args" => [],
-      "env" => env
+      "type" => "http",
+      "url" => "http://127.0.0.1:#{port}/mcp"
     }
 
     assert {:error, {:mcp_server_not_authorized, "imp-acp-demo"}} =
@@ -147,11 +147,18 @@ defmodule WorkspaceAgentTest do
              )
 
     on_exit(cleanup)
-    tool = Map.fetch!(program.tools, :external_workspace_name)
-    assert Imp.Tool.call(tool, %{}) == adapter_name
+    tool = Map.fetch!(program.tools, "external_workspace_name")
+    assert Imp.Tool.call(tool, %{}) == Path.basename(File.cwd!())
 
     # The demo server declares readOnlyHint, so the kind the ACP host will apply
     # a permission mode to comes from the tool rather than from a table here.
     assert tool_kinds == %{"external_workspace_name" => "read"}
+  end
+
+  defp free_port do
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, ip: {127, 0, 0, 1}, active: false])
+    {:ok, port} = :inet.port(socket)
+    :ok = :gen_tcp.close(socket)
+    port
   end
 end
