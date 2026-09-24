@@ -213,14 +213,17 @@ defmodule Imp.MCPCallOutcomeTest do
   end
 
   describe "sent, with no trustworthy answer" do
-    # MCP servers send invalid params after a tool ran, too: the MCP
-    # TypeScript SDK reports a result that fails the tool's outputSchema that
-    # way. So the code alone does not say the tool did not run.
-    test "JSON-RPC invalid params is unknown" do
+    # ExMCP's server sends a tool handler's returned ProtocolError as the
+    # JSON-RPC error, after the handler ran. So the code alone does not say the
+    # tool did not run.
+    test "JSON-RPC invalid params is unknown: the handler that sent it had run" do
+      Process.register(self(), :mcp_outcome_probe)
       {_imported, tools} = http_tools(http_server())
 
       assert {:error, %CallFailure{outcome: :unknown, reason: %{"code" => -32_602}}} =
                call(tools, "invalid_params")
+
+      assert_received {:ran, "invalid_params"}
     end
 
     test "a handler that crashes after it started is unknown, not refused" do

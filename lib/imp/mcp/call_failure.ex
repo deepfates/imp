@@ -10,8 +10,9 @@ defmodule Imp.MCP.CallFailure do
     * `:refused` — declined before anything ran. The server answered with a
       JSON-RPC error that rejects the request before any method runs (parse
       error, invalid request, method not found), or the HTTP layer refused it
-      with a 4xx status (401 and 403 included). The same call will be refused
-      again.
+      with a 4xx status (401 and 403 included). Nothing ran, so repeating the
+      call is safe; whether it will succeed depends on why it was refused (a
+      408 or 429 may pass later, a 404 will not).
     * `:not_sent` — the request never left: the connection could not be
       opened, the address could not be resolved, the client was not connected,
       or the client process was already gone.
@@ -24,11 +25,17 @@ defmodule Imp.MCP.CallFailure do
       cancelled request, and a client that exited during the call. Check
       before repeating it.
 
-  Invalid params (-32602) is `:unknown`, not `:refused`, because MCP servers
-  send it after a tool has run: the MCP TypeScript SDK reports a result that
-  fails the tool's `outputSchema` as invalid params. An `ExMCP.Error.ProtocolError`
-  struct is `:unknown` whatever its code: ExMCP builds those itself, including
-  after the first round of a multi-round call has reached the server.
+  Invalid params (-32602) is `:unknown`, not `:refused`, because a server can
+  send it after its tool ran: MCP names it the code for a bad tool call, and
+  ExMCP's server passes a tool handler's returned `ExMCP.Error.ProtocolError`
+  on as the JSON-RPC error, after the handler ran
+  (`ExMCP.MessageProcessor.MethodHandlers.handle_tool_reply/3`). Parse error,
+  invalid request and method not found are read as refusals on the premise that
+  a server sends them before it dispatches to a tool, as JSON-RPC defines them;
+  a tool handler that returns one after acting breaks that premise, and the
+  code cannot show it. An `ExMCP.Error.ProtocolError` struct is `:unknown` whatever its code: ExMCP
+  builds those itself, including after the first round of a multi-round call
+  has reached the server.
 
   A timeout is `:unknown` even when the request was still waiting in the
   client: ExMCP's client sends a plain HTTP request from inside its own

@@ -240,7 +240,7 @@ or a 4xx status),
 `:not_sent` (the request never left) or `:unknown` (it was, or may yet be,
 delivered, with no trustworthy answer: a timeout, a closed connection after
 sending, a 5xx status, a handler that crashed or timed out on the server,
-invalid params, which MCP servers also send after a tool ran).
+invalid params, which a server can send after its tool ran).
 `reason` is ExMCP's own error, unchanged. `Imp.Tool.outcome/1` reads the
 outcome of any tool call, and ReActV2 and RLM record it on each `:tool_result`
 event as `metadata.outcome`. A timeout is always `:unknown`: ExMCP's client
