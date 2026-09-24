@@ -225,13 +225,27 @@ not such a contract. Retired Imp-specific backoff/Retry-After knobs are not
 reimplemented above ExMCP. Discovery errors are returned to the caller, which
 can decide whether to retry a new import.
 
-Tool errors now return `{:error, {:mcp_tool_error, original_envelope}}`, retaining
-`content`, `structuredContent`, error codes and operation identifiers. This
-replaces the old text-only error tuple so refusal, authorization refusal and
-indeterminate effect outcomes remain distinguishable. Successful `:text` and
-`:structured` result conversion remains unchanged. The model reads only the
-text of an error result's content (`Imp.MCP.failure_text/1`); the recorded
-term keeps the whole envelope.
+Tool errors return `{:error, {:mcp_tool_error, original_envelope}}`, retaining
+`content`, `structuredContent`, error codes and operation identifiers, so
+refusal, authorization refusal and indeterminate effect outcomes the tool
+reports remain distinguishable. Successful `:text` and `:structured` result
+conversion remains unchanged. The model reads only the text of an error
+result's content (`Imp.MCP.failure_text/1`); the recorded term keeps the whole
+envelope.
+
+A call that got no answer from its tool returns
+`{:error, %Imp.MCP.CallFailure{outcome: outcome, reason: reason}}`. `outcome`
+is `:refused` (a JSON-RPC parse error, invalid request or method not found,
+or a 4xx status),
+`:not_sent` (the request never left) or `:unknown` (it was, or may yet be,
+delivered, with no trustworthy answer: a timeout, a closed connection after
+sending, a 5xx status, a handler that crashed or timed out on the server,
+invalid params, which MCP servers also send after a tool ran).
+`reason` is ExMCP's own error, unchanged. `Imp.Tool.outcome/1` reads the
+outcome of any tool call, and ReActV2 and RLM record it on each `:tool_result`
+event as `metadata.outcome`. A timeout is always `:unknown`: ExMCP's client
+sends one HTTP request at a time from its own process, so a call that timed
+out waiting behind another is still sent afterwards.
 
 Each imported tool carries `metadata.mcp` with `server_name`, `tool_name`,
 `schema`, and `annotations`. These describe its original source, regardless of

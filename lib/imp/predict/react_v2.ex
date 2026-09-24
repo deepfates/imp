@@ -879,7 +879,8 @@ defmodule Imp.Predict.ReActV2 do
                 tool_call_id: call.id,
                 tool_name: call.name,
                 output: if(error?, do: nil, else: result),
-                error: if(error?, do: result, else: nil)
+                error: if(error?, do: result, else: nil),
+                metadata: %{outcome: if(error?, do: Imp.Tool.outcome(result), else: :result)}
               )
           end
 

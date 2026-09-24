@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- An MCP tool call that got no answer from its tool returns
+  `{:error, %Imp.MCP.CallFailure{}}` instead of
+  `{:mcp_tool_call_failed, server, reason}` or
+  `{:mcp_connection_unavailable, server, reason}`. Its `outcome` says whether
+  the call was refused before anything ran, never sent, or sent with no
+  trustworthy answer (`:refused`, `:not_sent`, `:unknown`); `reason` keeps
+  ExMCP's error unchanged, and an exit is kept as `{:exit, reason}`.
+  `Imp.Tool.outcome/1` gives the outcome of any tool call (`:result` when the
+  tool answered, MCP error results included), and ReActV2 and RLM record it on
+  each `:tool_result` event as `metadata.outcome`.
+
 - The last request of an interrupted one-text-output turn no longer says
   `tool_choice: "none"`. It is a step like any other, with the same tools and
   `tool_choice: "auto"`. Told "none" while it wanted a tool, a model wrote the

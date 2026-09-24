@@ -1,0 +1,433 @@
+defmodule Imp.MCPCallOutcomeTest do
+  # A tool call's outcome is one of four: the tool answered (`:result`), the
+  # server or Imp declined before anything ran (`:refused`), the request never
+  # left (`:not_sent`), or it left and no trustworthy answer came back
+  # (`:unknown`). Each case here drives the real ExMCP client against a real
+  # server and reads the outcome Imp decided, never the shape of the term.
+  use ExUnit.Case, async: false
+
+  alias Imp.MCP.CallFailure
+
+  @moduletag capture_log: true
+
+  setup_all do
+    {:ok, _} = Application.ensure_all_started(:ex_mcp)
+    :ok
+  end
+
+  defmodule Handler do
+    use ExMCP.Server.Handler
+    def init(_), do: {:ok, %{}}
+
+    @tools ~w(answer tool_error crash slow invalid_params no_method)
+
+    def handle_list_tools(_cursor, state) do
+      tools =
+        for name <- @tools,
+            do: %{"name" => name, "description" => name, "inputSchema" => %{"type" => "object"}}
+
+      {:ok, tools, nil, state}
+    end
+
+    def handle_call_tool(name, _arguments, state) do
+      if probe = Process.whereis(:mcp_outcome_probe), do: send(probe, {:ran, name})
+      call(name, state)
+    end
+
+    defp call("answer", state), do: {:ok, %{"content" => [text("done")]}, state}
+    defp call("tool_error", state), do: {:error, "the tool said no", state}
+    defp call("crash", _state), do: raise("the handler crashed")
+
+    defp call("slow", state) do
+      Process.sleep(1_000)
+      {:ok, %{"content" => [text("late")]}, state}
+    end
+
+    defp call("invalid_params", state),
+      do: {:error, ExMCP.Error.protocol_error(-32_602, "Unknown tool: missing"), state}
+
+    defp call("no_method", state),
+      do: {:error, ExMCP.Error.protocol_error(-32_601, "Method not found"), state}
+
+    defp text(value), do: %{"type" => "text", "text" => value}
+  end
+
+  # Stands in front of the MCP endpoint so a test can make the HTTP layer
+  # answer with a status, or hold one request before the server sees it.
+  defmodule Gate do
+    @behaviour Plug
+    def init(opts), do: ExMCP.HttpPlug.init(opts)
+
+    def call(conn, opts) do
+      key = {__MODULE__, conn.port}
+
+      case :persistent_term.get(key, :open) do
+        :open ->
+          ExMCP.HttpPlug.call(conn, opts)
+
+        {:hold_once, ms} ->
+          :persistent_term.put(key, :open)
+          Process.sleep(ms)
+          ExMCP.HttpPlug.call(conn, opts)
+
+        status when is_integer(status) ->
+          conn |> Plug.Conn.send_resp(status, "gate") |> Plug.Conn.halt()
+      end
+    end
+  end
+
+  defp free_port do
+    {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
+    {:ok, port} = :inet.port(socket)
+    :gen_tcp.close(socket)
+    port
+  end
+
+  defp http_server(server_opts \\ []) do
+    port = free_port()
+    ref = {__MODULE__, port}
+
+    {:ok, _} =
+      Plug.Cowboy.http(
+        Gate,
+        [
+          handler: Handler,
+          server_info: %{name: "outcome", version: "1"},
+          allowed_hosts: ["127.0.0.1"],
+          allowed_origins: :any
+        ] ++ server_opts,
+        port: port,
+        ref: ref
+      )
+
+    stop = fn ->
+      try do
+        Plug.Cowboy.shutdown(ref)
+      catch
+        _kind, _reason -> :ok
+      end
+    end
+
+    on_exit(fn ->
+      :persistent_term.erase({Gate, port})
+      stop.()
+    end)
+
+    %{port: port, stop: stop, url: "http://127.0.0.1:#{port}/mcp"}
+  end
+
+  defp gate(server, setting), do: :persistent_term.put({Gate, server.port}, setting)
+
+  defp tools(descriptor, opts) do
+    {:ok, imported} = Imp.MCP.connect([descriptor], [trusted_servers: [descriptor]] ++ opts)
+    on_exit(fn -> imported.cleanup.() end)
+    {imported, Map.new(imported.tools, &{to_string(&1.name), &1})}
+  end
+
+  defp http_tools(server, opts \\ []) do
+    tools(%{"name" => "outcome", "type" => "http", "url" => server.url}, opts)
+  end
+
+  defp call(tools, name), do: Imp.Tool.call(Map.fetch!(tools, name), %{})
+
+  describe "the tool answered" do
+    test "a successful call is a result" do
+      {_imported, tools} = http_tools(http_server())
+      assert "done" = result = call(tools, "answer")
+      assert Imp.Tool.outcome(result) == :result
+    end
+
+    test "an MCP error result is the tool's own answer, kept whole" do
+      {_imported, tools} = http_tools(http_server())
+      assert {:error, {:mcp_tool_error, envelope}} = result = call(tools, "tool_error")
+      assert envelope["isError"] == true
+      assert Imp.Tool.outcome(result) == :result
+    end
+  end
+
+  describe "declined before anything ran" do
+    test "JSON-RPC method not found is a refusal" do
+      {_imported, tools} = http_tools(http_server())
+
+      assert {:error,
+              %CallFailure{outcome: :refused, server: "outcome", tool: "no_method"} = failure} =
+               result = call(tools, "no_method")
+
+      assert %{"code" => -32_601} = failure.reason
+      assert Imp.Tool.outcome(result) == :refused
+    end
+
+    test "an HTTP 401 or 403 on the call is a refusal" do
+      server = http_server()
+      {_imported, tools} = http_tools(server)
+
+      for status <- [401, 403] do
+        gate(server, status)
+        assert {:error, %CallFailure{outcome: :refused}} = call(tools, "answer")
+      end
+    end
+
+    test "Imp's own validation and a host's authorization refuse before the tool runs" do
+      for reason <- [
+            {:unknown_tool, "frobnicate"},
+            {:malformed_tool_call, %{}},
+            {:missing_required, ["uri"]},
+            {:schema_validation, [%{field: "limit", message: "must be <= 100"}]},
+            {:tool_authorization_denied, :post, :client_denied},
+            {:tool_denied, :post},
+            {:rlm_tool_error, {:tool_denied, :post}}
+          ] do
+        assert Imp.Tool.outcome({:error, reason}) == :refused, inspect(reason)
+      end
+    end
+  end
+
+  describe "the request never left" do
+    test "a server that refuses the connection was not sent anything" do
+      server = http_server()
+      {_imported, tools} = http_tools(server)
+      server.stop.()
+
+      assert {:error, %CallFailure{outcome: :not_sent, reason: reason}} = call(tools, "answer")
+      # The durable error is ExMCP's own, not a summary of it.
+      assert %{type: :transport_error, message: "Failed to send request: " <> _} = reason
+    end
+
+    test "a closed import has no client to send through" do
+      {imported, tools} = http_tools(http_server())
+      imported.cleanup.()
+
+      assert {:error, %CallFailure{outcome: :not_sent, reason: {:exit, {:noproc, _}}}} =
+               call(tools, "answer")
+    end
+
+    @tag :tmp_dir
+    test "a stdio server that has exited leaves the client unconnected", %{tmp_dir: dir} do
+      {_imported, tools} = stdio_tools(dir)
+
+      assert {:error, %CallFailure{outcome: :unknown}} = call(tools, "exit")
+
+      assert {:error, %CallFailure{outcome: :not_sent, reason: :not_connected}} =
+               call(tools, "answer")
+    end
+  end
+
+  describe "sent, with no trustworthy answer" do
+    # MCP servers send invalid params after a tool ran, too: the MCP
+    # TypeScript SDK reports a result that fails the tool's outputSchema that
+    # way. So the code alone does not say the tool did not run.
+    test "JSON-RPC invalid params is unknown" do
+      {_imported, tools} = http_tools(http_server())
+
+      assert {:error, %CallFailure{outcome: :unknown, reason: %{"code" => -32_602}}} =
+               call(tools, "invalid_params")
+    end
+
+    test "a handler that crashes after it started is unknown, not refused" do
+      {_imported, tools} = http_tools(http_server())
+
+      assert {:error, %CallFailure{outcome: :unknown, reason: reason}} = call(tools, "crash")
+      assert %{"code" => -32_603, "data" => %{"type" => "handler_crash"}} = reason
+    end
+
+    test "a handler the server stopped waiting for is unknown, and it keeps running" do
+      Process.register(self(), :mcp_outcome_probe)
+      {_imported, tools} = http_tools(http_server(handler_call_timeout: 100))
+
+      assert {:error, %CallFailure{outcome: :unknown, reason: reason}} = call(tools, "slow")
+      assert %{"code" => -32_603, "data" => %{"type" => "handler_timeout"}} = reason
+      assert_received {:ran, "slow"}
+    end
+
+    test "a caller timeout is unknown: the server still runs the call" do
+      Process.register(self(), :mcp_outcome_probe)
+      {_imported, tools} = http_tools(http_server(), timeout: 300)
+
+      assert {:error, %CallFailure{outcome: :unknown, reason: :timeout}} = call(tools, "slow")
+      assert_receive {:ran, "slow"}, 2_000
+    end
+
+    # ExMCP's client makes a plain HTTP POST inside its own process, so a second
+    # call to the same server waits for the first. A call that times out while
+    # waiting has not left yet, but its request is still in the client's queue
+    # and is sent when the first finishes. So a timeout is never "not sent".
+    # The wait is over five seconds because ExMCP's pre-flight check before
+    # each call waits up to five seconds for the busy client, outside the
+    # call's own timeout.
+    @tag timeout: 30_000
+    test "a call that timed out waiting behind another is sent afterwards" do
+      Process.register(self(), :mcp_outcome_probe)
+      server = http_server()
+      {_imported, tools} = http_tools(server, timeout: 300)
+      gate(server, {:hold_once, 6_000})
+      spawn(fn -> call(tools, "slow") end)
+      Process.sleep(100)
+
+      assert {:error, %CallFailure{outcome: :unknown, reason: :timeout}} = call(tools, "answer")
+      refute_received {:ran, "answer"}
+      assert_receive {:ran, "answer"}, 5_000
+    end
+
+    test "a server error status after the request arrived is unknown" do
+      server = http_server()
+      {_imported, tools} = http_tools(server)
+
+      for status <- [500, 502, 503, 504] do
+        gate(server, status)
+        assert {:error, %CallFailure{outcome: :unknown}} = call(tools, "answer")
+      end
+    end
+
+    @tag :tmp_dir
+    test "a stdio server that exits during the call is unknown", %{tmp_dir: dir} do
+      {_imported, tools} = stdio_tools(dir)
+
+      assert {:error,
+              %CallFailure{outcome: :unknown, reason: %ExMCP.Error{code: :connection_error}}} =
+               call(tools, "exit")
+    end
+
+    test "a local tool that exits or raises may have acted" do
+      assert Imp.Tool.outcome({:error, {:tool_error, :lookup, {:exit, :killed}}}) == :unknown
+      assert Imp.Tool.outcome({:error, {:tool_error, :lookup, "boom"}}) == :unknown
+    end
+
+    test "an RLM budget that stopped or refused a tool call does not say whether it ran" do
+      for reason <- [
+            :rlm_time_budget_exceeded,
+            {:rlm_effect_exit, :killed},
+            {:rlm_cancelled, :owner_stopped},
+            {:rlm_max_llm_calls, 4}
+          ] do
+        assert Imp.Tool.outcome({:error, {:rlm_tool_error, reason}}) == :unknown, inspect(reason)
+      end
+    end
+  end
+
+  # Shapes ExMCP produces on paths a live server cannot be made to take on
+  # demand here: the streaming POST (its raw transport reason), a response
+  # stream that broke after delivery, a client that exits mid-call, and a
+  # cancelled request. Each is built exactly as ExMCP builds it.
+  describe "the shapes ExMCP reports on its other paths" do
+    test "each is classified by what it says about delivery" do
+      cases = [
+        {{:transport_error, %Mint.TransportError{reason: :econnrefused}}, :not_sent},
+        {{:transport_error, :dns_failed}, :not_sent},
+        {{:transport_error, {:unauthorized, 401, "", nil}}, :refused},
+        {{:transport_error, {:http_error, 429, ""}}, :refused},
+        {{:transport_error, {:http_error, 502, ""}}, :unknown},
+        {{:transport_error, {:http_receive_failed, %Mint.TransportError{reason: :closed}}},
+         :unknown},
+        {{:transport_error, {:http_request_failed, %Mint.TransportError{reason: :closed}}},
+         :unknown},
+        {transport_text({:http_receive_failed, %Mint.TransportError{reason: :timeout}}),
+         :unknown},
+        {transport_text(%Mint.TransportError{reason: :timeout}), :not_sent},
+        {transport_text(:dns_timeout), :not_sent},
+        {transport_text({:json_decode_error, %Jason.DecodeError{data: ""}}), :unknown},
+        {ExMCP.Error.transport_error(:http, :outcome_unknown, %{}), :unknown},
+        {ExMCP.Error.connection_error("Client disconnected"), :unknown},
+        {%{"code" => -32_800, "message" => "Request cancelled"}, :unknown},
+        {%{"code" => -32_700, "message" => "Parse error"}, :refused},
+        {%{"code" => -32_600, "message" => "Invalid Request"}, :refused},
+        # ExMCP builds these itself, some after the first round of a
+        # multi-round call reached the server (`ExMCP.Client` MRTR).
+        {%ExMCP.Error.ProtocolError{code: -32_602, message: "MRTR round limit exceeded"},
+         :unknown},
+        {%ExMCP.Error.ProtocolError{code: -32_601, message: "unsupported input"}, :unknown}
+      ]
+
+      for {reason, expected} <- cases do
+        assert CallFailure.returned("s", "t", reason).outcome == expected, inspect(reason)
+      end
+
+      assert CallFailure.exited("s", "t", {:noproc, {GenServer, :call, []}}).outcome ==
+               :not_sent
+
+      for exit <- [{:normal, {GenServer, :call, []}}, {:killed, {GenServer, :call, []}}, :timeout] do
+        assert CallFailure.exited("s", "t", exit).outcome == :unknown, inspect(exit)
+      end
+    end
+  end
+
+  describe "the record" do
+    test "a ReActV2 tool_result event carries the outcome" do
+      exits = Imp.Tool.new(:lookup, "look something up", fn _ -> exit(:killed) end)
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            if List.last(messages)[:role] == :tool,
+              do: "gave up",
+              else: %{
+                next_thought: "look",
+                tool_calls: [%{id: "call-1", name: "lookup", arguments: %{}}]
+              }
+          end
+        )
+
+      program = Imp.react_v2("question -> answer", [exits], lm: lm, max_iters: 2)
+      owner = self()
+
+      {:ok, run} =
+        Imp.Run.start(program, %{question: "q"}, event_sink: &send(owner, {:event, &1}))
+
+      assert_receive {:event, %{kind: :tool_result} = event}, 5_000
+      assert event.metadata.outcome == :unknown
+      assert Imp.Run.Event.to_map(event)["metadata"]["outcome"] == "unknown"
+      Imp.Run.cancel(run)
+    end
+
+    test "an MCP call failure serializes with its outcome beside the untouched reason" do
+      failure = CallFailure.returned("kite", "reply", :timeout)
+
+      assert %{
+               "outcome" => "unknown",
+               "server" => "kite",
+               "tool" => "reply",
+               "reason" => "timeout"
+             } =
+               Imp.Run.Event.to_map(%Imp.Run.Event{
+                 run_id: "r",
+                 sequence: 0,
+                 kind: :tool_result,
+                 error: failure
+               })["error"]
+    end
+  end
+
+  defp transport_text(reason),
+    do: %{type: :transport_error, message: "Failed to send request: #{inspect(reason)}"}
+
+  @stdio_script """
+  import json, os, sys
+  for line in sys.stdin:
+      request = json.loads(line)
+      method = request.get("method")
+      response = None
+      if method == "initialize":
+          response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {"protocolVersion": "2025-03-26", "capabilities": {"tools": {}}, "serverInfo": {"name": "stdio", "version": "1"}}}
+      elif method == "tools/list":
+          response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {"tools": [{"name": name, "description": name, "inputSchema": {"type": "object"}} for name in ["answer", "exit"]]}}
+      elif method == "tools/call":
+          if request["params"]["name"] == "exit":
+              os._exit(3)
+          response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {"content": [{"type": "text", "text": "done"}]}}
+      elif request.get("id") is not None:
+          response = {"jsonrpc": "2.0", "id": request["id"], "error": {"code": -32601, "message": "Method not found"}}
+      if response is not None:
+          sys.stdout.write(json.dumps(response) + "\\n")
+          sys.stdout.flush()
+  """
+
+  defp stdio_tools(dir) do
+    script = Path.join(dir, "server.py")
+    File.write!(script, @stdio_script)
+    python = System.find_executable("python3") || raise "python3 required for this test"
+
+    tools(
+      %{"name" => "stdio", "type" => "stdio", "command" => python, "args" => [script]},
+      timeout: 10_000
+    )
+  end
+end
