@@ -1051,15 +1051,24 @@ defmodule Imp.Clients.ReqLLM do
         opts
 
       deadline ->
-        remaining = Imp.Deadline.remaining(deadline)
+        # ReqLLM takes neither timeout as zero, and an expired deadline is a
+        # call that should end at once as a timeout rather than fail option
+        # validation.
+        remaining = max(Imp.Deadline.remaining(deadline), 1)
 
+        # :receive_timeout bounds one attempt's wait for the next bytes, and
+        # ReqLLM retries a timed-out attempt, and a 429 or 529 after its
+        # retry-after, so that cap alone let one call run to several
+        # multiples of the time left. :total_timeout is ReqLLM's bound on the
+        # whole call, retries and their waits included.
+        #
         # Cap :connect_options only when the caller supplied it — ReqLLM's
         # option schema rejects the key, so fabricating it here made every
         # deadline-bearing call fail validation (GEPA reflection was the
-        # only such caller and was undrivable live). The :receive_timeout
-        # cap alone bounds the call end to end.
+        # only such caller and was undrivable live).
         opts
         |> cap_timeout(:receive_timeout, remaining)
+        |> cap_timeout(:total_timeout, remaining)
         |> then(fn capped ->
           if Keyword.has_key?(capped, :connect_options) do
             Keyword.update!(capped, :connect_options, &cap_timeout(&1, :timeout, remaining))
