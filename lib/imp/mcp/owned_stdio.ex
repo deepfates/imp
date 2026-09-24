@@ -78,12 +78,23 @@ defmodule Imp.MCP.OwnedStdio do
         {:error, {:validation_error, {:embedded_newline, "a stdio frame is one line"}}}
 
       true ->
-        case call(state, {:send, message <> "\n"}) do
+        case write(state, message <> "\n") do
           :ok -> {:ok, state}
           {:error, :closed} -> {:error, :not_connected}
           {:error, reason} -> {:error, {:transport_error, {:send_failed, reason}}}
         end
     end
+  end
+
+  # Only a transport that was gone before the call, or that stopped with the
+  # write still queued behind its close, did not write. Any other exit, a
+  # timeout above all, leaves the write in the process's mailbox or half done
+  # in erlexec, so it may still reach the server.
+  defp write(state, data) do
+    GenServer.call(state.server, {:send, data})
+  catch
+    :exit, {reason, _call} when reason in [:noproc, :normal, :shutdown] -> {:error, :closed}
+    :exit, {reason, _call} -> {:error, {:exit, reason}}
   end
 
   @impl ExMCP.Transport
