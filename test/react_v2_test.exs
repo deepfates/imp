@@ -766,6 +766,74 @@ defmodule ReActV2Test do
     assert call.function.name == "lookup"
   end
 
+  # A turn recorded while the loop still offered `submit` is replayed to a loop
+  # that has none as what it was: the answer, in plain text. Shown as a call to
+  # a tool the request does not offer, a model can imitate it and write the
+  # raw tool-call markup as its answer.
+  test "a recorded submit is replayed as the answer's text to a loop without submit" do
+    submitted = fn thought, calls, results ->
+      Imp.History.new([
+        %{
+          question: "prior",
+          next_thought: thought,
+          tool_calls: Imp.Adapter.Types.ToolCalls.new(calls) |> Imp.Redaction.redact(),
+          tool_call_results: results
+        }
+      ])
+    end
+
+    no_submit = [guidance: %{finish_tool: nil, input_names: [], output_names: [], tool_names: []}]
+    signature = Imp.react_v2("question -> answer", []).react.signature
+
+    alone =
+      submitted.(
+        "",
+        [%{id: "s-1", name: "submit", arguments: %{answer: "Seven, exactly."}}],
+        [%{id: "s-1", name: "submit", result: "Completed.", error: false}]
+      )
+
+    assert [%{role: :system}, %{role: :user}, answer, %{role: :user}] =
+             Imp.Adapter.Chat.format(signature, %{history: alone, tools: []}, no_submit)
+
+    assert answer == %{role: :assistant, content: "Seven, exactly."}
+
+    beside =
+      submitted.(
+        "checking",
+        [
+          %{id: "l-1", name: "lookup", arguments: %{query: "beam"}},
+          %{id: "s-1", name: "submit", arguments: %{answer: "BEAM."}}
+        ],
+        [
+          %{id: "l-1", name: "lookup", result: "BEAM", error: false},
+          %{id: "s-1", name: "submit", result: "Completed.", error: false}
+        ]
+      )
+
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{role: :assistant, content: "checking", tool_calls: [call]},
+             %{role: :tool, content: "BEAM"},
+             %{role: :assistant, content: "BEAM."},
+             %{role: :user}
+           ] = Imp.Adapter.Chat.format(signature, %{history: beside, tools: []}, no_submit)
+
+    assert call.function.name == "lookup"
+
+    # A loop that still has submit replays the call as recorded.
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{tool_calls: [kept]},
+             %{role: :tool},
+             %{role: :user}
+           ] =
+             Imp.Adapter.Chat.format(signature, %{history: alone, tools: []}, [])
+
+    assert kept.function.name == "submit"
+  end
+
   test "participates in LM demo and registry-backed persistence lifecycle" do
     runner = fn %{query: query} -> query end
     registry = Imp.Saving.Registry.new(lookup_runner: runner)
