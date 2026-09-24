@@ -108,7 +108,9 @@ defmodule Imp.MixProject do
       {:jsv, "~> 0.21"},
       {:nimble_options, "~> 1.1"},
       {:req, "~> 0.6"},
-      {:req_llm, "~> 1.17"},
+      # 1.18 is the first release with :total_timeout, which bounds a call
+      # under an Imp.Deadline including ReqLLM's retries (Imp.Clients.ReqLLM).
+      {:req_llm, "~> 1.18"},
       {:saxy, "~> 1.6"},
       {:telemetry, "~> 1.3"},
       {:bandit, "~> 1.0", only: :test},

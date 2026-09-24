@@ -185,4 +185,59 @@ defmodule Imp.ModelResponseCostTest do
     snapshot = Imp.Optimizer.Budget.snapshot(budget)
     assert snapshot["usage"] == %{"input_tokens" => 3, "output_tokens" => 2, "usd" => 0.001858}
   end
+
+  # A call under an `Imp.Deadline` carries ReqLLM's `:total_timeout`, and ReqLLM
+  # runs such a call in a task of its own, so its usage telemetry is emitted from
+  # that task rather than from the process that made the call. The budget has to
+  # count it anyway: a campaign whose calls run under a deadline (every GEPA
+  # trial) otherwise spends without the ceiling seeing any of it.
+  test "a budgeted call under a deadline records the usage the provider reports" do
+    assert {:ok, budget} =
+             Imp.start_optimizer_budget(
+               limits: %{requests: 2, input_tokens: 10_000, output_tokens: 20, usd: 1.0},
+               pricing: %{"input_per_million" => 1.0, "output_per_million" => 2.0},
+               default_max_output_tokens: 20
+             )
+
+    base_url =
+      Imp.Test.LocalHTTP.start(fn _request ->
+        {200,
+         %{
+           "id" => "usage",
+           "object" => "chat.completion",
+           "model" => "usage-model",
+           "choices" => [
+             %{
+               "index" => 0,
+               "finish_reason" => "stop",
+               "message" => %{"role" => "assistant", "content" => "pong"}
+             }
+           ],
+           "usage" => %{"prompt_tokens" => 7, "completion_tokens" => 3, "total_tokens" => 10}
+         }}
+      end)
+
+    inner =
+      Imp.req_llm(
+        %{
+          provider: :openai,
+          id: "usage-model",
+          model: "usage-model",
+          base_url: base_url <> "/v1"
+        },
+        api_key: "local-test-key",
+        cache: false
+      )
+
+    lm = Imp.budgeted_lm(inner, budget, max_output_tokens: 20)
+
+    assert {:ok, _response} =
+             Imp.Deadline.with_deadline(5_000, fn ->
+               Imp.LM.generate(lm, [%{role: :user, content: "ping"}], [])
+             end)
+
+    usage = Imp.Optimizer.Budget.snapshot(budget)["usage"]
+    assert usage["input_tokens"] == 7
+    assert usage["output_tokens"] == 3
+  end
 end
