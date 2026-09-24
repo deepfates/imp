@@ -72,6 +72,28 @@ defmodule Imp.MCPTrustTest do
     assert eventually(fn -> origin not in trusted_origins() end)
   end
 
+  test "a crash of the process that added an origin does not leave it trusted" do
+    origin = "https://crash.example:443"
+    holder = spawn(fn -> Process.sleep(:infinity) end)
+    on_exit(fn -> Process.exit(holder, :kill) end)
+
+    assert :ok = Imp.MCP.Trust.hold(origin, holder)
+    assert origin in trusted_origins()
+
+    trust = Process.whereis(Imp.MCP.Trust)
+    Process.exit(trust, :kill)
+
+    assert eventually(fn ->
+             restarted = Process.whereis(Imp.MCP.Trust)
+             is_pid(restarted) and restarted != trust
+           end)
+
+    assert eventually(fn -> origin not in trusted_origins() end),
+           "#{origin} stayed trusted after the process that added it crashed"
+
+    assert trusted_origins() == ["https://configured.example:443"]
+  end
+
   defp trusted_origins do
     :ex_mcp |> Application.get_env(:security) |> Keyword.get(:trusted_origins)
   end

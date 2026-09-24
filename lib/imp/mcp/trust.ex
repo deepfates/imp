@@ -25,7 +25,8 @@ defmodule Imp.MCP.Trust do
   # `security:` option to its request check.
   #
   # All changes go through this one process, so two connections opening at
-  # once cannot lose each other's origin. A host that rewrites
+  # once cannot lose each other's origin. If it crashes, its restart removes
+  # every origin it had added (see `init/1`). A host that rewrites
   # `:ex_mcp, :security` itself while connections are open can remove an
   # origin this process added.
 
@@ -42,8 +43,28 @@ defmodule Imp.MCP.Trust do
   def hold(origin, holder) when is_binary(origin) and is_pid(holder),
     do: GenServer.call(__MODULE__, {:hold, origin, holder})
 
+  # The origins this process added are also kept outside it, so a restart after
+  # a crash can take them back out. The connections that held them are not
+  # known any more, so their trust ends too: a request on one of them is then
+  # refused by ExMCP's check rather than trusted with nothing holding it.
+  @added_key {__MODULE__, :added}
+
   @impl true
-  def init(_opts), do: {:ok, %{holders: %{}, monitors: %{}, added: MapSet.new()}}
+  def init(_opts) do
+    case :persistent_term.get(@added_key, []) do
+      [] -> :ok
+      leftover -> put_origins(configured_origins() -- leftover)
+    end
+
+    record_added(MapSet.new())
+    {:ok, %{holders: %{}, monitors: %{}, added: MapSet.new()}}
+  end
+
+  defp record_added(added) do
+    list = added |> MapSet.to_list() |> Enum.sort()
+    if :persistent_term.get(@added_key, nil) != list, do: :persistent_term.put(@added_key, list)
+    added
+  end
 
   @impl true
   def handle_call({:hold, origin, holder}, _from, state) do
@@ -66,7 +87,7 @@ defmodule Imp.MCP.Trust do
         MapSet.put(state.added, origin)
       end
 
-    {:reply, :ok, %{state | added: added}}
+    {:reply, :ok, %{state | added: record_added(added)}}
   end
 
   @impl true
@@ -87,7 +108,7 @@ defmodule Imp.MCP.Trust do
        state
        | holders: holders,
          monitors: Map.delete(state.monitors, holder),
-         added: MapSet.difference(state.added, MapSet.new(released))
+         added: record_added(MapSet.difference(state.added, MapSet.new(released)))
      }}
   end
 
