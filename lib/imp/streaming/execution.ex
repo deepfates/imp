@@ -44,7 +44,7 @@ defmodule Imp.Streaming.Execution do
   defp stream_generate(context, name, %module{} = lm, messages, opts) do
     cond do
       Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) ->
-        module.stream(lm, messages, opts)
+        module.stream(lm, messages, unrecorded(opts))
         |> consume_stream(context, name, lm)
 
       true ->
@@ -54,7 +54,7 @@ defmodule Imp.Streaming.Execution do
 
   defp stream_generate(context, name, module, messages, opts) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-      module.stream(module, messages, opts)
+      module.stream(module, messages, unrecorded(opts))
       |> consume_stream(context, name, module)
     else
       Imp.LM.generate(module, messages, opts)
@@ -65,7 +65,7 @@ defmodule Imp.Streaming.Execution do
     merged = Keyword.merge(client_opts, opts)
 
     if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-      module.stream(lm, messages, merged)
+      module.stream(lm, messages, unrecorded(merged))
       |> consume_stream(context, name, lm)
     else
       Imp.LM.generate(lm, messages, opts)
@@ -74,6 +74,11 @@ defmodule Imp.Streaming.Execution do
 
   defp stream_generate(_context, _name, lm, messages, opts),
     do: Imp.LM.generate(lm, messages, opts)
+
+  # A streamed call goes to the provider without `Imp.LM.generate/3`, which is
+  # where `:purpose` is taken off and recorded, and it emits no request event to
+  # record it on; it is dropped so it is never sent.
+  defp unrecorded(opts), do: Keyword.delete(opts, :purpose)
 
   defp consume_stream(stream, context, name, lm) do
     stream = attach_listeners(stream, context, name)

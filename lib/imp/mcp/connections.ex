@@ -39,6 +39,40 @@ defmodule Imp.MCP.Connections do
   ACP session. Exact descriptors must be approved through `:authorize` or
   `:trusted_servers`; connection cleanup never depends on a model-visible name.
 
+  ## Descriptors
+
+  A server is a map with string keys. A local server runs as a child process
+  that speaks MCP on stdin and stdout:
+
+      %{
+        "name" => "files",
+        "type" => "stdio",
+        "command" => "npx",
+        "args" => ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        "env" => [%{"name" => "LOG_LEVEL", "value" => "warn"}]
+      }
+
+  `"type"` may be left out when `"command"` is present. The command is found on
+  `PATH` and runs in `:cwd` (the current directory by default). It sees the
+  host's ordinary variables (`HOME`, `PATH`, `LANG` and the like) and its own
+  `"env"`, not the rest of the host's environment. Closing the import, or the
+  end of its `:owner`, stops the server and every process it started.
+
+  A remote server is `"type" => "http"` (Streamable HTTP) or `"sse"`, with a
+  `"url"`:
+
+      %{"name" => "docs", "type" => "http", "url" => "https://mcp.example.com/mcp"}
+
+  Only descriptors the caller authorized are dialed. `trusted_servers:` lists
+  them exactly; `authorize:` is a function of the descriptor (and optionally
+  a `%{cwd: cwd, server: descriptor}` context) that returns `:ok` or `true` to
+  allow it; anything else refuses it:
+
+      {:ok, import} = Imp.MCP.connect([server], trusted_servers: [server])
+      tool = Enum.find(import.tools, &(to_string(&1.name) == "read_text_file"))
+      Imp.Tool.call(tool, %{"path" => "/tmp/notes.txt"})
+      import.cleanup.()
+
   ## Authenticating an HTTP server
 
   A descriptor may carry static `"headers"`. It may instead name an auth kind,
@@ -304,7 +338,9 @@ defmodule Imp.MCP.Connections do
          :ok <- authorize(server, opts),
          {:ok, headers} <- connection_headers(server, opts),
          options = client_options(server, opts, headers),
-         {:ok, client} <- dial(options, timeout(opts)) do
+         :ok <- trust(options, self()),
+         {:ok, client} <- dial_http_fallback(options, timeout(opts)),
+         :ok <- trust(options, client) do
       connect_all(rest, opts, index + 1, [{index, server, client} | clients], unavailable)
     else
       {:unreachable, reason} ->
@@ -396,6 +432,39 @@ defmodule Imp.MCP.Connections do
         {:unreachable, {:mcp_connection_failed, :timeout}}
     end
   end
+
+  # An authorized remote server's origin is trusted while this helper dials it
+  # and then for as long as its client lives. See `Imp.MCP.Trust`.
+  defp trust(options, holder) do
+    case Keyword.get(options, :url) do
+      nil -> :ok
+      url -> Imp.MCP.Trust.hold(http_origin!(url), holder)
+    end
+  end
+
+  # ExMCP opens an HTTP connection with a `server/discover` probe and falls back
+  # to the standard `initialize` only when the probe fails with a JSON-RPC error
+  # or an HTTP 400. Public servers that do not know the probe answer it with
+  # other 4xx statuses (Scry answers 404), and the connection then fails without
+  # `initialize` ever being sent. One more dial asks for the standard handshake
+  # only. A 401 is reported as `:unauthorized`, not as an HTTP error, and is not
+  # retried: it is about credentials, not the protocol. ExMCP reports this
+  # failure as a string, so the status is read from its text. This retires if
+  # ExMCP falls back on any 4xx to the probe.
+  defp dial_http_fallback(options, deadline) do
+    case dial(options, deadline) do
+      {:unreachable, {:mcp_connection_failed, reason}} = failed ->
+        if Keyword.get(options, :transport) == :http and probe_refused?(reason),
+          do: dial(Keyword.put(options, :protocol_mode, :legacy_only), deadline),
+          else: failed
+
+      outcome ->
+        outcome
+    end
+  end
+
+  defp probe_refused?(reason),
+    do: inspect(reason, limit: :infinity) =~ ~r/era_probe_failed.*\{:http_error, 4\d\d\b/
 
   defp client_entries(connected),
     do: Enum.map(connected, fn {_index, server, client} -> {server, client} end)
@@ -844,11 +913,11 @@ defmodule Imp.MCP.Connections do
         env = name_value_list!(Map.get(server, "env", []), "env")
 
         [
-          transport: :stdio,
+          # Owns the server's process group; see `Imp.MCP.OwnedStdio`.
+          transport: Imp.MCP.OwnedStdio,
           command: [command | args],
           cd: Keyword.get(opts, :cwd, File.cwd!()),
           env: env,
-          environment_policy: :isolated,
           default_timeout: timeout(opts),
           era_probe_timeout: timeout(opts),
           handshake_timeout: timeout(opts),
@@ -863,17 +932,32 @@ defmodule Imp.MCP.Connections do
           transport: :http,
           url: url,
           headers: headers,
-          security: %{trusted_origins: [http_origin!(url)]},
+          # ExMCP sends the server's own origin back to it as `Origin` unless
+          # told otherwise. A client that is not a browser has no origin to
+          # assert, and a server that allow-lists browser origins refuses it
+          # (Scry answers 403). No `Origin` header is sent.
+          security: %{origin: nil},
           use_sse: type == "sse",
           default_timeout: timeout(opts),
           era_probe_timeout: timeout(opts),
           handshake_timeout: timeout(opts),
           health_check_interval: nil,
           reconnect: false
-        ]
+        ] ++ root_endpoint(url)
 
       type ->
         raise ArgumentError, "unsupported ACP MCP server type: #{inspect(type)}"
+    end
+  end
+
+  # A URL whose path is `/` names a server that answers at its root (Scry
+  # answers `initialize` on `POST https://mcp.scry.io/`). ExMCP reads a `/`
+  # path as no path and posts to `/mcp/v1`; an empty endpoint keeps the root.
+  # This retires if ExMCP treats a written `/` as a path.
+  defp root_endpoint(url) do
+    case URI.parse(url) do
+      %URI{path: "/"} -> [endpoint: ""]
+      _other -> []
     end
   end
 

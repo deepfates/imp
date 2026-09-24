@@ -290,6 +290,33 @@ defmodule Imp.MCPCallOutcomeTest do
                call(tools, "exit")
     end
 
+    # The client waits five seconds for `Imp.MCP.OwnedStdio` to take a write.
+    # A transport that is busy past that (here held by `:sys.suspend/1`, in
+    # life a slow erlexec manager or a group being stopped) still has the
+    # request in its mailbox and writes it when it gets to it.
+    @tag :tmp_dir
+    @tag timeout: 30_000
+    test "a stdio write the client stopped waiting for is unknown, and it arrives", %{
+      tmp_dir: dir
+    } do
+      # Only this import's transport: another test's may still be closing.
+      before = owned_stdio_processes()
+      {_imported, tools} = stdio_tools(dir)
+      [transport] = owned_stdio_processes() -- before
+      :sys.suspend(transport)
+
+      failure =
+        try do
+          call(tools, "answer")
+        after
+          :sys.resume(transport)
+        end
+
+      assert {:error, %CallFailure{outcome: :unknown} = failure} = failure
+      assert Imp.MCP.failure_text(failure) =~ "may have been carried out"
+      assert eventually(fn -> File.read(Path.join(dir, "ran")) == {:ok, "answer\n"} end)
+    end
+
     test "a local tool that exits or raises may have acted" do
       assert Imp.Tool.outcome({:error, {:tool_error, :lookup, {:exit, :killed}}}) == :unknown
       assert Imp.Tool.outcome({:error, {:tool_error, :lookup, "boom"}}) == :unknown
@@ -448,6 +475,8 @@ defmodule Imp.MCPCallOutcomeTest do
       elif method == "tools/list":
           response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {"tools": [{"name": name, "description": name, "inputSchema": {"type": "object"}} for name in ["answer", "exit"]]}}
       elif method == "tools/call":
+          with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ran"), "a") as ran:
+              ran.write(request["params"]["name"] + "\\n")
           if request["params"]["name"] == "exit":
               os._exit(3)
           response = {"jsonrpc": "2.0", "id": request.get("id"), "result": {"content": [{"type": "text", "text": "done"}]}}
@@ -457,6 +486,27 @@ defmodule Imp.MCPCallOutcomeTest do
           sys.stdout.write(json.dumps(response) + "\\n")
           sys.stdout.flush()
   """
+
+  defp owned_stdio_processes do
+    for pid <- Process.list(),
+        match?({:dictionary, %{"$initial_call": {Imp.MCP.OwnedStdio, :init, 1}}}, dict(pid)),
+        do: pid
+  end
+
+  defp dict(pid) do
+    case Process.info(pid, :dictionary) do
+      {:dictionary, entries} -> {:dictionary, Map.new(entries)}
+      nil -> nil
+    end
+  end
+
+  defp eventually(check, tries \\ 50) do
+    cond do
+      check.() -> true
+      tries == 0 -> false
+      true -> Process.sleep(100) && eventually(check, tries - 1)
+    end
+  end
 
   defp stdio_tools(dir) do
     script = Path.join(dir, "server.py")
