@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## 0.5.0 — not yet released
 
+### Installing
+
 - Imp is a Hex package: `{:imp, "~> 0.5"}`. Every dependency comes from Hex,
   including ExMCP (`~> 1.5`, unpatched); the `deepfates/ex_mcp` Git fork, the
   bundled `vendor/ex_mcp` path and the `EX_MCP_PATH` override are gone.
@@ -27,53 +29,34 @@ User-visible changes to Imp are recorded here.
     client in the VM may send credentials to that origin. In 0.4.0 the trust
     belonged to the one connection. The origin is removed when the last
     connection to it closes, and origins the host configured are left alone.
-- A tool's name keeps the type it was given. `Imp.Tool.new/4` no longer turns a
-  string into an atom that happens to exist, and tools imported from an MCP
-  server are always named by the server's string. Lookups (`resolve_name/2`,
-  tool policies) already compare names by text; code that matched an imported
-  tool's name against an atom matches the string now.
-- `Imp.Predict.ReActV2.new/3` documents its options.
-- `Imp.MCP.OAuth.begin/3` runs its own browser flow on ExMCP's public OAuth
-  functions. Its `:flow` option is replaced by `:client_registration`
-  (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`);
-  a pre-registered client also names its `:client_issuer`, and the flow
-  refuses to begin when the server names a different authorization server. A
-  server with neither protected-resource nor authorization-server metadata is
-  refused rather than given guessed `/authorize` and `/token` endpoints.
-- A run no longer outlives its control process. When the control ends,
-  whether its event sink's process died or `Imp.Run.stop/1` was called while
-  the run was still going, the task is killed and every cancellation registered by
-  work in flight (an authorization decision being waited on, an RLM budget,
-  an ACP terminal command) is called with `{:run_control_ended, reason}`. Before, the task ran on until
-  its next event, and in-flight effects were never cancelled. The task's
-  monitor then reports `:killed`. `Imp.Run.cancel/2` on a run whose control
-  has already ended still exits (`:noproc`), but there is no longer a task
-  left to stop.
-- A cancellation that never returns no longer holds a run. `Imp.Run.cancel/3`
-  and `cancel_with_events/3` give the registered cancellations the cancel's
-  `timeout` (5 s by default) and then end the task as before; the control
-  ending, its owner going down, and work registered after a cancel give them
-  5 s. A cancellation still running then is abandoned. Before, one that never
-  returned held the run's control, left the task running, and made the cancel
-  exit after 30 s. When the control ends, the cancellations are again called
-  before the task is killed, so an RLM's model call in flight is ended by its
-  budget instead of being left running. The cancellations are called at once,
-  each in its own process, so one that never returns keeps no other from
-  being called, and those processes end with the control however it ends.
 
-- `Imp.LM.generate/3` takes `purpose:`, a name for what kind of call this is.
-  It is recorded on the `:model_request` event's metadata as `:purpose` and is
-  never sent to the provider, so a caller that makes more than one kind of model
-  call can tell them apart on the record.
-- An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
-  The run's owner is sent
-  `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
-  and delivery goes on with the next event. Stopping or cancelling a run
-  reports the same way every event the sink had not finished with
-  (`:in_sink_when_stopped`, `:never_handed_to_sink`). Run owners receive this
-  message where they received nothing before; an owner with a strict
-  `handle_info/2` needs a clause for it.
+### MCP
 
+- An MCP tool call that got no answer from its tool returns
+  `{:error, %Imp.MCP.CallFailure{}}` instead of
+  `{:mcp_tool_call_failed, server, reason}` or
+  `{:mcp_connection_unavailable, server, reason}`. Its `outcome` says whether
+  the call was refused before anything ran, never sent, or sent with no
+  trustworthy answer (`:refused`, `:not_sent`, `:unknown`); `reason` keeps
+  ExMCP's error unchanged, and an exit is kept as `{:exit, reason}`.
+  `Imp.Tool.outcome/1` gives the outcome of any tool call (`:result` when the
+  tool answered, MCP error results included), and ReActV2 and RLM record it on
+  each `:tool_result` event as `metadata.outcome`.
+- A failed tool call reaches the model as plain text instead of an Elixir
+  term. An MCP error result is the text of its content, the tool's own words,
+  after `Error: ` unless the text already begins with "error"; a JSON-RPC
+  error is the server's message; a call that got no answer says why in one
+  sentence, and unless the request was never sent, that it may have been
+  carried out (a timeout, a closed or failed connection, a broken stream, a
+  server that stopped waiting for its tool or a tool that crashed). An
+  unknown tool, missing or invalid arguments, a denied tool and a tool that
+  exits or throws are sentences too; a tool that exits may have been carried
+  out. `Imp.Adapter.Chat.format_tool_result/1`
+  renders these, `Imp.Adapter.Chat.tool_error_text/1` gives the words without
+  `Error: `, and `Imp.MCP.failure_text/1` gives the MCP ones. The recorded
+  error term is unchanged. `Imp.Predict.ReAct`'s `:dspy_3_2_1` observations
+  use the same words after `Execution error in <tool>: `, where they showed
+  `inspect/1` of the reason.
 - `Imp.MCP.connect/2` takes `pool_size:` (1 by default): that many
   connections are opened to each `http` or `sse` server, and each tool call
   borrows an idle one for the length of the call, so up to `pool_size` calls to
@@ -90,7 +73,19 @@ User-visible changes to Imp are recorded here.
   rather than lent again while ExMCP still waits on that request, and is
   closed once that request is done, so the server finishes what it was doing;
   a replacement that cannot be dialed leaves the server a connection fewer.
-
+- A call to an HTTP MCP server that asks for progress (`call_meta` with a
+  `progressToken`) no longer loses its server-side work when the caller's
+  `:timeout` passes. ExMCP ended such a request's stream a second after the
+  call's timeout, and its server ended the tool with it: a 3 s write under a
+  300 ms timeout never finished. The caller is answered at its
+  `:timeout`, `:unknown` with `reason: :timeout`, and the request runs on to
+  the connection's limit.
+  `:call_meta` is still called in the process that makes the call.
+- An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
+  ended every HTTP request at its own 30 s default whatever `:timeout` said,
+  so a call to a tool that takes 33 s failed at about 30 s under
+  `timeout: 45_000`. ExMCP's `request_timeout` is now the import's `:timeout`,
+  and never less than 30 s.
 - `"type" => "sse"` now means MCP's deprecated HTTP+SSE transport (2024-11-05):
   the descriptor's `"url"` is the event stream's (`https://host/sse`), and
   requests go to the URL the server names on it. Before, `sse` was Streamable
@@ -109,71 +104,56 @@ User-visible changes to Imp are recorded here.
   after a stretch with nothing on it, and does not reopen it) is replaced,
   rather than kept and lent; the stretch is at least 60 s and longer than a
   request can take.
-
-- A call to an HTTP MCP server that asks for progress (`call_meta` with a
-  `progressToken`) no longer loses its server-side work when the caller's
-  `:timeout` passes. ExMCP ended such a request's stream a second after the
-  call's timeout, and its server ended the tool with it: a 3 s write under a
-  300 ms timeout never finished. The caller is still answered at its
-  `:timeout`, `:unknown` with `reason: :timeout` (formerly a process exit
-  for a plain request), and the request runs on to the connection's limit.
-  `:call_meta` is still called in the process that makes the call.
-
-- An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
-  ended every HTTP request at its own 30 s default whatever `:timeout` said,
-  so a call to a tool that takes 33 s failed at about 30 s under
-  `timeout: 45_000`. ExMCP's `request_timeout` is now the import's `:timeout`,
-  and never less than 30 s.
-
 - A caller of `Imp.MCP.connect/2` that dies while its import is connecting no
-  longer leaves the connections already made open, each holding its server's
-  origin in the trusted origins. They close with the import's `:owner`, which
+  longer leaves the connections already made open. They close with the import's `:owner`, which
   is the caller unless another process was named.
+- `Imp.MCP.OAuth.begin/3` runs its own browser flow on ExMCP's public OAuth
+  functions. Its `:flow` option is replaced by `:client_registration`
+  (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`);
+  a pre-registered client also names its `:client_issuer`, and the flow
+  refuses to begin when the server names a different authorization server. A
+  server with neither protected-resource nor authorization-server metadata is
+  refused rather than given guessed `/authorize` and `/token` endpoints.
+- A tool's name keeps the type it was given. `Imp.Tool.new/4` no longer turns a
+  string into an atom that happens to exist, and tools imported from an MCP
+  server are always named by the server's string. Lookups (`resolve_name/2`,
+  tool policies) already compare names by text; code that matched an imported
+  tool's name against an atom matches the string now.
 
+### Runs
+
+- A run no longer outlives its control process, and a cancellation that
+  never returns no longer holds a run. When the control ends (its event
+  sink's process died, or `Imp.Run.stop/1` was called while the run was still
+  going), every cancellation registered by work in flight (an authorization
+  decision being waited on, an RLM budget, an ACP terminal command) is called
+  with `{:run_control_ended, reason}`, and then the task is killed; its
+  monitor reports `:killed`. In 0.4.0 the task ran on until its next event and
+  those effects were never cancelled. `Imp.Run.cancel/3` and
+  `cancel_with_events/3` give the registered cancellations the cancel's
+  `timeout` (5 s by default) and then end the task; the control ending, its
+  owner going down, and work registered after a cancel give them 5 s. The
+  cancellations are called at once, each in its own process, and one still
+  running at the end of that time is abandoned. In 0.4.0 they were called one
+  after another inside the control, so one that never returned held the run
+  and made the cancel exit after 30 s. `Imp.Run.cancel/2` on a run whose
+  control has already ended still exits (`:noproc`).
 - `Imp.Run.start/3` takes `admission: {pool, limit}`: the run holds a place in
   the host's named pool instead of the machine-wide `:async_max_workers` pool,
   at most `limit` runs hold places in that pool at once, and a full pool
   returns `{:error, :busy}` without waiting. Runs started without it wait for
   the machine-wide pool as before.
+- An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
+  The run's owner is sent
+  `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
+  and delivery goes on with the next event. Stopping or cancelling a run
+  reports the same way every event the sink had not finished with
+  (`:in_sink_when_stopped`, `:never_handed_to_sink`). Run owners receive this
+  message where they received nothing before; an owner with a strict
+  `handle_info/2` needs a clause for it.
 
-- An MCP tool call that got no answer from its tool returns
-  `{:error, %Imp.MCP.CallFailure{}}` instead of
-  `{:mcp_tool_call_failed, server, reason}` or
-  `{:mcp_connection_unavailable, server, reason}`. Its `outcome` says whether
-  the call was refused before anything ran, never sent, or sent with no
-  trustworthy answer (`:refused`, `:not_sent`, `:unknown`); `reason` keeps
-  ExMCP's error unchanged, and an exit is kept as `{:exit, reason}`.
-  `Imp.Tool.outcome/1` gives the outcome of any tool call (`:result` when the
-  tool answered, MCP error results included), and ReActV2 and RLM record it on
-  each `:tool_result` event as `metadata.outcome`.
+### ReActV2, adapters and models
 
-- A failed tool call reaches the model as plain text instead of an Elixir
-  term. An MCP error result is the text of its content, the tool's own words,
-  after `Error: ` unless the text already begins with "error"; a JSON-RPC
-  error is the server's message; a call that got no answer says why in one
-  sentence, and unless the request was never sent, that it may have been
-  carried out (a timeout, a closed or failed connection, a broken stream, a
-  server that stopped waiting for its tool or a tool that crashed). An
-  unknown tool, missing or invalid arguments, a denied tool and a tool that
-  exits or throws are sentences too; a tool that exits may have been carried
-  out. `Imp.Adapter.Chat.format_tool_result/1`
-  renders these, `Imp.Adapter.Chat.tool_error_text/1` gives the words without
-  `Error: `, and `Imp.MCP.failure_text/1` gives the MCP ones. The recorded
-  error term is unchanged. `Imp.Predict.ReAct`'s `:dspy_3_2_1` observations
-  use the same words after `Execution error in <tool>: `, where they showed
-  `inspect/1` of the reason.
-
-- ReActV2 preserves provider-native reasoning text and opaque reasoning details
-  across tool calls and saved-history reloads. ReqLLM receives the original
-  continuation data, including provider extension fields and signatures, instead
-  of losing it while rebuilding assistant messages. Operational history must be
-  stored privately; run events and explicit diagnostic redaction still redact
-  credential-shaped values.
-- `Imp.Clients.ReqLLM` returns a response whose body carries a provider error
-  as `{:error, %ReqLLM.Error.API.Request{}}`. OpenRouter relays an upstream
-  provider's refusal as a successful HTTP response with an error object and no
-  choices, which ReqLLM decodes to an empty message; read as a completion, a
-  refused request was a model that said nothing.
 - `ReActV2` offers `submit` only to a signature that needs it. A task
   signature with exactly one output of type `:string` gets no `submit` tool:
   a step that comes back as prose with no tool call is the answer, in that
@@ -201,9 +181,6 @@ User-visible changes to Imp are recorded here.
   `termination_reason: :deadline_exceeded`. `forced_submit_notice` is for
   signatures with `submit` and `last_prose_note` for those without; each is
   refused at construction for the other.
-- `Imp.Observability` reports a prediction that ended `:answered`,
-  `:last_prose` or `:finished_by_tool` as complete; it reported them as
-  incomplete.
 - `ReActV2` gains `finish_on`, a map from tool name to
   `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. A tool
   named there ends the turn with the outputs the function returns, which are
@@ -214,6 +191,26 @@ User-visible changes to Imp are recorded here.
   step calls several terminal tools, the first in call order finishes the run
   and the rest still execute and are recorded; a `submit` in the same step
   still wins. The functions persist by registry name, like a tool runner.
+- A `ReActV2` step answered in plain prose with no tool call is now a thought
+  that called nothing, not a parse failure. It used to fail the chat parse and
+  re-ask the whole prompt through `Imp.Adapter.JSON`, which doubled the cost of
+  the step and broke the provider's prefix cache; the prose is now
+  `next_thought` and `tool_calls` is empty, which is what the turn-ending rule
+  above then reads. The prose is
+  recorded as that turn's thought in the history and shown back to the model as
+  a plain assistant turn in any next request. `Imp.Adapter.Chat` reads a
+  marker-free completion this way only for a signature that declares
+  `metadata[:prose_step]`; every other signature parses exactly as before, JSON
+  fallback included.
+- `Imp.Observability` reports a prediction that ended `:answered`,
+  `:last_prose` or `:finished_by_tool` as complete; it reported them as
+  incomplete.
+- ReActV2 preserves provider-native reasoning text and opaque reasoning details
+  across tool calls and saved-history reloads. ReqLLM receives the original
+  continuation data, including provider extension fields and signatures, instead
+  of losing it while rebuilding assistant messages. Operational history must be
+  stored privately; run events and explicit diagnostic redaction still redact
+  credential-shaped values.
 - A `:model_request` event now records the whole request, not only its
   messages. Its metadata carries `:options`, the request options with the tool
   definitions removed, and `:tools_hash`, a SHA-256 of the canonical JSON of
@@ -222,7 +219,10 @@ User-visible changes to Imp are recorded here.
   `:tools_offered` event whose input is the tool list as sent. A recorded run
   can now be reproduced call for call, without repeating an unchanging roster
   on every one. Both payloads are redacted like every other event.
-
+- `Imp.LM.generate/3` takes `purpose:`, a name for what kind of call this is.
+  It is recorded on the `:model_request` event's metadata as `:purpose` and is
+  never sent to the provider, so a caller that makes more than one kind of model
+  call can tell them apart on the record.
 - The chat adapter's format options gain the `:history_note_renderer` seam,
   `fn signature, turn -> nil | String.t()`. It is consulted for every stored
   history turn, native tool turns included, after that turn's own messages, and
@@ -239,23 +239,18 @@ User-visible changes to Imp are recorded here.
   A field without a description still emits no `description` key. This is the
   only place a field description reaches a host that replaces the chat
   adapter's rendered system section.
-- A `ReActV2` step answered in plain prose with no tool call is now a thought
-  that called nothing, not a parse failure. It used to fail the chat parse and
-  re-ask the whole prompt through `Imp.Adapter.JSON`, which doubled the cost of
-  the step and broke the provider's prefix cache; the prose is now
-  `next_thought` and `tool_calls` is empty, which is what the turn-ending rule
-  above then reads. The prose is
-  recorded as that turn's thought in the history and shown back to the model as
-  a plain assistant turn in any next request. `Imp.Adapter.Chat` reads a
-  marker-free completion this way only for a signature that declares
-  `metadata[:prose_step]`; every other signature parses exactly as before, JSON
-  fallback included.
 - `Imp.Adapter.Types.ToolCall.from_map/1` accepts `tool` as a spelling of the
   tool name, beside `name` and `recipient_name` (the arguments already accepted
   `arguments`, `args` and `parameters`). `%{"tool" => ..., "arguments" => ...}`
   is what a model emits when it writes a tool call as JSON instead of calling
   natively, and `Imp.Predict.ReActV2` now executes such a call instead of
   recording a malformed-call observation and spending another iteration on it.
+- `Imp.Clients.ReqLLM` returns a response whose body carries a provider error
+  as `{:error, %ReqLLM.Error.API.Request{}}`. OpenRouter relays an upstream
+  provider's refusal as a successful HTTP response with an error object and no
+  choices, which ReqLLM decodes to an empty message; read as a completion, a
+  refused request was a model that said nothing.
+- `Imp.Predict.ReActV2.new/3` documents its options.
 
 ## 0.4.0 — 2026-09-17
 

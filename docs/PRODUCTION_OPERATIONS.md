@@ -205,13 +205,24 @@ Dropping covers the connection and `tools/list` only — a descriptor
 `:authorize` refused, one whose declared `auth` cannot produce a header (a
 `bearer_env` variable declared `required` and unset, say), a malformed one, and
 anything the caller's own `:tool_filter` raises still refuse the import. The
-one exception is an `"sse"` descriptor that carries credentials (below): it is
-left out as an unreachable server is.
+exceptions are an `"sse"` descriptor that carries credentials (below) or has a
+query string in its URL: it is left out as an unreachable server is.
 
 Each dial is bounded by `:timeout` on its own, so a host that accepts the
 connection and then answers nothing — a firewall dropping packets, a wedged
-proxy — costs that server its timeout and no more. Budget a boot that dials n
-servers at `n * :timeout` in the worst case.
+proxy — costs that server its timeout and no more. A server can cost up to
+about three dials (the first, one retry with the standard handshake when the
+server refuses ExMCP's opening probe, and the extra connections of
+`pool_size:`, which are dialed together), so budget a boot that dials n servers
+at about `3 * n * :timeout` in the worst case.
+
+`pool_size:` (1 by default) opens that many connections to each `"http"` or
+`"sse"` server, so up to that many calls to one server run at once; ExMCP's
+client sends one HTTP request at a time. A call is answered at its `:timeout`
+as `%Imp.MCP.CallFailure{outcome: :unknown, reason: :timeout}` while its
+request runs on, and a call that finds every connection busy until then is
+`:not_sent` (`reason: :no_idle_connection`). A `stdio` server keeps one
+connection. `Imp.MCP.Connections` has the details.
 Imported clients follow `:owner` (the importing process by default); a temporary
 import worker should name its long-lived owner explicitly. Cleanup is idempotent.
 Closed-client calls return errors rather than exiting their callers.

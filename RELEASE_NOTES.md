@@ -44,6 +44,10 @@ Ordinary Imp startup starts no protocol endpoint.
   tool call reaches the model as plain text.
 - A host names its own run pool and limit (`Imp.Run.start/3`'s `:admission`),
   and a failing run event sink is reported to the run's owner.
+- `Imp.MCP.connect/2` takes `pool_size:`, so several calls to one HTTP server
+  run at once, and an HTTP call can take as long as its `:timeout` allows.
+- A run no longer outlives its control process, and a cancellation that never
+  returns no longer holds a run.
 
 ## Breaking changes from v0.4.0
 
@@ -69,7 +73,21 @@ Ordinary Imp startup starts no protocol endpoint.
 - An MCP tool call that got no answer returns
   `{:error, %Imp.MCP.CallFailure{}}` instead of
   `{:mcp_tool_call_failed, server, reason}` or
-  `{:mcp_connection_unavailable, server, reason}`.
+  `{:mcp_connection_unavailable, server, reason}`. A call that reaches its
+  `:timeout` is `%Imp.MCP.CallFailure{outcome: :unknown, reason: :timeout}`,
+  answered at the timeout while the request runs on; a call to an HTTP server
+  whose connections all stay busy until the timeout is `:not_sent` with
+  `reason: :no_idle_connection`.
+- `"type" => "sse"` is MCP's deprecated HTTP+SSE transport, and its `"url"`
+  is the event stream's. In 0.4.0 it was Streamable HTTP with a standing GET
+  stream; a Streamable HTTP server is now `"type" => "http"`. An `sse`
+  descriptor with `"headers"` or `"auth"`, or with a query string in its URL,
+  is refused before anything is dialed (`:mcp_sse_credentials_refused`,
+  `:mcp_sse_url_refused`): the whole import under the default
+  `on_failure: :refuse`, only that server under `on_failure: :drop`.
+- When a run's control process ends while the run is still going, the task is
+  killed after its registered cancellations are called; its monitor reports
+  `:killed`.
 - A run's owner can receive
   `{:imp_run_event_sink_failed, run_id, details}`; an owner with a strict
   `handle_info/2` needs a clause for it.
@@ -86,7 +104,10 @@ Ordinary Imp startup starts no protocol endpoint.
 4. Match MCP call failures on `%Imp.MCP.CallFailure{outcome: ...}`, compare
    imported tool names as strings, and give run owners a clause for
    `:imp_run_event_sink_failed`.
-5. Run your held-out evaluation and application smoke test against the new
+5. Change `"type" => "sse"` descriptors for Streamable HTTP servers to
+   `"http"`. A server that needs credentials is reached over Streamable HTTP;
+   an `sse` descriptor takes none.
+6. Run your held-out evaluation and application smoke test against the new
    release; a one-text-output ReActV2 program now ends turns differently.
 
 The [CHANGELOG](CHANGELOG.md) records every user-visible change in this
