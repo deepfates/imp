@@ -115,6 +115,39 @@ defmodule Imp.MCP.Connections do
   Each dial is bounded by `:timeout` on its own, so a host that accepts the
   connection and then answers nothing costs that server its timeout and no more.
 
+  ## Calls to one server at once
+
+  `pool_size:` (1 by default) is how many connections Imp opens to each
+  `http` or `sse` server. An ExMCP client sends one HTTP request at a time,
+  making the POST from inside its own process, so a quick call made while a
+  slow one is out on the same connection waits for the slow one to answer.
+  With a pool each tool call borrows an idle connection for the length of the
+  call, so up to `pool_size` calls to one server run at once. A host sets it
+  from how many of its own calls can be out together. A call that finds every
+  connection busy waits for one, and if none comes free within `:timeout` it
+  fails as `:not_sent` (`Imp.MCP.CallFailure`): nothing was sent.
+
+  The first connection to a server decides whether the server is reachable and
+  lists its tools. The others are dialed at once, the way the first connected,
+  so a server costs the import at most about three `:timeout`s (the first
+  dial, a second one with the standard handshake only when a server refuses
+  ExMCP's opening probe, and the extras) whatever `pool_size` is. Each holds the server's origin in the trusted origins for as
+  long as it lives, and one that cannot be opened leaves the server with fewer
+  connections and is logged.
+
+  A connection whose call timed out, or whose caller died during the call, may
+  still be waiting on that request inside ExMCP, and lent again it would hold
+  the next call behind it. It is taken out of the pool instead and closed once
+  that request is done, so the server finishes what it was doing, and a
+  replacement is dialed in the background; calls wait for it. A replacement that cannot be dialed
+  leaves the server a connection fewer, and a server left with none answers
+  its calls `:not_sent` with `reason: :not_connected`.
+
+  A `stdio` server has one connection whatever `pool_size` says. ExMCP writes
+  each request to its pipe and matches answers by id, so calls to it already
+  run at once over that connection, and they go straight to it. A second
+  connection would be a second server process with state of its own.
+
   ## What a tool is named
 
   The declaration decides, and nothing else. A descriptor may carry a
@@ -168,8 +201,15 @@ defmodule Imp.MCP.Connections do
     :call_meta,
     :tool_filter,
     :credentials,
-    :on_failure
+    :on_failure,
+    :pool_size
   ]
+
+  # ExMCP 1.5.0's own defaults for an HTTP connection, set explicitly so the
+  # bound on a request can be read from the options it was dialed with.
+  @http_dns_timeout 1_000
+  @http_connect_timeout 5_000
+  @http_request_timeout 30_000
 
   @doc """
   Connects authorized servers and imports all discovered tools.
@@ -193,10 +233,11 @@ defmodule Imp.MCP.Connections do
 
     with :ok <- ensure_runtime(servers),
          {:ok, bridge} <- Imp.MCP.Clients.start(owner: owner) do
+      # Internal: the tools borrow their connections from the bridge.
+      opts = Keyword.put(opts, :bridge, bridge)
+
       case connect_isolated(servers, opts) do
         {:ok, connected, unavailable} ->
-          :ok = Imp.MCP.Clients.adopt(bridge, client_entries(connected))
-
           case tools_from_clients(connected, opts) do
             {:ok, tools, annotations, unlisted} ->
               {:ok,
@@ -213,11 +254,6 @@ defmodule Imp.MCP.Connections do
               _ = Imp.MCP.Clients.stop(bridge)
               {:error, reason}
           end
-
-        {:error, reason, clients} ->
-          disconnect_all(clients)
-          _ = Imp.MCP.Clients.stop(bridge)
-          {:error, reason}
 
         {:error, reason} ->
           _ = Imp.MCP.Clients.stop(bridge)
@@ -245,8 +281,9 @@ defmodule Imp.MCP.Connections do
     ref = make_ref()
     # Every dial is bounded on its own inside `dial/2`. This budget is only the
     # backstop for the helper itself wedging around them, so it has to cover the
-    # whole list dialed in turn.
-    timeout = timeout(opts) * max(length(servers), 1) + 5_000
+    # whole list dialed in turn: per server the first dial, the one retry
+    # `dial_http_fallback/2` may make, and the extra dials, which run at once.
+    timeout = timeout(opts) * 3 * max(length(servers), 1) + 5_000
 
     {pid, mon} =
       spawn_monitor(fn ->
@@ -264,20 +301,33 @@ defmodule Imp.MCP.Connections do
             kind, reason -> {:error, {:mcp_connection_failed, {kind, reason}}, []}
           end
 
+        # The helper hands its clients to the bridge itself, and lets go of
+        # them only once the bridge holds them, so at no moment does nothing
+        # hold them. The caller may die, or give up at the time limit below,
+        # after the helper has answered; the bridge then closes them with its
+        # owner or with the import, and a bridge already gone means they are
+        # closed here.
         case result do
           {:ok, clients, unavailable} ->
-            Enum.each(clients, fn {_index, _server, client} ->
-              if Process.alive?(client), do: Process.unlink(client)
-            end)
+            try do
+              :ok =
+                Imp.MCP.Clients.adopt(
+                  Keyword.fetch!(opts, :bridge),
+                  client_entries(clients),
+                  replacements(clients, opts)
+                )
 
-            send(parent, {ref, {:ok, clients, unavailable}})
+              unlink_all(clients)
+              send(parent, {ref, {:ok, clients, unavailable}})
+            catch
+              :exit, reason ->
+                disconnect_all(clients)
+                send(parent, {ref, {:error, {:mcp_import_exit, reason}}})
+            end
 
           {:error, reason, clients} ->
-            Enum.each(clients, fn {_index, _server, client} ->
-              if Process.alive?(client), do: Process.unlink(client)
-            end)
-
-            send(parent, {ref, {:error, reason, clients}})
+            disconnect_all(clients)
+            send(parent, {ref, {:error, reason}})
         end
       end)
 
@@ -292,8 +342,23 @@ defmodule Imp.MCP.Connections do
       timeout ->
         abandon(pid)
         Process.demonitor(mon, [:flush])
+
+        # An answer that arrived with the time limit names clients the bridge
+        # already holds; the caller stops the bridge, which closes them.
+        receive do
+          {^ref, _result} -> :ok
+        after
+          0 -> :ok
+        end
+
         {:error, :mcp_import_timeout}
     end
+  end
+
+  defp unlink_all(clients) do
+    Enum.each(clients, fn {_index, _server, pooled, _options} ->
+      Enum.each(pooled, &if(Process.alive?(&1), do: Process.unlink(&1)))
+    end)
   end
 
   # Killing a process that opened MCP clients does not close them: an
@@ -303,8 +368,9 @@ defmodule Imp.MCP.Connections do
   # not returned has no pid anybody holds, so the links are the only handle on
   # it and must be read before the kill. The chain is at most
   # helper -> dial -> client -> transport and every link in it was opened by
-  # this import: nothing is adopted onto the caller-owned bridge until the
-  # whole connect has answered.
+  # this import. A helper abandoned while handing its clients to the bridge
+  # reaches the bridge through them; that bridge is this import's own, and the
+  # caller stops it on the time limit anyway.
   defp abandon(pid), do: abandon(pid, 3)
 
   defp abandon(pid, depth) do
@@ -339,9 +405,11 @@ defmodule Imp.MCP.Connections do
          {:ok, headers} <- connection_headers(server, opts),
          options = client_options(server, opts, headers),
          :ok <- trust(options, self()),
-         {:ok, client} <- dial_http_fallback(options, timeout(opts)),
+         {:ok, client, options} <- dial_http_fallback(options, timeout(opts)),
          :ok <- trust(options, client) do
-      connect_all(rest, opts, index + 1, [{index, server, client} | clients], unavailable)
+      pooled = [client | dial_more(options, server, extra_connections(server, opts), opts)]
+      connected = {index, server, pooled, options}
+      connect_all(rest, opts, index + 1, [connected | clients], unavailable)
     else
       {:unreachable, reason} ->
         if drop?(opts) do
@@ -376,11 +444,19 @@ defmodule Imp.MCP.Connections do
   # is killed along with the half-open client it is still linked to, which does
   # not die of the link alone (see `abandon/1`).
   defp dial(options, deadline) do
+    options |> start_dial() |> await_dial(System.monotonic_time(:millisecond) + deadline)
+  end
+
+  # Linked, not detached: a dial left running when the import helper above is
+  # abandoned would hold a client and a socket that nobody holds a pid for.
+  # The dial process keeps its link to the client until the process awaiting
+  # it has linked the client too, so the client is linked to one of them at
+  # every moment and `abandon/1` finds it through either. Several dials can be
+  # out at once; one whose answer waits in the mailbox still holds its client.
+  defp start_dial(options) do
     parent = self()
     ref = make_ref()
 
-    # Linked, not detached: a dial left running when the import helper above is
-    # abandoned would hold a client and a socket that nobody holds a pid for.
     pid =
       spawn_link(fn ->
         # The client exits when its transport refuses, and this process has to
@@ -390,25 +466,41 @@ defmodule Imp.MCP.Connections do
         outcome =
           try do
             case ExMCP.Client.start_link(options) do
-              {:ok, client} ->
-                # Unlink before answering: this process exits immediately
-                # afterwards, and a client still linked to it would go with it.
-                if Process.alive?(client), do: Process.unlink(client)
-                {:ok, client}
-
-              {:error, reason} ->
-                {:unreachable, {:mcp_connection_failed, reason}}
+              {:ok, client} -> {:ok, client}
+              {:error, reason} -> {:unreachable, {:mcp_connection_failed, reason}}
             end
           catch
             kind, reason -> {:unreachable, {:mcp_connection_failed, {kind, reason}}}
           end
 
         send(parent, {ref, outcome})
+
+        with {:ok, client} <- outcome do
+          receive do
+            {^ref, :taken} ->
+              Process.unlink(client)
+
+            # The process awaiting this dial is gone: nobody will take the
+            # client, and it does not die of the link alone.
+            {:EXIT, ^parent, _reason} ->
+              Process.exit(client, :kill)
+          end
+        end
       end)
 
-    mon = Process.monitor(pid)
+    {pid, Process.monitor(pid), ref}
+  end
 
+  defp await_dial({pid, mon, ref}, deadline_at) do
     receive do
+      {^ref, {:ok, client} = outcome} ->
+        Process.demonitor(mon, [:flush])
+        # This process traps exits, so a client already gone arrives as an
+        # `EXIT` here rather than raising.
+        Process.link(client)
+        send(pid, {ref, :taken})
+        outcome
+
       {^ref, outcome} ->
         Process.demonitor(mon, [:flush])
         outcome
@@ -416,15 +508,14 @@ defmodule Imp.MCP.Connections do
       {:DOWN, ^mon, :process, ^pid, reason} ->
         {:unreachable, {:mcp_connection_failed, {:exit, reason}}}
     after
-      deadline ->
+      max(deadline_at - System.monotonic_time(:millisecond), 0) ->
+        # The dial process is still linked to its client, whether the client
+        # is half-open or finished between the deadline and this kill.
         abandon(pid)
         Process.demonitor(mon, [:flush])
 
-        # The dial may have finished between the deadline and the kill. Its
-        # client was unlinked before it answered, so it is not among the links
-        # `abandon/1` closed and nothing else would ever close it.
         receive do
-          {^ref, {:ok, client}} -> safe_disconnect(client)
+          {^ref, _outcome} -> :ok
         after
           0 -> :ok
         end
@@ -450,29 +541,115 @@ defmodule Imp.MCP.Connections do
   # only. A 401 is reported as `:unauthorized`, not as an HTTP error, and is not
   # retried: it is about credentials, not the protocol. ExMCP reports this
   # failure as a string, so the status is read from its text. This retires if
-  # ExMCP falls back on any 4xx to the probe.
+  # ExMCP falls back on any 4xx to the probe. The options that connected are
+  # returned with the client, so further connections to the server are dialed
+  # the way that worked.
   defp dial_http_fallback(options, deadline) do
     case dial(options, deadline) do
-      {:unreachable, {:mcp_connection_failed, reason}} = failed ->
-        if Keyword.get(options, :transport) == :http and probe_refused?(reason),
-          do: dial(Keyword.put(options, :protocol_mode, :legacy_only), deadline),
-          else: failed
+      {:ok, client} ->
+        {:ok, client, options}
 
-      outcome ->
-        outcome
+      {:unreachable, {:mcp_connection_failed, reason}} = failed ->
+        if Keyword.get(options, :transport) == :http and probe_refused?(reason) do
+          legacy = Keyword.put(options, :protocol_mode, :legacy_only)
+
+          with {:ok, client} <- dial(legacy, deadline), do: {:ok, client, legacy}
+        else
+          failed
+        end
+
+      failed ->
+        failed
     end
   end
 
   defp probe_refused?(reason),
     do: inspect(reason, limit: :infinity) =~ ~r/era_probe_failed.*\{:http_error, 4\d\d\b/
 
+  # The connections past the first. The first already showed the server is
+  # there, so one of these that cannot be opened costs the server a connection
+  # rather than its place in the import.
+  # Each is dialed with the options the first connected with, and holds its
+  # server's origin in `Imp.MCP.Trust` for as long as it lives.
+  defp dial_more(_options, _server, count, _opts) when count <= 0, do: []
+
+  defp dial_more(options, server, count, opts) do
+    # All at once, each bounded by the same deadline, so extras that never
+    # answer cost the server one `:timeout` rather than one each.
+    deadline_at = System.monotonic_time(:millisecond) + timeout(opts)
+
+    1..count
+    |> Enum.map(fn _ -> start_dial(options) end)
+    |> Enum.flat_map(fn dialing ->
+      case await_dial(dialing, deadline_at) do
+        {:ok, client} ->
+          :ok = trust(options, client)
+          [client]
+
+        {:unreachable, reason} ->
+          Logger.warning(
+            "MCP server #{inspect(server_name(server))} took one connection fewer than " <>
+              "pool_size asked for: #{inspect(shorten(reason))}"
+          )
+
+          []
+      end
+    end)
+  end
+
+  # A pooled connection whose call timed out, or whose borrower died, may
+  # still be waiting on that request inside ExMCP, so the bridge closes it and
+  # asks for another in its place. The replacement is dialed the way the first
+  # connection connected. The bridge's dialing process holds the origin in the
+  # trusted origins before the retired client, which held it, is closed, and
+  # the replacement holds it for its own life after.
+  #
+  # Each comes with how long a retired connection is given to finish the
+  # request it is inside before it is killed: longer than that request can
+  # take as the connection bounds it.
+  defp replacements(connected, opts) do
+    for {index, server, _pooled, options} <- connected, pooled?(server), into: %{} do
+      {index, {redial(server, options, opts), request_bound(options) + 1_000}}
+    end
+  end
+
+  defp request_bound(options) do
+    Keyword.fetch!(options, :dns_timeout_ms) + Keyword.fetch!(options, :timeout) +
+      Keyword.fetch!(options, :request_timeout)
+  end
+
+  defp redial(server, options, opts) do
+    fn close_retired ->
+      :ok = trust(options, self())
+      close_retired.()
+
+      with {:ok, client} <- dial(options, timeout(opts)),
+           :ok <- trust(options, client) do
+        {:ok, client}
+      else
+        {:unreachable, reason} ->
+          Logger.warning(
+            "MCP server #{inspect(server_name(server))} lost a connection that could " <>
+              "not be replaced: #{inspect(shorten(reason))}"
+          )
+
+          {:error, reason}
+      end
+    end
+  end
+
+  # Each connection is lent by the bridge under its server's place in the list.
   defp client_entries(connected),
-    do: Enum.map(connected, fn {_index, server, client} -> {server, client} end)
+    do:
+      Enum.flat_map(connected, fn {index, _server, pooled, _options} ->
+        Enum.map(pooled, &{index, &1})
+      end)
 
   defp tools_from_clients(clients, opts) do
     clients
-    |> Enum.reduce_while({:ok, [], []}, fn {index, server, client}, {:ok, acc, unavailable} ->
-      case server_tools(server, client, opts) do
+    |> Enum.reduce_while({:ok, [], []}, fn {index, server, [client | _] = pooled, _options},
+                                           {:ok, acc, unavailable} ->
+      case server_tools(index, server, client, opts) do
         {:ok, sourced} ->
           {:cont, {:ok, acc ++ sourced, unavailable}}
 
@@ -481,7 +658,7 @@ defmodule Imp.MCP.Connections do
             # This one answered the handshake and then could not say what it
             # offers, so it contributes nothing. Close it here: an open client
             # nothing imported from would otherwise live as long as the import.
-            safe_disconnect(client)
+            Enum.each(pooled, &safe_disconnect/1)
             {:cont, {:ok, acc, [absence(server, index, reason) | unavailable]}}
           else
             {:halt, {:error, reason}}
@@ -511,11 +688,11 @@ defmodule Imp.MCP.Connections do
   # reason always names the server and is never a fault of the caller's that
   # happened to surface here. Failures after the catalog — the caller's own
   # `:tool_filter` raising, for one — are left to the caller's error paths.
-  defp server_tools(server, client, opts) do
+  defp server_tools(index, server, client, opts) do
     case list_tools(client, opts) do
       {:ok, response} ->
         case tool_schemas(response) do
-          {:ok, schemas} -> attach_client_runs(schemas, client, server, opts)
+          {:ok, schemas} -> attach_client_runs(schemas, index, client, server, opts)
           {:error, reason} -> {:error, {:mcp_tools_list_failed, server_name(server), reason}}
         end
 
@@ -569,7 +746,10 @@ defmodule Imp.MCP.Connections do
     if String.length(text) > 120, do: String.slice(text, 0, 119) <> "…", else: text
   end
 
-  defp attach_client_runs(schemas, client, server, opts) do
+  defp attach_client_runs(schemas, index, client, server, opts) do
+    bridge = Keyword.fetch!(opts, :bridge)
+    pooled? = pooled?(server)
+
     schemas =
       schemas
       |> Enum.filter(fn schema ->
@@ -592,31 +772,67 @@ defmodule Imp.MCP.Connections do
             }
           })
 
-        Map.put(schema, "run", fn arguments ->
-          try do
-            # A lost response does not establish that a write did not happen.
-            # ExMCP defaults modern stream retries to at-least-once; this tool
-            # boundary has no server idempotency contract, so never opt into it.
-            case ExMCP.Client.call_tool(client, name, arguments,
-                   format: :map,
-                   retry_policy: false,
-                   http_stream_retry: :safe_only,
-                   timeout: timeout(opts),
-                   meta: call_meta(server, opts)
-                 ) do
-              {:ok, result} ->
-                Imp.MCP.tool_result(result, result_mode(opts))
+        Map.put(schema, "run", fn
+          arguments when not pooled? ->
+            call_tool(client, name, arguments, server, opts)
 
-              {:error, reason} ->
-                {:error, CallFailure.returned(server_name(server), name, reason)}
-            end
-          catch
-            :exit, reason -> {:error, CallFailure.exited(server_name(server), name, reason)}
-          end
+          arguments ->
+            borrowed_call(bridge, index, name, arguments, server, opts)
         end)
       end)
 
     {:ok, Enum.map(schemas, &{server, &1})}
+  end
+
+  defp borrowed_call(bridge, index, name, arguments, server, opts) do
+    case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
+      {:ok, client} ->
+        result =
+          try do
+            call_tool(client, name, arguments, server, opts)
+          catch
+            kind, reason ->
+              Imp.MCP.Clients.retire(bridge, client)
+              :erlang.raise(kind, reason, __STACKTRACE__)
+          end
+
+        # A call its caller stopped waiting for is still out inside ExMCP's
+        # client, which sends one request at a time: lent again, the client
+        # would hold the next call behind it.
+        if still_out?(result),
+          do: Imp.MCP.Clients.retire(bridge, client),
+          else: Imp.MCP.Clients.checkin(bridge, client)
+
+        result
+
+      {:error, reason} ->
+        {:error, CallFailure.returned(server_name(server), name, reason)}
+    end
+  end
+
+  defp still_out?({:error, %CallFailure{reason: :timeout}}), do: true
+  defp still_out?({:error, %CallFailure{reason: {:exit, {:timeout, _call}}}}), do: true
+  defp still_out?(_result), do: false
+
+  defp call_tool(client, name, arguments, server, opts) do
+    # A lost response does not establish that a write did not happen.
+    # ExMCP defaults modern stream retries to at-least-once; this tool
+    # boundary has no server idempotency contract, so never opt into it.
+    case ExMCP.Client.call_tool(client, name, arguments,
+           format: :map,
+           retry_policy: false,
+           http_stream_retry: :safe_only,
+           timeout: timeout(opts),
+           meta: call_meta(server, opts)
+         ) do
+      {:ok, result} ->
+        Imp.MCP.tool_result(result, result_mode(opts))
+
+      {:error, reason} ->
+        {:error, CallFailure.returned(server_name(server), name, reason)}
+    end
+  catch
+    :exit, reason -> {:error, CallFailure.exited(server_name(server), name, reason)}
   end
 
   defp call_meta(server, opts) do
@@ -918,7 +1134,6 @@ defmodule Imp.MCP.Connections do
           command: [command | args],
           cd: Keyword.get(opts, :cwd, File.cwd!()),
           env: env,
-          default_timeout: timeout(opts),
           era_probe_timeout: timeout(opts),
           handshake_timeout: timeout(opts),
           health_check_interval: nil,
@@ -938,7 +1153,17 @@ defmodule Imp.MCP.Connections do
           # (Scry answers 403). No `Origin` header is sent.
           security: %{origin: nil},
           use_sse: type == "sse",
-          default_timeout: timeout(opts),
+          # ExMCP bounds each HTTP request by these, apart from how long the
+          # caller waits: resolving the name, connecting (ExMCP reads the
+          # connect bound from `:timeout`, which is also the client's wait for
+          # a request made without one; Imp passes one on every request), and
+          # the request itself. The request bound is the host's `:timeout`, so
+          # a call it allows is not cut off by ExMCP's own 30 s default, and
+          # never less than that default: a request its caller stopped waiting
+          # for is left to finish on the server (see `Imp.MCP.Clients`).
+          dns_timeout_ms: @http_dns_timeout,
+          timeout: @http_connect_timeout,
+          request_timeout: max(timeout(opts), @http_request_timeout),
           era_probe_timeout: timeout(opts),
           handshake_timeout: timeout(opts),
           health_check_interval: nil,
@@ -1022,8 +1247,8 @@ defmodule Imp.MCP.Connections do
     do: raise(ArgumentError, "MCP server #{field} must be a list")
 
   defp disconnect_all(clients) do
-    Enum.each(clients, fn {_index, _server, client} ->
-      if Process.alive?(client), do: safe_disconnect(client)
+    Enum.each(clients, fn {_index, _server, pooled, _options} ->
+      Enum.each(pooled, &if(Process.alive?(&1), do: safe_disconnect(&1)))
     end)
 
     :ok
@@ -1090,7 +1315,19 @@ defmodule Imp.MCP.Connections do
     unless is_integer(timeout(opts)) and timeout(opts) > 0 do
       raise ArgumentError, ":timeout must be a positive integer"
     end
+
+    unless is_integer(pool_size(opts)) and pool_size(opts) > 0 do
+      raise ArgumentError, ":pool_size must be a positive integer"
+    end
   end
+
+  defp pool_size(opts), do: Keyword.get(opts, :pool_size, 1)
+
+  # Only HTTP connections are pooled; see "Calls to one server at once".
+  defp extra_connections(server, opts),
+    do: if(pooled?(server), do: pool_size(opts) - 1, else: 0)
+
+  defp pooled?(server), do: server_type(server) in ["http", "sse"]
 
   defp timeout(opts), do: Keyword.get(opts, :timeout, 30_000)
   defp result_mode(opts), do: Keyword.get(opts, :result_mode, :text)

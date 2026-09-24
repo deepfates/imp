@@ -15,6 +15,7 @@ defmodule Imp.MCPHTTPPublicServerTest.PublicServer do
       mount: Keyword.fetch!(opts, :mount),
       refuse_origin: Keyword.get(opts, :refuse_origin, false),
       probe_status: Keyword.get(opts, :probe_status),
+      delay: Keyword.get(opts, :delay, 0),
       notify: Keyword.fetch!(opts, :notify),
       mcp:
         ExMCP.HttpPlug.init(
@@ -31,6 +32,7 @@ defmodule Imp.MCPHTTPPublicServerTest.PublicServer do
     {:ok, body, conn} = read_body(conn)
     method = decode_method(body)
     send(opts.notify, {:request, conn.request_path, method, get_req_header(conn, "origin")})
+    if method in ["server/discover", "initialize"], do: Process.sleep(opts.delay)
 
     cond do
       conn.request_path != opts.mount ->
@@ -99,6 +101,45 @@ defmodule Imp.MCPHTTPPublicServerTest do
 
     assert_received {:request, "/mcp", "server/discover", _origin}
     assert_received {:request, "/mcp", "initialize", _origin}
+  end
+
+  # The connections past the first are dialed the way the first connected, so
+  # a server that refuses the probe is asked it once, not once per connection.
+  # ExMCP's own era cache (`ExMCP.Client.EraCache`, five minutes for a legacy
+  # server) gives the same result today, so this holds the outcome in place
+  # rather than telling the two apart.
+  test "pooled connections to a server that refuses the era probe all go through initialize" do
+    url = public_server(mount: "/mcp", probe_status: 404) <> "/mcp"
+    server = %{"name" => "public", "type" => "http", "url" => url}
+
+    assert {:ok, imported} =
+             Imp.MCP.connect([server], trusted_servers: [server], timeout: 10_000, pool_size: 3)
+
+    connections = Imp.MCP.Clients.client_pids(bridge(imported))
+    imported.cleanup.()
+
+    assert length(connections) == 3
+    assert_received {:request, "/mcp", "server/discover", _origin}
+    refute_received {:request, "/mcp", "server/discover", _origin}
+  end
+
+  # The import gives up on its helper only past the time every dial it may
+  # make could take, and a refused probe costs the server a second dial.
+  @tag timeout: 60_000
+  test "a server slow both to refuse the era probe and to initialize is still reached" do
+    url = public_server(mount: "/mcp", probe_status: 404, delay: 5_500) <> "/mcp"
+    server = %{"name" => "public", "type" => "http", "url" => url}
+
+    assert {:ok, imported} =
+             Imp.MCP.connect([server], trusted_servers: [server], timeout: 6_000)
+
+    imported.cleanup.()
+  end
+
+  # The bridge an import's cleanup stops, read from the cleanup's closure.
+  defp bridge(imported) do
+    {:env, env} = Function.info(imported.cleanup, :env)
+    Enum.find(env, &is_pid/1)
   end
 
   test "a 401 on the era probe is not retried as a protocol problem" do

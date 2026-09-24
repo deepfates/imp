@@ -15,7 +15,8 @@ defmodule Imp.MCP.CallFailure do
       408 or 429 may pass later, a 404 will not).
     * `:not_sent` — the request never left: the connection could not be
       opened, the address could not be resolved, the client was not connected,
-      or the client process was already gone.
+      the client process was already gone, or every connection to an HTTP
+      server stayed busy until the call's timeout (`:no_idle_connection`).
     * `:unknown` — the request was, or may yet be, delivered, and whether the
       tool acted is not known: the caller's timeout, a connection that closed
       after sending, a 5xx status, a response that could not be read, a stream
@@ -39,8 +40,11 @@ defmodule Imp.MCP.CallFailure do
 
   A timeout is `:unknown` even when the request was still waiting in the
   client: ExMCP's client sends a plain HTTP request from inside its own
-  process, so a call behind a slow one waits, and when its caller gives up the
-  request stays queued and is sent later.
+  process, so a call behind a slow one on the same client waits, and when its
+  caller gives up the request stays queued and is sent later. Imp lends each
+  call to an HTTP server a client of its own (`pool_size:` in
+  `Imp.MCP.Connections`), so a call waits for a client rather than inside one,
+  and a call that never got one is `:not_sent`.
 
   An answer from the tool itself, including an MCP error result
   (`{:mcp_tool_error, envelope}`, where `isError` is true), is not a
@@ -96,6 +100,7 @@ defmodule Imp.MCP.CallFailure do
   end
 
   defp classify(:not_connected), do: :not_sent
+  defp classify(:no_idle_connection), do: :not_sent
   defp classify(%{"code" => code}) when is_integer(code), do: code_outcome(code)
 
   defp classify(%ExMCP.Error.ValidationError{}), do: :not_sent

@@ -197,7 +197,7 @@ defmodule Imp.MCPCallOutcomeTest do
       {imported, tools} = http_tools(http_server())
       imported.cleanup.()
 
-      assert {:error, %CallFailure{outcome: :not_sent, reason: {:exit, {:noproc, _}}}} =
+      assert {:error, %CallFailure{outcome: :not_sent, reason: :not_connected}} =
                call(tools, "answer")
     end
 
@@ -251,22 +251,33 @@ defmodule Imp.MCPCallOutcomeTest do
     end
 
     # ExMCP's client makes a plain HTTP POST inside its own process, so a second
-    # call to the same server waits for the first. A call that times out while
+    # call on the same client waits for the first. A call that times out while
     # waiting has not left yet, but its request is still in the client's queue
     # and is sent when the first finishes. So a timeout is never "not sent".
+    # Imp does not put one HTTP call behind another on a client (each call
+    # borrows a client of its own, and one whose call timed out is replaced),
+    # so this is shown on ExMCP's client directly, borrowed from the import.
     # The wait is over five seconds because ExMCP's pre-flight check before
     # each call waits up to five seconds for the busy client, outside the
     # call's own timeout.
     @tag timeout: 30_000
-    test "a call that timed out waiting behind another is sent afterwards" do
+    test "a call that timed out waiting behind another on one client is sent afterwards" do
       Process.register(self(), :mcp_outcome_probe)
       server = http_server()
-      {_imported, tools} = http_tools(server, timeout: 300)
+      {imported, _tools} = http_tools(server, timeout: 300)
       gate(server, {:hold_once, 6_000})
-      spawn(fn -> call(tools, "slow") end)
+
+      {:env, env} = Function.info(imported.cleanup, :env)
+      {:ok, client} = Imp.MCP.Clients.checkout(Enum.find(env, &is_pid/1), 0, 1_000)
+      options = [format: :map, retry_policy: false, http_stream_retry: :safe_only]
+
+      spawn(fn -> ExMCP.Client.call_tool(client, "slow", %{}, [timeout: 10_000] ++ options) end)
       Process.sleep(100)
 
-      assert {:error, %CallFailure{outcome: :unknown, reason: :timeout}} = call(tools, "answer")
+      assert {:error, :timeout = reason} =
+               ExMCP.Client.call_tool(client, "answer", %{}, [timeout: 300] ++ options)
+
+      assert %CallFailure{outcome: :unknown} = CallFailure.returned("outcome", "answer", reason)
       refute_received {:ran, "answer"}
       assert_receive {:ran, "answer"}, 5_000
     end

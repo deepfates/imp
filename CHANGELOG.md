@@ -74,6 +74,34 @@ User-visible changes to Imp are recorded here.
   message where they received nothing before; an owner with a strict
   `handle_info/2` needs a clause for it.
 
+- `Imp.MCP.connect/2` takes `pool_size:` (1 by default): that many
+  connections are opened to each `http` or `sse` server, and each tool call
+  borrows an idle one for the length of the call, so up to `pool_size` calls to
+  one server run at once. One ExMCP client sends one HTTP request at a time, so
+  without it a quick call waits behind a slow one to the same server. A call
+  that finds every connection busy until its `:timeout` fails as `:not_sent`
+  (`reason: :no_idle_connection`), and a call on a closed HTTP import fails as
+  `:not_sent` with `reason: :not_connected` rather than a process exit. A
+  `stdio` server keeps one connection whatever `pool_size` says: ExMCP already
+  sends it several calls at once, and another connection would be another
+  server process. The extra connections are dialed at once, so a server costs
+  the import at most about three `:timeout`s. A connection whose call timed
+  out, or whose caller died during the call, is replaced in the background
+  rather than lent again while ExMCP still waits on that request, and is
+  closed once that request is done, so the server finishes what it was doing;
+  a replacement that cannot be dialed leaves the server a connection fewer.
+
+- An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
+  ended every HTTP request at its own 30 s default whatever `:timeout` said,
+  so a call to a tool that takes 33 s failed at about 30 s under
+  `timeout: 45_000`. ExMCP's `request_timeout` is now the import's `:timeout`,
+  and never less than 30 s.
+
+- A caller of `Imp.MCP.connect/2` that dies while its import is connecting no
+  longer leaves the connections already made open, each holding its server's
+  origin in the trusted origins. They close with the import's `:owner`, which
+  is the caller unless another process was named.
+
 - `Imp.Run.start/3` takes `admission: {pool, limit}`: the run holds a place in
   the host's named pool instead of the machine-wide `:async_max_workers` pool,
   at most `limit` runs hold places in that pool at once, and a full pool
