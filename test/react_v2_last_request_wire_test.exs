@@ -1,19 +1,21 @@
 defmodule Imp.ReActV2LastRequestWireTest do
   use ExUnit.Case
 
-  # The last request of an interrupted turn says `tool_choice: "none"` and
-  # keeps the roster every step sent. What that means on the wire is the
-  # provider's encoding, so each provider path is run through the real ReqLLM
-  # request stack against a local server and the encoded body is read back.
+  # The last request of an interrupted turn keeps the roster and the
+  # `tool_choice` every step sent, and never says "none". What that means on
+  # the wire is the provider's encoding, so each provider path is run through
+  # the real ReqLLM request stack against a local server and the encoded body
+  # is read back.
 
   @providers [
-    {:openai, "/v1", "none"},
-    {:openrouter, "", "none"},
-    {:anthropic, "", %{"type" => "none"}}
+    {:openai, "/v1", "auto"},
+    # ReqLLM leaves "auto", OpenRouter's default, out of the body.
+    {:openrouter, "", nil},
+    {:anthropic, "", %{"type" => "auto"}}
   ]
 
   for {provider, prefix, expected_choice} <- @providers do
-    test "#{provider} encodes the last request as tool_choice none with the same tools" do
+    test "#{provider} encodes the last request with the same tools and tool_choice as every step" do
       provider = unquote(provider)
       {:ok, bodies} = Agent.start_link(fn -> [] end)
 
@@ -46,7 +48,7 @@ defmodule Imp.ReActV2LastRequestWireTest do
 
       [first, last] = Agent.get(bodies, & &1)
       assert last["tool_choice"] == unquote(Macro.escape(expected_choice))
-      assert first["tool_choice"] != last["tool_choice"]
+      assert first["tool_choice"] == last["tool_choice"]
       assert [%{} | _] = last["tools"]
       assert last["tools"] == first["tools"]
     end

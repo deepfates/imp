@@ -2,15 +2,16 @@ defmodule ReActV2LastProseTest do
   use ExUnit.Case, async: true
 
   # A signature with one text output ends every interrupted turn (the step
-  # limit, a failed request, a step that calls nothing and says nothing) with
-  # one request with `tool_choice: "none"` and the same tools as every step, so
-  # the model can only write text. What it writes is the single text output; what it does not say
-  # is an empty answer, not an error. A deadline that has already passed
-  # leaves no time for that request.
+  # limit, a failed request) with one more request with the same tools and
+  # `tool_choice: "auto"` as every step. Its text is the single text output; a
+  # tool call in it is not run; what it does not say is an empty answer, not an
+  # error. A deadline that has already passed leaves no time for that request.
 
   defp look, do: Imp.tool(:look, "Look at a thing", fn _arguments -> %{"seen" => true} end)
 
-  defp recording_lm(owner, last) do
+  # Answers the first `steps` requests with a tool call and every later one
+  # with `last`.
+  defp recording_lm(owner, last, steps \\ 1) do
     counter = :counters.new(1, [])
 
     Imp.LM.Static.new(
@@ -19,7 +20,7 @@ defmodule ReActV2LastProseTest do
         :counters.put(counter, 1, n)
         send(owner, {:request, n, messages, opts})
 
-        if opts[:tool_choice] != "none" do
+        if n <= steps do
           %{
             next_thought: "look first",
             tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]
@@ -36,13 +37,13 @@ defmodule ReActV2LastProseTest do
   defp user_contents(messages),
     do: messages |> Enum.filter(&(&1[:role] == :user)) |> Enum.map(& &1[:content])
 
-  test "the step limit spends one request that allows no tool call and takes its prose as the answer" do
+  test "the step limit spends one more request and takes its text as the answer" do
     owner = self()
     prose = "Two looks were enough: the thing is there."
 
     program =
       Imp.react_v2("intent -> answer", [look()],
-        lm: recording_lm(owner, prose),
+        lm: recording_lm(owner, prose, 2),
         max_iters: 2
       )
 
@@ -55,7 +56,7 @@ defmodule ReActV2LastProseTest do
     refute_received {:request, 4, _messages, _opts}
 
     assert Keyword.fetch!(first_opts, :tool_choice) == "auto"
-    assert last_opts[:tool_choice] == "none"
+    assert last_opts[:tool_choice] == "auto"
     # The roster is the one every step sent, so the prompt prefix is unchanged.
     assert last_opts[:tools] == first_opts[:tools]
 
@@ -179,7 +180,7 @@ defmodule ReActV2LastProseTest do
     assert Imp.get(prediction, :termination_cause) == :prediction_error
 
     [_failed, {last, last_opts}] = requests(2)
-    assert last_opts[:tool_choice] == "none"
+    assert last_opts[:tool_choice] == "auto"
 
     # The inputs no step spent come first, and the note is the last thing said.
     [inputs, note] = Enum.take(user_contents(last), -2)
@@ -217,10 +218,15 @@ defmodule ReActV2LastProseTest do
     def generate_text(model, messages, opts) do
       send(Keyword.fetch!(opts, :owner), {:tool_choice, opts[:tool_choice]})
 
+      # The first request is the step; the relayed error makes the next the last.
       {message, meta} =
-        if opts[:tool_choice] == "none",
+        if Process.get(:relayed_error_sent),
           do: {"Answered after all.", %{}},
-          else: {"", %{"error" => %{"code" => 400, "message" => "Upstream error"}}}
+          else:
+            (
+              Process.put(:relayed_error_sent, true)
+              {"", %{"error" => %{"code" => 400, "message" => "Upstream error"}}}
+            )
 
       {:ok,
        %ReqLLM.Response{
@@ -244,7 +250,7 @@ defmodule ReActV2LastProseTest do
     assert Imp.get(prediction, :termination_reason) == :last_prose
     assert Imp.get(prediction, :termination_cause) == :prediction_error
     assert_received {:tool_choice, "auto"}
-    assert_received {:tool_choice, "none"}
+    assert_received {:tool_choice, "auto"}
   end
 
   test "a deadline that has already passed makes no last request" do
@@ -279,12 +285,11 @@ defmodule ReActV2LastProseTest do
     refute Enum.any?(Imp.History.messages(history), &(Map.get(&1, :intent) == "Last one."))
   end
 
-  # `tool_choice: "none"` is a request, not a guarantee. A call the model makes
-  # anyway is not run and is not replayed as a call with no result; its text
-  # is the answer and the call is named in `unexecuted_tool_calls`.
+  # A call the model makes on the last request is not run and is not replayed
+  # as a call with no result; its text is the answer and the call is named in
+  # `unexecuted_tool_calls`.
   test "a tool call on the last request is not run, and its text is the answer" do
     owner = self()
-    counter = :counters.new(1, [])
 
     look =
       Imp.tool(:look, "Look at a thing", fn _arguments ->
@@ -292,20 +297,12 @@ defmodule ReActV2LastProseTest do
         %{"seen" => true}
       end)
 
-    lm =
-      Imp.LM.Static.new(
-        handler: fn _messages, opts ->
-          n = :counters.get(counter, 1) + 1
-          :counters.put(counter, 1, n)
+    last = %{
+      next_thought: "One more look, then: it is there.",
+      tool_calls: [%{id: "late", name: "look", arguments: %{"where" => "shelf"}}]
+    }
 
-          if opts[:tool_choice] == "none",
-            do: %{
-              next_thought: "One more look, then: it is there.",
-              tool_calls: [%{id: "late", name: "look", arguments: %{"where" => "shelf"}}]
-            },
-            else: %{tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]}
-        end
-      )
+    lm = recording_lm(owner, last)
 
     program = Imp.react_v2("intent -> answer", [look], lm: lm, max_iters: 1)
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
@@ -322,6 +319,81 @@ defmodule ReActV2LastProseTest do
     [_first, last] = Imp.History.messages(Imp.get(prediction, :history))
     assert last.answer == "One more look, then: it is there."
     assert last.tool_calls.tool_calls == []
+  end
+
+  # The live failure: the first request failed upstream, and the last request
+  # said `tool_choice: "none"` to a model that had done nothing yet and wanted
+  # a tool. It wrote the call as text in its own markup, and that text became
+  # the answer. The last request offers tools the way every step does, so the
+  # model calls the tool natively; the call is not run, and the answer is the
+  # completion's text, here none.
+  test "after a failed first request, a tool call on the last request is not run and the answer is empty" do
+    owner = self()
+    counter = :counters.new(1, [])
+
+    identity_status =
+      Imp.tool(:identity_status, "Who am I", fn _arguments ->
+        send(owner, :identity_status_ran)
+        %{"handle" => "gregory"}
+      end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, opts ->
+          n = :counters.get(counter, 1) + 1
+          :counters.put(counter, 1, n)
+          send(owner, {:tool_choice, n, opts[:tool_choice]})
+
+          if n == 1,
+            do: raise(RuntimeError, "Service unavailable"),
+            else: %{tool_calls: [%{id: "wanted", name: "identity_status", arguments: %{}}]}
+        end
+      )
+
+    program = Imp.react_v2("intent -> answer", [identity_status], lm: lm)
+    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+
+    assert_received {:tool_choice, 2, "auto"}
+    refute_received :identity_status_ran
+    assert Imp.get(prediction, :answer) == nil
+    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_cause) == :prediction_error
+
+    assert [%{id: "wanted", name: "identity_status"}] =
+             Imp.get(prediction, :unexecuted_tool_calls)
+  end
+
+  # `tool_choice: "none"` makes some models write the call they wanted as text
+  # in their own tool markup, which would then be the answer. No request an
+  # interrupted turn makes says "none".
+  test "no request of an interrupted turn says tool_choice none" do
+    owner = self()
+
+    for {lm, max_iters} <- [
+          {recording_lm(owner, "Done.", 3), 3},
+          {Imp.LM.Static.new(
+             handler: fn _messages, opts ->
+               send(owner, {:request, :any, [], opts})
+               if opts[:tool_choice] == "none", do: "none was sent", else: raise("unavailable")
+             end
+           ), 5}
+        ] do
+      program = Imp.react_v2("intent -> answer", [look()], lm: lm, max_iters: max_iters)
+      assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+      refute Imp.get(prediction, :answer) == "none was sent"
+    end
+
+    choices = collect_choices([])
+    assert choices != []
+    refute "none" in choices
+  end
+
+  defp collect_choices(acc) do
+    receive do
+      {:request, _n, _messages, opts} -> collect_choices([opts[:tool_choice] | acc])
+    after
+      0 -> acc
+    end
   end
 
   test "each note is refused for the signature it does not belong to" do
