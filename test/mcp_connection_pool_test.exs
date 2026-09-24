@@ -36,23 +36,46 @@ defmodule Imp.MCPConnectionPoolTest do
       do: {:ok, %{"content" => [%{"type" => "text", "text" => "fast done"}]}, state}
   end
 
-  # Answers the first connection's handshake and holds every later one, as a
-  # server that takes one session at a time does. Tool requests still answer.
+  # Answers the first `answered` connections' handshakes (one by default), or
+  # those whose place in arrival order is in the list `answered`, and holds
+  # every other one, as a server that takes one session at a time does,
+  # or refuses it with a 503 when `later` is `:refuse`. Tool requests still
+  # answer.
   defmodule OneSession do
     @behaviour Plug
     def init(opts), do: ExMCP.HttpPlug.init(opts)
+
+    def setup(answered \\ 1, later \\ :hold) do
+      :persistent_term.put({__MODULE__, :handshakes}, :counters.new(1, []))
+      :persistent_term.put({__MODULE__, :answered}, answered)
+      :persistent_term.put({__MODULE__, :later}, later)
+    end
 
     def call(conn, opts) do
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       handshakes = :persistent_term.get({__MODULE__, :handshakes})
 
-      unless body =~ ~s("tools/) do
-        if :counters.get(handshakes, 1) > 0, do: Process.sleep(:infinity)
+      if body =~ ~s("tools/) do
+        ExMCP.HttpPlug.call(Plug.Conn.assign(conn, :raw_body, body), opts)
+      else
+        seen = :counters.get(handshakes, 1)
         :counters.add(handshakes, 1, 1)
-      end
 
-      ExMCP.HttpPlug.call(Plug.Conn.assign(conn, :raw_body, body), opts)
+        cond do
+          answered?(seen, :persistent_term.get({__MODULE__, :answered})) ->
+            ExMCP.HttpPlug.call(Plug.Conn.assign(conn, :raw_body, body), opts)
+
+          :persistent_term.get({__MODULE__, :later}) == :refuse ->
+            Plug.Conn.send_resp(conn, 503, "one session at a time")
+
+          true ->
+            Process.sleep(:infinity)
+        end
+      end
     end
+
+    defp answered?(seen, answered) when is_list(answered), do: seen in answered
+    defp answered?(seen, answered), do: seen < answered
   end
 
   defp server(plug \\ ExMCP.HttpPlug) do
@@ -172,14 +195,105 @@ defmodule Imp.MCPConnectionPoolTest do
     refute Enum.any?(bridge_clients, &Process.alive?/1)
   end
 
-  # Each extra dial is bounded by `:timeout` on its own, so the import as a
-  # whole must allow for `pool_size` of them per server.
+  # Each extra dial is bounded by `:timeout` on its own, and the import's time
+  # limit allows a round of them per server.
   test "extra connections that never answer cost the server connections, not the import" do
-    :persistent_term.put({OneSession, :handshakes}, :counters.new(1, []))
+    OneSession.setup()
     {imported, tools} = tools(server(OneSession), pool_size: 8, timeout: 1_000)
 
     assert [_one] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
     assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+  end
+
+  # The extra connections to a server are dialed at once, so extras that never
+  # answer cost the import one `:timeout`, not one each.
+  test "a server's extra connections are dialed at once" do
+    OneSession.setup()
+
+    {elapsed, {imported, _tools}} =
+      ms(fn -> tools(server(OneSession), pool_size: 4, timeout: 1_000) end)
+
+    assert [_one] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+    assert elapsed < 2_000, "three held extra dials took #{elapsed} ms"
+  end
+
+  # The import's time limit allows each server its first dial, the one
+  # fallback dial and one round of extra dials. An import given up while extras
+  # are still dialing closes every connection it made, the ones that answered
+  # and the ones still in their handshake.
+  test "an import given up while extra connections dial closes every one" do
+    # Of seven extras the first three to arrive are held and the rest answer,
+    # so answers wait to be taken while the import still awaits held ones.
+    OneSession.setup([0, 4, 5, 6, 7])
+    descriptor = server(OneSession)
+    origin = String.replace(descriptor["url"], "/mcp", "")
+    before = exmcp_clients()
+
+    # Limit: 3 * 1_000 + 5_000. The extras start at about 7_300 ms, the held
+    # ones would hold until 8_300 ms, and the import is given up at 8_000.
+    authorize = fn _descriptor ->
+      Process.sleep(7_300)
+      :ok
+    end
+
+    assert {:error, :mcp_import_timeout} =
+             Imp.MCP.connect([descriptor], authorize: authorize, pool_size: 8, timeout: 1_000)
+
+    assert eventually(fn -> exmcp_clients() -- before == [] end),
+           "#{length(exmcp_clients() -- before)} clients outlived the abandoned import"
+
+    assert eventually(fn -> origin not in trusted_origins() end)
+  end
+
+  # A call that timed out leaves its request with ExMCP, which is still
+  # waiting on it. That connection is closed and a new one dialed, so the next
+  # call does not wait behind the old request.
+  test "after a call times out the next call does not wait behind it" do
+    {_imported, tools} = tools(server(), pool_size: 1, timeout: 400)
+
+    assert {:error, %CallFailure{outcome: :unknown}} = Imp.Tool.call(tools["slow"], %{})
+
+    {elapsed, result} = ms(fn -> Imp.Tool.call(tools["fast"], %{}) end)
+    assert result == "fast done"
+    assert elapsed < 300, "the next call waited #{elapsed} ms"
+  end
+
+  test "after a borrower dies mid-call the next call does not wait behind its request" do
+    {_imported, tools} = tools(server(), pool_size: 1, timeout: 5_000)
+
+    {:ok, borrower} = Task.start(fn -> Imp.Tool.call(tools["slow"], %{}) end)
+    Process.sleep(200)
+    Process.exit(borrower, :kill)
+
+    {elapsed, result} = ms(fn -> Imp.Tool.call(tools["fast"], %{}) end)
+    assert result == "fast done"
+    assert elapsed < 500, "the next call waited #{elapsed} ms"
+  end
+
+  # A replacement that cannot be dialed leaves the server with one connection
+  # fewer; with none left, its calls are not sent and say so.
+  test "a replacement that cannot be dialed shrinks the pool" do
+    OneSession.setup(1, :refuse)
+    {imported, tools} = tools(server(OneSession), pool_size: 1, timeout: 400)
+
+    assert {:error, %CallFailure{outcome: :unknown}} = Imp.Tool.call(tools["slow"], %{})
+
+    assert {:error, %CallFailure{outcome: :not_sent, reason: :not_connected}} =
+             Imp.Tool.call(tools["fast"], %{})
+
+    assert Imp.MCP.Clients.client_pids(imported_bridge(imported)) == []
+  end
+
+  defp exmcp_clients do
+    Enum.filter(Process.list(), fn pid ->
+      case Process.info(pid, :dictionary) do
+        {:dictionary, dictionary} ->
+          match?({ExMCP.Client, _, _}, dictionary[:"$initial_call"])
+
+        nil ->
+          false
+      end
+    end)
   end
 
   # Each pooled connection holds its server's origin in `Imp.MCP.Trust` for as

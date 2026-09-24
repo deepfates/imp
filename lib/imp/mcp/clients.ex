@@ -13,7 +13,16 @@ defmodule Imp.MCP.Clients do
   # its server (`checkout/3`), makes the call and gives it back (`checkin/2`); a
   # call that finds none idle waits in line, and one still waiting at its
   # timeout is answered `{:error, :no_idle_connection}` without anything having
-  # been sent. A borrower that dies gives its client back.
+  # been sent.
+  #
+  # A client whose call timed out, or whose borrower died during the call, may
+  # still be waiting on that request: ExMCP's client makes the request inside
+  # its own process. Lent again, it would hold the next call behind that one.
+  # Such a client is retired instead (`retire/2`): closed, and a replacement
+  # dialed in the background by the function the import gave for its server.
+  # Calls wait for the replacement. One that cannot be dialed leaves the server
+  # a connection fewer, and a server left with none answers its calls
+  # `:not_connected`.
 
   use GenServer
 
@@ -30,9 +39,12 @@ defmodule Imp.MCP.Clients do
     GenServer.start(__MODULE__, opts)
   end
 
-  @spec adopt(pid(), [client_entry()]) :: :ok
-  def adopt(bridge, clients) when is_pid(bridge) and is_list(clients) do
-    GenServer.call(bridge, {:adopt, clients})
+  @type replacement :: ((-> term()) -> {:ok, pid()} | {:error, term()})
+
+  @spec adopt(pid(), [client_entry()], %{optional(term()) => replacement()}) :: :ok
+  def adopt(bridge, clients, replacements \\ %{})
+      when is_pid(bridge) and is_list(clients) and is_map(replacements) do
+    GenServer.call(bridge, {:adopt, clients, replacements})
   end
 
   @doc false
@@ -57,6 +69,10 @@ defmodule Imp.MCP.Clients do
   @doc false
   @spec checkin(pid(), pid()) :: :ok
   def checkin(bridge, client), do: GenServer.cast(bridge, {:checkin, client})
+
+  @doc false
+  @spec retire(pid(), pid()) :: :ok
+  def retire(bridge, client), do: GenServer.cast(bridge, {:retire, client})
 
   @spec client_pids(pid()) :: [pid()]
   def client_pids(bridge) when is_pid(bridge) do
@@ -89,12 +105,14 @@ defmodule Imp.MCP.Clients do
        clients: [],
        idle: %{},
        lent: %{},
-       waiting: %{}
+       waiting: %{},
+       replacements: %{},
+       replacing: %{}
      }}
   end
 
   @impl true
-  def handle_call({:adopt, clients}, _from, state) do
+  def handle_call({:adopt, clients, replacements}, _from, state) do
     Enum.each(clients, fn {_server, client} ->
       true = Process.link(client)
     end)
@@ -104,7 +122,13 @@ defmodule Imp.MCP.Clients do
         Map.update(idle, server, [client], &(&1 ++ [client]))
       end)
 
-    {:reply, :ok, %{state | clients: state.clients ++ clients, idle: idle}}
+    {:reply, :ok,
+     %{
+       state
+       | clients: state.clients ++ clients,
+         idle: idle,
+         replacements: Map.merge(state.replacements, replacements)
+     }}
   end
 
   def handle_call({:checkout, server, ref}, {pid, _tag} = from, state) do
@@ -114,7 +138,7 @@ defmodule Imp.MCP.Clients do
          lend(%{state | idle: Map.put(state.idle, server, rest)}, client, pid, ref)}
 
       [] ->
-        if Enum.any?(state.clients, fn {key, _client} -> key == server end) do
+        if connected?(state, server) do
           line = Map.get(state.waiting, server, :queue.new())
           waiting = Map.put(state.waiting, server, :queue.in({from, ref}, line))
           {:noreply, %{state | waiting: waiting}}
@@ -131,6 +155,17 @@ defmodule Imp.MCP.Clients do
 
   @impl true
   def handle_cast({:checkin, client}, state), do: {:noreply, give_back(state, client)}
+
+  def handle_cast({:retire, client}, state) do
+    case Map.pop(state.lent, client) do
+      {nil, _lent} ->
+        {:noreply, state}
+
+      {lease, lent} ->
+        Process.demonitor(lease.monitor, [:flush])
+        {:noreply, replace(%{state | lent: lent}, client)}
+    end
+  end
 
   def handle_cast({:withdraw, ref}, state) do
     waiting =
@@ -153,12 +188,41 @@ defmodule Imp.MCP.Clients do
     {:stop, :normal, %{state | clients: []}}
   end
 
-  # A borrower that died gives back what it held.
+  # A borrower that died may have left its call out on the client it held.
   def handle_info({:DOWN, monitor, :process, _pid, _reason}, state) do
     case Enum.find(state.lent, fn {_client, lease} -> lease.monitor == monitor end) do
-      {client, _lease} -> {:noreply, give_back(state, client)}
-      nil -> {:noreply, state}
+      {client, _lease} ->
+        {:noreply, replace(%{state | lent: Map.delete(state.lent, client)}, client)}
+
+      nil ->
+        {:noreply, state}
     end
+  end
+
+  # A replacement dialer answers with the new client, still linked to it; the
+  # bridge links it before the dialer lets go.
+  def handle_info({:replacement, dialer, server, outcome}, state) do
+    state = %{state | replacing: Map.delete(state.replacing, dialer)}
+
+    state =
+      case outcome do
+        {:ok, client} ->
+          Process.link(client)
+          send(dialer, {:replacement_taken, client})
+          state = %{state | clients: state.clients ++ [{server, client}]}
+          next_in_line(state, server, client)
+
+        {:error, _reason} ->
+          answer_if_gone(state, server)
+      end
+
+    {:noreply, state}
+  end
+
+  # A dialer that died without answering replaced nothing.
+  def handle_info({:EXIT, pid, _reason}, state) when is_map_key(state.replacing, pid) do
+    {server, replacing} = Map.pop(state.replacing, pid)
+    {:noreply, answer_if_gone(%{state | replacing: replacing}, server)}
   end
 
   # A client that exited is neither lent nor idle again. A server left with no
@@ -182,25 +246,87 @@ defmodule Imp.MCP.Clients do
           %{state | lent: lent}
       end
 
-    state =
-      Enum.reduce(gone, state, fn {server, _client}, acc ->
-        if Enum.any?(acc.clients, fn {key, _client} -> key == server end) do
-          acc
-        else
-          {line, waiting} = Map.pop(acc.waiting, server, :queue.new())
-
-          Enum.each(:queue.to_list(line), fn {from, _ref} ->
-            GenServer.reply(from, {:error, :not_connected})
-          end)
-
-          %{acc | waiting: waiting}
-        end
-      end)
-
+    state = Enum.reduce(gone, state, fn {server, _client}, acc -> answer_if_gone(acc, server) end)
     {:noreply, state}
   end
 
   def handle_info(_message, state), do: {:noreply, state}
+
+  defp connected?(state, server) do
+    Enum.any?(state.clients, fn {key, _client} -> key == server end) or
+      Enum.any?(state.replacing, fn {_dialer, key} -> key == server end)
+  end
+
+  # A server with no client and none being dialed answers its waiting calls
+  # that it is not connected.
+  defp answer_if_gone(state, server) do
+    if connected?(state, server) do
+      state
+    else
+      {line, waiting} = Map.pop(state.waiting, server, :queue.new())
+
+      Enum.each(:queue.to_list(line), fn {from, _ref} ->
+        GenServer.reply(from, {:error, :not_connected})
+      end)
+
+      %{state | waiting: waiting}
+    end
+  end
+
+  # The retired client is closed by killing it: it may be inside a request, and
+  # a disconnect would wait behind that. Its replacement is dialed by a linked
+  # process of the bridge's, which traps exits so that a dial abandoned at its
+  # deadline does not take it down.
+  defp replace(state, client) do
+    server = Enum.find_value(state.clients, fn {key, pid} -> if pid == client, do: key end)
+    Process.unlink(client)
+    clients = Enum.reject(state.clients, fn {_key, pid} -> pid == client end)
+    state = %{state | clients: clients}
+
+    case {server, Map.fetch(state.replacements, server)} do
+      {nil, _} ->
+        Process.exit(client, :kill)
+        state
+
+      {_server, :error} ->
+        Process.exit(client, :kill)
+        answer_if_gone(state, server)
+
+      {server, {:ok, redial}} ->
+        bridge = self()
+
+        dialer =
+          spawn_link(fn ->
+            Process.flag(:trap_exit, true)
+            dial_replacement(bridge, server, client, redial)
+          end)
+
+        %{state | replacing: Map.put(state.replacing, dialer, server)}
+    end
+  end
+
+  defp dial_replacement(bridge, server, retired, redial) do
+    # The replacement function takes the server's origin into the trusted
+    # origins for this process before it calls back to kill the retired client,
+    # which held it until then.
+    outcome =
+      try do
+        redial.(fn -> Process.exit(retired, :kill) end)
+      catch
+        kind, reason -> {:error, {kind, reason}}
+      end
+
+    # Ensure the retired client is gone whatever the dial did.
+    Process.exit(retired, :kill)
+    send(bridge, {:replacement, self(), server, outcome})
+
+    with {:ok, client} <- outcome do
+      receive do
+        {:replacement_taken, ^client} -> Process.unlink(client)
+        {:EXIT, ^bridge, _reason} -> Process.exit(client, :kill)
+      end
+    end
+  end
 
   defp lend(state, client, borrower, ref),
     do: %{

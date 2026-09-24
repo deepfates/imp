@@ -72,6 +72,50 @@ defmodule Imp.MCPTrustTest do
     assert eventually(fn -> origin not in trusted_origins() end)
   end
 
+  # A pooled connection retired after a call timed out is replaced; the dial
+  # of its replacement holds the origin before the retired one, which held it
+  # until then, is closed, so the replacement is sent with its credentials.
+  test "a replacement for a retired connection is dialed with the origin trusted" do
+    %{url: url, origin: origin} = credentialed_server("Bearer trust-test-token")
+
+    server = %{
+      "name" => "credentialed",
+      "type" => "http",
+      "url" => url,
+      "headers" => [%{"name" => "Authorization", "value" => "Bearer trust-test-token"}]
+    }
+
+    assert {:ok, imported} = Imp.MCP.connect([server], trusted_servers: [server])
+    on_exit(fn -> imported.cleanup.() end)
+    flush_auth()
+
+    {:env, env} = Function.info(imported.cleanup, :env)
+    bridge = Enum.find(env, &is_pid/1)
+    {:ok, retired} = Imp.MCP.Clients.checkout(bridge, 0, 1_000)
+    :ok = Imp.MCP.Clients.retire(bridge, retired)
+
+    assert_receive {:mcp_http_auth, :accepted}, 5_000
+    refute_received {:mcp_http_auth, :rejected}
+
+    assert eventually(fn ->
+             match?(
+               [replacement] when replacement != retired,
+               Imp.MCP.Clients.client_pids(bridge)
+             )
+           end)
+
+    refute Process.alive?(retired)
+    assert origin in trusted_origins()
+  end
+
+  defp flush_auth do
+    receive do
+      {:mcp_http_auth, _status} -> flush_auth()
+    after
+      0 -> :ok
+    end
+  end
+
   test "a crash of the process that added an origin does not leave it trusted" do
     origin = "https://crash.example:443"
     holder = spawn(fn -> Process.sleep(:infinity) end)

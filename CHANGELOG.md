@@ -72,7 +72,11 @@ User-visible changes to Imp are recorded here.
   `:not_sent` with `reason: :not_connected` rather than a process exit. A
   `stdio` server keeps one connection whatever `pool_size` says: ExMCP already
   sends it several calls at once, and another connection would be another
-  server process.
+  server process. The extra connections are dialed at once, so a server costs
+  the import at most about three `:timeout`s. A connection whose call timed
+  out, or whose caller died during the call, is closed and replaced in the
+  background rather than lent again while ExMCP still waits on that request;
+  a replacement that cannot be dialed leaves the server a connection fewer.
 
 - A caller of `Imp.MCP.connect/2` that dies while its import is connecting no
   longer leaves the connections already made open, each holding its server's
