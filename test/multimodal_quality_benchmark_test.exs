@@ -189,6 +189,36 @@ defmodule MultimodalQualityBenchmarkTest do
     end
   end
 
+  test "the campaign records the loaded ReqLLM package and a checkpoint cannot resume under another" do
+    manifest = Manifest.load!(@openai_manifest)
+    refute Map.has_key?(manifest.payload["provider"], "req_llm_dependency")
+
+    loaded = Application.spec(:req_llm, :vsn) |> to_string()
+    {:hex, :req_llm, ^loaded, package_sha256, _, _, "hexpm", _} = Mix.Dep.Lock.read()[:req_llm]
+
+    assert Manifest.runtime_dependency!() == %{
+             "package" => "req_llm",
+             "package_sha256" => package_sha256,
+             "source" => "hexpm",
+             "version" => loaded
+           }
+
+    artifact = Runner.run(mode: :plan, manifest: @openai_manifest, max_concurrency: 1)
+    assert artifact["provider"]["req_llm_dependency"] == Manifest.runtime_dependency!()
+
+    path = tmp_path("other-req-llm.json")
+    bindings = Manifest.sample_bindings(manifest.payload)
+    identity = checkpoint_identity(manifest)
+    Checkpoint.load!(path, identity, bindings)
+
+    other_build =
+      put_in(identity, ["provider", "req_llm_dependency", "version"], "0.0.0-other")
+
+    assert_raise ArgumentError, ~r/campaign identity mismatch/, fn ->
+      Checkpoint.load!(path, other_build, bindings)
+    end
+  end
+
   test "duplicate provider response IDs are rejected before checkpoint completion" do
     {base_url, _request_pid} = start_openai_fixture(response_id: "resp_duplicated")
 
@@ -432,6 +462,7 @@ defmodule MultimodalQualityBenchmarkTest do
   end
 
   defp checkpoint_identity(manifest) do
+    manifest = Manifest.bind_runtime_dependency!(manifest)
     provider = manifest.payload["provider"]
 
     %{

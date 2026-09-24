@@ -15,8 +15,7 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
 
     root = Keyword.get(opts, :root, File.cwd!()) |> Path.expand()
     manifest_path = Keyword.get(opts, :manifest, Path.join(root, @default_manifest))
-    manifest = Manifest.load!(manifest_path, root: root)
-    Manifest.runtime_dependency!(manifest.payload)
+    manifest = manifest_path |> Manifest.load!(root: root) |> Manifest.bind_runtime_dependency!()
     max_concurrency = validate_concurrency!(Keyword.get(opts, :max_concurrency, 2))
 
     case mode do
