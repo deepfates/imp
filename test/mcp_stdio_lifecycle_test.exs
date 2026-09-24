@@ -135,6 +135,42 @@ defmodule Imp.MCPStdioLifecycleTest do
            "stdio server child #{child_pid} outlived its killed client"
   end
 
+  test "a server that exits on its own leaves no child behind", %{tmp_dir: tmp_dir} do
+    started_file = Path.join(tmp_dir, "exits.started")
+    child_pid_file = Path.join(tmp_dir, "exits.child.pid")
+
+    {pid_file, script} =
+      server_script(tmp_dir, "exits_itself",
+        ignore_sigterm: true,
+        block_tool_call: {started_file, child_pid_file},
+        exit_after_child: true
+      )
+
+    python = System.find_executable("python3")
+    {:ok, _started} = Application.ensure_all_started(:ex_mcp)
+    Process.flag(:trap_exit, true)
+
+    {:ok, client} =
+      ExMCP.Client.start_link(
+        transport: Imp.MCP.OwnedStdio,
+        command: [python, script],
+        health_check_interval: nil,
+        reconnect: false
+      )
+
+    spawn(fn -> ExMCP.Client.call_tool(client, "noop", %{}, timeout: 30_000) end)
+
+    wait_for_file!(started_file)
+    os_pid = read_pid!(pid_file)
+    child_pid = read_pid!(child_pid_file)
+    on_exit(fn -> kill_process_group(os_pid) end)
+
+    assert os_process_dead?(os_pid), "stdio server #{os_pid} did not exit"
+
+    assert os_process_dead?(child_pid, 5_000),
+           "stdio server child #{child_pid} outlived the server that started it"
+  end
+
   # A JSON-RPC server that answers initialize/tools/list/tools/call, then
   # deliberately refuses to exit on stdin EOF (and optionally ignores SIGTERM).
   defp fake_server(tmp_dir, label, opts) do
@@ -146,6 +182,10 @@ defmodule Imp.MCPStdioLifecycleTest do
   defp server_script(tmp_dir, label, opts) do
     ignore_sigterm = Keyword.fetch!(opts, :ignore_sigterm)
     block_tool_call = Keyword.get(opts, :block_tool_call)
+    # After starting its child, the server exits on its own instead of blocking.
+    after_child =
+      if Keyword.get(opts, :exit_after_child, false), do: "os._exit(0)", else: "time.sleep(300)"
+
     pid_file = Path.join(tmp_dir, "#{label}.pid")
     script = Path.join(tmp_dir, "#{label}.py")
 
@@ -167,7 +207,7 @@ defmodule Imp.MCPStdioLifecycleTest do
           ])
           with open(#{inspect(child_pid_file)}, "w") as handle:
               handle.write(str(child.pid))
-          time.sleep(300)
+          #{after_child}
           """
 
         nil ->
@@ -276,8 +316,8 @@ defmodule Imp.MCPStdioLifecycleTest do
 
   # kill -0 probes existence without sending a signal. Poll briefly so process
   # table cleanup after a synchronous kill cannot flake the assertion.
-  defp os_process_dead?(os_pid) do
-    deadline = System.monotonic_time(:millisecond) + 2_000
+  defp os_process_dead?(os_pid, within \\ 2_000) do
+    deadline = System.monotonic_time(:millisecond) + within
     poll_dead(os_pid, deadline)
   end
 

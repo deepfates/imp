@@ -32,6 +32,7 @@ defmodule Imp.MCP.OwnedStdio do
   # A close runs on the caller's path (a run being cancelled, a session ending),
   # and MCP servers keep no state a hard stop would corrupt.
   @kill_timeout_seconds 1
+  @orphan_grace_ms 500
   @default_max_frame_bytes 1_048_576
 
   # Variables a server keeps from the host environment; everything else is the
@@ -286,6 +287,7 @@ defmodule Imp.MCP.OwnedStdio do
   end
 
   def handle_info({:EXIT, exec_pid, reason}, %{exec_pid: exec_pid} = state) do
+    reap_group(state.os_pid)
     {:noreply, %{deliver_exit(state, exit_status(reason)) | exec_pid: nil}}
   end
 
@@ -366,6 +368,29 @@ defmodule Imp.MCP.OwnedStdio do
   end
 
   defp stop_group(_state), do: :ok
+
+  # A server that exits on its own is not stopped by erlexec, so nothing signals
+  # the rest of its group: a child that ignores SIGTERM, or was never sent it,
+  # lives on after the connection has closed. The group keeps the leader's pid
+  # as its id, so SIGKILL goes to that group after `@orphan_grace_ms`, which
+  # gives children that exit with their parent the time to do so. The kill runs
+  # in its own process so it happens even if this one stops first. The risk
+  # accepted here: if every member exits within the grace and the system hands
+  # that id to a new process that leads a group of its own, that group is
+  # killed. A process id is not reused while a group with that id exists, and
+  # reuse within a second on a system that allocates ids in order is rare.
+  defp reap_group(os_pid) when is_integer(os_pid) do
+    spawn(fn ->
+      Process.sleep(@orphan_grace_ms)
+
+      case System.find_executable("kill") do
+        nil -> :ok
+        kill -> System.cmd(kill, ["-KILL", "--", "-#{os_pid}"], stderr_to_stdout: true)
+      end
+    end)
+
+    :ok
+  end
 
   defp exit_status(:normal), do: 0
 
