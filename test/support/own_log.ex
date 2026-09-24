@@ -7,10 +7,11 @@ defmodule Imp.Test.OwnLog do
   whichever tests happen to run at the same moment, so `refute log =~ ...` fails
   when a concurrent test logs the same words, and `assert log =~ ...` can pass
   on another test's output. `capture/1` returns only the events the calling
-  process emitted, and still keeps the whole window off the console.
+  process and the Tasks it started emitted, and still keeps the whole window
+  off the console.
   """
 
-  @doc "Runs `fun` and returns the formatted log events the calling process emitted."
+  @doc "Runs `fun` and returns the formatted log events of the calling process and its Tasks."
   def capture(fun) when is_function(fun, 0) do
     ref = make_ref()
     id = :"imp_own_log_#{System.unique_integer([:positive])}"
@@ -25,14 +26,19 @@ defmodule Imp.Test.OwnLog do
     collect(ref, [])
   end
 
-  # A :logger handler runs in the process that logs, so the owner's own events
-  # arrive in its mailbox before `fun` returns.
+  # A :logger handler runs in the process that logs, so it can read that
+  # process's `$callers`: an event counts when the owner emitted it or is among
+  # the callers of the process that did (a Task the owner started, at any
+  # depth). Each event is sent before the logging call returns, so the owner's
+  # and its awaited children's events are in its mailbox when `fun` returns.
   @doc false
-  def log(%{meta: %{pid: owner}} = event, %{config: %{owner: owner, ref: ref}}) do
-    send(owner, {ref, :logger_formatter.format(event, %{single_line: false, template: [:msg]})})
-  end
+  def log(%{meta: meta} = event, %{config: %{owner: owner, ref: ref}}) do
+    if meta[:pid] == owner or owner in Process.get(:"$callers", []) do
+      send(owner, {ref, :logger_formatter.format(event, %{single_line: false, template: [:msg]})})
+    end
 
-  def log(_event, _config), do: :ok
+    :ok
+  end
 
   defp collect(ref, acc) do
     receive do
