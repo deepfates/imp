@@ -11,6 +11,7 @@ defmodule Imp.Telemetry do
   """
 
   @context_key :imp_telemetry_span_stack
+  @acting_for_key :imp_telemetry_acting_for
 
   @doc """
   Emits a redacted telemetry event when the optional `:telemetry` dependency is available.
@@ -84,6 +85,24 @@ defmodule Imp.Telemetry do
       restore_context(previous)
     end
   end
+
+  @doc false
+  # Makes the running process emit as `owner`: under `owner`'s span context,
+  # and recognized by `emitted_for?/1`. For a process that exists only to make
+  # one call for `owner`, such as the task ReqLLM runs a call with a
+  # :total_timeout in (`Imp.Clients.ReqLLM`).
+  def act_for(owner, context) when is_pid(owner) and is_list(context) do
+    Process.put(@context_key, context)
+    Process.put(@acting_for_key, owner)
+    :ok
+  end
+
+  @doc false
+  # Whether the running process is `owner`, or is acting for it. A handler that
+  # keeps only its owner's events asks this rather than comparing `self()`:
+  # other processes the owner started are still excluded.
+  def emitted_for?(owner) when is_pid(owner),
+    do: owner == self() or Process.get(@acting_for_key) == owner
 
   @doc false
   def context, do: Process.get(@context_key, [])

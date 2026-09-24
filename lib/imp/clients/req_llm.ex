@@ -312,6 +312,7 @@ defmodule Imp.Clients.ReqLLM do
       opts
       |> encode_openrouter_reasoning(lm.model)
       |> cap_transport_timeouts()
+      |> bind_to_caller()
       |> enforce_explicit_no_retry()
 
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
@@ -1077,6 +1078,53 @@ defmodule Imp.Clients.ReqLLM do
           end
         end)
     end
+  end
+
+  # ReqLLM runs a call that has a :total_timeout -- every call under a deadline,
+  # above -- in a task under its own supervisor, not linked to the caller
+  # (ReqLLM.TimeoutBudget). Three things the call had in the caller's process
+  # are lost in that task: a caller that dies mid-call, such as a cancelled
+  # Imp.Run, leaves the task retrying against the provider until its timeouts
+  # run out; events emitted from it (the transport attempt, ReqLLM's usage)
+  # lose the caller's trace and span; and handlers that count only the
+  # caller's own events, such as a campaign budget's usage, drop them. The
+  # request step below runs first in that task and restores all three: it ends
+  # the task when the caller goes down, and makes the task emit as the caller
+  # (`Imp.Telemetry.act_for/2`). It is unnecessary once ReqLLM runs the call
+  # in the caller's process or ties the task to it.
+  defp bind_to_caller(opts) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+
+    if Keyword.has_key?(opts, :total_timeout) and Keyword.keyword?(http_opts) and
+         is_list(Keyword.get(http_opts, :plugins, [])) do
+      step = {__MODULE__, :act_for_caller, [self(), Imp.Telemetry.context()]}
+      plugin = &Req.Request.prepend_request_steps(&1, imp_act_for_caller: step)
+      plugins = Keyword.get(http_opts, :plugins, []) ++ [plugin]
+      Keyword.put(opts, :req_http_options, Keyword.put(http_opts, :plugins, plugins))
+    else
+      opts
+    end
+  end
+
+  @doc false
+  def act_for_caller(%Req.Request{} = request, caller, context) do
+    worker = self()
+
+    if worker != caller do
+      Imp.Telemetry.act_for(caller, context)
+
+      spawn(fn ->
+        caller_down = Process.monitor(caller)
+        worker_down = Process.monitor(worker)
+
+        receive do
+          {:DOWN, ^caller_down, :process, _pid, _reason} -> Process.exit(worker, :kill)
+          {:DOWN, ^worker_down, :process, _pid, _reason} -> :ok
+        end
+      end)
+    end
+
+    request
   end
 
   # An explicit caller no-retry policy is applied again in a final request step

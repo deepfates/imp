@@ -619,6 +619,20 @@ defmodule ReqLLMClientTest do
       )
     end
 
+    defp wait_until(check, tries \\ 200) do
+      cond do
+        check.() ->
+          :ok
+
+        tries == 0 ->
+          flunk("condition never held")
+
+        true ->
+          Process.sleep(10)
+          wait_until(check, tries - 1)
+      end
+    end
+
     defp call_under_deadline(lm, budget_ms) do
       deadline = System.monotonic_time(:millisecond) + budget_ms
 
@@ -660,6 +674,69 @@ defmodule ReqLLMClientTest do
       assert {:error, _reason} = result
       assert div(microseconds, 1_000) < 2_500
       assert Agent.get(attempts, & &1) <= 1
+    end
+
+    # The transport attempt is emitted from inside that task too, so it has to
+    # carry the caller's trace with it or a trace of the call loses it.
+    test "a traced call keeps its transport attempt" do
+      base_url =
+        Imp.Test.LocalHTTP.start(fn _request ->
+          {200,
+           %{
+             "id" => "traced",
+             "object" => "chat.completion",
+             "model" => "deadline-model",
+             "choices" => [
+               %{
+                 "index" => 0,
+                 "finish_reason" => "stop",
+                 "message" => %{"role" => "assistant", "content" => "pong"}
+               }
+             ],
+             "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+           }}
+        end)
+
+      lm = deadline_lm(base_url)
+
+      trace =
+        Imp.Observability.trace(fn ->
+          Imp.Deadline.with_deadline(5_000, fn ->
+            Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "ping"}], max_retries: 0)
+          end)
+        end)
+
+      assert {:ok, _response} = trace.result
+
+      assert [[:imp, :lm, :start], [:imp, :lm, :transport, :attempt], [:imp, :lm, :stop]] ==
+               Enum.map(trace.events, fn {event, _measurements, _metadata} -> event end)
+    end
+
+    # ReqLLM runs a call with a :total_timeout in a task it does not link to the
+    # caller. A caller that dies mid-call -- an `Imp.Run` that is cancelled --
+    # must take the request with it, not leave it retrying against the provider
+    # for as long as the deadline it was built under allows.
+    test "a caller that dies mid-call takes its request with it", %{attempts: attempts} do
+      base_url =
+        Imp.Test.LocalHTTP.start(fn _request ->
+          Agent.update(attempts, &(&1 + 1))
+          Process.sleep(10_000)
+          {200, %{}}
+        end)
+
+      lm = deadline_lm(base_url)
+
+      caller =
+        spawn(fn ->
+          call_under_deadline(lm, 600)
+        end)
+
+      wait_until(fn -> Agent.get(attempts, & &1) == 1 end)
+      Process.exit(caller, :kill)
+
+      # Past the first attempt's receive timeout and a retry's backoff.
+      Process.sleep(1_500)
+      assert Agent.get(attempts, & &1) == 1
     end
   end
 

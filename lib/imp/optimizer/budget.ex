@@ -122,12 +122,12 @@ defmodule Imp.Optimizer.Budget do
     id
   end
 
-  def handle_req_llm_usage_event(_event, _measurements, _metadata, {_server, _id, owner})
-      when is_pid(owner) and owner != self(),
-      do: :ok
-
-  def handle_req_llm_usage_event(event, measurements, metadata, {server, id, _owner}),
-    do: handle_req_llm_usage_event(event, measurements, metadata, {server, id})
+  def handle_req_llm_usage_event(event, measurements, metadata, {server, id, owner})
+      when is_pid(owner) do
+    if Imp.Telemetry.emitted_for?(owner),
+      do: handle_req_llm_usage_event(event, measurements, metadata, {server, id}),
+      else: :ok
+  end
 
   @doc false
   def handle_req_llm_usage_event(_event, measurements, _metadata, {server, id})
