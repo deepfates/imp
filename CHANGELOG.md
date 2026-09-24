@@ -2,8 +2,37 @@
 
 User-visible changes to Imp are recorded here.
 
-## Unreleased
+## 0.5.0 — not yet released
 
+- Imp is a Hex package: `{:imp, "~> 0.5"}`. Every dependency comes from Hex,
+  including ExMCP (`~> 1.5`, unpatched); the `deepfates/ex_mcp` Git fork, the
+  bundled `vendor/ex_mcp` path and the `EX_MCP_PATH` override are gone.
+- A local (stdio) MCP server runs as the leader of its own process group,
+  started through erlexec, a new dependency. Closing the connection, or the
+  death of the process that owns it, sends the group SIGTERM and then SIGKILL a
+  second later, so the server and any children it started end with it. An OTP
+  release that uses `Imp.MCP` or `Imp.ACP` now lists
+  `applications: [ex_mcp: :load, erlexec: :load]`.
+- Inside an OTP release, a stdio server's `PATH` no longer carries the
+  release's own directories, so a server that is an Elixir or Erlang program
+  finds the host's runtime instead of the release's.
+- While a connection to an authorized remote MCP server is open, its exact
+  origin is in ExMCP's VM-wide `trusted_origins`, and it is removed when the
+  last connection to it closes. Origins the host configured are left alone.
+- Remote MCP connections send no `Origin` header, post to `/` when the URL is
+  written with a `/` path, and retry once with the standard `initialize`
+  handshake when ExMCP's `server/discover` probe gets a 4xx other than 401.
+  Servers such as Scry answer only these ways.
+- `Imp.MCP.OAuth.begin/3` runs its own browser flow on ExMCP's public OAuth
+  functions. Its `:flow` option is replaced by `:client_registration`
+  (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`).
+  Authorization-server discovery takes the document that names the issuer it
+  asked for, which finds a tenant issuer such as Readwise's; a
+  protected-resource document that names another resource is refused; a
+  `client_secret_basic` token endpoint gets the secret in the Authorization
+  header. A server with neither protected-resource nor authorization-server
+  metadata is refused rather than given guessed `/authorize` and `/token`
+  endpoints.
 - A failed tool call reaches the model as plain text instead of an Elixir
   term. An MCP error result is the text of its content, the tool's own words,
   after `Error: ` unless the text already begins with "error"; a JSON-RPC

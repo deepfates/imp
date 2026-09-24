@@ -2170,15 +2170,6 @@ submit(%{answer: observed <> ":" <> scratch})|
           env
       end
 
-    env =
-      case System.get_env("EX_MCP_PATH") do
-        path when is_binary(path) and path != "" ->
-          env ++ [%{"name" => "EX_MCP_PATH", "value" => path}]
-
-        _unset ->
-          env
-      end
-
     %{
       "name" => "demo-tools",
       "type" => "stdio",

@@ -114,15 +114,10 @@ defmodule WorkspaceAgentTest do
 
     env =
       [%{"name" => "MIX_ENV", "value" => "test"}] ++
-        Enum.flat_map(["EX_MCP_PATH", "IMP_PATH"], fn name ->
-          case System.get_env(name) do
-            path when is_binary(path) and path != "" ->
-              [%{"name" => name, "value" => path}]
-
-            _unset ->
-              []
-          end
-        end)
+        case System.get_env("IMP_PATH") do
+          path when is_binary(path) and path != "" -> [%{"name" => "IMP_PATH", "value" => path}]
+          _unset -> []
+        end
 
     server = %{
       "name" => "imp-acp-demo",

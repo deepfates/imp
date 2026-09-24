@@ -168,6 +168,25 @@ imported.cleanup.()
 The exact server descriptor must be authorized. Host-supplied command, URL,
 headers, environment and working-directory claims remain untrusted input.
 
+A stdio server runs as the leader of its own process group. Closing its
+connection, or the death of the process that owns the connection, sends the
+group SIGTERM and then SIGKILL one second later, so a server that ignores EOF
+and SIGTERM, and any children it started, end with it. A descendant that starts
+its own session (`setsid`) leaves the group and is not reached. The server
+starts with only `HOME`, `LANG`, `LOGNAME`, `PATH`, `SHELL`, `TEMP`, `TMP`,
+`TMPDIR`, `TZ`, `USER`, the certificate-path variables and `LC_*` from the host,
+plus the descriptor's own `env`; inside an OTP release, the release's own
+directories are removed from that `PATH`.
+
+ExMCP refuses credential headers to any HTTP origin not in its VM-wide
+`config :ex_mcp, :security, trusted_origins: [...]`. While a connection to an
+authorized remote server is open, Imp adds that server's exact origin
+(`scheme://host:port`) to the list and removes it when the last connection to it
+closes; origins the host configured itself are left alone. For that time any
+ExMCP client in the VM may send credentials to that one origin, and to no
+other. No `Origin` header is sent, and a URL written with a `/` path is posted to
+at `/`.
+
 One server that cannot be reached fails the whole import, which is what a
 caller that needs all of its tools wants. A long-lived host whose servers are
 independent passes `on_failure: :drop` instead: a server whose transport or
@@ -209,13 +228,13 @@ than injecting Imp's removed HTTP implementation. `:headers`, `:timeout`,
 `:result_mode`, ownership and catalog-filter options remain supported; stdio
 also accepts `:args`, `:env`, and `:cwd`.
 
-Known interoperability limit of the pinned ExMCP fork: when an HTTP server
-selects legacy version `2025-03-26`, the initial `notifications/initialized`
-request can still carry the client's `2025-11-25` header. Later requests use the
-selected version, but a strict older server may reject establishment. Current
-version peers and stdio do not have this particular limitation. The fork's
-connection manager must settle the HTTP version before sending that notification
-before compatibility with strict older HTTP servers can be claimed.
+Known interoperability limit of ExMCP 1.5: when an HTTP server selects legacy
+version `2025-03-26`, the initial `notifications/initialized` request can still
+carry the client's `2025-11-25` header. Later requests use the selected version,
+but a strict older server may reject establishment. Current version peers and
+stdio do not have this particular limitation. ExMCP's connection manager must
+settle the HTTP version before sending that notification before compatibility
+with strict older HTTP servers can be claimed.
 
 Imported tool calls explicitly disable generic transport retries and use
 ExMCP's `:safe_only` broken-stream policy. An ambiguous write is not repeated.
@@ -369,8 +388,10 @@ cancellation-error response for its notification.
 
 Imp compiles against ExMCP but does not start its application during ordinary
 prediction, evaluation or optimization. ACP entry points and nonempty MCP
-connections start it explicitly. An OTP release using those features must
-include `applications: [ex_mcp: :load]` in its release definition; `:load` bundles
-the application and dependencies while preserving explicit startup. A release
+connections start it explicitly, and the first stdio MCP connection starts
+erlexec, which owns the server's process group. An OTP release using those
+features must include `applications: [ex_mcp: :load, erlexec: :load]` in its
+release definition; `:load` bundles the applications and dependencies while
+preserving explicit startup. A release
 that already depends directly on ExMCP includes it normally. Plain Imp users
 need no protocol server or connection.

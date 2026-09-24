@@ -148,7 +148,7 @@ defmodule Imp.MCP.OAuth do
     @moduledoc """
     One authorization in progress.
 
-    Holds the ExMCP transaction, which carries client credentials and PKCE
+    Holds the authorization transaction, which carries client credentials and PKCE
     material. Keep it in the host process; never serialize it into a cookie, a
     URL, a log line or a durable event. Its `inspect/1` output shows only the
     credential reference and the redirect URI.
@@ -179,7 +179,7 @@ defmodule Imp.MCP.OAuth do
             resource_url: String.t(),
             authorization_url: String.t(),
             redirect_uri: String.t(),
-            flow: Imp.MCP.OAuth.Flow.t(),
+            flow: term(),
             listener: pid() | nil,
             state: String.t() | nil
           }

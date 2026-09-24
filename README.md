@@ -125,26 +125,23 @@ decision.
 
 ## Install
 
-Imp is not published to Hex. It is installed from this public repository, at
-an immutable tag, with no credentials:
+Add Imp to your dependencies in `mix.exs`:
 
 ```elixir
-{:imp, github: "deepfates/imp", tag: "v0.4.0"}
+{:imp, "~> 0.5"}
 ```
 
-ExMCP is declared `runtime: false`, so an OTP release that uses `Imp.ACP` or
-`Imp.MCP` must list `applications: [ex_mcp: :load]` in its release definition;
-see [protocol runtime in releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
+Imp requires Elixir `~> 1.19`. Every dependency comes from Hex. Version `0.5.0`
+changes how Imp is installed and one `Imp.MCP.OAuth` option; see the
+[release notes](RELEASE_NOTES.md) when upgrading from `0.4.0`.
+
+ExMCP and erlexec are declared `runtime: false`, so an OTP release that uses
+`Imp.ACP` or `Imp.MCP` must list `applications: [ex_mcp: :load, erlexec: :load]`
+in its release definition; see
+[protocol runtime in releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
 
 Imp is MIT licensed (`LICENSE`); `NOTICE` records the upstream DSPy code two
 modules are ported from.
-
-Use `{:imp, path: "path/to/imp"}` only while developing against a local
-checkout. Imp requires Elixir `~> 1.19`. Commit your application's `mix.lock`;
-the Git tag fixes Imp's source, while normal Mix constraints may otherwise
-resolve newer compatible transitive versions. Version `0.4.0` contains
-breaking changes from `0.3.2`; see the [release notes](RELEASE_NOTES.md) when
-upgrading.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. The
@@ -202,8 +199,8 @@ checking its launcher and workspace boundary.
 ## Where this fits
 
 Imp is a library: typed language-model programs, an MCP client (`Imp.MCP`), and
-the ACP server side (`Imp.ACP`). It depends on `deepfates/ex_mcp`, a fork of
-`ex_mcp`, which is the one MCP and ACP implementation Imp uses. Ordinary Imp
-startup opens no protocol endpoint, and Imp is never a service. A host
+the ACP server side (`Imp.ACP`). [ExMCP](https://hex.pm/packages/ex_mcp) is the
+one MCP and ACP implementation Imp uses. Ordinary Imp startup opens no protocol
+endpoint, and Imp is never a service. A host
 application owns product lifetimes and decides when to launch an Imp program as
 an external ACP process.

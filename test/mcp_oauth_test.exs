@@ -289,7 +289,7 @@ defmodule Imp.MCPOAuthTest do
     # evidence that a token can never reach a log: once the header is handed to
     # ExMCP.Client it lives in that client's transport state, and an OTP crash
     # report prints that state. The same is true of a static "headers" entry.
-    # Redacting it belongs in the ex_mcp fork, not here.
+    # Redacting it belongs in ExMCP, not here.
     refute log =~ access_token
 
     stored_bytes = File.read!(credential_path(tmp_dir, "workspace"))
