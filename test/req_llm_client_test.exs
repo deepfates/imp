@@ -344,6 +344,26 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  # What ReqLLM's OpenAI-format decoder returns for a successful HTTP response
+  # whose body is an error object and no choices, which is how OpenRouter
+  # relays an upstream provider's refusal: an empty message, no finish reason,
+  # and the error in `provider_meta`.
+  defmodule RelayedErrorStub do
+    def generate_text(model, messages, opts) do
+      error = Keyword.fetch!(opts, :relayed_error)
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "unknown",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(""),
+         finish_reason: nil,
+         provider_meta: %{"error" => error}
+       }}
+    end
+  end
+
   defmodule InvalidStub do
     def generate_text(_model, _messages, _opts), do: :not_a_req_llm_response
   end
@@ -512,6 +532,16 @@ defmodule ReqLLMClientTest do
       assert Imp.Clients.ReqLLM.response_format_capability(lm) ==
                Imp.LM.Capability.json_schema()
     end)
+  end
+
+  test "a response that carries a provider error is a failed request, not an empty completion" do
+    lm = Imp.req_llm("openrouter:thinkingmachines/inkling", req_module: RelayedErrorStub)
+    message = "Upstream error from DeepInfra: Failed to compile structural_tag grammar"
+
+    assert {:error, %ReqLLM.Error.API.Request{status: 400, reason: ^message}} =
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}],
+               relayed_error: %{"code" => 400, "message" => message}
+             )
   end
 
   test "provider metadata preserves semantic schema descriptors while redacting credentials" do

@@ -210,6 +210,43 @@ defmodule ReActV2LastProseTest do
     refute_received {:request, 2, _, _}
   end
 
+  # OpenRouter relays an upstream provider's refusal as a successful response
+  # whose body is an error object: ReqLLM decodes it to an empty message with
+  # the error in `provider_meta`. The last request answers in prose.
+  defmodule RelayedErrorReqLLM do
+    def generate_text(model, messages, opts) do
+      send(Keyword.fetch!(opts, :owner), {:tool_choice, opts[:tool_choice]})
+
+      {message, meta} =
+        if opts[:tool_choice] == "none",
+          do: {"Answered after all.", %{}},
+          else: {"", %{"error" => %{"code" => 400, "message" => "Upstream error"}}}
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "unknown",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(message),
+         provider_meta: meta
+       }}
+    end
+  end
+
+  test "a request the provider refused in its response body is a failed step, not an empty answer" do
+    lm =
+      Imp.req_llm("openrouter:test/model", req_module: RelayedErrorReqLLM, owner: self())
+
+    program = Imp.react_v2("intent -> answer", [look()], lm: lm)
+
+    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+    assert Imp.get(prediction, :answer) == "Answered after all."
+    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_cause) == :prediction_error
+    assert_received {:tool_choice, "auto"}
+    assert_received {:tool_choice, "none"}
+  end
+
   test "a deadline that has already passed makes no last request" do
     owner = self()
 

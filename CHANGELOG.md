@@ -4,6 +4,11 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- `Imp.Clients.ReqLLM` returns a response whose body carries a provider error
+  as `{:error, %ReqLLM.Error.API.Request{}}`. OpenRouter relays an upstream
+  provider's refusal as a successful HTTP response with an error object and no
+  choices, which ReqLLM decodes to an empty message; read as a completion, a
+  refused request was a model that said nothing.
 - `ReActV2` offers `submit` only to a signature that needs it. A task
   signature with exactly one output of type `:string` gets no `submit` tool:
   a step that comes back as prose with no tool call is the answer, in that
@@ -12,13 +17,16 @@ User-visible changes to Imp are recorded here.
   turn. Its history event carries the output, as a `submit`'s does, and the
   answer is not also emitted as a `:reasoning` event. A signature with several
   outputs, or one non-text output, keeps DSPy's `submit` unchanged.
+- A step of a one-text-output signature that calls nothing and says nothing
+  is an empty answer: the turn ends there with `termination_reason:
+  :answered` and no further request, because saying nothing is how a model
+  declines to answer.
 - An interrupted turn of a one-text-output signature (the step limit, a
-  failed request, a step that calls nothing and says nothing) makes one more
+  failed request, prose the output does not accept) makes one more
   request with the same tools as every step and `tool_choice: "none"`, so the
   model can only write text, and that text is the answer, with `termination_reason: :last_prose`
   and `termination_cause` naming the interruption (`:max_iters`,
-  `:prediction_error`, `:parse_error`, `:empty_completion`,
-  `:invalid_answer`). A completion that says nothing is an empty answer rather
+  `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
   run; the text is the answer and the calls are listed in
   `unexecuted_tool_calls`. `last_prose_note`, a string, puts one line of host text in
