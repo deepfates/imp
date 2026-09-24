@@ -32,7 +32,9 @@ defmodule Imp.Run do
   returns, after any report the sink's own failures produced, in sequence
   order, and each event is reported at most once. The same reports are sent
   when the sink's process dies outright, for example because it was linked
-  to a process that crashed; the run's control then ends too.
+  to a process that crashed; the run's control then ends too, and so does the
+  run: an effect in flight has its cancellation called with
+  `{:run_control_ended, reason}` and the task is killed.
 
   `events/1` reads the retained native sequence independently of sink progress.
   `cancel_with_events/3` snapshots that sequence before cleanup, including one
@@ -198,7 +200,12 @@ defmodule Imp.Run do
     {:ok, events}
   end
 
-  @doc "Releases the event/cancellation control process after a run completes."
+  @doc """
+  Releases the event/cancellation control process after a run completes.
+
+  A run still going when its control is released is ended with it, as when
+  its control ends for any other reason.
+  """
   @spec stop(t()) :: :ok
   def stop(%__MODULE__{control: control}) do
     Control.stop(control)
@@ -508,7 +515,7 @@ defmodule Imp.Run.Control do
     if is_pid(state.task_pid) and Process.alive?(state.task_pid),
       do: Process.exit(state.task_pid, :kill)
 
-    {:stop, :normal, state}
+    {:stop, :normal, %{state | cancellables: %{}}}
   end
 
   def handle_info({EventDelivery, :failed, failure}, state),
@@ -523,7 +530,17 @@ defmodule Imp.Run.Control do
   def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
 
   @impl true
-  def terminate(_reason, state) do
+  def terminate(reason, state) do
+    # The run does not outlive its control: whatever ended the control (its
+    # sink's process dying, a stop), an effect still in flight is cancelled
+    # and the task is ended, rather than left running until it next emits.
+    Enum.each(state.cancellables, fn {_ref, fun} ->
+      safe_cancel(fun, {:run_control_ended, reason})
+    end)
+
+    if is_pid(state.task_pid) and Process.alive?(state.task_pid),
+      do: Process.exit(state.task_pid, :kill)
+
     Process.unlink(state.delivery)
     monitor = Process.monitor(state.delivery)
     Process.exit(state.delivery, :kill)

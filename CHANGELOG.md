@@ -4,6 +4,16 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- A run no longer outlives its control process. When the control ends,
+  whether its event sink's process died or `Imp.Run.stop/1` was called while
+  the run was still going, the task is killed and every cancellation registered by
+  work in flight (an authorization decision being waited on, an RLM budget,
+  an ACP terminal command) is called with `{:run_control_ended, reason}`. Before, the task ran on until
+  its next event, and in-flight effects were never cancelled. The task's
+  monitor then reports `:killed`. `Imp.Run.cancel/2` on a run whose control
+  has already ended still exits (`:noproc`), but there is no longer a task
+  left to stop.
+
 - An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
   The run's owner is sent
   `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
